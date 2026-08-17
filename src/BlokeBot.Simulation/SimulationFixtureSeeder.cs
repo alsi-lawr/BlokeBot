@@ -258,11 +258,11 @@ internal sealed class SimulationFixtureSeeder(
                 AutomationNode(
                     nodeIds[11],
                     flowId,
-                    "delay",
-                    """{"duration-milliseconds":500}""",
+                    "merge-branches",
+                    "{}",
                     528,
                     456,
-                    displayAlias: "Short wait"
+                    displayAlias: "Merge branches"
                 ),
                 AutomationNode(
                     nodeIds[12],

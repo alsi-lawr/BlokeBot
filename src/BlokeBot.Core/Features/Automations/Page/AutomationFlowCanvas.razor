@@ -64,6 +64,8 @@
             {
                 var errors = ErrorsFor(node.Id);
                 var outcome = OutcomeFor(node.Id);
+                var selected = SelectedNodeIds.Contains(node.Id);
+                var needsRepair = errors.Count > 0 || Disconnected(node.Id);
                 <article @key="node.Id"
                          class="@NodeClass(node, errors.Count > 0, outcome)"
                          style="@NodeStyle(node)"
@@ -74,18 +76,27 @@
                     <button type="button"
                             class="automation-node-select"
                             data-automation-node-select
-                            aria-label="@NodeAccessibleLabel(node)"
-                            aria-pressed="@(SelectedNodeIds.Contains(node.Id) ? "true" : "false")"
+                            aria-label="@NodeAccessibleLabel(node, needsRepair)"
+                            aria-pressed="@(selected ? "true" : "false")"
                             @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
                             @onkeydown="args => HandleNodeKeyAsync(node, args)">
                         <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
                         <span class="automation-node-title"><AutomationNodeIcon DefinitionId="node.Definition.Id" /><strong title="@node.EffectiveName">@node.EffectiveName</strong></span>
-                        <span class="automation-node-description">@NodeSummary(node)</span>
-                        <span class="automation-node-type-badges" aria-hidden="true">@TypeBadges(node)</span>
-                        @if (outcome is not null)
+                        @if (selected)
                         {
-                            <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
+                            <span class="automation-node-description">@node.Definition.Display.Description</span>
+                            <span class="automation-node-selected-ports">
+                                @foreach (var input in node.Definition.Inputs)
+                                {
+                                    <span><i data-port-marker-shape="@PortMarkerShape(input)"></i><b>@PortDisplay(input)</b><em>in</em></span>
+                                }
+                                @foreach (var output in node.Definition.Outputs)
+                                {
+                                    <span><i data-port-marker-shape="@PortMarkerShape(output)"></i><b>@PortDisplay(output)</b><em>out</em></span>
+                                }
+                            </span>
                         }
+                        <span class="@(needsRepair ? "automation-node-status automation-node-status--repair" : "automation-node-status")">@(needsRepair ? "Needs repair" : outcome is null ? "Ready" : OutcomeLabel(outcome))</span>
                     </button>
                     @foreach (var input in node.Definition.Inputs.Select((port, index) => new { Port = port, Index = index }))
                     {
@@ -97,13 +108,14 @@
                                 aria-label="@($"{node.EffectiveName}: {input.Port.Name} input")"
                                 data-automation-port
                                 data-port-direction="input"
+                                data-port-marker-shape="@PortMarkerShape(input.Port)"
                                 data-node-id="@node.Id.Value"
                                 data-port-id="@input.Port.Id.Value"
                                 data-port-type="@input.Port.ValueType"
                                 data-port-sensitivity="@input.Port.Sensitivity"
                                 data-port-nullability="@input.Port.Nullability"
                                 data-port-occupied="@InputOccupied(node.Id, input.Port.Id)"
-                                @onclick:stopPropagation="true"><span class="automation-port-label">@PortDisplay(input.Port)</span></button>
+                                @onclick:stopPropagation="true"></button>
                     }
                     @foreach (var output in node.Definition.Outputs.Select((port, index) => new { Port = port, Index = index }))
                     {
@@ -115,12 +127,13 @@
                                 aria-label="@($"{node.EffectiveName}: {output.Port.Name} output")"
                                 data-automation-port
                                 data-port-direction="output"
+                                data-port-marker-shape="@PortMarkerShape(output.Port)"
                                 data-node-id="@node.Id.Value"
                                 data-port-id="@output.Port.Id.Value"
                                 data-port-type="@output.Port.ValueType"
                                 data-port-sensitivity="@output.Port.Sensitivity"
                                 data-port-nullability="@output.Port.Nullability"
-                                @onclick:stopPropagation="true"><span class="automation-port-label">@PortDisplay(output.Port)</span></button>
+                                @onclick:stopPropagation="true"></button>
                     }
                     @foreach (var retained in RetainedPorts(node, input: true))
                     {
@@ -132,12 +145,13 @@
                                 aria-label="@($"{node.EffectiveName}: saved input {retained.PortId.Value} needs repair")"
                                 data-automation-port
                                 data-port-direction="input"
+                                data-port-marker-shape="diamond"
                                 data-node-id="@node.Id.Value"
                                 data-port-id="@retained.PortId.Value"
                                 data-port-type="Unknown"
                                 data-port-sensitivity="Safe"
                                 data-port-nullability="Nullable"
-                                @onclick:stopPropagation="true"><span class="automation-port-label">Needs repair</span></button>
+                                @onclick:stopPropagation="true"></button>
                     }
                     @foreach (var retained in RetainedPorts(node, input: false))
                     {
@@ -149,12 +163,13 @@
                                 aria-label="@($"{node.EffectiveName}: saved output {retained.PortId.Value} needs repair")"
                                 data-automation-port
                                 data-port-direction="output"
+                                data-port-marker-shape="diamond"
                                 data-node-id="@node.Id.Value"
                                 data-port-id="@retained.PortId.Value"
                                 data-port-type="Unknown"
                                 data-port-sensitivity="Safe"
                                 data-port-nullability="Nullable"
-                                @onclick:stopPropagation="true"><span class="automation-port-label">Needs repair</span></button>
+                                @onclick:stopPropagation="true"></button>
                     }
                 </article>
             }

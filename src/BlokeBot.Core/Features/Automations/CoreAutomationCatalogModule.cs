@@ -19,6 +19,8 @@ public static class AutomationDefinitionIds
 
     public static AutomationDefinitionId DelayControl { get; } = new("delay");
 
+    internal static AutomationDefinitionId MergeBranchesControl { get; } = new("merge-branches");
+
     public static AutomationDefinitionId StreamOnlineSource { get; } = new("stream-online");
 
     public static AutomationDefinitionId StreamOfflineSource { get; } = new("stream-offline");
@@ -112,16 +114,13 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
         RandomNumber(),
         AutomationCelTransform.Definition(
             AutomationDefinitionIds.CelTransform,
-            new(
-                "CEL Transform",
-                "Evaluates authored CEL expressions over exact typed inputs.",
-                "Data"
-            )
+            new("CEL Transform", "Calculates new values from data in this flow.", "Data")
         ),
         SendChatAction(),
         PlayOverlayCueAction(),
         ConditionControl(),
         DelayControl(),
+        MergeBranchesControl(),
     ];
 
     private static AutomationDefinition<CustomCommandSourceConfiguration> CustomCommandSource() =>
@@ -133,7 +132,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 _schema,
                 new(
                     "Custom command",
-                    "Starts an automation when a selected custom command is used.",
+                    "Starts this flow when a selected custom command is used.",
                     "Chat"
                 ),
                 [],
@@ -203,7 +202,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Send chat message", "Sends a message in the host channel.", "Chat"),
+                new("Send chat message", "Sends a message to the channel chat.", "Chat"),
                 [
                     _flowInput,
                     new(
@@ -238,7 +237,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Value,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Random Number", "Creates one random whole number for each run.", "Data"),
+                new("Random Number", "Picks a random whole number.", "Data"),
                 [],
                 [
                     new(
@@ -278,11 +277,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Play overlay cue",
-                    "Plays a saved cue through the host's Cue player Browser Source.",
-                    "Overlays"
-                ),
+                new("Play overlay cue", "Shows a selected cue on the stream overlay.", "Overlays"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -319,7 +314,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Control,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Condition", "Routes Flow from one exact Boolean predicate.", "Control"),
+                new("Condition", "Chooses a path from a yes or no value.", "Control"),
                 [
                     _flowInput,
                     new(
@@ -367,7 +362,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Control,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Delay", "Waits before the next node.", "Control"),
+                new("Delay", "Pauses this flow for a set time.", "Control"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -387,6 +382,24 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             ),
             ParseDelay,
             ValidateDelay
+        );
+
+    private static AutomationDefinition<MergeBranchesControlConfiguration> MergeBranchesControl() =>
+        new(
+            new(
+                AutomationDefinitionIds.MergeBranchesControl,
+                AutomationNodeKind.Control,
+                AutomationDefinitionScope.Host,
+                _schema,
+                new("Merge branches", "Continues after a connected path runs.", "Control"),
+                [_flowInput],
+                [_completeOutput],
+                [],
+                AutomationActionCapabilities.None,
+                AutomationActionRetrySafety.NotApplicable
+            ),
+            static _ => Parsed(new MergeBranchesControlConfiguration()),
+            static _ => AutomationValidationResult.Valid
         );
 
     private static AutomationConfigurationParseResult ParseCustomCommand(JsonElement json) =>

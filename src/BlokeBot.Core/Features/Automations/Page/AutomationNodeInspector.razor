@@ -29,10 +29,23 @@ else
                            title="Edit node name"
                            @oninput="args => SetDisplayAliasAsync(args.Value)" />
                     <span>@Node.Definition.Display.Name</span>
+                    <small class="automation-inspector-purpose">@Node.Definition.Display.Description</small>
                 </div>
             </div>
             <button class="automation-icon-button" type="button" aria-label="Close Inspector" title="Close Inspector" @onclick="ClearSelection"><AutomationIcon Name="close" /></button>
         </header>
+
+        <section class="automation-inspector-port-summary" aria-labelledby="automation-node-ports-heading">
+            <h3 id="automation-node-ports-heading">Ports</h3>
+            @foreach (var input in Node.Definition.Inputs)
+            {
+                <span><b>@input.Name</b><em>Input · @AutomationConnections.TypeLabel(input)</em></span>
+            }
+            @foreach (var output in Node.Definition.Outputs)
+            {
+                <span><b>@output.Name</b><em>Output · @AutomationConnections.TypeLabel(output)</em></span>
+            }
+        </section>
 
         @if (Node.IsCelTransform)
         {

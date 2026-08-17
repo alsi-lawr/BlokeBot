@@ -100,43 +100,43 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
         PollSource(
             AutomationDefinitionIds.PollStartedSource,
             "Poll started",
-            "Starts an automation when a poll begins in the channel.",
+            "Starts this flow when a poll begins.",
             static () => new PollStartedSourceConfiguration()
         ),
         PollSource(
             AutomationDefinitionIds.PollProgressedSource,
             "Poll progressed",
-            "Starts an automation when viewers vote in the channel's active poll.",
+            "Starts this flow when viewers vote in a poll.",
             static () => new PollProgressedSourceConfiguration()
         ),
         PollSource(
             AutomationDefinitionIds.PollEndedSource,
             "Poll ended",
-            "Starts an automation when the channel's poll finishes.",
+            "Starts this flow when a poll ends.",
             static () => new PollEndedSourceConfiguration()
         ),
         PredictionSource(
             AutomationDefinitionIds.PredictionStartedSource,
             "Prediction started",
-            "Starts an automation when a prediction begins in the channel.",
+            "Starts this flow when a prediction begins.",
             static () => new PredictionStartedSourceConfiguration()
         ),
         PredictionSource(
             AutomationDefinitionIds.PredictionProgressedSource,
             "Prediction progressed",
-            "Starts an automation when viewers put Channel Points on the channel's active prediction.",
+            "Starts this flow when viewers enter a prediction.",
             static () => new PredictionProgressedSourceConfiguration()
         ),
         PredictionSource(
             AutomationDefinitionIds.PredictionLockedSource,
             "Prediction locked",
-            "Starts an automation when the channel's prediction locks.",
+            "Starts this flow when a prediction locks.",
             static () => new PredictionLockedSourceConfiguration()
         ),
         PredictionSource(
             AutomationDefinitionIds.PredictionEndedSource,
             "Prediction ended",
-            "Starts an automation when the channel's prediction is resolved or cancelled.",
+            "Starts this flow when a prediction ends.",
             static () => new PredictionEndedSourceConfiguration()
         ),
         SendShoutoutAction(),
@@ -182,7 +182,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Shoutout sent",
-                    "Starts an automation when this channel sends a Twitch shoutout.",
+                    "Starts this flow when this channel sends a shoutout.",
                     "Twitch events"
                 ),
                 [],
@@ -209,7 +209,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Shoutout received",
-                    "Starts an automation when another channel sends this channel a Twitch shoutout.",
+                    "Starts this flow when another channel sends a shoutout.",
                     "Twitch events"
                 ),
                 [],
@@ -282,11 +282,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Send shoutout",
-                    "Sends a Twitch shoutout message to the broadcaster from the trigger. Use a trigger that includes a viewer or broadcaster.",
-                    "Shoutouts"
-                ),
+                new("Send shoutout", "Sends a shoutout for a selected channel.", "Shoutouts"),
                 [_flowInput],
                 [_completeOutput],
                 [],
@@ -320,11 +316,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Start poll",
-                    "Starts a Twitch poll in the channel. The action fails when another poll is active.",
-                    "Polls"
-                ),
+                new("Start poll", "Starts a poll in the channel.", "Polls"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -383,11 +375,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "End poll",
-                    "Ends the channel's active Twitch poll immediately. A poll started outside BlokeBot is never ended by an automation.",
-                    "Polls"
-                ),
+                new("End poll", "Ends the active poll in the channel.", "Polls"),
                 [_flowInput],
                 [_completeOutput],
                 [],
@@ -405,11 +393,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Create clip",
-                    "Creates a Twitch clip of the channel's live stream.",
-                    "Clips & markers"
-                ),
+                new("Create clip", "Creates a clip of the live stream.", "Clips & markers"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -437,11 +421,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Create stream marker",
-                    "Adds a marker to the live stream. You can find the marked time later. The description can contain automation variables.",
-                    "Clips & markers"
-                ),
+                new("Create stream marker", "Adds a marker to the live stream.", "Clips & markers"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -469,11 +449,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 AutomationNodeKind.Action,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Start prediction",
-                    "Starts a Twitch prediction in the channel. The action fails when another prediction is active.",
-                    "Predictions"
-                ),
+                new("Start prediction", "Starts a prediction in the channel.", "Predictions"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -524,7 +500,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Lock prediction",
-                    "Locks the channel's active prediction so viewers can no longer participate.",
+                    "Stops new entries to the active prediction.",
                     "Predictions"
                 ),
                 [_flowInput],
@@ -546,7 +522,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Cancel prediction",
-                    "Cancels the channel's active prediction so Twitch refunds every viewer's Channel Points.",
+                    "Cancels the active prediction and refunds all points.",
                     "Predictions"
                 ),
                 [_flowInput],
@@ -568,7 +544,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Resolve prediction",
-                    "Resolves the active prediction with an outcome ID. An automation variable or expression usually supplies the ID.",
+                    "Selects the winning outcome for the active prediction.",
                     "Predictions"
                 ),
                 [_flowInput],

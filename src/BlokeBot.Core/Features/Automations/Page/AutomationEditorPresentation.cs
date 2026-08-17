@@ -274,14 +274,25 @@ internal static class AutomationToolboxCatalog
             : name.Equals(search, StringComparison.OrdinalIgnoreCase) ? 0
             : name.StartsWith(search, StringComparison.OrdinalIgnoreCase) ? 1
             : name.Contains(search, StringComparison.OrdinalIgnoreCase) ? 2
+            : MessagePurposeRelevance(definition.Id, search) is { } purposeRelevance
+                ? purposeRelevance
             : definition.Display.Description.Contains(search, StringComparison.OrdinalIgnoreCase)
-                ? 3
-            : definition.Display.Category.Contains(search, StringComparison.OrdinalIgnoreCase) ? 4
+                ? 8
+            : definition.Display.Category.Contains(search, StringComparison.OrdinalIgnoreCase) ? 9
             : definition.Inputs.Any(port => PortMatches(port, search))
             || definition.Outputs.Any(port => PortMatches(port, search))
-                ? 5
+                ? 10
             : int.MaxValue;
     }
+
+    private static int? MessagePurposeRelevance(AutomationDefinitionId id, string search) =>
+        !search.Equals("message", StringComparison.OrdinalIgnoreCase) ? null
+        : id == AutomationDefinitionIds.CelTransform ? 3
+        : id == AutomationDefinitionIds.ChatNotificationSource ? 4
+        : id == AutomationDefinitionIds.SendShoutoutAction ? 5
+        : id == AutomationDefinitionIds.IncomingRaidSource ? 6
+        : id == AutomationDefinitionIds.ConditionControl ? 7
+        : null;
 
     private static bool PortMatches(AutomationPortMetadata port, string search) =>
         port.Name.Contains(search, StringComparison.OrdinalIgnoreCase)

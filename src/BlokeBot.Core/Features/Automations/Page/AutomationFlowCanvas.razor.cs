@@ -245,7 +245,7 @@ public partial class AutomationFlowCanvas
     {
         var display = DisplayPosition(node.Position, Settings.Orientation);
         return FormattableString.Invariant(
-            $"--automation-node-x:{display.X.Value};--automation-node-y:{display.Y.Value}"
+            $"--automation-node-x:{display.X.Value};--automation-node-y:{display.Y.Value};--automation-node-port-count:{node.Definition.Inputs.Length + node.Definition.Outputs.Length}"
         );
     }
 
@@ -315,15 +315,6 @@ public partial class AutomationFlowCanvas
             _ => "automation-branch--default",
         };
 
-    private static string NodeSummary(AutomationEditorNode node) =>
-        node.Definition.Kind switch
-        {
-            AutomationNodeKind.Source => "Starts this flow.",
-            AutomationNodeKind.Control => "Selects the next branch.",
-            AutomationNodeKind.Action => "Runs this action.",
-            _ => "Runs this node.",
-        };
-
     private static string KindToken(AutomationNodeKind kind) =>
         kind switch
         {
@@ -341,13 +332,16 @@ public partial class AutomationFlowCanvas
             AutomationNodeKind.Source => "Trigger",
             AutomationNodeKind.Value => "Value",
             AutomationNodeKind.Transform => "CEL Transform",
-            AutomationNodeKind.Control => "Condition",
+            AutomationNodeKind.Control => "Control",
             AutomationNodeKind.Action => "Action",
             _ => "Node",
         };
 
     private static string PortClass(AutomationPortMetadata port, string direction) =>
         $"automation-port automation-port--{direction} automation-port--{(port.ValueType == AutomationPortValueType.Flow ? "flow" : "data")}";
+
+    private static string PortMarkerShape(AutomationPortMetadata port) =>
+        port.ValueType == AutomationPortValueType.Flow ? "circle" : "diamond";
 
     private static string PortDisplay(AutomationPortMetadata port) =>
         port.ValueType == AutomationPortValueType.Flow
@@ -363,22 +357,13 @@ public partial class AutomationFlowCanvas
             ? "true"
             : "false";
 
-    private string NodeAccessibleLabel(AutomationEditorNode node)
+    private string NodeAccessibleLabel(AutomationEditorNode node, bool needsRepair)
     {
         var ports = node
             .Definition.Inputs.Select(port => $"{PortDisplay(port)} input")
             .Concat(node.Definition.Outputs.Select(port => $"{PortDisplay(port)} output"));
-        return $"Select {node.EffectiveName}. {string.Join(". ", ports)}";
+        return $"Select {node.EffectiveName}. {KindLabel(node.Definition.Kind)}. {node.Definition.Display.Name} icon. {(needsRepair ? "Needs repair" : "Ready")}. Ports: {string.Join(". ", ports)}";
     }
-
-    private static string TypeBadges(AutomationEditorNode node) =>
-        string.Join(
-            " · ",
-            node.Definition.Inputs.Concat(node.Definition.Outputs)
-                .Where(static port => port.ValueType != AutomationPortValueType.Flow)
-                .Select(AutomationConnections.TypeLabel)
-                .Distinct(StringComparer.Ordinal)
-        );
 
     private string EdgeAccessibleLabel(AutomationFlowDraftEdge edge)
     {

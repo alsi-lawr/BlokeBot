@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
+using BlokeBot.Core.Features.Competitions;
 using Bunit;
 using Microsoft.AspNetCore.Components.Web;
 using Shouldly;
@@ -160,6 +161,202 @@ public sealed class AutomationEditorInteractionTests
             .ShouldBe("true");
         toolbox.Find("[data-automation-toolbox]").KeyDown(new KeyboardEventArgs { Key = "Escape" });
         closed.ShouldBe(1);
+    }
+
+    [Test]
+    public void TypedEditor_ToolboxRows_UsePurposeCopyAndCompactUnavailableReasons()
+    {
+        using var context = new BunitContext();
+        var definitions = ProductionDefinitions();
+        var permittedStarts = new[]
+        {
+            "Starts ",
+            "Picks ",
+            "Calculates ",
+            "Sends ",
+            "Shows ",
+            "Chooses ",
+            "Pauses ",
+            "Continues ",
+            "Marks ",
+            "Cancels ",
+            "Creates ",
+            "Adds ",
+            "Stops ",
+            "Selects ",
+            "Ends ",
+        };
+
+        definitions.ShouldAllBe(definition =>
+            definition.Display.Description.EndsWith(".", StringComparison.Ordinal)
+            && permittedStarts.Any(start =>
+                definition.Display.Description.StartsWith(start, StringComparison.Ordinal)
+            )
+            && definition
+                .Display.Description.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Length <= 10
+        );
+        definitions
+            .Single(definition => definition.Id == AutomationDefinitionIds.RandomNumber)
+            .Display.Description.ShouldBe("Picks a random whole number.");
+        definitions
+            .Select(static definition => definition.Display.Description)
+            .ShouldAllBe(static purpose =>
+                !purpose.Contains("typed", StringComparison.OrdinalIgnoreCase)
+                && !purpose.Contains("implementation", StringComparison.OrdinalIgnoreCase)
+                && !purpose.Contains("Flow in", StringComparison.OrdinalIgnoreCase)
+                && !purpose.Contains('—')
+            );
+
+        var toolbox = context.Render<AutomationToolbox>(parameters =>
+            parameters
+                .Add(component => component.Definitions, definitions)
+                .Add(component => component.Nodes, [])
+        );
+        toolbox.Find("[data-automation-toolbox-search]").Input("message");
+        var rows = toolbox.FindAll(".automation-toolbox-row");
+
+        rows.Select(row => row.QuerySelector("strong")!.TextContent)
+            .ShouldBe([
+                "Send chat message",
+                "CEL Transform",
+                "Chat notification",
+                "Send shoutout",
+                "Incoming raid",
+                "Condition",
+            ]);
+        rows.Select(row => row.QuerySelector("em")!.TextContent).Distinct().Count().ShouldBe(4);
+        rows[0].QuerySelectorAll(".automation-toolbox-row-copy > span").Length.ShouldBe(2);
+        rows[0]
+            .QuerySelector(".automation-toolbox-row-purpose")!
+            .TextContent.ShouldBe("Sends a message to the channel chat.");
+        var unavailable = rows.Single(row => row.GetAttribute("aria-disabled") == "true");
+        unavailable.TextContent.ShouldContain("Needs a known channel on each path.");
+        unavailable
+            .GetAttribute("aria-label")
+            .ShouldNotBeNull()
+            .ShouldContain("Add a trigger with a known viewer or broadcaster to use this action.");
+        toolbox.FindAll(".automation-toolbox-row-meta").ShouldBeEmpty();
+        toolbox.FindAll(".automation-toolbox-row a").ShouldBeEmpty();
+        toolbox.Markup.ShouldNotContain("Focused result");
+        toolbox.Markup.ShouldNotContain(">Details<");
+    }
+
+    [Test]
+    public void TypedEditor_Canvas_UsesReadableProgressiveDisclosureAtEveryViewport()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var conditionDefinition = ProductionDefinitions()
+            .Single(definition => definition.Id == AutomationDefinitionIds.ConditionControl);
+        var condition = AutomationEditorNode.Create(conditionDefinition, new(new(48), new(72)));
+
+        var unselected = context.Render<AutomationFlowCanvas>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [condition])
+                .Add(component => component.Edges, [])
+                .Add(component => component.ViewportKey, "progressive-unselected")
+        );
+
+        unselected.FindAll(".automation-node-description").ShouldBeEmpty();
+        unselected.FindAll(".automation-node-type-badges").ShouldBeEmpty();
+        unselected.FindAll(".automation-port-label").ShouldBeEmpty();
+        unselected.Find(".automation-node-kind").TextContent.ShouldBe("Control");
+        unselected.Find(".automation-node-status").TextContent.ShouldBe("Needs repair");
+        unselected
+            .FindAll("[data-port-marker-shape]")
+            .Select(marker => marker.GetAttribute("data-port-marker-shape"))
+            .Distinct()
+            .ShouldBe(["circle", "diamond"]);
+        unselected
+            .Find("[data-automation-node-select]")
+            .GetAttribute("aria-label")
+            .ShouldNotBeNull()
+            .ShouldContain("predicate · Boolean input");
+
+        var selected = context.Render<AutomationFlowCanvas>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [condition])
+                .Add(component => component.Edges, [])
+                .Add(
+                    component => component.SelectedNodeIds,
+                    new HashSet<AutomationNodeId> { condition.Id }
+                )
+                .Add(component => component.ViewportKey, "progressive-selected")
+        );
+
+        selected
+            .Find(".automation-node-description")
+            .TextContent.ShouldBe("Chooses a path from a yes or no value.");
+        selected.FindAll(".automation-node-selected-ports > span").Count.ShouldBe(4);
+        selected.Markup.ShouldContain("predicate · Boolean");
+        selected.Find("[data-canvas-zoom-label]").TextContent.ShouldBe("100%");
+    }
+
+    [Test]
+    public void TypedEditor_MergeBranches_UsesDedicatedGlyphAcrossAllEditorContexts()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var definitions = ProductionDefinitions();
+        var mergeDefinition = definitions.Single(definition =>
+            definition.Id == AutomationDefinitionIds.MergeBranchesControl
+        );
+        var merge = AutomationEditorNode.Create(mergeDefinition, new(new(48), new(72)));
+        var toolbox = context.Render<AutomationToolbox>(parameters =>
+            parameters
+                .Add(component => component.Definitions, definitions)
+                .Add(component => component.Nodes, [])
+        );
+        toolbox.Find("#automation-toolbox-tab-control").Click();
+
+        var toolboxMerge = toolbox.Find("[data-automation-node-icon='merge-branches']");
+        var toolboxCondition = toolbox.Find("[data-automation-node-icon='condition']");
+        toolboxMerge.QuerySelectorAll("circle").Length.ShouldBe(3);
+        toolboxMerge.QuerySelectorAll("path").Length.ShouldBe(1);
+        toolboxMerge.InnerHtml.ShouldNotBe(toolboxCondition.InnerHtml);
+        toolboxMerge
+            .ParentElement!.GetAttribute("aria-label")
+            .ShouldNotBeNull()
+            .ShouldStartWith("Merge branches. Continues after a connected path runs.");
+
+        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [merge])
+                .Add(component => component.Edges, [])
+                .Add(component => component.ViewportKey, "merge-icon")
+        );
+        canvas.FindAll("[data-automation-node-icon='merge-branches']").Count.ShouldBe(1);
+        canvas
+            .Find("[data-automation-node-select]")
+            .GetAttribute("aria-label")
+            .ShouldNotBeNull()
+            .ShouldContain("Merge branches icon");
+
+        var list = context.Render<AutomationFlowList>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [merge])
+                .Add(component => component.Edges, [])
+        );
+        list.FindAll("[data-automation-node-icon='merge-branches']").Count.ShouldBe(1);
+        list.Find("[data-automation-list-node]").TextContent.ShouldContain("Merge branches");
+
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, merge)
+                .Add(component => component.Nodes, [merge])
+                .Add(component => component.Edges, [])
+        );
+        inspector.FindAll("[data-automation-node-icon='merge-branches']").Count.ShouldBe(1);
+        inspector
+            .Find("[data-automation-inspector]")
+            .TextContent.ShouldContain("Continues after a connected path runs.");
+        inspector
+            .Find(".automation-inspector-port-summary")
+            .TextContent.ShouldContain("FlowInput · Flow");
+        inspector
+            .Find(".automation-inspector-port-summary")
+            .TextContent.ShouldContain("CompleteOutput · Flow");
     }
 
     [Test]
@@ -605,4 +802,20 @@ public sealed class AutomationEditorInteractionTests
         AutomationPortNullability nullability = AutomationPortNullability.NonNullable,
         AutomationConfigurationFieldId? bindingFieldId = null
     ) => new(new(id), id, $"Supplies {type}.", type, sensitivity, nullability, bindingFieldId);
+
+    private static AutomationDefinitionDescriptor[] ProductionDefinitions() =>
+        [
+            .. new CoreAutomationCatalogModule().Definitions.Select(static value =>
+                value.Descriptor
+            ),
+            .. new TwitchEventAutomationCatalogModule().Definitions.Select(static value =>
+                value.Descriptor
+            ),
+            .. new NativeOperationAutomationCatalogModule().Definitions.Select(static value =>
+                value.Descriptor
+            ),
+            .. new CompetitionAutomationCatalogModule().Definitions.Select(static value =>
+                value.Descriptor
+            ),
+        ];
 }

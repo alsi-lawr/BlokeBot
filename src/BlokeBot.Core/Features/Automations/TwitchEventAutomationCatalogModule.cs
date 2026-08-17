@@ -212,17 +212,17 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
         HypeTrainSource(
             AutomationDefinitionIds.HypeTrainBeginSource,
             "Hype Train started",
-            "Starts an automation when a Hype Train begins in the channel."
+            "Starts this flow when a Hype Train begins."
         ),
         HypeTrainSource(
             AutomationDefinitionIds.HypeTrainProgressSource,
             "Hype Train progressed",
-            "Starts an automation when a Hype Train gains progress or levels up."
+            "Starts this flow when a Hype Train progresses."
         ),
         HypeTrainSource(
             AutomationDefinitionIds.HypeTrainEndSource,
             "Hype Train ended",
-            "Starts an automation when a Hype Train finishes."
+            "Starts this flow when a Hype Train ends."
         ),
         ChatNotificationSource(),
         RewardRedemptionSource(),
@@ -262,7 +262,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Stream went live",
-                    "Starts an automation when the channel's stream goes live.",
+                    "Starts this flow when the channel stream goes live.",
                     "Twitch events"
                 ),
                 [],
@@ -295,7 +295,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Stream went offline",
-                    "Starts an automation when the channel's stream ends.",
+                    "Starts this flow when the channel stream ends.",
                     "Twitch events"
                 ),
                 [],
@@ -317,7 +317,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "New follower",
-                    "Starts an automation when a viewer follows the channel.",
+                    "Starts this flow when a viewer follows the channel.",
                     "Twitch events"
                 ),
                 [],
@@ -344,7 +344,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "New subscription",
-                    "Starts an automation when a viewer subscribes to the channel.",
+                    "Starts this flow when a viewer subscribes to the channel.",
                     "Twitch events"
                 ),
                 [],
@@ -371,7 +371,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Gifted subscriptions",
-                    "Starts an automation when a viewer gifts subscriptions to the channel.",
+                    "Starts this flow when a viewer gifts subscriptions.",
                     "Twitch events"
                 ),
                 [],
@@ -413,11 +413,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 AutomationNodeKind.Source,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new(
-                    "Cheer",
-                    "Starts an automation when a viewer cheers Bits in the channel.",
-                    "Twitch events"
-                ),
+                new("Cheer", "Starts this flow when a viewer cheers Bits.", "Twitch events"),
                 [],
                 [
                     FlowPort(),
@@ -462,7 +458,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Incoming raid",
-                    "Starts an automation when another channel raids this channel.",
+                    "Starts this flow when another channel raids.",
                     "Twitch events"
                 ),
                 [],
@@ -528,7 +524,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Chat notification",
-                    "Starts an automation from a typed Twitch chat notification such as an announcement or resub message. Ordinary chat messages never start automations.",
+                    "Starts this flow for a supported Twitch chat notification.",
                     "Twitch events"
                 ),
                 [],
@@ -591,7 +587,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Channel Points redemption",
-                    "Starts an automation when a viewer redeems a Custom Reward. Only BlokeBot can change rewards that it manages.",
+                    "Starts this flow when a viewer redeems a Custom Reward.",
                     "Twitch events"
                 ),
                 [],
@@ -637,7 +633,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Fulfil redemption",
-                    "Marks the Channel Points redemption from the trigger as fulfilled. Use this action only for rewards that BlokeBot manages.",
+                    "Marks the Channel Points redemption as fulfilled.",
                     "Channel Points"
                 ),
                 [FlowInput()],
@@ -660,7 +656,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Cancel redemption",
-                    "Cancels the Channel Points redemption from the trigger. Twitch refunds the points. Use this action only for rewards that BlokeBot manages.",
+                    "Cancels the redemption and refunds the Channel Points.",
                     "Channel Points"
                 ),
                 [FlowInput()],

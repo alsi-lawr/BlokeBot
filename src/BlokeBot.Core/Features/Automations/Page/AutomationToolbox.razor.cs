@@ -40,6 +40,8 @@ public partial class AutomationToolbox
             ? AutomationToolboxCatalog.CategoryLabel(_category)
             : $"Results for “{_search.Trim()}”";
 
+    private bool _searching => !string.IsNullOrWhiteSpace(_search);
+
     private string _activeTabId =>
         $"automation-toolbox-tab-{AutomationToolboxCatalog.CategoryLabel(_category).ToLowerInvariant()}";
 
@@ -102,67 +104,15 @@ public partial class AutomationToolbox
             _ => "Available in this flow.",
         };
 
-    private static string Description(AutomationDefinitionDescriptor definition) =>
-        definition.Id == AutomationDefinitionIds.CelTransform
-            ? "CEL is a small language that calculates a value from node inputs."
-            : definition.Display.Description;
+    private static string AccessibleLabel(AutomationToolboxItem item) =>
+        item.IsAvailable
+            ? $"{item.Definition.Display.Name}. {item.Definition.Display.Description} Available."
+            : $"{item.Definition.Display.Name}. {item.Definition.Display.Description} Unavailable. {item.Availability}";
 
-    private static string AvailabilityPrefix(AutomationToolboxItem item) =>
-        item.IsAvailable ? "✓ " : "Unavailable — ";
-
-    private static string KindAndTypes(AutomationDefinitionDescriptor definition)
-    {
-        var types = definition
-            .Inputs.Concat(definition.Outputs)
-            .Where(static port => port.ValueType != AutomationPortValueType.Flow)
-            .Select(AutomationConnections.TypeLabel)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        var kind = definition.Kind switch
-        {
-            AutomationNodeKind.Source => "Trigger",
-            AutomationNodeKind.Value => "Value",
-            AutomationNodeKind.Transform => "Transform",
-            AutomationNodeKind.Control => "Control",
-            AutomationNodeKind.Action => "Action",
-            _ => "Node",
-        };
-        return types.Length == 0 ? kind : $"{kind} · {string.Join(", ", types)}";
-    }
-
-    private static string PortSummary(AutomationDefinitionDescriptor definition)
-    {
-        var flowInputs = definition.Inputs.Count(static port =>
-            port.ValueType == AutomationPortValueType.Flow
-        );
-        var flowOutputs = definition.Outputs.Count(static port =>
-            port.ValueType == AutomationPortValueType.Flow
-        );
-        var dataInputs = definition.Inputs.Length - flowInputs;
-        var dataOutputs = definition.Outputs.Length - flowOutputs;
-        var parts = new List<string>();
-        if (flowInputs + flowOutputs > 0)
-        {
-            parts.Add($"Flow {Direction(flowInputs, flowOutputs)}");
-        }
-        if (dataInputs > 0)
-        {
-            parts.Add($"{dataInputs} Data in");
-        }
-        if (dataOutputs > 0)
-        {
-            parts.Add($"{dataOutputs} Data out");
-        }
-        return parts.Count == 0 ? "No ports" : string.Join(" · ", parts);
-    }
-
-    private static string Direction(int inputs, int outputs) =>
-        (inputs, outputs) switch
-        {
-            (> 0, > 0) => "in/out",
-            (> 0, 0) => "in",
-            _ => "out",
-        };
+    private static string ShortUnavailableReason(AutomationToolboxItem item) =>
+        item.Definition.Id == AutomationDefinitionIds.SendShoutoutAction
+            ? "Needs a known channel on each path."
+            : "This node is not available in this flow.";
 
     private string Selected(AutomationToolboxCategory category) =>
         _category == category ? "true" : "false";

@@ -303,6 +303,8 @@ public sealed record ConditionControlConfiguration(bool Predicate) : AutomationC
 
 public sealed record DelayControlConfiguration(TimeSpan Duration) : AutomationConfiguration;
 
+internal sealed record MergeBranchesControlConfiguration : AutomationConfiguration;
+
 public sealed record PersistedAutomationNodeDefinition(
     string TypeId,
     int SchemaVersion,

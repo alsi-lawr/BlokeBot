@@ -26,7 +26,7 @@ internal sealed class CompetitionAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Competition lifecycle",
-                    "Starts an automation after a committed public competition lifecycle event.",
+                    "Starts this flow when a public competition changes.",
                     "Community progression"
                 ),
                 [],
