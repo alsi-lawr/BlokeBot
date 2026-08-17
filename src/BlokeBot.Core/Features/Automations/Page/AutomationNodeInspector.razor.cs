@@ -236,7 +236,11 @@ public partial class AutomationNodeInspector
     private IReadOnlyList<AutomationGraphError> _genericErrors =>
         Node is null
             ? []
-            : Errors.Where(error => error.NodeId == Node.Id && error.FieldId is null).ToArray();
+            : Errors
+                .Where(error =>
+                    error.NodeId == Node.Id && error.FieldId is null && error.PortId is null
+                )
+                .ToArray();
 
     private IReadOnlyList<AutomationGraphError> FieldErrors(
         AutomationConfigurationFieldId fieldId

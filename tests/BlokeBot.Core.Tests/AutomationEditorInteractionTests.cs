@@ -113,6 +113,22 @@ public sealed class AutomationEditorInteractionTests
         results.Select(static item => item.IsAvailable).ShouldBe([true, false, true]);
         results[1].Availability.ShouldBe("BlokeBot needs permission to read chat events.");
 
+        var configuredTransform = availableTransform with
+        {
+            Display = new("CEL Transform", "Calculate typed values.", "Data"),
+            Outputs = [Port("message", AutomationPortValueType.Text)],
+        };
+        AutomationToolboxCatalog
+            .Query(
+                [configuredTransform with { Outputs = [] }],
+                AutomationToolboxCategory.Values,
+                "message",
+                static _ => (true, "Available."),
+                [configuredTransform]
+            )
+            .ShouldHaveSingleItem()
+            .Definition.Id.ShouldBe(configuredTransform.Id);
+
         AutomationToolboxCatalog
             .Query(
                 [availableAction],
@@ -228,6 +244,133 @@ public sealed class AutomationEditorInteractionTests
             .GetAttribute("aria-label")
             .ShouldNotBeNull()
             .ShouldContain("number · Number output");
+    }
+
+    [Test]
+    public void TypedEditor_ValidationPresentation_ShowsOneRetainedRepairWithoutReachabilityCascades()
+    {
+        var flowInput = Port("flow", AutomationPortValueType.Flow);
+        var flowOutput = Port("flow", AutomationPortValueType.Flow);
+        var source = AutomationEditorNode.Create(
+            Definition(
+                "source",
+                AutomationNodeKind.Source,
+                "Source",
+                outputs: [flowOutput, Port("actor", AutomationPortValueType.Actor)]
+            ),
+            new(new(24), new(24))
+        );
+        var number = AutomationEditorNode.Create(
+            Definition(
+                "number",
+                AutomationNodeKind.Value,
+                "Number",
+                outputs: [Port("number", AutomationPortValueType.Number)]
+            ),
+            new(new(24), new(192))
+        );
+        var transform = AutomationEditorNode.Create(
+            Definition(
+                "transform",
+                AutomationNodeKind.Transform,
+                "Transform",
+                inputs:
+                [
+                    flowInput,
+                    Port("predicate", AutomationPortValueType.Boolean),
+                    Port("actor", AutomationPortValueType.Actor),
+                ],
+                outputs: [flowOutput, Port("message", AutomationPortValueType.Text)]
+            ),
+            new(new(192), new(24))
+        );
+        var action = AutomationEditorNode.Create(
+            Definition(
+                "action",
+                AutomationNodeKind.Action,
+                "Action",
+                inputs: [flowInput, Port("message", AutomationPortValueType.Text)]
+            ),
+            new(new(360), new(24))
+        );
+        var invalidEdge = new AutomationFlowDraftEdge(
+            Guid.NewGuid(),
+            AutomationEdgeKind.Data,
+            number.Id,
+            new("number"),
+            transform.Id,
+            new("predicate")
+        );
+        var edges = new[]
+        {
+            new AutomationFlowDraftEdge(
+                Guid.NewGuid(),
+                AutomationEdgeKind.Flow,
+                source.Id,
+                new("flow"),
+                transform.Id,
+                new("flow")
+            ),
+            new AutomationFlowDraftEdge(
+                Guid.NewGuid(),
+                AutomationEdgeKind.Flow,
+                transform.Id,
+                new("flow"),
+                action.Id,
+                new("flow")
+            ),
+            new AutomationFlowDraftEdge(
+                Guid.NewGuid(),
+                AutomationEdgeKind.Data,
+                source.Id,
+                new("actor"),
+                transform.Id,
+                new("actor")
+            ),
+            new AutomationFlowDraftEdge(
+                Guid.NewGuid(),
+                AutomationEdgeKind.Data,
+                transform.Id,
+                new("message"),
+                action.Id,
+                new("message")
+            ),
+            invalidEdge,
+        };
+        var errors = new[]
+        {
+            new AutomationGraphError(
+                transform.Id,
+                "data-type-incompatible",
+                "Connect Data ports that have the same exact type.",
+                PortId: new("predicate")
+            ),
+            new AutomationGraphError(
+                transform.Id,
+                "node-disconnected",
+                "Connect this node to a trigger."
+            ),
+            new AutomationGraphError(
+                action.Id,
+                "node-disconnected",
+                "Connect this node to a trigger."
+            ),
+            new AutomationGraphError(
+                action.Id,
+                "data-source-unavailable",
+                "This source Data is not available on every Flow path to the input."
+            ),
+        };
+
+        var presentation = AutomationValidationPresentation.Create(
+            errors,
+            [source, number, transform, action],
+            edges
+        );
+
+        presentation.IssueCount.ShouldBe(1);
+        presentation.VisibleErrors.ShouldHaveSingleItem().Code.ShouldBe("data-type-incompatible");
+        errors.Length.ShouldBe(4);
     }
 
     [Test]

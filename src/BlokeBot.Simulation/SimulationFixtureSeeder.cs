@@ -145,6 +145,8 @@ internal sealed class SimulationFixtureSeeder(
             Name = "Welcome a qualifying raid",
             SchemaVersion = 1,
             IsEnabled = false,
+            UseVerticalLayout = true,
+            UseSmoothEdges = true,
             CreatedAtUtc = now.AddDays(-4),
             UpdatedAtUtc = now.AddMinutes(-1),
             Nodes =
@@ -181,7 +183,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "cel-transform",
                     TransformConfiguration,
-                    336,
+                    192,
                     264,
                     TransformBindings,
                     "Raid announcement"
@@ -191,7 +193,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "condition",
                     """{"predicate":false}""",
-                    648,
+                    360,
                     96,
                     ConnectedPredicate,
                     "High roll?"
@@ -201,7 +203,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "send-chat",
                     """{"message":"Saved message"}""",
-                    648,
+                    360,
                     264,
                     ConnectedMessage,
                     "Send message"
@@ -211,7 +213,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "send-chat",
                     """{"message":"Saved log message"}""",
-                    648,
+                    360,
                     432,
                     ConnectedMessage,
                     "Log result"
@@ -221,7 +223,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "send-chat",
                     """{"message":"Saved announcement"}""",
-                    648,
+                    360,
                     600,
                     ConnectedMessage,
                     "Announce result"
@@ -231,7 +233,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "play-overlay-cue",
                     $$"""{"target-id":"{{target.PublicId:D}}","cue-id":"{{cue.PublicId:D}}"}""",
-                    960,
+                    528,
                     24,
                     displayAlias: "Play celebration"
                 ),
@@ -240,7 +242,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "delay",
                     """{"duration-milliseconds":2000}""",
-                    960,
+                    528,
                     168,
                     displayAlias: "Wait 2 seconds"
                 ),
@@ -249,7 +251,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "play-overlay-cue",
                     $$"""{"target-id":"{{target.PublicId:D}}","cue-id":"{{cue.PublicId:D}}"}""",
-                    960,
+                    528,
                     312,
                     displayAlias: "Show roll"
                 ),
@@ -258,7 +260,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "delay",
                     """{"duration-milliseconds":500}""",
-                    960,
+                    528,
                     456,
                     displayAlias: "Short wait"
                 ),
@@ -267,7 +269,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "send-chat",
                     """{"message":"Audit complete"}""",
-                    1200,
+                    696,
                     552,
                     displayAlias: "Save audit"
                 ),
@@ -276,7 +278,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "condition",
                     """{"predicate":false}""",
-                    960,
+                    528,
                     600,
                     ConnectedPredicate,
                     "Check result"
@@ -286,7 +288,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "stream-online",
                     "{}",
-                    336,
+                    192,
                     24,
                     displayAlias: "Stream online"
                 ),
@@ -295,7 +297,7 @@ internal sealed class SimulationFixtureSeeder(
                     flowId,
                     "send-chat",
                     """{"message":"Stream started"}""",
-                    648,
+                    360,
                     744,
                     displayAlias: "Stream notice"
                 ),

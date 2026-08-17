@@ -62,6 +62,15 @@ public partial class AutomationEditorPage
             ? _editor?.Nodes.FirstOrDefault(node => node.Id == _selectedNodeIds.Single())
             : null;
 
+    private AutomationValidationPresentation _validationPresentation =>
+        _editor is null
+            ? new([], _validationErrors.Length)
+            : AutomationValidationPresentation.Create(
+                _validationErrors,
+                _editor.Nodes,
+                _editor.Edges
+            );
+
     private string _flowSubtitle =>
         _editor?.Id is null ? "Not saved · changes stay private"
         : _editor.IsEnabled ? "Enabled · saved changes update the live flow"
@@ -71,7 +80,9 @@ public partial class AutomationEditorPage
         _validated
             ? _validationErrors.IsEmpty
                 ? "✓ Ready"
-                : $"{_validationErrors.Length} issues"
+                : _validationPresentation.IssueCount == 1
+                    ? "1 issue needs repair"
+                    : $"{_validationPresentation.IssueCount} issues need repair"
             : "Draft";
 
     private string _validationClass =>

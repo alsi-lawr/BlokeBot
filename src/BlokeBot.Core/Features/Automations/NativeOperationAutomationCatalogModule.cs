@@ -284,7 +284,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Send shoutout",
-                    "Sends a Twitch shoutout to the broadcaster from the trigger. Use a trigger that includes a viewer or broadcaster.",
+                    "Sends a Twitch shoutout message to the broadcaster from the trigger. Use a trigger that includes a viewer or broadcaster.",
                     "Shoutouts"
                 ),
                 [_flowInput],

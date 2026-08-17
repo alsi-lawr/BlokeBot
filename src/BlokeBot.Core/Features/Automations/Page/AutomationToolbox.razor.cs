@@ -27,7 +27,13 @@ public partial class AutomationToolbox
     public EventCallback Close { get; set; }
 
     private ImmutableArray<AutomationToolboxItem> _items =>
-        AutomationToolboxCatalog.Query(Definitions, _category, _search, Availability);
+        AutomationToolboxCatalog.Query(
+            Definitions,
+            _category,
+            _search,
+            Availability,
+            Nodes.Select(static node => node.Definition)
+        );
 
     private string _resultsTitle =>
         string.IsNullOrWhiteSpace(_search)
@@ -73,9 +79,12 @@ public partial class AutomationToolbox
     {
         if (definition.TriggerContextRequirement is { } requirement)
         {
-            var available = Nodes.Any(node =>
-                requirement.CompatibleSources.Contains(node.Definition.Id)
+            var sources = Nodes.Where(static node =>
+                node.Definition.Kind == AutomationNodeKind.Source
             );
+            var available =
+                sources.Any()
+                && sources.All(node => requirement.CompatibleSources.Contains(node.Definition.Id));
             return available
                 ? (true, AvailableReason(definition))
                 : (false, requirement.UnavailableReason);
