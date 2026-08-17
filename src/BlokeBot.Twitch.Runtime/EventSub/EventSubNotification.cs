@@ -218,11 +218,15 @@ internal abstract record EventSubNotification
             _ => new Unknown(),
         };
 
+    // Twitch echoes both condition keys on every channel.raid notification, with the unused
+    // side as an empty string, so only a non-empty value identifies the subscribed direction.
     private static EventSubRaidSubscriptionDirection RaidDirection(JsonElement? subscription) =>
         subscription is { ValueKind: JsonValueKind.Object } value
         && value.TryGetProperty("condition", out var condition)
         && condition.ValueKind is JsonValueKind.Object
-        && condition.TryGetProperty("from_broadcaster_user_id", out _)
+        && condition.TryGetProperty("from_broadcaster_user_id", out var fromBroadcaster)
+        && fromBroadcaster.ValueKind is JsonValueKind.String
+        && fromBroadcaster.GetString() is { Length: > 0 }
             ? EventSubRaidSubscriptionDirection.Outgoing
             : EventSubRaidSubscriptionDirection.Incoming;
 

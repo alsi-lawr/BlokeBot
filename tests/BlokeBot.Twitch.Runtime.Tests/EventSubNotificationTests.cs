@@ -9,7 +9,11 @@ public sealed class EventSubNotificationTests
 {
     private const string _incomingRaidJson = """
         {
-          "subscription": { "type": "channel.raid", "version": "1" },
+          "subscription": {
+            "type": "channel.raid",
+            "version": "1",
+            "condition": { "from_broadcaster_user_id": "", "to_broadcaster_user_id": "target-id" }
+          },
           "event": {
             "from_broadcaster_user_id": "source-id",
             "from_broadcaster_user_login": "source_login",
@@ -77,6 +81,7 @@ public sealed class EventSubNotificationTests
         outgoing["subscription"]!["condition"] = new JsonObject
         {
             ["from_broadcaster_user_id"] = "source-id",
+            ["to_broadcaster_user_id"] = "",
         };
 
         var raid = Parse(outgoing.ToJsonString(), "raid-message-1")
