@@ -1630,11 +1630,6 @@ public sealed class AutomationFlowService(
                 "delay-skipped",
                 "complete"
             ),
-            MergeBranchesControlConfiguration => new(
-                AutomationNodeRunState.Succeeded,
-                "branches-merged",
-                "complete"
-            ),
             SendChatActionConfiguration => EvaluateSampleSend(inputs),
             _ => new(AutomationNodeRunState.Succeeded, "action-simulated", "complete"),
         };

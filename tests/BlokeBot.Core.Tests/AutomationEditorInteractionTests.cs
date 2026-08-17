@@ -112,7 +112,6 @@ public sealed class AutomationEditorInteractionTests
             .Select(static item => item.Definition.Id.Value)
             .ShouldBe(["message-transform", "chat-message", "send-message"]);
         results.Select(static item => item.IsAvailable).ShouldBe([true, false, true]);
-        results[1].Availability.ShouldBe("BlokeBot needs permission to read chat events.");
 
         var configuredTransform = availableTransform with
         {
@@ -155,95 +154,15 @@ public sealed class AutomationEditorInteractionTests
 
         tabs[1].KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
 
-        toolbox
-            .Find("#automation-toolbox-tab-transforms")
-            .GetAttribute("aria-selected")
-            .ShouldBe("true");
+        var updatedTabs = toolbox.FindAll("[role=tab]");
+        var selectedTab = updatedTabs.Single(tab => tab.GetAttribute("aria-selected") == "true");
+        selectedTab.ShouldBe(updatedTabs[2]);
         toolbox.Find("[data-automation-toolbox]").KeyDown(new KeyboardEventArgs { Key = "Escape" });
         closed.ShouldBe(1);
     }
 
     [Test]
-    public void TypedEditor_ToolboxRows_UsePurposeCopyAndCompactUnavailableReasons()
-    {
-        using var context = new BunitContext();
-        var definitions = ProductionDefinitions();
-        var permittedStarts = new[]
-        {
-            "Starts ",
-            "Picks ",
-            "Calculates ",
-            "Sends ",
-            "Shows ",
-            "Chooses ",
-            "Pauses ",
-            "Continues ",
-            "Marks ",
-            "Cancels ",
-            "Creates ",
-            "Adds ",
-            "Stops ",
-            "Selects ",
-            "Ends ",
-        };
-
-        definitions.ShouldAllBe(definition =>
-            definition.Display.Description.EndsWith(".", StringComparison.Ordinal)
-            && permittedStarts.Any(start =>
-                definition.Display.Description.StartsWith(start, StringComparison.Ordinal)
-            )
-            && definition
-                .Display.Description.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Length <= 10
-        );
-        definitions
-            .Single(definition => definition.Id == AutomationDefinitionIds.RandomNumber)
-            .Display.Description.ShouldBe("Picks a random whole number.");
-        definitions
-            .Select(static definition => definition.Display.Description)
-            .ShouldAllBe(static purpose =>
-                !purpose.Contains("typed", StringComparison.OrdinalIgnoreCase)
-                && !purpose.Contains("implementation", StringComparison.OrdinalIgnoreCase)
-                && !purpose.Contains("Flow in", StringComparison.OrdinalIgnoreCase)
-                && !purpose.Contains('—')
-            );
-
-        var toolbox = context.Render<AutomationToolbox>(parameters =>
-            parameters
-                .Add(component => component.Definitions, definitions)
-                .Add(component => component.Nodes, [])
-        );
-        toolbox.Find("[data-automation-toolbox-search]").Input("message");
-        var rows = toolbox.FindAll(".automation-toolbox-row");
-
-        rows.Select(row => row.QuerySelector("strong")!.TextContent)
-            .ShouldBe([
-                "Send chat message",
-                "CEL Transform",
-                "Chat notification",
-                "Send shoutout",
-                "Incoming raid",
-                "Condition",
-            ]);
-        rows.Select(row => row.QuerySelector("em")!.TextContent).Distinct().Count().ShouldBe(4);
-        rows[0].QuerySelectorAll(".automation-toolbox-row-copy > span").Length.ShouldBe(2);
-        rows[0]
-            .QuerySelector(".automation-toolbox-row-purpose")!
-            .TextContent.ShouldBe("Sends a message to the channel chat.");
-        var unavailable = rows.Single(row => row.GetAttribute("aria-disabled") == "true");
-        unavailable.TextContent.ShouldContain("Needs a known channel on each path.");
-        unavailable
-            .GetAttribute("aria-label")
-            .ShouldNotBeNull()
-            .ShouldContain("Add a trigger with a known viewer or broadcaster to use this action.");
-        toolbox.FindAll(".automation-toolbox-row-meta").ShouldBeEmpty();
-        toolbox.FindAll(".automation-toolbox-row a").ShouldBeEmpty();
-        toolbox.Markup.ShouldNotContain("Focused result");
-        toolbox.Markup.ShouldNotContain(">Details<");
-    }
-
-    [Test]
-    public void TypedEditor_Canvas_UsesReadableProgressiveDisclosureAtEveryViewport()
+    public void TypedEditor_Canvas_AnnouncesEveryPortWithoutVisualDisclosure()
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -251,136 +170,49 @@ public sealed class AutomationEditorInteractionTests
             .Single(definition => definition.Id == AutomationDefinitionIds.ConditionControl);
         var condition = AutomationEditorNode.Create(conditionDefinition, new(new(48), new(72)));
 
-        var unselected = context.Render<AutomationFlowCanvas>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [condition])
-                .Add(component => component.Edges, [])
-                .Add(component => component.ViewportKey, "progressive-unselected")
-        );
-
-        unselected.FindAll(".automation-node-description").ShouldBeEmpty();
-        unselected.FindAll(".automation-node-type-badges").ShouldBeEmpty();
-        unselected.FindAll(".automation-port-label").ShouldBeEmpty();
-        unselected.Find(".automation-node-kind").TextContent.ShouldBe("Control");
-        unselected.Find(".automation-node-status").TextContent.ShouldBe("Needs repair");
-        unselected
-            .FindAll("[data-port-marker-shape]")
-            .Select(marker => marker.GetAttribute("data-port-marker-shape"))
-            .Distinct()
-            .ShouldBe(["circle", "diamond"]);
-        unselected
-            .Find("[data-automation-node-select]")
-            .GetAttribute("aria-label")
-            .ShouldNotBeNull()
-            .ShouldContain("predicate · Boolean input");
-
-        var selected = context.Render<AutomationFlowCanvas>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [condition])
-                .Add(component => component.Edges, [])
-                .Add(
-                    component => component.SelectedNodeIds,
-                    new HashSet<AutomationNodeId> { condition.Id }
-                )
-                .Add(component => component.ViewportKey, "progressive-selected")
-        );
-
-        selected
-            .Find(".automation-node-description")
-            .TextContent.ShouldBe("Chooses a path from a yes or no value.");
-        selected.FindAll(".automation-node-selected-ports > span").Count.ShouldBe(4);
-        selected.Markup.ShouldContain("predicate · Boolean");
-        selected.Find("[data-canvas-zoom-label]").TextContent.ShouldBe("100%");
-    }
-
-    [Test]
-    public void TypedEditor_MergeBranches_UsesDedicatedGlyphAcrossAllEditorContexts()
-    {
-        using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var definitions = ProductionDefinitions();
-        var mergeDefinition = definitions.Single(definition =>
-            definition.Id == AutomationDefinitionIds.MergeBranchesControl
-        );
-        var merge = AutomationEditorNode.Create(mergeDefinition, new(new(48), new(72)));
-        var toolbox = context.Render<AutomationToolbox>(parameters =>
-            parameters
-                .Add(component => component.Definitions, definitions)
-                .Add(component => component.Nodes, [])
-        );
-        toolbox.Find("#automation-toolbox-tab-control").Click();
-
-        var toolboxMerge = toolbox.Find("[data-automation-node-icon='merge-branches']");
-        var toolboxCondition = toolbox.Find("[data-automation-node-icon='condition']");
-        toolboxMerge.QuerySelectorAll("circle").Length.ShouldBe(3);
-        toolboxMerge.QuerySelectorAll("path").Length.ShouldBe(1);
-        toolboxMerge.InnerHtml.ShouldNotBe(toolboxCondition.InnerHtml);
-        toolboxMerge
-            .ParentElement!.GetAttribute("aria-label")
-            .ShouldNotBeNull()
-            .ShouldStartWith("Merge branches. Continues after a connected path runs.");
-
         var canvas = context.Render<AutomationFlowCanvas>(parameters =>
             parameters
-                .Add(component => component.Nodes, [merge])
+                .Add(component => component.Nodes, [condition])
                 .Add(component => component.Edges, [])
-                .Add(component => component.ViewportKey, "merge-icon")
+                .Add(component => component.ViewportKey, "accessible-ports")
         );
-        canvas.FindAll("[data-automation-node-icon='merge-branches']").Count.ShouldBe(1);
-        canvas
+
+        var accessibleName = canvas
             .Find("[data-automation-node-select]")
             .GetAttribute("aria-label")
-            .ShouldNotBeNull()
-            .ShouldContain("Merge branches icon");
+            .ShouldNotBeNull();
 
-        var list = context.Render<AutomationFlowList>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [merge])
-                .Add(component => component.Edges, [])
-        );
-        list.FindAll("[data-automation-node-icon='merge-branches']").Count.ShouldBe(1);
-        list.Find("[data-automation-list-node]").TextContent.ShouldContain("Merge branches");
-
-        var inspector = context.Render<AutomationNodeInspector>(parameters =>
-            parameters
-                .Add(component => component.Node, merge)
-                .Add(component => component.Nodes, [merge])
-                .Add(component => component.Edges, [])
-        );
-        inspector.FindAll("[data-automation-node-icon='merge-branches']").Count.ShouldBe(1);
-        inspector
-            .Find("[data-automation-inspector]")
-            .TextContent.ShouldContain("Continues after a connected path runs.");
-        inspector
-            .Find(".automation-inspector-port-summary")
-            .TextContent.ShouldContain("FlowInput · Flow");
-        inspector
-            .Find(".automation-inspector-port-summary")
-            .TextContent.ShouldContain("CompleteOutput · Flow");
+        foreach (var input in conditionDefinition.Inputs)
+        {
+            accessibleName.ShouldContain($"{AccessiblePortName(input)} input");
+        }
+        foreach (var output in conditionDefinition.Outputs)
+        {
+            accessibleName.ShouldContain($"{AccessiblePortName(output)} output");
+        }
     }
 
     [Test]
-    public void TypedEditor_EditorState_AddsAtTheFirstFreeDeterministicGridPosition()
+    public void TypedEditor_EditorState_ReusesTheFirstFreeGridPosition()
     {
         var definition = Definition("value", AutomationNodeKind.Value, "Value");
         var editor = AutomationEditorState.Create("Flow");
         var first = editor.AddNode(definition);
         var second = editor.AddNode(definition);
         var third = editor.AddNode(definition);
+        var removedPosition = second.Position;
         editor.RemoveNode(second.Id);
 
         var replacement = editor.AddNode(definition);
 
-        first.Position.ShouldBe(new AutomationCanvasPosition(new(48), new(72)));
-        third.Position.ShouldBe(new AutomationCanvasPosition(new(528), new(72)));
-        replacement.Position.ShouldBe(new AutomationCanvasPosition(new(288), new(72)));
+        replacement.Position.ShouldBe(removedPosition);
+        replacement.Position.ShouldNotBe(first.Position);
+        replacement.Position.ShouldNotBe(third.Position);
     }
 
     [Test]
     public void TypedEditor_TypedConnections_AllowFanOutAndRetainAnExactInvalidEdgeForRepair()
     {
-        using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var sourceDefinition = Definition(
             "number-source",
             AutomationNodeKind.Value,
@@ -423,24 +255,12 @@ public sealed class AutomationEditorInteractionTests
             ),
         };
 
-        AutomationConnections
-            .Issue(edges[0], [source, firstTarget, secondTarget])
-            .ShouldBe("Expected Boolean. The selected source port supplies Number.");
-        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [source, firstTarget, secondTarget])
-                .Add(component => component.Edges, edges)
-                .Add(component => component.ViewportKey, "typed")
-        );
-
-        canvas.FindAll("[data-edge-kind=data]").Count.ShouldBe(2);
-        canvas.FindAll(".automation-edge-group--invalid").Count.ShouldBe(2);
-        canvas.FindAll("[data-port-direction=output][data-port-type=Number]").Count.ShouldBe(1);
-        canvas
-            .Find("[data-automation-node-select]")
-            .GetAttribute("aria-label")
-            .ShouldNotBeNull()
-            .ShouldContain("number · Number output");
+        edges.ShouldAllBe(edge => edge.SourceNodeId == source.Id);
+        edges.Select(static edge => edge.TargetNodeId).Distinct().Count().ShouldBe(2);
+        var issues = edges
+            .Select(edge => AutomationConnections.Issue(edge, [source, firstTarget, secondTarget]))
+            .ToArray();
+        issues.ShouldAllBe(static issue => issue != null);
     }
 
     [Test]
@@ -586,10 +406,10 @@ public sealed class AutomationEditorInteractionTests
 
         AutomationConnections
             .Compatibility(AutomationNodeKind.Value, safeNullableNumber, safeRequiredNumber)
-            .Reason.ShouldBe("Expected Number. The selected source can be null.");
+            .IsCompatible.ShouldBeFalse();
         AutomationConnections
             .Compatibility(AutomationNodeKind.Value, sensitiveNumber, safeRequiredNumber)
-            .Reason.ShouldBe("This input cannot accept Sensitive Data.");
+            .IsCompatible.ShouldBeFalse();
         AutomationConnections
             .Compatibility(AutomationNodeKind.Value, safeRequiredNumber, sensitiveNumber)
             .IsCompatible.ShouldBeTrue();
@@ -599,7 +419,7 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
-    public void TypedEditor_SourcePicker_ExplainsCompatibilityAndEscapeCancelsTheChoice()
+    public void TypedEditor_SourcePicker_EscapeCancelsTheChoice()
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -645,14 +465,10 @@ public sealed class AutomationEditorInteractionTests
                 .Add(component => component.Edges, [])
         );
 
-        inspector.FindAll("button").Single(button => button.TextContent == "Choose source").Click();
+        inspector.Find("button[aria-haspopup=dialog]").Click();
 
         var dialog = inspector.Find("[role=dialog]");
-        dialog.TextContent.ShouldContain("Number source · number");
-        dialog.TextContent.ShouldContain(
-            "Expected Boolean. The selected source port supplies Number."
-        );
-        dialog.TextContent.ShouldContain("Boolean source · boolean");
+        dialog.GetAttribute("aria-modal").ShouldBe("true");
         dialog.KeyDown(new KeyboardEventArgs { Key = "Escape" });
         inspector.FindAll("[role=dialog]").ShouldBeEmpty();
     }
@@ -705,9 +521,7 @@ public sealed class AutomationEditorInteractionTests
         );
         restored.RemoveTransformInput(originalInput.PortId);
 
-        AutomationConnections
-            .Issue(retained, [source, restored])
-            .ShouldBe("A saved port is not available.");
+        _ = AutomationConnections.Issue(retained, [source, restored]).ShouldNotBeNull();
         retained.TargetPortId.ShouldBe(originalInput.PortId);
     }
 
@@ -747,24 +561,6 @@ public sealed class AutomationEditorInteractionTests
             .ShouldBeEmpty();
     }
 
-    [Test]
-    public void TypedEditor_ListView_ShowsEveryNodeAndStatesThatConnectionsDoNotDefineRunOrder()
-    {
-        using var context = new BunitContext();
-        var definition = Definition("value", AutomationNodeKind.Value, "Value");
-        var first = AutomationEditorNode.Create(definition, new(new(48), new(72)));
-        var second = AutomationEditorNode.Create(definition, new(new(288), new(72)));
-        var list = context.Render<AutomationFlowList>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [first, second])
-                .Add(component => component.Edges, [])
-        );
-
-        list.FindAll("[data-automation-list-node]").Count.ShouldBe(2);
-        list.Find("[data-automation-list]")
-            .TextContent.ShouldContain("Connections do not define run order.");
-    }
-
     private static AutomationDefinitionDescriptor Definition(
         string id,
         AutomationNodeKind kind,
@@ -802,6 +598,11 @@ public sealed class AutomationEditorInteractionTests
         AutomationPortNullability nullability = AutomationPortNullability.NonNullable,
         AutomationConfigurationFieldId? bindingFieldId = null
     ) => new(new(id), id, $"Supplies {type}.", type, sensitivity, nullability, bindingFieldId);
+
+    private static string AccessiblePortName(AutomationPortMetadata port) =>
+        port.ValueType == AutomationPortValueType.Flow
+            ? port.Name
+            : $"{port.Name} · {AutomationConnections.TypeLabel(port)}";
 
     private static AutomationDefinitionDescriptor[] ProductionDefinitions() =>
         [

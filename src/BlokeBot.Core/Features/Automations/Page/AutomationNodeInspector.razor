@@ -129,7 +129,7 @@ else
                         </div>
                     }
                     <div class="automation-repair-actions">
-                        <button type="button" @ref="_pickerOpener" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : "Repair source")</button>
+                        <button type="button" aria-haspopup="dialog" aria-expanded="@(_pickerInputId == input.Id ? "true" : "false")" @ref="_pickerOpener" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : "Repair source")</button>
                         @if (edge is not null)
                         {
                             <button class="automation-danger-button" type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)">Disconnect</button>

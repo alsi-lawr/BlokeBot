@@ -19,8 +19,6 @@ public static class AutomationDefinitionIds
 
     public static AutomationDefinitionId DelayControl { get; } = new("delay");
 
-    internal static AutomationDefinitionId MergeBranchesControl { get; } = new("merge-branches");
-
     public static AutomationDefinitionId StreamOnlineSource { get; } = new("stream-online");
 
     public static AutomationDefinitionId StreamOfflineSource { get; } = new("stream-offline");
@@ -120,7 +118,6 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
         PlayOverlayCueAction(),
         ConditionControl(),
         DelayControl(),
-        MergeBranchesControl(),
     ];
 
     private static AutomationDefinition<CustomCommandSourceConfiguration> CustomCommandSource() =>
@@ -382,24 +379,6 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             ),
             ParseDelay,
             ValidateDelay
-        );
-
-    private static AutomationDefinition<MergeBranchesControlConfiguration> MergeBranchesControl() =>
-        new(
-            new(
-                AutomationDefinitionIds.MergeBranchesControl,
-                AutomationNodeKind.Control,
-                AutomationDefinitionScope.Host,
-                _schema,
-                new("Merge branches", "Continues after a connected path runs.", "Control"),
-                [_flowInput],
-                [_completeOutput],
-                [],
-                AutomationActionCapabilities.None,
-                AutomationActionRetrySafety.NotApplicable
-            ),
-            static _ => Parsed(new MergeBranchesControlConfiguration()),
-            static _ => AutomationValidationResult.Valid
         );
 
     private static AutomationConfigurationParseResult ParseCustomCommand(JsonElement json) =>

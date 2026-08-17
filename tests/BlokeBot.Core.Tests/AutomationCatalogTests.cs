@@ -80,14 +80,6 @@ public sealed class AutomationCatalogTests
                 )
             );
         condition.Outputs.Select(static output => output.Id.Value).ShouldBe(["yes", "no"]);
-        var merge = definitions.Single(static definition =>
-            definition.Id == AutomationDefinitionIds.MergeBranchesControl
-        );
-        merge.Display.Name.ShouldBe("Merge branches");
-        merge.Inputs.Select(static input => input.Id.Value).ShouldBe(["flow"]);
-        merge.Outputs.Select(static output => output.Id.Value).ShouldBe(["complete"]);
-        merge.Configuration.ShouldBeEmpty();
-
         var follow = definitions.Single(static definition =>
             definition.Id == AutomationDefinitionIds.FollowSource
         );
@@ -252,7 +244,7 @@ public sealed class AutomationCatalogTests
 
         var enabled = await service.DiscoverAsync(new(enabledHost), CancellationToken.None);
         enabled.Availability.ShouldBe(AutomationCatalogAvailability.Enabled);
-        enabled.Definitions.Length.ShouldBe(8);
+        enabled.Definitions.Length.ShouldBe(7);
 
         await features.EnableAsync(
             disabledHost,
@@ -313,7 +305,6 @@ public sealed class AutomationCatalogTests
                 AutomationDefinitionIds.DelayControl,
                 new DelayControlConfiguration(TimeSpan.FromDays(30))
             ),
-            (AutomationDefinitionIds.MergeBranchesControl, new MergeBranchesControlConfiguration()),
         };
         var invalid = new (AutomationDefinitionId Id, AutomationConfiguration Configuration)[]
         {
@@ -454,7 +445,7 @@ public sealed class AutomationCatalogTests
             new CoreAutomationCatalogModule(),
             new AdditionalAutomationModule(),
         ]);
-        extended.Descriptors.Length.ShouldBe(10);
+        extended.Descriptors.Length.ShouldBe(9);
         extended.Descriptors.ShouldContain(static definition =>
             definition.Id == new AutomationDefinitionId("sample-source")
         );

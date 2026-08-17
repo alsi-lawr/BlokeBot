@@ -163,30 +163,6 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task SampleRun_MergeBranchesContinuesToTheConnectedNode()
-    {
-        await using var fixture = await RuntimeFixture.CreateAsync();
-        var source = Node("custom-command", """{"custom-command-id":7}""");
-        var merge = Node("merge-branches", "{}");
-        var action = Node("send-chat", """{"message":"Merged"}""");
-
-        var outcome = await fixture.Flows.RunSampleAsync(
-            Draft(
-                fixture.HostId,
-                [source, merge, action],
-                [Edge(source, "flow", merge), Edge(merge, "complete", action)]
-            ),
-            source.Id,
-            CancellationToken.None
-        );
-
-        outcome
-            .ShouldBeOfType<AutomationSampleRunOutcome.Completed>()
-            .Nodes.Select(static node => node.OutcomeCode)
-            .ShouldBe(["source-received", "branches-merged", "action-simulated"]);
-    }
-
-    [Test]
     public async Task ConnectedCompositeJourney_CheckpointsRandomAndTransformBeforeRestartedSend()
     {
         var entropy = new CountingIntegerEntropy(73);

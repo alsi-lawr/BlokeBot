@@ -1175,11 +1175,6 @@ public sealed class AutomationRuntimeService(
         {
             ConditionControlConfiguration => EvaluateCondition(inputs),
             DelayControlConfiguration delay => Delay(delay),
-            MergeBranchesControlConfiguration => new AutomationNodeExecution.Succeeded(
-                "branches-merged",
-                null,
-                clock.GetUtcNow().UtcDateTime
-            ),
             _ => await ExecuteActionAsync(
                 hostId,
                 configuration,
