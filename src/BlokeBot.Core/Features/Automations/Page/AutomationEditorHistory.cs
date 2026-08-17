@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Text.Json;
-using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.Automations.Page;
 
@@ -13,15 +12,13 @@ internal enum AutomationEditorHistoryAction
 
 internal static class AutomationEditorHistoryShortcut
 {
-    internal static AutomationEditorHistoryAction Resolve(KeyboardEventArgs args) =>
-        !args.CtrlKey || args.AltKey || args.MetaKey || args.ShiftKey
-            ? AutomationEditorHistoryAction.None
-            : args.Key.ToUpperInvariant() switch
-            {
-                "Z" => AutomationEditorHistoryAction.Undo,
-                "Y" => AutomationEditorHistoryAction.Redo,
-                _ => AutomationEditorHistoryAction.None,
-            };
+    internal static AutomationEditorHistoryAction Parse(string action) =>
+        action switch
+        {
+            "undo" => AutomationEditorHistoryAction.Undo,
+            "redo" => AutomationEditorHistoryAction.Redo,
+            _ => AutomationEditorHistoryAction.None,
+        };
 }
 
 internal sealed class AutomationEditorHistory
@@ -31,20 +28,42 @@ internal sealed class AutomationEditorHistory
     private readonly List<AutomationEditorDraftDiff> _undo = [];
     private readonly List<AutomationEditorDraftDiff> _redo = [];
     private AutomationEditorDraftSnapshot? _current;
+    private AutomationEditorDraftSnapshot? _saved;
 
     internal int UndoCount => _undo.Count;
 
     internal int RedoCount => _redo.Count;
 
-    internal void Reset(AutomationEditorState? editor)
+    internal bool HasSavedDraft => _saved is not null;
+
+    internal void StartNew(AutomationEditorState editor) =>
+        Reset(AutomationEditorDraftSnapshot.Capture(editor), null);
+
+    internal void StartLoaded(AutomationEditorState editor)
+    {
+        var snapshot = AutomationEditorDraftSnapshot.Capture(editor);
+        Reset(snapshot, snapshot);
+    }
+
+    internal void Clear() => Reset(null, null);
+
+    internal void ContinueAfterSave(AutomationEditorState editor)
+    {
+        var snapshot = AutomationEditorDraftSnapshot.Capture(editor);
+        _current = snapshot;
+        _saved = snapshot;
+    }
+
+    internal bool IsDirty(AutomationEditorState editor) =>
+        _saved is null || !_saved.Matches(editor);
+
+    private void Reset(AutomationEditorDraftSnapshot? current, AutomationEditorDraftSnapshot? saved)
     {
         _undo.Clear();
         _redo.Clear();
-        _current = editor is null ? null : AutomationEditorDraftSnapshot.Capture(editor);
+        _current = current;
+        _saved = saved;
     }
-
-    internal void ContinueWith(AutomationEditorState editor) =>
-        _current = AutomationEditorDraftSnapshot.Capture(editor);
 
     internal bool Record(AutomationEditorState editor)
     {

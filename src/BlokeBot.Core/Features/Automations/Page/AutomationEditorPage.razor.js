@@ -75,28 +75,42 @@ export function disposeFullscreen() {
     fullscreenState = null;
 }
 
-function isHistoryShortcut(event) {
+function isEditable(target) {
+    return (
+        target instanceof Element
+        && (target.isContentEditable || target.closest("input, textarea, select") !== null)
+    );
+}
+
+function historyAction(event) {
     if (
         !event.ctrlKey
         || event.altKey
         || event.metaKey
         || event.shiftKey
         || !(event.target instanceof Element)
+        || isEditable(event.target)
         || event.target.closest("[data-automation-editor-history]") === null
     ) {
-        return false;
+        return null;
     }
 
     const key = event.key.toLowerCase();
-    return key === "z" || key === "y";
+    if (key === "z") return "undo";
+    if (key === "y") return "redo";
+    return null;
 }
 
-export function initializeHistoryKeyboard() {
+export function initializeHistoryKeyboard(dotnet) {
     disposeHistoryKeyboard();
     const keydown = (event) => {
-        if (isHistoryShortcut(event)) event.preventDefault();
+        const action = historyAction(event);
+        if (action === null) return;
+
+        event.preventDefault();
+        void dotnet.invokeMethodAsync("ApplyEditorHistoryShortcutAsync", action);
     };
-    historyKeyboard = { keydown };
+    historyKeyboard = { keydown, dotnet };
     document.addEventListener("keydown", keydown, true);
 }
 

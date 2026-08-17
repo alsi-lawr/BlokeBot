@@ -1,6 +1,5 @@
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
-using Microsoft.AspNetCore.Components.Web;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -12,7 +11,7 @@ public sealed class AutomationEditorHistoryTests
     {
         var editor = AutomationEditorState.Create("Initial");
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
 
         for (var index = 1; index <= AutomationEditorHistory.Capacity + 1; index++)
         {
@@ -47,7 +46,7 @@ public sealed class AutomationEditorHistoryTests
     {
         var editor = AutomationEditorState.Create("Initial");
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
 
         history.Undo(editor).ShouldBeNull();
         history.Redo(editor).ShouldBeNull();
@@ -96,7 +95,7 @@ public sealed class AutomationEditorHistoryTests
         var originalFirstPosition = first.Position;
         var originalSecondPosition = second.Position;
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
 
         first.Position = new(new(400), new(500));
         second.Position = new(new(600), new(700));
@@ -138,7 +137,7 @@ public sealed class AutomationEditorHistoryTests
         var editor = AutomationEditorState.Create("Settings");
         var node = editor.AddNode(definition);
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
 
         node.SetDisplayAlias("Announce result");
         history.Record(editor).ShouldBeTrue();
@@ -199,7 +198,7 @@ public sealed class AutomationEditorHistoryTests
         );
         editor.Edges.Add(retainedEdge);
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
 
         transform.UpdateTransformInput(
             originalInput.PortId,
@@ -338,7 +337,7 @@ public sealed class AutomationEditorHistoryTests
         var sendField = new AutomationConfigurationFieldId("message");
         var conditionField = new AutomationConfigurationFieldId("predicate");
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
 
         send.SetValue(sendField, "Fixed message");
         history.Record(editor).ShouldBeTrue();
@@ -401,94 +400,98 @@ public sealed class AutomationEditorHistoryTests
     }
 
     [Test]
-    public void History_SaveBaselineRetainsTransfersAndFlowIdentity_WhileResetClearsBothStacks()
+    public void History_SaveBaselineRetainsTransfersAndFlowIdentity_WhileClearResetsTheSession()
     {
         var editor = AutomationEditorState.Create("Before save");
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
         editor.Name = "Saved name";
         history.Record(editor).ShouldBeTrue();
         var savedFlowId = new AutomationFlowId(Guid.NewGuid());
         editor.Id = savedFlowId;
-        history.ContinueWith(editor);
-        var saved = AutomationEditorDraftSnapshot.Capture(editor);
+        history.ContinueAfterSave(editor);
 
         history.UndoCount.ShouldBe(1);
         editor = history.Undo(editor).ShouldNotBeNull();
         editor.Id.ShouldBe(savedFlowId);
-        saved.Matches(editor).ShouldBeFalse();
+        history.IsDirty(editor).ShouldBeTrue();
         editor = history.Redo(editor).ShouldNotBeNull();
         editor.Id.ShouldBe(savedFlowId);
-        saved.Matches(editor).ShouldBeTrue();
+        history.IsDirty(editor).ShouldBeFalse();
 
         editor.Name = "Unsaved again";
         history.Record(editor).ShouldBeTrue();
-        saved.Matches(editor).ShouldBeFalse();
-        history.Reset(editor);
+        history.IsDirty(editor).ShouldBeTrue();
+        history.Clear();
 
         history.UndoCount.ShouldBe(0);
         history.RedoCount.ShouldBe(0);
+        history.HasSavedDraft.ShouldBeFalse();
         history.Undo(editor).ShouldBeNull();
         history.Redo(editor).ShouldBeNull();
     }
 
     [Test]
-    public void HistoryShortcuts_CtrlZAndCtrlYTransferExactlyOneDiff_WhileCtrlRDoesNothing()
+    public void History_UnavailableProviderRecovery_ClearsBothStacksAndSavedDraft()
+    {
+        var editor = AutomationEditorState.Create("Loaded flow");
+        var history = new AutomationEditorHistory();
+        history.StartLoaded(editor);
+        editor.Name = "First change";
+        history.Record(editor).ShouldBeTrue();
+        editor.Name = "Second change";
+        history.Record(editor).ShouldBeTrue();
+        editor = history.Undo(editor).ShouldNotBeNull();
+
+        history.UndoCount.ShouldBe(1);
+        history.RedoCount.ShouldBe(1);
+        history.HasSavedDraft.ShouldBeTrue();
+
+        history.Clear();
+
+        history.UndoCount.ShouldBe(0);
+        history.RedoCount.ShouldBe(0);
+        history.HasSavedDraft.ShouldBeFalse();
+        history.Undo(editor).ShouldBeNull();
+        history.Redo(editor).ShouldBeNull();
+        history.IsDirty(editor).ShouldBeTrue();
+    }
+
+    [Test]
+    public void HistoryActions_UndoAndRedoTransferExactlyOneDiff_WhileUnknownDoesNothing()
     {
         var editor = AutomationEditorState.Create("Initial");
         var history = new AutomationEditorHistory();
-        history.Reset(editor);
+        history.StartNew(editor);
         editor.Name = "First";
         history.Record(editor).ShouldBeTrue();
         editor.Name = "Second";
         history.Record(editor).ShouldBeTrue();
 
-        editor = ApplyShortcut(
-            history,
-            editor,
-            new KeyboardEventArgs { Key = "z", CtrlKey = true }
-        );
+        editor = ApplyAction(history, editor, "undo");
         editor.Name.ShouldBe("First");
         history.UndoCount.ShouldBe(1);
         history.RedoCount.ShouldBe(1);
-        editor = ApplyShortcut(
-            history,
-            editor,
-            new KeyboardEventArgs { Key = "Y", CtrlKey = true }
-        );
+        editor = ApplyAction(history, editor, "redo");
         editor.Name.ShouldBe("Second");
         history.UndoCount.ShouldBe(2);
         history.RedoCount.ShouldBe(0);
 
-        editor = ApplyShortcut(
-            history,
-            editor,
-            new KeyboardEventArgs { Key = "r", CtrlKey = true }
-        );
+        editor = ApplyAction(history, editor, "reload");
         editor.Name.ShouldBe("Second");
         history.UndoCount.ShouldBe(2);
         history.RedoCount.ShouldBe(0);
         AutomationEditorHistoryShortcut
-            .Resolve(
-                new KeyboardEventArgs
-                {
-                    Key = "z",
-                    CtrlKey = true,
-                    ShiftKey = true,
-                }
-            )
-            .ShouldBe(AutomationEditorHistoryAction.None);
-        AutomationEditorHistoryShortcut
-            .Resolve(new KeyboardEventArgs { Key = "y", MetaKey = true })
+            .Parse("reload")
             .ShouldBe(AutomationEditorHistoryAction.None);
     }
 
-    private static AutomationEditorState ApplyShortcut(
+    private static AutomationEditorState ApplyAction(
         AutomationEditorHistory history,
         AutomationEditorState editor,
-        KeyboardEventArgs args
+        string action
     ) =>
-        AutomationEditorHistoryShortcut.Resolve(args) switch
+        AutomationEditorHistoryShortcut.Parse(action) switch
         {
             AutomationEditorHistoryAction.Undo => history.Undo(editor) ?? editor,
             AutomationEditorHistoryAction.Redo => history.Redo(editor) ?? editor,
