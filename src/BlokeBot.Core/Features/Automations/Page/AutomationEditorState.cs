@@ -41,16 +41,19 @@ internal sealed class AutomationEditorState
     internal static AutomationEditorState Restore(
         AutomationFlowSnapshot snapshot,
         IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions
+    ) => Restore(snapshot.Draft, definitions);
+
+    internal static AutomationEditorState Restore(
+        AutomationFlowDraft draft,
+        IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions
     ) =>
         new(
-            snapshot.Draft.Id,
-            snapshot.Draft.Name,
-            snapshot.Draft.IsEnabled,
-            snapshot.Draft.Canvas,
-            snapshot.Draft.Nodes.Select(node =>
-                AutomationEditorNode.Restore(node, definitions[node.Id])
-            ),
-            snapshot.Draft.Edges
+            draft.Id,
+            draft.Name,
+            draft.IsEnabled,
+            draft.Canvas,
+            draft.Nodes.Select(node => AutomationEditorNode.Restore(node, definitions[node.Id])),
+            draft.Edges
         );
 
     internal AutomationFlowDraft Draft(AutomationHostId hostId) =>

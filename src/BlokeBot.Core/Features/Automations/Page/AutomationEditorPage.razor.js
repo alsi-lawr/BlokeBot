@@ -1,5 +1,6 @@
 let dirtyNavigation = null;
 let fullscreenState = null;
+let historyKeyboard = null;
 
 function fullNavigationTarget(event) {
     if (
@@ -72,6 +73,37 @@ export function disposeFullscreen() {
     if (fullscreenState === null) return;
     document.removeEventListener("fullscreenchange", fullscreenState.change);
     fullscreenState = null;
+}
+
+function isHistoryShortcut(event) {
+    if (
+        !event.ctrlKey
+        || event.altKey
+        || event.metaKey
+        || event.shiftKey
+        || !(event.target instanceof Element)
+        || event.target.closest("[data-automation-editor-history]") === null
+    ) {
+        return false;
+    }
+
+    const key = event.key.toLowerCase();
+    return key === "z" || key === "y";
+}
+
+export function initializeHistoryKeyboard() {
+    disposeHistoryKeyboard();
+    const keydown = (event) => {
+        if (isHistoryShortcut(event)) event.preventDefault();
+    };
+    historyKeyboard = { keydown };
+    document.addEventListener("keydown", keydown, true);
+}
+
+export function disposeHistoryKeyboard() {
+    if (historyKeyboard === null) return;
+    document.removeEventListener("keydown", historyKeyboard.keydown, true);
+    historyKeyboard = null;
 }
 
 export async function toggleBrowserFullscreen() {

@@ -80,7 +80,11 @@
         }
         else
         {
-            <section class="@_editorClass" aria-label="Visual automation editor" data-editor-mode="@ModeToken(_mode)">
+            <section class="@_editorClass"
+                     aria-label="Visual automation editor"
+                     data-editor-mode="@ModeToken(_mode)"
+                     data-automation-editor-history
+                     @onkeydown="HandleEditorKeyAsync">
                 @if (!_focusMode || !_editorToolsCollapsed)
                 {
                 <header class="automation-editor-bar">

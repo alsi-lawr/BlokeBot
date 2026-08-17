@@ -3,6 +3,7 @@ using System.Globalization;
 using BlokeBot.Core.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.JSInterop;
 
@@ -21,7 +22,9 @@ public partial class AutomationEditorPage
     private ImmutableArray<AutomationRunSummary> _recentRuns = [];
     private readonly HashSet<AutomationNodeId> _selectedNodeIds = [];
     private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];
+    private readonly AutomationEditorHistory _history = new();
     private AutomationEditorState? _editor;
+    private AutomationEditorDraftSnapshot? _savedDraft;
     private AutomationFlowCanvas? _canvas;
     private AutomationFlowList? _list;
     private AutomationEditorMode? _inspectorFocusMode;
@@ -215,6 +218,7 @@ public partial class AutomationEditorPage
                     _hasChanges
                 );
                 await _pageModule.InvokeVoidAsync("initializeFullscreen", _pageReference);
+                await _pageModule.InvokeVoidAsync("initializeHistoryKeyboard");
             }
             else if (_pageModule is not null)
             {
@@ -264,9 +268,16 @@ public partial class AutomationEditorPage
 
     private async Task LoadCoreAsync(
         AutomationFlowId? preferredFlowId = null,
-        bool preserveViewport = false
+        bool preserveViewport = false,
+        bool preserveHistory = false
     )
     {
+        if (!preserveHistory)
+        {
+            _history.Reset(null);
+            _savedDraft = null;
+        }
+
         var previousFlowId = _editor?.Id;
         _ = await LoadPageContextAsync();
         ResetTransientState();
@@ -301,7 +312,7 @@ public partial class AutomationEditorPage
             {
                 ResetCanvasViewport();
             }
-            if (RestoreEditor(selected))
+            if (RestoreEditor(selected, preserveHistory))
             {
                 await ValidateCoreAsync(showFeedback: false);
             }
@@ -313,6 +324,7 @@ public partial class AutomationEditorPage
                 ResetCanvasViewport();
             }
             _editor = null;
+            _savedDraft = null;
         }
 
         var runQuery = await _runsService.ListAsync(hostId, CancellationToken.None);
@@ -362,6 +374,8 @@ public partial class AutomationEditorPage
         ResetCanvasViewport();
         ResetTransientState();
         _editor = AutomationEditorState.Create("New automation");
+        _savedDraft = null;
+        _history.Reset(_editor);
         _selectedNodeId = null;
         _selectedNodeIds.Clear();
         _selectedEdgeId = null;
@@ -393,7 +407,7 @@ public partial class AutomationEditorPage
             ? Task.CompletedTask
             : RequestTransitionAsync(() => SelectFlowCoreAsync(snapshot));
 
-    private bool RestoreEditor(AutomationFlowSnapshot snapshot)
+    private bool RestoreEditor(AutomationFlowSnapshot snapshot, bool preserveHistory = false)
     {
         _unavailableDefinitionIds.Clear();
         var availableDefinitions = _definitions.ToDictionary(static definition => definition.Id);
@@ -424,6 +438,15 @@ public partial class AutomationEditorPage
         _selectedNodeId = null;
         ResetTransientState();
         SetSingleNodeSelection(null);
+        _savedDraft = AutomationEditorDraftSnapshot.Capture(_editor);
+        if (preserveHistory)
+        {
+            _history.ContinueWith(_editor);
+        }
+        else
+        {
+            _history.Reset(_editor);
+        }
         _hasChanges = false;
         return true;
     }
@@ -670,7 +693,11 @@ public partial class AutomationEditorPage
                     switch (outcome)
                     {
                         case AutomationFlowSaveOutcome.Saved saved:
-                            await LoadCoreAsync(saved.FlowId, preserveViewport: true);
+                            await LoadCoreAsync(
+                                saved.FlowId,
+                                preserveViewport: true,
+                                preserveHistory: true
+                            );
                             _feedback = "Flow saved.";
                             _operationFailed = false;
                             _hasChanges = false;
@@ -1027,6 +1054,16 @@ public partial class AutomationEditorPage
 
     private void EditorChanged()
     {
+        if (_editor is null || !_history.Record(_editor))
+        {
+            return;
+        }
+
+        DraftChanged();
+    }
+
+    private void DraftChanged()
+    {
         CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];
@@ -1035,7 +1072,51 @@ public partial class AutomationEditorPage
         _operationFailed = false;
         _enableConfirmation = false;
         _deleteConfirmation = false;
-        _hasChanges = true;
+        _hasChanges = _editor is not null && (_savedDraft is null || !_savedDraft.Matches(_editor));
+    }
+
+    private void Undo()
+    {
+        if (_editor is not null && _history.Undo(_editor) is { } restored)
+        {
+            ApplyHistory(restored);
+        }
+    }
+
+    private void Redo()
+    {
+        if (_editor is not null && _history.Redo(_editor) is { } restored)
+        {
+            ApplyHistory(restored);
+        }
+    }
+
+    private void ApplyHistory(AutomationEditorState restored)
+    {
+        _editor = restored;
+        _ = _selectedNodeIds.RemoveWhere(nodeId => restored.Nodes.All(node => node.Id != nodeId));
+        _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
+        if (_selectedEdgeId is { } edgeId && restored.Edges.All(edge => edge.Id != edgeId))
+        {
+            _selectedEdgeId = null;
+        }
+
+        DraftChanged();
+    }
+
+    private Task HandleEditorKeyAsync(KeyboardEventArgs args)
+    {
+        switch (AutomationEditorHistoryShortcut.Resolve(args))
+        {
+            case AutomationEditorHistoryAction.Undo:
+                Undo();
+                break;
+            case AutomationEditorHistoryAction.Redo:
+                Redo();
+                break;
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task RequestTransitionAsync(Func<Task> transition)
@@ -1384,6 +1465,8 @@ public partial class AutomationEditorPage
         if (disposing)
         {
             CancelValidationFeedback();
+            _history.Reset(null);
+            _savedDraft = null;
         }
 
         base.Dispose(disposing);
@@ -1397,6 +1480,7 @@ public partial class AutomationEditorPage
             {
                 await _pageModule.InvokeVoidAsync("disposeDirtyNavigation");
                 await _pageModule.InvokeVoidAsync("disposeFullscreen");
+                await _pageModule.InvokeVoidAsync("disposeHistoryKeyboard");
             }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
