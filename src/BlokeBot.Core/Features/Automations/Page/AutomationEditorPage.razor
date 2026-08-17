@@ -24,7 +24,7 @@
 
 <DashboardPage Kicker="Automation"
                Title="Visual automations"
-               Description="Connect triggers to conditions and actions. Validate the flow before you enable it."
+               Description="Connect events, data, conditions, and actions. Validate the flow before you enable it."
                Width="DashboardPageWidth.Wide"
                data-automation-editor-page>
     @if (_loadFailed)
@@ -98,7 +98,6 @@
                             <button type="button" role="tab" data-automation-mode="list" aria-selected="@(_mode == AutomationEditorMode.List ? "true" : "false")" @onclick="() => SetMode(AutomationEditorMode.List)"><AutomationIcon Name="list" />List</button>
                         </div>
                         <span class="@_validationClass" role="status">@_validationLabel</span>
-                        <button class="automation-node-library-button" type="button" aria-expanded="@_nodeLibraryOpen" @onclick="ToggleNodeLibrary"><AutomationIcon Name="node" />Node</button>
                         <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ValidateAsync"><AutomationIcon Name="validate" />Validate</button>
                         <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" data-automation-test-flow @onclick="RunSampleAsync"><AutomationIcon Name="test" />Test flow</button>
                         <button class="btn-secondary" type="button" disabled="@_busy" @onclick="SaveAsync"><AutomationIcon Name="save" />Save</button>
@@ -157,6 +156,11 @@
                     }
                 </div>
 
+                @if (_nodeLibraryOpen)
+                {
+                    <div class="automation-toolbox-backdrop" @onclick="CloseNodeLibraryAsync" aria-hidden="true"></div>
+                }
+
                 <div class="@_editorBodyClass">
                     @if (!_focusMode || !_flowRailCollapsed)
                     {
@@ -199,7 +203,41 @@
                     </aside>
                     }
 
-                    <div class="automation-workspace" role="region" aria-label="Flow workspace">
+                    @if (_nodeLibraryOpen)
+                    {
+                        <AutomationToolbox Definitions="_definitions"
+                                           Nodes="_editor.Nodes"
+                                           Add="AddNode"
+                                           Close="CloseNodeLibraryAsync" />
+                    }
+
+                    <div class="automation-workspace" role="region" aria-label="Flow workspace" @onclick="CloseNodeLibraryFromOutsideAsync">
+                        <div class="automation-workspace-toolbar" role="toolbar" aria-label="Automation editor tools" @onclick:stopPropagation="true">
+                            <button class="automation-toolbox-button"
+                                    type="button"
+                                    aria-expanded="@_nodeLibraryOpen"
+                                    @ref="_toolboxOpener"
+                                    @onclick="ToggleNodeLibraryAsync"><AutomationIcon Name="add" />Toolbox</button>
+                            @if (_selectedNode is not null)
+                            {
+                                <button class="automation-mobile-inspector-button" type="button" @onclick="FocusInspectorAsync"><AutomationIcon Name="node" />Inspector</button>
+                            }
+                            <label><span class="sr-only">Flow direction</span><select value="@_editor.Canvas.Orientation" @onchange="ChangeOrientation"><option value="@AutomationFlowOrientation.Horizontal">Horizontal</option><option value="@AutomationFlowOrientation.Vertical">Vertical</option></select></label>
+                            <label><span class="sr-only">Connection style</span><select value="@_editor.Canvas.EdgeStyle" @onchange="ChangeEdgeStyle"><option value="@AutomationEdgeStyle.Angular">Angular</option><option value="@AutomationEdgeStyle.Smooth">Smooth</option></select></label>
+                            <span class="automation-connection-legend automation-connection-legend--flow">Flow schedules</span>
+                            <span class="automation-connection-legend automation-connection-legend--data">Data supplies values</span>
+                        </div>
+                        @if (_selectedNode is not null)
+                        {
+                            <div class="automation-mobile-selection-summary" aria-label="Selected node summary">
+                                <div>
+                                    <strong>@_selectedNode.EffectiveName</strong><span> · @_selectedNode.Definition.Display.Name</span>
+                                    <small>Inputs: @string.Join(", ", _selectedNode.Definition.Inputs.Select(static port => port.Name))</small>
+                                    <small>Outputs: @string.Join(", ", _selectedNode.Definition.Outputs.Select(static port => port.Name))</small>
+                                </div>
+                                <button type="button" @onclick="FocusInspectorAsync"><AutomationIcon Name="node" />Inspector</button>
+                            </div>
+                        }
                         @if (_mode == AutomationEditorMode.Grid)
                         {
                             <AutomationFlowCanvas @ref="_canvas"
@@ -227,14 +265,16 @@
                                                 SelectedNodeId="_selectedNodeId"
                                                 Errors="_validationErrors"
                                                 SampleOutcomes="_sampleOutcomes"
+                                                UnavailableDefinitionIds="_unavailableDefinitionIds"
                                                 SelectNode="SelectNode"
                                                 DeleteNode="DeleteNode" />
                         }
                     </div>
 
-                    @if (_selectedNode is not null)
+                    @if (_selectedNode is not null && !_nodeLibraryOpen && _inspectorFocusMode == _mode)
                     {
                         <AutomationNodeInspector Node="_selectedNode"
+                                                 MobileOpen="_mobileInspectorOpen"
                                                  Nodes="_editor.Nodes"
                                                  Edges="_editor.Edges"
                                                  Errors="_validationErrors"
@@ -242,6 +282,7 @@
                                                  Changed="EditorChanged"
                                                  ClearSelection="CloseInspector"
                                                  Connect="ConnectNodes"
+                                                 Repair="RepairConnection"
                                                  DeleteEdge="DeleteEdge"
                                                  DeleteNode="DeleteNode" />
                     }
@@ -283,49 +324,6 @@
             </section>
         }
 
-        @if (_nodeLibraryOpen && _editor is not null)
-        {
-            <div class="automation-node-library-backdrop" @onclick="CloseNodeLibrary">
-                <section class="automation-node-library-panel"
-                         role="dialog"
-                         aria-modal="true"
-                         aria-labelledby="automation-node-library-title"
-                         @onclick:stopPropagation="true">
-                    <header>
-                        <div>
-                            <strong id="automation-node-library-title">Node library</strong>
-                            <span>@(_editor.Nodes.Count == 0 ? "Select a trigger." : "Select a node.")</span>
-                        </div>
-                        <button type="button" aria-label="Close the node library" title="Close the node library" @onclick="CloseNodeLibrary"><AutomationIcon Name="close" /></button>
-                    </header>
-                    <label class="automation-node-search">
-                        <span>Search nodes</span>
-                        <input type="search" placeholder="Search by name or category" @bind="_nodeSearch" @bind:event="oninput" />
-                    </label>
-                    @foreach (var group in _filteredDefinitions.GroupBy(definition => definition.Display.Category).OrderBy(static group => group.Key))
-                    {
-                        <section>
-                            <h3>@group.Key</h3>
-                            @foreach (var definition in group)
-                            {
-                                <button type="button"
-                                        disabled="@(!DefinitionIsAvailable(definition))"
-                                        title="@DefinitionUnavailableReason(definition)"
-                                    @onclick="() => AddNode(definition)">
-                                    <span class="automation-node-kind automation-node-kind--@KindToken(definition.Kind)">@KindLabel(definition.Kind)</span>
-                                    <span class="automation-library-node-title"><AutomationNodeIcon DefinitionId="definition.Id" /><strong>@definition.Display.Name</strong></span>
-                                    <small>@DefinitionLibraryHelp(definition)</small>
-                                </button>
-                            }
-                        </section>
-                    }
-                    @if (!_filteredDefinitions.Any())
-                    {
-                        <p class="automation-node-search-empty">No nodes match this search.</p>
-                    }
-                </section>
-            </div>
-        }
     }
 </DashboardPage>
 

@@ -2060,7 +2060,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Automations",
             Title = "Connect channel events to automatic actions",
             Summary =
-                "Build channel flows on a snapped grid. Connect typed triggers to conditions and actions. Then, validate and test the flow before you enable it.",
+                "Build channel flows on a snapped grid. Connect events, data, conditions, and actions. Then, validate and test the flow before you enable it.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/automations/phone-dark-grid-visual-automations.png",
                 LightPhoneSource: "media/automations/phone-light-grid-visual-automations.png",
@@ -2068,7 +2068,7 @@ internal static partial class SiteGuideCatalog
                 LightLaptopSource: "media/automations/desktop-light-grid-visual-automations.png",
                 PhoneAlt: "The Visual automations editor at 390 pixels. It shows snapped nodes and the validation state.",
                 LaptopAlt: "The Visual automations editor. It shows the flow library, typed nodes, connections, and the node inspector.",
-                "Use Grid view to arrange nodes. Use List view to inspect the same flow in its run order."
+                "Use Grid view to arrange nodes. Use List view to inspect the same nodes and connections."
             ),
             Sections =
             [
@@ -2079,7 +2079,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Choose the channel in the top bar and open Channel setup.",
                         "Open Chat tools and turn on Automations. BlokeBot saves the change at once.",
-                        "Open Automations. Create a flow and choose a trigger from the Node library.",
+                        "Open Automations. Create a flow and choose a trigger from the Toolbox.",
                     ],
                     Paragraphs =
                     [
@@ -2093,7 +2093,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Build on the snapped grid",
                     Steps =
                     [
-                        "Search the Node library. Add one or more triggers, then add controls and actions.",
+                        "Search the Toolbox. Add one or more triggers, then add values, transforms, controls, and actions.",
                         "Select a node to open its inspector from the right. Drag an output port to a compatible input port or node.",
                         "Drag nodes on the 24-pixel grid, or move them with the keyboard. Use the canvas controls to set the flow direction and connection style.",
                         "Use Ctrl and the mouse wheel to zoom. Drag the background to move the canvas. Hold Alt and drag to select nodes.",
@@ -2118,17 +2118,45 @@ internal static partial class SiteGuideCatalog
                     Heading = "Understand a flow",
                     Paragraphs =
                     [
-                        "A flow connects triggers to actions through typed connections. Each step receives only a compatible value.",
+                        "A flow uses Flow connections to schedule nodes. Data connections supply values and do not define run order.",
                     ],
                     Bullets =
                     [
                         "A selected custom command, Twitch event or Channel Points redemption can start a flow.",
-                        "A Condition checks a CEL expression against the trigger data. The flow continues through Matches or Does not match.",
+                        "A Condition uses one Boolean input. Yes continues when the value is true. No continues when the value is false.",
                         "A Delay waits the configured time before the flow continues. Delayed flows do not block chat or other automations.",
                         "Actions send chat messages, play overlay cues, complete Channel Points redemptions and run native Twitch operations.",
                     ],
                     Note =
-                        "Grid and List views edit the same saved graph. BlokeBot saves each node configuration and snapped position.",
+                        "Grid and List edit the same saved graph. List shows connections, input choices, sources, types, and repair states.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Write CEL expressions",
+                    Paragraphs =
+                    [
+                        "CEL is a small language that calculates a value from node inputs.",
+                        "This BlokeBot guide explains the inputs and safety limits for automations. The official CEL reference explains the general language.",
+                    ],
+                    Bullets =
+                    [
+                        "Declare each Transform input before you use its CEL name in an output expression.",
+                        "Connect an Actor input to use actor.display_name or actor.login. Other Actor fields are not available.",
+                        "Bind arguments to a declared Arguments input. Output CEL can then use that declared input name.",
+                        "An output can return Text, Number, Boolean, Timestamp, or a null value with one of these types.",
+                        "Use format_number(number) to format a Number. Add a second value from 0 through 6 for exact decimal places.",
+                        "If a port changes, BlokeBot keeps an invalid connection. The editor shows Needs repair so you can repair or disconnect it.",
+                        "CEL cannot use raw event context, private data, IDs, roles, services, or outputs from the same Transform.",
+                    ],
+                    Code =
+                        "${actor.display_name} rolled ${format_number(number)}\nnumber >= 75\narguments_input.size() > 0",
+                    Links =
+                    [
+                        new SiteLink(
+                            "Official introduction to CEL",
+                            "https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md"
+                        ),
+                    ],
                 },
                 new SiteGuideSection
                 {

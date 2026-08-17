@@ -1,5 +1,110 @@
 const states = new WeakMap();
+const activeStates = new Set();
 const savedViewports = new Map();
+const metrics = {
+  routeRecalculationCount: 0,
+  routeEdgeCount: 0,
+  routeEdgeLiveCount: 0,
+  routeEdgeLiveMaximumPerFrame: 0,
+  dragFrames: 0,
+  refreshCount: 0,
+  uiUpdateCount: 0,
+};
+globalThis.__blokeBotAutomationMetrics = metrics;
+globalThis.__resetBlokeBotAutomationMetrics = () => {
+  for (const key of Object.keys(metrics)) metrics[key] = 0;
+};
+globalThis.__simulateBlokeBotAutomationUpdate = () => {
+  metrics.uiUpdateCount += 1;
+  metrics.refreshCount += 1;
+  for (const state of activeStates) {
+    if (state.drag === null) scheduleRouteAll(state);
+  }
+};
+globalThis.__runBlokeBotAutomationPerformanceWorkload = async () => {
+  const state = [...activeStates][0];
+  const obstacle = state?.root.querySelector('[data-node-kind="transform"]');
+  if (state === undefined || !(obstacle instanceof HTMLElement)) {
+    throw new Error("The automation performance fixture is not ready.");
+  }
+  globalThis.__resetBlokeBotAutomationMetrics();
+  const eventDelaySamples = [];
+  const longTasks = [];
+  const longObserver = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      longTasks.push({ startTime: entry.startTime, duration: entry.duration });
+    }
+  });
+  try { longObserver.observe({ type: "longtask", buffered: false }); } catch {}
+  const delayTimer = setInterval(() => {
+    const expected = performance.now() + 10;
+    setTimeout(() => eventDelaySamples.push(Math.max(0, performance.now() - expected)), 10);
+  }, 10);
+  const original = nodeGraphPosition(obstacle);
+  const edges = [...state.root.querySelectorAll("[data-automation-edge]")]
+    .filter((edge) => edge.dataset.sourceNode === obstacle.dataset.automationNode
+      || edge.dataset.targetNode === obstacle.dataset.automationNode);
+  state.drag = { edges };
+  const started = performance.now();
+  const updates = new Promise((resolve) => {
+    let count = 0;
+    const timer = setInterval(() => {
+      count += 1;
+      globalThis.__simulateBlokeBotAutomationUpdate();
+      document.documentElement.style.setProperty("--sample-pulse", String(count % 2));
+      if (count === 20) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 200);
+  });
+  const drag = new Promise((resolve) => {
+    const step = (now) => {
+      const elapsed = now - started;
+      setNodeGraphPosition(
+        obstacle,
+        original.x + Math.sin(elapsed / 260) * 85,
+        original.y + Math.sin(elapsed / 410) * 55,
+      );
+      metrics.dragFrames += 1;
+      metrics.routeEdgeLiveMaximumPerFrame = Math.max(
+        metrics.routeEdgeLiveMaximumPerFrame,
+        edges.length,
+      );
+      for (const edge of edges) routeEdgeLive(state, edge);
+      if (elapsed < 5000) {
+        requestAnimationFrame(step);
+        return;
+      }
+      setNodeGraphPosition(obstacle, original.x, original.y);
+      state.drag = null;
+      routeAll(state);
+      resolve();
+    };
+    requestAnimationFrame(step);
+  });
+  await Promise.all([updates, drag]);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  clearInterval(delayTimer);
+  longObserver.disconnect();
+  eventDelaySamples.sort((first, second) => first - second);
+  const percentile = (value) => eventDelaySamples.length === 0
+    ? 0
+    : eventDelaySamples[Math.min(
+      eventDelaySamples.length - 1,
+      Math.floor(eventDelaySamples.length * value),
+    )];
+  return {
+    actionDurationMs: performance.now() - started,
+    ...metrics,
+    eventDelaySampleCount: eventDelaySamples.length,
+    eventDelayP95Ms: percentile(0.95),
+    eventDelayMaxMs: eventDelaySamples.at(-1) ?? 0,
+    longTaskCount: longTasks.length,
+    longTaskDurationMs: longTasks.reduce((total, entry) => total + entry.duration, 0),
+    longTasks,
+  };
+};
 const gridSize = 24;
 const obstacleMargin = 18;
 const routeClearance = 12;
@@ -129,8 +234,10 @@ function nodeGraphPosition(node) {
       y: Number(node.dataset.automationGraphY),
     };
   }
-  const style = getComputedStyle(node);
-  return { x: Number.parseFloat(style.left), y: Number.parseFloat(style.top) };
+  return {
+    x: Number.parseFloat(node.style.getPropertyValue("--automation-node-x")),
+    y: Number.parseFloat(node.style.getPropertyValue("--automation-node-y")),
+  };
 }
 
 function setNodeGraphPosition(node, x, y) {
@@ -151,6 +258,12 @@ function nodeGraphRectangle(node, margin = 0) {
 }
 
 function portPoint(state, nodeId, portId, direction) {
+  const key = `${nodeId}|${portId}|${direction}`;
+  const cached = state.portOffsets.get(key);
+  if (cached?.node.isConnected) {
+    const position = nodeGraphPosition(cached.node);
+    return { x: position.x + cached.x, y: position.y + cached.y };
+  }
   const port = state.root.querySelector(
     `[data-automation-port][data-node-id="${CSS.escape(nodeId)}"][data-port-id="${CSS.escape(portId)}"][data-port-direction="${direction}"]`,
   );
@@ -160,24 +273,19 @@ function portPoint(state, nodeId, portId, direction) {
   const position = nodeGraphPosition(node);
   const portStyle = getComputedStyle(port);
   const portTransform = new DOMMatrixReadOnly(portStyle.transform);
-  return {
-    x: position.x
-      + node.clientLeft
+  const offset = {
+    node,
+    x: node.clientLeft
       + Number.parseFloat(portStyle.left)
       + Number.parseFloat(portStyle.width) / 2
       + portTransform.e,
-    y: position.y
-      + node.clientTop
+    y: node.clientTop
       + Number.parseFloat(portStyle.top)
       + Number.parseFloat(portStyle.height) / 2
       + portTransform.f,
   };
-}
-
-function nodeObstacles(state, excluded) {
-  return [...state.root.querySelectorAll("[data-automation-node]")]
-    .filter((node) => !excluded.has(node.dataset.automationNode))
-    .map((node) => nodeGraphRectangle(node, obstacleMargin));
+  state.portOffsets.set(key, offset);
+  return { x: position.x + offset.x, y: position.y + offset.y };
 }
 
 function endpointObstacle(state, nodeId, endpoint) {
@@ -1013,6 +1121,7 @@ function pathMidpoint(points) {
 }
 
 function routeEdgeLive(state, group) {
+  metrics.routeEdgeLiveCount += 1;
   const start = portPoint(
     state,
     group.dataset.sourceNode,
@@ -1048,36 +1157,74 @@ function routeEdgeLive(state, group) {
   });
 }
 
-function routeEdge(state, group) {
+function routingFrame(state) {
+  const nodes = [...state.root.querySelectorAll("[data-automation-node]")]
+    .filter((node) => node instanceof HTMLElement)
+    .map((node) => ({
+      id: node.dataset.automationNode,
+      obstacle: nodeGraphRectangle(node, obstacleMargin),
+      endpoint: nodeGraphRectangle(node),
+      signature: `${node.dataset.automationNode}:${nodeGraphPosition(node).x},${nodeGraphPosition(node).y},${node.offsetWidth},${node.offsetHeight}`,
+    }));
+  const viewBox = state.root.querySelector(".automation-edges")?.viewBox.baseVal;
+  return {
+    nodes,
+    ports: new Map(),
+    labelBounds: viewBox === undefined
+      ? null
+      : {
+        left: viewBox.x,
+        top: viewBox.y,
+        right: viewBox.x + viewBox.width,
+        bottom: viewBox.y + viewBox.height,
+      },
+    signature: `${state.shell.dataset.orientation}|${state.shell.dataset.edgeStyle}|${nodes.map((node) => node.signature).join("|")}`,
+  };
+}
+
+function framePortPoint(state, frame, nodeId, portId, direction) {
+  const key = `${nodeId}|${portId}|${direction}`;
+  if (!frame.ports.has(key)) frame.ports.set(key, portPoint(state, nodeId, portId, direction));
+  return frame.ports.get(key);
+}
+
+function routeEdge(state, group, frame) {
+  metrics.routeEdgeCount += 1;
   const sourceNode = group.dataset.sourceNode;
   const targetNode = group.dataset.targetNode;
-  const start = portPoint(state, sourceNode, group.dataset.sourcePort, "output");
-  const end = portPoint(state, targetNode, group.dataset.targetPort, "input");
+  const start = framePortPoint(state, frame, sourceNode, group.dataset.sourcePort, "output");
+  const end = framePortPoint(state, frame, targetNode, group.dataset.targetPort, "input");
   const label = group.querySelector("[data-edge-label]");
   if (start === null || end === null) {
     commitRoute(group, label, null);
     return;
   }
   const orientation = state.shell.dataset.orientation;
-  const nodeRectangles = nodeObstacles(state, new Set([sourceNode, targetNode]));
+  const routeKey = `${frame.signature}|${sourceNode}:${group.dataset.sourcePort}>${targetNode}:${group.dataset.targetPort}`;
+  const cached = state.routeCache.get(group.dataset.automationEdge);
+  if (cached?.key === routeKey) {
+    commitRoute(group, label, cached.route);
+    return;
+  }
+  const nodeRectangles = frame.nodes
+    .filter((node) => node.id !== sourceNode && node.id !== targetNode)
+    .map((node) => node.obstacle);
   const overlappingEndpoints = nodeRectangles.filter((rectangle) =>
     pointInsideRectangle(start, rectangle) || pointInsideRectangle(end, rectangle));
   const obstacles = nodeRectangles.filter((rectangle) => !overlappingEndpoints.includes(rectangle));
+  const sourceEndpoint = frame.nodes.find((node) => node.id === sourceNode)?.endpoint;
+  const targetEndpoint = frame.nodes.find((node) => node.id === targetNode)?.endpoint;
   const endpoints = [
-    endpointObstacle(state, sourceNode, "source"),
-    endpointObstacle(state, targetNode, "target"),
+    sourceEndpoint === undefined
+      ? null
+      : { rectangle: sourceEndpoint, endpoint: "source" },
+    targetEndpoint === undefined
+      ? null
+      : { rectangle: targetEndpoint, endpoint: "target" },
     ...overlappingEndpoints.map((rectangle) => ({ rectangle, endpoint: "overlap" })),
   ].filter((endpoint) => endpoint !== null);
   const needsLabel = label !== null;
-  const viewBox = group.ownerSVGElement?.viewBox.baseVal;
-  const labelBounds = viewBox === undefined
-    ? null
-    : {
-      left: viewBox.x,
-      top: viewBox.y,
-      right: viewBox.x + viewBox.width,
-      bottom: viewBox.y + viewBox.height,
-    };
+  const labelBounds = frame.labelBounds;
   const route = state.shell.dataset.edgeStyle === "smooth"
     ? smoothRoute(start, end, orientation, obstacles, endpoints, needsLabel, labelBounds)
     : (() => {
@@ -1088,11 +1235,16 @@ function routeEdge(state, group) {
         ? null
         : { path: angularPath(routed.points), points: routed.points, label: routed.label };
     })();
+  state.routeCache.set(group.dataset.automationEdge, { key: routeKey, route });
   commitRoute(group, label, route);
 }
 
 function routeAll(state) {
-  for (const edge of state.root.querySelectorAll("[data-automation-edge]")) routeEdge(state, edge);
+  metrics.routeRecalculationCount += 1;
+  const frame = routingFrame(state);
+  for (const edge of state.root.querySelectorAll("[data-automation-edge]")) {
+    routeEdge(state, edge, frame);
+  }
   state.root.dataset.automationCanvasReady = "true";
 }
 
@@ -1106,8 +1258,10 @@ function scheduleRouteAll(state) {
   if (state.routeFrame !== null) return;
   state.routeFrame = requestAnimationFrame(() => {
     state.routeFrame = null;
+    metrics.routeRecalculationCount += 1;
+    const frame = routingFrame(state);
     for (const edge of state.root.querySelectorAll("[data-automation-edge]")) {
-      routeEdge(state, edge);
+      routeEdge(state, edge, frame);
     }
     state.root.dataset.automationCanvasReady = "true";
   });
@@ -1118,6 +1272,11 @@ function scheduleDragRoutes(state) {
   state.routeFrame = requestAnimationFrame(() => {
     state.routeFrame = null;
     if (state.drag === null) return;
+    metrics.dragFrames += 1;
+    metrics.routeEdgeLiveMaximumPerFrame = Math.max(
+      metrics.routeEdgeLiveMaximumPerFrame,
+      state.drag.edges.length,
+    );
     for (const edge of state.drag.edges) routeEdgeLive(state, edge);
   });
 }
@@ -1138,13 +1297,13 @@ function startConnection(state, port) {
     portId: port.dataset.portId,
     type: port.dataset.portType,
     sensitivity: port.dataset.portSensitivity,
+    nullability: port.dataset.portNullability,
+    sourceKind: port.closest("[data-automation-node]")?.dataset.nodeKind,
   };
   port.classList.add("automation-port--source");
   state.root.classList.add("automation-canvas--connecting");
   for (const input of state.root.querySelectorAll('[data-port-direction="input"]')) {
-    const compatible = input.dataset.nodeId !== state.connection.nodeId
-      && input.dataset.portType === state.connection.type
-      && input.dataset.portSensitivity === state.connection.sensitivity;
+    const compatible = compatibleTarget(state, input);
     input.classList.toggle("automation-port--compatible", compatible);
   }
 }
@@ -1169,11 +1328,21 @@ function beginConnectionDrag(state, event, port) {
 }
 
 function compatibleTarget(state, port) {
-  return state.connection !== null
-    && port.dataset.portDirection === "input"
-    && port.dataset.nodeId !== state.connection.nodeId
-    && port.dataset.portType === state.connection.type
-    && port.dataset.portSensitivity === state.connection.sensitivity;
+  if (
+    state.connection === null
+    || port.dataset.portDirection !== "input"
+    || port.dataset.nodeId === state.connection.nodeId
+    || port.dataset.portType !== state.connection.type
+  ) return false;
+  const data = state.connection.type !== "Flow";
+  return (!data || state.connection.sourceKind !== "action")
+    && (!data || port.dataset.portOccupied !== "true")
+    && (!data
+      || state.connection.nullability !== "Nullable"
+      || port.dataset.portNullability === "Nullable")
+    && (!data
+      || state.connection.sensitivity !== "Sensitive"
+      || port.dataset.portSensitivity === "Sensitive");
 }
 
 function connectionReleaseTarget(state, clientX, clientY) {
@@ -1570,6 +1739,8 @@ export function initialize(root, dotnet) {
     connectionDrag: null,
     suppressPortClick: false,
     routeFrame: null,
+    routeCache: new Map(),
+    portOffsets: new Map(),
     listeners: [],
   };
 
@@ -1659,6 +1830,7 @@ export function initialize(root, dotnet) {
   });
 
   states.set(root, state);
+  activeStates.add(state);
   restoreViewport(state);
   updateEditorHeight(state);
   routeAll(state);
@@ -1670,6 +1842,7 @@ export function refresh(root) {
   const stage = root.querySelector(".automation-canvas-stage");
   if (!(stage instanceof HTMLElement)) return;
   state.stage = stage;
+  state.portOffsets.clear();
   state.preview = root.querySelector("[data-connection-preview]");
   state.marquee = root.querySelector("[data-automation-marquee]");
   if (state.viewportKey !== (state.shell.dataset.viewportKey ?? "")) {
@@ -1702,5 +1875,6 @@ export function dispose(root) {
   if (state === undefined) return;
   cancelScheduledRoutes(state);
   for (const remove of state.listeners.reverse()) remove();
+  activeStates.delete(state);
   states.delete(root);
 }

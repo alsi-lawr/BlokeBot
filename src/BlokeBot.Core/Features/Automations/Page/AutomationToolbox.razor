@@ -1,0 +1,75 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<section class="automation-toolbox"
+         role="dialog"
+         aria-labelledby="automation-toolbox-title"
+         @onkeydown="HandleKeyAsync"
+         @onclick:stopPropagation="true"
+         data-automation-toolbox>
+    <header>
+        <div>
+            <span class="automation-toolbox-eyebrow">Add a node</span>
+            <h2 id="automation-toolbox-title">Toolbox</h2>
+            <p>Choose a node type.</p>
+        </div>
+        <button class="automation-icon-button" type="button" aria-label="Close Toolbox" title="Close Toolbox" @onclick="Close"><AutomationIcon Name="close" /></button>
+    </header>
+
+    <label class="automation-toolbox-search">
+        <span class="sr-only">Search all categories</span>
+        <AutomationIcon Name="search" />
+        <input type="search"
+               placeholder="Search all categories"
+               value="@_search"
+               @oninput="SearchChanged"
+               data-automation-toolbox-search />
+        <kbd>/</kbd>
+    </label>
+
+    <div class="automation-toolbox-tabs" role="tablist" aria-label="Toolbox categories">
+        <button type="button" role="tab" id="automation-toolbox-tab-triggers" aria-controls="automation-toolbox-panel" aria-selected="@Selected(AutomationToolboxCategory.Triggers)" tabindex="@TabIndex(AutomationToolboxCategory.Triggers)" @ref="_triggerTab" @onclick="() => SelectCategory(AutomationToolboxCategory.Triggers)" @onkeydown="args => HandleTabKeyAsync(AutomationToolboxCategory.Triggers, args)">Triggers</button>
+        <button type="button" role="tab" id="automation-toolbox-tab-values" aria-controls="automation-toolbox-panel" aria-selected="@Selected(AutomationToolboxCategory.Values)" tabindex="@TabIndex(AutomationToolboxCategory.Values)" @ref="_valueTab" @onclick="() => SelectCategory(AutomationToolboxCategory.Values)" @onkeydown="args => HandleTabKeyAsync(AutomationToolboxCategory.Values, args)">Values</button>
+        <button type="button" role="tab" id="automation-toolbox-tab-transforms" aria-controls="automation-toolbox-panel" aria-selected="@Selected(AutomationToolboxCategory.Transforms)" tabindex="@TabIndex(AutomationToolboxCategory.Transforms)" @ref="_transformTab" @onclick="() => SelectCategory(AutomationToolboxCategory.Transforms)" @onkeydown="args => HandleTabKeyAsync(AutomationToolboxCategory.Transforms, args)">Transforms</button>
+        <button type="button" role="tab" id="automation-toolbox-tab-control" aria-controls="automation-toolbox-panel" aria-selected="@Selected(AutomationToolboxCategory.Control)" tabindex="@TabIndex(AutomationToolboxCategory.Control)" @ref="_controlTab" @onclick="() => SelectCategory(AutomationToolboxCategory.Control)" @onkeydown="args => HandleTabKeyAsync(AutomationToolboxCategory.Control, args)">Control</button>
+        <button type="button" role="tab" id="automation-toolbox-tab-actions" aria-controls="automation-toolbox-panel" aria-selected="@Selected(AutomationToolboxCategory.Actions)" tabindex="@TabIndex(AutomationToolboxCategory.Actions)" @ref="_actionTab" @onclick="() => SelectCategory(AutomationToolboxCategory.Actions)" @onkeydown="args => HandleTabKeyAsync(AutomationToolboxCategory.Actions, args)">Actions</button>
+    </div>
+
+    <div id="automation-toolbox-panel"
+         class="automation-toolbox-results"
+         role="tabpanel"
+         aria-labelledby="@_activeTabId">
+        <div class="automation-toolbox-results-heading">
+            <strong>@_resultsTitle</strong>
+            <span>@_items.Length items</span>
+        </div>
+        @if (_items.IsEmpty)
+        {
+            <p class="automation-toolbox-empty" role="status">No nodes match this search.</p>
+        }
+        else
+        {
+            @foreach (var item in _items)
+            {
+                var reasonId = $"automation-toolbox-reason-{item.Definition.Id.Value}";
+                <button @key="item.Definition.Id"
+                        type="button"
+                        class="automation-toolbox-row"
+                        aria-disabled="@(!item.IsAvailable ? "true" : null)"
+                        aria-describedby="@reasonId"
+                        @onclick="() => AddAsync(item)">
+                    <AutomationNodeIcon DefinitionId="item.Definition.Id" />
+                    <span class="automation-toolbox-row-copy">
+                        <span class="automation-toolbox-row-title"><strong>@item.Definition.Display.Name</strong><em>@AutomationToolboxCatalog.CategoryLabel(item.Category)</em></span>
+                        <span class="automation-toolbox-row-meta">@KindAndTypes(item.Definition) · @PortSummary(item.Definition)</span>
+                        <span>@Description(item.Definition)</span>
+                        <span id="@reasonId" class="@(item.IsAvailable ? "automation-toolbox-availability" : "automation-toolbox-availability automation-toolbox-availability--unavailable")">@AvailabilityPrefix(item)@item.Availability</span>
+                        @if (item.Definition.Id == AutomationDefinitionIds.CelTransform)
+                        {
+                            <a href="https://www.blokebot.com/automations#write-cel-expressions" @onclick:stopPropagation="true">BlokeBot guide to CEL expressions</a>
+                        }
+                    </span>
+                </button>
+            }
+        }
+    </div>
+</section>

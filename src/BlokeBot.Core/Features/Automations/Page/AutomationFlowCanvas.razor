@@ -14,20 +14,6 @@
             <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" title="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)"><AutomationIcon Name="arrow-down" /></button>
             <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" title="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)"><AutomationIcon Name="arrow-right" /></button>
         </div>
-        <label>
-            <span><AutomationIcon Name="direction" />Flow direction</span>
-            <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
-                <option value="@AutomationFlowOrientation.Horizontal">Horizontal</option>
-                <option value="@AutomationFlowOrientation.Vertical">Vertical</option>
-            </select>
-        </label>
-        <label>
-            <span><AutomationIcon Name="tools" />Connection style</span>
-            <select value="@Settings.EdgeStyle" @onchange="ChangeEdgeStyleAsync">
-                <option value="@AutomationEdgeStyle.Angular">Angular</option>
-                <option value="@AutomationEdgeStyle.Smooth">Smooth</option>
-            </select>
-        </label>
         <button type="button" data-canvas-zoom-reset><AutomationIcon Name="zoom-reset" /><span data-canvas-zoom-label>100%</span></button>
     </div>
 
@@ -40,7 +26,11 @@
          data-automation-canvas>
         <div class="automation-canvas-stage-size" style="@_canvasStageStyle">
         <div class="automation-canvas-stage">
-            <svg class="automation-edges" viewBox="0 0 @_canvasWidth @_canvasHeight" aria-label="Flow connections">
+            <svg class="automation-edges" viewBox="0 0 @_canvasWidth @_canvasHeight" aria-label="Flow and Data connections">
+                <defs>
+                    <marker id="automation-flow-marker" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker>
+                    <marker id="automation-data-marker" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto"><path d="M 1 6 L 6 1 L 11 6 L 6 11 z" /></marker>
+                </defs>
                 @foreach (var edge in Edges)
                 {
                     <g @key="edge.Id"
@@ -50,10 +40,12 @@
                        data-source-port="@edge.SourcePortId.Value"
                        data-target-node="@edge.TargetNodeId.Value"
                        data-target-port="@edge.TargetPortId.Value"
+                       data-edge-kind="@edge.Kind.ToString().ToLowerInvariant()"
+                       aria-label="@EdgeAccessibleLabel(edge)"
                        @onclick:stopPropagation="true"
                        @onclick="() => SelectEdgeAsync(edge.Id)">
                         <path class="automation-edge-hit" d="" />
-                        <path class="automation-edge" d="" />
+                        <path class="automation-edge" d="" marker-end="@EdgeMarker(edge)" />
                         @if (BranchLabel(edge) is { } label)
                         {
                             <svg:g class="automation-edge-label" data-edge-label style="display:none">
@@ -76,28 +68,31 @@
                          class="@NodeClass(node, errors.Count > 0, outcome)"
                          style="@NodeStyle(node)"
                          data-automation-node="@node.Id.Value"
+                         data-node-kind="@node.Definition.Kind.ToString().ToLowerInvariant()"
                          data-node-x="@node.Position.X.Value"
                          data-node-y="@node.Position.Y.Value">
                     <button type="button"
                             class="automation-node-select"
                             data-automation-node-select
-                            aria-label="Select @node.EffectiveName"
+                            aria-label="@NodeAccessibleLabel(node)"
                             aria-pressed="@(SelectedNodeIds.Contains(node.Id) ? "true" : "false")"
                             @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
                             @onkeydown="args => HandleNodeKeyAsync(node, args)">
                         <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
                         <span class="automation-node-title"><AutomationNodeIcon DefinitionId="node.Definition.Id" /><strong title="@node.EffectiveName">@node.EffectiveName</strong></span>
                         <span class="automation-node-description">@NodeSummary(node)</span>
+                        <span class="automation-node-type-badges" aria-hidden="true">@TypeBadges(node)</span>
                         @if (outcome is not null)
                         {
                             <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
                         }
                     </button>
-                    @foreach (var input in node.Definition.Inputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
+                    @foreach (var input in node.Definition.Inputs.Select((port, index) => new { Port = port, Index = index }))
                     {
                         <button type="button"
-                                class="automation-port automation-port--input"
-                                style="@PortStyle(input.Index, node.Definition.Inputs.Count(IsFlowPort))"
+                                tabindex="-1"
+                                class="@PortClass(input.Port, "input")"
+                                style="@PortStyle(input.Index, node.Definition.Inputs.Length)"
                                 title="@input.Port.Name"
                                 aria-label="@($"{node.EffectiveName}: {input.Port.Name} input")"
                                 data-automation-port
@@ -106,13 +101,16 @@
                                 data-port-id="@input.Port.Id.Value"
                                 data-port-type="@input.Port.ValueType"
                                 data-port-sensitivity="@input.Port.Sensitivity"
-                                @onclick:stopPropagation="true"></button>
+                                data-port-nullability="@input.Port.Nullability"
+                                data-port-occupied="@InputOccupied(node.Id, input.Port.Id)"
+                                @onclick:stopPropagation="true"><span class="automation-port-label">@PortDisplay(input.Port)</span></button>
                     }
-                    @foreach (var output in node.Definition.Outputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
+                    @foreach (var output in node.Definition.Outputs.Select((port, index) => new { Port = port, Index = index }))
                     {
                         <button type="button"
-                                class="automation-port automation-port--output automation-port--branch-@BranchToken(output.Port.Id)"
-                                style="@PortStyle(output.Index, node.Definition.Outputs.Count(IsFlowPort))"
+                                tabindex="-1"
+                                class="@($"{PortClass(output.Port, "output")} automation-port--branch-{BranchToken(output.Port.Id)}")"
+                                style="@PortStyle(output.Index, node.Definition.Outputs.Length)"
                                 title="@output.Port.Name"
                                 aria-label="@($"{node.EffectiveName}: {output.Port.Name} output")"
                                 data-automation-port
@@ -121,7 +119,42 @@
                                 data-port-id="@output.Port.Id.Value"
                                 data-port-type="@output.Port.ValueType"
                                 data-port-sensitivity="@output.Port.Sensitivity"
-                                @onclick:stopPropagation="true"></button>
+                                data-port-nullability="@output.Port.Nullability"
+                                @onclick:stopPropagation="true"><span class="automation-port-label">@PortDisplay(output.Port)</span></button>
+                    }
+                    @foreach (var retained in RetainedPorts(node, input: true))
+                    {
+                        <button type="button"
+                                tabindex="-1"
+                                class="automation-port automation-port--input automation-port--data automation-port--retained"
+                                style="@PortStyle(retained.Index, retained.Count)"
+                                title="Needs repair"
+                                aria-label="@($"{node.EffectiveName}: saved input {retained.PortId.Value} needs repair")"
+                                data-automation-port
+                                data-port-direction="input"
+                                data-node-id="@node.Id.Value"
+                                data-port-id="@retained.PortId.Value"
+                                data-port-type="Unknown"
+                                data-port-sensitivity="Safe"
+                                data-port-nullability="Nullable"
+                                @onclick:stopPropagation="true"><span class="automation-port-label">Needs repair</span></button>
+                    }
+                    @foreach (var retained in RetainedPorts(node, input: false))
+                    {
+                        <button type="button"
+                                tabindex="-1"
+                                class="automation-port automation-port--output automation-port--data automation-port--retained"
+                                style="@PortStyle(retained.Index, retained.Count)"
+                                title="Needs repair"
+                                aria-label="@($"{node.EffectiveName}: saved output {retained.PortId.Value} needs repair")"
+                                data-automation-port
+                                data-port-direction="output"
+                                data-node-id="@node.Id.Value"
+                                data-port-id="@retained.PortId.Value"
+                                data-port-type="Unknown"
+                                data-port-sensitivity="Safe"
+                                data-port-nullability="Nullable"
+                                @onclick:stopPropagation="true"><span class="automation-port-label">Needs repair</span></button>
                     }
                 </article>
             }

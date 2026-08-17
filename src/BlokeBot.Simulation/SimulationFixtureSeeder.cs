@@ -97,11 +97,10 @@ internal sealed class SimulationFixtureSeeder(
         }
 
         var flowId = Guid.Parse("1b10be82-0000-4000-8000-000000000001");
-        var sourceId = Guid.Parse("1b10be82-0000-4000-8000-000000000011");
-        var commandSourceId = Guid.Parse("1b10be82-0000-4000-8000-000000000015");
-        var conditionId = Guid.Parse("1b10be82-0000-4000-8000-000000000012");
-        var chatId = Guid.Parse("1b10be82-0000-4000-8000-000000000013");
-        var overlayId = Guid.Parse("1b10be82-0000-4000-8000-000000000014");
+        var nodeIds = Enumerable
+            .Range(111, 16)
+            .Select(value => Guid.Parse($"1b10be82-0000-4000-8000-{value:000000000000}"))
+            .ToArray();
         var target = await db
             .OverlayInstances.Where(value =>
                 value.HostId == hostId && value.Type == OverlayType.CuePlayer
@@ -112,10 +111,33 @@ internal sealed class SimulationFixtureSeeder(
             .OverlayCues.Where(value => value.HostId == hostId)
             .OrderBy(static value => value.Id)
             .FirstAsync(cancellationToken);
-        var commandId = await db
-            .CustomCommands.Where(value => value.HostId == hostId && value.Name == "Welcome viewer")
-            .Select(static value => value.Id)
-            .SingleAsync(cancellationToken);
+        const string TransformConfiguration = """
+            {
+              "inputs": [
+                { "port-id": "actor", "cel-identifier": "actor", "display-name": "Actor", "binding-field-id": "actor-binding", "type": "Actor", "nullability": "NonNullable", "fixed": { "login": "", "display-name": "" } },
+                { "port-id": "number", "cel-identifier": "number", "display-name": "Number", "binding-field-id": "number-binding", "type": "Number", "nullability": "NonNullable", "fixed": 0 },
+                { "port-id": "threshold", "cel-identifier": "threshold", "display-name": "Threshold", "binding-field-id": "threshold-binding", "type": "Boolean", "nullability": "NonNullable", "fixed": false },
+                { "port-id": "arguments", "cel-identifier": "arguments_input", "display-name": "Arguments", "binding-field-id": "arguments-binding", "type": "Arguments", "nullability": "NonNullable", "fixed": [] }
+              ],
+              "outputs": [
+                { "port-id": "message", "display-name": "Message", "type": "Text", "nullability": "NonNullable", "cel": "${actor.display_name} rolled ${format_number(number)}" },
+                { "port-id": "is-high", "display-name": "Is high", "type": "Boolean", "nullability": "NonNullable", "cel": "number >= 75" },
+                { "port-id": "rolled", "display-name": "Rolled", "type": "Number", "nullability": "Nullable", "cel": "number" }
+              ]
+            }
+            """;
+        const string TransformBindings = """
+            {
+              "actor-binding": { "mode": "Connected", "expression": null },
+              "number-binding": { "mode": "Connected", "expression": null },
+              "threshold-binding": { "mode": "Connected", "expression": null },
+              "arguments-binding": { "mode": "Expression", "expression": { "languageVersion": 1, "source": "arguments" } }
+            }
+            """;
+        const string ConnectedMessage =
+            "{\"message\":{\"mode\":\"Connected\",\"expression\":null}}";
+        const string ConnectedPredicate =
+            "{\"predicate\":{\"mode\":\"Connected\",\"expression\":null}}";
         var flow = new AutomationFlow
         {
             Id = flowId,
@@ -128,76 +150,182 @@ internal sealed class SimulationFixtureSeeder(
             Nodes =
             [
                 AutomationNode(
-                    sourceId,
+                    nodeIds[0],
                     flowId,
                     "incoming-raid",
                     """{"minimum-viewers":20}""",
                     24,
-                    72
+                    120,
+                    displayAlias: "Incoming raid"
                 ),
                 AutomationNode(
-                    commandSourceId,
+                    nodeIds[1],
                     flowId,
-                    "custom-command",
-                    $$"""{"custom-command-id":{{commandId}}}""",
-                    24,
-                    408
+                    "random-number",
+                    """{"minimum":0,"maximum":100}""",
+                    48,
+                    336,
+                    displayAlias: "Roll"
                 ),
                 AutomationNode(
-                    conditionId,
+                    nodeIds[2],
+                    flowId,
+                    "random-number",
+                    """{"minimum":50,"maximum":90}""",
+                    48,
+                    528,
+                    displayAlias: "Threshold seed"
+                ),
+                AutomationNode(
+                    nodeIds[3],
+                    flowId,
+                    "cel-transform",
+                    TransformConfiguration,
+                    336,
+                    264,
+                    TransformBindings,
+                    "Raid announcement"
+                ),
+                AutomationNode(
+                    nodeIds[4],
                     flowId,
                     "condition",
-                    """{"expression":"viewer_count >= 20"}""",
-                    240,
-                    216
+                    """{"predicate":false}""",
+                    648,
+                    96,
+                    ConnectedPredicate,
+                    "High roll?"
                 ),
                 AutomationNode(
-                    chatId,
+                    nodeIds[5],
                     flowId,
                     "send-chat",
-                    """{"message":"Welcome ${actor.display_name}!"}""",
-                    456,
-                    72
+                    """{"message":"Saved message"}""",
+                    648,
+                    264,
+                    ConnectedMessage,
+                    "Send message"
                 ),
                 AutomationNode(
-                    overlayId,
+                    nodeIds[6],
+                    flowId,
+                    "send-chat",
+                    """{"message":"Saved log message"}""",
+                    648,
+                    432,
+                    ConnectedMessage,
+                    "Log result"
+                ),
+                AutomationNode(
+                    nodeIds[7],
+                    flowId,
+                    "send-chat",
+                    """{"message":"Saved announcement"}""",
+                    648,
+                    600,
+                    ConnectedMessage,
+                    "Announce result"
+                ),
+                AutomationNode(
+                    nodeIds[8],
                     flowId,
                     "play-overlay-cue",
                     $$"""{"target-id":"{{target.PublicId:D}}","cue-id":"{{cue.PublicId:D}}"}""",
+                    960,
+                    24,
+                    displayAlias: "Play celebration"
+                ),
+                AutomationNode(
+                    nodeIds[9],
+                    flowId,
+                    "delay",
+                    """{"duration-milliseconds":2000}""",
+                    960,
+                    168,
+                    displayAlias: "Wait 2 seconds"
+                ),
+                AutomationNode(
+                    nodeIds[10],
+                    flowId,
+                    "play-overlay-cue",
+                    $$"""{"target-id":"{{target.PublicId:D}}","cue-id":"{{cue.PublicId:D}}"}""",
+                    960,
+                    312,
+                    displayAlias: "Show roll"
+                ),
+                AutomationNode(
+                    nodeIds[11],
+                    flowId,
+                    "delay",
+                    """{"duration-milliseconds":500}""",
+                    960,
                     456,
-                    360
+                    displayAlias: "Short wait"
+                ),
+                AutomationNode(
+                    nodeIds[12],
+                    flowId,
+                    "send-chat",
+                    """{"message":"Audit complete"}""",
+                    1200,
+                    552,
+                    displayAlias: "Save audit"
+                ),
+                AutomationNode(
+                    nodeIds[13],
+                    flowId,
+                    "condition",
+                    """{"predicate":false}""",
+                    960,
+                    600,
+                    ConnectedPredicate,
+                    "Check result"
+                ),
+                AutomationNode(
+                    nodeIds[14],
+                    flowId,
+                    "stream-online",
+                    "{}",
+                    336,
+                    24,
+                    displayAlias: "Stream online"
+                ),
+                AutomationNode(
+                    nodeIds[15],
+                    flowId,
+                    "send-chat",
+                    """{"message":"Stream started"}""",
+                    648,
+                    744,
+                    displayAlias: "Stream notice"
                 ),
             ],
             Edges =
             [
-                AutomationEdge(
-                    Guid.Parse("1b10be82-0000-4000-8000-000000000031"),
-                    flowId,
-                    sourceId,
-                    "flow",
-                    conditionId
-                ),
-                AutomationEdge(
-                    Guid.Parse("1b10be82-0000-4000-8000-000000000032"),
-                    flowId,
-                    commandSourceId,
-                    "flow",
-                    conditionId
-                ),
-                AutomationEdge(
-                    Guid.Parse("1b10be82-0000-4000-8000-000000000033"),
-                    flowId,
-                    conditionId,
-                    "true",
-                    chatId
-                ),
-                AutomationEdge(
-                    Guid.Parse("1b10be82-0000-4000-8000-000000000034"),
-                    flowId,
-                    conditionId,
-                    "false",
-                    overlayId
-                ),
+                FlowEdge(31, flowId, nodeIds[0], "flow", nodeIds[4]),
+                FlowEdge(32, flowId, nodeIds[0], "flow", nodeIds[5]),
+                FlowEdge(33, flowId, nodeIds[4], "yes", nodeIds[8]),
+                FlowEdge(34, flowId, nodeIds[4], "no", nodeIds[6]),
+                FlowEdge(35, flowId, nodeIds[8], "complete", nodeIds[9]),
+                FlowEdge(36, flowId, nodeIds[9], "complete", nodeIds[7]),
+                FlowEdge(37, flowId, nodeIds[5], "complete", nodeIds[7]),
+                FlowEdge(38, flowId, nodeIds[6], "complete", nodeIds[7]),
+                FlowEdge(39, flowId, nodeIds[7], "complete", nodeIds[13]),
+                FlowEdge(40, flowId, nodeIds[13], "yes", nodeIds[10]),
+                FlowEdge(41, flowId, nodeIds[13], "no", nodeIds[11]),
+                FlowEdge(42, flowId, nodeIds[10], "complete", nodeIds[12]),
+                FlowEdge(43, flowId, nodeIds[11], "complete", nodeIds[12]),
+                FlowEdge(44, flowId, nodeIds[14], "flow", nodeIds[15]),
+                FlowEdge(45, flowId, nodeIds[15], "complete", nodeIds[12]),
+                FlowEdge(46, flowId, nodeIds[0], "flow", nodeIds[12]),
+                DataEdge(47, flowId, nodeIds[0], "actor", nodeIds[3], "actor"),
+                DataEdge(48, flowId, nodeIds[1], "number", nodeIds[3], "number"),
+                DataEdge(49, flowId, nodeIds[2], "number", nodeIds[3], "threshold"),
+                DataEdge(50, flowId, nodeIds[3], "message", nodeIds[5], "message"),
+                DataEdge(51, flowId, nodeIds[3], "message", nodeIds[6], "message"),
+                DataEdge(52, flowId, nodeIds[3], "message", nodeIds[7], "message"),
+                DataEdge(53, flowId, nodeIds[3], "is-high", nodeIds[4], "predicate"),
+                DataEdge(54, flowId, nodeIds[3], "is-high", nodeIds[13], "predicate"),
             ],
         };
         _ = db.AutomationFlows.Add(flow);
@@ -236,7 +364,7 @@ internal sealed class SimulationFixtureSeeder(
                 RequiredFeatures = HostFeatureFlags.Automations,
                 ContextSchemaVersion = 1,
                 SourceDefinitionId = "incoming-raid",
-                SourceNodeId = sourceId,
+                SourceNodeId = nodeIds[0],
                 SourceOccurrenceId = Guid.Parse("1b10be82-0000-4000-8000-000000000022"),
                 ContextJson = "{}",
                 DefinitionJson = AutomationRuntimeSerialization.SerializeDefinition(flow),
@@ -245,9 +373,9 @@ internal sealed class SimulationFixtureSeeder(
                 CompletedAtUtc = now.AddMinutes(-12).AddSeconds(1),
                 NodeRuns =
                 [
-                    AutomationNodeRun(sourceId, 0, "source-received", now),
-                    AutomationNodeRun(conditionId, 1, "condition-true", now),
-                    AutomationNodeRun(chatId, 2, "action-succeeded", now),
+                    AutomationNodeRun(nodeIds[0], 0, "source-received", now),
+                    AutomationNodeRun(nodeIds[3], 1, "transform-completed", now),
+                    AutomationNodeRun(nodeIds[5], 2, "action-succeeded", now),
                 ],
             }
         );
@@ -285,7 +413,9 @@ internal sealed class SimulationFixtureSeeder(
         string definitionId,
         string configuration,
         int canvasX,
-        int canvasY
+        int canvasY,
+        string inputBindings = "{}",
+        string? displayAlias = null
     ) =>
         new()
         {
@@ -294,14 +424,15 @@ internal sealed class SimulationFixtureSeeder(
             DefinitionId = definitionId,
             DefinitionSchemaVersion = 1,
             ConfigurationJson = configuration,
-            InputBindingsJson = "{}",
+            InputBindingsJson = inputBindings,
             ExpressionLanguageVersion = 1,
             CanvasX = canvasX,
             CanvasY = canvasY,
+            DisplayAlias = displayAlias,
         };
 
-    private static AutomationFlowEdge AutomationEdge(
-        Guid id,
+    private static AutomationFlowEdge FlowEdge(
+        int id,
         Guid flowId,
         Guid sourceNodeId,
         string sourcePortId,
@@ -309,13 +440,32 @@ internal sealed class SimulationFixtureSeeder(
     ) =>
         new()
         {
-            Id = id,
+            Id = Guid.Parse($"1b10be82-0000-4000-8000-{id:000000000000}"),
             FlowId = flowId,
             Kind = PersistedAutomationEdgeKind.Flow,
             SourceNodeId = sourceNodeId,
             SourcePortId = sourcePortId,
             TargetNodeId = targetNodeId,
             TargetPortId = "flow",
+        };
+
+    private static AutomationFlowEdge DataEdge(
+        int id,
+        Guid flowId,
+        Guid sourceNodeId,
+        string sourcePortId,
+        Guid targetNodeId,
+        string targetPortId
+    ) =>
+        new()
+        {
+            Id = Guid.Parse($"1b10be82-0000-4000-8000-{id:000000000000}"),
+            FlowId = flowId,
+            Kind = PersistedAutomationEdgeKind.Data,
+            SourceNodeId = sourceNodeId,
+            SourcePortId = sourcePortId,
+            TargetNodeId = targetNodeId,
+            TargetPortId = targetPortId,
         };
 
     private static AutomationNodeRun AutomationNodeRun(

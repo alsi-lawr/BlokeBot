@@ -238,7 +238,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Value,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Random number", "Generates one inclusive whole number for each run.", "Data"),
+                new("Random Number", "Creates one random whole number for each run.", "Data"),
                 [],
                 [
                     new(

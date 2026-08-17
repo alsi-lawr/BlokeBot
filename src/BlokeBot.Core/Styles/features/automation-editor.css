@@ -20,8 +20,6 @@
 .automation-run-actions button,
 .automation-dirty-dialog-actions button,
 .automation-inspector-footer button,
-.automation-connected-row button,
-.automation-order-state button,
 .automation-restore-tab {
     align-items: center;
     display: inline-flex;
@@ -62,6 +60,7 @@
 }
 
 .automation-editor {
+    animation: none !important;
     background: var(--app-surface-solid);
     border: 1px solid var(--app-border);
     border-radius: 0.95rem;
@@ -77,6 +76,7 @@
     min-height: 36rem;
     overflow: hidden;
     position: relative;
+    transform: none !important;
 }
 
 .automation-editor-bar {
@@ -211,7 +211,7 @@
     color: var(--tone-red-fg);
 }
 
-.automation-node-library-button {
+.automation-toolbox-button {
     align-items: center;
     background: var(--app-control-bg);
     border: 1px solid var(--app-control-border);
@@ -226,148 +226,18 @@
     padding: 0 0.75rem;
 }
 
-.automation-node-library-backdrop {
-    align-items: flex-start;
-    background: rgb(15 23 42 / 0.46);
-    display: flex;
-    inset: 0;
-    justify-content: flex-end;
-    padding: 5rem 1.5rem 1.5rem;
-    position: fixed;
-    z-index: 420;
-}
-
-.automation-node-library-panel {
-    background: var(--app-surface-solid);
-    border: 1px solid var(--app-border);
-    border-radius: 0.75rem;
-    box-shadow: var(--app-shadow-surface);
-    display: grid;
-    gap: 0.8rem;
-    max-height: calc(100vh - 6.5rem);
-    overflow-y: auto;
-    padding: 0.85rem;
-    width: min(26rem, calc(100vw - 2rem));
-}
-
-.automation-node-library-panel > header,
-.automation-node-library-panel > header > div {
-    align-items: flex-start;
-    display: flex;
-    justify-content: space-between;
-}
-
-.automation-node-library-panel > header > div {
-    flex-direction: column;
-}
-
-.automation-node-library-panel > header button {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    color: var(--app-text-muted);
-    display: inline-flex;
-    font-size: 1.25rem;
-    justify-content: center;
-    height: 2rem;
-    width: 2rem;
-}
-
-.automation-node-library-panel > header button:hover,
 .automation-flow-rail-heading button:hover,
 .automation-icon-button:hover {
     background: var(--app-control-hover);
     color: var(--app-text-strong);
 }
 
-.automation-node-library-panel > header button:focus-visible,
 .automation-flow-rail-heading button:focus-visible,
 .automation-icon-button:focus-visible,
 .automation-canvas-tool-group button:focus-visible {
     box-shadow: 0 0 0 3px var(--tone-blue-ring);
     outline: 1px solid var(--tone-blue-solid);
     outline-offset: 1px;
-}
-
-.automation-node-library-panel > header span,
-.automation-node-library-panel h3 {
-    color: var(--app-text-muted);
-    font-size: 0.7rem;
-}
-
-.automation-node-library-panel h3 {
-    letter-spacing: 0.1em;
-    margin: 0 0 0.35rem;
-    text-transform: uppercase;
-}
-
-.automation-node-library-panel section {
-    display: grid;
-    gap: 0.35rem;
-}
-
-.automation-node-library-panel section button {
-    background: var(--app-surface-muted);
-    border: 1px solid var(--app-border);
-    border-radius: 0.55rem;
-    color: var(--app-text-strong);
-    cursor: pointer;
-    display: grid;
-    gap: 0.16rem;
-    grid-template-columns: auto 1fr;
-    padding: 0.65rem;
-    text-align: left;
-}
-
-.automation-node-library-panel section button:disabled {
-    cursor: not-allowed;
-    opacity: 0.42;
-}
-
-.automation-node-library-panel section button small {
-    color: var(--app-text-muted);
-    grid-column: 1 / -1;
-}
-
-.automation-library-node-title {
-    align-items: center;
-    display: flex;
-    gap: 0.5rem;
-    min-width: 0;
-}
-
-.automation-library-node-title strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.automation-node-search {
-    display: grid;
-    gap: 0.3rem;
-}
-
-.automation-node-search span {
-    color: var(--app-text-muted);
-    font-size: 0.68rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-.automation-node-search input {
-    background: var(--app-control-bg);
-    border: 1px solid var(--app-control-border);
-    border-radius: 0.5rem;
-    color: var(--app-text-strong);
-    min-height: 2.5rem;
-    padding: 0.5rem 0.65rem;
-}
-
-.automation-node-search-empty {
-    color: var(--app-text-muted);
-    font-size: 0.8rem;
-    margin: 1rem 0;
-    text-align: center;
 }
 
 .automation-feedback,
@@ -820,6 +690,11 @@
     outline: none;
 }
 
+.automation-node:has(.automation-port--data) .automation-node-select {
+    padding-left: 3.35rem;
+    padding-right: 3.35rem;
+}
+
 .automation-node--moving {
     cursor: grabbing;
     opacity: 0.92;
@@ -1132,35 +1007,6 @@
     margin-bottom: 0.65rem;
 }
 
-.automation-connected-row {
-    align-items: center;
-    background: var(--app-surface-muted);
-    border: 1px solid var(--app-border);
-    border-radius: 0.45rem;
-    display: flex;
-    font-size: 0.68rem;
-    gap: 0.4rem;
-    justify-content: space-between;
-    margin-top: 0.35rem;
-    padding: 0.45rem;
-}
-
-.automation-connected-row button {
-    background: transparent;
-    border: 0;
-    color: var(--tone-red-fg);
-    cursor: pointer;
-    font-size: 0.68rem;
-    font-weight: 800;
-}
-
-.automation-connected-row > span {
-    align-items: center;
-    display: flex;
-    gap: 0.35rem;
-    min-width: 0;
-}
-
 .automation-danger-button {
     background: var(--tone-red-bg);
     border: 1px solid var(--tone-red-ring);
@@ -1179,12 +1025,10 @@
     outline-offset: 1px;
 }
 
-.automation-node-library-button:focus-visible,
+.automation-toolbox-button:focus-visible,
 .automation-focus-action:focus-visible,
 .automation-restore-tab:focus-visible,
 .automation-canvas-tools > button:focus-visible,
-.automation-connected-row button:focus-visible,
-.automation-order-state button:focus-visible,
 .automation-enable-warning button:focus-visible,
 .automation-port:focus-visible {
     box-shadow: 0 0 0 3px var(--tone-blue-ring);
@@ -1240,90 +1084,6 @@
     text-align: center;
 }
 
-.automation-order-list {
-    display: grid;
-    gap: 0.55rem;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.automation-order-row {
-    align-items: center;
-    background: var(--app-surface-solid);
-    border: 1px solid var(--app-border);
-    border-radius: 0.65rem;
-    display: flex;
-    gap: 0.75rem;
-    justify-content: space-between;
-    padding: 0.55rem 0.7rem;
-}
-
-.automation-order-row--invalid {
-    border-color: var(--tone-red-ring);
-}
-
-.automation-order-select {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    color: var(--app-text-strong);
-    cursor: pointer;
-    display: flex;
-    gap: 0.65rem;
-    text-align: left;
-}
-
-.automation-order-select > .automation-node-icon {
-    height: 1.5rem;
-    width: 1.5rem;
-}
-
-.automation-order-number {
-    align-items: center;
-    background: var(--app-surface-muted);
-    border: 1px solid var(--app-border);
-    border-radius: 50%;
-    display: inline-flex;
-    font-size: 0.72rem;
-    font-weight: 800;
-    height: 2rem;
-    justify-content: center;
-    width: 2rem;
-}
-
-.automation-order-select strong,
-.automation-order-select small {
-    display: block;
-}
-
-.automation-order-select small,
-.automation-order-state {
-    color: var(--app-text-muted);
-    font-size: 0.7rem;
-    margin-top: 0.15rem;
-}
-
-.automation-order-state {
-    align-items: flex-end;
-    display: grid;
-    gap: 0.25rem;
-    justify-items: end;
-}
-
-.automation-order-state button {
-    background: transparent;
-    border: 0;
-    color: var(--tone-red-fg);
-    cursor: pointer;
-    font-size: 0.65rem;
-    font-weight: 800;
-}
-
-.automation-order-error {
-    color: var(--tone-red-fg);
-}
-
 .automation-run-drawer {
     align-items: center;
     background: var(--app-surface);
@@ -1366,7 +1126,6 @@
     width: 1.2rem;
 }
 
-.automation-library-node-title .automation-node-icon,
 .automation-inspector-identity > .automation-node-icon {
     height: 1.65rem;
     width: 1.65rem;
@@ -1620,22 +1379,9 @@
     .automation-editor-actions > .btn-primary,
     .automation-editor-actions > .btn-secondary,
     .automation-validation,
-    .automation-node-library-button {
+    .automation-toolbox-button {
         justify-content: center;
         white-space: nowrap;
-    }
-
-    .automation-node-library-backdrop {
-        align-items: flex-end;
-        padding: 0;
-    }
-
-    .automation-node-library-panel {
-        border-bottom: 0;
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-        max-height: 78vh;
-        width: 100%;
     }
 
     .automation-feedback,
@@ -1792,5 +1538,827 @@
 
     .automation-editor--focus .automation-run-actions > :first-child {
         display: inline-flex;
+    }
+}
+
+.automation-editor-body--toolbox-open {
+    grid-template-columns: 12rem 19rem minmax(31rem, 1fr);
+}
+
+.automation-workspace-toolbar {
+    align-items: center;
+    background: var(--app-surface-solid);
+    border-bottom: 1px solid var(--app-border);
+    display: flex;
+    gap: 0.45rem;
+    min-height: 3.3rem;
+    overflow-x: auto;
+    padding: 0.45rem 0.65rem;
+}
+
+.automation-workspace-toolbar button,
+.automation-workspace-toolbar select {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.55rem;
+    color: var(--app-text-strong);
+    display: inline-flex;
+    font-size: 0.76rem;
+    font-weight: 800;
+    gap: 0.35rem;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.65rem;
+    white-space: nowrap;
+}
+
+.automation-mobile-inspector-button {
+    display: none !important;
+}
+
+.automation-connection-legend {
+    align-items: center;
+    color: var(--app-text-muted);
+    display: inline-flex;
+    font-size: 0.65rem;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.automation-connection-legend::before {
+    content: "";
+    display: inline-block;
+    width: 1.5rem;
+}
+
+.automation-connection-legend--flow::before {
+    border-top: 2px solid var(--tone-blue-solid);
+}
+
+.automation-connection-legend--data::before {
+    border-top: 2px dashed var(--tone-violet-solid);
+}
+
+.automation-toolbox {
+    background: var(--app-surface-solid);
+    border-right: 1px solid var(--app-border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    z-index: 30;
+}
+
+.automation-toolbox > header,
+.automation-source-picker > header,
+.automation-inspector-section-heading {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+}
+
+.automation-toolbox > header {
+    padding: 0.8rem 0.75rem 0.55rem;
+}
+
+.automation-toolbox h2,
+.automation-toolbox p,
+.automation-source-picker h3 {
+    margin: 0;
+}
+
+.automation-toolbox h2 {
+    font-size: 1rem;
+}
+
+.automation-toolbox p {
+    color: var(--app-text-muted);
+    font-size: 0.68rem;
+    margin-top: 0.15rem;
+}
+
+.automation-toolbox-eyebrow {
+    color: var(--app-text-muted);
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.automation-toolbox-search {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.5rem;
+    display: flex;
+    gap: 0.4rem;
+    margin: 0 0.65rem 0.55rem;
+    padding: 0 0.5rem;
+}
+
+.automation-toolbox-search input {
+    background: transparent;
+    border: 0;
+    color: var(--app-text-strong);
+    flex: 1;
+    min-width: 0;
+    padding: 0.55rem 0;
+}
+
+.automation-toolbox-search input:focus {
+    outline: 0;
+}
+
+.automation-toolbox-search:focus-within {
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 2px var(--tone-blue-ring);
+}
+
+.automation-toolbox-search kbd {
+    color: var(--app-text-muted);
+    font-size: 0.65rem;
+}
+
+.automation-toolbox-tabs {
+    border-bottom: 1px solid var(--app-border);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0 0.35rem;
+}
+
+.automation-toolbox-tabs button {
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--app-text-muted);
+    font-size: 0.57rem;
+    font-weight: 900;
+    padding: 0.55rem 0.15rem;
+}
+
+.automation-toolbox-tabs button[aria-selected="true"] {
+    border-bottom-color: var(--tone-blue-solid);
+    color: var(--tone-blue-fg);
+}
+
+.automation-toolbox-results {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.55rem;
+}
+
+.automation-toolbox-results-heading {
+    align-items: center;
+    color: var(--app-text-muted);
+    display: flex;
+    font-size: 0.66rem;
+    justify-content: space-between;
+    padding: 0.1rem 0.15rem 0.45rem;
+}
+
+.automation-toolbox-row {
+    align-items: flex-start;
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.6rem;
+    color: var(--app-text-strong);
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: 1.7rem minmax(0, 1fr);
+    margin-bottom: 0.35rem;
+    padding: 0.55rem;
+    text-align: left;
+    width: 100%;
+}
+
+.automation-toolbox-row[aria-disabled="true"] {
+    color: var(--app-text-muted);
+}
+
+.automation-toolbox-row:focus-visible,
+.automation-toolbox-tabs button:focus-visible {
+    outline: 2px solid var(--tone-blue-solid);
+    outline-offset: -2px;
+}
+
+.automation-toolbox-row > .automation-node-icon {
+    background: var(--tone-blue-bg);
+    border-radius: 0.45rem;
+    height: 1.7rem;
+    padding: 0.32rem;
+    width: 1.7rem;
+}
+
+.automation-toolbox-row-copy,
+.automation-toolbox-row-copy > span {
+    display: block;
+}
+
+.automation-toolbox-row-copy {
+    font-size: 0.66rem;
+    line-height: 1.35;
+    min-width: 0;
+}
+
+.automation-toolbox-row-title {
+    align-items: baseline;
+    display: flex !important;
+    justify-content: space-between;
+}
+
+.automation-toolbox-row-title strong {
+    font-size: 0.75rem;
+}
+
+.automation-toolbox-row-title em {
+    color: var(--tone-violet-fg);
+    font-size: 0.52rem;
+    font-style: normal;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.automation-toolbox-row-meta {
+    color: var(--app-text-muted);
+    font-size: 0.59rem;
+    margin: 0.1rem 0 0.2rem;
+}
+
+.automation-toolbox-availability {
+    color: var(--tone-green-fg);
+    font-weight: 800;
+    margin-top: 0.25rem;
+}
+
+.automation-toolbox-availability--unavailable {
+    color: var(--tone-amber-fg);
+}
+
+.automation-toolbox-row a,
+.automation-inspector-cel-help a {
+    color: var(--tone-blue-fg);
+    display: inline-block;
+    font-weight: 800;
+    margin-top: 0.2rem;
+}
+
+.automation-toolbox-backdrop {
+    display: contents;
+}
+
+.automation-mobile-selection-summary {
+    display: none;
+}
+
+.automation-workspace {
+    display: flex;
+    flex-direction: column;
+}
+
+.automation-canvas-wrap {
+    flex: 1;
+}
+
+.automation-canvas-tools {
+    left: auto;
+    right: 0.65rem;
+    width: auto;
+}
+
+.automation-edge-group--data {
+    color: var(--tone-violet-solid);
+}
+
+.automation-edge-group--data .automation-edge {
+    stroke-dasharray: 7 5;
+}
+
+.automation-edge-group--invalid {
+    color: var(--tone-red-solid);
+}
+
+.automation-edge-group--invalid .automation-edge {
+    stroke-dasharray: 2 5;
+}
+
+.automation-edges marker path {
+    fill: context-stroke;
+}
+
+.automation-node {
+    height: 118px;
+    width: 184px;
+}
+
+.automation-node-kind--value {
+    background: var(--tone-blue-bg);
+    color: var(--tone-blue-fg);
+}
+
+.automation-node-kind--transform {
+    background: var(--tone-violet-bg);
+    color: var(--tone-violet-fg);
+}
+
+.automation-node-type-badges {
+    border: 1px solid var(--app-border);
+    border-radius: 0.3rem;
+    color: var(--app-text-muted);
+    display: inline-block;
+    font-size: 0.55rem;
+    margin-top: 0.25rem;
+    padding: 0.12rem 0.25rem;
+}
+
+.automation-port--data {
+    background: var(--tone-violet-solid);
+    border-radius: 0.15rem;
+    transform: translateY(-50%) rotate(45deg);
+}
+
+.automation-port--retained {
+    background: var(--tone-red-solid);
+    border-radius: 50%;
+}
+
+.automation-port-label {
+    background: var(--app-surface-solid);
+    border-radius: 0.2rem;
+    color: var(--app-text-muted);
+    font-size: 0.44rem;
+    line-height: 1;
+    max-width: 3.8rem;
+    overflow: hidden;
+    padding: 0.1rem 0.18rem;
+    pointer-events: none;
+    position: absolute;
+    text-overflow: ellipsis;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+}
+
+.automation-port--data .automation-port-label {
+    transform: translateY(-50%) rotate(-45deg);
+}
+
+.automation-port--input .automation-port-label {
+    left: 0.75rem;
+}
+
+.automation-port--output .automation-port-label {
+    right: 0.75rem;
+}
+
+.automation-inspector {
+    width: 23.5rem;
+}
+
+.automation-inspector-cel-help,
+.automation-binding-choice-help,
+.automation-inactive-values {
+    background: var(--app-surface-muted);
+    border-radius: 0.45rem;
+    color: var(--app-text-muted);
+    font-size: 0.64rem;
+    line-height: 1.4;
+    padding: 0.45rem;
+}
+
+.automation-inspector-cel-help p {
+    margin: 0;
+}
+
+.automation-inspector-cel-help {
+    background: var(--app-surface-solid);
+    border-bottom: 1px solid var(--app-border);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.automation-inspector-cel-help div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.8rem;
+}
+
+.automation-inspector-section-heading {
+    align-items: center;
+}
+
+.automation-inspector-section-heading button,
+.automation-repair-actions button,
+.automation-source-picker footer button {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.4rem;
+    color: var(--app-text-strong);
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 0.35rem 0.5rem;
+}
+
+.automation-transform-declaration,
+.automation-input-editor {
+    border-top: 1px solid var(--app-border);
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.65rem 0;
+}
+
+.automation-transform-declaration {
+    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.7fr);
+}
+
+.automation-transform-declaration label,
+.automation-transform-declaration span {
+    color: var(--app-text-muted);
+    display: grid;
+    font-size: 0.59rem;
+    gap: 0.15rem;
+}
+
+.automation-transform-declaration input,
+.automation-transform-declaration select,
+.automation-transform-declaration textarea {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.35rem;
+    color: var(--app-text-strong);
+    min-width: 0;
+    padding: 0.35rem;
+}
+
+.automation-transform-cel {
+    grid-column: 1 / -1;
+}
+
+.automation-input-heading {
+    align-items: baseline;
+    display: flex;
+    justify-content: space-between;
+}
+
+.automation-input-heading h3 {
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.automation-input-heading span {
+    color: var(--tone-violet-fg);
+    font-size: 0.58rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.automation-binding-mode-tabs {
+    background: var(--app-surface-muted);
+    border: 1px solid var(--app-border);
+    border-radius: 0.45rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 0.15rem;
+}
+
+.automation-binding-mode-tabs button {
+    background: transparent;
+    border: 0;
+    border-radius: 0.35rem;
+    color: var(--app-text-muted);
+    font-size: 0.63rem;
+    font-weight: 800;
+    padding: 0.4rem;
+}
+
+.automation-binding-mode-tabs button[aria-pressed="true"] {
+    background: var(--app-surface-solid);
+    box-shadow: 0 1px 4px rgb(15 23 42 / 0.16);
+    color: var(--app-text-strong);
+}
+
+.automation-binding-card {
+    background: var(--app-surface-muted);
+    border: 1px solid var(--app-border);
+    border-radius: 0.45rem;
+    display: grid;
+    font-size: 0.64rem;
+    gap: 0.12rem;
+    padding: 0.45rem;
+}
+
+.automation-binding-card--invalid {
+    border-color: var(--tone-red-ring);
+}
+
+.automation-connection-diagnostic,
+.automation-list-needs-repair {
+    color: var(--tone-red-fg);
+}
+
+.automation-repair-actions {
+    display: grid;
+    gap: 0.35rem;
+    grid-template-columns: 1fr 1fr;
+}
+
+.automation-cel-completions {
+    border: 1px solid var(--tone-blue-solid);
+    border-radius: 0.45rem;
+    display: grid;
+    font-size: 0.62rem;
+    overflow: hidden;
+}
+
+.automation-cel-completions > * {
+    align-items: center;
+    border-top: 1px solid var(--app-border);
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0.45rem;
+}
+
+.automation-cel-completions > :first-child {
+    background: var(--tone-blue-bg);
+    border-top: 0;
+}
+
+.automation-cel-completions em {
+    color: var(--app-text-muted);
+    font-style: normal;
+}
+
+.automation-source-picker-backdrop {
+    align-items: center;
+    background: rgb(15 23 42 / 0.58);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    z-index: 520;
+}
+
+.automation-source-picker {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 3rem rgb(15 23 42 / 0.35);
+    max-height: min(38rem, 85dvh);
+    max-width: calc(100vw - 2rem);
+    overflow: auto;
+    padding: 0.75rem;
+    width: 30rem;
+}
+
+.automation-source-picker-options {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.75rem 0;
+}
+
+.automation-source-picker-option {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.45rem;
+    color: var(--app-text-strong);
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.automation-source-picker-option span,
+.automation-source-picker-option small {
+    display: block;
+}
+
+.automation-source-picker-option em {
+    color: var(--app-text-muted);
+    font-size: 0.62rem;
+    font-style: normal;
+    max-width: 45%;
+    text-align: right;
+}
+
+.automation-source-picker-option--selected {
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 2px var(--tone-blue-ring);
+}
+
+.automation-source-picker footer {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.automation-connection-list {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.automation-connection-row {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.6rem;
+    display: grid;
+    grid-template-columns: 10rem 13.5rem minmax(17rem, 1fr) 7rem 5rem;
+    overflow: hidden;
+}
+
+.automation-connection-row--invalid {
+    border-color: var(--tone-red-ring);
+}
+
+.automation-connection-row > * {
+    border-left: 1px solid var(--app-border);
+    min-width: 0;
+    padding: 0.55rem;
+}
+
+.automation-connection-row > :first-child {
+    border-left: 0;
+}
+
+.automation-connection-node {
+    align-items: flex-start;
+    background: transparent;
+    border: 0;
+    color: var(--app-text-strong);
+    display: flex;
+    gap: 0.45rem;
+    text-align: left;
+}
+
+.automation-connection-node span,
+.automation-connection-node small,
+.automation-list-connections span,
+.automation-list-inputs span,
+.automation-list-status span,
+.automation-list-status small {
+    display: block;
+}
+
+.automation-connection-node small,
+.automation-list-connections,
+.automation-list-inputs,
+.automation-list-status,
+.automation-list-actions {
+    color: var(--app-text-muted);
+    font-size: 0.61rem;
+    line-height: 1.35;
+}
+
+.automation-list-connections > strong,
+.automation-list-inputs > strong,
+.automation-list-status > strong,
+.automation-list-actions > strong {
+    display: block;
+    font-size: 0.52rem;
+    letter-spacing: 0.09em;
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+}
+
+.automation-list-inputs em {
+    background: var(--tone-violet-bg);
+    border-radius: 0.3rem;
+    color: var(--tone-violet-fg);
+    font-style: normal;
+    padding: 0.1rem 0.25rem;
+}
+
+.automation-list-actions button {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.4rem;
+    color: var(--app-text-strong);
+    margin-right: 0.25rem;
+    padding: 0.35rem;
+}
+
+@media (max-width: 74rem) and (min-width: 48.001rem) {
+    .automation-editor-body--toolbox-open {
+        grid-template-columns: 10.5rem 18rem minmax(26rem, 1fr);
+    }
+}
+
+@media (max-width: 48rem) {
+    .automation-editor-body--toolbox-open {
+        display: block;
+    }
+
+    .automation-workspace-toolbar {
+        padding: 0.45rem;
+    }
+
+    .automation-mobile-inspector-button {
+        display: inline-flex !important;
+    }
+
+    .automation-connection-legend,
+    .automation-workspace-toolbar label {
+        display: none;
+    }
+
+    .automation-toolbox-backdrop {
+        background: rgb(15 23 42 / 0.58);
+        display: block;
+        inset: 0;
+        position: fixed;
+        z-index: 470;
+    }
+
+    .automation-toolbox {
+        border: 1px solid var(--app-border);
+        border-bottom: 0;
+        border-radius: 1rem 1rem 0 0;
+        bottom: 0;
+        height: min(42dvh, 24rem);
+        left: 0;
+        position: fixed;
+        right: 0;
+        width: 100%;
+        z-index: 480;
+    }
+
+    .automation-node:not(.automation-node--selected) .automation-port-label {
+        display: none;
+    }
+
+    .automation-node--selected {
+        width: 238px;
+    }
+
+    .automation-inspector {
+        display: none;
+        height: min(82dvh, 42rem);
+    }
+
+    .automation-inspector--mobile-open {
+        display: block;
+    }
+
+    .automation-mobile-selection-summary {
+        align-items: center;
+        background: var(--tone-blue-bg);
+        border-bottom: 1px solid var(--tone-blue-ring);
+        border-top: 1px solid var(--tone-blue-ring);
+        color: var(--app-text-strong);
+        display: flex;
+        gap: 0.5rem;
+        justify-content: space-between;
+        padding: 0.45rem 0.55rem;
+    }
+
+    .automation-mobile-selection-summary div,
+    .automation-mobile-selection-summary small {
+        display: block;
+        min-width: 0;
+    }
+
+    .automation-mobile-selection-summary span,
+    .automation-mobile-selection-summary small {
+        color: var(--app-text-muted);
+        font-size: 0.62rem;
+    }
+
+    .automation-mobile-selection-summary small {
+        white-space: normal;
+    }
+
+    .automation-mobile-selection-summary button {
+        align-items: center;
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        border-radius: 0.45rem;
+        color: var(--app-text-strong);
+        display: inline-flex;
+        flex: none;
+        gap: 0.3rem;
+        padding: 0.4rem 0.55rem;
+    }
+
+    .automation-list-heading {
+        align-items: flex-start;
+        display: grid;
+        gap: 0.2rem;
+    }
+
+    .automation-connection-row {
+        grid-template-columns: 1fr;
+    }
+
+    .automation-connection-row > * {
+        border-left: 0;
+        border-top: 1px solid var(--app-border);
+    }
+
+    .automation-connection-row > :first-child {
+        border-top: 0;
     }
 }

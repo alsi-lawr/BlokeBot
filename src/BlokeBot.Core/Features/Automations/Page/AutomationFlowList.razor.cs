@@ -23,6 +23,10 @@ public partial class AutomationFlowList
     public IReadOnlyList<AutomationSampleNodeOutcome> SampleOutcomes { get; set; } = [];
 
     [Parameter]
+    public IReadOnlySet<AutomationDefinitionId> UnavailableDefinitionIds { get; set; } =
+        new HashSet<AutomationDefinitionId>();
+
+    [Parameter]
     public EventCallback<AutomationNodeId> SelectNode { get; set; }
 
     [Parameter]
@@ -34,82 +38,110 @@ public partial class AutomationFlowList
     {
         if (
             _focusNodeAfterRender is not { } nodeId
-            || !Nodes.Any(node => node.Id == nodeId)
             || !_nodeSelectors.TryGetValue(nodeId, out var selector)
         )
         {
             return;
         }
-
         _focusNodeAfterRender = null;
         await selector.FocusAsync();
     }
 
-    private IReadOnlyList<AutomationEditorNode> _orderedNodes
-    {
-        get
-        {
-            if (Nodes.Count == 0)
-            {
-                return [];
-            }
+    private IReadOnlyList<AutomationEditorNode> _orderedNodes =>
+        Nodes
+            .OrderBy(node => node.Id == SelectedNodeId ? 0 : 1)
+            .ThenBy(static node => node.Position.Y.Value)
+            .ThenBy(static node => node.Position.X.Value)
+            .ThenBy(static node => node.EffectiveName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-            var incoming = Nodes.ToDictionary(static node => node.Id, static _ => 0);
-            foreach (var edge in Edges.Where(edge => incoming.ContainsKey(edge.TargetNodeId)))
-            {
-                incoming[edge.TargetNodeId]++;
-            }
-
-            var ready = new Queue<AutomationNodeId>(
-                Nodes
-                    .Where(node => incoming[node.Id] == 0)
-                    .OrderBy(static node => node.Position.Y.Value)
-                    .ThenBy(static node => node.Position.X.Value)
-                    .Select(static node => node.Id)
-            );
-            var ordered = new List<AutomationEditorNode>();
-            while (ready.TryDequeue(out var nodeId))
-            {
-                ordered.Add(Nodes.Single(node => node.Id == nodeId));
-                foreach (
-                    var target in Edges
-                        .Where(edge => edge.SourceNodeId == nodeId)
-                        .OrderBy(static edge => edge.SourcePortId.Value)
-                        .Select(static edge => edge.TargetNodeId)
+    private string Incoming(AutomationEditorNode node) =>
+        Names(
+            Edges
+                .Where(edge => edge.TargetNodeId == node.Id)
+                .Select(edge =>
+                    Nodes
+                        .FirstOrDefault(candidate => candidate.Id == edge.SourceNodeId)
+                        ?.EffectiveName
                 )
-                {
-                    incoming[target]--;
-                    if (incoming[target] == 0)
-                    {
-                        ready.Enqueue(target);
-                    }
-                }
-            }
+        );
 
-            return ordered.Count == Nodes.Count ? ordered : Nodes;
-        }
-    }
+    private string Outgoing(AutomationEditorNode node) =>
+        Names(
+            Edges
+                .Where(edge => edge.SourceNodeId == node.Id)
+                .Select(edge =>
+                    Nodes
+                        .FirstOrDefault(candidate => candidate.Id == edge.TargetNodeId)
+                        ?.EffectiveName
+                )
+        );
 
-    private string ConnectionLabel(AutomationNodeId nodeId)
+    private static string Names(IEnumerable<string?> names)
     {
-        var outgoing = Edges.Count(edge => edge.SourceNodeId == nodeId);
-        return outgoing switch
-        {
-            0 => "End of branch",
-            1 => "1 next node",
-            _ => $"{outgoing} branches",
-        };
+        var values = names
+            .Where(static name => name is not null)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return values.Length == 0 ? "None" : string.Join(", ", values);
     }
+
+    private string InputSource(AutomationEditorNode node, AutomationPortMetadata input)
+    {
+        var binding = node.Binding(input.BindingFieldId!.Value);
+        if (binding.Mode == AutomationInputBindingMode.Fixed)
+        {
+            return "Entered value";
+        }
+        if (binding.Mode == AutomationInputBindingMode.Expression)
+        {
+            return binding.Expression?.Source ?? "No expression";
+        }
+        var edge = IncomingDataEdge(node, input);
+        if (edge is null)
+        {
+            return "No source";
+        }
+        var source = Nodes.FirstOrDefault(candidate => candidate.Id == edge.SourceNodeId);
+        var output = source?.Definition.Outputs.FirstOrDefault(port =>
+            port.Id == edge.SourcePortId
+        );
+        return $"{source?.EffectiveName ?? "Unavailable node"}.{output?.Name ?? "Unavailable port"}";
+    }
+
+    private AutomationFlowDraftEdge? IncomingDataEdge(
+        AutomationEditorNode node,
+        AutomationPortMetadata input
+    ) =>
+        Edges.FirstOrDefault(edge =>
+            edge.Kind == AutomationEdgeKind.Data
+            && edge.TargetNodeId == node.Id
+            && edge.TargetPortId == input.Id
+        );
+
+    private string? InputIssue(AutomationEditorNode node, AutomationPortMetadata input) =>
+        IncomingDataEdge(node, input) is { } edge ? AutomationConnections.Issue(edge, Nodes)
+        : node.Binding(input.BindingFieldId!.Value).Mode == AutomationInputBindingMode.Connected
+            ? "Choose a source."
+        : null;
+
+    private string? NodeIssue(AutomationEditorNode node) =>
+        Edges
+            .Where(edge => edge.TargetNodeId == node.Id)
+            .Select(edge => AutomationConnections.Issue(edge, Nodes))
+            .FirstOrDefault(static issue => issue is not null);
+
+    private static bool IsDataPort(AutomationPortMetadata port) =>
+        port.ValueType != AutomationPortValueType.Flow && port.BindingFieldId is not null;
 
     private static string KindLabel(AutomationNodeKind kind) =>
         kind switch
         {
-            AutomationNodeKind.Source => "Event",
+            AutomationNodeKind.Source => "Trigger",
+            AutomationNodeKind.Value => "Value",
+            AutomationNodeKind.Transform => "Transform",
             AutomationNodeKind.Control => "Control",
             AutomationNodeKind.Action => "Action",
             _ => "Node",
         };
-
-    private static string OutcomeLabel(AutomationSampleNodeOutcome outcome) =>
-        outcome.State == AutomationNodeRunState.Failed ? "Sample failed" : "Sample passed";
 }

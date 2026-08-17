@@ -11,6 +11,7 @@ public partial class AutomationFlowCanvas
     private IJSObjectReference? _module;
     private DotNetObjectReference<AutomationFlowCanvas>? _self;
     private AutomationNodeId? _focusNodeAfterRender;
+    private string? _renderSignature;
 
     [Parameter, EditorRequired]
     public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];
@@ -84,9 +85,14 @@ public partial class AutomationFlowCanvas
             await _module.InvokeVoidAsync("initialize", _root, _self);
         }
 
-        if (_module is not null)
+        var signature = RenderSignature();
+        if (_module is not null && (firstRender || signature != _renderSignature))
         {
             await _module.InvokeVoidAsync("refresh", _root);
+            _renderSignature = signature;
+        }
+        if (_module is not null)
+        {
             if (_focusNodeAfterRender is { } nodeId)
             {
                 _focusNodeAfterRender = null;
@@ -279,24 +285,33 @@ public partial class AutomationFlowCanvas
     private string EdgeGroupClass(AutomationFlowDraftEdge edge) =>
         string.Join(
             ' ',
-            "automation-edge-group",
-            BranchToken(edge.SourcePortId),
-            SelectedEdgeId == edge.Id ? "automation-edge-group--selected" : string.Empty
+            new[]
+            {
+                "automation-edge-group",
+                edge.Kind == AutomationEdgeKind.Flow
+                    ? "automation-edge-group--flow"
+                    : "automation-edge-group--data",
+                BranchToken(edge.SourcePortId),
+                AutomationConnections.Issue(edge, Nodes) is null
+                    ? string.Empty
+                    : "automation-edge-group--invalid",
+                SelectedEdgeId == edge.Id ? "automation-edge-group--selected" : string.Empty,
+            }.Where(static value => value.Length > 0)
         );
 
     private string? BranchLabel(AutomationFlowDraftEdge edge) =>
         edge.SourcePortId.Value switch
         {
-            "true" => "Yes",
-            "false" => "No",
+            "yes" => "Yes",
+            "no" => "No",
             _ => null,
         };
 
     private static string BranchToken(AutomationPortId portId) =>
         portId.Value switch
         {
-            "true" => "automation-branch--true",
-            "false" => "automation-branch--false",
+            "yes" => "automation-branch--true",
+            "no" => "automation-branch--false",
             _ => "automation-branch--default",
         };
 
@@ -313,6 +328,8 @@ public partial class AutomationFlowCanvas
         kind switch
         {
             AutomationNodeKind.Source => "source",
+            AutomationNodeKind.Value => "value",
+            AutomationNodeKind.Transform => "transform",
             AutomationNodeKind.Control => "control",
             AutomationNodeKind.Action => "action",
             _ => "node",
@@ -322,13 +339,107 @@ public partial class AutomationFlowCanvas
         kind switch
         {
             AutomationNodeKind.Source => "Trigger",
+            AutomationNodeKind.Value => "Value",
+            AutomationNodeKind.Transform => "CEL Transform",
             AutomationNodeKind.Control => "Condition",
             AutomationNodeKind.Action => "Action",
             _ => "Node",
         };
 
-    private static bool IsFlowPort(AutomationPortMetadata port) =>
-        port.ValueType == AutomationPortValueType.Flow;
+    private static string PortClass(AutomationPortMetadata port, string direction) =>
+        $"automation-port automation-port--{direction} automation-port--{(port.ValueType == AutomationPortValueType.Flow ? "flow" : "data")}";
+
+    private static string PortDisplay(AutomationPortMetadata port) =>
+        port.ValueType == AutomationPortValueType.Flow
+            ? port.Name
+            : $"{port.Name} · {AutomationConnections.TypeLabel(port)}";
+
+    private string InputOccupied(AutomationNodeId nodeId, AutomationPortId portId) =>
+        Edges.Any(edge =>
+            edge.Kind == AutomationEdgeKind.Data
+            && edge.TargetNodeId == nodeId
+            && edge.TargetPortId == portId
+        )
+            ? "true"
+            : "false";
+
+    private string NodeAccessibleLabel(AutomationEditorNode node)
+    {
+        var ports = node
+            .Definition.Inputs.Select(port => $"{PortDisplay(port)} input")
+            .Concat(node.Definition.Outputs.Select(port => $"{PortDisplay(port)} output"));
+        return $"Select {node.EffectiveName}. {string.Join(". ", ports)}";
+    }
+
+    private static string TypeBadges(AutomationEditorNode node) =>
+        string.Join(
+            " · ",
+            node.Definition.Inputs.Concat(node.Definition.Outputs)
+                .Where(static port => port.ValueType != AutomationPortValueType.Flow)
+                .Select(AutomationConnections.TypeLabel)
+                .Distinct(StringComparer.Ordinal)
+        );
+
+    private string EdgeAccessibleLabel(AutomationFlowDraftEdge edge)
+    {
+        var source = Nodes.FirstOrDefault(node => node.Id == edge.SourceNodeId);
+        var target = Nodes.FirstOrDefault(node => node.Id == edge.TargetNodeId);
+        var sourceName = source?.EffectiveName ?? "Unavailable source";
+        var targetName = target?.EffectiveName ?? "Unavailable target";
+        var kind = edge.Kind == AutomationEdgeKind.Flow ? "Flow" : "Data";
+        var issue = AutomationConnections.Issue(edge, Nodes);
+        return issue is null
+            ? $"{kind} connection from {sourceName} to {targetName}"
+            : $"{kind} connection from {sourceName} to {targetName}. Needs repair. {issue}";
+    }
+
+    private static string EdgeMarker(AutomationFlowDraftEdge edge) =>
+        edge.Kind == AutomationEdgeKind.Flow
+            ? "url(#automation-flow-marker)"
+            : "url(#automation-data-marker)";
+
+    private IReadOnlyList<AutomationRetainedPort> RetainedPorts(
+        AutomationEditorNode node,
+        bool input
+    )
+    {
+        var declared = (input ? node.Definition.Inputs : node.Definition.Outputs)
+            .Select(static port => port.Id)
+            .ToHashSet();
+        var retained = Edges
+            .Where(edge => input ? edge.TargetNodeId == node.Id : edge.SourceNodeId == node.Id)
+            .Select(edge => input ? edge.TargetPortId : edge.SourcePortId)
+            .Where(portId => !declared.Contains(portId))
+            .Distinct()
+            .OrderBy(static portId => portId.Value, StringComparer.Ordinal)
+            .ToArray();
+        var count = declared.Count + retained.Length;
+        return retained
+            .Select(
+                (portId, index) => new AutomationRetainedPort(portId, declared.Count + index, count)
+            )
+            .ToArray();
+    }
+
+    private string RenderSignature() =>
+        string.Join(
+            '|',
+            Settings.Orientation,
+            Settings.EdgeStyle,
+            ViewportKey,
+            string.Join(
+                ';',
+                Nodes.Select(node =>
+                    $"{node.Id.Value:N}:{node.Position.X.Value}:{node.Position.Y.Value}:{node.Definition.Inputs.Length}:{node.Definition.Outputs.Length}:{OutcomeFor(node.Id)?.OutcomeCode}"
+                )
+            ),
+            string.Join(
+                ';',
+                Edges.Select(edge =>
+                    $"{edge.Id:N}:{edge.Kind}:{edge.SourceNodeId.Value:N}:{edge.SourcePortId.Value}:{edge.TargetNodeId.Value:N}:{edge.TargetPortId.Value}"
+                )
+            )
+        );
 
     private static string OutcomeLabel(AutomationSampleNodeOutcome outcome) =>
         outcome.OutcomeCode switch
@@ -371,3 +482,5 @@ public sealed record AutomationCanvasSelectionRequest(
     IReadOnlyList<AutomationNodeId> NodeIds,
     Guid? EdgeId
 );
+
+internal sealed record AutomationRetainedPort(AutomationPortId PortId, int Index, int Count);

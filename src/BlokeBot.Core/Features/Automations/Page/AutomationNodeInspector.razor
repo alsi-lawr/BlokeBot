@@ -1,14 +1,19 @@
+@using Microsoft.AspNetCore.Components.Web
+
 @if (Node is null)
 {
     <aside class="automation-inspector automation-inspector--empty" aria-label="Node inspector">
         <p class="automation-inspector-eyebrow">Inspector</p>
         <h2>Select a node</h2>
-        <p>Select one node in Grid or List view. Then, edit its fields and connections.</p>
+        <p>Select one node in Grid or List. Then, edit its fields and connections.</p>
     </aside>
 }
 else
 {
-    <aside class="automation-inspector" aria-label="Node inspector: @Node.EffectiveName" data-automation-inspector="@Node.Id.Value">
+    <aside class="@(MobileOpen ? "automation-inspector automation-inspector--mobile-open" : "automation-inspector")"
+           aria-label="Node inspector: @Node.EffectiveName"
+           tabindex="-1"
+           data-automation-inspector="@Node.Id.Value">
         <header class="automation-inspector-header">
             <div class="automation-inspector-identity">
                 <AutomationNodeIcon DefinitionId="Node.Definition.Id" />
@@ -23,12 +28,106 @@ else
                            placeholder="@Node.Definition.Display.Name"
                            title="Edit node name"
                            @oninput="args => SetDisplayAliasAsync(args.Value)" />
+                    <span>@Node.Definition.Display.Name</span>
                 </div>
             </div>
-            <button class="automation-icon-button" type="button" aria-label="Close inspector" title="Close inspector" @onclick="ClearSelection"><AutomationIcon Name="close" /></button>
+            <button class="automation-icon-button" type="button" aria-label="Close Inspector" title="Close Inspector" @onclick="ClearSelection"><AutomationIcon Name="close" /></button>
         </header>
 
-        @foreach (var field in Node.Definition.Configuration)
+        @if (Node.IsCelTransform)
+        {
+            <div class="automation-inspector-cel-help">
+                <p>CEL is a small language that calculates a value from node inputs.</p>
+                <p>An input Expression can use only Arguments when the input has the Arguments type.</p>
+                <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
+            </div>
+            <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Declared inputs</h3><button type="button" @onclick="AddTransformInputAsync"><AutomationIcon Name="add" />Add input</button></div>
+                @foreach (var input in Node.TransformInputs)
+                {
+                    <div class="automation-transform-declaration" @key="input.PortId">
+                        <label>Input name<input type="text" value="@input.DisplayName" @oninput="args => UpdateTransformInputAsync(input, displayName: args.Value?.ToString())" /></label>
+                        <label>Type<select value="@input.ValueType" @onchange="args => UpdateTransformInputAsync(input, valueType: args.Value?.ToString())">@foreach (var type in _inputTypes){<option value="@type">@type</option>}</select></label>
+                        <label>Null value<select value="@input.Nullability" @onchange="args => UpdateTransformInputAsync(input, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Can be null</option></select></label>
+                        <span>CEL name <code>@input.Identifier.Value</code></span>
+                        <button class="automation-danger-button" type="button" aria-label="Remove input @input.DisplayName" @onclick="() => RemoveTransformInputAsync(input.PortId)"><AutomationIcon Name="delete" />Remove</button>
+                    </div>
+                }
+            </section>
+        }
+
+        <p class="automation-binding-choice-help">Fixed: Enter a value. Connected: Use another node. Expression: Calculate a value.</p>
+
+        @foreach (var input in Node.Definition.Inputs.Where(IsDataPort))
+        {
+            var fieldId = input.BindingFieldId!.Value;
+            var binding = Node.Binding(fieldId);
+            var edge = IncomingDataEdge(input.Id);
+            var issue = edge is null ? null : AutomationConnections.Issue(edge, Nodes);
+            <section class="automation-input-editor" @key="input.Id" aria-label="@input.Name input">
+                <div class="automation-input-heading"><h3>Input · @input.Name</h3><span>@AutomationConnections.TypeLabel(input) · @(input.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</span></div>
+                <div class="automation-binding-mode-tabs" role="group" aria-label="@input.Name input choice">
+                    @foreach (var mode in Enum.GetValues<AutomationInputBindingMode>())
+                    {
+                        <button type="button" aria-pressed="@(binding.Mode == mode ? "true" : "false")" @onclick="() => SetBindingModeAsync(fieldId, mode)">@mode</button>
+                    }
+                </div>
+                @if (binding.Mode == AutomationInputBindingMode.Fixed)
+                {
+                    <label class="automation-field"><span>Enter a value</span><input type="@FixedInputType(input)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
+                }
+                else if (binding.Mode == AutomationInputBindingMode.Expression)
+                {
+                    <label class="automation-field"><span>Calculate a value</span><textarea aria-label="@input.Name input expression" value="@binding.Expression?.Source" @oninput="args => SetExpressionAsync(fieldId, args.Value)"></textarea></label>
+                    <div class="automation-cel-completions" aria-label="Available names for @input.Name">
+                        <strong>Available name for this input</strong>
+                        @if (AutomationCelCompletions.ForRestrictedInput(input).IsEmpty)
+                        {
+                            <span>No available name has the required type.</span>
+                        }
+                        else
+                        {
+                            @foreach (var completion in AutomationCelCompletions.ForRestrictedInput(input))
+                            {
+                                <span><code>@completion.Name</code><em>@completion.ValueType</em></span>
+                            }
+                        }
+                    </div>
+                }
+                else
+                {
+                    @if (edge is null)
+                    {
+                        <div class="automation-binding-card"><strong>No source</strong><span>Use another node for this input.</span></div>
+                    }
+                    else
+                    {
+                        <div class="@(issue is null ? "automation-binding-card" : "automation-binding-card automation-binding-card--invalid")">
+                            <strong>@ConnectedSourceLabel(edge)</strong>
+                            @if (issue is null)
+                            {
+                                <span>Connected · @ConnectedSourceType(edge)</span>
+                            }
+                            else
+                            {
+                                <span>Needs repair. BlokeBot keeps the connection so you can repair it.</span>
+                                <span class="automation-connection-diagnostic" role="alert">@issue</span>
+                            }
+                        </div>
+                    }
+                    <div class="automation-repair-actions">
+                        <button type="button" @ref="_pickerOpener" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : "Repair source")</button>
+                        @if (edge is not null)
+                        {
+                            <button class="automation-danger-button" type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)">Disconnect</button>
+                        }
+                    </div>
+                }
+                <p class="automation-inactive-values">BlokeBot keeps the unused choices. Only @binding.Mode runs.</p>
+            </section>
+        }
+
+        @foreach (var field in Node.Definition.Configuration.Where(static field => field.FieldType is not AutomationConfigurationFieldType.Data))
         {
             var choices = ChoicesFor(field);
             var fieldErrors = FieldErrors(field.Id);
@@ -36,128 +135,83 @@ else
                 <label for="@FieldId(Node.Id, field.Id)">@field.Name</label>
                 @if (field.FieldType is AutomationConfigurationFieldType.Text { Multiline: true })
                 {
-                    <textarea id="@FieldId(Node.Id, field.Id)"
-                              value="@Node.Value(field.Id)"
-                              maxlength="@MaximumLength(field)"
-                              required="@field.Required"
-                              aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
-                              @oninput="args => SetValueAsync(field.Id, args.Value)"></textarea>
+                    <textarea id="@FieldId(Node.Id, field.Id)" value="@Node.Value(field.Id)" maxlength="@MaximumLength(field)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @oninput="args => SetValueAsync(field.Id, args.Value)"></textarea>
                 }
                 else if (choices.Count > 0)
                 {
-                    <select id="@FieldId(Node.Id, field.Id)"
-                            value="@Node.Value(field.Id)"
-                            required="@field.Required"
-                            aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
-                            @onchange="args => SetValueAsync(field.Id, args.Value)">
-                        @if (!field.Required)
-                        {
-                            <option value="">Any</option>
-                        }
-                        else if (string.IsNullOrWhiteSpace(Node.Value(field.Id)))
-                        {
-                            <option value="">Choose @field.Name.ToLowerInvariant()</option>
-                        }
-                        @foreach (var choice in choices)
-                        {
-                            <option value="@choice.Value">@choice.Label</option>
-                        }
-                    </select>
-                }
-                else if (field.FieldType is AutomationConfigurationFieldType.Number number)
-                {
-                    <input id="@FieldId(Node.Id, field.Id)"
-                           type="number"
-                           min="@number.Minimum"
-                           max="@number.Maximum"
-                           value="@Node.Value(field.Id)"
-                           required="@field.Required"
-                           aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
-                           @oninput="args => SetValueAsync(field.Id, args.Value)" />
-                }
-                else if (field.FieldType is AutomationConfigurationFieldType.Duration duration)
-                {
-                    <input id="@FieldId(Node.Id, field.Id)"
-                           type="number"
-                           min="@DurationMinimum(field, duration)"
-                           max="@DurationMaximum(field, duration)"
-                           value="@Node.Value(field.Id)"
-                           required="@field.Required"
-                           aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
-                           @oninput="args => SetValueAsync(field.Id, args.Value)" />
+                    <select id="@FieldId(Node.Id, field.Id)" value="@Node.Value(field.Id)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @onchange="args => SetValueAsync(field.Id, args.Value)">@if (!field.Required){<option value="">Any</option>}@foreach (var choice in choices){<option value="@choice.Value">@choice.Label</option>}</select>
                 }
                 else
                 {
-                    <input id="@FieldId(Node.Id, field.Id)"
-                           type="text"
-                           value="@Node.Value(field.Id)"
-                           maxlength="@MaximumLength(field)"
-                           required="@field.Required"
-                           aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
-                           @oninput="args => SetValueAsync(field.Id, args.Value)" />
+                    <input id="@FieldId(Node.Id, field.Id)" type="@GenericInputType(field)" value="@Node.Value(field.Id)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @oninput="args => SetValueAsync(field.Id, args.Value)" />
                 }
-                <p>@FieldHelp(field)</p>
-                @foreach (var error in fieldErrors)
-                {
-                    <span class="automation-field-error" role="alert">@error.Message</span>
-                }
+                <p>@field.Description</p>
+                @foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@error.Message</span>}
             </div>
+        }
+
+        @if (Node.IsCelTransform)
+        {
+            <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-outputs-heading">
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-outputs-heading">Outputs</h3><button type="button" @onclick="AddTransformOutputAsync"><AutomationIcon Name="add" />Add output</button></div>
+                @foreach (var output in Node.TransformOutputs)
+                {
+                    <div class="automation-transform-declaration" @key="output.PortId">
+                        <label>Output name<input type="text" value="@output.DisplayName" @oninput="args => UpdateTransformOutputAsync(output, displayName: args.Value?.ToString())" /></label>
+                        <label>Type<select value="@output.ValueType" @onchange="args => UpdateTransformOutputAsync(output, valueType: args.Value?.ToString())">@foreach (var type in _outputTypes){<option value="@type">@type</option>}</select></label>
+                        <label>Null value<select value="@output.Nullability" @onchange="args => UpdateTransformOutputAsync(output, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Can be null</option></select></label>
+                        <label class="automation-transform-cel">CEL expression<textarea value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></label>
+                        <button class="automation-danger-button" type="button" aria-label="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><AutomationIcon Name="delete" />Remove</button>
+                    </div>
+                }
+                <div class="automation-cel-completions" aria-label="Available output CEL names">
+                    <strong>Available node inputs</strong>
+                    @foreach (var completion in AutomationCelCompletions.ForOutput(Node))
+                    {
+                        <span><code>@completion.Name</code><em>@completion.ValueType</em></span>
+                    }
+                    <span><code>format_number(number[, 0..6])</code><em>Text</em></span>
+                </div>
+            </section>
         }
 
         @if (_genericErrors.Count > 0)
         {
-            <div class="automation-node-errors" role="alert">
-                @foreach (var error in _genericErrors)
-                {
-                    <span>@error.Message</span>
-                }
-            </div>
+            <div class="automation-node-errors" role="alert">@foreach (var error in _genericErrors){<span>@error.Message</span>}</div>
         }
 
         @if (Node.Definition.Outputs.Any(IsFlowPort))
         {
             <section class="automation-inspector-section" aria-labelledby="automation-connections-heading">
-                <h3 id="automation-connections-heading">Connections</h3>
+                <h3 id="automation-connections-heading">Flow connections</h3>
                 @foreach (var output in Node.Definition.Outputs.Where(IsFlowPort))
                 {
-                    <div class="automation-connection-editor" @key="output.Id">
-                        <label for="@ConnectionId(Node.Id, output.Id)">@output.Name goes to</label>
-                        <select id="@ConnectionId(Node.Id, output.Id)"
-                                value=""
-                                @onchange="args => ConnectAsync(output, args.Value)">
-                            <option value="">Choose a compatible node</option>
-                            @foreach (var target in CompatibleTargets(output))
-                            {
-                                <option value="@target.Id.Value">@target.EffectiveName</option>
-                            }
-                        </select>
-                    </div>
-                }
-                @foreach (var edge in Edges.Where(edge => edge.SourceNodeId == Node.Id))
-                {
-                    var target = Nodes.Single(node => node.Id == edge.TargetNodeId);
-                    <div class="automation-connected-row" @key="edge.Id">
-                        <span><AutomationNodeIcon DefinitionId="target.Definition.Id" />@PortLabel(edge.SourcePortId) → @target.EffectiveName</span>
-                        <button type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)"><AutomationIcon Name="remove" />Remove</button>
-                    </div>
+                    <div class="automation-connection-editor" @key="output.Id"><label for="@ConnectionId(Node.Id, output.Id)">@output.Name goes to</label><select id="@ConnectionId(Node.Id, output.Id)" value="" @onchange="args => ConnectAsync(output, args.Value)"><option value="">Choose a compatible node</option>@foreach (var target in CompatibleTargets(output)){<option value="@target.Id.Value">@target.EffectiveName</option>}</select></div>
                 }
             </section>
         }
 
-        @if (Node.Definition.Kind is not AutomationNodeKind.Source)
+        @if (Node.Definition.Kind is not AutomationNodeKind.Source and not AutomationNodeKind.Value and not AutomationNodeKind.Transform)
         {
-            <div class="automation-field">
-                <label for="automation-failure-policy">If this node fails</label>
-                <select id="automation-failure-policy" @bind="Node.FailurePolicy" @bind:after="ChangedAsync">
-                    <option value="@AutomationNodeFailurePolicy.Stop">Stop this run</option>
-                    <option value="@AutomationNodeFailurePolicy.Continue">Continue this branch</option>
-                </select>
-            </div>
+            <div class="automation-field"><label for="automation-failure-policy">If this node fails</label><select id="automation-failure-policy" @bind="Node.FailurePolicy" @bind:after="ChangedAsync"><option value="@AutomationNodeFailurePolicy.Stop">Stop this run</option><option value="@AutomationNodeFailurePolicy.Continue">Continue this branch</option></select></div>
         }
 
-        <footer class="automation-inspector-footer">
-            <button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)"><AutomationIcon Name="delete" />Delete node</button>
-            <button class="btn-primary" type="button" @onclick="ChangedAsync"><AutomationIcon Name="apply" />Apply</button>
-        </footer>
+        <footer class="automation-inspector-footer"><button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)"><AutomationIcon Name="delete" />Delete node</button><button class="btn-primary" type="button" @onclick="ChangedAsync"><AutomationIcon Name="apply" />Apply</button></footer>
+
+        @if (_pickerInputId is not null)
+        {
+            <div class="automation-source-picker-backdrop" @onclick="CancelSourcePickerAsync">
+                <section class="automation-source-picker" role="dialog" aria-modal="true" aria-labelledby="automation-source-picker-title" @onkeydown="HandlePickerKeyAsync" @onclick:stopPropagation="true">
+                    <header><div><span class="automation-inspector-eyebrow">Use another node</span><h3 id="automation-source-picker-title">Choose a source and port</h3></div><button class="automation-icon-button" type="button" aria-label="Cancel source choice" @onclick="CancelSourcePickerAsync"><AutomationIcon Name="close" /></button></header>
+                    <div class="automation-source-picker-options">
+                        @foreach (var choice in SourceChoices())
+                        {
+                            <button type="button" class="@(choice == _selectedSource ? "automation-source-picker-option automation-source-picker-option--selected" : "automation-source-picker-option")" aria-pressed="@(choice == _selectedSource ? "true" : "false")" @ref="_sourceReferences[choice]" @onclick="() => SelectSource(choice)"><span><strong>@choice.Node.EffectiveName · @choice.Port.Name</strong><small>@choice.Node.Definition.Display.Name · @AutomationConnections.TypeLabel(choice.Port)</small></span><em>@choice.Compatibility.Reason</em></button>
+                        }
+                    </div>
+                    <footer><button type="button" @onclick="CancelSourcePickerAsync">Cancel</button><button class="btn-primary" type="button" disabled="@(_selectedSource?.Compatibility.IsCompatible != true)" @onclick="ConnectSelectedSourceAsync">Connect</button></footer>
+                </section>
+            </div>
+        }
     </aside>
 }

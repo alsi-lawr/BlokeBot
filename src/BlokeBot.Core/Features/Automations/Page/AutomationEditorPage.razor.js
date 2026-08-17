@@ -82,3 +82,7 @@ export async function toggleBrowserFullscreen() {
 
     await document.documentElement.requestFullscreen();
 }
+
+export function focusInspector() {
+    document.querySelector("[data-automation-inspector]")?.focus({ preventScroll: true });
+}

@@ -35,14 +35,16 @@ public partial class AutomationEditorPage
     private bool _validated;
     private bool _operationFailed;
     private bool _nodeLibraryOpen;
+    private bool _mobileInspectorOpen;
+    private bool _focusInspectorAfterRender;
     private bool _enableConfirmation;
     private bool _deleteConfirmation;
     private bool _hasChanges;
     private bool _feedbackFading;
     private string? _feedback;
     private string? _flowRecoveryMessage;
-    private string _nodeSearch = string.Empty;
     private string _canvasViewportKey = Guid.NewGuid().ToString("N");
+    private ElementReference _toolboxOpener;
     private CancellationTokenSource? _validationFeedbackCancellation;
     private Func<Task>? _pendingTransition;
     private Func<Task>? _acceptedTransition;
@@ -59,33 +61,6 @@ public partial class AutomationEditorPage
         _selectedNodeIds.Count == 1
             ? _editor?.Nodes.FirstOrDefault(node => node.Id == _selectedNodeIds.Single())
             : null;
-
-    private IEnumerable<AutomationDefinitionDescriptor> _filteredDefinitions
-    {
-        get
-        {
-            var definitions =
-                _editor?.Nodes.Count == 0
-                    ? _definitions.Where(static definition =>
-                        definition.Kind == AutomationNodeKind.Source
-                    )
-                    : _definitions;
-            if (string.IsNullOrWhiteSpace(_nodeSearch))
-            {
-                return definitions;
-            }
-
-            var search = _nodeSearch.Trim();
-            return definitions.Where(definition =>
-                definition.Display.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || definition.Display.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || definition.Display.Description.Contains(
-                    search,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            );
-        }
-    }
 
     private string _flowSubtitle =>
         _editor?.Id is null ? "Not saved · changes stay private"
@@ -187,9 +162,17 @@ public partial class AutomationEditorPage
     }
 
     private string _editorBodyClass =>
-        _focusMode && _flowRailCollapsed
-            ? "automation-editor-body automation-editor-body--flows-collapsed"
-            : "automation-editor-body";
+        string.Join(
+            ' ',
+            new[]
+            {
+                "automation-editor-body",
+                _focusMode && _flowRailCollapsed
+                    ? "automation-editor-body--flows-collapsed"
+                    : string.Empty,
+                _nodeLibraryOpen ? "automation-editor-body--toolbox-open" : string.Empty,
+            }.Where(static value => value.Length > 0)
+        );
 
     protected override async Task OnInitializedAsync()
     {
@@ -230,6 +213,12 @@ public partial class AutomationEditorPage
         catch (JSDisconnectedException) { }
         catch (JSException) { }
         catch (TaskCanceledException) { }
+
+        if (_focusInspectorAfterRender && _pageModule is not null)
+        {
+            _focusInspectorAfterRender = false;
+            await _pageModule.InvokeVoidAsync("focusInspector");
+        }
 
         if (_acceptedTransition is not { } transition)
         {
@@ -365,7 +354,6 @@ public partial class AutomationEditorPage
         _selectedNodeId = null;
         _selectedNodeIds.Clear();
         _selectedEdgeId = null;
-        _nodeSearch = string.Empty;
         _nodeLibraryOpen = true;
         _hasChanges = true;
     }
@@ -397,25 +385,28 @@ public partial class AutomationEditorPage
     private bool RestoreEditor(AutomationFlowSnapshot snapshot)
     {
         _unavailableDefinitionIds.Clear();
-        var definitions = _definitions.ToDictionary(static definition => definition.Id);
+        var availableDefinitions = _definitions.ToDictionary(static definition => definition.Id);
+        var definitions = new Dictionary<AutomationNodeId, AutomationDefinitionDescriptor>();
         foreach (var node in snapshot.Draft.Nodes)
         {
             var id = new AutomationDefinitionId(node.Definition.TypeId);
-            if (definitions.ContainsKey(id))
+            if (!availableDefinitions.TryGetValue(id, out var descriptor))
             {
-                continue;
+                if (!_catalogService.TryDescribe(id, out descriptor))
+                {
+                    _editor = null;
+                    _flowRecoveryMessage =
+                        $"The saved flow '{snapshot.Draft.Name}' uses an unavailable node type. Restore the node provider, or delete the flow.";
+                    return false;
+                }
+
+                _ = _unavailableDefinitionIds.Add(id);
             }
 
-            if (!_catalogService.TryDescribe(id, out var descriptor))
-            {
-                _editor = null;
-                _flowRecoveryMessage =
-                    $"The saved flow '{snapshot.Draft.Name}' uses an unavailable node type. Restore the node provider, or delete the flow.";
-                return false;
-            }
-
-            definitions.Add(id, descriptor);
-            _ = _unavailableDefinitionIds.Add(id);
+            definitions[node.Id] = _catalogService.ValidatePersistedDefinition(node.Definition)
+                is AutomationConfigurationCheck.Valid valid
+                ? valid.Definition
+                : descriptor;
         }
 
         _editor = AutomationEditorState.Restore(snapshot, definitions);
@@ -438,7 +429,8 @@ public partial class AutomationEditorPage
         _selectedNodeId = node.Id;
         SetSingleNodeSelection(node.Id);
         _nodeLibraryOpen = false;
-        _nodeSearch = string.Empty;
+        _mobileInspectorOpen = true;
+        _focusInspectorAfterRender = true;
         EditorChanged();
     }
 
@@ -446,14 +438,6 @@ public partial class AutomationEditorPage
         definition.TriggerContextRequirement is not { } requirement
         || _editor?.Nodes.Any(node => requirement.CompatibleSources.Contains(node.Definition.Id))
             == true;
-
-    private string? DefinitionUnavailableReason(AutomationDefinitionDescriptor definition) =>
-        DefinitionIsAvailable(definition)
-            ? null
-            : definition.TriggerContextRequirement?.UnavailableReason;
-
-    private string DefinitionLibraryHelp(AutomationDefinitionDescriptor definition) =>
-        DefinitionUnavailableReason(definition) ?? definition.Display.Description;
 
     private void ApplyFirstReferenceDefaults(AutomationEditorNode node)
     {
@@ -487,12 +471,20 @@ public partial class AutomationEditorPage
     {
         if (
             _editor is null
-            || !CompatibleConnection(_editor, request)
+            || ConnectionDetails(_editor, request) is not { } connection
             || _editor.Edges.Any(edge =>
                 edge.SourceNodeId == request.SourceNodeId
                 && edge.SourcePortId == request.SourcePortId
                 && edge.TargetNodeId == request.TargetNodeId
                 && edge.TargetPortId == request.TargetPortId
+            )
+            || (
+                connection.Kind == AutomationEdgeKind.Data
+                && _editor.Edges.Any(edge =>
+                    edge.Kind == AutomationEdgeKind.Data
+                    && edge.TargetNodeId == request.TargetNodeId
+                    && edge.TargetPortId == request.TargetPortId
+                )
             )
         )
         {
@@ -501,7 +493,7 @@ public partial class AutomationEditorPage
 
         var edge = new AutomationFlowDraftEdge(
             Guid.NewGuid(),
-            AutomationEdgeKind.Flow,
+            connection.Kind,
             request.SourceNodeId,
             request.SourcePortId,
             request.TargetNodeId,
@@ -514,13 +506,38 @@ public partial class AutomationEditorPage
         EditorChanged();
     }
 
+    private void RepairConnection(AutomationRepairConnectionRequest request)
+    {
+        if (_editor is null || ConnectionDetails(_editor, request.Connection) is not { } connection)
+        {
+            return;
+        }
+
+        var index = _editor.Edges.FindIndex(edge => edge.Id == request.EdgeId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        _editor.Edges[index] = _editor.Edges[index] with
+        {
+            Kind = connection.Kind,
+            SourceNodeId = request.Connection.SourceNodeId,
+            SourcePortId = request.Connection.SourcePortId,
+            TargetNodeId = request.Connection.TargetNodeId,
+            TargetPortId = request.Connection.TargetPortId,
+        };
+        _selectedEdgeId = request.EdgeId;
+        EditorChanged();
+    }
+
     private void RejectConnection() =>
         ShowTimedValidationFeedback(
             "Release the connection on one compatible input or node.",
             failed: true
         );
 
-    private static bool CompatibleConnection(
+    private static AutomationConnectionDetails? ConnectionDetails(
         AutomationEditorState editor,
         AutomationConnectionRequest request
     )
@@ -533,14 +550,13 @@ public partial class AutomationEditorPage
         var input = target?.Definition.Inputs.FirstOrDefault(port =>
             port.Id == request.TargetPortId
         );
-        return source is not null
-            && target is not null
-            && source.Id != target.Id
-            && output is not null
-            && input is not null
-            && output.ValueType == AutomationPortValueType.Flow
-            && output.ValueType == input.ValueType
-            && output.Sensitivity == input.Sensitivity;
+        if (source is null || target is null || output is null || input is null)
+        {
+            return null;
+        }
+
+        var compatibility = AutomationConnections.Compatibility(source, output, target, input);
+        return compatibility.IsCompatible ? new(AutomationConnections.Kind(output)) : null;
     }
 
     private void DeleteEdge(Guid edgeId)
@@ -614,6 +630,7 @@ public partial class AutomationEditorPage
 
         _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
         _selectedEdgeId = selection.EdgeId;
+        _mobileInspectorOpen = false;
         _inspectorFocusMode = _selectedNodeId is null ? null : AutomationEditorMode.Grid;
     }
 
@@ -1115,6 +1132,8 @@ public partial class AutomationEditorPage
         _feedback = null;
         _operationFailed = false;
         _nodeLibraryOpen = false;
+        _mobileInspectorOpen = false;
+        _focusInspectorAfterRender = false;
         _enableConfirmation = false;
         _deleteConfirmation = false;
         _hasChanges = false;
@@ -1153,6 +1172,7 @@ public partial class AutomationEditorPage
 
         _selectedNodeId = nodeId;
         _selectedEdgeId = null;
+        _mobileInspectorOpen = false;
         _inspectorFocusMode = nodeId is null ? null : _mode;
     }
 
@@ -1161,6 +1181,7 @@ public partial class AutomationEditorPage
         _selectedNodeIds.Clear();
         _selectedNodeId = null;
         _selectedEdgeId = null;
+        _mobileInspectorOpen = false;
         _inspectorFocusMode = null;
     }
 
@@ -1226,16 +1247,53 @@ public partial class AutomationEditorPage
 
     private void ResetCanvasViewport() => _canvasViewportKey = Guid.NewGuid().ToString("N");
 
-    private void ToggleNodeLibrary()
+    private Task ToggleNodeLibraryAsync()
     {
         _nodeLibraryOpen = !_nodeLibraryOpen;
-        if (_nodeLibraryOpen)
+        return Task.CompletedTask;
+    }
+
+    private async Task CloseNodeLibraryAsync()
+    {
+        _nodeLibraryOpen = false;
+        await InvokeAsync(StateHasChanged);
+        await _toolboxOpener.FocusAsync();
+    }
+
+    private Task CloseNodeLibraryFromOutsideAsync() =>
+        _nodeLibraryOpen ? CloseNodeLibraryAsync() : Task.CompletedTask;
+
+    private async Task FocusInspectorAsync()
+    {
+        _mobileInspectorOpen = true;
+        await InvokeAsync(StateHasChanged);
+        if (_pageModule is not null)
         {
-            _nodeSearch = string.Empty;
+            await _pageModule.InvokeVoidAsync("focusInspector");
         }
     }
 
-    private void CloseNodeLibrary() => _nodeLibraryOpen = false;
+    private void ChangeOrientation(ChangeEventArgs args)
+    {
+        if (
+            _editor is not null
+            && Enum.TryParse<AutomationFlowOrientation>(args.Value?.ToString(), out var orientation)
+        )
+        {
+            ChangeCanvasSettings(_editor.Canvas with { Orientation = orientation });
+        }
+    }
+
+    private void ChangeEdgeStyle(ChangeEventArgs args)
+    {
+        if (
+            _editor is not null
+            && Enum.TryParse<AutomationEdgeStyle>(args.Value?.ToString(), out var edgeStyle)
+        )
+        {
+            ChangeCanvasSettings(_editor.Canvas with { EdgeStyle = edgeStyle });
+        }
+    }
 
     private void CancelEnable() => _enableConfirmation = false;
 
@@ -1350,4 +1408,6 @@ public partial class AutomationEditorPage
         Grid,
         List,
     }
+
+    private sealed record AutomationConnectionDetails(AutomationEdgeKind Kind);
 }
