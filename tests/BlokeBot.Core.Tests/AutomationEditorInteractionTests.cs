@@ -10,6 +10,8 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class AutomationEditorInteractionTests
 {
+    private const string _focusInterop = "Blazor._internal.domWrapper.focus";
+
     [Test]
     public void TypedEditor_CanvasKeyboard_MovesOnGridAndRequestsNodeDeletion()
     {
@@ -260,7 +262,7 @@ public sealed class AutomationEditorInteractionTests
         var issues = edges
             .Select(edge => AutomationConnections.Issue(edge, [source, firstTarget, secondTarget]))
             .ToArray();
-        issues.ShouldAllBe(static issue => issue != null);
+        issues.ShouldAllBe(static issue => !string.IsNullOrWhiteSpace(issue));
     }
 
     [Test]
@@ -404,73 +406,158 @@ public sealed class AutomationEditorInteractionTests
             Sensitivity = AutomationDataSensitivity.Sensitive,
         };
 
-        AutomationConnections
-            .Compatibility(AutomationNodeKind.Value, safeNullableNumber, safeRequiredNumber)
-            .IsCompatible.ShouldBeFalse();
-        AutomationConnections
-            .Compatibility(AutomationNodeKind.Value, sensitiveNumber, safeRequiredNumber)
-            .IsCompatible.ShouldBeFalse();
+        var nullableRejection = AutomationConnections.Compatibility(
+            AutomationNodeKind.Value,
+            safeNullableNumber,
+            safeRequiredNumber
+        );
+        nullableRejection.IsCompatible.ShouldBeFalse();
+        nullableRejection.Reason.ShouldNotBeNullOrWhiteSpace();
+        var sensitiveRejection = AutomationConnections.Compatibility(
+            AutomationNodeKind.Value,
+            sensitiveNumber,
+            safeRequiredNumber
+        );
+        sensitiveRejection.IsCompatible.ShouldBeFalse();
+        sensitiveRejection.Reason.ShouldNotBeNullOrWhiteSpace();
         AutomationConnections
             .Compatibility(AutomationNodeKind.Value, safeRequiredNumber, sensitiveNumber)
             .IsCompatible.ShouldBeTrue();
-        AutomationConnections
-            .Compatibility(AutomationNodeKind.Action, safeRequiredNumber, safeRequiredNumber)
-            .IsCompatible.ShouldBeFalse();
+        var sourceKindRejection = AutomationConnections.Compatibility(
+            AutomationNodeKind.Action,
+            safeRequiredNumber,
+            safeRequiredNumber
+        );
+        sourceKindRejection.IsCompatible.ShouldBeFalse();
+        sourceKindRejection.Reason.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Test]
-    public void TypedEditor_SourcePicker_EscapeCancelsTheChoice()
+    public void TypedEditor_SourcePicker_CompatibleSelectionEmitsExactConnectionAndReturnsFocus()
+    {
+        var nodes = CreatePickerNodes();
+        var expected = new AutomationConnectionRequest(
+            nodes.CompatibleSource.Id,
+            nodes.CompatibleSource.Definition.Outputs.Single().Id,
+            nodes.Target.Id,
+            nodes.Target.Definition.Inputs.Single().Id
+        );
+        var completion = CompletePicker(
+            nodes.Target,
+            [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target],
+            []
+        );
+
+        completion.Connection.ShouldBe(expected);
+        completion.Repair.ShouldBeNull();
+    }
+
+    [Test]
+    public void TypedEditor_SourcePicker_RetainedEdgeRepairEmitsExactReplacementAndReturnsFocus()
+    {
+        var nodes = CreatePickerNodes();
+        var incompatibleOutput = nodes.IncompatibleSource.Definition.Outputs.Single();
+        var targetInput = nodes.Target.Definition.Inputs.Single();
+        var retained = new AutomationFlowDraftEdge(
+            Guid.NewGuid(),
+            AutomationEdgeKind.Data,
+            nodes.IncompatibleSource.Id,
+            incompatibleOutput.Id,
+            nodes.Target.Id,
+            targetInput.Id
+        );
+        var expected = new AutomationConnectionRequest(
+            nodes.CompatibleSource.Id,
+            nodes.CompatibleSource.Definition.Outputs.Single().Id,
+            nodes.Target.Id,
+            targetInput.Id
+        );
+        var completion = CompletePicker(
+            nodes.Target,
+            [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target],
+            [retained]
+        );
+
+        completion.Connection.ShouldBeNull();
+        completion.Repair.ShouldBe(new(retained.Id, expected));
+        retained.SourceNodeId.ShouldBe(nodes.IncompatibleSource.Id);
+        retained.SourcePortId.ShouldBe(incompatibleOutput.Id);
+        retained.TargetNodeId.ShouldBe(nodes.Target.Id);
+        retained.TargetPortId.ShouldBe(targetInput.Id);
+        AutomationConnections
+            .Issue(retained, [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target])
+            .ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Test]
+    public void TypedEditor_SourcePicker_IncompatibleChoiceExplainsAndCannotComplete()
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var numberSource = AutomationEditorNode.Create(
-            Definition(
-                "number-source",
-                AutomationNodeKind.Value,
-                "Number source",
-                outputs: [Port("number", AutomationPortValueType.Number)]
-            ),
-            new(new(48), new(72))
+        var nodes = CreatePickerNodes();
+        var output = nodes.IncompatibleSource.Definition.Outputs.Single();
+        var input = nodes.Target.Definition.Inputs.Single();
+        var compatibility = AutomationConnections.Compatibility(
+            nodes.IncompatibleSource,
+            output,
+            nodes.Target,
+            input
         );
-        var booleanSource = AutomationEditorNode.Create(
-            Definition(
-                "boolean-source",
-                AutomationNodeKind.Value,
-                "Boolean source",
-                outputs: [Port("boolean", AutomationPortValueType.Boolean)]
-            ),
-            new(new(48), new(240))
-        );
-        var target = AutomationEditorNode.Create(
-            Definition(
-                "condition",
-                AutomationNodeKind.Control,
-                "Condition",
-                inputs:
-                [
-                    Port(
-                        "predicate",
-                        AutomationPortValueType.Boolean,
-                        bindingFieldId: new("predicate")
-                    ),
-                ]
-            ),
-            new(new(288), new(72))
-        );
-        target.SetBindingMode(new("predicate"), AutomationInputBindingMode.Connected);
+        AutomationConnectionRequest? connection = null;
+        AutomationRepairConnectionRequest? repair = null;
+        compatibility.IsCompatible.ShouldBeFalse();
+        compatibility.Reason.ShouldNotBeNullOrWhiteSpace();
         var inspector = context.Render<AutomationNodeInspector>(parameters =>
             parameters
-                .Add(component => component.Node, target)
-                .Add(component => component.Nodes, [numberSource, booleanSource, target])
+                .Add(component => component.Node, nodes.Target)
+                .Add(component => component.Nodes, [nodes.IncompatibleSource, nodes.Target])
                 .Add(component => component.Edges, [])
+                .Add(component => component.Connect, request => connection = request)
+                .Add(component => component.Repair, request => repair = request)
         );
 
         inspector.Find("button[aria-haspopup=dialog]").Click();
+        inspector.Find("[role=dialog] button[aria-pressed=false]").Click();
+
+        var selectedChoice = inspector.Find("[role=dialog] button[aria-pressed=true]");
+        selectedChoice.TextContent.ShouldContain(compatibility.Reason);
+        inspector.Find("[role=dialog] button[disabled]").Click();
+        connection.ShouldBeNull();
+        repair.ShouldBeNull();
+        _ = inspector.Find("[role=dialog]");
+    }
+
+    [Test]
+    public void TypedEditor_SourcePicker_EscapeCancelsAndReturnsFocus()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var nodes = CreatePickerNodes();
+        AutomationConnectionRequest? connection = null;
+        AutomationRepairConnectionRequest? repair = null;
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, nodes.Target)
+                .Add(
+                    component => component.Nodes,
+                    [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target]
+                )
+                .Add(component => component.Edges, [])
+                .Add(component => component.Connect, request => connection = request)
+                .Add(component => component.Repair, request => repair = request)
+        );
+        var opener = inspector.Find("button[aria-haspopup=dialog]");
+        opener.Click();
+        var focusCalls = FocusCalls(context);
 
         var dialog = inspector.Find("[role=dialog]");
         dialog.GetAttribute("aria-modal").ShouldBe("true");
         dialog.KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        connection.ShouldBeNull();
+        repair.ShouldBeNull();
         inspector.FindAll("[role=dialog]").ShouldBeEmpty();
+        FocusCalls(context).ShouldBe(focusCalls + 1);
     }
 
     [Test]
@@ -521,7 +608,10 @@ public sealed class AutomationEditorInteractionTests
         );
         restored.RemoveTransformInput(originalInput.PortId);
 
-        _ = AutomationConnections.Issue(retained, [source, restored]).ShouldNotBeNull();
+        AutomationConnections.Issue(retained, [source, restored]).ShouldNotBeNullOrWhiteSpace();
+        retained.SourceNodeId.ShouldBe(source.Id);
+        retained.SourcePortId.ShouldBe(new AutomationPortId("number"));
+        retained.TargetNodeId.ShouldBe(restored.Id);
         retained.TargetPortId.ShouldBe(originalInput.PortId);
     }
 
@@ -604,6 +694,102 @@ public sealed class AutomationEditorInteractionTests
             ? port.Name
             : $"{port.Name} · {AutomationConnections.TypeLabel(port)}";
 
+    private static PickerNodes CreatePickerNodes()
+    {
+        var incompatibleSource = AutomationEditorNode.Create(
+            Definition(
+                "number-source",
+                AutomationNodeKind.Value,
+                "Number source",
+                outputs: [Port("number", AutomationPortValueType.Number)]
+            ),
+            new(new(48), new(72))
+        );
+        var compatibleSource = AutomationEditorNode.Create(
+            Definition(
+                "boolean-source",
+                AutomationNodeKind.Value,
+                "Boolean source",
+                outputs: [Port("boolean", AutomationPortValueType.Boolean)]
+            ),
+            new(new(48), new(240))
+        );
+        var target = AutomationEditorNode.Create(
+            Definition(
+                "condition",
+                AutomationNodeKind.Control,
+                "Condition",
+                inputs:
+                [
+                    Port(
+                        "predicate",
+                        AutomationPortValueType.Boolean,
+                        bindingFieldId: new("predicate")
+                    ),
+                ]
+            ),
+            new(new(288), new(72))
+        );
+        target.SetBindingMode(new("predicate"), AutomationInputBindingMode.Connected);
+        return new(incompatibleSource, compatibleSource, target);
+    }
+
+    private static PickerCompletion CompletePicker(
+        AutomationEditorNode target,
+        IReadOnlyList<AutomationEditorNode> nodes,
+        IReadOnlyList<AutomationFlowDraftEdge> edges
+    )
+    {
+        for (var controlIndex = 0; ; controlIndex++)
+        {
+            using var context = new BunitContext();
+            context.JSInterop.Mode = JSRuntimeMode.Loose;
+            AutomationConnectionRequest? connection = null;
+            AutomationRepairConnectionRequest? repair = null;
+            var inspector = context.Render<AutomationNodeInspector>(parameters =>
+                parameters
+                    .Add(component => component.Node, target)
+                    .Add(component => component.Nodes, nodes)
+                    .Add(component => component.Edges, edges)
+                    .Add(component => component.Connect, request => connection = request)
+                    .Add(component => component.Repair, request => repair = request)
+            );
+            var opener = inspector.Find("button[aria-haspopup=dialog]");
+            opener.Click();
+            inspector.Find("[role=dialog] button[aria-pressed=true]").Click();
+            var focusCalls = FocusCalls(context);
+            var completionControls = inspector
+                .FindAll("[role=dialog] button")
+                .Where(static button =>
+                    !button.HasAttribute("aria-label")
+                    && !button.HasAttribute("aria-pressed")
+                    && !button.HasAttribute("disabled")
+                )
+                .ToArray();
+            if (controlIndex >= completionControls.Length)
+            {
+                throw new InvalidOperationException(
+                    "No enabled dialog control emitted a picker completion."
+                );
+            }
+
+            completionControls[controlIndex].Click();
+            if (connection is null && repair is null)
+            {
+                continue;
+            }
+
+            inspector.FindAll("[role=dialog]").ShouldBeEmpty();
+            FocusCalls(context).ShouldBe(focusCalls + 1);
+            return new(connection, repair);
+        }
+    }
+
+    private static int FocusCalls(BunitContext context) =>
+        context.JSInterop.Invocations.Count(static invocation =>
+            invocation.Identifier == _focusInterop
+        );
+
     private static AutomationDefinitionDescriptor[] ProductionDefinitions() =>
         [
             .. new CoreAutomationCatalogModule().Definitions.Select(static value =>
@@ -619,4 +805,15 @@ public sealed class AutomationEditorInteractionTests
                 value.Descriptor
             ),
         ];
+
+    private sealed record PickerNodes(
+        AutomationEditorNode IncompatibleSource,
+        AutomationEditorNode CompatibleSource,
+        AutomationEditorNode Target
+    );
+
+    private sealed record PickerCompletion(
+        AutomationConnectionRequest? Connection,
+        AutomationRepairConnectionRequest? Repair
+    );
 }
