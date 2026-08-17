@@ -442,10 +442,11 @@ public sealed class AutomationEditorInteractionTests
             nodes.Target.Id,
             nodes.Target.Definition.Inputs.Single().Id
         );
-        var completion = CompletePicker(
+        var completion = ActivatePickerAction(
             nodes.Target,
             [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target],
-            []
+            [],
+            "Connect"
         );
 
         completion.Connection.ShouldBe(expected);
@@ -472,10 +473,11 @@ public sealed class AutomationEditorInteractionTests
             nodes.Target.Id,
             targetInput.Id
         );
-        var completion = CompletePicker(
+        var completion = ActivatePickerAction(
             nodes.Target,
             [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target],
-            [retained]
+            [retained],
+            "Connect"
         );
 
         completion.Connection.ShouldBeNull();
@@ -734,55 +736,40 @@ public sealed class AutomationEditorInteractionTests
         return new(incompatibleSource, compatibleSource, target);
     }
 
-    private static PickerCompletion CompletePicker(
+    private static PickerCompletion ActivatePickerAction(
         AutomationEditorNode target,
         IReadOnlyList<AutomationEditorNode> nodes,
-        IReadOnlyList<AutomationFlowDraftEdge> edges
+        IReadOnlyList<AutomationFlowDraftEdge> edges,
+        string actionName
     )
     {
-        for (var controlIndex = 0; ; controlIndex++)
-        {
-            using var context = new BunitContext();
-            context.JSInterop.Mode = JSRuntimeMode.Loose;
-            AutomationConnectionRequest? connection = null;
-            AutomationRepairConnectionRequest? repair = null;
-            var inspector = context.Render<AutomationNodeInspector>(parameters =>
-                parameters
-                    .Add(component => component.Node, target)
-                    .Add(component => component.Nodes, nodes)
-                    .Add(component => component.Edges, edges)
-                    .Add(component => component.Connect, request => connection = request)
-                    .Add(component => component.Repair, request => repair = request)
-            );
-            var opener = inspector.Find("button[aria-haspopup=dialog]");
-            opener.Click();
-            inspector.Find("[role=dialog] button[aria-pressed=true]").Click();
-            var focusCalls = FocusCalls(context);
-            var completionControls = inspector
-                .FindAll("[role=dialog] button")
-                .Where(static button =>
-                    !button.HasAttribute("aria-label")
-                    && !button.HasAttribute("aria-pressed")
-                    && !button.HasAttribute("disabled")
-                )
-                .ToArray();
-            if (controlIndex >= completionControls.Length)
-            {
-                throw new InvalidOperationException(
-                    "No enabled dialog control emitted a picker completion."
-                );
-            }
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        AutomationConnectionRequest? connection = null;
+        AutomationRepairConnectionRequest? repair = null;
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, target)
+                .Add(component => component.Nodes, nodes)
+                .Add(component => component.Edges, edges)
+                .Add(component => component.Connect, request => connection = request)
+                .Add(component => component.Repair, request => repair = request)
+        );
+        var opener = inspector.Find("button[aria-haspopup=dialog]");
+        opener.Click();
+        inspector.Find("[role=dialog] button[aria-pressed=true]").Click();
+        var focusCalls = FocusCalls(context);
 
-            completionControls[controlIndex].Click();
-            if (connection is null && repair is null)
-            {
-                continue;
-            }
+        inspector
+            .FindAll("button")
+            .Single(button =>
+                string.Equals(button.TextContent.Trim(), actionName, StringComparison.Ordinal)
+            )
+            .Click();
 
-            inspector.FindAll("[role=dialog]").ShouldBeEmpty();
-            FocusCalls(context).ShouldBe(focusCalls + 1);
-            return new(connection, repair);
-        }
+        inspector.FindAll("[role=dialog]").ShouldBeEmpty();
+        FocusCalls(context).ShouldBe(focusCalls + 1);
+        return new(connection, repair);
     }
 
     private static int FocusCalls(BunitContext context) =>
