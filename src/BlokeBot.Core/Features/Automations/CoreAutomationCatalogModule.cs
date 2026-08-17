@@ -11,9 +11,9 @@ public static class AutomationDefinitionIds
 
     public static AutomationDefinitionId PlayOverlayCueAction { get; } = new("play-overlay-cue");
 
-    public static AutomationDefinitionId RandomNumber { get; } = new("random-number");
+    internal static AutomationDefinitionId RandomNumber { get; } = new("random-number");
 
-    public static AutomationDefinitionId CelTransform { get; } = new("cel-transform");
+    internal static AutomationDefinitionId CelTransform { get; } = new("cel-transform");
 
     public static AutomationDefinitionId ConditionControl { get; } = new("condition");
 
