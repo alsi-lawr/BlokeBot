@@ -55,7 +55,7 @@ public sealed class AutomationFlowRoutingTests
         RunModuleProbeAsync(_scenario1);
 
     [Test]
-    public Task ChangedSnappedDrop_RecomputesOnlyAffectedRoutesOffThePointerEvent() =>
+    public Task ChangedSnappedDrop_RecomputesTheSceneOffThePointerEvent() =>
         RunModuleProbeAsync(_scenario2);
 
     [Test]
@@ -63,7 +63,7 @@ public sealed class AutomationFlowRoutingTests
         RunModuleProbeAsync(_scenario3);
 
     [Test]
-    public Task ObstacleAndEndpointInvalidation_PreservesRouteSafetyAndCacheRetention() =>
+    public Task ObstacleAndEndpointInvalidation_PreservesRouteSafety() =>
         RunModuleProbeAsync(_scenario4);
 
     [Test]
@@ -71,7 +71,7 @@ public sealed class AutomationFlowRoutingTests
         RunModuleProbeAsync(_scenario5);
 
     [Test]
-    public Task RouteAndLabelCommits_AreAtomicUnderSteppedScheduling() =>
+    public Task RouteAndLabelCommits_AreAtomicAndTheSceneSettlesOnce() =>
         RunModuleProbeAsync(_scenario6);
 
     [Test]
@@ -80,6 +80,10 @@ public sealed class AutomationFlowRoutingTests
 
     [Test]
     public Task SmoothStyle_RoutesMatchTheUncachedReference() => RunModuleProbeAsync(_scenario8);
+
+    [Test]
+    public Task GlobalNudging_SeparatesOverlappingChannelSegments() =>
+        RunModuleProbeAsync(_scenario9);
 
     private static async Task RunModuleProbeAsync(string scenario)
     {
@@ -628,8 +632,8 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   flushAllScheduled();
   const disclosed = metricsSnapshot();
   assert.equal(disclosed.routeEdgeCount - before.routeEdgeCount, 4, "bounded pass enumerates edges once");
-  assert.equal(disclosed.routeCacheHitCount - before.routeCacheHitCount, 1, "far edge stays cached");
-  assert.equal(disclosed.routeComputationCount - before.routeComputationCount, 2, "only affected edges recompute");
+  assert.equal(disclosed.routeComputationCount - before.routeComputationCount, 3, "one bounded scene recompute covers the routable edges");
+  assert.equal(disclosed.routeRecalculationCount - before.routeRecalculationCount <= 2, true, "disclosure schedules a bounded number of passes");
   assertMatchesReference(fixture.root, "disclosed geometry");
 
   const again = metricsSnapshot();
@@ -667,8 +671,7 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
 
   flushAllScheduled();
   const settled = metricsSnapshot();
-  assert.equal(settled.routeCacheHitCount - before.routeCacheHitCount >= 1, true, "unaffected edge reuses its cache entry");
-  assert.equal(settled.routeComputationCount - before.routeComputationCount <= 3, true, "recompute is bounded to affected edges");
+  assert.equal(settled.routeComputationCount - before.routeComputationCount, 3, "one scene recompute covers the routable edges");
   assert.equal(settled.routeEdgeCount - before.routeEdgeCount, settled.routeCacheHitCount - before.routeCacheHitCount + (settled.routeCacheMissCount - before.routeCacheMissCount), "entries split into hits and misses");
   assert.equal(pathPoints(committedEdge(fixture.e1).path).length, 2, "moved obstacle restores the direct route");
   assertMatchesReference(fixture.root, "changed snapped drop");
@@ -743,7 +746,7 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   dragNode(fixture.root, fixture.b, 48, 24, 23);
   flushAllScheduled();
   after = metricsSnapshot();
-  assert.equal(after.routeCacheHitCount - before.routeCacheHitCount >= 1, true, "far edge cache survives endpoint movement");
+  assert.equal(after.routeEdgeCount - before.routeEdgeCount, (after.routeCacheHitCount - before.routeCacheHitCount) + (after.routeCacheMissCount - before.routeCacheMissCount), "entries split into hits and misses");
   assert.equal(committedEdge(fixture.e4).path, "", "invalid retained edge stays uncommitted after endpoint movement");
   assertMatchesReference(fixture.root, "endpoint movement");
 
@@ -813,9 +816,20 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   dispatch(fixture.root, "pointermove", { pointerId: 29, clientX: 30 - 72, clientY: 30 + 144 });
   dispatch(fixture.root, "pointerup", { pointerId: 29, clientX: 30 - 72, clientY: 30 + 144 });
   const observed = [];
+  const allEdges = () => [fixture.e1, fixture.e2, fixture.e3, fixture.e4]
+    .map((edge) => committedEdge(edge).path)
+    .join("#");
+  let scene = allEdges();
+  let sceneChanges = 0;
   while (flushOneScheduled()) {
     observed.push(committedEdge(fixture.e2));
+    const current = allEdges();
+    if (current !== scene) {
+      sceneChanges += 1;
+      scene = current;
+    }
   }
+  assert.equal(sceneChanges, 1, "the whole scene commits exactly once per geometry change");
   const finalPair = committedEdge(fixture.e2);
   assert.notDeepEqual(finalPair, oldPair, "the disclosure change reroutes the labelled edge");
   for (const pair of observed) {
@@ -879,6 +893,40 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assertMatchesReference(fixture.root, "smooth changed drop");
   moduleExports.dispose(fixture.root);
   console.log("scenario 8 ok");
+}
+""";
+
+    private const string _scenario9 = """
+// Scenario 9: global nudging separates overlapping channel segments ---
+{
+  const canvas = buildCanvas();
+  const root = canvas.root;
+  const wall = buildNode(root, { id: "node-wall", kind: "transform", x: 240, y: 0, width: 120, height: 600 });
+  const l1 = buildNode(root, { id: "node-l1", x: 0, y: 48 });
+  buildPort(l1, { nodeId: "node-l1", portId: "flow", direction: "output", left: 113, top: 23 });
+  const l2 = buildNode(root, { id: "node-l2", x: 0, y: 192 });
+  buildPort(l2, { nodeId: "node-l2", portId: "flow", direction: "output", left: 113, top: 23 });
+  const r1 = buildNode(root, { id: "node-r1", x: 480, y: 48 });
+  buildPort(r1, { nodeId: "node-r1", portId: "in", direction: "input", left: -7, top: 23 });
+  const r2 = buildNode(root, { id: "node-r2", x: 480, y: 192 });
+  buildPort(r2, { nodeId: "node-r2", portId: "in", direction: "input", left: -7, top: 23 });
+  const eTop = buildEdge(canvas.svg, { id: "edge-top", sourceNode: "node-l1", sourcePort: "flow", targetNode: "node-r1", targetPort: "in" });
+  const eSecond = buildEdge(canvas.svg, { id: "edge-second", sourceNode: "node-l2", sourcePort: "flow", targetNode: "node-r2", targetPort: "in" });
+  const dotnet = makeDotnet();
+  moduleExports.initialize(root, dotnet);
+  flushAllScheduled();
+  const firstPath = committedEdge(eTop).path;
+  const secondPath = committedEdge(eSecond).path;
+  assert.equal(pathTouchesRectangle(firstPath, nodeRectangle(wall)), false, "first route avoids the wall");
+  assert.equal(pathTouchesRectangle(secondPath, nodeRectangle(wall)), false, "second route avoids the wall");
+  const channelY = (path) => Math.min(...pathPoints(path).map((point) => point.y));
+  const firstChannel = channelY(firstPath);
+  const secondChannel = channelY(secondPath);
+  assert.equal(Math.abs(firstChannel - secondChannel), 8, "overlapping channel segments separate into distinct lanes");
+  assertMatchesReference(root, "nudged channels");
+  moduleExports.dispose(root);
+  globalThis.__resetBlokeBotAutomationMetrics();
+  console.log("scenario 9 ok");
 }
 """;
 }
