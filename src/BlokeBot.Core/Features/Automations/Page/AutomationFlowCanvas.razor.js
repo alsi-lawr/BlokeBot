@@ -24,18 +24,95 @@ globalThis.__simulateBlokeBotAutomationUpdate = () => {
     if (state.drag === null) scheduleRoutePass(state);
   }
 };
+// Test-only complete-route evaluation. Every other node is an obstacle for the
+// identical final geometry, with no route cache, no port-offset cache, and no
+// relevant-region restriction: it shares only the core routing primitives with
+// production and deliberately does not pass through edgeRouteInputs or
+// relevantObstacleNodes, so it independently validates the selective
+// invalidation it is compared against. Nothing on any pointer path calls it.
 globalThis.__blokeBotAutomationRouteReference = (root = null) => {
   const state = root === null ? [...activeStates][0] : states.get(root);
   if (state === undefined) {
     throw new Error("The automation canvas is not initialized.");
   }
-  const frame = routingFrame(state);
+  const uncachedPortPoint = (nodeId, portId, direction) => {
+    const port = state.root.querySelector(
+      `[data-automation-port][data-node-id="${CSS.escape(nodeId)}"][data-port-id="${CSS.escape(portId)}"][data-port-direction="${direction}"]`,
+    );
+    if (!(port instanceof HTMLElement)) return null;
+    const node = port.closest("[data-automation-node]");
+    if (!(node instanceof HTMLElement)) return null;
+    const position = nodeGraphPosition(node);
+    const portStyle = getComputedStyle(port);
+    const portTransform = new DOMMatrixReadOnly(portStyle.transform);
+    const offsetX = node.clientLeft
+      + Number.parseFloat(portStyle.left)
+      + Number.parseFloat(portStyle.width) / 2
+      + portTransform.e;
+    const offsetY = node.clientTop
+      + Number.parseFloat(portStyle.top)
+      + Number.parseFloat(portStyle.height) / 2
+      + portTransform.f;
+    return { x: position.x + offsetX, y: position.y + offsetY };
+  };
+  const orientation = state.shell.dataset.orientation;
+  const edgeStyle = state.shell.dataset.edgeStyle;
+  const nodes = [...state.root.querySelectorAll("[data-automation-node]")]
+    .filter((node) => node instanceof HTMLElement)
+    .map((node) => ({
+      id: node.dataset.automationNode,
+      obstacle: nodeGraphRectangle(node, obstacleMargin),
+      endpoint: nodeGraphRectangle(node),
+    }));
+  const viewBox = state.root.querySelector(".automation-edges")?.viewBox.baseVal;
+  const labelBounds = viewBox === undefined
+    ? null
+    : {
+      left: viewBox.x,
+      top: viewBox.y,
+      right: viewBox.x + viewBox.width,
+      bottom: viewBox.y + viewBox.height,
+    };
   return [...state.root.querySelectorAll("[data-automation-edge]")].map((group) => {
     const needsLabel = group.querySelector("[data-edge-label]") !== null;
-    const inputs = edgeRouteInputs(state, frame, group, needsLabel);
-    const route = inputs.start === null || inputs.end === null
-      ? null
-      : computeEdgeRoute(state, frame, inputs, needsLabel);
+    const sourceNode = group.dataset.sourceNode;
+    const targetNode = group.dataset.targetNode;
+    const start = uncachedPortPoint(sourceNode, group.dataset.sourcePort, "output");
+    const end = uncachedPortPoint(targetNode, group.dataset.targetPort, "input");
+    let route = null;
+    if (start !== null && end !== null) {
+      const nodeRectangles = nodes
+        .filter((node) => node.id !== sourceNode && node.id !== targetNode)
+        .map((node) => node.obstacle);
+      const overlappingEndpoints = nodeRectangles.filter((rectangle) =>
+        pointInsideRectangle(start, rectangle) || pointInsideRectangle(end, rectangle));
+      const obstacles = nodeRectangles.filter(
+        (rectangle) => !overlappingEndpoints.includes(rectangle),
+      );
+      const sourceEndpoint = nodes.find((node) => node.id === sourceNode)?.endpoint;
+      const targetEndpoint = nodes.find((node) => node.id === targetNode)?.endpoint;
+      const endpoints = [
+        sourceEndpoint === undefined
+          ? null
+          : { rectangle: sourceEndpoint, endpoint: "source" },
+        targetEndpoint === undefined
+          ? null
+          : { rectangle: targetEndpoint, endpoint: "target" },
+        ...overlappingEndpoints.map((rectangle) => ({ rectangle, endpoint: "overlap" })),
+      ].filter((endpoint) => endpoint !== null);
+      if (edgeStyle === "smooth") {
+        route = smoothRoute(start, end, orientation, obstacles, endpoints, needsLabel, labelBounds);
+      } else {
+        const routed = needsLabel
+          ? runRouteSteps(
+            routePointsWithLabelSteps(start, end, orientation, obstacles, endpoints, labelBounds),
+          )
+          : { points: routePoints(start, end, orientation, obstacles, endpoints), label: null };
+        route = routed === null || routed.points === null
+          ? null
+          : { path: angularPath(routed.points), points: routed.points, label: routed.label };
+      }
+    }
     const accepted = route !== null && (!needsLabel || route.label !== null);
     return {
       edgeId: group.dataset.automationEdge,
@@ -1415,10 +1492,6 @@ function* computeEdgeRouteSteps(state, frame, inputs, needsLabel) {
   return routed === null || routed.points === null
     ? null
     : { path: angularPath(routed.points), points: routed.points, label: routed.label };
-}
-
-function computeEdgeRoute(state, frame, inputs, needsLabel) {
-  return runRouteSteps(computeEdgeRouteSteps(state, frame, inputs, needsLabel));
 }
 
 function cancelRoutePass(state) {
