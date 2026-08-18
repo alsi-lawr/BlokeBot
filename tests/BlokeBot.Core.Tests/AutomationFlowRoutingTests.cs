@@ -85,6 +85,10 @@ public sealed class AutomationFlowRoutingTests
     public Task GlobalNudging_SeparatesOverlappingChannelSegments() =>
         RunModuleProbeAsync(_scenario9);
 
+    [Test]
+    public Task DisclosureActivation_SettlesRoutingOnceAcrossTheRenderRoundTrip() =>
+        RunModuleProbeAsync(_scenario10);
+
     private static async Task RunModuleProbeAsync(string scenario)
     {
         var source = string.Join(
@@ -940,6 +944,72 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   moduleExports.dispose(root);
   globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 9 ok");
+}
+""";
+
+    // Disclosed card content is pre-rendered hidden, so the card reaches its final
+    // disclosed size from the local class toggle alone and the .NET render that
+    // follows is bookkeeping only. The refresh that render queues must therefore
+    // find identical geometry and commit no second visible route change.
+    private const string _scenario10 = """
+// Scenario 10: one routing settle per disclosure activation ---
+{
+  const canvas = buildCanvas();
+  const root = canvas.root;
+  const source = buildNode(root, { id: "node-source", kind: "source", x: 0, y: 96 });
+  buildPort(source, { nodeId: "node-source", portId: "flow", direction: "output", left: 113, top: 23 });
+  const target = buildNode(root, { id: "node-target", x: 480, y: 96 });
+  buildPort(target, { nodeId: "node-target", portId: "in", direction: "input", left: -7, top: 23 });
+  // The disclosure target sits clear of the straight route while compact and blocks
+  // it once disclosed, so any settle is visible in the committed path.
+  const middle = buildNode(root, { id: "node-middle", kind: "transform", x: 240, y: 72, height: 24, disclosedHeight: 180 });
+  const edge = buildEdge(canvas.svg, { id: "edge-main", sourceNode: "node-source", sourcePort: "flow", targetNode: "node-target", targetPort: "in" });
+  const dotnet = makeDotnet();
+  moduleExports.initialize(root, dotnet);
+  flushAllScheduled();
+  assert.equal(pathPoints(committedEdge(edge).path).length, 2, "the compact scene routes directly");
+  const button = middle.querySelector("[data-automation-node-select]");
+
+  const activate = (pointerId) => {
+    dispatch(root, "pointerdown", { pointerId, target: button, clientX: 20, clientY: 20 });
+    dispatch(root, "pointerup", { pointerId, clientX: 20, clientY: 20 });
+    flushAllScheduled();
+  };
+
+  // Opening: the local echo alone produces the whole geometry change.
+  const beforeOpen = metricsSnapshot();
+  activate(41);
+  assert.equal(middle.classes.has("automation-node--disclosed"), true, "activation discloses locally");
+  assert.equal(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync", "activation still notifies .NET");
+  const echoed = metricsSnapshot();
+  assert.equal(echoed.routeVisualCommitCount - beforeOpen.routeVisualCommitCount, 1, "the local echo settles the scene once");
+  assert.equal(pathPoints(committedEdge(edge).path).length > 2, true, "the disclosed card reroutes the edge");
+  assertMatchesReference(root, "single-stage disclosed geometry");
+
+  // The .NET render round trip refreshes with unchanged geometry and must not settle again.
+  moduleExports.refresh(root);
+  flushAllScheduled();
+  const afterRender = metricsSnapshot();
+  assert.equal(afterRender.routeVisualCommitCount, echoed.routeVisualCommitCount, "the render round trip commits no second visible route change");
+  assert.equal(afterRender.routeComputationCount, echoed.routeComputationCount, "the render round trip reuses the settled scene");
+  assert.equal(afterRender.routeCacheHitCount - echoed.routeCacheHitCount, 1, "the render round trip reuses every cache entry");
+  assertMatchesReference(root, "geometry after the disclosure render");
+
+  // Closing behaves identically through the BLOKEBOT-238 toggle.
+  const beforeClose = metricsSnapshot();
+  activate(43);
+  assert.equal(middle.classes.has("automation-node--disclosed"), false, "the toggle closes disclosure locally");
+  const closed = metricsSnapshot();
+  assert.equal(closed.routeVisualCommitCount - beforeClose.routeVisualCommitCount, 1, "the toggle close settles the scene once");
+  assert.equal(pathPoints(committedEdge(edge).path).length, 2, "the closed card restores the direct route");
+  moduleExports.refresh(root);
+  flushAllScheduled();
+  const afterCloseRender = metricsSnapshot();
+  assert.equal(afterCloseRender.routeVisualCommitCount, closed.routeVisualCommitCount, "the close round trip commits no second visible route change");
+  assertMatchesReference(root, "geometry after the close render");
+  moduleExports.dispose(root);
+  globalThis.__resetBlokeBotAutomationMetrics();
+  console.log("scenario 10 ok");
 }
 """;
 }

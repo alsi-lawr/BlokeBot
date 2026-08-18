@@ -83,20 +83,20 @@
                             @onkeydown="args => HandleNodeKeyAsync(node, args)">
                         <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
                         <span class="automation-node-title"><AutomationNodeIcon DefinitionId="node.Definition.Id" /><strong title="@node.EffectiveName">@node.EffectiveName</strong></span>
-                        @if (disclosed)
-                        {
-                            <span class="automation-node-description">@node.Definition.Display.Description</span>
-                            <span class="automation-node-selected-ports">
-                                @foreach (var input in node.Definition.Inputs)
-                                {
-                                    <span><i data-port-marker-shape="@PortMarkerShape(input)"></i><b>@PortDisplay(input)</b><em>in</em></span>
-                                }
-                                @foreach (var output in node.Definition.Outputs)
-                                {
-                                    <span><i data-port-marker-shape="@PortMarkerShape(output)"></i><b>@PortDisplay(output)</b><em>out</em></span>
-                                }
-                            </span>
-                        }
+                        @* Disclosed content is rendered for every node and hidden with display:none
+                           until automation-node--disclosed is present, so the local activation echo
+                           reveals ready-made content in one geometry change. *@
+                        <span class="automation-node-description">@node.Definition.Display.Description</span>
+                        <span class="automation-node-selected-ports">
+                            @foreach (var input in node.Definition.Inputs)
+                            {
+                                <span><i data-port-marker-shape="@PortMarkerShape(input)"></i><b>@PortDisplay(input)</b><em>in</em></span>
+                            }
+                            @foreach (var output in node.Definition.Outputs)
+                            {
+                                <span><i data-port-marker-shape="@PortMarkerShape(output)"></i><b>@PortDisplay(output)</b><em>out</em></span>
+                            }
+                        </span>
                         <span class="@(needsRepair ? "automation-node-status automation-node-status--repair" : "automation-node-status")">@NodeStatus(needsRepair, outcome)</span>
                     </button>
                     @foreach (var input in node.Definition.Inputs.Select((port, index) => new { Port = port, Index = index }))

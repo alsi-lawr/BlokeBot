@@ -339,6 +339,75 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public void TypedEditor_Canvas_RevealsPreRenderedDisclosedContentInOneStage()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var definition = ProductionDefinitions()
+            .Single(value => value.Id == AutomationDefinitionIds.ConditionControl);
+        var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
+        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [node])
+                .Add(component => component.Edges, [])
+                .Add(component => component.ViewportKey, "single-stage-reveal")
+        );
+
+        // Stage-1 readiness: the disclosed content is already in the document for an
+        // undisclosed node, so the local class toggle has nothing left to fetch.
+        var article = canvas.Find($"[data-automation-node='{node.Id.Value:D}']");
+        article.ClassList.ShouldNotContain("automation-node--disclosed");
+        canvas
+            .Find("[data-automation-node-select]")
+            .GetAttribute("aria-expanded")
+            .ShouldBe("false");
+        canvas
+            .Find(".automation-node-description")
+            .TextContent.Trim()
+            .ShouldBe(definition.Display.Description);
+        var compactPortRows = canvas
+            .FindAll(".automation-node-selected-ports > span")
+            .Select(static row => row.TextContent.Trim())
+            .ToArray();
+        foreach (var input in definition.Inputs)
+        {
+            compactPortRows.ShouldContain($"{AccessiblePortName(input)}in");
+        }
+        foreach (var output in definition.Outputs)
+        {
+            compactPortRows.ShouldContain($"{AccessiblePortName(output)}out");
+        }
+
+        var compactContent = DisclosedContentMarkup(canvas);
+        var compactNodeStyle = article.GetAttribute("style");
+        var compactClasses = article.ClassList.ToArray();
+
+        canvas.Render(parameters =>
+            parameters
+                .Add(component => component.Nodes, [node])
+                .Add(component => component.Edges, [])
+                .Add(component => component.ViewportKey, "single-stage-reveal")
+                .Add(component => component.DisclosedNodeId, node.Id)
+        );
+
+        var disclosedArticle = canvas.Find($"[data-automation-node='{node.Id.Value:D}']");
+        disclosedArticle.ClassList.ShouldContain("automation-node--disclosed");
+        canvas.Find("[data-automation-node-select]").GetAttribute("aria-expanded").ShouldBe("true");
+
+        // Disclosing changes nothing but the class and aria-expanded bookkeeping, so the
+        // Blazor patch that follows the local echo cannot produce a second geometry change.
+        DisclosedContentMarkup(canvas).ShouldBe(compactContent);
+        disclosedArticle.GetAttribute("style").ShouldBe(compactNodeStyle);
+        disclosedArticle
+            .ClassList.Where(static value => value != "automation-node--disclosed")
+            .ShouldBe(compactClasses);
+    }
+
+    private static string DisclosedContentMarkup(IRenderedComponent<AutomationFlowCanvas> canvas) =>
+        canvas.Find(".automation-node-description").OuterHtml
+        + canvas.Find(".automation-node-selected-ports").OuterHtml;
+
+    [Test]
     public void TypedEditor_BindingModes_RoundTripWithoutDiscardingInactiveFixedOrExpressionPayloads()
     {
         var definition = new CoreAutomationCatalogModule()
