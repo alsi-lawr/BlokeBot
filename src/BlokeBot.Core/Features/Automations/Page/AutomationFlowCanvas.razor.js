@@ -1605,7 +1605,8 @@ function finishNodeDrag(state, event, cancelled = false) {
   if (drag.moved) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
   else if (!cancelled && drag.discloseOnClick) {
     const nodeId = drag.capture.dataset.automationNode;
-    setLocalDisclosure(state.root, nodeId);
+    const wasDisclosed = drag.capture.classList.contains("automation-node--disclosed");
+    setLocalDisclosure(state.root, wasDisclosed ? null : nodeId);
     void state.dotnet.invokeMethodAsync("ActivateNodeFromCanvasAsync", nodeId);
   }
   scheduleRoutePass(state);
@@ -1901,7 +1902,8 @@ export function initialize(root, dotnet) {
       event.preventDefault();
       event.stopPropagation();
       if (event.detail !== 0 || event.altKey || event.ctrlKey || event.metaKey) return;
-      const nodeId = selector.closest("[data-automation-node]")?.dataset.automationNode;
+      const nodeElement = selector.closest("[data-automation-node]");
+      const nodeId = nodeElement?.dataset.automationNode;
       if (nodeId === undefined) return;
       if (event.shiftKey) {
         setLocalDisclosure(state.root, null);
@@ -1909,8 +1911,9 @@ export function initialize(root, dotnet) {
         void state.dotnet.invokeMethodAsync("ToggleNodeSelectionFromCanvasAsync", nodeId);
         return;
       }
+      const wasDisclosed = nodeElement.classList.contains("automation-node--disclosed");
       setLocalSelection(state.root, [nodeId], null);
-      setLocalDisclosure(state.root, nodeId);
+      setLocalDisclosure(state.root, wasDisclosed ? null : nodeId);
       scheduleRoutePass(state);
       void state.dotnet.invokeMethodAsync("ActivateNodeFromCanvasAsync", nodeId);
       return;

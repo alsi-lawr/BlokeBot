@@ -1281,8 +1281,9 @@ public partial class AutomationEditorPage
 
     private void ActivateCanvasNode(AutomationNodeId nodeId)
     {
+        var closeDisclosure = _disclosedNodeId == nodeId;
         SetSingleNodeSelection(nodeId);
-        _disclosedNodeId = nodeId;
+        _disclosedNodeId = closeDisclosure ? null : nodeId;
     }
 
     private void CloseCanvasNodeDisclosure() => _disclosedNodeId = null;

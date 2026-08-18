@@ -296,6 +296,49 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public async Task TypedEditor_Page_PlainActivationTogglesDisclosureAndMovesItBetweenNodes()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync();
+        var canvas = fixture.Page.FindComponent<AutomationFlowCanvas>();
+        var source = canvas.Instance.Nodes.Single(static node =>
+            node.Definition.Id == AutomationDefinitionIds.StreamOnlineSource
+        );
+        var target = canvas.Instance.Nodes.Single(static node =>
+            node.Definition.Id == AutomationDefinitionIds.SendChatAction
+        );
+
+        await DiscloseAsync(fixture.Page, source.Id);
+        NodeSelector(fixture.Page, source.Id).GetAttribute("aria-pressed").ShouldBe("true");
+        NodeSelector(fixture.Page, source.Id).GetAttribute("aria-expanded").ShouldBe("true");
+
+        await fixture.Page.InvokeAsync(() =>
+            fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.ActivateNodeFromCanvasAsync(source.Id.Value)
+        );
+        fixture.Page.WaitForAssertion(() =>
+        {
+            DisclosureCount(fixture.Page).ShouldBe(0);
+            NodeSelector(fixture.Page, source.Id).GetAttribute("aria-pressed").ShouldBe("true");
+        });
+
+        await DiscloseAsync(fixture.Page, source.Id);
+        await fixture.Page.InvokeAsync(() =>
+            fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.ActivateNodeFromCanvasAsync(target.Id.Value)
+        );
+        fixture.Page.WaitForAssertion(() =>
+        {
+            DisclosureCount(fixture.Page).ShouldBe(1);
+            NodeSelector(fixture.Page, target.Id).GetAttribute("aria-expanded").ShouldBe("true");
+            NodeSelector(fixture.Page, target.Id).GetAttribute("aria-pressed").ShouldBe("true");
+            NodeSelector(fixture.Page, source.Id).GetAttribute("aria-expanded").ShouldBe("false");
+            NodeSelector(fixture.Page, source.Id).GetAttribute("aria-pressed").ShouldBe("false");
+        });
+    }
+
+    [Test]
     public void TypedEditor_BindingModes_RoundTripWithoutDiscardingInactiveFixedOrExpressionPayloads()
     {
         var definition = new CoreAutomationCatalogModule()
@@ -1134,6 +1177,12 @@ public sealed class AutomationEditorInteractionTests
 
     private static int DisclosureCount(IRenderedComponent<AutomationEditorPage> page) =>
         page.FindAll("[data-automation-node-select][aria-expanded='true']").Count;
+
+    private static IElement NodeSelector(
+        IRenderedComponent<AutomationEditorPage> page,
+        AutomationNodeId nodeId
+    ) =>
+        page.Find($"[data-automation-node='{nodeId.Value:D}'] [data-automation-node-select]");
 
     private static string CanvasDraft(AutomationFlowCanvas canvas) =>
         JsonSerializer.Serialize(

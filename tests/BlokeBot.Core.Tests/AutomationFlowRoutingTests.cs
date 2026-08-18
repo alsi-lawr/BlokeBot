@@ -639,11 +639,24 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   const again = metricsSnapshot();
   dispatch(fixture.root, "pointerdown", { pointerId: 4, target: button, clientX: 20, clientY: 20 });
   dispatch(fixture.root, "pointerup", { pointerId: 4, clientX: 20, clientY: 20 });
+  assert.equal(fixture.a.classes.has("automation-node--disclosed"), false, "second click closes the local disclosure without a flash");
+  assert.deepEqual(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync");
+  flushAllScheduled();
+  const closed = metricsSnapshot();
+  assert.equal(closed.routeComputationCount - again.routeComputationCount, 3, "toggle close recomputes the shrunken scene once");
+  assertMatchesReference(fixture.root, "toggle-closed geometry");
+
+  const fButton = fixture.f.querySelector("[data-automation-node-select]");
+  const beforeUnchanged = metricsSnapshot();
+  dispatch(fixture.root, "pointerdown", { pointerId: 5, target: fButton, clientX: 20, clientY: 20 });
+  dispatch(fixture.root, "pointerup", { pointerId: 5, clientX: 20, clientY: 20 });
+  assert.equal(fixture.f.classes.has("automation-node--disclosed"), true, "click on another node moves disclosure to it");
+  assert.deepEqual(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync");
   flushAllScheduled();
   const unchanged = metricsSnapshot();
-  assert.equal(unchanged.routeComputationCount, again.routeComputationCount, "unchanged geometry computes nothing");
-  assert.equal(unchanged.routeEdgeCount, again.routeEdgeCount, "unchanged geometry enumerates nothing");
-  assert.equal(unchanged.routeRecalculationCount, again.routeRecalculationCount, "unchanged geometry runs no pass");
+  assert.equal(unchanged.routeComputationCount, beforeUnchanged.routeComputationCount, "unchanged geometry computes nothing");
+  assert.equal(unchanged.routeEdgeCount, beforeUnchanged.routeEdgeCount, "unchanged geometry enumerates nothing");
+  assert.equal(unchanged.routeRecalculationCount, beforeUnchanged.routeRecalculationCount, "unchanged geometry runs no pass");
   moduleExports.dispose(fixture.root);
   globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 1 ok");
