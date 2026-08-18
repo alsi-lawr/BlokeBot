@@ -4,6 +4,9 @@ const savedViewports = new Map();
 const metrics = {
   routeRecalculationCount: 0,
   routeEdgeCount: 0,
+  routeCacheHitCount: 0,
+  routeCacheMissCount: 0,
+  routeComputationCount: 0,
   routeEdgeLiveCount: 0,
   routeEdgeLiveMaximumPerFrame: 0,
   dragFrames: 0,
@@ -18,96 +21,35 @@ globalThis.__simulateBlokeBotAutomationUpdate = () => {
   metrics.uiUpdateCount += 1;
   metrics.refreshCount += 1;
   for (const state of activeStates) {
-    if (state.drag === null) scheduleRouteAll(state);
+    if (state.drag === null) scheduleRoutePass(state);
   }
 };
-globalThis.__runBlokeBotAutomationPerformanceWorkload = async () => {
-  const state = [...activeStates][0];
-  const obstacle = state?.root.querySelector('[data-node-kind="transform"]');
-  if (state === undefined || !(obstacle instanceof HTMLElement)) {
-    throw new Error("The automation performance fixture is not ready.");
+globalThis.__blokeBotAutomationRouteReference = (root = null) => {
+  const state = root === null ? [...activeStates][0] : states.get(root);
+  if (state === undefined) {
+    throw new Error("The automation canvas is not initialized.");
   }
-  globalThis.__resetBlokeBotAutomationMetrics();
-  const eventDelaySamples = [];
-  const longTasks = [];
-  const longObserver = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) {
-      longTasks.push({ startTime: entry.startTime, duration: entry.duration });
-    }
-  });
-  try { longObserver.observe({ type: "longtask", buffered: false }); } catch {}
-  const delayTimer = setInterval(() => {
-    const expected = performance.now() + 10;
-    setTimeout(() => eventDelaySamples.push(Math.max(0, performance.now() - expected)), 10);
-  }, 10);
-  const original = nodeGraphPosition(obstacle);
-  const edges = [...state.root.querySelectorAll("[data-automation-edge]")]
-    .filter((edge) => edge.dataset.sourceNode === obstacle.dataset.automationNode
-      || edge.dataset.targetNode === obstacle.dataset.automationNode);
-  state.drag = { edges };
-  const started = performance.now();
-  const updates = new Promise((resolve) => {
-    let count = 0;
-    const timer = setInterval(() => {
-      count += 1;
-      globalThis.__simulateBlokeBotAutomationUpdate();
-      document.documentElement.style.setProperty("--sample-pulse", String(count % 2));
-      if (count === 20) {
-        clearInterval(timer);
-        resolve();
-      }
-    }, 200);
-  });
-  const drag = new Promise((resolve) => {
-    const step = (now) => {
-      const elapsed = now - started;
-      setNodeGraphPosition(
-        obstacle,
-        original.x + Math.sin(elapsed / 260) * 85,
-        original.y + Math.sin(elapsed / 410) * 55,
-      );
-      metrics.dragFrames += 1;
-      metrics.routeEdgeLiveMaximumPerFrame = Math.max(
-        metrics.routeEdgeLiveMaximumPerFrame,
-        edges.length,
-      );
-      for (const edge of edges) routeEdgeLive(state, edge);
-      if (elapsed < 5000) {
-        requestAnimationFrame(step);
-        return;
-      }
-      setNodeGraphPosition(obstacle, original.x, original.y);
-      state.drag = null;
-      routeAll(state);
-      resolve();
+  const frame = routingFrame(state);
+  return [...state.root.querySelectorAll("[data-automation-edge]")].map((group) => {
+    const needsLabel = group.querySelector("[data-edge-label]") !== null;
+    const inputs = edgeRouteInputs(state, frame, group, needsLabel);
+    const route = inputs.start === null || inputs.end === null
+      ? null
+      : computeEdgeRoute(state, frame, inputs, needsLabel);
+    const accepted = route !== null && (!needsLabel || route.label !== null);
+    return {
+      edgeId: group.dataset.automationEdge,
+      accepted,
+      path: accepted ? route.path : "",
+      label: accepted && needsLabel ? { x: route.label.x, y: route.label.y } : null,
     };
-    requestAnimationFrame(step);
   });
-  await Promise.all([updates, drag]);
-  await new Promise((resolve) => setTimeout(resolve, 160));
-  clearInterval(delayTimer);
-  longObserver.disconnect();
-  eventDelaySamples.sort((first, second) => first - second);
-  const percentile = (value) => eventDelaySamples.length === 0
-    ? 0
-    : eventDelaySamples[Math.min(
-      eventDelaySamples.length - 1,
-      Math.floor(eventDelaySamples.length * value),
-    )];
-  return {
-    actionDurationMs: performance.now() - started,
-    ...metrics,
-    eventDelaySampleCount: eventDelaySamples.length,
-    eventDelayP95Ms: percentile(0.95),
-    eventDelayMaxMs: eventDelaySamples.at(-1) ?? 0,
-    longTaskCount: longTasks.length,
-    longTaskDurationMs: longTasks.reduce((total, entry) => total + entry.duration, 0),
-    longTasks,
-  };
 };
 const gridSize = 24;
 const obstacleMargin = 18;
 const routeClearance = 12;
+const routeRegionMargin = 288;
+const routePassFrameBudgetMs = 3;
 const curveSampleCount = 96;
 const labelHalfWidth = 20;
 const labelHalfHeight = 12;
@@ -264,8 +206,15 @@ function nodeGraphPosition(node) {
 function setNodeGraphPosition(node, x, y) {
   node.dataset.automationGraphX = `${x}`;
   node.dataset.automationGraphY = `${y}`;
+  node.style.removeProperty("transform");
   node.style.left = `${x}px`;
   node.style.top = `${y}px`;
+}
+
+function setNodeLiveGraphPosition(item) {
+  item.element.dataset.automationGraphX = `${item.x}`;
+  item.element.dataset.automationGraphY = `${item.y}`;
+  item.element.style.transform = `translate(${item.x - item.startX}px, ${item.y - item.startY}px)`;
 }
 
 function nodeGraphRectangle(node, margin = 0) {
@@ -490,7 +439,82 @@ function compareRouteCost(first, second) {
   return first.bends - second.bends || first.distance - second.distance;
 }
 
+function comparePendingEntries(first, second) {
+  return (
+    compareRouteCost(first.cost, second.cost) || first.key.localeCompare(second.key)
+  );
+}
+
+function pushPendingEntry(heap, entry) {
+  heap.push(entry);
+  let index = heap.length - 1;
+  while (index > 0) {
+    const parent = (index - 1) >> 1;
+    if (comparePendingEntries(heap[index], heap[parent]) >= 0) break;
+    [heap[index], heap[parent]] = [heap[parent], heap[index]];
+    index = parent;
+  }
+}
+
+function popPendingEntry(heap) {
+  const top = heap[0];
+  const last = heap.pop();
+  if (heap.length === 0) return top;
+  heap[0] = last;
+  let index = 0;
+  for (;;) {
+    const left = index * 2 + 1;
+    const right = left + 1;
+    let smallest = index;
+    if (left < heap.length && comparePendingEntries(heap[left], heap[smallest]) < 0) {
+      smallest = left;
+    }
+    if (right < heap.length && comparePendingEntries(heap[right], heap[smallest]) < 0) {
+      smallest = right;
+    }
+    if (smallest === index) return top;
+    [heap[index], heap[smallest]] = [heap[smallest], heap[index]];
+    index = smallest;
+  }
+}
+
+function segmentsHitRectangle(points, rectangle) {
+  for (let index = 1; index < points.length; index += 1) {
+    if (segmentHitsRectangle(points[index - 1], points[index], rectangle)) return true;
+  }
+  return false;
+}
+
+function* gridRouteSteps(start, end, obstacles, initialAxis = null, finalAxis = null) {
+  const envelope = {
+    left: Math.min(start.x, end.x) - routeClearance,
+    top: Math.min(start.y, end.y) - routeClearance,
+    right: Math.max(start.x, end.x) + routeClearance,
+    bottom: Math.max(start.y, end.y) + routeClearance,
+  };
+  let active = obstacles.filter((obstacle) => rectanglesIntersect(obstacle, envelope));
+  for (;;) {
+    const route = yield* gridRouteThroughObstaclesSteps(start, end, active, initialAxis, finalAxis);
+    if (route === null) {
+      if (active.length === obstacles.length) return null;
+      active = obstacles;
+      continue;
+    }
+    const violated = obstacles.filter(
+      (obstacle) => !active.includes(obstacle) && segmentsHitRectangle(route, obstacle),
+    );
+    if (violated.length === 0) {
+      return pathIsSafe(route, obstacles) ? route : null;
+    }
+    active = [...active, ...violated];
+  }
+}
+
 function gridRoute(start, end, obstacles, initialAxis = null, finalAxis = null) {
+  return runRouteSteps(gridRouteSteps(start, end, obstacles, initialAxis, finalAxis));
+}
+
+function* gridRouteThroughObstaclesSteps(start, end, obstacles, initialAxis, finalAxis) {
   const coordinates = gridCoordinates(start, end, obstacles);
   const nodes = new Map();
   for (const x of coordinates.x) {
@@ -500,12 +524,21 @@ function gridRoute(start, end, obstacles, initialAxis = null, finalAxis = null) 
         nodes.set(coordinateKey(point), point);
       }
     }
+    yield;
   }
   const startKey = coordinateKey(start);
   const endKey = coordinateKey(end);
   nodes.set(startKey, start);
   nodes.set(endKey, end);
   const neighbours = new Map([...nodes.keys()].map((key) => [key, []]));
+  const rows = new Map();
+  const columns = new Map();
+  for (const point of nodes.values()) {
+    if (!rows.has(point.y)) rows.set(point.y, []);
+    rows.get(point.y).push(point);
+    if (!columns.has(point.x)) columns.set(point.x, []);
+    columns.get(point.x).push(point);
+  }
   const connectLine = (line) => {
     for (let index = 1; index < line.length; index += 1) {
       const first = line[index - 1];
@@ -517,24 +550,32 @@ function gridRoute(start, end, obstacles, initialAxis = null, finalAxis = null) 
     }
   };
   for (const y of coordinates.y) {
-    connectLine([...nodes.values()].filter((point) => point.y === y).sort((a, b) => a.x - b.x));
+    connectLine((rows.get(y) ?? []).sort((a, b) => a.x - b.x));
+    yield;
   }
   for (const x of coordinates.x) {
-    connectLine([...nodes.values()].filter((point) => point.x === x).sort((a, b) => a.y - b.y));
+    connectLine((columns.get(x) ?? []).sort((a, b) => a.y - b.y));
+    yield;
   }
 
   const stateKey = (pointKey, axis) => `${pointKey}|${axis ?? "none"}`;
   const startStateKey = stateKey(startKey, initialAxis);
   const costs = new Map([[startStateKey, { bends: 0, distance: 0 }]]);
   const previous = new Map();
-  const pending = [{ pointKey: startKey, axis: initialAxis, key: startStateKey }];
+  const pending = [];
+  pushPendingEntry(pending, {
+    pointKey: startKey,
+    axis: initialAxis,
+    key: startStateKey,
+    cost: costs.get(startStateKey),
+  });
   const visited = new Set();
   let bestEnd = null;
+  let processed = 0;
   while (pending.length > 0) {
-    pending.sort((first, second) =>
-      compareRouteCost(costs.get(first.key), costs.get(second.key))
-      || first.key.localeCompare(second.key));
-    const current = pending.shift();
+    processed += 1;
+    if (processed % 64 === 0) yield;
+    const current = popPendingEntry(pending);
     if (visited.has(current.key)) continue;
     visited.add(current.key);
     const currentCost = costs.get(current.key);
@@ -562,7 +603,12 @@ function gridRoute(start, end, obstacles, initialAxis = null, finalAxis = null) 
       if (existing !== undefined && compareRouteCost(cost, existing) >= 0) continue;
       costs.set(nextKey, cost);
       previous.set(nextKey, current.key);
-      pending.push({ pointKey: neighbourKey, axis: nextAxis, key: nextKey });
+      pushPendingEntry(pending, {
+        pointKey: neighbourKey,
+        axis: nextAxis,
+        key: nextKey,
+        cost,
+      });
     }
   }
   if (bestEnd === null) return null;
@@ -579,7 +625,7 @@ function gridRoute(start, end, obstacles, initialAxis = null, finalAxis = null) 
   return pathIsSafe(route, obstacles) ? route : null;
 }
 
-function routePoints(start, end, orientation, obstacles, endpoints = []) {
+function* routePointsSteps(start, end, orientation, obstacles, endpoints = []) {
   const vertical = orientation === "vertical";
   const startLead = vertical
     ? { x: start.x, y: start.y + gridSize }
@@ -591,7 +637,7 @@ function routePoints(start, end, orientation, obstacles, endpoints = []) {
   if (pathIsSafe([start, startLead], obstacles, endpoints.filter((item) => item.endpoint === "source"))
     && pathIsSafe([endLead, end], obstacles, endpoints.filter((item) => item.endpoint === "target"))) {
     const leadAxis = vertical ? "vertical" : "horizontal";
-    const interior = gridRoute(
+    const interior = yield* gridRouteSteps(
       startLead,
       endLead,
       [...obstacles, ...endpointRectangles],
@@ -603,11 +649,15 @@ function routePoints(start, end, orientation, obstacles, endpoints = []) {
       if (pathIsSafe(directed, obstacles, endpoints)) return directed;
     }
   }
-  const fallback = gridRoute(start, end, obstacles);
+  const fallback = yield* gridRouteSteps(start, end, obstacles);
   return fallback !== null && pathIsSafe(fallback, obstacles, endpoints) ? fallback : null;
 }
 
-function routeFromSource(start, end, orientation, obstacles, endpoints) {
+function routePoints(start, end, orientation, obstacles, endpoints = []) {
+  return runRouteSteps(routePointsSteps(start, end, orientation, obstacles, endpoints));
+}
+
+function* routeFromSourceSteps(start, end, orientation, obstacles, endpoints) {
   const vertical = orientation === "vertical";
   const lead = vertical
     ? { x: start.x, y: start.y + gridSize }
@@ -617,17 +667,17 @@ function routeFromSource(start, end, orientation, obstacles, endpoints) {
     const endpointRectangles = endpoints
       .map((endpoint) => endpoint.rectangle)
       .filter((rectangle) => !pointInsideRectangle(lead, rectangle));
-    const interior = gridRoute(lead, end, [...obstacles, ...endpointRectangles], leadAxis);
+    const interior = yield* gridRouteSteps(lead, end, [...obstacles, ...endpointRectangles], leadAxis);
     if (interior !== null) {
       const directed = normalizePath([start, ...interior]);
       if (pathIsSafe(directed, obstacles, endpoints)) return directed;
     }
   }
-  const fallback = gridRoute(start, end, obstacles);
+  const fallback = yield* gridRouteSteps(start, end, obstacles);
   return fallback !== null && pathIsSafe(fallback, obstacles, endpoints) ? fallback : null;
 }
 
-function routeToTarget(start, end, orientation, obstacles, endpoints) {
+function* routeToTargetSteps(start, end, orientation, obstacles, endpoints) {
   const vertical = orientation === "vertical";
   const lead = vertical
     ? { x: end.x, y: end.y - gridSize }
@@ -637,13 +687,13 @@ function routeToTarget(start, end, orientation, obstacles, endpoints) {
     const endpointRectangles = endpoints
       .map((endpoint) => endpoint.rectangle)
       .filter((rectangle) => !pointInsideRectangle(lead, rectangle));
-    const interior = gridRoute(start, lead, [...obstacles, ...endpointRectangles], null, leadAxis);
+    const interior = yield* gridRouteSteps(start, lead, [...obstacles, ...endpointRectangles], null, leadAxis);
     if (interior !== null) {
       const directed = normalizePath([...interior, end]);
       if (pathIsSafe(directed, obstacles, endpoints)) return directed;
     }
   }
-  const fallback = gridRoute(start, end, obstacles);
+  const fallback = yield* gridRouteSteps(start, end, obstacles);
   return fallback !== null && pathIsSafe(fallback, obstacles, endpoints) ? fallback : null;
 }
 
@@ -924,7 +974,7 @@ function labelLanes(start, end, orientation, rectangles) {
     ]));
 }
 
-function routeThroughLabelLane(start, end, orientation, obstacles, endpoints, lane) {
+function* routeThroughLabelLaneSteps(start, end, orientation, obstacles, endpoints, lane) {
   const firstEndpoints = endpoints.filter((endpoint) =>
     pointInsideRectangle(start, endpoint.rectangle));
   const secondEndpoints = endpoints.filter((endpoint) =>
@@ -941,21 +991,23 @@ function routeThroughLabelLane(start, end, orientation, obstacles, endpoints, la
       .filter((endpoint) => !secondEndpoints.includes(endpoint))
       .map((endpoint) => endpoint.rectangle),
   ];
-  const first = routeFromSource(
+  const first = yield* routeFromSourceSteps(
     start,
     lane.start,
     orientation,
     firstObstacles,
     firstEndpoints,
   );
-  const second = routeToTarget(
+  if (first === null) return null;
+  yield;
+  const second = yield* routeToTargetSteps(
     lane.end,
     end,
     orientation,
     secondObstacles,
     secondEndpoints,
   );
-  if (first === null || second === null) return null;
+  if (second === null) return null;
   const points = normalizePath([...first, lane.end, ...second.slice(1)]);
   return pathIsSafe(points, obstacles, endpoints) ? points : null;
 }
@@ -1000,7 +1052,7 @@ function directExteriorCorridors(start, end, orientation, rectangles) {
   ]);
 }
 
-function routePointCandidatesWithLabel(
+function* routePointCandidateSteps(
   start,
   end,
   orientation,
@@ -1009,7 +1061,7 @@ function routePointCandidatesWithLabel(
   labelBounds = null,
 ) {
   const rectangles = branchLabelObstacles(obstacles, endpoints);
-  const direct = routePoints(start, end, orientation, obstacles, endpoints);
+  const direct = yield* routePointsSteps(start, end, orientation, obstacles, endpoints);
   const candidates = [];
   const seen = new Set();
   const addCandidate = (points) => {
@@ -1023,34 +1075,48 @@ function routePointCandidatesWithLabel(
     candidates.push({ points, label, cost: routeCost(points) });
   };
   addCandidate(direct);
+  yield;
   for (const corridor of directExteriorCorridors(start, end, orientation, rectangles)) {
     addCandidate(corridor);
+    yield;
   }
   for (const lane of labelLanes(start, end, orientation, rectangles)) {
-    addCandidate(routeThroughLabelLane(start, end, orientation, obstacles, endpoints, lane));
+    addCandidate(
+      yield* routeThroughLabelLaneSteps(start, end, orientation, obstacles, endpoints, lane),
+    );
+    yield;
   }
   candidates.sort((first, second) => compareRouteCost(first.cost, second.cost));
   return candidates;
 }
 
-function routePointsWithLabel(start, end, orientation, obstacles, endpoints, labelBounds = null) {
+function* routePointsWithLabelSteps(
+  start,
+  end,
+  orientation,
+  obstacles,
+  endpoints,
+  labelBounds = null,
+) {
   const rectangles = branchLabelObstacles(obstacles, endpoints);
-  const direct = routePoints(start, end, orientation, obstacles, endpoints);
+  const direct = yield* routePointsSteps(start, end, orientation, obstacles, endpoints);
   if (direct !== null) {
     const label = branchLabelPoint(direct, rectangles, labelBounds);
     if (label !== null) return { points: direct, label };
   }
-  return routePointCandidatesWithLabel(
+  yield;
+  const candidates = yield* routePointCandidateSteps(
     start,
     end,
     orientation,
     obstacles,
     endpoints,
     labelBounds,
-  )[0] ?? null;
+  );
+  return candidates[0] ?? null;
 }
 
-function smoothRoute(
+function* smoothRouteSteps(
   start,
   end,
   orientation,
@@ -1066,8 +1132,9 @@ function smoothRoute(
     const label = needsLabel ? branchLabelPoint(points, rectangles, labelBounds) : null;
     if (!needsLabel || label !== null) return { path: curvePath(direct), points, label };
   }
+  yield;
   const routedCandidates = needsLabel
-    ? routePointCandidatesWithLabel(
+    ? yield* routePointCandidateSteps(
       start,
       end,
       orientation,
@@ -1075,7 +1142,12 @@ function smoothRoute(
       endpoints,
       labelBounds,
     )
-    : [{ points: routePoints(start, end, orientation, obstacles, endpoints), label: null }];
+    : [
+      {
+        points: yield* routePointsSteps(start, end, orientation, obstacles, endpoints),
+        label: null,
+      },
+    ];
   for (const routed of routedCandidates) {
     if (routed.points === null) continue;
     const guided = guideCurve(routed.points);
@@ -1092,8 +1164,30 @@ function smoothRoute(
         if (!needsLabel || label !== null) return { path: curvesPath(curves), points, label };
       }
     }
+    yield;
   }
   return null;
+}
+
+function runRouteSteps(steps) {
+  for (;;) {
+    const next = steps.next();
+    if (next.done) return next.value;
+  }
+}
+
+function smoothRoute(
+  start,
+  end,
+  orientation,
+  obstacles,
+  endpoints = [],
+  needsLabel = false,
+  labelBounds = null,
+) {
+  return runRouteSteps(
+    smoothRouteSteps(start, end, orientation, obstacles, endpoints, needsLabel, labelBounds),
+  );
 }
 
 function commitRoute(group, label, route) {
@@ -1181,25 +1275,34 @@ function routeEdgeLive(state, group) {
 function routingFrame(state) {
   const nodes = [...state.root.querySelectorAll("[data-automation-node]")]
     .filter((node) => node instanceof HTMLElement)
-    .map((node) => ({
-      id: node.dataset.automationNode,
-      obstacle: nodeGraphRectangle(node, obstacleMargin),
-      endpoint: nodeGraphRectangle(node),
-      signature: `${node.dataset.automationNode}:${nodeGraphPosition(node).x},${nodeGraphPosition(node).y},${node.offsetWidth},${node.offsetHeight}`,
-    }));
+    .map((node) => {
+      const position = nodeGraphPosition(node);
+      return {
+        id: node.dataset.automationNode,
+        obstacle: nodeGraphRectangle(node, obstacleMargin),
+        endpoint: nodeGraphRectangle(node),
+        signature: `${node.dataset.automationNode}:${position.x},${position.y},${node.offsetWidth},${node.offsetHeight},${node.clientLeft},${node.clientTop}`,
+      };
+    });
   const viewBox = state.root.querySelector(".automation-edges")?.viewBox.baseVal;
+  const labelBounds = viewBox === undefined
+    ? null
+    : {
+      left: viewBox.x,
+      top: viewBox.y,
+      right: viewBox.x + viewBox.width,
+      bottom: viewBox.y + viewBox.height,
+    };
+  const settingsSignature = `${state.shell.dataset.orientation}|${state.shell.dataset.edgeStyle}|${labelBounds === null
+    ? "none"
+    : `${labelBounds.left},${labelBounds.top},${labelBounds.right},${labelBounds.bottom}`}`;
   return {
     nodes,
+    nodesById: new Map(nodes.map((node) => [node.id, node])),
     ports: new Map(),
-    labelBounds: viewBox === undefined
-      ? null
-      : {
-        left: viewBox.x,
-        top: viewBox.y,
-        right: viewBox.x + viewBox.width,
-        bottom: viewBox.y + viewBox.height,
-      },
-    signature: `${state.shell.dataset.orientation}|${state.shell.dataset.edgeStyle}|${nodes.map((node) => node.signature).join("|")}`,
+    labelBounds,
+    settingsSignature,
+    signature: `${settingsSignature}|${nodes.map((node) => node.signature).join("|")}`,
   };
 }
 
@@ -1209,95 +1312,255 @@ function framePortPoint(state, frame, nodeId, portId, direction) {
   return frame.ports.get(key);
 }
 
-function routeEdge(state, group, frame) {
-  metrics.routeEdgeCount += 1;
+function relevantObstacleNodes(frame, sourceNode, targetNode, start, end) {
+  let region = {
+    left: Math.min(start.x, end.x) - routeRegionMargin,
+    top: Math.min(start.y, end.y) - routeRegionMargin,
+    right: Math.max(start.x, end.x) + routeRegionMargin,
+    bottom: Math.max(start.y, end.y) + routeRegionMargin,
+  };
+  const include = (rectangle) => {
+    region = {
+      left: Math.min(region.left, rectangle.left - routeRegionMargin),
+      top: Math.min(region.top, rectangle.top - routeRegionMargin),
+      right: Math.max(region.right, rectangle.right + routeRegionMargin),
+      bottom: Math.max(region.bottom, rectangle.bottom + routeRegionMargin),
+    };
+  };
+  const source = frame.nodesById.get(sourceNode);
+  const target = frame.nodesById.get(targetNode);
+  if (source !== undefined) include(source.obstacle);
+  if (target !== undefined) include(target.obstacle);
+  const remaining = frame.nodes.filter(
+    (node) => node.id !== sourceNode && node.id !== targetNode,
+  );
+  const relevant = [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (let index = 0; index < remaining.length; index += 1) {
+      const node = remaining[index];
+      if (node === null || !rectanglesIntersect(node.obstacle, region)) continue;
+      remaining[index] = null;
+      relevant.push(node);
+      include(node.obstacle);
+      added = true;
+    }
+  }
+  return relevant;
+}
+
+function edgeRouteInputs(state, frame, group, needsLabel) {
   const sourceNode = group.dataset.sourceNode;
   const targetNode = group.dataset.targetNode;
   const start = framePortPoint(state, frame, sourceNode, group.dataset.sourcePort, "output");
   const end = framePortPoint(state, frame, targetNode, group.dataset.targetPort, "input");
-  const label = group.querySelector("[data-edge-label]");
+  const source = frame.nodesById.get(sourceNode);
+  const target = frame.nodesById.get(targetNode);
+  const base = `${frame.settingsSignature}|${needsLabel}|${source?.signature ?? "missing"}|${target?.signature ?? "missing"}`;
   if (start === null || end === null) {
-    commitRoute(group, label, null);
-    return;
+    return { start: null, end: null, key: `${base}|unroutable` };
   }
-  const orientation = state.shell.dataset.orientation;
-  const routeKey = `${frame.signature}|${sourceNode}:${group.dataset.sourcePort}>${targetNode}:${group.dataset.targetPort}`;
-  const cached = state.routeCache.get(group.dataset.automationEdge);
-  if (cached?.key === routeKey) {
-    commitRoute(group, label, cached.route);
-    return;
-  }
-  const nodeRectangles = frame.nodes
-    .filter((node) => node.id !== sourceNode && node.id !== targetNode)
-    .map((node) => node.obstacle);
-  const overlappingEndpoints = nodeRectangles.filter((rectangle) =>
-    pointInsideRectangle(start, rectangle) || pointInsideRectangle(end, rectangle));
-  const obstacles = nodeRectangles.filter((rectangle) => !overlappingEndpoints.includes(rectangle));
-  const sourceEndpoint = frame.nodes.find((node) => node.id === sourceNode)?.endpoint;
-  const targetEndpoint = frame.nodes.find((node) => node.id === targetNode)?.endpoint;
-  const endpoints = [
-    sourceEndpoint === undefined
-      ? null
-      : { rectangle: sourceEndpoint, endpoint: "source" },
-    targetEndpoint === undefined
-      ? null
-      : { rectangle: targetEndpoint, endpoint: "target" },
-    ...overlappingEndpoints.map((rectangle) => ({ rectangle, endpoint: "overlap" })),
-  ].filter((endpoint) => endpoint !== null);
-  const needsLabel = label !== null;
-  const labelBounds = frame.labelBounds;
-  const route = state.shell.dataset.edgeStyle === "smooth"
-    ? smoothRoute(start, end, orientation, obstacles, endpoints, needsLabel, labelBounds)
-    : (() => {
-      const routed = needsLabel
-        ? routePointsWithLabel(start, end, orientation, obstacles, endpoints, labelBounds)
-        : { points: routePoints(start, end, orientation, obstacles, endpoints), label: null };
-      return routed === null || routed.points === null
-        ? null
-        : { path: angularPath(routed.points), points: routed.points, label: routed.label };
-    })();
-  state.routeCache.set(group.dataset.automationEdge, { key: routeKey, route });
-  commitRoute(group, label, route);
+  const relevant = relevantObstacleNodes(frame, sourceNode, targetNode, start, end);
+  const relevantSignature = relevant
+    .map((node) => node.signature)
+    .sort()
+    .join(";");
+  return {
+    start,
+    end,
+    source,
+    target,
+    relevant,
+    key: `${base}|${start.x},${start.y}>${end.x},${end.y}|${relevantSignature}`,
+  };
 }
 
-function routeAll(state) {
-  metrics.routeRecalculationCount += 1;
-  const frame = routingFrame(state);
-  for (const edge of state.root.querySelectorAll("[data-automation-edge]")) {
-    routeEdge(state, edge, frame);
+function* computeEdgeRouteSteps(state, frame, inputs, needsLabel) {
+  const nodeRectangles = inputs.relevant.map((node) => node.obstacle);
+  const overlappingEndpoints = nodeRectangles.filter((rectangle) =>
+    pointInsideRectangle(inputs.start, rectangle)
+    || pointInsideRectangle(inputs.end, rectangle));
+  const obstacles = nodeRectangles.filter((rectangle) => !overlappingEndpoints.includes(rectangle));
+  const endpoints = [
+    inputs.source === undefined
+      ? null
+      : { rectangle: inputs.source.endpoint, endpoint: "source" },
+    inputs.target === undefined
+      ? null
+      : { rectangle: inputs.target.endpoint, endpoint: "target" },
+    ...overlappingEndpoints.map((rectangle) => ({ rectangle, endpoint: "overlap" })),
+  ].filter((endpoint) => endpoint !== null);
+  const orientation = state.shell.dataset.orientation;
+  const labelBounds = frame.labelBounds;
+  const start = inputs.start;
+  const end = inputs.end;
+  if (state.shell.dataset.edgeStyle === "smooth") {
+    return yield* smoothRouteSteps(
+      start,
+      end,
+      orientation,
+      obstacles,
+      endpoints,
+      needsLabel,
+      labelBounds,
+    );
   }
+  const routed = needsLabel
+    ? yield* routePointsWithLabelSteps(start, end, orientation, obstacles, endpoints, labelBounds)
+    : {
+      points: yield* routePointsSteps(start, end, orientation, obstacles, endpoints),
+      label: null,
+    };
+  return routed === null || routed.points === null
+    ? null
+    : { path: angularPath(routed.points), points: routed.points, label: routed.label };
+}
+
+function computeEdgeRoute(state, frame, inputs, needsLabel) {
+  return runRouteSteps(computeEdgeRouteSteps(state, frame, inputs, needsLabel));
+}
+
+function cancelRoutePass(state) {
+  const pass = state.routePass;
+  if (pass === null) return;
+  if (pass.timer !== null) clearTimeout(pass.timer);
+  if (pass.begun) state.routedSignature = null;
+  state.routePass = null;
+}
+
+const routePassSliceSpacingMs = 12;
+
+function scheduleRoutePassSlice(state, pass) {
+  pass.timer = setTimeout(() => {
+    if (state.routePass !== pass) return;
+    pass.timer = null;
+    runRoutePassSlice(state, pass);
+  }, routePassSliceSpacingMs);
+}
+
+function runRoutePassSlice(state, pass) {
+  const started = performance.now();
+  const withinBudget = () => performance.now() - started < routePassFrameBudgetMs;
+  if (!pass.begun || pass.stale) {
+    const frame = routingFrame(state);
+    if (!pass.begun && frame.signature === state.routedSignature) {
+      state.routePass = null;
+      state.root.dataset.automationCanvasReady = "true";
+      return;
+    }
+    if (!pass.begun || frame.signature !== pass.routingFrame.signature) {
+      pass.routingFrame = frame;
+      pass.edges = [...state.root.querySelectorAll("[data-automation-edge]")];
+      pass.index = 0;
+      pass.job = null;
+      metrics.routeRecalculationCount += 1;
+      for (const node of frame.nodes) {
+        if (state.nodeSignatures.get(node.id) === node.signature) continue;
+        for (const key of [...state.portOffsets.keys()]) {
+          if (key.startsWith(`${node.id}|`)) state.portOffsets.delete(key);
+        }
+      }
+      state.nodeSignatures = new Map(frame.nodes.map((node) => [node.id, node.signature]));
+      for (const group of pass.edges) {
+        framePortPoint(state, frame, group.dataset.sourceNode, group.dataset.sourcePort, "output");
+        framePortPoint(state, frame, group.dataset.targetNode, group.dataset.targetPort, "input");
+      }
+    }
+    pass.begun = true;
+    pass.stale = false;
+    if (pass.index < pass.edges.length && !withinBudget()) {
+      scheduleRoutePassSlice(state, pass);
+      return;
+    }
+  }
+  while (pass.index < pass.edges.length) {
+    if (pass.job === null) {
+      const group = pass.edges[pass.index];
+      metrics.routeEdgeCount += 1;
+      const label = group.querySelector("[data-edge-label]");
+      const inputs = edgeRouteInputs(state, pass.routingFrame, group, label !== null);
+      const cached = state.routeCache.get(group.dataset.automationEdge);
+      if (cached?.key === inputs.key) {
+        metrics.routeCacheHitCount += 1;
+        commitRoute(group, label, cached.route);
+        pass.index += 1;
+        if (!withinBudget()) break;
+        continue;
+      }
+      metrics.routeCacheMissCount += 1;
+      if (inputs.start === null || inputs.end === null) {
+        state.routeCache.set(group.dataset.automationEdge, { key: inputs.key, route: null });
+        commitRoute(group, label, null);
+        pass.index += 1;
+        if (!withinBudget()) break;
+        continue;
+      }
+      metrics.routeComputationCount += 1;
+      pass.job = {
+        group,
+        label,
+        inputs,
+        steps: computeEdgeRouteSteps(state, pass.routingFrame, inputs, label !== null),
+      };
+    }
+    let next = pass.job.steps.next();
+    while (!next.done && withinBudget()) next = pass.job.steps.next();
+    if (!next.done) break;
+    state.routeCache.set(pass.job.group.dataset.automationEdge, {
+      key: pass.job.inputs.key,
+      route: next.value,
+    });
+    commitRoute(pass.job.group, pass.job.label, next.value);
+    pass.job = null;
+    pass.index += 1;
+    if (!withinBudget()) break;
+  }
+  if (pass.index < pass.edges.length) {
+    scheduleRoutePassSlice(state, pass);
+    return;
+  }
+  state.routePass = null;
+  state.routedSignature = pass.routingFrame.signature;
   state.root.dataset.automationCanvasReady = "true";
 }
 
-function cancelScheduledRoutes(state) {
-  if (state.routeFrame === null) return;
-  cancelAnimationFrame(state.routeFrame);
-  state.routeFrame = null;
+function scheduleRoutePass(state) {
+  if (state.drag !== null && state.drag.moved) return;
+  if (state.routePass !== null) {
+    state.routePass.stale = true;
+    return;
+  }
+  const pass = {
+    timer: null,
+    routingFrame: null,
+    edges: [],
+    index: 0,
+    job: null,
+    begun: false,
+    stale: false,
+  };
+  state.routePass = pass;
+  scheduleRoutePassSlice(state, pass);
 }
 
-function scheduleRouteAll(state) {
-  if (state.routeFrame !== null) return;
-  state.routeFrame = requestAnimationFrame(() => {
-    state.routeFrame = null;
-    metrics.routeRecalculationCount += 1;
-    const frame = routingFrame(state);
-    for (const edge of state.root.querySelectorAll("[data-automation-edge]")) {
-      routeEdge(state, edge, frame);
-    }
-    state.root.dataset.automationCanvasReady = "true";
-  });
+function cancelDragRouteFrame(state) {
+  if (state.dragFrame === null) return;
+  cancelAnimationFrame(state.dragFrame);
+  state.dragFrame = null;
 }
 
 function scheduleDragRoutes(state) {
-  if (state.routeFrame !== null || state.drag === null) return;
-  state.routeFrame = requestAnimationFrame(() => {
-    state.routeFrame = null;
+  if (state.dragFrame !== null || state.drag === null) return;
+  state.dragFrame = requestAnimationFrame(() => {
+    state.dragFrame = null;
     if (state.drag === null) return;
     metrics.dragFrames += 1;
     metrics.routeEdgeLiveMaximumPerFrame = Math.max(
       metrics.routeEdgeLiveMaximumPerFrame,
       state.drag.edges.length,
     );
+    for (const item of state.drag.nodes) setNodeLiveGraphPosition(item);
     for (const edge of state.drag.edges) routeEdgeLive(state, edge);
   });
 }
@@ -1515,6 +1778,7 @@ function moveNodeDrag(state, event) {
   const deltaY = (event.clientY - drag.startY) / scale;
   if (!drag.moved && (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2)) {
     drag.moved = true;
+    cancelRoutePass(state);
     setLocalDisclosure(state.root, null);
     void state.dotnet.invokeMethodAsync("CloseNodeDisclosureFromCanvasAsync");
     state.root.classList.add("automation-canvas--node-dragging");
@@ -1524,7 +1788,6 @@ function moveNodeDrag(state, event) {
   for (const item of drag.nodes) {
     item.x = Math.max(0, item.startX + deltaX);
     item.y = Math.max(0, item.startY + deltaY);
-    setNodeGraphPosition(item.element, item.x, item.y);
   }
   scheduleDragRoutes(state);
   return true;
@@ -1550,14 +1813,14 @@ function finishNodeDrag(state, event, cancelled = false) {
       y: vertical ? displayX : displayY,
     };
   });
-  cancelScheduledRoutes(state);
-  routeAll(state);
+  cancelDragRouteFrame(state);
   if (drag.moved) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
   else if (!cancelled && drag.discloseOnClick) {
     const nodeId = drag.capture.dataset.automationNode;
     setLocalDisclosure(state.root, nodeId);
     void state.dotnet.invokeMethodAsync("ActivateNodeFromCanvasAsync", nodeId);
   }
+  scheduleRoutePass(state);
   return true;
 }
 
@@ -1576,7 +1839,11 @@ function beginBackgroundAction(state, event) {
     setLocalDisclosure(state.root, null);
     void state.dotnet.invokeMethodAsync("CloseNodeDisclosureFromCanvasAsync");
     const start = screenToGraph(state, event.clientX, event.clientY);
-    state.marqueeState = { pointerId: event.pointerId, start, current: start };
+    const nodes = [...state.root.querySelectorAll("[data-automation-node]")].map((node) => ({
+      id: node.dataset.automationNode,
+      rectangle: nodeGraphRectangle(node),
+    }));
+    state.marqueeState = { pointerId: event.pointerId, start, current: start, nodes };
     Object.assign(state.marquee.style, {
       left: `${start.x}px`,
       top: `${start.y}px`,
@@ -1610,27 +1877,45 @@ function moveBackgroundAction(state, event) {
   }
   if (state.marqueeState?.pointerId !== event.pointerId) return false;
   state.marqueeState.current = screenToGraph(state, event.clientX, event.clientY);
-  const left = Math.min(state.marqueeState.start.x, state.marqueeState.current.x);
-  const top = Math.min(state.marqueeState.start.y, state.marqueeState.current.y);
-  const width = Math.abs(state.marqueeState.current.x - state.marqueeState.start.x);
-  const height = Math.abs(state.marqueeState.current.y - state.marqueeState.start.y);
+  scheduleMarqueeUpdate(state);
+  return true;
+}
+
+function applyMarqueeSelection(state) {
+  const marquee = state.marqueeState;
+  if (marquee === null) return;
+  const left = Math.min(marquee.start.x, marquee.current.x);
+  const top = Math.min(marquee.start.y, marquee.current.y);
+  const width = Math.abs(marquee.current.x - marquee.start.x);
+  const height = Math.abs(marquee.current.y - marquee.start.y);
   Object.assign(state.marquee.style, {
     left: `${left}px`,
     top: `${top}px`,
     width: `${width}px`,
     height: `${height}px`,
   });
-  const ids = [...state.root.querySelectorAll("[data-automation-node]")]
-    .filter((node) => {
-      const rectangle = nodeGraphRectangle(node);
-      return rectangle.left < left + width
-        && rectangle.right > left
-        && rectangle.top < top + height
-        && rectangle.bottom > top;
-    })
-    .map((node) => node.dataset.automationNode);
+  const ids = marquee.nodes
+    .filter(({ rectangle }) =>
+      rectangle.left < left + width
+      && rectangle.right > left
+      && rectangle.top < top + height
+      && rectangle.bottom > top)
+    .map(({ id }) => id);
   setLocalSelection(state.root, ids, null);
-  return true;
+}
+
+function scheduleMarqueeUpdate(state) {
+  if (state.marqueeFrame !== null) return;
+  state.marqueeFrame = requestAnimationFrame(() => {
+    state.marqueeFrame = null;
+    applyMarqueeSelection(state);
+  });
+}
+
+function cancelMarqueeUpdate(state) {
+  if (state.marqueeFrame === null) return;
+  cancelAnimationFrame(state.marqueeFrame);
+  state.marqueeFrame = null;
 }
 
 function finishBackgroundAction(state, event) {
@@ -1648,18 +1933,22 @@ function finishBackgroundAction(state, event) {
     state.root.classList.remove("automation-canvas--panning");
     if (deselect) {
       setLocalSelection(state.root, [], null);
+      scheduleRoutePass(state);
       state.root.focus({ preventScroll: true });
       void notifyCompactSelection(state);
     }
     return true;
   }
   if (state.marqueeState?.pointerId !== event.pointerId) return false;
+  cancelMarqueeUpdate(state);
+  applyMarqueeSelection(state);
   state.marqueeState = null;
   if (state.root.hasPointerCapture(event.pointerId)) {
     state.root.releasePointerCapture(event.pointerId);
   }
   state.marquee.hidden = true;
   state.root.classList.remove("automation-canvas--selecting");
+  scheduleRoutePass(state);
   void notifyCompactSelection(state);
   return true;
 }
@@ -1734,7 +2023,7 @@ function moveSelectionByKeyboard(state, key) {
     };
   });
   if (moves.length === 0) return true;
-  routeAll(state);
+  scheduleRoutePass(state);
   void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
   return true;
 }
@@ -1774,9 +2063,13 @@ export function initialize(root, dotnet) {
     connection: null,
     connectionDrag: null,
     suppressPortClick: false,
-    routeFrame: null,
+    routePass: null,
+    routedSignature: null,
+    dragFrame: null,
+    marqueeFrame: null,
     routeCache: new Map(),
     portOffsets: new Map(),
+    nodeSignatures: new Map(),
     listeners: [],
   };
 
@@ -1824,11 +2117,13 @@ export function initialize(root, dotnet) {
       if (nodeId === undefined) return;
       if (event.shiftKey) {
         setLocalDisclosure(state.root, null);
+        scheduleRoutePass(state);
         void state.dotnet.invokeMethodAsync("ToggleNodeSelectionFromCanvasAsync", nodeId);
         return;
       }
       setLocalSelection(state.root, [nodeId], null);
       setLocalDisclosure(state.root, nodeId);
+      scheduleRoutePass(state);
       void state.dotnet.invokeMethodAsync("ActivateNodeFromCanvasAsync", nodeId);
       return;
     }
@@ -1881,14 +2176,14 @@ export function initialize(root, dotnet) {
   });
   register(state, window, "resize", () => {
     updateEditorHeight(state);
-    scheduleRouteAll(state);
+    scheduleRoutePass(state);
   });
 
   states.set(root, state);
   activeStates.add(state);
   restoreViewport(state);
   updateEditorHeight(state);
-  routeAll(state);
+  scheduleRoutePass(state);
 }
 
 export function refresh(root) {
@@ -1905,18 +2200,23 @@ export function refresh(root) {
   } else {
     applyTransform(state);
   }
-  updateEditorHeight(state);
+  requestAnimationFrame(() => {
+    if (activeStates.has(state)) updateEditorHeight(state);
+  });
   if (state.drag === null) {
     for (const node of root.querySelectorAll("[data-automation-node]")) {
       delete node.dataset.automationGraphX;
       delete node.dataset.automationGraphY;
+      node.style.removeProperty("transform");
       node.style.removeProperty("left");
       node.style.removeProperty("top");
     }
   }
   cancelConnection(state);
-  cancelScheduledRoutes(state);
-  routeAll(state);
+  cancelDragRouteFrame(state);
+  cancelRoutePass(state);
+  state.routedSignature = null;
+  scheduleRoutePass(state);
 }
 
 export function focusNode(root, nodeId) {
@@ -1928,7 +2228,9 @@ export function focusNode(root, nodeId) {
 export function dispose(root) {
   const state = states.get(root);
   if (state === undefined) return;
-  cancelScheduledRoutes(state);
+  cancelDragRouteFrame(state);
+  cancelMarqueeUpdate(state);
+  cancelRoutePass(state);
   for (const remove of state.listeners.reverse()) remove();
   activeStates.delete(state);
   states.delete(root);

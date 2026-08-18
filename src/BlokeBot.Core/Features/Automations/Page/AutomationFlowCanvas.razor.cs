@@ -100,8 +100,8 @@ public partial class AutomationFlowCanvas
         var signature = RenderSignature();
         if (_module is not null && (firstRender || signature != _renderSignature))
         {
-            await _module.InvokeVoidAsync("refresh", _root);
             _renderSignature = signature;
+            await _module.InvokeVoidAsync("refresh", _root);
         }
         if (_module is not null)
         {
