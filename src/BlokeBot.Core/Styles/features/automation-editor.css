@@ -1611,6 +1611,10 @@
     grid-template-columns: 12rem 19rem minmax(31rem, 1fr);
 }
 
+.automation-editor-body--flows-collapsed.automation-editor-body--toolbox-open {
+    grid-template-columns: 19rem minmax(31rem, 1fr);
+}
+
 .automation-workspace-toolbar {
     align-items: center;
     background: var(--app-surface-solid);
@@ -2328,11 +2332,19 @@
     .automation-editor-body--toolbox-open {
         grid-template-columns: 10.5rem 18rem minmax(26rem, 1fr);
     }
+
+    .automation-editor-body--flows-collapsed.automation-editor-body--toolbox-open {
+        grid-template-columns: 18rem minmax(26rem, 1fr);
+    }
 }
 
 @media (max-width: 48rem) {
     .automation-editor-body--toolbox-open {
         display: block;
+    }
+
+    .automation-editor--focus .automation-editor-body--flows-collapsed.automation-editor-body--toolbox-open {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .automation-workspace-toolbar {
