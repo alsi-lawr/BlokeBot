@@ -416,6 +416,7 @@ public partial class AutomationEditorPage
                 if (!_catalogService.TryDescribe(id, out descriptor))
                 {
                     _editor = null;
+                    _disclosedNodeId = null;
                     _history.Clear();
                     _flowRecoveryMessage =
                         $"The saved flow '{snapshot.Draft.Name}' uses an unavailable node type. Restore the node provider, or delete the flow.";
@@ -531,6 +532,7 @@ public partial class AutomationEditorPage
         );
         _editor.Edges.Add(edge);
         _selectedEdgeId = edge.Id;
+        _disclosedNodeId = null;
         _selectedNodeIds.Clear();
         _selectedNodeId = null;
         EditorChanged();
@@ -558,6 +560,7 @@ public partial class AutomationEditorPage
             TargetPortId = request.Connection.TargetPortId,
         };
         _selectedEdgeId = request.EdgeId;
+        _disclosedNodeId = null;
         EditorChanged();
     }
 

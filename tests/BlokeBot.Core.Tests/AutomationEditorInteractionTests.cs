@@ -1,9 +1,14 @@
 using System.Collections.Immutable;
+using System.Text.Json;
+using AngleSharp.Dom;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
 using BlokeBot.Core.Features.Competitions;
+using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -148,6 +153,146 @@ public sealed class AutomationEditorInteractionTests
         buttons[0].GetAttribute("aria-expanded").ShouldBe("true");
         buttons[1].GetAttribute("aria-pressed").ShouldBe("false");
         buttons[1].GetAttribute("aria-expanded").ShouldBe("false");
+    }
+
+    [Test]
+    public async Task TypedEditor_Page_ConnectionCreationAndRepairCloseDisclosure()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync();
+        var canvas = fixture.Page.FindComponent<AutomationFlowCanvas>();
+        var source = canvas.Instance.Nodes.Single(static node =>
+            node.Definition.Id == AutomationDefinitionIds.StreamOnlineSource
+        );
+        var target = canvas.Instance.Nodes.Single(static node =>
+            node.Definition.Id == AutomationDefinitionIds.SendChatAction
+        );
+        var connection = FlowConnection(source, target);
+        var originalEdgeId = canvas.Instance.Edges.ShouldHaveSingleItem().Id;
+
+        await fixture.Page.InvokeAsync(() =>
+            canvas.Instance.DeleteSelectionFromCanvasAsync([], originalEdgeId)
+        );
+        fixture.Page.WaitForAssertion(() =>
+            fixture.Page.FindComponent<AutomationFlowCanvas>().Instance.Edges.ShouldBeEmpty()
+        );
+        await DiscloseAsync(fixture.Page, source.Id);
+
+        await fixture.Page.InvokeAsync(() =>
+            fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.ConnectFromCanvasAsync(
+                    connection.SourceNodeId.Value,
+                    connection.SourcePortId.Value,
+                    connection.TargetNodeId.Value,
+                    connection.TargetPortId.Value
+                )
+        );
+
+        fixture.Page.WaitForAssertion(() =>
+        {
+            DisclosureCount(fixture.Page).ShouldBe(0);
+            _ = fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.Edges.ShouldHaveSingleItem();
+        });
+
+        canvas = fixture.Page.FindComponent<AutomationFlowCanvas>();
+        var createdEdgeId = canvas.Instance.Edges.ShouldHaveSingleItem().Id;
+        await DiscloseAsync(fixture.Page, target.Id);
+        await fixture.Page.InvokeAsync(() =>
+            fixture
+                .Page.FindComponent<AutomationNodeInspector>()
+                .Instance.Repair.InvokeAsync(new(createdEdgeId, connection))
+        );
+
+        fixture.Page.WaitForAssertion(() =>
+        {
+            DisclosureCount(fixture.Page).ShouldBe(0);
+            fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.SelectedEdgeId.ShouldBe(createdEdgeId);
+        });
+    }
+
+    [Test]
+    public async Task TypedEditor_Page_DisclosureDoesNotChangeDraftDirtyStateOrHistoryDepth()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync();
+        var canvas = fixture.Page.FindComponent<AutomationFlowCanvas>();
+        var source = canvas.Instance.Nodes.Single(static node =>
+            node.Definition.Id == AutomationDefinitionIds.StreamOnlineSource
+        );
+        var originalPosition = source.Position;
+        var draftBeforeDisclosure = CanvasDraft(canvas.Instance);
+        FlowStateButton(fixture.Page).HasAttribute("disabled").ShouldBeFalse();
+
+        await DiscloseAsync(fixture.Page, source.Id);
+
+        CanvasDraft(fixture.Page.FindComponent<AutomationFlowCanvas>().Instance)
+            .ShouldBe(draftBeforeDisclosure);
+        FlowStateButton(fixture.Page).HasAttribute("disabled").ShouldBeFalse();
+
+        fixture
+            .Page.Find(
+                $"[data-automation-node='{source.Id.Value:D}'] [data-automation-node-select]"
+            )
+            .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
+        fixture.Page.WaitForAssertion(() =>
+        {
+            var moved = fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.Nodes.Single(node => node.Id == source.Id);
+            moved.Position.ShouldNotBe(originalPosition);
+            DisclosureCount(fixture.Page).ShouldBe(1);
+            FlowStateButton(fixture.Page).HasAttribute("disabled").ShouldBeTrue();
+        });
+
+        await fixture.Page.Instance.ApplyEditorHistoryShortcutAsync("undo");
+        fixture.Page.WaitForAssertion(() =>
+        {
+            var restored = fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.Nodes.Single(node => node.Id == source.Id);
+            restored.Position.ShouldBe(originalPosition);
+            DisclosureCount(fixture.Page).ShouldBe(0);
+            FlowStateButton(fixture.Page).HasAttribute("disabled").ShouldBeFalse();
+        });
+
+        await fixture.Page.Instance.ApplyEditorHistoryShortcutAsync("redo");
+        fixture.Page.WaitForAssertion(() =>
+        {
+            var redone = fixture
+                .Page.FindComponent<AutomationFlowCanvas>()
+                .Instance.Nodes.Single(node => node.Id == source.Id);
+            redone.Position.ShouldNotBe(originalPosition);
+            DisclosureCount(fixture.Page).ShouldBe(0);
+            FlowStateButton(fixture.Page).HasAttribute("disabled").ShouldBeTrue();
+        });
+    }
+
+    [Test]
+    public async Task TypedEditor_Page_DirectUnavailableProviderFlowSelectionClearsDisclosure()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync(
+            includeUnavailableFlow: true
+        );
+        var source = fixture
+            .Page.FindComponent<AutomationFlowCanvas>()
+            .Instance.Nodes.Single(static node =>
+                node.Definition.Id == AutomationDefinitionIds.StreamOnlineSource
+            );
+        await DiscloseAsync(fixture.Page, source.Id);
+
+        fixture
+            .Page.FindAll(".automation-flow-item")
+            .Single(item => item.TextContent.Contains("Unavailable provider flow"))
+            .Click();
+
+        fixture.Page.WaitForAssertion(() =>
+        {
+            fixture.Page.FindAll("[data-automation-canvas]").ShouldBeEmpty();
+            DisclosureCount(fixture.Page).ShouldBe(0);
+        });
     }
 
     [Test]
@@ -882,6 +1027,82 @@ public sealed class AutomationEditorInteractionTests
             invocation.Identifier == _focusInterop
         );
 
+    private static AutomationConnectionRequest FlowConnection(
+        AutomationEditorNode source,
+        AutomationEditorNode target
+    ) =>
+        new(
+            source.Id,
+            source
+                .Definition.Outputs.Single(static port =>
+                    port.ValueType == AutomationPortValueType.Flow
+                )
+                .Id,
+            target.Id,
+            target
+                .Definition.Inputs.Single(static port =>
+                    port.ValueType == AutomationPortValueType.Flow
+                )
+                .Id
+        );
+
+    private static async Task DiscloseAsync(
+        IRenderedComponent<AutomationEditorPage> page,
+        AutomationNodeId nodeId
+    )
+    {
+        await page.InvokeAsync(() =>
+            page.FindComponent<AutomationFlowCanvas>()
+                .Instance.ActivateNodeFromCanvasAsync(nodeId.Value)
+        );
+        page.WaitForAssertion(() => DisclosureCount(page).ShouldBe(1));
+    }
+
+    private static int DisclosureCount(IRenderedComponent<AutomationEditorPage> page) =>
+        page.FindAll("[data-automation-node-select][aria-expanded='true']").Count;
+
+    private static string CanvasDraft(AutomationFlowCanvas canvas) =>
+        JsonSerializer.Serialize(
+            new
+            {
+                Nodes = canvas.Nodes.Select(static node =>
+                {
+                    var draft = node.Draft();
+                    return new
+                    {
+                        Id = draft.Id.Value,
+                        draft.Definition.TypeId,
+                        draft.Definition.SchemaVersion,
+                        Configuration = draft.Definition.Configuration.GetRawText(),
+                        Bindings = AutomationRuntimeSerialization.SerializeInputBindings(
+                            draft.InputBindings
+                        ),
+                        ExpressionVersion = draft.ExpressionLanguageVersion.Value,
+                        draft.FailurePolicy,
+                        X = draft.Position.X.Value,
+                        Y = draft.Position.Y.Value,
+                        draft.DisplayAlias,
+                    };
+                }),
+                Edges = canvas.Edges.Select(static edge => new
+                {
+                    edge.Id,
+                    edge.Kind,
+                    SourceNodeId = edge.SourceNodeId.Value,
+                    SourcePortId = edge.SourcePortId.Value,
+                    TargetNodeId = edge.TargetNodeId.Value,
+                    TargetPortId = edge.TargetPortId.Value,
+                }),
+                canvas.Settings,
+            }
+        );
+
+    private static IElement FlowStateButton(IRenderedComponent<AutomationEditorPage> page) =>
+        page.FindAll(".automation-editor-actions button")
+            .Single(button =>
+                button.TextContent.Trim() is "Enable" or "Enable anyway" or "Disable"
+            );
+
     private static AutomationDefinitionDescriptor[] ProductionDefinitions() =>
         [
             .. new CoreAutomationCatalogModule().Definitions.Select(static value =>
@@ -897,6 +1118,151 @@ public sealed class AutomationEditorInteractionTests
                 value.Descriptor
             ),
         ];
+
+    private sealed class AutomationEditorPageFixture : IAsyncDisposable
+    {
+        private AutomationEditorPageFixture(
+            SqliteBlokeBotDbFactory database,
+            BunitContext context,
+            IRenderedComponent<AutomationEditorPage> page
+        )
+        {
+            _database = database;
+            _context = context;
+            Page = page;
+        }
+
+        private readonly SqliteBlokeBotDbFactory _database;
+
+        private readonly BunitContext _context;
+
+        internal IRenderedComponent<AutomationEditorPage> Page { get; }
+
+        internal static async Task<AutomationEditorPageFixture> CreateAsync(
+            bool includeUnavailableFlow = false
+        )
+        {
+            var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var hostId = await SeedHostAsync(database);
+            var context = UiTestContextFactory.Create(database, hostId);
+            _ = context.Services.AddSingleton<IOverlayCueAdmissionService>(
+                new UnavailableOverlayCueAdmissionService()
+            );
+            _ = context.Services.AddBlokeBotAutomations();
+            var editor = AvailableEditor();
+            _ = (
+                await context
+                    .Services.GetRequiredService<AutomationFlowService>()
+                    .SaveAsync(editor.Draft(new(hostId)), CancellationToken.None)
+            ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+            if (includeUnavailableFlow)
+            {
+                await SeedUnavailableFlowAsync(database, hostId);
+            }
+
+            var page = context.Render<AutomationEditorPage>();
+            page.WaitForAssertion(() =>
+                page.FindComponent<AutomationFlowCanvas>().Instance.Nodes.Count.ShouldBe(2)
+            );
+            return new(database, context, page);
+        }
+
+        private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
+        {
+            await using var db = await database.CreateDbContextAsync();
+            var host = new BotHost
+            {
+                TwitchUserId = "automation-editor-host",
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.Automations,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            return host.Id;
+        }
+
+        private static AutomationEditorState AvailableEditor()
+        {
+            var editor = AutomationEditorState.Create("Available flow");
+            var definitions = ProductionDefinitions();
+            var source = editor.AddNode(
+                definitions.Single(static definition =>
+                    definition.Id == AutomationDefinitionIds.StreamOnlineSource
+                )
+            );
+            var target = editor.AddNode(
+                definitions.Single(static definition =>
+                    definition.Id == AutomationDefinitionIds.SendChatAction
+                )
+            );
+            target.SetValue(new("message"), "Hello from the editor fixture.");
+            var connection = FlowConnection(source, target);
+            editor.Edges.Add(
+                new(
+                    Guid.NewGuid(),
+                    AutomationEdgeKind.Flow,
+                    connection.SourceNodeId,
+                    connection.SourcePortId,
+                    connection.TargetNodeId,
+                    connection.TargetPortId
+                )
+            );
+            return editor;
+        }
+
+        private static async Task SeedUnavailableFlowAsync(
+            SqliteBlokeBotDbFactory database,
+            int hostId
+        )
+        {
+            await using var db = await database.CreateDbContextAsync();
+            var flowId = Guid.NewGuid();
+            var updatedAtUtc = new DateTime(2026, 7, 9, 12, 0, 0, DateTimeKind.Utc);
+            _ = db.AutomationFlows.Add(
+                new()
+                {
+                    Id = flowId,
+                    HostId = hostId,
+                    Name = "Unavailable provider flow",
+                    SchemaVersion = 1,
+                    CreatedAtUtc = updatedAtUtc,
+                    UpdatedAtUtc = updatedAtUtc,
+                    Nodes =
+                    [
+                        new()
+                        {
+                            Id = Guid.NewGuid(),
+                            FlowId = flowId,
+                            DefinitionId = "removed-provider-node",
+                            DefinitionSchemaVersion = 1,
+                            ConfigurationJson = "{}",
+                            InputBindingsJson =
+                                AutomationRuntimeSerialization.SerializeInputBindings(
+                                    ImmutableDictionary<
+                                        AutomationConfigurationFieldId,
+                                        AutomationInputBinding
+                                    >.Empty
+                                ),
+                            ExpressionLanguageVersion = AutomationExpressionLanguage
+                                .CurrentVersion
+                                .Value,
+                            CanvasX = 48,
+                            CanvasY = 72,
+                        },
+                    ],
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _context.Dispose();
+            await _database.DisposeAsync();
+        }
+    }
 
     private sealed record PickerNodes(
         AutomationEditorNode IncompatibleSource,
