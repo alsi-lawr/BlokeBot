@@ -1181,8 +1181,7 @@ public sealed class AutomationEditorInteractionTests
     private static IElement NodeSelector(
         IRenderedComponent<AutomationEditorPage> page,
         AutomationNodeId nodeId
-    ) =>
-        page.Find($"[data-automation-node='{nodeId.Value:D}'] [data-automation-node-select]");
+    ) => page.Find($"[data-automation-node='{nodeId.Value:D}'] [data-automation-node-select]");
 
     private static string CanvasDraft(AutomationFlowCanvas canvas) =>
         JsonSerializer.Serialize(
