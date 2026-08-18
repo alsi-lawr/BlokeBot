@@ -12,13 +12,25 @@ const metrics = {
   lastVisualCommitAt: 0,
   routeEdgeLiveCount: 0,
   routeEdgeLiveMaximumPerFrame: 0,
+  routeEdgeLiveAffectedCount: 0,
+  routeEdgeLiveDeferredCount: 0,
+  routeEdgeLiveDeferredMaximumPerFrame: 0,
   dragFrames: 0,
+  dragGraphBuildCount: 0,
+  dragGraphPatchCount: 0,
+  dragRouteCostTotalMs: 0,
+  dragRouteCostMaximumMs: 0,
   refreshCount: 0,
   uiUpdateCount: 0,
 };
+// Bounded per-drag-frame routing cost samples for the D-251 benchmark. Only the
+// benchmark reads them; nothing in the module branches on their contents.
+const dragFrameCosts = [];
 globalThis.__blokeBotAutomationMetrics = metrics;
+globalThis.__blokeBotAutomationDragFrameCosts = dragFrameCosts;
 globalThis.__resetBlokeBotAutomationMetrics = () => {
   for (const key of Object.keys(metrics)) metrics[key] = 0;
+  dragFrameCosts.length = 0;
 };
 globalThis.__simulateBlokeBotAutomationUpdate = () => {
   metrics.uiUpdateCount += 1;
@@ -299,6 +311,16 @@ function pointInsideRectangle(point, rectangle) {
 }
 
 function segmentHitsRectangle(first, second, rectangle) {
+  // Exact bounding-box rejection: a segment can only touch the rectangle if its
+  // own extent overlaps the rectangle inclusively on both axes.
+  if (
+    (first.x < rectangle.left && second.x < rectangle.left)
+    || (first.x > rectangle.right && second.x > rectangle.right)
+    || (first.y < rectangle.top && second.y < rectangle.top)
+    || (first.y > rectangle.bottom && second.y > rectangle.bottom)
+  ) {
+    return false;
+  }
   const deltaX = second.x - first.x;
   const deltaY = second.y - first.y;
   let minimum = 0;
@@ -322,10 +344,23 @@ function segmentHitsRectangle(first, second, rectangle) {
   return true;
 }
 
+function boundsOverlapRectangle(bounds, rectangle) {
+  return bounds.left <= rectangle.right
+    && bounds.right >= rectangle.left
+    && bounds.top <= rectangle.bottom
+    && bounds.bottom >= rectangle.top;
+}
+
 function pathHitsObstacles(points, obstacles) {
+  if (points.length < 2) return false;
+  // Densely sampled curves are checked against many rectangles, so obstacles
+  // outside the path's own extent are dropped before the segment walk. The
+  // filter is an exact necessary condition, not an approximation.
+  const bounds = routeBounds(points);
+  const relevant = obstacles.filter((obstacle) => boundsOverlapRectangle(bounds, obstacle));
   for (let index = 1; index < points.length; index += 1) {
-    if (obstacles.some((obstacle) => segmentHitsRectangle(points[index - 1], points[index], obstacle))) {
-      return true;
+    for (const obstacle of relevant) {
+      if (segmentHitsRectangle(points[index - 1], points[index], obstacle)) return true;
     }
   }
   return false;
@@ -399,7 +434,10 @@ function normalizePath(points) {
 }
 
 function pathAvoidsEndpoints(points, endpoints) {
+  if (points.length === 0) return true;
+  const bounds = routeBounds(points);
   for (const endpoint of endpoints) {
+    if (!boundsOverlapRectangle(bounds, endpoint.rectangle)) continue;
     const startsInside = pointInsideRectangle(points[0], endpoint.rectangle);
     const endsInside = pointInsideRectangle(points.at(-1), endpoint.rectangle);
     let firstOutside = 0;
@@ -528,11 +566,11 @@ function splineRouteCurves(points, tension) {
   });
 }
 
-function sampleCurves(curves) {
+function sampleCurves(curves, sampleCount = curveSampleCount) {
   const points = [curves[0].start];
   for (const curve of curves) {
-    for (let step = 1; step <= curveSampleCount; step += 1) {
-      points.push(cubicPoint(curve, step / curveSampleCount));
+    for (let step = 1; step <= sampleCount; step += 1) {
+      points.push(cubicPoint(curve, step / sampleCount));
     }
   }
   return points;
@@ -543,9 +581,9 @@ function sampleCurves(curves) {
 // self-intersection instead of the dense sample polyline, because the direct
 // curve is monotone along its axis and clamped spline handles keep each curve
 // segment inside its skeleton segment's corridor.
-function sampledCurvesClear(curves, obstacles, endpoints = []) {
+function sampledCurvesClear(curves, obstacles, endpoints, sampleCount) {
   if (curves.length === 0) return false;
-  const points = sampleCurves(curves);
+  const points = sampleCurves(curves, sampleCount);
   return !pathHitsObstacles(points, obstacles) && pathAvoidsEndpoints(points, endpoints);
 }
 
@@ -694,43 +732,6 @@ function pathMidpoint(points) {
     };
   }
   return points.at(-1);
-}
-
-function routeEdgeLive(state, group) {
-  metrics.routeEdgeLiveCount += 1;
-  const start = portPoint(
-    state,
-    group.dataset.sourceNode,
-    group.dataset.sourcePort,
-    "output",
-  );
-  const end = portPoint(
-    state,
-    group.dataset.targetNode,
-    group.dataset.targetPort,
-    "input",
-  );
-  const label = group.querySelector("[data-edge-label]");
-  if (start === null || end === null) {
-    commitRoute(group, label, null);
-    return;
-  }
-
-  const orientation = state.shell.dataset.orientation;
-  if (state.shell.dataset.edgeStyle === "smooth") {
-    const curve = directCurve(start, end, orientation);
-    commitRoute(group, label, {
-      path: curvePath(curve),
-      label: label === null ? null : cubicPoint(curve, 0.5),
-    });
-    return;
-  }
-
-  const points = liveAngularPoints(start, end, orientation);
-  commitRoute(group, label, {
-    path: angularPath(points),
-    label: label === null ? null : pathMidpoint(points),
-  });
 }
 
 function routingFrame(state) {
@@ -890,6 +891,90 @@ function buildVisibilityGraph(obstacles, anchorPoints) {
   };
 }
 
+// Incremental maintenance of that graph for a drag frame. The base graph holds
+// every standing-still obstacle and route anchor and is built once per drag;
+// this re-adds only the moving nodes' coordinate contributions, inherits every
+// cell whose row and column both survive unchanged, evaluates only the inserted
+// rows and columns against the static obstacles, and blocks only the cells the
+// moving rectangles now cover. No frame rebuilds the whole graph.
+function patchVisibilityGraph(base, staticObstacles, extraXs, extraYs, movingObstacles) {
+  const xCoords = uniqueSorted([...base.xCoords, ...extraXs]);
+  const yCoords = uniqueSorted([...base.yCoords, ...extraYs]);
+  const width = xCoords.length;
+  const height = yCoords.length;
+  const baseColumns = xCoords.map((value) => base.xIndex.get(value) ?? -1);
+  const baseRows = yCoords.map((value) => base.yIndex.get(value) ?? -1);
+  const free = new Uint8Array(width * height);
+  const rightOpen = new Uint8Array(width * height);
+  const downOpen = new Uint8Array(width * height);
+  for (let row = 0; row < height; row += 1) {
+    const y = yCoords[row];
+    const baseRow = baseRows[row];
+    const spanning = staticObstacles.filter((obstacle) => y > obstacle.top && y < obstacle.bottom);
+    const moving = movingObstacles.filter((obstacle) => y > obstacle.top && y < obstacle.bottom);
+    for (let col = 0; col < width; col += 1) {
+      const x = xCoords[col];
+      const inherited = baseRow >= 0 && baseColumns[col] >= 0;
+      let open = inherited
+        ? base.free[baseRow * base.width + baseColumns[col]]
+        : (spanning.some((obstacle) => x > obstacle.left && x < obstacle.right) ? 0 : 1);
+      if (open === 1 && moving.some((obstacle) => x > obstacle.left && x < obstacle.right)) {
+        open = 0;
+      }
+      free[row * width + col] = open;
+    }
+    for (let col = 0; col < width - 1; col += 1) {
+      const vertex = row * width + col;
+      if (free[vertex] === 0 || free[vertex + 1] === 0) continue;
+      const left = xCoords[col];
+      const right = xCoords[col + 1];
+      const inherited = baseRow >= 0
+        && baseColumns[col] >= 0
+        && baseColumns[col + 1] === baseColumns[col] + 1;
+      let open = inherited
+        ? base.rightOpen[baseRow * base.width + baseColumns[col]]
+        : (spanning.some((obstacle) => left < obstacle.right && right > obstacle.left) ? 0 : 1);
+      if (open === 1 && moving.some((obstacle) => left < obstacle.right && right > obstacle.left)) {
+        open = 0;
+      }
+      rightOpen[vertex] = open;
+    }
+  }
+  for (let col = 0; col < width; col += 1) {
+    const x = xCoords[col];
+    const baseColumn = baseColumns[col];
+    const spanning = staticObstacles.filter((obstacle) => x > obstacle.left && x < obstacle.right);
+    const moving = movingObstacles.filter((obstacle) => x > obstacle.left && x < obstacle.right);
+    for (let row = 0; row < height - 1; row += 1) {
+      const vertex = row * width + col;
+      if (free[vertex] === 0 || free[vertex + width] === 0) continue;
+      const top = yCoords[row];
+      const bottom = yCoords[row + 1];
+      const inherited = baseColumn >= 0
+        && baseRows[row] >= 0
+        && baseRows[row + 1] === baseRows[row] + 1;
+      let open = inherited
+        ? base.downOpen[baseRows[row] * base.width + baseColumn]
+        : (spanning.some((obstacle) => top < obstacle.bottom && bottom > obstacle.top) ? 0 : 1);
+      if (open === 1 && moving.some((obstacle) => top < obstacle.bottom && bottom > obstacle.top)) {
+        open = 0;
+      }
+      downOpen[vertex] = open;
+    }
+  }
+  return {
+    xCoords,
+    yCoords,
+    width,
+    height,
+    free,
+    rightOpen,
+    downOpen,
+    xIndex: new Map(xCoords.map((value, index) => [value, index])),
+    yIndex: new Map(yCoords.map((value, index) => [value, index])),
+  };
+}
+
 function compareSearchEntries(first, second) {
   return first.priority - second.priority || first.state - second.state;
 }
@@ -927,11 +1012,32 @@ function popSearchEntry(heap) {
   }
 }
 
+// Reused expansion scratch: at most four axis-aligned moves leave a vertex, so
+// the search relaxes them out of these buffers instead of allocating.
+const searchMoveVertices = new Int32Array(4);
+const searchMoveAxes = new Int32Array(4);
+const searchMoveDistances = new Float64Array(4);
+
 // A* per edge over the shared graph with the lexicographic bend-then-distance
 // cost encoded as bends * bendWeight + distance. The Manhattan-distance
 // heuristic is admissible because every remaining path is at least that long
 // and bends only add cost; equal-cost ties break on the numeric state index.
-function routeOverGraph(graph, startPoint, endPoint, flowAxis) {
+// Live drag routes additionally estimate the remaining bends, which prunes the
+// bend-dominated frontier hard enough to fit an animation frame; the routing
+// pass leaves the heuristic exactly as it was.
+// Lower bound on the bends any remaining path must still pay, including the
+// arrival penalty. Admissible: reaching a target that differs on both axes
+// needs at least one axis change, and two when the current axis is already the
+// arrival axis; a single-axis run needs one change unless it is already on that
+// axis, plus one when it cannot arrive along the flow axis.
+function remainingBends(needX, needY, axis, flowAxis) {
+  if (!needX && !needY) return 0;
+  if (needX && needY) return axis === flowAxis ? 2 : 1;
+  const travelAxis = needX ? 0 : 1;
+  return (axis === travelAxis ? 0 : 1) + (travelAxis === flowAxis ? 0 : 1);
+}
+
+function routeOverGraph(graph, startPoint, endPoint, flowAxis, estimateBends = false) {
   const startCol = graph.xIndex.get(startPoint.x);
   const startRow = graph.yIndex.get(startPoint.y);
   const endCol = graph.xIndex.get(endPoint.x);
@@ -950,17 +1056,31 @@ function routeOverGraph(graph, startPoint, endPoint, flowAxis) {
   if (free[startVertex] === 0 || free[endVertex] === 0) return null;
   if (startVertex === endVertex) return [startPoint];
   const stateCount = width * height * 2;
-  const bestCosts = new Float64Array(stateCount).fill(Infinity);
-  const parents = new Int32Array(stateCount).fill(-1);
+  // Search scratch lives on the graph, so a pass or drag frame allocates it once
+  // instead of once per edge. Values are reset before every search.
+  if (graph.searchCosts === undefined || graph.searchCosts.length < stateCount) {
+    graph.searchCosts = new Float64Array(stateCount);
+    graph.searchParents = new Int32Array(stateCount);
+  }
+  const bestCosts = graph.searchCosts.fill(Infinity, 0, stateCount);
+  const parents = graph.searchParents.fill(-1, 0, stateCount);
   const heap = [];
-  const heuristic = (vertex) => {
+  const moveVertices = searchMoveVertices;
+  const moveAxes = searchMoveAxes;
+  const moveDistances = searchMoveDistances;
+  const heuristic = (vertex, axis) => {
     const col = vertex % width;
     const row = (vertex - col) / width;
-    return Math.abs(xCoords[col] - endPoint.x) + Math.abs(yCoords[row] - endPoint.y);
+    const deltaX = xCoords[col] - endPoint.x;
+    const deltaY = yCoords[row] - endPoint.y;
+    const distance = Math.abs(deltaX) + Math.abs(deltaY);
+    return estimateBends
+      ? distance + bendWeight * remainingBends(deltaX !== 0, deltaY !== 0, axis, flowAxis)
+      : distance;
   };
   const startState = startVertex * 2 + flowAxis;
   bestCosts[startState] = 0;
-  pushSearchEntry(heap, { priority: heuristic(startVertex), cost: 0, state: startState });
+  pushSearchEntry(heap, { priority: heuristic(startVertex, flowAxis), cost: 0, state: startState });
   while (heap.length > 0) {
     const current = popSearchEntry(heap);
     if (current.cost > bestCosts[current.state]) continue;
@@ -982,28 +1102,42 @@ function routeOverGraph(graph, startPoint, endPoint, flowAxis) {
     }
     const col = vertex % width;
     const row = (vertex - col) / width;
-    const moves = [];
+    let moveCount = 0;
     if (col > 0 && rightOpen[vertex - 1] === 1) {
-      moves.push({ vertex: vertex - 1, moveAxis: 0, distance: xCoords[col] - xCoords[col - 1] });
+      moveVertices[moveCount] = vertex - 1;
+      moveAxes[moveCount] = 0;
+      moveDistances[moveCount] = xCoords[col] - xCoords[col - 1];
+      moveCount += 1;
     }
     if (col < width - 1 && rightOpen[vertex] === 1) {
-      moves.push({ vertex: vertex + 1, moveAxis: 0, distance: xCoords[col + 1] - xCoords[col] });
+      moveVertices[moveCount] = vertex + 1;
+      moveAxes[moveCount] = 0;
+      moveDistances[moveCount] = xCoords[col + 1] - xCoords[col];
+      moveCount += 1;
     }
     if (row > 0 && downOpen[vertex - width] === 1) {
-      moves.push({ vertex: vertex - width, moveAxis: 1, distance: yCoords[row] - yCoords[row - 1] });
+      moveVertices[moveCount] = vertex - width;
+      moveAxes[moveCount] = 1;
+      moveDistances[moveCount] = yCoords[row] - yCoords[row - 1];
+      moveCount += 1;
     }
     if (row < height - 1 && downOpen[vertex] === 1) {
-      moves.push({ vertex: vertex + width, moveAxis: 1, distance: yCoords[row + 1] - yCoords[row] });
+      moveVertices[moveCount] = vertex + width;
+      moveAxes[moveCount] = 1;
+      moveDistances[moveCount] = yCoords[row + 1] - yCoords[row];
+      moveCount += 1;
     }
-    for (const move of moves) {
-      let cost = current.cost + move.distance + (move.moveAxis === axis ? 0 : bendWeight);
-      if (move.vertex === endVertex && move.moveAxis !== flowAxis) cost += bendWeight;
-      const nextState = move.vertex * 2 + move.moveAxis;
+    for (let index = 0; index < moveCount; index += 1) {
+      const moveVertex = moveVertices[index];
+      const moveAxis = moveAxes[index];
+      let cost = current.cost + moveDistances[index] + (moveAxis === axis ? 0 : bendWeight);
+      if (moveVertex === endVertex && moveAxis !== flowAxis) cost += bendWeight;
+      const nextState = moveVertex * 2 + moveAxis;
       if (cost >= bestCosts[nextState]) continue;
       bestCosts[nextState] = cost;
       parents[nextState] = current.state;
       pushSearchEntry(heap, {
-        priority: cost + heuristic(move.vertex),
+        priority: cost + heuristic(moveVertex, moveAxis),
         cost,
         state: nextState,
       });
@@ -1121,21 +1255,38 @@ function edgeObstaclesAndEndpoints(frame, edge, start, end) {
 
 // Smooth mode drapes a spline over the nudged orthogonal skeleton, falling back
 // to the angular skeleton itself when no sampled spline stays clear.
-function smoothSkeleton(points, frame, edge, anchors) {
+function smoothSkeleton(points, frame, edge, anchors, sampleCount) {
   const scope = edgeObstaclesAndEndpoints(frame, edge, anchors.start, anchors.end);
   if (!pathSelfIntersects(points)) {
     const guided = guideCurve(points);
-    if (guided !== null && sampledCurvesClear(guided, scope.obstacles, scope.endpoints)) {
-      return { path: curvesPath(guided), points: sampleCurves(guided), label: null };
+    if (guided !== null && sampledCurvesClear(guided, scope.obstacles, scope.endpoints, sampleCount)) {
+      return { path: curvesPath(guided), points: sampleCurves(guided, sampleCount), label: null };
     }
     for (const tension of [0.42, 0.34, 0.26, 0.18, 0.12, 0.08, 0.04]) {
       const curves = splineRouteCurves(points, tension);
-      if (sampledCurvesClear(curves, scope.obstacles, scope.endpoints)) {
-        return { path: curvesPath(curves), points: sampleCurves(curves), label: null };
+      if (sampledCurvesClear(curves, scope.obstacles, scope.endpoints, sampleCount)) {
+        return { path: curvesPath(curves), points: sampleCurves(curves, sampleCount), label: null };
       }
     }
   }
   return { path: angularPath(points), points, label: null };
+}
+
+// The smooth fast path: a direct curve is taken whenever it stays clear of the
+// edge's obstacles and endpoints, so no graph search is needed for it.
+function directSmoothRoute(frame, edge, anchors, orientation, sampleCount) {
+  const scope = edgeObstaclesAndEndpoints(frame, edge, anchors.start, anchors.end);
+  const curve = directCurve(anchors.start, anchors.end, orientation);
+  return sampledCurvesClear([curve], scope.obstacles, scope.endpoints, sampleCount)
+    ? { path: curvePath(curve), points: sampleCurves([curve], sampleCount), label: null }
+    : null;
+}
+
+function skeletonRoute(skeleton, frame, edge, anchors, smooth, sampleCount) {
+  const points = normalizePath(skeleton);
+  return smooth
+    ? smoothSkeleton(points, frame, edge, anchors, sampleCount)
+    : { path: angularPath(points), points, label: null };
 }
 
 // The scene pipeline: resolve anchors, take the smooth direct-curve fast path,
@@ -1166,17 +1317,14 @@ function* computeSceneSteps(frame, options) {
   if (smooth) {
     for (const item of items) {
       if (item.anchors === null) continue;
-      const scope = edgeObstaclesAndEndpoints(
+      item.route = directSmoothRoute(
         frame,
         item.edge,
-        item.anchors.start,
-        item.anchors.end,
+        item.anchors,
+        options.orientation,
+        curveSampleCount,
       );
-      const curve = directCurve(item.anchors.start, item.anchors.end, options.orientation);
-      if (sampledCurvesClear([curve], scope.obstacles, scope.endpoints)) {
-        item.direct = true;
-        item.route = { path: curvePath(curve), points: sampleCurves([curve]), label: null };
-      }
+      item.direct = item.route !== null;
       yield;
     }
   }
@@ -1200,10 +1348,14 @@ function* computeSceneSteps(frame, options) {
   yield;
   for (const item of items) {
     if (item.points !== null) {
-      const points = normalizePath(item.points);
-      item.route = smooth
-        ? smoothSkeleton(points, frame, item.edge, item.anchors)
-        : { path: angularPath(points), points, label: null };
+      item.route = skeletonRoute(
+        item.points,
+        frame,
+        item.edge,
+        item.anchors,
+        smooth,
+        curveSampleCount,
+      );
     }
     if (item.route !== null && item.needsLabel) {
       const scope = edgeObstaclesAndEndpoints(
@@ -1338,6 +1490,275 @@ function scheduleRoutePass(state) {
   scheduleRoutePassSlice(state, pass);
 }
 
+// Live drag routing. One session per drag holds the routing frame, the shared
+// visibility graph of everything standing still, and the last known route of
+// every edge. Each animation frame patches that graph for the moving nodes and
+// reroutes only the affected edges - the dragged nodes' own edges plus every
+// edge whose corridor the moving rectangles sweep - through the same A*,
+// nudging, and smoothing the drop pass uses. Edges beyond the per-frame cap or
+// budget keep their previous route and are retried first on the next frame;
+// whatever is still outstanding at release is settled by the drop pass.
+const dragLiveRouteCap = 24;
+// Live previews check clearance on a coarser sampling of the identical curves.
+// The committed path is the same Bezier either way; only the granularity of the
+// preview's collision test changes, and the drop pass re-checks at full detail.
+const dragCurveSampleCount = 32;
+// Budget for the search phase of a frame. The smoothing, nudging, and commit
+// that follow it cost roughly as much again for the edges the search accepted,
+// so this is deliberately about half of the frame time a drag may spend.
+const dragRouteFrameBudgetMs = 0.8;
+
+function routeBounds(points) {
+  const bounds = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+  for (const point of points) {
+    bounds.left = Math.min(bounds.left, point.x);
+    bounds.right = Math.max(bounds.right, point.x);
+    bounds.top = Math.min(bounds.top, point.y);
+    bounds.bottom = Math.max(bounds.bottom, point.y);
+  }
+  return bounds;
+}
+
+function beginDragRouting(state) {
+  const frame = routingFrame(state);
+  const movingIds = new Set(state.drag.nodes.map((item) => item.nodeId));
+  // Selecting a node changes its border metrics, so its cached port offsets are
+  // resolved again once here rather than every frame.
+  for (const key of [...state.portOffsets.keys()]) {
+    if (movingIds.has(key.slice(0, key.indexOf("|")))) state.portOffsets.delete(key);
+  }
+  const moving = state.drag.nodes
+    .map((item) => ({ item, node: frame.nodesById.get(item.nodeId) }))
+    .filter((entry) => entry.node !== undefined)
+    .map((entry) => ({
+      ...entry,
+      width: entry.node.endpoint.right - entry.node.endpoint.left,
+      height: entry.node.endpoint.bottom - entry.node.endpoint.top,
+      previous: entry.node.obstacle,
+    }));
+  const staticObstacles = frame.nodes
+    .filter((node) => !movingIds.has(node.id))
+    .map((node) => node.obstacle);
+  const orientation = state.shell.dataset.orientation;
+  const vertical = orientation === "vertical";
+  const resolvePort = (nodeId, portId, direction) => portPoint(state, nodeId, portId, direction);
+  const settled = state.sceneCache?.results ?? null;
+  const items = frame.edges.map((edge) => {
+    const route = settled?.get(edge.edgeId)?.route ?? null;
+    const item = {
+      edge,
+      incident: movingIds.has(edge.sourceNode) || movingIds.has(edge.targetNode),
+      anchors: null,
+      points: route === null ? null : route.points,
+      bounds: route === null ? null : routeBounds(route.points),
+      deferred: false,
+      probed: false,
+    };
+    // Anchors of an edge between standing-still nodes cannot move during the
+    // drag, so they are resolved once here. Their lead points join the graph
+    // per frame, only while the edge is actually being rerouted.
+    if (!item.incident) {
+      item.anchors = resolveEdgeAnchors(resolvePort, edge, vertical, staticObstacles);
+    }
+    return item;
+  });
+  metrics.dragGraphBuildCount += 1;
+  return {
+    frame,
+    moving,
+    staticObstacles,
+    baseGraph: buildVisibilityGraph(staticObstacles, []),
+    items,
+    orientation,
+    vertical,
+    smooth: state.shell.dataset.edgeStyle === "smooth",
+    resolvePort,
+  };
+}
+
+// The moving rectangles for this frame, returning the region each node swept
+// since the previous frame. The sweep is what an edge's corridor is tested
+// against, so an edge the node has just left is rerouted as well as one it has
+// just entered.
+function sweepMovingNodes(session) {
+  return session.moving.map((entry) => {
+    const obstacle = {
+      left: entry.item.x - obstacleMargin,
+      top: entry.item.y - obstacleMargin,
+      right: entry.item.x + entry.width + obstacleMargin,
+      bottom: entry.item.y + entry.height + obstacleMargin,
+    };
+    const swept = {
+      left: Math.min(obstacle.left, entry.previous.left) - routeClearance,
+      top: Math.min(obstacle.top, entry.previous.top) - routeClearance,
+      right: Math.max(obstacle.right, entry.previous.right) + routeClearance,
+      bottom: Math.max(obstacle.bottom, entry.previous.bottom) + routeClearance,
+    };
+    entry.previous = obstacle;
+    entry.node.obstacle = obstacle;
+    entry.node.endpoint = {
+      left: entry.item.x,
+      top: entry.item.y,
+      right: entry.item.x + entry.width,
+      bottom: entry.item.y + entry.height,
+    };
+    return swept;
+  });
+}
+
+function routeCrossesRectangles(points, rectangles) {
+  for (let index = 1; index < points.length; index += 1) {
+    for (const rectangle of rectangles) {
+      if (segmentHitsRectangle(points[index - 1], points[index], rectangle)) return true;
+    }
+  }
+  return false;
+}
+
+// Affected edges in the order they earn the frame's budget: the dragged nodes'
+// own edges first, deferred work ahead of fresh work inside each group so no
+// edge can starve, then edges whose corridor the sweep crosses, then edges with
+// no known route yet (probed once per drag, conservatively).
+function dragAffectedItems(session, swept) {
+  const groups = [[], [], [], [], []];
+  for (const item of session.items) {
+    if (item.incident) {
+      groups[item.deferred ? 0 : 1].push(item);
+      continue;
+    }
+    if (item.points === null) {
+      if (!item.probed) groups[4].push(item);
+      continue;
+    }
+    if (!swept.some((rectangle) => rectanglesIntersect(rectangle, item.bounds))) continue;
+    if (!routeCrossesRectangles(item.points, swept)) continue;
+    groups[item.deferred ? 2 : 3].push(item);
+  }
+  return groups.flat();
+}
+
+function commitDragRoute(item) {
+  if (item.route === null) return;
+  if (item.edge.label !== null) {
+    // Live previews keep the cheap midpoint label they have always used; the
+    // authoritative lane placement happens in the drop pass.
+    item.route.label = pathMidpoint(item.route.points);
+  }
+  // An unchanged route is not written back, so a frame only repaints the edges
+  // it actually moved.
+  if (item.route.path !== item.committedPath) {
+    commitRoute(item.edge.group, item.edge.label, item.route);
+    item.committedPath = item.route.path;
+  }
+  item.points = item.route.points;
+  item.bounds = routeBounds(item.route.points);
+}
+
+function runDragRouteFrame(state) {
+  const started = performance.now();
+  state.dragRouting ??= beginDragRouting(state);
+  const session = state.dragRouting;
+  for (const item of state.drag.nodes) setNodeLiveGraphPosition(item);
+  const swept = sweepMovingNodes(session);
+  const movingObstacles = session.moving.map((entry) => entry.node.obstacle);
+  const obstacles = session.frame.nodes.map((node) => node.obstacle);
+  const extraXs = [];
+  const extraYs = [];
+  for (const obstacle of movingObstacles) {
+    extraXs.push(obstacle.left - routeClearance, obstacle.right + routeClearance);
+    extraYs.push(obstacle.top - routeClearance, obstacle.bottom + routeClearance);
+  }
+  for (const item of session.items) {
+    if (!item.incident) continue;
+    item.anchors = resolveEdgeAnchors(session.resolvePort, item.edge, session.vertical, obstacles);
+  }
+  const affected = dragAffectedItems(session, swept);
+  for (const item of affected) {
+    if (item.anchors === null) continue;
+    extraXs.push(item.anchors.sourceLead.x, item.anchors.targetLead.x);
+    extraYs.push(item.anchors.sourceLead.y, item.anchors.targetLead.y);
+  }
+  const graph = patchVisibilityGraph(
+    session.baseGraph,
+    session.staticObstacles,
+    extraXs,
+    extraYs,
+    movingObstacles,
+  );
+  metrics.dragGraphPatchCount += 1;
+  const flowAxis = session.vertical ? 1 : 0;
+  const routed = [];
+  const skeletons = [];
+  let deferred = 0;
+  for (const item of affected) {
+    if (
+      routed.length >= dragLiveRouteCap
+      || (routed.length > 0 && performance.now() - started >= dragRouteFrameBudgetMs)
+    ) {
+      item.deferred = true;
+      deferred += 1;
+      continue;
+    }
+    item.deferred = false;
+    item.probed = true;
+    item.route = null;
+    routed.push(item);
+    metrics.routeEdgeLiveCount += 1;
+    if (item.anchors === null) continue;
+    if (session.smooth) {
+      item.route = directSmoothRoute(
+        session.frame,
+        item.edge,
+        item.anchors,
+        session.orientation,
+        dragCurveSampleCount,
+      );
+      if (item.route !== null) continue;
+    }
+    // The last argument turns on the remaining-bend estimate, which only live
+    // routing uses.
+    const inner = routeOverGraph(
+      graph,
+      item.anchors.sourceLead,
+      item.anchors.targetLead,
+      flowAxis,
+      true,
+    );
+    if (inner === null) continue;
+    skeletons.push({
+      owner: item,
+      edge: item.edge,
+      points: normalizePath([item.anchors.start, ...inner, item.anchors.end]),
+    });
+  }
+  nudgeSceneRoutes(skeletons);
+  for (const skeleton of skeletons) {
+    skeleton.owner.route = skeletonRoute(
+      skeleton.points,
+      session.frame,
+      skeleton.owner.edge,
+      skeleton.owner.anchors,
+      session.smooth,
+      dragCurveSampleCount,
+    );
+  }
+  for (const item of routed) commitDragRoute(item);
+  const cost = performance.now() - started;
+  metrics.routeEdgeLiveMaximumPerFrame = Math.max(
+    metrics.routeEdgeLiveMaximumPerFrame,
+    routed.length,
+  );
+  metrics.routeEdgeLiveAffectedCount += affected.length;
+  metrics.routeEdgeLiveDeferredCount += deferred;
+  metrics.routeEdgeLiveDeferredMaximumPerFrame = Math.max(
+    metrics.routeEdgeLiveDeferredMaximumPerFrame,
+    deferred,
+  );
+  metrics.dragRouteCostTotalMs += cost;
+  metrics.dragRouteCostMaximumMs = Math.max(metrics.dragRouteCostMaximumMs, cost);
+  if (dragFrameCosts.length < 4096) dragFrameCosts.push(cost);
+}
+
 function cancelDragRouteFrame(state) {
   if (state.dragFrame === null) return;
   cancelAnimationFrame(state.dragFrame);
@@ -1350,12 +1771,7 @@ function scheduleDragRoutes(state) {
     state.dragFrame = null;
     if (state.drag === null) return;
     metrics.dragFrames += 1;
-    metrics.routeEdgeLiveMaximumPerFrame = Math.max(
-      metrics.routeEdgeLiveMaximumPerFrame,
-      state.drag.edges.length,
-    );
-    for (const item of state.drag.nodes) setNodeLiveGraphPosition(item);
-    for (const edge of state.drag.edges) routeEdgeLive(state, edge);
+    runDragRouteFrame(state);
   });
 }
 
@@ -1545,6 +1961,7 @@ function beginNodeDrag(state, event, node) {
   } catch (error) {
     if (event.isTrusted) throw error;
   }
+  state.dragRouting = null;
   state.drag = {
     pointerId: event.pointerId,
     capture: node,
@@ -1553,8 +1970,6 @@ function beginNodeDrag(state, event, node) {
     moved: false,
     discloseOnClick: !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey,
     nodes,
-    edges: [...state.root.querySelectorAll("[data-automation-edge]")].filter((edge) =>
-      selected.has(edge.dataset.sourceNode) || selected.has(edge.dataset.targetNode)),
   };
 }
 
@@ -1602,6 +2017,7 @@ function finishNodeDrag(state, event, cancelled = false) {
     };
   });
   cancelDragRouteFrame(state);
+  state.dragRouting = null;
   if (drag.moved) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
   else if (!cancelled && drag.discloseOnClick) {
     const nodeId = drag.capture.dataset.automationNode;
@@ -1855,6 +2271,7 @@ export function initialize(root, dotnet) {
     routePass: null,
     routedSignature: null,
     dragFrame: null,
+    dragRouting: null,
     marqueeFrame: null,
     sceneCache: null,
     portOffsets: new Map(),
@@ -2005,6 +2422,9 @@ export function refresh(root) {
   }
   cancelConnection(state);
   cancelDragRouteFrame(state);
+  // A render can change geometry under an in-flight drag, so the session's
+  // frame, port anchors, and base graph are rebuilt on the next drag frame.
+  state.dragRouting = null;
   cancelRoutePass(state);
   state.routedSignature = null;
   scheduleRoutePass(state);

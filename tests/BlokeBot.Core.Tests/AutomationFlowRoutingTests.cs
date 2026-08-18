@@ -89,6 +89,14 @@ public sealed class AutomationFlowRoutingTests
     public Task DisclosureActivation_SettlesRoutingOnceAcrossTheRenderRoundTrip() =>
         RunModuleProbeAsync(_scenario10);
 
+    [Test]
+    public Task DragFrames_RouteOnlyTheAffectedEdgesAndAvoidObstaclesLive() =>
+        RunModuleProbeAsync(_scenario11);
+
+    [Test]
+    public Task DragFrames_CapLiveCollisionRoutesAndCompleteDeferredWorkOnDrop() =>
+        RunModuleProbeAsync(_scenario12);
+
     private static async Task RunModuleProbeAsync(string scenario)
     {
         var source = string.Join(
@@ -600,6 +608,19 @@ function buildStandardFixture(options = {}) {
   return { ...canvas, a, b, c, d, f, g, e1, e2, e3, e4 };
 }
 
+// The probe clock advances on every reading, which would let the drag frame
+// budget end a frame after its first edge. Scenarios that assert how many edges
+// a frame routes freeze it so the per-frame cap is the only bound.
+function withFrozenClock(action) {
+  const ticking = globalThis.performance;
+  globalThis.performance = { now: () => clock };
+  try {
+    return action();
+  } finally {
+    globalThis.performance = ticking;
+  }
+}
+
 function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   const button = node.querySelector("[data-automation-node-select]");
   dispatch(root, "pointerdown", { pointerId, target: button, clientX: 10, clientY: 10 });
@@ -715,7 +736,7 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   fixture.a.classes.add("automation-node--selected");
   fixture.c.classes.add("automation-node--selected");
   const before = metricsSnapshot();
-  dragNode(fixture.root, fixture.a, 48, 24, 13);
+  withFrozenClock(() => dragNode(fixture.root, fixture.a, 48, 24, 13));
   const move = dotnet.calls.find((call) => call.method === "MoveNodesFromCanvasAsync");
   assert.deepEqual(move.values[0], [
     { nodeId: "node-a", x: 48, y: 120 },
@@ -723,8 +744,10 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   ], "group drag persists every selected node");
   flushAllScheduled();
   const after = metricsSnapshot();
-  assert.equal(after.routeEdgeLiveMaximumPerFrame, 3, "live routing stays bounded to the dragged edges");
+  assert.equal(after.routeEdgeLiveMaximumPerFrame, 3, "live collision routing stays bounded to the affected edges");
   assert.equal(after.dragFrames >= 1, true, "live frames are animation-frame bounded");
+  assert.equal(after.dragGraphBuildCount, 1, "one shared graph is built for the drag");
+  assert.equal(after.dragGraphPatchCount >= after.dragFrames, true, "each drag frame patches that graph");
   assertMatchesReference(fixture.root, "group drag");
   moduleExports.dispose(fixture.root);
   globalThis.__resetBlokeBotAutomationMetrics();
@@ -1010,6 +1033,132 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   moduleExports.dispose(root);
   globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 10 ok");
+}
+""";
+
+    // A drag frame must reroute the edges the moving node actually affects -
+    // its own edges and every edge whose corridor it sweeps - collision-aware,
+    // and must leave every other edge's committed route untouched.
+    private const string _scenario11 = """
+// Scenario 11: affected-edge selection during a drag ---
+{
+  const canvas = buildCanvas();
+  const root = canvas.root;
+  const nearSource = buildNode(root, { id: "node-near-source", kind: "source", x: 0, y: 96 });
+  buildPort(nearSource, { nodeId: "node-near-source", portId: "flow", direction: "output", left: 113, top: 23 });
+  const nearTarget = buildNode(root, { id: "node-near-target", x: 480, y: 96 });
+  buildPort(nearTarget, { nodeId: "node-near-target", portId: "in", direction: "input", left: -7, top: 23 });
+  const farSource = buildNode(root, { id: "node-far-source", kind: "source", x: 0, y: 720 });
+  buildPort(farSource, { nodeId: "node-far-source", portId: "flow", direction: "output", left: 113, top: 23 });
+  const farTarget = buildNode(root, { id: "node-far-target", x: 480, y: 720 });
+  buildPort(farTarget, { nodeId: "node-far-target", portId: "in", direction: "input", left: -7, top: 23 });
+  // The blocker owns no edge, so everything it causes comes from corridor
+  // intersection rather than from being an endpoint.
+  const blocker = buildNode(root, { id: "node-blocker", kind: "transform", x: 240, y: 336 });
+  const near = buildEdge(canvas.svg, { id: "edge-near", sourceNode: "node-near-source", sourcePort: "flow", targetNode: "node-near-target", targetPort: "in" });
+  const far = buildEdge(canvas.svg, { id: "edge-far", sourceNode: "node-far-source", sourcePort: "flow", targetNode: "node-far-target", targetPort: "in" });
+  const dotnet = makeDotnet();
+  moduleExports.initialize(root, dotnet);
+  flushAllScheduled();
+  const nearBefore = committedEdge(near).path;
+  const farBefore = committedEdge(far).path;
+  assert.equal(pathPoints(nearBefore).length, 2, "the near edge starts as a direct route");
+  assert.equal(pathPoints(farBefore).length, 2, "the far edge starts as a direct route");
+
+  // Drag the blocker up onto the near edge, one animation frame at a time.
+  const button = blocker.querySelector("[data-automation-node-select]");
+  const duringDrag = withFrozenClock(() => {
+    dispatch(root, "pointerdown", { pointerId: 61, target: button, clientX: 300, clientY: 400 });
+    dispatch(root, "pointermove", { pointerId: 61, clientX: 300, clientY: 280 });
+    flushAllScheduled();
+    dispatch(root, "pointermove", { pointerId: 61, clientX: 300, clientY: 160 });
+    flushAllScheduled();
+    return metricsSnapshot();
+  });
+  const nearDuring = committedEdge(near).path;
+  assert.equal(blocker.dataset.automationGraphY, "96", "the blocker follows the pointer live");
+  assert.notEqual(nearDuring, nearBefore, "the swept edge is rerouted during the drag");
+  assert.equal(pathPoints(nearDuring).length > 2, true, "the live route detours");
+  assert.equal(pathTouchesRectangle(nearDuring, nodeRectangle(blocker)), false, "the live route avoids the moving node");
+  assert.equal(committedEdge(far).path, farBefore, "the distant edge is not recomputed");
+  assert.equal(duringDrag.routeEdgeLiveMaximumPerFrame, 1, "only the affected edge is routed per frame");
+  assert.equal(duringDrag.routeEdgeLiveDeferredCount, 0, "nothing is deferred below the cap");
+  assert.equal(duringDrag.dragGraphBuildCount, 1, "the shared graph is built once for the drag");
+  assert.equal(duringDrag.dragGraphPatchCount, duringDrag.dragFrames, "every drag frame patches that graph");
+
+  dispatch(root, "pointerup", { pointerId: 61, clientX: 300, clientY: 160 });
+  flushAllScheduled();
+  assert.equal(pathTouchesRectangle(committedEdge(near).path, nodeRectangle(blocker)), false, "the settled route avoids the moved node");
+  assertMatchesReference(root, "drop after a corridor drag");
+
+  // Dragging the blocker away again releases the detour.
+  withFrozenClock(() => {
+    dispatch(root, "pointerdown", { pointerId: 63, target: button, clientX: 300, clientY: 160 });
+    dispatch(root, "pointermove", { pointerId: 63, clientX: 300, clientY: 400 });
+    flushAllScheduled();
+  });
+  const releasedDuring = committedEdge(near).path;
+  assert.equal(pathPoints(releasedDuring).length, 2, "the live route returns to direct once the node leaves the corridor");
+  dispatch(root, "pointerup", { pointerId: 63, clientX: 300, clientY: 400 });
+  flushAllScheduled();
+  assertMatchesReference(root, "drop after leaving the corridor");
+  moduleExports.dispose(root);
+  globalThis.__resetBlokeBotAutomationMetrics();
+  console.log("scenario 11 ok");
+}
+""";
+
+    // The per-frame cap bounds live collision routing; the edges it defers keep
+    // their previous route and the drop pass settles them.
+    private const string _scenario12 = """
+// Scenario 12: per-frame cap, deferral, and completion on drop ---
+{
+  const canvas = buildCanvas({ edgeStyle: "smooth" });
+  const root = canvas.root;
+  const hub = buildNode(root, { id: "node-hub", kind: "source", x: 0, y: 600, width: 120, height: 60 });
+  const edges = [];
+  const edgeCount = 26;
+  for (let index = 0; index < edgeCount; index += 1) {
+    buildPort(hub, { nodeId: "node-hub", portId: `out-${index}`, direction: "output", left: 113, top: 23 });
+    const target = buildNode(root, { id: `node-t${index}`, x: 720, y: index * 96 });
+    buildPort(target, { nodeId: `node-t${index}`, portId: "in", direction: "input", left: -7, top: 23 });
+    edges.push(buildEdge(canvas.svg, {
+      id: `edge-${index}`,
+      sourceNode: "node-hub",
+      sourcePort: `out-${index}`,
+      targetNode: `node-t${index}`,
+      targetPort: "in",
+    }));
+  }
+  const dotnet = makeDotnet();
+  moduleExports.initialize(root, dotnet);
+  flushAllScheduled();
+  const before = edges.map((edge) => committedEdge(edge).path);
+  assert.equal(before.filter((path) => path.length > 0).length, edgeCount, "every edge routes before the drag");
+
+  const button = hub.querySelector("[data-automation-node-select]");
+  const duringDrag = withFrozenClock(() => {
+    dispatch(root, "pointerdown", { pointerId: 71, target: button, clientX: 60, clientY: 630 });
+    dispatch(root, "pointermove", { pointerId: 71, clientX: 156, clientY: 678 });
+    flushAllScheduled();
+    return metricsSnapshot();
+  });
+  assert.equal(duringDrag.routeEdgeLiveAffectedCount >= edgeCount, true, "every edge of the dragged node is affected");
+  assert.equal(duringDrag.routeEdgeLiveMaximumPerFrame, 24, "live collision routes stop at the per-frame cap");
+  assert.equal(duringDrag.routeEdgeLiveDeferredCount, edgeCount - 24, "the edges beyond the cap are deferred");
+  const during = edges.map((edge) => committedEdge(edge).path);
+  assert.equal(during.filter((path, index) => path === before[index]).length >= edgeCount - 24, true, "deferred edges keep their previous route");
+
+  dispatch(root, "pointerup", { pointerId: 71, clientX: 156, clientY: 678 });
+  flushAllScheduled();
+  const move = dotnet.calls.find((call) => call.method === "MoveNodesFromCanvasAsync");
+  assert.deepEqual(move.values[0], [{ nodeId: "node-hub", x: 96, y: 648 }], "the drop persists the snapped position");
+  const settled = edges.map((edge) => committedEdge(edge).path);
+  assert.equal(settled.filter((path, index) => path !== before[index]).length, edgeCount, "the drop pass completes every edge, deferred or not");
+  assertMatchesReference(root, "drop completes the deferred work");
+  moduleExports.dispose(root);
+  globalThis.__resetBlokeBotAutomationMetrics();
+  console.log("scenario 12 ok");
 }
 """;
 }
