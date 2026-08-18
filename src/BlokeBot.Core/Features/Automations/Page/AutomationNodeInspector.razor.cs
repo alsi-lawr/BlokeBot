@@ -372,6 +372,18 @@ public partial class AutomationNodeInspector
     private static string DeclarationFieldId(AutomationPortId portId, string suffix) =>
         $"automation-declaration-{portId.Value}-{suffix}";
 
+    private static string BindingModeHelpId(AutomationInputBindingMode mode) =>
+        $"automation-binding-mode-help-{mode.ToString().ToLowerInvariant()}";
+
+    private static string BindingModeHelp(AutomationInputBindingMode mode) =>
+        mode switch
+        {
+            AutomationInputBindingMode.Fixed => "Enter a value",
+            AutomationInputBindingMode.Connected => "Use another node",
+            AutomationInputBindingMode.Expression => "Calculate a value",
+            _ => string.Empty,
+        };
+
     private static string ConnectionId(AutomationNodeId nodeId, AutomationPortId portId) =>
         $"automation-connection-{nodeId.Value:N}-{portId.Value}";
 

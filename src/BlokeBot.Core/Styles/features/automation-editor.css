@@ -1996,26 +1996,30 @@
     width: 23.5rem;
 }
 
-.automation-inspector-cel-help,
-.automation-binding-choice-help {
-    background: var(--app-surface-muted);
+.automation-inspector-cel-help {
+    background: var(--app-surface-solid);
+    border-bottom: 1px solid var(--app-border);
     border-radius: 0.45rem;
     color: var(--app-text-muted);
     font-size: 0.64rem;
     line-height: 1.4;
     padding: 0.45rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
 }
 
 .automation-inspector-cel-help p {
     margin: 0;
 }
 
-.automation-inspector-cel-help {
-    background: var(--app-surface-solid);
-    border-bottom: 1px solid var(--app-border);
-    position: sticky;
-    top: 0;
-    z-index: 2;
+.automation-binding-mode-help {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
 }
 
 .automation-inspector-cel-help div {
@@ -2051,20 +2055,20 @@
     grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.7fr) auto;
 }
 
-.automation-transform-declaration > span {
-    align-self: center;
-    color: var(--app-text-muted);
-    display: grid;
-    font-size: 0.59rem;
-    gap: 0.15rem;
-}
-
 .automation-transform-declaration .field {
     padding: 0.35rem 0.55rem;
 }
 
 .automation-transform-declaration .field__input {
     font-size: 0.8rem;
+}
+
+.automation-declaration-cel-name {
+    grid-column: 2 / -1;
+}
+
+.automation-declaration-cel-name .field__input {
+    font-size: 0.95rem;
 }
 
 .automation-transform-declaration textarea.field__input {

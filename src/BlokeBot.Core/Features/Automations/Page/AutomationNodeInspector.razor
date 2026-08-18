@@ -62,14 +62,17 @@ else
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "name")">Input name</label><input class="field__input" id="@DeclarationFieldId(input.PortId, "name")" type="text" value="@input.DisplayName" @oninput="args => UpdateTransformInputAsync(input, displayName: args.Value?.ToString())" /></div>
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "type")">Type</label><select class="field__input" id="@DeclarationFieldId(input.PortId, "type")" value="@input.ValueType" @onchange="args => UpdateTransformInputAsync(input, valueType: args.Value?.ToString())">@foreach (var type in _inputTypes){<option value="@type">@type</option>}</select></div>
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(input.PortId, "required")" value="@input.Nullability" @onchange="args => UpdateTransformInputAsync(input, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
-                        <span>CEL name <code>@input.Identifier.Value</code></span>
+                        <div class="field automation-declaration-cel-name"><label class="field__label" for="@DeclarationFieldId(input.PortId, "cel-name")">CEL name</label><input class="field__input" id="@DeclarationFieldId(input.PortId, "cel-name")" type="text" readonly="readonly" value="@input.Identifier.Value" /></div>
                         <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove input @input.DisplayName" title="Remove input @input.DisplayName" @onclick="() => RemoveTransformInputAsync(input.PortId)"><AutomationIcon Name="delete" /></button>
                     </div>
                 }
             </section>
         }
 
-        <p class="automation-binding-choice-help">Fixed: Enter a value. Connected: Use another node. Expression: Calculate a value.</p>
+        @if (Node.Definition.Inputs.Any(IsDataPort))
+        {
+            <div class="automation-binding-mode-help">@foreach (var mode in Enum.GetValues<AutomationInputBindingMode>()){<span id="@BindingModeHelpId(mode)">@BindingModeHelp(mode)</span>}</div>
+        }
 
         @foreach (var input in Node.Definition.Inputs.Where(IsDataPort))
         {
@@ -82,7 +85,7 @@ else
                 <div class="automation-binding-mode-tabs" role="group" aria-label="@input.Name input choice">
                     @foreach (var mode in Enum.GetValues<AutomationInputBindingMode>())
                     {
-                        <button type="button" aria-pressed="@(binding.Mode == mode ? "true" : "false")" @onclick="() => SetBindingModeAsync(fieldId, mode)">@mode</button>
+                        <button type="button" aria-pressed="@(binding.Mode == mode ? "true" : "false")" aria-describedby="@BindingModeHelpId(mode)" title="@BindingModeHelp(mode)" @onclick="() => SetBindingModeAsync(fieldId, mode)">@mode</button>
                     }
                 </div>
                 @if (binding.Mode == AutomationInputBindingMode.Fixed)

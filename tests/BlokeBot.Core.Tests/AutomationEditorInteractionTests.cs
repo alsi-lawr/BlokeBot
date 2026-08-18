@@ -930,6 +930,39 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public void TypedEditor_Inspector_BindingModeButtonsDescribeTheirOwnChoiceWithoutHelpProse()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var nodes = CreatePickerNodes();
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, nodes.Target)
+                .Add(component => component.Nodes, [nodes.CompatibleSource, nodes.Target])
+                .Add(component => component.Edges, [])
+        );
+
+        var expected = new Dictionary<string, string>
+        {
+            ["Fixed"] = "Enter a value",
+            ["Connected"] = "Use another node",
+            ["Expression"] = "Calculate a value",
+        };
+        var buttons = inspector.FindAll(".automation-binding-mode-tabs button");
+        buttons.Count.ShouldBe(expected.Count);
+        foreach (var button in buttons)
+        {
+            var guidance = expected[button.TextContent.Trim()];
+            button.GetAttribute("title").ShouldBe(guidance);
+            var describedBy = button.GetAttribute("aria-describedby");
+            describedBy.ShouldNotBeNullOrWhiteSpace();
+            inspector.Find($"[id='{describedBy}']").TextContent.Trim().ShouldBe(guidance);
+        }
+
+        inspector.Markup.ShouldNotContain("Fixed: Enter a value");
+    }
+
+    [Test]
     public void TypedEditor_DynamicTransform_RoundTripsIdentityAndKeepsRemovedPortEdgesVisible()
     {
         var registered = new CoreAutomationCatalogModule()
