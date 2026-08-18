@@ -27,6 +27,7 @@ public partial class AutomationEditorPage
     private AutomationFlowList? _list;
     private AutomationEditorMode? _inspectorFocusMode;
     private AutomationNodeId? _selectedNodeId;
+    private AutomationNodeId? _disclosedNodeId;
     private Guid? _selectedEdgeId;
     private AutomationEditorMode _mode;
     private bool _loading = true;
@@ -608,6 +609,10 @@ public partial class AutomationEditorPage
         {
             _editor.RemoveNode(nodeId);
             _ = _selectedNodeIds.Remove(nodeId);
+            if (_disclosedNodeId == nodeId)
+            {
+                _disclosedNodeId = null;
+            }
         }
 
         _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
@@ -650,6 +655,24 @@ public partial class AutomationEditorPage
     }
 
     private void ChangeCanvasSelection(AutomationCanvasSelectionRequest selection)
+    {
+        ApplyCanvasSelection(selection);
+        _disclosedNodeId = null;
+    }
+
+    private void ChangeCanvasPointerSelection(AutomationCanvasSelectionRequest selection)
+    {
+        ApplyCanvasSelection(selection);
+        if (
+            _disclosedNodeId is { } disclosed
+            && (_selectedNodeIds.Count != 1 || !_selectedNodeIds.Contains(disclosed))
+        )
+        {
+            _disclosedNodeId = null;
+        }
+    }
+
+    private void ApplyCanvasSelection(AutomationCanvasSelectionRequest selection)
     {
         _selectedNodeIds.Clear();
         foreach (var nodeId in selection.NodeIds)
@@ -1089,6 +1112,7 @@ public partial class AutomationEditorPage
     private void ApplyHistory(AutomationEditorState restored)
     {
         _editor = restored;
+        _disclosedNodeId = null;
         _ = _selectedNodeIds.RemoveWhere(nodeId => restored.Nodes.All(node => node.Id != nodeId));
         _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
         if (_selectedEdgeId is { } edgeId && restored.Edges.All(edge => edge.Id != edgeId))
@@ -1221,6 +1245,7 @@ public partial class AutomationEditorPage
         _feedback = null;
         _operationFailed = false;
         _nodeLibraryOpen = false;
+        _disclosedNodeId = null;
         _mobileInspectorOpen = false;
         _focusInspectorAfterRender = false;
         _enableConfirmation = false;
@@ -1251,8 +1276,17 @@ public partial class AutomationEditorPage
 
     private void SelectNode(AutomationNodeId nodeId) => SetSingleNodeSelection(nodeId);
 
+    private void ActivateCanvasNode(AutomationNodeId nodeId)
+    {
+        SetSingleNodeSelection(nodeId);
+        _disclosedNodeId = nodeId;
+    }
+
+    private void CloseCanvasNodeDisclosure() => _disclosedNodeId = null;
+
     private void SetSingleNodeSelection(AutomationNodeId? nodeId)
     {
+        _disclosedNodeId = null;
         _selectedNodeIds.Clear();
         if (nodeId is { } selected)
         {
@@ -1267,6 +1301,7 @@ public partial class AutomationEditorPage
 
     private void ClearSelection()
     {
+        _disclosedNodeId = null;
         _selectedNodeIds.Clear();
         _selectedNodeId = null;
         _selectedEdgeId = null;
@@ -1295,7 +1330,14 @@ public partial class AutomationEditorPage
         ClearSelection();
     }
 
-    private void SetMode(AutomationEditorMode mode) => _mode = mode;
+    private void SetMode(AutomationEditorMode mode)
+    {
+        if (_mode != mode)
+        {
+            _disclosedNodeId = null;
+            _mode = mode;
+        }
+    }
 
     private void ToggleFocusMode() => _focusMode = !_focusMode;
 

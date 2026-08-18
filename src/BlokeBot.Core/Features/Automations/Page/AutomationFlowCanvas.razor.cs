@@ -24,6 +24,9 @@ public partial class AutomationFlowCanvas
         new HashSet<AutomationNodeId>();
 
     [Parameter]
+    public AutomationNodeId? DisclosedNodeId { get; set; }
+
+    [Parameter]
     public Guid? SelectedEdgeId { get; set; }
 
     [Parameter]
@@ -40,6 +43,15 @@ public partial class AutomationFlowCanvas
 
     [Parameter]
     public EventCallback<AutomationCanvasSelectionRequest> SelectionChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<AutomationCanvasSelectionRequest> PointerSelectionChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<AutomationNodeId> NodeActivated { get; set; }
+
+    [Parameter]
+    public EventCallback DisclosureClosed { get; set; }
 
     [Parameter]
     public EventCallback<IReadOnlyList<AutomationNodeMoveRequest>> MoveNodes { get; set; }
@@ -122,6 +134,32 @@ public partial class AutomationFlowCanvas
         );
 
     [JSInvokable]
+    public Task SetPointerSelectionFromCanvasAsync(Guid[] nodeIds) =>
+        PointerSelectionChanged.InvokeAsync(
+            new(nodeIds.Select(static id => new AutomationNodeId(id)).ToArray(), null)
+        );
+
+    [JSInvokable]
+    public Task ActivateNodeFromCanvasAsync(Guid nodeId) =>
+        NodeActivated.InvokeAsync(new AutomationNodeId(nodeId));
+
+    [JSInvokable]
+    public Task ToggleNodeSelectionFromCanvasAsync(Guid nodeId)
+    {
+        var selected = SelectedNodeIds.ToHashSet();
+        var typedNodeId = new AutomationNodeId(nodeId);
+        if (!selected.Add(typedNodeId))
+        {
+            _ = selected.Remove(typedNodeId);
+        }
+
+        return SelectionChanged.InvokeAsync(new(selected.ToArray(), null));
+    }
+
+    [JSInvokable]
+    public Task CloseNodeDisclosureFromCanvasAsync() => DisclosureClosed.InvokeAsync();
+
+    [JSInvokable]
     public Task DeleteSelectionFromCanvasAsync(Guid[] nodeIds, Guid? edgeId) =>
         edgeId is { } selectedEdge
             ? DeleteEdge.InvokeAsync(selectedEdge)
@@ -142,24 +180,6 @@ public partial class AutomationFlowCanvas
 
     [JSInvokable]
     public Task RejectConnectionFromCanvasAsync() => ConnectionRejected.InvokeAsync();
-
-    private Task SelectNodeAsync(AutomationNodeId nodeId, bool toggle)
-    {
-        var selected = SelectedNodeIds.ToHashSet();
-        if (toggle)
-        {
-            if (!selected.Add(nodeId))
-            {
-                _ = selected.Remove(nodeId);
-            }
-        }
-        else
-        {
-            selected = [nodeId];
-        }
-
-        return SelectionChanged.InvokeAsync(new(selected.ToArray(), null));
-    }
 
     private Task SelectEdgeAsync(Guid edgeId) => SelectionChanged.InvokeAsync(new([], edgeId));
 
@@ -272,6 +292,7 @@ public partial class AutomationFlowCanvas
             {
                 "automation-node",
                 SelectedNodeIds.Contains(node.Id) ? "automation-node--selected" : string.Empty,
+                DisclosedNodeId == node.Id ? "automation-node--disclosed" : string.Empty,
                 invalid || Disconnected(node.Id) ? "automation-node--invalid" : string.Empty,
                 outcome?.State == AutomationNodeRunState.Failed ? "automation-node--failed"
                 : outcome is not null ? "automation-node--ran"
@@ -357,13 +378,22 @@ public partial class AutomationFlowCanvas
             ? "true"
             : "false";
 
-    private string NodeAccessibleLabel(AutomationEditorNode node, bool needsRepair)
+    private string NodeAccessibleLabel(
+        AutomationEditorNode node,
+        bool needsRepair,
+        AutomationSampleNodeOutcome? outcome
+    )
     {
         var ports = node
             .Definition.Inputs.Select(port => $"{PortDisplay(port)} input")
             .Concat(node.Definition.Outputs.Select(port => $"{PortDisplay(port)} output"));
-        return $"Select {node.EffectiveName}. {KindLabel(node.Definition.Kind)}. {node.Definition.Display.Name} icon. {(needsRepair ? "Needs repair" : "Ready")}. Ports: {string.Join(". ", ports)}";
+        return $"Select {node.EffectiveName}. {KindLabel(node.Definition.Kind)}. {node.Definition.Display.Name} icon. {NodeStatus(needsRepair, outcome)}. Ports: {string.Join(". ", ports)}";
     }
+
+    private static string NodeStatus(bool needsRepair, AutomationSampleNodeOutcome? outcome) =>
+        needsRepair ? "Needs repair"
+        : outcome is null ? "Ready"
+        : OutcomeLabel(outcome);
 
     private string EdgeAccessibleLabel(AutomationFlowDraftEdge edge)
     {
@@ -412,6 +442,7 @@ public partial class AutomationFlowCanvas
             Settings.Orientation,
             Settings.EdgeStyle,
             ViewportKey,
+            DisclosedNodeId?.Value,
             string.Join(
                 ';',
                 Nodes.Select(node =>

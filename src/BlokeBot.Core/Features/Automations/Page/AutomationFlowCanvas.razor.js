@@ -152,17 +152,38 @@ function setLocalSelection(root, nodeIds, edgeId = null) {
     node.classList.toggle("automation-node--selected", isSelected);
     node.querySelector("[data-automation-node-select]")
       ?.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    if (!isSelected) {
+      node.classList.remove("automation-node--disclosed");
+      node.querySelector("[data-automation-node-select]")
+        ?.setAttribute("aria-expanded", "false");
+    }
   }
   for (const edge of root.querySelectorAll("[data-automation-edge]")) {
     edge.classList.toggle("automation-edge-group--selected", edge.dataset.automationEdge === edgeId);
   }
 }
 
-function notifySelection(state) {
+function setLocalDisclosure(root, nodeId) {
+  for (const node of root.querySelectorAll("[data-automation-node]")) {
+    const isDisclosed = node.dataset.automationNode === nodeId;
+    node.classList.toggle("automation-node--disclosed", isDisclosed);
+    node.querySelector("[data-automation-node-select]")
+      ?.setAttribute("aria-expanded", isDisclosed ? "true" : "false");
+  }
+}
+
+function notifyCompactSelection(state) {
   return state.dotnet.invokeMethodAsync(
     "SetSelectionFromCanvasAsync",
     selectionIds(state.root),
     selectedEdgeId(state.root),
+  );
+}
+
+function notifyPointerSelection(state) {
+  return state.dotnet.invokeMethodAsync(
+    "SetPointerSelectionFromCanvasAsync",
+    selectionIds(state.root),
   );
 }
 
@@ -1444,13 +1465,15 @@ function beginNodeDrag(state, event, node) {
   let selected = new Set(selectionIds(state.root));
   const nodeId = node.dataset.automationNode;
   if (event.shiftKey) {
+    setLocalDisclosure(state.root, null);
+    void state.dotnet.invokeMethodAsync("CloseNodeDisclosureFromCanvasAsync");
     if (selected.has(nodeId)) selected.delete(nodeId);
     else selected.add(nodeId);
   } else if (!selected.has(nodeId)) {
     selected = new Set([nodeId]);
   }
   setLocalSelection(state.root, selected, null);
-  void notifySelection(state);
+  void notifyPointerSelection(state);
   if (!selected.has(nodeId)) return;
   node.querySelector("[data-automation-node-select]")?.focus({ preventScroll: true });
   const nodes = [...state.root.querySelectorAll("[data-automation-node]")]
@@ -1477,12 +1500,11 @@ function beginNodeDrag(state, event, node) {
     startX: event.clientX,
     startY: event.clientY,
     moved: false,
+    discloseOnClick: !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey,
     nodes,
     edges: [...state.root.querySelectorAll("[data-automation-edge]")].filter((edge) =>
       selected.has(edge.dataset.sourceNode) || selected.has(edge.dataset.targetNode)),
   };
-  state.root.classList.add("automation-canvas--node-dragging");
-  for (const item of nodes) item.element.classList.add("automation-node--moving");
 }
 
 function moveNodeDrag(state, event) {
@@ -1491,7 +1513,14 @@ function moveNodeDrag(state, event) {
   const scale = zoomScale(state);
   const deltaX = (event.clientX - drag.startX) / scale;
   const deltaY = (event.clientY - drag.startY) / scale;
-  drag.moved ||= Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2;
+  if (!drag.moved && (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2)) {
+    drag.moved = true;
+    setLocalDisclosure(state.root, null);
+    void state.dotnet.invokeMethodAsync("CloseNodeDisclosureFromCanvasAsync");
+    state.root.classList.add("automation-canvas--node-dragging");
+    for (const item of drag.nodes) item.element.classList.add("automation-node--moving");
+  }
+  if (!drag.moved) return true;
   for (const item of drag.nodes) {
     item.x = Math.max(0, item.startX + deltaX);
     item.y = Math.max(0, item.startY + deltaY);
@@ -1501,7 +1530,7 @@ function moveNodeDrag(state, event) {
   return true;
 }
 
-function finishNodeDrag(state, event) {
+function finishNodeDrag(state, event, cancelled = false) {
   const drag = state.drag;
   if (drag === null || drag.pointerId !== event.pointerId) return false;
   state.drag = null;
@@ -1524,6 +1553,11 @@ function finishNodeDrag(state, event) {
   cancelScheduledRoutes(state);
   routeAll(state);
   if (drag.moved) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
+  else if (!cancelled && drag.discloseOnClick) {
+    const nodeId = drag.capture.dataset.automationNode;
+    setLocalDisclosure(state.root, nodeId);
+    void state.dotnet.invokeMethodAsync("ActivateNodeFromCanvasAsync", nodeId);
+  }
   return true;
 }
 
@@ -1539,6 +1573,8 @@ function beginBackgroundAction(state, event) {
     if (event.isTrusted) throw error;
   }
   if (event.altKey) {
+    setLocalDisclosure(state.root, null);
+    void state.dotnet.invokeMethodAsync("CloseNodeDisclosureFromCanvasAsync");
     const start = screenToGraph(state, event.clientX, event.clientY);
     state.marqueeState = { pointerId: event.pointerId, start, current: start };
     Object.assign(state.marquee.style, {
@@ -1613,7 +1649,7 @@ function finishBackgroundAction(state, event) {
     if (deselect) {
       setLocalSelection(state.root, [], null);
       state.root.focus({ preventScroll: true });
-      void notifySelection(state);
+      void notifyCompactSelection(state);
     }
     return true;
   }
@@ -1624,7 +1660,7 @@ function finishBackgroundAction(state, event) {
   }
   state.marquee.hidden = true;
   state.root.classList.remove("automation-canvas--selecting");
-  void notifySelection(state);
+  void notifyCompactSelection(state);
   return true;
 }
 
@@ -1773,10 +1809,29 @@ export function initialize(root, dotnet) {
   });
   register(state, root, "pointercancel", (event) => {
     if (finishConnectionDrag(state, event, true)) return;
-    if (finishNodeDrag(state, event)) return;
+    if (finishNodeDrag(state, event, true)) return;
     finishBackgroundAction(state, event);
   });
   register(state, root, "click", (event) => {
+    const selector = event.target instanceof Element
+      ? event.target.closest("[data-automation-node-select]")
+      : null;
+    if (selector instanceof HTMLButtonElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.detail !== 0 || event.altKey || event.ctrlKey || event.metaKey) return;
+      const nodeId = selector.closest("[data-automation-node]")?.dataset.automationNode;
+      if (nodeId === undefined) return;
+      if (event.shiftKey) {
+        setLocalDisclosure(state.root, null);
+        void state.dotnet.invokeMethodAsync("ToggleNodeSelectionFromCanvasAsync", nodeId);
+        return;
+      }
+      setLocalSelection(state.root, [nodeId], null);
+      setLocalDisclosure(state.root, nodeId);
+      void state.dotnet.invokeMethodAsync("ActivateNodeFromCanvasAsync", nodeId);
+      return;
+    }
     const port = event.target instanceof Element ? event.target.closest("[data-automation-port]") : null;
     if (!(port instanceof HTMLButtonElement)) return;
     event.preventDefault();

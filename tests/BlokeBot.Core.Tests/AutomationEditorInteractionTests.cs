@@ -50,6 +50,107 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public void TypedEditor_CanvasKeyboard_NudgePreservesSingleNodeDisclosure()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var definition = new CoreAutomationCatalogModule()
+            .Definitions.Select(static value => value.Descriptor)
+            .Single(static value => value.Id == AutomationDefinitionIds.SendChatAction);
+        var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
+        IReadOnlyList<AutomationNodeMoveRequest>? moved = null;
+        var disclosureClosures = 0;
+        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [node])
+                .Add(component => component.Edges, [])
+                .Add(
+                    component => component.SelectedNodeIds,
+                    new HashSet<AutomationNodeId> { node.Id }
+                )
+                .Add(component => component.DisclosedNodeId, node.Id)
+                .Add(component => component.MoveNodes, requests => moved = requests)
+                .Add(component => component.DisclosureClosed, () => disclosureClosures++)
+        );
+
+        canvas
+            .Find("[data-automation-node-select]")
+            .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
+
+        moved.ShouldBe([new AutomationNodeMoveRequest(node.Id, 72, 72)]);
+        disclosureClosures.ShouldBe(0);
+        canvas.Find("[data-automation-node-select]").GetAttribute("aria-expanded").ShouldBe("true");
+    }
+
+    [Test]
+    public async Task TypedEditor_Canvas_SeparatesSelectionFromSingleNodeDisclosure()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var definitions = new CoreAutomationCatalogModule()
+            .Definitions.Select(static value => value.Descriptor)
+            .ToArray();
+        var firstNode = AutomationEditorNode.Create(
+            definitions.Single(static value => value.Id == AutomationDefinitionIds.SendChatAction),
+            new(new(48), new(72))
+        );
+        var secondNode = AutomationEditorNode.Create(
+            definitions.Single(static value =>
+                value.Id == AutomationDefinitionIds.ConditionControl
+            ),
+            new(new(288), new(72))
+        );
+        AutomationNodeId? activated = null;
+        AutomationCanvasSelectionRequest? compactSelection = null;
+        AutomationCanvasSelectionRequest? pointerSelection = null;
+        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
+            parameters
+                .Add(component => component.Nodes, [firstNode, secondNode])
+                .Add(component => component.Edges, [])
+                .Add(
+                    component => component.SelectedNodeIds,
+                    new HashSet<AutomationNodeId> { firstNode.Id, secondNode.Id }
+                )
+                .Add(component => component.NodeActivated, nodeId => activated = nodeId)
+                .Add(component => component.SelectionChanged, value => compactSelection = value)
+                .Add(
+                    component => component.PointerSelectionChanged,
+                    value => pointerSelection = value
+                )
+        );
+
+        foreach (var button in canvas.FindAll("[data-automation-node-select]"))
+        {
+            button.GetAttribute("aria-pressed").ShouldBe("true");
+            button.GetAttribute("aria-expanded").ShouldBe("false");
+        }
+
+        await canvas.Instance.SetPointerSelectionFromCanvasAsync([firstNode.Id.Value]);
+        pointerSelection.ShouldNotBeNull().NodeIds.ShouldBe([firstNode.Id]);
+        pointerSelection.EdgeId.ShouldBeNull();
+        compactSelection.ShouldBeNull();
+
+        await canvas.Instance.ActivateNodeFromCanvasAsync(firstNode.Id.Value);
+        activated.ShouldBe(firstNode.Id);
+
+        canvas.Render(parameters =>
+            parameters
+                .Add(component => component.Nodes, [firstNode, secondNode])
+                .Add(component => component.Edges, [])
+                .Add(
+                    component => component.SelectedNodeIds,
+                    new HashSet<AutomationNodeId> { firstNode.Id }
+                )
+                .Add(component => component.DisclosedNodeId, firstNode.Id)
+        );
+        var buttons = canvas.FindAll("[data-automation-node-select]");
+        buttons[0].GetAttribute("aria-pressed").ShouldBe("true");
+        buttons[0].GetAttribute("aria-expanded").ShouldBe("true");
+        buttons[1].GetAttribute("aria-pressed").ShouldBe("false");
+        buttons[1].GetAttribute("aria-expanded").ShouldBe("false");
+    }
+
+    [Test]
     public void TypedEditor_BindingModes_RoundTripWithoutDiscardingInactiveFixedOrExpressionPayloads()
     {
         var definition = new CoreAutomationCatalogModule()
@@ -171,6 +272,8 @@ public sealed class AutomationEditorInteractionTests
         var conditionDefinition = ProductionDefinitions()
             .Single(definition => definition.Id == AutomationDefinitionIds.ConditionControl);
         var condition = AutomationEditorNode.Create(conditionDefinition, new(new(48), new(72)));
+        condition.DisplayAlias =
+            "A deliberately long compact node title that remains complete for assistive technology";
 
         var canvas = context.Render<AutomationFlowCanvas>(parameters =>
             parameters
@@ -183,6 +286,8 @@ public sealed class AutomationEditorInteractionTests
             .Find("[data-automation-node-select]")
             .GetAttribute("aria-label")
             .ShouldNotBeNull();
+
+        accessibleName.ShouldContain(condition.DisplayAlias);
 
         foreach (var input in conditionDefinition.Inputs)
         {

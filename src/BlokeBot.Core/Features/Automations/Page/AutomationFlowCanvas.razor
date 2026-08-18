@@ -65,6 +65,7 @@
                 var errors = ErrorsFor(node.Id);
                 var outcome = OutcomeFor(node.Id);
                 var selected = SelectedNodeIds.Contains(node.Id);
+                var disclosed = DisclosedNodeId == node.Id;
                 var needsRepair = errors.Count > 0 || Disconnected(node.Id);
                 <article @key="node.Id"
                          class="@NodeClass(node, errors.Count > 0, outcome)"
@@ -76,13 +77,13 @@
                     <button type="button"
                             class="automation-node-select"
                             data-automation-node-select
-                            aria-label="@NodeAccessibleLabel(node, needsRepair)"
+                            aria-label="@NodeAccessibleLabel(node, needsRepair, outcome)"
                             aria-pressed="@(selected ? "true" : "false")"
-                            @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
+                            aria-expanded="@(disclosed ? "true" : "false")"
                             @onkeydown="args => HandleNodeKeyAsync(node, args)">
                         <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
                         <span class="automation-node-title"><AutomationNodeIcon DefinitionId="node.Definition.Id" /><strong title="@node.EffectiveName">@node.EffectiveName</strong></span>
-                        @if (selected)
+                        @if (disclosed)
                         {
                             <span class="automation-node-description">@node.Definition.Display.Description</span>
                             <span class="automation-node-selected-ports">
@@ -96,7 +97,7 @@
                                 }
                             </span>
                         }
-                        <span class="@(needsRepair ? "automation-node-status automation-node-status--repair" : "automation-node-status")">@(needsRepair ? "Needs repair" : outcome is null ? "Ready" : OutcomeLabel(outcome))</span>
+                        <span class="@(needsRepair ? "automation-node-status automation-node-status--repair" : "automation-node-status")">@NodeStatus(needsRepair, outcome)</span>
                     </button>
                     @foreach (var input in node.Definition.Inputs.Select((port, index) => new { Port = port, Index = index }))
                     {

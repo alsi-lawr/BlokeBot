@@ -651,6 +651,7 @@
     background: var(--app-surface-solid);
     border: 1px solid var(--app-control-hover-border);
     border-radius: 0.75rem;
+    box-sizing: border-box;
     box-shadow: 0 0.7rem 1.5rem rgb(15 23 42 / 0.15);
     color: var(--app-text-strong);
     cursor: grab;
@@ -669,6 +670,7 @@
 .automation-node:has(.automation-node-select:focus-visible),
 .automation-node--selected {
     border-color: var(--tone-blue-solid);
+    border-width: 2px;
     box-shadow: 0 0 0 3px var(--tone-blue-ring), 0 0.85rem 1.7rem rgb(15 23 42 / 0.18);
     outline: none;
 }
@@ -677,10 +679,15 @@
     background: transparent;
     border: 0;
     border-radius: inherit;
+    box-sizing: border-box;
     color: inherit;
     cursor: inherit;
-    display: block;
+    display: grid;
+    gap: 0.12rem;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
     padding: 0.45rem 0.52rem;
     text-align: left;
     width: 100%;
@@ -711,10 +718,15 @@
     display: inline-flex;
     font-size: 0.61rem;
     font-weight: 900;
+    justify-self: start;
     letter-spacing: 0.08em;
-    margin-bottom: 0.18rem;
+    margin-bottom: 0;
+    max-width: 100%;
+    overflow: hidden;
     padding: 0.12rem 0.3rem;
+    text-overflow: ellipsis;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .automation-node-kind--source {
@@ -747,7 +759,7 @@
 .automation-node-title strong {
     flex: 1;
     font-size: 0.8rem;
-    margin-bottom: 0.12rem;
+    margin-bottom: 0;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -758,6 +770,12 @@
     color: var(--app-text-muted);
     font-size: 0.68rem;
     line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.automation-node:not(.automation-node--disclosed) .automation-node-description,
+.automation-node:not(.automation-node--disclosed) .automation-node-selected-ports {
+    display: none;
 }
 
 .automation-node-selected-ports {
@@ -778,9 +796,8 @@
 }
 
 .automation-node-selected-ports b {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .automation-node-selected-ports em {
@@ -807,7 +824,7 @@
     display: block;
     font-size: 0.6rem;
     font-weight: 800;
-    margin-top: 0.2rem;
+    margin-top: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1901,10 +1918,29 @@
     width: 184px;
 }
 
-.automation-node--selected {
-    height: calc(5.7rem + (var(--automation-node-port-count) * 1.15rem));
+.automation-node--disclosed {
+    height: auto;
+    min-height: 78px;
     width: 270px;
     z-index: 4;
+}
+
+.automation-node--disclosed .automation-node-select {
+    gap: 0.18rem;
+    grid-template-rows: none;
+    height: auto;
+    min-height: 76px;
+    padding: 0.5rem 0.58rem;
+}
+
+.automation-node--disclosed .automation-node-title {
+    align-items: flex-start;
+}
+
+.automation-node--disclosed .automation-node-title strong,
+.automation-node--disclosed .automation-node-status {
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .automation-node-kind--value {
@@ -2326,8 +2362,7 @@
         z-index: 480;
     }
 
-    .automation-node--selected {
-        height: calc(5.7rem + (var(--automation-node-port-count) * 1.15rem));
+    .automation-node--disclosed {
         width: 238px;
     }
 
