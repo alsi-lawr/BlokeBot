@@ -129,27 +129,34 @@ internal sealed partial class EventSubChannelSession(
         await work;
     }
 
+    // Desired channels and the remote subscription inventory are loaded inside the scheduled
+    // slot: a snapshot taken before queueing goes stale behind in-flight work and tears down
+    // subscriptions that work just created.
     internal async Task TriggerReconciliationAndDrainAsync(
-        IReadOnlyList<string> desiredChannels,
+        Func<CancellationToken, ValueTask<IReadOnlyList<string>>> loadDesiredChannels,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
     ) =>
         await ScheduleAndDrainAsync(
-            token =>
-                RunReconciliationAsync(BotChannelList.Normalize(desiredChannels), trigger, token),
+            async token =>
+                await RunReconciliationAsync(
+                    BotChannelList.Normalize(await loadDesiredChannels(token)),
+                    trigger,
+                    token
+                ),
             cancellationToken
         );
 
     internal async Task RepairMissingSubscriptionsAndDrainAsync(
-        IReadOnlySet<string> enabledRemoteSubscriptionIds,
-        IReadOnlyList<string> desiredChannels,
+        Func<CancellationToken, Task<IReadOnlySet<string>>> listEnabledRemoteSubscriptionIds,
+        Func<CancellationToken, ValueTask<IReadOnlyList<string>>> loadDesiredChannels,
         CancellationToken cancellationToken
     ) =>
         await ScheduleAndDrainAsync(
-            token =>
-                RepairMissingSubscriptionsAsync(
-                    enabledRemoteSubscriptionIds,
-                    BotChannelList.Normalize(desiredChannels),
+            async token =>
+                await RepairMissingSubscriptionsAsync(
+                    await listEnabledRemoteSubscriptionIds(token),
+                    BotChannelList.Normalize(await loadDesiredChannels(token)),
                     token
                 ),
             cancellationToken
@@ -157,16 +164,16 @@ internal sealed partial class EventSubChannelSession(
 
     internal async Task RepairRevokedSubscriptionAndDrainAsync(
         string subscriptionId,
-        IReadOnlyList<string> desiredChannels,
+        Func<CancellationToken, ValueTask<IReadOnlyList<string>>> loadDesiredChannels,
         CancellationToken cancellationToken
     ) =>
         await ScheduleAndDrainAsync(
-            token =>
-                RepairSubscriptionsAsync(
+            async token =>
+                await RepairSubscriptionsAsync(
                     FindChannels(subscription =>
                         ContainsSubscription(subscription, subscriptionId)
                     ),
-                    BotChannelList.Normalize(desiredChannels),
+                    BotChannelList.Normalize(await loadDesiredChannels(token)),
                     EventSubChannelRecoveryTrigger.Explicit,
                     token
                 ),
@@ -178,6 +185,24 @@ internal sealed partial class EventSubChannelSession(
         CancellationToken cancellationToken
     )
     {
+        // The scheduled slot must never fault: a stored fault would poison _currentWork and
+        // block every later reconciliation, so the outcome travels back through the completion.
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        async Task GuardedAsync(CancellationToken token)
+        {
+            try
+            {
+                await work(token);
+                _ = completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                _ = completion.TrySetException(exception);
+            }
+        }
+
         while (true)
         {
             Task currentWork;
@@ -195,7 +220,7 @@ internal sealed partial class EventSubChannelSession(
                 if (_currentWork.IsCompleted)
                 {
                     _currentWork.GetAwaiter().GetResult();
-                    ScheduleLocked(work);
+                    ScheduleLocked(GuardedAsync);
                     scheduled = true;
                 }
 
@@ -205,6 +230,7 @@ internal sealed partial class EventSubChannelSession(
             await currentWork.WaitAsync(cancellationToken);
             if (scheduled)
             {
+                await completion.Task;
                 return;
             }
         }

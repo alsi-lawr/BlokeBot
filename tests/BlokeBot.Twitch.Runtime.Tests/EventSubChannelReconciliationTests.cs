@@ -14,8 +14,8 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         await harness.Session.DrainAsync();
 
         await harness.Session.RepairMissingSubscriptionsAndDrainAsync(
-            new HashSet<string>(StringComparer.Ordinal),
-            ["channel"],
+            _ => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal)),
+            _ => ValueTask.FromResult<IReadOnlyList<string>>(["channel"]),
             CancellationToken.None
         );
 
@@ -37,8 +37,11 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         harness.Diagnostics.Clear();
 
         await harness.Session.RepairMissingSubscriptionsAndDrainAsync(
-            new HashSet<string>(StringComparer.Ordinal) { "subscription-healthy" },
-            ["missing", "healthy"],
+            _ =>
+                Task.FromResult<IReadOnlySet<string>>(
+                    new HashSet<string>(StringComparer.Ordinal) { "subscription-healthy" }
+                ),
+            _ => ValueTask.FromResult<IReadOnlyList<string>>(["missing", "healthy"]),
             CancellationToken.None
         );
 
@@ -61,7 +64,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
 
         await harness.Session.RepairRevokedSubscriptionAndDrainAsync(
             "subscription-revoked",
-            ["revoked", "healthy"],
+            _ => ValueTask.FromResult<IReadOnlyList<string>>(["revoked", "healthy"]),
             CancellationToken.None
         );
 

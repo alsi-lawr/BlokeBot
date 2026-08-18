@@ -44,11 +44,8 @@ internal sealed class EventSubRuntime(
         try
         {
             await session.RepairMissingSubscriptionsAndDrainAsync(
-                await subscriptions.ListEnabledOwnedIdsAsync(
-                    settings.Identity.ClientId,
-                    stoppingToken
-                ),
-                BotChannelList.Normalize(await channels.GetChannelsAsync(stoppingToken)),
+                token => subscriptions.ListEnabledOwnedIdsAsync(settings.Identity.ClientId, token),
+                channels.GetChannelsAsync,
                 stoppingToken
             );
         }

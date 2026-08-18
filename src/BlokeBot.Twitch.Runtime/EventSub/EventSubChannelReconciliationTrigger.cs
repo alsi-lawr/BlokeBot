@@ -19,9 +19,8 @@ internal sealed class EventSubChannelReconciliationTrigger(IBotChannelProvider c
             return;
         }
 
-        var desiredChannels = await channels.GetChannelsAsync(cancellationToken);
         await session.TriggerReconciliationAndDrainAsync(
-            BotChannelList.Normalize(desiredChannels),
+            channels.GetChannelsAsync,
             EventSubChannelRecoveryTrigger.Explicit,
             cancellationToken
         );
@@ -45,7 +44,7 @@ internal sealed class EventSubChannelReconciliationTrigger(IBotChannelProvider c
 
         await session.RepairRevokedSubscriptionAndDrainAsync(
             subscriptionId,
-            BotChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken)),
+            channels.GetChannelsAsync,
             cancellationToken
         );
     }
