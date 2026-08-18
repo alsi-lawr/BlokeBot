@@ -55,15 +55,15 @@ else
                 <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
             </div>
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">
-                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Declared inputs</h3><button type="button" @onclick="AddTransformInputAsync"><AutomationIcon Name="add" />Add input</button></div>
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><button class="automation-icon-button" type="button" aria-label="Add input" title="Add input" @onclick="AddTransformInputAsync"><AutomationIcon Name="add" /></button></div>
                 @foreach (var input in Node.TransformInputs)
                 {
                     <div class="automation-transform-declaration" @key="input.PortId">
-                        <label>Input name<input type="text" value="@input.DisplayName" @oninput="args => UpdateTransformInputAsync(input, displayName: args.Value?.ToString())" /></label>
-                        <label>Type<select value="@input.ValueType" @onchange="args => UpdateTransformInputAsync(input, valueType: args.Value?.ToString())">@foreach (var type in _inputTypes){<option value="@type">@type</option>}</select></label>
-                        <label>Null value<select value="@input.Nullability" @onchange="args => UpdateTransformInputAsync(input, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Can be null</option></select></label>
+                        <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "name")">Input name</label><input class="field__input" id="@DeclarationFieldId(input.PortId, "name")" type="text" value="@input.DisplayName" @oninput="args => UpdateTransformInputAsync(input, displayName: args.Value?.ToString())" /></div>
+                        <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "type")">Type</label><select class="field__input" id="@DeclarationFieldId(input.PortId, "type")" value="@input.ValueType" @onchange="args => UpdateTransformInputAsync(input, valueType: args.Value?.ToString())">@foreach (var type in _inputTypes){<option value="@type">@type</option>}</select></div>
+                        <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(input.PortId, "required")" value="@input.Nullability" @onchange="args => UpdateTransformInputAsync(input, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
                         <span>CEL name <code>@input.Identifier.Value</code></span>
-                        <button class="automation-danger-button" type="button" aria-label="Remove input @input.DisplayName" @onclick="() => RemoveTransformInputAsync(input.PortId)"><AutomationIcon Name="delete" />Remove</button>
+                        <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove input @input.DisplayName" title="Remove input @input.DisplayName" @onclick="() => RemoveTransformInputAsync(input.PortId)"><AutomationIcon Name="delete" /></button>
                     </div>
                 }
             </section>
@@ -123,7 +123,6 @@ else
                             }
                             else
                             {
-                                <span>Needs repair. BlokeBot keeps the connection so you can repair it.</span>
                                 <span class="automation-connection-diagnostic" role="alert">@issue</span>
                             }
                         </div>
@@ -136,7 +135,6 @@ else
                         }
                     </div>
                 }
-                <p class="automation-inactive-values">BlokeBot keeps the unused choices. Only @binding.Mode runs.</p>
             </section>
         }
 
@@ -166,15 +164,15 @@ else
         @if (Node.IsCelTransform)
         {
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-outputs-heading">
-                <div class="automation-inspector-section-heading"><h3 id="automation-transform-outputs-heading">Outputs</h3><button type="button" @onclick="AddTransformOutputAsync"><AutomationIcon Name="add" />Add output</button></div>
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-outputs-heading">Outputs</h3><button class="automation-icon-button" type="button" aria-label="Add output" title="Add output" @onclick="AddTransformOutputAsync"><AutomationIcon Name="add" /></button></div>
                 @foreach (var output in Node.TransformOutputs)
                 {
                     <div class="automation-transform-declaration" @key="output.PortId">
-                        <label>Output name<input type="text" value="@output.DisplayName" @oninput="args => UpdateTransformOutputAsync(output, displayName: args.Value?.ToString())" /></label>
-                        <label>Type<select value="@output.ValueType" @onchange="args => UpdateTransformOutputAsync(output, valueType: args.Value?.ToString())">@foreach (var type in _outputTypes){<option value="@type">@type</option>}</select></label>
-                        <label>Null value<select value="@output.Nullability" @onchange="args => UpdateTransformOutputAsync(output, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Can be null</option></select></label>
-                        <label class="automation-transform-cel">CEL expression<textarea value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></label>
-                        <button class="automation-danger-button" type="button" aria-label="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><AutomationIcon Name="delete" />Remove</button>
+                        <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "name")">Output name</label><input class="field__input" id="@DeclarationFieldId(output.PortId, "name")" type="text" value="@output.DisplayName" @oninput="args => UpdateTransformOutputAsync(output, displayName: args.Value?.ToString())" /></div>
+                        <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "type")">Type</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "type")" value="@output.ValueType" @onchange="args => UpdateTransformOutputAsync(output, valueType: args.Value?.ToString())">@foreach (var type in _outputTypes){<option value="@type">@type</option>}</select></div>
+                        <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "required")" value="@output.Nullability" @onchange="args => UpdateTransformOutputAsync(output, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
+                        <div class="field automation-transform-cel"><label class="field__label" for="@DeclarationFieldId(output.PortId, "expression")">CEL expression</label><textarea class="field__input" id="@DeclarationFieldId(output.PortId, "expression")" value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></div>
+                        <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove output @output.DisplayName" title="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><AutomationIcon Name="delete" /></button>
                     </div>
                 }
                 <div class="automation-cel-completions" aria-label="Available output CEL names">

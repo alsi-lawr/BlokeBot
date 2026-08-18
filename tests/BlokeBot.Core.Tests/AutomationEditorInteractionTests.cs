@@ -813,6 +813,80 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public void TypedEditor_Inspector_DeclarationFieldsEditAddAndRemoveThroughStandardControls()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var registered = new CoreAutomationCatalogModule()
+            .Definitions.Select(static definition => definition.Descriptor)
+            .Single(static definition => definition.Id == AutomationDefinitionIds.CelTransform);
+        var transform = AutomationEditorNode.Create(registered, new(new(48), new(72)));
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, transform)
+                .Add(component => component.Nodes, [transform])
+                .Add(component => component.Edges, [])
+        );
+
+        var declaredInput = transform.TransformInputs.Single();
+        inspector
+            .Find($"[id='automation-declaration-{declaredInput.PortId.Value}-required']")
+            .Change(nameof(AutomationPortNullability.Nullable));
+        transform.TransformInputs.Single().Nullability.ShouldBe(AutomationPortNullability.Nullable);
+        inspector
+            .Find($"[id='automation-declaration-{declaredInput.PortId.Value}-required']")
+            .Change(nameof(AutomationPortNullability.NonNullable));
+        transform
+            .TransformInputs.Single()
+            .Nullability.ShouldBe(AutomationPortNullability.NonNullable);
+
+        inspector.Find("[aria-label='Add input']").Click();
+        transform.TransformInputs.Count.ShouldBe(2);
+        inspector.FindAll("[aria-label^='Remove input']")[1].Click();
+        transform.TransformInputs.Single().PortId.ShouldBe(declaredInput.PortId);
+
+        var declaredOutput = transform.TransformOutputs.Single();
+        inspector
+            .Find($"[id='automation-declaration-{declaredOutput.PortId.Value}-expression']")
+            .Input("value > 10");
+        transform.TransformOutputs.Single().Source.ShouldBe("value > 10");
+    }
+
+    [Test]
+    public void TypedEditor_Inspector_RetainedConnectionShowsDiagnosticWithoutFillerProse()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var nodes = CreatePickerNodes();
+        var retained = new AutomationFlowDraftEdge(
+            Guid.NewGuid(),
+            AutomationEdgeKind.Data,
+            nodes.IncompatibleSource.Id,
+            nodes.IncompatibleSource.Definition.Outputs.Single().Id,
+            nodes.Target.Id,
+            nodes.Target.Definition.Inputs.Single().Id
+        );
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, nodes.Target)
+                .Add(
+                    component => component.Nodes,
+                    [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target]
+                )
+                .Add(component => component.Edges, [retained])
+        );
+
+        inspector
+            .Find(".automation-connection-diagnostic[role=alert]")
+            .TextContent.ShouldNotBeNullOrWhiteSpace();
+        inspector
+            .FindAll("button")
+            .ShouldContain(button => button.TextContent.Trim() == "Repair source");
+        inspector.Markup.ShouldNotContain("BlokeBot keeps");
+        inspector.Markup.ShouldNotContain("unused choices");
+    }
+
+    [Test]
     public void TypedEditor_DynamicTransform_RoundTripsIdentityAndKeepsRemovedPortEdgesVisible()
     {
         var registered = new CoreAutomationCatalogModule()

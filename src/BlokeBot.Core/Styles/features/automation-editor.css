@@ -1993,8 +1993,7 @@
 }
 
 .automation-inspector-cel-help,
-.automation-binding-choice-help,
-.automation-inactive-values {
+.automation-binding-choice-help {
     background: var(--app-surface-muted);
     border-radius: 0.45rem;
     color: var(--app-text-muted);
@@ -2025,7 +2024,6 @@
     align-items: center;
 }
 
-.automation-inspector-section-heading button,
 .automation-repair-actions button,
 .automation-source-picker footer button {
     background: var(--app-control-bg);
@@ -2046,26 +2044,35 @@
 }
 
 .automation-transform-declaration {
-    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.7fr);
+    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.7fr) auto;
 }
 
-.automation-transform-declaration label,
-.automation-transform-declaration span {
+.automation-transform-declaration > span {
+    align-self: center;
     color: var(--app-text-muted);
     display: grid;
     font-size: 0.59rem;
     gap: 0.15rem;
 }
 
-.automation-transform-declaration input,
-.automation-transform-declaration select,
-.automation-transform-declaration textarea {
-    background: var(--app-control-bg);
-    border: 1px solid var(--app-control-border);
-    border-radius: 0.35rem;
-    color: var(--app-text-strong);
-    min-width: 0;
-    padding: 0.35rem;
+.automation-transform-declaration .field {
+    padding: 0.35rem 0.55rem;
+}
+
+.automation-transform-declaration .field__input {
+    font-size: 0.8rem;
+}
+
+.automation-transform-declaration textarea.field__input {
+    resize: vertical;
+}
+
+.automation-declaration-remove {
+    align-self: start;
+    color: var(--tone-red-fg);
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
 }
 
 .automation-transform-cel {

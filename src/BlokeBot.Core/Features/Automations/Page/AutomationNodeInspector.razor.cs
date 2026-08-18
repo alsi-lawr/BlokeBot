@@ -369,6 +369,9 @@ public partial class AutomationNodeInspector
         AutomationConfigurationFieldId fieldId
     ) => $"automation-{nodeId.Value:N}-{fieldId.Value}";
 
+    private static string DeclarationFieldId(AutomationPortId portId, string suffix) =>
+        $"automation-declaration-{portId.Value}-{suffix}";
+
     private static string ConnectionId(AutomationNodeId nodeId, AutomationPortId portId) =>
         $"automation-connection-{nodeId.Value:N}-{portId.Value}";
 
