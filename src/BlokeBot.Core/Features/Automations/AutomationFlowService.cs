@@ -287,10 +287,10 @@ public sealed class AutomationFlowService(
                 return new AutomationFlowSaveOutcome.Invalid([MalformedGraphError()]);
             }
 
-            var identityErrors = TransformInputIdentityErrors(restored.Draft, draft);
-            if (!identityErrors.IsEmpty)
+            var bindingFieldErrors = TransformInputBindingFieldErrors(restored.Draft, draft);
+            if (!bindingFieldErrors.IsEmpty)
             {
-                return new AutomationFlowSaveOutcome.Invalid(identityErrors);
+                return new AutomationFlowSaveOutcome.Invalid(bindingFieldErrors);
             }
 
             flow = await db.AutomationFlows.SingleAsync(
@@ -329,7 +329,7 @@ public sealed class AutomationFlowService(
         return new AutomationFlowSaveOutcome.Saved(new(flow.Id));
     }
 
-    private ImmutableArray<AutomationGraphError> TransformInputIdentityErrors(
+    private ImmutableArray<AutomationGraphError> TransformInputBindingFieldErrors(
         AutomationFlowDraft existing,
         AutomationFlowDraft candidate
     )
@@ -362,17 +362,14 @@ public sealed class AutomationFlowService(
             {
                 if (
                     candidateInputs.TryGetValue(existingInput.PortId, out var candidateInput)
-                    && (
-                        candidateInput.Identifier != existingInput.Identifier
-                        || candidateInput.BindingFieldId != existingInput.BindingFieldId
-                    )
+                    && candidateInput.BindingFieldId != existingInput.BindingFieldId
                 )
                 {
                     errors.Add(
                         new(
                             existingNode.Id,
-                            "transform-input-identity-changed",
-                            "Create a new Transform input instead of changing its CEL identifier or binding field.",
+                            "transform-input-binding-field-changed",
+                            "Create a new Transform input instead of changing its binding field.",
                             existingInput.BindingFieldId,
                             existingInput.PortId
                         )

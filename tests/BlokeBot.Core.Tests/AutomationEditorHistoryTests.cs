@@ -318,6 +318,62 @@ public sealed class AutomationEditorHistoryTests
     }
 
     [Test]
+    public void History_CelIdentifierRename_IsOneDirtyDiffCoveringIdentifierAndExpressions()
+    {
+        var transformDefinition = new CoreAutomationCatalogModule()
+            .Definitions.Select(static definition => definition.Descriptor)
+            .Single(static definition => definition.Id == AutomationDefinitionIds.CelTransform);
+        var editor = AutomationEditorState.Create("Rename history");
+        var transform = editor.AddNode(transformDefinition);
+        var declared = transform.TransformInputs.Single();
+        var first = transform.TransformOutputs.Single();
+        transform.AddTransformOutput();
+        var second = transform.TransformOutputs.Last();
+        transform.UpdateTransformOutput(
+            first.PortId,
+            "First",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.NonNullable,
+            "value + \" value \""
+        );
+        transform.UpdateTransformOutput(
+            second.PortId,
+            "Second",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.NonNullable,
+            "${value} value"
+        );
+        var history = new AutomationEditorHistory();
+        history.StartLoaded(editor);
+        history.IsDirty(editor).ShouldBeFalse();
+
+        transform.RenameTransformInput(declared.PortId, "payout").ShouldBeTrue();
+
+        history.Record(editor).ShouldBeTrue();
+        history.UndoCount.ShouldBe(1);
+        history.IsDirty(editor).ShouldBeTrue();
+
+        editor = history.Undo(editor).ShouldNotBeNull();
+        transform = editor.Nodes.Single(node => node.Id == transform.Id);
+        transform.TransformInputs.Single().Identifier.ShouldBe(declared.Identifier);
+        transform
+            .TransformOutputs.Select(static output => output.Source)
+            .ShouldBe(["value + \" value \"", "${value} value"]);
+        history.UndoCount.ShouldBe(0);
+        history.IsDirty(editor).ShouldBeFalse();
+
+        editor = history.Redo(editor).ShouldNotBeNull();
+        transform = editor.Nodes.Single(node => node.Id == transform.Id);
+        transform
+            .TransformInputs.Single()
+            .Identifier.ShouldBe(new AutomationCelIdentifier("payout"));
+        transform
+            .TransformOutputs.Select(static output => output.Source)
+            .ShouldBe(["payout + \" value \"", "${payout} value"]);
+        history.RedoCount.ShouldBe(0);
+    }
+
+    [Test]
     public void History_UnifiedSendAndConditionPayloads_RoundTripWithoutDuplicateState()
     {
         var definitions = new CoreAutomationCatalogModule()

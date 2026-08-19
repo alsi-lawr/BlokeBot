@@ -345,6 +345,63 @@ public sealed class AutomationEditorNode
         RefreshTransformDefinition();
     }
 
+    internal bool RenameTransformInput(AutomationPortId portId, string identifier)
+    {
+        if (_transform is null)
+        {
+            return false;
+        }
+
+        var index = IndexOf(_transform.Inputs, input => input.PortId == portId);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        var current = _transform.Inputs[index];
+        if (string.Equals(identifier, current.Identifier.Value, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (
+            !AutomationCelSyntax.IsIdentifier(identifier)
+            || AutomationCelSyntax.ReservedIdentifiers.Contains(identifier)
+            || _transform.Inputs.Any(input =>
+                string.Equals(input.Identifier.Value, identifier, StringComparison.Ordinal)
+            )
+        )
+        {
+            return false;
+        }
+
+        _transform = _transform with
+        {
+            Inputs = _transform.Inputs.SetItem(
+                index,
+                current with
+                {
+                    Identifier = new(identifier),
+                }
+            ),
+            Outputs =
+            [
+                .. _transform.Outputs.Select(output =>
+                    output with
+                    {
+                        Source = AutomationTransformCelService.RenameIdentifier(
+                            output,
+                            current.Identifier.Value,
+                            identifier
+                        ),
+                    }
+                ),
+            ],
+        };
+        RefreshTransformDefinition();
+        return true;
+    }
+
     internal void UpdateTransformOutput(
         AutomationPortId portId,
         string displayName,

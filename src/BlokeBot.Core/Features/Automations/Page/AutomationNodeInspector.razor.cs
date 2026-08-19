@@ -11,6 +11,9 @@ public partial class AutomationNodeInspector
     private ElementReference _pickerOpener;
     private readonly Dictionary<AutomationSourceChoice, ElementReference> _sourceReferences = [];
     private bool _pickerNeedsFocus;
+    private AutomationNodeId? _rejectedRenameNodeId;
+    private AutomationPortId? _rejectedRenamePortId;
+    private int _renameAttempt;
 
     [Parameter]
     public AutomationEditorNode? Node { get; set; }
@@ -116,6 +119,15 @@ public partial class AutomationNodeInspector
         _selectedSource = SourceChoices()
             .FirstOrDefault(static choice => choice.Compatibility.IsCompatible);
         _pickerNeedsFocus = true;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_rejectedRenameNodeId is { } nodeId && Node?.Id != nodeId)
+        {
+            _rejectedRenameNodeId = null;
+            _rejectedRenamePortId = null;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -327,6 +339,32 @@ public partial class AutomationNodeInspector
         );
         await Changed.InvokeAsync();
     }
+
+    private async Task RenameTransformInputAsync(
+        AutomationCelTransformInput input,
+        string? identifier
+    )
+    {
+        if (Node is null)
+        {
+            return;
+        }
+        if (!Node.RenameTransformInput(input.PortId, identifier ?? string.Empty))
+        {
+            _rejectedRenameNodeId = Node.Id;
+            _rejectedRenamePortId = input.PortId;
+            _renameAttempt++;
+            return;
+        }
+        _rejectedRenameNodeId = null;
+        _rejectedRenamePortId = null;
+        await Changed.InvokeAsync();
+    }
+
+    private string? RenameDiagnostic(AutomationPortId portId) =>
+        Node is not null && _rejectedRenameNodeId == Node.Id && _rejectedRenamePortId == portId
+            ? "Use a unique CEL name. Letters, digits and underscores only, not starting with a digit, and not a reserved word."
+            : null;
 
     private async Task UpdateTransformOutputAsync(
         AutomationCelTransformOutput output,

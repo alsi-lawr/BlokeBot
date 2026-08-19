@@ -925,6 +925,90 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public void TypedEditor_Inspector_CelNameRenameRewritesOnlyIdentifierTokensInEveryOutput()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var transform = CelTransformNode();
+        var changes = 0;
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, transform)
+                .Add(component => component.Nodes, [transform])
+                .Add(component => component.Edges, [])
+                .Add(component => component.Changed, () => changes++)
+        );
+        var renamed = transform.TransformInputs.Single();
+        inspector.Find("[aria-label='Add input']").Click();
+        inspector.Find("[aria-label='Add output']").Click();
+        CelNameField(inspector, transform.TransformInputs.Last().PortId).Change("value12");
+        ExpressionField(inspector, transform.TransformOutputs.First().PortId)
+            .Input("value + \" value \" + value12");
+        ExpressionField(inspector, transform.TransformOutputs.Last().PortId)
+            .Input("${value} value ${value12}");
+        changes = 0;
+
+        CelNameField(inspector, renamed.PortId).Change("actor_login");
+
+        changes.ShouldBe(1);
+        transform
+            .TransformInputs.Select(static input => input.Identifier.Value)
+            .ShouldBe(["actor_login", "value12"]);
+        transform
+            .TransformOutputs.Select(static output => output.Source)
+            .ShouldBe(["actor_login + \" value \" + value12", "${actor_login} value ${value12}"]);
+        CelNameField(inspector, renamed.PortId).GetAttribute("value").ShouldBe("actor_login");
+        inspector
+            .FindAll(".automation-declaration-cel-name .automation-field-error")
+            .ShouldBeEmpty();
+    }
+
+    [Test]
+    [Arguments("")]
+    [Arguments(" ")]
+    [Arguments("1value")]
+    [Arguments("has space")]
+    [Arguments("value.login")]
+    [Arguments("input_1")]
+    [Arguments("true")]
+    [Arguments("arguments")]
+    [Arguments("format_number")]
+    public void TypedEditor_Inspector_CelNameRejectsCandidateWithoutMutatingTheDeclaration(
+        string candidate
+    )
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var transform = CelTransformNode();
+        var changes = 0;
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, transform)
+                .Add(component => component.Nodes, [transform])
+                .Add(component => component.Edges, [])
+                .Add(component => component.Changed, () => changes++)
+        );
+        var declared = transform.TransformInputs.Single();
+        inspector.Find("[aria-label='Add input']").Click();
+        ExpressionField(inspector, transform.TransformOutputs.Single().PortId).Input("value");
+        changes = 0;
+
+        CelNameField(inspector, declared.PortId).Change(candidate);
+
+        changes.ShouldBe(0);
+        transform
+            .TransformInputs.Select(static input => input.Identifier.Value)
+            .ShouldBe(["value", "input_1"]);
+        transform.TransformOutputs.Single().Source.ShouldBe("value");
+        var field = CelNameField(inspector, declared.PortId);
+        field.GetAttribute("value").ShouldBe("value");
+        field.GetAttribute("aria-invalid").ShouldBe("true");
+        inspector
+            .Find(".automation-declaration-cel-name .automation-field-error[role=alert]")
+            .TextContent.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Test]
     public void TypedEditor_Inspector_DeclarationFieldsEditAddAndRemoveThroughStandardControls()
     {
         using var context = new BunitContext();
@@ -1121,6 +1205,24 @@ public sealed class AutomationEditorInteractionTests
             .ForRestrictedInput(transform.Definition.Inputs.Single(port => port.Id == input.PortId))
             .ShouldBeEmpty();
     }
+
+    private static AutomationEditorNode CelTransformNode() =>
+        AutomationEditorNode.Create(
+            new CoreAutomationCatalogModule()
+                .Definitions.Select(static definition => definition.Descriptor)
+                .Single(static definition => definition.Id == AutomationDefinitionIds.CelTransform),
+            new(new(48), new(72))
+        );
+
+    private static IElement CelNameField(
+        IRenderedComponent<AutomationNodeInspector> inspector,
+        AutomationPortId portId
+    ) => inspector.Find($"[id='automation-declaration-{portId.Value}-cel-name']");
+
+    private static IElement ExpressionField(
+        IRenderedComponent<AutomationNodeInspector> inspector,
+        AutomationPortId portId
+    ) => inspector.Find($"[id='automation-declaration-{portId.Value}-expression']");
 
     private static AutomationDefinitionDescriptor Definition(
         string id,

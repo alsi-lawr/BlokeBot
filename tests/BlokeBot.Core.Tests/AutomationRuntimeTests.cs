@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Automations.Page;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
@@ -2087,9 +2088,9 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    [Arguments("replacement", "amount-binding")]
     [Arguments("amount", "replacement-binding")]
-    public async Task CelTransform_UpdateRejectsRetainedInputIdentityReplacementAndPreservesStoredGraph(
+    [Arguments("replacement", "replacement-binding")]
+    public async Task CelTransform_UpdateRejectsRetainedInputBindingFieldReplacementAndPreservesStoredGraph(
         string identifier,
         string bindingFieldId
     )
@@ -2186,7 +2187,7 @@ public sealed class AutomationRuntimeTests
             await fixture.Flows.SaveAsync(update, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
         var error = rejected.Errors.ShouldHaveSingleItem();
-        error.Code.ShouldBe("transform-input-identity-changed");
+        error.Code.ShouldBe("transform-input-binding-field-changed");
         error.NodeId.ShouldBe(transform.Id);
         error.PortId.ShouldBe(new("amount-input"));
 
@@ -2202,6 +2203,94 @@ public sealed class AutomationRuntimeTests
             .Definition.Configuration.GetRawText()
             .ShouldBe(original.Definition.Configuration.GetRawText());
         retained.InputBindings.ShouldBe(original.InputBindings);
+    }
+
+    [Test]
+    public async Task CelTransform_UpdateAcceptsRenamedInputIdentifierWithRewrittenOutputs()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var transform = Node(
+            "cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "amount-input",
+                        "amount",
+                        "Amount",
+                        "amount-binding",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        1m
+                    ),
+                ],
+                [
+                    new(
+                        "text-output",
+                        "Text",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "format_number(amount, 2) + \" amount\""
+                    ),
+                ]
+            ),
+            bindings: Bindings("amount-binding", AutomationInputBindingMode.Connected)
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var flowId = await fixture.SaveAsync(
+            [source, transform, action],
+            [
+                Edge(source, "flow", action),
+                Edge(source, "value", transform, "amount-input", AutomationEdgeKind.Data),
+                Edge(transform, "text-output", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        var before = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == flowId);
+        var persisted = before.Draft.Nodes.Single(node => node.Id == transform.Id);
+        var descriptor = fixture
+            .Catalog.ValidatePersistedDefinition(persisted.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>()
+            .Definition;
+        var editorNode = AutomationEditorNode.Restore(persisted, descriptor);
+
+        editorNode.RenameTransformInput(new("amount-input"), "payout").ShouldBeTrue();
+
+        var renamed = editorNode.Draft();
+        _ = (
+            await fixture.Flows.SaveAsync(
+                before.Draft with
+                {
+                    Nodes =
+                    [
+                        .. before.Draft.Nodes.Select(node =>
+                            node.Id == transform.Id ? renamed : node
+                        ),
+                    ],
+                },
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+
+        var reloaded = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == flowId)
+            .Draft.Nodes.Single(node => node.Id == transform.Id);
+        var configuration = fixture
+            .Catalog.ValidatePersistedDefinition(reloaded.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>()
+            .Configuration.ShouldBeOfType<AutomationCelTransformConfiguration>();
+        configuration.Inputs.Single().Identifier.ShouldBe(new AutomationCelIdentifier("payout"));
+        configuration
+            .Inputs.Single()
+            .BindingFieldId.ShouldBe(new AutomationConfigurationFieldId("amount-binding"));
+        configuration.Outputs.Single().Source.ShouldBe("format_number(payout, 2) + \" amount\"");
+        reloaded.InputBindings.ShouldBe(persisted.InputBindings);
     }
 
     [Test]

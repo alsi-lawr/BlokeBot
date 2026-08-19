@@ -492,6 +492,39 @@ internal sealed class AutomationTransformCelService
                 && result.IsAssignableTo(output.ValueType, output.Nullability);
     }
 
+    internal static string RenameIdentifier(
+        AutomationCelTransformOutput output,
+        string from,
+        string to
+    )
+    {
+        if (
+            output.ValueType != AutomationPortValueType.Text
+            || !output.Source.Contains("${", StringComparison.Ordinal)
+        )
+        {
+            return AutomationCelSyntax.RewriteIdentifier(output.Source, from, to);
+        }
+
+        if (Segments(output.Source, allowInterpolation: true) is not { } segments)
+        {
+            return output.Source;
+        }
+
+        var rewritten = new StringBuilder();
+        foreach (var segment in segments)
+        {
+            _ = segment.Literal is { } literal
+                ? rewritten.Append(literal)
+                : rewritten
+                    .Append("${")
+                    .Append(AutomationCelSyntax.RewriteIdentifier(segment.Source!, from, to))
+                    .Append('}');
+        }
+
+        return rewritten.ToString();
+    }
+
     internal AutomationPureNodeResult Execute(
         AutomationCelTransformConfiguration configuration,
         ImmutableDictionary<AutomationPortId, AutomationResolvedValue> inputs,
@@ -1461,6 +1494,7 @@ internal static class AutomationCelSyntax
         ImmutableHashSet.Create(
             StringComparer.Ordinal,
             AutomationCelTransform.FunctionName,
+            "arguments",
             "as",
             "break",
             "const",
@@ -1505,6 +1539,42 @@ internal static class AutomationCelSyntax
         catch (CelException)
         {
             return false;
+        }
+    }
+
+    internal static string RewriteIdentifier(string source, string from, string to)
+    {
+        try
+        {
+            var occurrences = new CelEnvironment([], string.Empty)
+                .Parse(source)
+                .DescendantsAndSelf()
+                .OfType<CelParser.IdentOrGlobalCallContext>()
+                .Where(identifier =>
+                    identifier.LPAREN() is null
+                    && string.Equals(identifier.id.Text, from, StringComparison.Ordinal)
+                )
+                .Select(static identifier => identifier.id)
+                .OrderBy(static token => token.StartIndex)
+                .ToArray();
+            if (occurrences.Length == 0)
+            {
+                return source;
+            }
+
+            var rewritten = new StringBuilder();
+            var offset = 0;
+            foreach (var token in occurrences)
+            {
+                _ = rewritten.Append(source, offset, token.StartIndex - offset).Append(to);
+                offset = token.StopIndex + 1;
+            }
+
+            return rewritten.Append(source[offset..]).ToString();
+        }
+        catch (CelException)
+        {
+            return source;
         }
     }
 
