@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -43,6 +44,7 @@ public sealed class ViewerPassportCommandTests
         );
         var services = new ServiceCollection();
         _ = services.AddSingleton(service);
+        _ = services.AddSingleton<IOptions<BlokeBotOptions>>(Options.Create(new BlokeBotOptions()));
         _ = services.AddChatCommands().AddCommandModule<ViewerPassportCommandModule>();
         await using var provider = services.BuildServiceProvider();
         var dispatcher = provider.GetRequiredService<ChatCommandDispatcher>();
@@ -101,6 +103,62 @@ public sealed class ViewerPassportCommandTests
                     )
                 )
             );
+    }
+
+    [Test]
+    public async Task Summary_SendsAFullLinkOnlyWhenAPublicBaseIsConfigured()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                TwitchUserId = "streamer-id",
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.ViewerPassports,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+        }
+        var service = new ViewerPassportService(
+            database,
+            new PointBalanceService(database),
+            new LiveStreamProvider(),
+            TimeProvider.System
+        );
+        _ = Success(
+            await service.SaveAsync(Save(hostId, ViewerPassportVisibility.Public, "LINE"), default)
+        );
+
+        async Task<string> ReplyAsync(string? publicBaseUrl)
+        {
+            var services = new ServiceCollection();
+            _ = services.AddSingleton(service);
+            _ = services.AddSingleton<IOptions<BlokeBotOptions>>(
+                Options.Create(new BlokeBotOptions { PublicBaseUrl = publicBaseUrl })
+            );
+            _ = services.AddChatCommands().AddCommandModule<ViewerPassportCommandModule>();
+            await using var provider = services.BuildServiceProvider();
+            var responses = new List<string>();
+            await DispatchAsync(provider.GetRequiredService<ChatCommandDispatcher>(), responses);
+            return responses.Single();
+        }
+
+        (await ReplyAsync("https://bot.example.com")).ShouldContain(
+            "https://bot.example.com/passport/streamer/viewer"
+        );
+        (await ReplyAsync("https://bot.example.com/prefix")).ShouldContain(
+            "https://bot.example.com/prefix/passport/streamer/viewer"
+        );
+
+        // An unusable value degrades to the path the reply already used.
+        (await ReplyAsync("not a url")).ShouldContain("/passport/streamer/viewer");
+        (await ReplyAsync("not a url")).ShouldNotContain("http");
+        (await ReplyAsync(null)).ShouldContain("/passport/streamer/viewer");
     }
 
     private static async Task DispatchAsync(

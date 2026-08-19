@@ -1,10 +1,23 @@
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Persistence.Models;
+using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Core.Features.ViewerPassports;
 
-internal sealed class ViewerPassportCommandModule(ViewerPassportService passports)
-    : IChatCommandModule
+internal sealed class ViewerPassportCommandModule(
+    ViewerPassportService passports,
+    IOptions<BlokeBotOptions> options
+) : IChatCommandModule
 {
+    /// <summary>
+    /// Builds the address a viewer can open. A deployment that configures
+    /// <c>BlokeBot:PublicBaseUrl</c> gets a full link; otherwise the reply keeps the bare path.
+    /// </summary>
+    private string Link(string path) =>
+        HelpSiteGuide.BaseAddress(options.Value.PublicBaseUrl) is { } baseAddress
+            ? new Uri(baseAddress, path.TrimStart('/')).ToString()
+            : path;
+
     public void AddCommands(IChatCommandBuilder commands) =>
         _ = commands.Map(FixedChatCommandRoutes.Passport, PassportAsync);
 
@@ -39,7 +52,7 @@ internal sealed class ViewerPassportCommandModule(ViewerPassportService passport
         if (passport.Visibility != ViewerPassportVisibility.Public)
         {
             await context.ReplyAsync(
-                $"Open your viewer passport: /passports/{passport.HostLogin}/me",
+                $"Open your viewer passport: {Link($"/passports/{Uri.EscapeDataString(passport.HostLogin)}/me")}",
                 cancellationToken
             );
             return;
@@ -53,7 +66,9 @@ internal sealed class ViewerPassportCommandModule(ViewerPassportService passport
                 + (passport.Statistics.PointsRank is { } rank ? $" (#{rank})" : string.Empty)
                 + $", {passport.Statistics.CorrectGuesses}/{passport.Statistics.GuessRounds} guesses correct"
                 + $", {passport.Statistics.Achievements} achievements{attendance}. "
-                + $"/passport/{passport.HostLogin}/{passport.Login}",
+                + Link(
+                    $"/passport/{Uri.EscapeDataString(passport.HostLogin)}/{Uri.EscapeDataString(passport.Login)}"
+                ),
             cancellationToken
         );
     }

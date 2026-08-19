@@ -25,7 +25,7 @@ public sealed class PointsConfigurationUiTests
         var page = context.Render<PointsConfigurationPage>();
 
         page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save changes")
+            .Single(button => button.TextContent.Trim() == "Save")
             .Click();
 
         page.WaitForAssertion(() => toasts.Current.ShouldHaveSingleItem());
@@ -51,7 +51,7 @@ public sealed class PointsConfigurationUiTests
                 )
             );
         page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save changes")
+            .Single(button => button.TextContent.Trim() == "Save")
             .Click();
 
         await using var correctedDb = await dbFactory.CreateDbContextAsync();

@@ -1,4 +1,17 @@
 @layer components {
+    .save-changes-button {
+        align-items: center;
+        display: inline-flex;
+        gap: 0.4rem;
+        justify-content: center;
+    }
+
+    .save-changes-button__icon {
+        block-size: 1em;
+        flex: none;
+        inline-size: 1em;
+    }
+
     .save-changes-button[data-save-state="dirty"]:not(:disabled) {
         box-shadow:
             0 0 0 3px color-mix(in srgb, var(--app-focus-border) 22%, transparent),

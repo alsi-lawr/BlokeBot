@@ -335,16 +335,16 @@
                                placeholder="commands"
                                autocomplete="off" />
                     </div>
-                    <p class="mt-1 text-xs font-medium text-slate-500">
-                        Separate extra command words with commas. Leave this blank to disable the catalog.
-                    </p>
                 </div>
-                <div class="studio-span-4 content-end">
+                <div class="studio-span-4 flex items-center">
                     <SaveChangesButton AccessibleName="Save commands"
-                                       Class="w-full"
+                                       Class="h-10 w-full"
                                        Saving="@_commandsSaving"
                                        OnSave="() => SaveCommandsAsync(hostId)" />
                 </div>
+                <p class="studio-span-12 -mt-1 text-xs font-medium text-slate-500">
+                    Separate extra command words with commas. Leave this blank to disable the catalog.
+                </p>
                 @if (!string.IsNullOrWhiteSpace(_state.Commands.ConflictAlias))
                 {
                     <div class="studio-span-12 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-700"

@@ -20,6 +20,14 @@ public sealed record BlokeBotOptions
     /// <see cref="BlokeBotOptionsValidation"/> so a bad value never prevents startup.
     /// </summary>
     public string? HelpSiteBaseUrl { get; init; }
+
+    /// <summary>
+    /// Optional base address this deployment is reached on. Chat replies that point a viewer at a
+    /// page use it to send a full link instead of a bare path. It follows
+    /// <see cref="HelpSiteBaseUrl"/> in staying outside <see cref="BlokeBotOptionsValidation"/>, so
+    /// a bad value degrades the reply to the path it already used and never prevents startup.
+    /// </summary>
+    public string? PublicBaseUrl { get; init; }
 }
 
 public sealed record BlokeBotCustomCommandOptions
