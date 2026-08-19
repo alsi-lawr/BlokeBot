@@ -168,8 +168,9 @@ local succeeded, failure = pcall(function()
   if device == "wide" and mode == "grid" then
     viset.page.evaluate(viset.javascript([=[
       (() => {
-        const node = [...document.querySelectorAll("[data-automation-node]")]
-          .find((candidate) => candidate.querySelector("strong")?.textContent.trim() === "Condition");
+        // Nodes carry author-chosen names, so select the first Condition by kind.
+        const node = [...document.querySelectorAll('[data-automation-node][data-node-kind="control"]')]
+          .find((candidate) => candidate.querySelector("[data-automation-node-select]") !== null);
         node.querySelector("[data-automation-node-select]").click();
         return true;
       })()

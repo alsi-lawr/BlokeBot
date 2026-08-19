@@ -745,6 +745,41 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    public async Task FlowValidation_ReachesEveryNodePastAReconvergingBranch()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var value = Node("test-number-value", "{}");
+        var sibling = ConnectedNode("test-number-consumer");
+        var left = ConnectedNode("test-number-consumer");
+        var right = ConnectedNode("test-number-consumer");
+        var merge = ConnectedNode("test-number-consumer");
+
+        // Both branches rejoin at "merge". A traversal that stops at the first
+        // repeated node abandons the rest of its queue, so "sibling" stays
+        // unvisited even though the trigger reaches it directly.
+        var diamond = Draft(
+            fixture.HostId,
+            [source, value, sibling, left, right, merge],
+            [
+                Edge(source, "flow", sibling),
+                Edge(source, "flow", left),
+                Edge(source, "flow", right),
+                Edge(left, "complete", merge),
+                Edge(right, "complete", merge),
+                Edge(value, "value", sibling, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", left, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", right, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", merge, "value", AutomationEdgeKind.Data),
+            ]
+        );
+
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(diamond, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+    }
+
+    [Test]
     public async Task DataValidation_SeparatesTopologyAndEnforcesInputContracts()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();

@@ -116,7 +116,7 @@ internal sealed class SimulationFixtureSeeder(
               "inputs": [
                 { "port-id": "actor", "cel-identifier": "actor", "display-name": "Actor", "binding-field-id": "actor-binding", "type": "Actor", "nullability": "NonNullable", "fixed": { "login": "", "display-name": "" } },
                 { "port-id": "number", "cel-identifier": "number", "display-name": "Number", "binding-field-id": "number-binding", "type": "Number", "nullability": "NonNullable", "fixed": 0 },
-                { "port-id": "threshold", "cel-identifier": "threshold", "display-name": "Threshold", "binding-field-id": "threshold-binding", "type": "Boolean", "nullability": "NonNullable", "fixed": false },
+                { "port-id": "threshold", "cel-identifier": "threshold", "display-name": "Threshold", "binding-field-id": "threshold-binding", "type": "Number", "nullability": "NonNullable", "fixed": 0 },
                 { "port-id": "arguments", "cel-identifier": "arguments_input", "display-name": "Arguments", "binding-field-id": "arguments-binding", "type": "Arguments", "nullability": "NonNullable", "fixed": [] }
               ],
               "outputs": [

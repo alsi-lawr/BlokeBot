@@ -1235,8 +1235,13 @@ public sealed class AutomationFlowService(
         {
             pending.Push(source);
         }
-        while (pending.TryPop(out var nodeId) && reached.Add(nodeId))
+        while (pending.TryPop(out var nodeId))
         {
+            if (!reached.Add(nodeId))
+            {
+                continue;
+            }
+
             foreach (var target in adjacency[nodeId])
             {
                 pending.Push(target);
