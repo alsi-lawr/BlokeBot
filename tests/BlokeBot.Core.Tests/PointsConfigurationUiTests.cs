@@ -24,9 +24,7 @@ public sealed class PointsConfigurationUiTests
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
 
-        page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save")
-            .Click();
+        page.Find("[data-save-state]").Click();
 
         page.WaitForAssertion(() => toasts.Current.ShouldHaveSingleItem());
 
@@ -50,9 +48,7 @@ public sealed class PointsConfigurationUiTests
                     CultureInfo.InvariantCulture
                 )
             );
-        page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save")
-            .Click();
+        page.Find("[data-save-state]").Click();
 
         await using var correctedDb = await dbFactory.CreateDbContextAsync();
         var corrected = await correctedDb.PointsSettings.SingleAsync();
