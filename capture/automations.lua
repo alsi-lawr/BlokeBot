@@ -42,8 +42,8 @@ touch = true
 device_scale = 1.0
 
 [devices.phone.viewport]
-width = 390
-height = 844
+width = 495
+height = 1100
 
 [matrix]
 theme = ["light", "dark"]
@@ -129,7 +129,7 @@ local succeeded, failure = pcall(function()
     )
     viset.page.evaluate(viset.javascript([=[
       (() => {
-        const select = [...document.querySelectorAll(".automation-canvas-tools select")]
+        const select = [...document.querySelectorAll(".automation-workspace-toolbar select")]
           .find((candidate) => [...candidate.options].some((option) => option.value === "Smooth"));
         select.value = "Smooth";
         select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -138,9 +138,19 @@ local succeeded, failure = pcall(function()
     ]=]))
     viset.page.wait_for(
       viset.javascript([=[
-        document.querySelector('[data-automation-canvas-shell][data-edge-style="smooth"]') !== null
-          && [...document.querySelectorAll('[data-automation-edge] .automation-edge')]
-            .every((path) => path.getAttribute("d").includes(" C "))
+        (() => {
+          if (document.querySelector('[data-automation-canvas-shell][data-edge-style="smooth"]') === null) {
+            return false;
+          }
+          const routes = [...document.querySelectorAll('[data-automation-edge] .automation-edge')]
+            .map((path) => path.getAttribute("d") || "");
+          if (routes.length === 0 || routes.some((route) => route.trim() === "")) {
+            return false;
+          }
+          // Smooth mode falls back to the angular skeleton for a path the spline cannot
+          // drape, so require curves on the majority rather than on every route.
+          return routes.filter((route) => route.includes(" C ")).length > routes.length / 2;
+        })()
       ]=]),
       "20s"
     )

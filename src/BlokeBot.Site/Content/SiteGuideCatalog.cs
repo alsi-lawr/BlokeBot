@@ -2060,14 +2060,14 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Automations",
             Title = "Connect channel events to automatic actions",
             Summary =
-                "Build channel flows on a snapped grid. Connect events, data, conditions, and actions. Then, validate and test the flow before you enable it.",
+                "Build channel flows on a snapped grid. Connect events, data, conditions, and actions. Then validate and test the flow before you enable it.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/automations/phone-dark-grid-visual-automations.png",
                 LightPhoneSource: "media/automations/phone-light-grid-visual-automations.png",
-                DarkLaptopSource: "media/automations/desktop-dark-grid-visual-automations.png",
-                LightLaptopSource: "media/automations/desktop-light-grid-visual-automations.png",
-                PhoneAlt: "The Visual automations editor at 390 pixels. It shows snapped nodes and the validation state.",
-                LaptopAlt: "The Visual automations editor. It shows the flow library, typed nodes, connections, and the node inspector.",
+                DarkLaptopSource: "media/automations/wide-dark-grid-visual-automations.png",
+                LightLaptopSource: "media/automations/wide-light-grid-visual-automations.png",
+                PhoneAlt: "The Visual automations editor on a phone. It shows compact nodes, connections, and the validation state.",
+                LaptopAlt: "The Visual automations editor. It shows the Toolbox, typed nodes, connections, and the node inspector.",
                 "Use Grid view to arrange nodes. Use List view to inspect the same nodes and connections."
             ),
             Sections =
@@ -2094,7 +2094,8 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Search the Toolbox. Add one or more triggers, then add values, transforms, controls, and actions.",
-                        "Select a node to open its inspector from the right. Drag an output port to a compatible input port or node.",
+                        "Select a node to open its inspector on the right. Drag an output port to a compatible input port or node.",
+                        "Click a node to open its details on the card. Click the same node again to close the details.",
                         "Drag nodes on the 24-pixel grid, or move them with the keyboard. Use the canvas controls to set the flow direction and connection style.",
                         "Use Ctrl and the mouse wheel to zoom. Drag the background to move the canvas. Hold Alt and drag to select nodes.",
                         "Save the draft. Validate it, and fix each disconnected node, invalid input, cycle, missing reference, or unavailable channel tool.",
@@ -2108,9 +2109,9 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Test flow runs a sample event through the graph and reports each node result. It does not send chat, change points, play an overlay, or call Twitch.",
-                        "Invalid graphs cannot be enabled. A flow that can send public messages, change points, play overlays, or call Twitch shows an explicit warning before enablement.",
-                        "The run drawer shows the latest sample and recent live results. It identifies the node that failed, even if the flow continued.",
-                        "Duplicate copies the graph and node positions as a disabled draft without copying run history.",
+                        "You cannot enable an invalid graph. If a flow can send public messages, change points, play overlays, or call Twitch, the editor shows a warning first.",
+                        "The run drawer shows the latest sample and recent live results. It names the node that failed, even if the flow continued.",
+                        "Duplicate copies the graph and node positions as a disabled draft. It does not copy run history.",
                     ],
                 },
                 new SiteGuideSection
@@ -2140,12 +2141,14 @@ internal static partial class SiteGuideCatalog
                     ],
                     Bullets =
                     [
-                        "Declare each Transform input before you use its CEL name in an output expression.",
+                        "Declare each Transform input under Inputs before you use its CEL name in an output expression.",
+                        "Set Required? to Required or Optional for each declared input.",
+                        "Edit the CEL name to rename a declared input. BlokeBot rewrites that name in the expressions of the same node.",
                         "Connect an Actor input to use actor.display_name or actor.login. Other Actor fields are not available.",
                         "Bind arguments to a declared Arguments input. Output CEL can then use that declared input name.",
                         "An output can return Text, Number, Boolean, Timestamp, or a null value with one of these types.",
                         "Use format_number(number) to format a Number. Add a second value from 0 through 6 for exact decimal places.",
-                        "If a port changes, BlokeBot keeps an invalid connection. The editor shows Needs repair so you can repair or disconnect it.",
+                        "If a port changes, BlokeBot keeps the connection and marks it for repair. Repair it or disconnect it.",
                         "CEL cannot use raw event context, private data, IDs, roles, services, or outputs from the same Transform.",
                     ],
                     Code =
@@ -2169,7 +2172,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Paragraphs =
                     [
-                        "The canonical privacy notice covers automation run records and the source event context.",
+                        "The privacy notice covers automation run records and the source event context.",
                     ],
                     Links = [new SiteLink("Read the privacy notice", "privacy")],
                 },
@@ -2178,8 +2181,8 @@ internal static partial class SiteGuideCatalog
                     Heading = "Know what happens on failure",
                     Bullets =
                     [
-                        "Every step has a failure choice: stop the flow or continue past the failure. A stopped flow records the step that failed and later steps do not run.",
-                        "BlokeBot never repeats an action because its outcome was uncertain. A chat message, clip or Twitch operation is not sent twice to force an answer.",
+                        "Every step has a failure choice: stop the flow or continue past the failure. A stopped flow records the step that failed. Later steps do not run.",
+                        "BlokeBot never repeats an action because its outcome was uncertain. It does not send a chat message, clip, or Twitch operation twice to force an answer.",
                         "Twitch can deliver the same event more than once. BlokeBot keeps a short-lived receipt, so a repeated delivery inside ten minutes starts nothing extra.",
                         "Actions inherit their feature switches. Overlay cues need Overlays. Native Twitch operations need their Native Twitch feature. Command starts need Custom commands.",
                     ],
