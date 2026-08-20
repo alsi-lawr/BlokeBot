@@ -28,24 +28,32 @@ public sealed class GuessingConfigurationTransferAdapter
             .Include(x => x.Rounds)
             .Where(x => x.HostId == hostId)
             .ToListAsync(cancellationToken);
+        var plan = GuessingConfigurationImportMapping.Resolve(
+            section,
+            selection,
+            existing
+                .Select(x => new GuessingConfigurationImportTarget(
+                    x.Id,
+                    x.Name,
+                    x.Slug,
+                    x.Rounds.Count > 0
+                ))
+                .ToArray()
+        );
+        if (plan.Issues.Count > 0)
+        {
+            return plan.Issues;
+        }
+        var existingById = existing.ToDictionary(x => x.Id);
+        var matches = plan.TargetIds.ToDictionary(
+            x => x.Key,
+            x => existingById[x.Value],
+            StringComparer.Ordinal
+        );
         var resolutions = selection.ItemResolutions.ToDictionary(
             x => x.ImportedId,
             StringComparer.Ordinal
         );
-        var matches = new Dictionary<string, GuessRoundProfile>(StringComparer.Ordinal);
-        foreach (var imported in section.Profiles)
-        {
-            var resolution = resolutions.GetValueOrDefault(imported.Id);
-            var match = resolution?.TargetId is { } targetId
-                ? existing.SingleOrDefault(x => x.Id == targetId)
-                : existing.SingleOrDefault(x =>
-                    string.Equals(x.Slug, imported.Slug, StringComparison.Ordinal)
-                );
-            if (match is not null)
-            {
-                matches[imported.Id] = match;
-            }
-        }
 
         var retained = resolutions
             .Values.Where(x =>
@@ -261,8 +269,6 @@ public sealed class GuessingConfigurationTransferAdapter
 
     private static GuessRoundProfileSummary ToSummary(GuessRoundProfile x) =>
         new(x.Id, x.Revision, x.Name, x.IsDefault);
-
-    private static string CanonicalSlug(string name) => GuessRoundProfileSlug.FromName(name).Value;
 
     private static int TemporaryId(string value) =>
         -Math.Abs(StringComparer.Ordinal.GetHashCode(value) | 1);

@@ -85,6 +85,7 @@ public sealed partial class ConfigurationTransferCoordinator(
                         host,
                         document,
                         selected,
+                        selection,
                         cancellationToken
                     );
             }

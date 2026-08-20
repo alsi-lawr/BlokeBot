@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
+using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -23,19 +24,19 @@ public sealed partial class ConfigurationImportPreviewService
         var existing = await db
             .Profiles.AsNoTracking()
             .Where(x => x.HostId == hostId)
-            .Select(x => new
-            {
+            .Select(x => new GuessingConfigurationImportTarget(
                 x.Id,
                 x.Name,
                 x.Slug,
-                HasHistory = x.Rounds.Any(),
-            })
+                x.Rounds.Any()
+            ))
             .ToArrayAsync(cancellationToken);
-        var importedSlugs = section.Profiles.Select(x => x.Slug).ToHashSet(StringComparer.Ordinal);
+        var plan = GuessingConfigurationImportMapping.Resolve(section, selection, existing);
+        var matchedTargetIds = plan.TargetIds.Values.ToHashSet();
         var conflicts =
             selection.Strategy == ImportConflictStrategy.ReplaceSection
                 ? existing
-                    .Where(x => x.HasHistory && !importedSlugs.Contains(x.Slug))
+                    .Where(x => x.HasHistory && !matchedTargetIds.Contains(x.Id))
                     .Select(x => new ConfigurationImportConflict(
                         ConfigurationSectionId.Guessing,
                         $"target-{x.Id}",
@@ -45,7 +46,7 @@ public sealed partial class ConfigurationImportPreviewService
                     ))
                     .ToArray()
                 : [];
-        var matches = section.Profiles.Count(x => existing.Any(y => y.Slug == x.Slug));
+        var matches = plan.TargetIds.Count;
         var counts = selection.Strategy switch
         {
             ImportConflictStrategy.AddMissing => new ConfigurationPreviewCount(
@@ -58,12 +59,31 @@ public sealed partial class ConfigurationImportPreviewService
             ImportConflictStrategy.ReplaceSection => new(
                 section.Profiles.Count - matches,
                 matches,
-                existing.Count(x => !importedSlugs.Contains(x.Slug) && x.HasHistory),
-                existing.Count(x => !importedSlugs.Contains(x.Slug) && !x.HasHistory)
+                existing.Count(x => !matchedTargetIds.Contains(x.Id) && x.HasHistory),
+                existing.Count(x => !matchedTargetIds.Contains(x.Id) && !x.HasHistory)
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(selection)),
         };
-        return new(ConfigurationSectionId.Guessing, counts, [], conflicts);
+        return new(ConfigurationSectionId.Guessing, counts, plan.Issues, conflicts)
+        {
+            GuessingProfileMappings = section
+                .Profiles.Select(imported => new GuessingProfileMappingPreview(
+                    imported.Id,
+                    imported.Name,
+                    existing
+                        .SingleOrDefault(x =>
+                            string.Equals(x.Slug, imported.Slug, StringComparison.Ordinal)
+                        )
+                        ?.Id,
+                    existing
+                        .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(x => x.Id)
+                        .Select(x => new GuessingProfileTargetChoice(x.Id, x.Name, x.Slug))
+                        .ToArray()
+                ))
+                .Where(x => x.ExistingTargets.Count > 0)
+                .ToArray(),
+        };
     }
 
     private static async Task<ConfigurationSectionPreview> PreviewPointsAsync(

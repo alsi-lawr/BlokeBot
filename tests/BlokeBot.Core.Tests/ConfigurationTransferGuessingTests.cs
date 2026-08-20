@@ -10,6 +10,92 @@ namespace BlokeBot.Core.Tests;
 public sealed class ConfigurationTransferGuessingTests
 {
     [Test]
+    public async Task Preview_ExplicitMappingWinsBeforeSlugAndRefreshesCountsAndConflicts()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        int automaticId;
+        int mappedId;
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "destination",
+                DisplayName = "Destination",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = seed.Hosts.Add(host);
+            _ = await seed.SaveChangesAsync();
+            hostId = host.Id;
+            var automatic = Profile(hostId, "Imported", "imported", true);
+            var mapped = Profile(hostId, "History target", "history-target", false);
+            mapped.Rounds.Add(
+                new GuessRound
+                {
+                    HostId = hostId,
+                    Status = GuessRoundStatus.Closed,
+                    StartedAtUtc = DateTime.UtcNow.AddHours(-1),
+                    ClosedAtUtc = DateTime.UtcNow,
+                }
+            );
+            seed.Profiles.AddRange(automatic, mapped);
+            _ = await seed.SaveChangesAsync();
+            automaticId = automatic.Id;
+            mappedId = mapped.Id;
+        }
+        var section = new GuessingSectionV1([
+            ImportedProfile("imported-profile", "Imported", "imported", true),
+        ]);
+        var service = new ConfigurationImportPreviewService(database);
+
+        var automaticPreview = await service.PreviewAsync(
+            Document(section),
+            new(
+                hostId,
+                [new(ConfigurationSectionId.Guessing, ImportConflictStrategy.ReplaceSection, [])],
+                new HashSet<HostFeatureFlags>()
+            ),
+            CancellationToken.None
+        );
+        var automaticSection = automaticPreview
+            .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
+            .Preview.Sections.Single();
+        automaticSection.Counts.ShouldBe(new(0, 1, 1, 0));
+        automaticSection.Conflicts.Single().ImportedId.ShouldBe($"target-{mappedId}");
+        var choices = automaticSection.GuessingProfileMappings.Single().ExistingTargets;
+        choices.ShouldContain(x => x.TargetId == automaticId);
+        choices.ShouldContain(x => x.TargetId == mappedId);
+
+        var mappedPreview = await service.PreviewAsync(
+            Document(section),
+            new(
+                hostId,
+                [
+                    new(
+                        ConfigurationSectionId.Guessing,
+                        ImportConflictStrategy.ReplaceSection,
+                        [
+                            new(
+                                "imported-profile",
+                                ImportConflictResolution.Replace,
+                                TargetId: mappedId
+                            ),
+                        ]
+                    ),
+                ],
+                new HashSet<HostFeatureFlags>()
+            ),
+            CancellationToken.None
+        );
+
+        var mappedSection = mappedPreview
+            .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
+            .Preview.Sections.Single();
+        mappedSection.Counts.ShouldBe(new(0, 1, 0, 1));
+        mappedSection.Conflicts.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task Replace_PreservesMappedAndHistoryBoundIdsAndDeletesOnlyUnusedAbsentProfile()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

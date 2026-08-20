@@ -69,7 +69,19 @@ public sealed record ConfigurationSectionPreview(
     ConfigurationPreviewCount Counts,
     IReadOnlyList<ConfigurationValidationIssue> Issues,
     IReadOnlyList<ConfigurationImportConflict> Conflicts
+)
+{
+    public IReadOnlyList<GuessingProfileMappingPreview> GuessingProfileMappings { get; init; } = [];
+}
+
+public sealed record GuessingProfileMappingPreview(
+    string ImportedProfileId,
+    string ImportedProfileName,
+    int? AutomaticTargetId,
+    IReadOnlyList<GuessingProfileTargetChoice> ExistingTargets
 );
+
+public sealed record GuessingProfileTargetChoice(int TargetId, string Name, string Slug);
 
 public sealed record ConfigurationImportPreview(
     Guid PreviewId,

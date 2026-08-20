@@ -51,6 +51,7 @@ public partial class ConfigurationTransferPage
         _importSections.Clear();
         _resolutions.Clear();
         _renames.Clear();
+        _guessingProfileTargets.Clear();
         _enablementSelections.Clear();
         foreach (var section in PresentSections(_document))
         {

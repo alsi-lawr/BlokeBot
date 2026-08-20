@@ -24,12 +24,9 @@ public sealed partial class ConfigurationTransferCoordinator
     private static int Count(ConfigurationDocumentV1 document, ConfigurationSectionId section) =>
         section switch
         {
-            ConfigurationSectionId.CustomCommands => document
-                .Sections
-                .CustomCommands
-                ?.Commands
-                .Count
-                ?? 0,
+            ConfigurationSectionId.CustomCommands => document.Sections.CustomCommands is { } custom
+                ? custom.Replies.Count + custom.Counters.Count + custom.Commands.Count + 1
+                : 0,
             ConfigurationSectionId.Announcements => document.Sections.Announcements?.Items.Count
                 ?? 0,
             ConfigurationSectionId.Guessing => document.Sections.Guessing?.Profiles.Count ?? 0,

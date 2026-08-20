@@ -76,12 +76,12 @@
             <header><span>1</span><div><h2>Add a configuration file</h2><p>Upload a BlokeBot JSON file or paste its contents. Nothing changes until you review and confirm.</p></div></header>
             <FileDropInput Accept=".json,application/json" Label="Configuration file" Disabled="@_busy" OnChange="ReadFileAsync" />
             <div class="configuration-transfer__or"><span>or paste JSON</span></div>
-            <textarea class="form-control min-h-36" aria-label="Configuration JSON" placeholder="Paste a BlokeBot configuration document" @bind="_pastedJson"></textarea>
+            <textarea id="configuration-transfer-json" class="form-control min-h-36" aria-label="Configuration JSON" placeholder="Paste a BlokeBot configuration document" @bind="_pastedJson"></textarea>
             @if (_parseIssue is { } issue)
             {
                 <div class="configuration-transfer__error" role="alert"><strong>@issue.Location</strong><p>@issue.Message</p></div>
             }
-            <footer><span></span><button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_pastedJson))" @onclick="PreviewPastedAsync">Validate and review</button></footer>
+            <footer><span></span><button id="configuration-transfer-preview" class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_pastedJson))" @onclick="PreviewPastedAsync">Validate and review</button></footer>
         </section>
     }
     else
@@ -104,6 +104,24 @@
                             @foreach (var strategy in Enum.GetValues<ImportConflictStrategy>()) { <option value="@strategy">@StrategyTitle(strategy)</option> }
                         </select>
                         @foreach (var issue in section.Issues.Where(_ => _importSections.Contains(section.Section))) { <div class="configuration-transfer__error"><strong>@issue.Location</strong><p>@issue.Message</p></div> }
+                        @if (section.GuessingProfileMappings.Count > 0 && _importSections.Contains(section.Section))
+                        {
+                            <div class="configuration-transfer__profile-mappings">
+                                @foreach (var mapping in section.GuessingProfileMappings)
+                                {
+                                    <div>
+                                        <label for="@GuessingMappingId(mapping)"><strong>@mapping.ImportedProfileName</strong><small>Choose the destination profile for this imported profile.</small></label>
+                                        <select id="@GuessingMappingId(mapping)" value="@GuessingProfileTargetValue(mapping.ImportedProfileId)" @onchange="args => SetGuessingProfileTargetAsync(mapping.ImportedProfileId, args.Value?.ToString())">
+                                            <option value="">@AutomaticTargetTitle(mapping)</option>
+                                            @foreach (var target in mapping.ExistingTargets)
+                                            {
+                                                <option value="@target.TargetId" disabled="@TargetMappedToAnotherProfile(mapping.ImportedProfileId, target.TargetId)">@target.Name (@target.Slug)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                            </div>
+                        }
                         @foreach (var conflict in section.Conflicts.Where(_ => _importSections.Contains(section.Section)))
                         {
                             <div class="configuration-transfer__conflict">
@@ -134,7 +152,7 @@
                 }
             </div>
             @if (_applyIssue is { } applyIssue) { <div class="configuration-transfer__error" role="alert"><strong>Import not applied</strong><p>@applyIssue</p></div> }
-            <footer><button class="btn-secondary" type="button" @onclick="ResetImport">Choose another file</button><button class="btn-primary" type="button" disabled="@(_busy || !_allConflictsResolved)" @onclick="ApplyAsync">Apply selected sections</button></footer>
+            <footer><button class="btn-secondary" type="button" @onclick="ResetImport">Choose another file</button><button id="configuration-transfer-apply" class="btn-primary" type="button" disabled="@(_busy || !_allConflictsResolved)" @onclick="ApplyAsync">Apply selected sections</button></footer>
         </section>
     }
 </DashboardPage>

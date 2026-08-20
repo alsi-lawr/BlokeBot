@@ -109,7 +109,7 @@ public sealed class ConfigurationTransferCoordinatorTests
         audit.OperationId.ShouldBe(applied.OperationId);
         audit.ActorTwitchUserId.ShouldBe("actor-id");
         audit.SummaryJson.ShouldBe(
-            "{\"Sections\":[{\"Id\":\"channelToolEnablement\",\"Count\":1},{\"Id\":\"customCommands\",\"Count\":1},{\"Id\":\"points\",\"Count\":1}]}"
+            "{\"Sections\":[{\"Id\":\"channelToolEnablement\",\"Count\":1},{\"Id\":\"customCommands\",\"Count\":3},{\"Id\":\"points\",\"Count\":1}]}"
         );
         audit.SummaryJson.ShouldNotContain("hello");
         audit.SummaryJson.Length.ShouldBeLessThanOrEqualTo(2048);

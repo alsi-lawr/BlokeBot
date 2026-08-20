@@ -10,10 +10,10 @@ namespace BlokeBot.Core.Tests;
 public sealed class ConfigurationTransferCustomCommandTests
 {
     [Test]
-    [Arguments(ImportConflictStrategy.AddMissing, 1, 0, 1, 0)]
-    [Arguments(ImportConflictStrategy.Merge, 1, 1, 0, 0)]
-    [Arguments(ImportConflictStrategy.ReplaceSection, 1, 1, 0, 0)]
-    public async Task Preview_CommandCountsMatchSelectedConflictStrategy(
+    [Arguments(ImportConflictStrategy.AddMissing, 2, 0, 1, 0)]
+    [Arguments(ImportConflictStrategy.Merge, 2, 1, 0, 0)]
+    [Arguments(ImportConflictStrategy.ReplaceSection, 2, 1, 0, 0)]
+    public async Task Preview_CustomCommandAggregateCountsMatchSelectedConflictStrategy(
         ImportConflictStrategy strategy,
         int add,
         int update,

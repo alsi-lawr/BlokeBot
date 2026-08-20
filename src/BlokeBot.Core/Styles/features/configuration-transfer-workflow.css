@@ -105,6 +105,26 @@
     display: block;
 }
 
+.configuration-transfer__profile-mappings {
+    display: grid;
+    width: 100%;
+    gap: 0.6rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+}
+
+.configuration-transfer__profile-mappings > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.8fr);
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.configuration-transfer__profile-mappings strong,
+.configuration-transfer__profile-mappings small {
+    display: block;
+}
+
 .configuration-transfer__flags {
     display: grid;
     width: 100%;
@@ -251,7 +271,12 @@ html[data-theme="dark"] .configuration-transfer__tabs button[aria-pressed="true"
 
     .configuration-transfer__panel > footer > *,
     .configuration-transfer__conflict select,
-    .configuration-transfer__conflict input {
+    .configuration-transfer__conflict input,
+    .configuration-transfer__profile-mappings select {
         width: 100%;
+    }
+
+    .configuration-transfer__profile-mappings > div {
+        grid-template-columns: 1fr;
     }
 }

@@ -83,6 +83,22 @@ internal static class HostFeatureTransitionStager
         {
             host.AutomationGeneration++;
         }
+        if (Enabled(previous, updated, HostFeatureFlags.CustomCommands))
+        {
+            var announcements = await db
+                .CustomAnnouncements.Where(x => x.HostId == host.Id)
+                .ToArrayAsync(cancellationToken);
+            foreach (var announcement in announcements)
+            {
+                if (
+                    announcement.LastOccurrenceAtUtc is null
+                    || announcement.LastOccurrenceAtUtc < now
+                )
+                {
+                    announcement.LastOccurrenceAtUtc = now;
+                }
+            }
+        }
         host.EnabledFeatures = updated;
     }
 

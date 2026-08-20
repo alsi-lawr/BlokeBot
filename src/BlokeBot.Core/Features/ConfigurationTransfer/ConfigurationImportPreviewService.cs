@@ -28,7 +28,14 @@ public sealed partial class ConfigurationImportPreviewService(
         foreach (var selected in selection.Sections)
         {
             previews.Add(
-                await PreviewSectionAsync(db, host, document, selected, cancellationToken)
+                await PreviewSectionAsync(
+                    db,
+                    host,
+                    document,
+                    selected,
+                    selection,
+                    cancellationToken
+                )
             );
         }
         var enablement = document.Sections.ChannelToolEnablement is { } imported

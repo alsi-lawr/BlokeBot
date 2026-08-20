@@ -23,21 +23,35 @@ public partial class ConfigurationTransferPage
             _enablementSelections
         );
 
-    private IReadOnlyList<ImportItemResolution> ResolutionsFor(ConfigurationSectionId section) =>
-        _preview
-            ?.Sections.SingleOrDefault(x => x.Section == section)
-            ?.Conflicts.Where(x => _resolutions.ContainsKey(ConflictKey(x)))
-            .Select(x => new ImportItemResolution(
-                x.ImportedId,
-                _resolutions[ConflictKey(x)],
-                _renames.GetValueOrDefault(ConflictKey(x)),
-                x.ImportedId.StartsWith("target-", StringComparison.Ordinal)
-                && int.TryParse(x.ImportedId.AsSpan(7), out var id)
-                    ? id
-                    : null
-            ))
-            .ToArray()
-        ?? [];
+    private IReadOnlyList<ImportItemResolution> ResolutionsFor(ConfigurationSectionId section)
+    {
+        var conflicts =
+            _preview
+                ?.Sections.SingleOrDefault(x => x.Section == section)
+                ?.Conflicts.Where(x => _resolutions.ContainsKey(ConflictKey(x)))
+                .Select(x => new ImportItemResolution(
+                    x.ImportedId,
+                    _resolutions[ConflictKey(x)],
+                    _renames.GetValueOrDefault(ConflictKey(x)),
+                    x.ImportedId.StartsWith("target-", StringComparison.Ordinal)
+                    && int.TryParse(x.ImportedId.AsSpan(7), out var id)
+                        ? id
+                        : null
+                ))
+                .ToArray()
+            ?? [];
+        return section == ConfigurationSectionId.Guessing
+            ?
+            [
+                .. conflicts,
+                .. _guessingProfileTargets.Select(x => new ImportItemResolution(
+                    x.Key,
+                    ImportConflictResolution.Replace,
+                    TargetId: x.Value
+                )),
+            ]
+            : conflicts;
+    }
 
     private async Task SetStrategyAsync(ConfigurationSectionId section, string? value)
     {
@@ -61,6 +75,27 @@ public partial class ConfigurationTransferPage
 
     private void SetRename(ConfigurationImportConflict conflict, string? value) =>
         _renames[ConflictKey(conflict)] = value?.Trim() ?? string.Empty;
+
+    private async Task SetGuessingProfileTargetAsync(string importedProfileId, string? value)
+    {
+        if (int.TryParse(value, out var targetId))
+        {
+            _guessingProfileTargets[importedProfileId] = targetId;
+        }
+        else
+        {
+            _ = _guessingProfileTargets.Remove(importedProfileId);
+        }
+        await RefreshPreviewAsync();
+    }
+
+    private string GuessingProfileTargetValue(string importedProfileId) =>
+        _guessingProfileTargets.TryGetValue(importedProfileId, out var targetId)
+            ? targetId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : string.Empty;
+
+    private bool TargetMappedToAnotherProfile(string importedProfileId, int targetId) =>
+        _guessingProfileTargets.Any(x => x.Key != importedProfileId && x.Value == targetId);
 
     private string ResolutionValue(ConfigurationImportConflict conflict) =>
         _resolutions
@@ -114,5 +149,6 @@ public partial class ConfigurationTransferPage
         _applyIssue = null;
         _pastedJson = string.Empty;
         _importSections.Clear();
+        _guessingProfileTargets.Clear();
     }
 }

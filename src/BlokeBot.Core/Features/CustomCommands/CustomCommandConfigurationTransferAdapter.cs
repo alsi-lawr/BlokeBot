@@ -31,15 +31,55 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
         }
 
         var draft = await LoadDraftAsync(db, hostId, cancellationToken);
-        var retainedAnnouncementReplies = announcementSelection is null
-            ? draft
-                .MessageEntries.Where(reply =>
-                    draft.Announcements.Any(announcement =>
-                        announcement.MessageLibraryEntryId == reply.Id
+        var retainedAnnouncementReplies =
+            announcementSelection?.Strategy != ImportConflictStrategy.ReplaceSection
+                ? draft
+                    .MessageEntries.Where(reply =>
+                        draft.Announcements.Any(announcement =>
+                            announcement.MessageLibraryEntryId == reply.Id
+                        )
                     )
-                )
-                .ToArray()
-            : [];
+                    .ToArray()
+                : [];
+        var retainedCommands =
+            customSelection?.Strategy == ImportConflictStrategy.ReplaceSection
+            && document.Sections.CustomCommands is { } replacement
+                ? LoadRetainedCommandsByName(
+                        draft.Commands,
+                        replacement
+                            .Commands.Where(command =>
+                                customSelection.ItemResolutions.Any(resolution =>
+                                    resolution.ImportedId == command.Id
+                                    && resolution.Resolution == ImportConflictResolution.Skip
+                                )
+                            )
+                            .Select(command => command.Name)
+                            .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                    )
+                    .ToArray()
+                : [];
+        var retainedCommandReplyIds = retainedCommands
+            .SelectMany(command =>
+                new[]
+                {
+                    command.Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId,
+                    command.Action.ReplyRoutes.OneArgumentMessageLibraryEntryId,
+                    command.Action.ReplyRoutes.TwoArgumentMessageLibraryEntryId,
+                }
+            )
+            .OfType<int>()
+            .ToHashSet();
+        var retainedCommandCounterIds = retainedCommands
+            .Select(command => command.Action)
+            .OfType<CounterCustomCommandActionEditor>()
+            .Select(action => action.CounterId)
+            .ToHashSet();
+        var retainedCommandReplies = draft
+            .MessageEntries.Where(reply => retainedCommandReplyIds.Contains(reply.Id))
+            .ToArray();
+        var retainedCommandCounters = draft
+            .Counters.Where(counter => retainedCommandCounterIds.Contains(counter.Id))
+            .ToArray();
         var nextId = -1;
         if (customSelection is not null && document.Sections.CustomCommands is { } custom)
         {
@@ -83,27 +123,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
             );
             if (customSelection.Strategy == ImportConflictStrategy.ReplaceSection)
             {
-                var skippedNames = custom
-                    .Commands.Where(command =>
-                        customSelection.ItemResolutions.Any(resolution =>
-                            resolution.ImportedId == command.Id
-                            && resolution.Resolution == ImportConflictResolution.Skip
-                        )
-                    )
-                    .Select(command => command.Name)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                foreach (
-                    var retained in LoadRetainedCommandsByName(
-                        await db
-                            .CustomCommands.AsSplitQuery()
-                            .Include(x => x.Action)
-                            .Include(x => x.Aliases)
-                            .Include(x => x.AllowedUsers)
-                            .Where(x => x.HostId == hostId)
-                            .ToArrayAsync(cancellationToken),
-                        skippedNames
-                    )
-                )
+                foreach (var retained in retainedCommands)
                 {
                     if (draft.Commands.All(x => x.Id != retained.Id))
                     {
@@ -111,11 +131,18 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                     }
                 }
             }
-            foreach (var reply in retainedAnnouncementReplies)
+            foreach (var reply in retainedAnnouncementReplies.Concat(retainedCommandReplies))
             {
                 if (draft.MessageEntries.All(x => x.Id != reply.Id))
                 {
                     draft.MessageEntries.Add(reply);
+                }
+            }
+            foreach (var counter in retainedCommandCounters)
+            {
+                if (draft.Counters.All(x => x.Id != counter.Id))
+                {
+                    draft.Counters.Add(counter);
                 }
             }
         }
@@ -209,77 +236,6 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                     )
             );
     }
-
-    private async Task<CustomCommandConfiguration> LoadDraftAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        CancellationToken cancellationToken
-    )
-    {
-        var replies = await db
-            .CustomMessageLibraryEntries.Include(x => x.Variants)
-            .Where(x => x.HostId == hostId)
-            .ToArrayAsync(cancellationToken);
-        var counters = await db
-            .CustomCounters.Where(x => x.HostId == hostId)
-            .ToArrayAsync(cancellationToken);
-        var commands = await db
-            .CustomCommands.AsSplitQuery()
-            .Include(x => x.Action)
-            .Include(x => x.Aliases)
-            .Include(x => x.AllowedUsers)
-            .Where(x => x.HostId == hostId)
-            .ToArrayAsync(cancellationToken);
-        var announcements = await db
-            .CustomAnnouncements.Include(x => x.Schedule)
-            .Include(x => x.DeliveryPolicy)
-            .Where(x => x.HostId == hostId)
-            .ToArrayAsync(cancellationToken);
-        var timeZone = await db
-            .Hosts.Where(x => x.Id == hostId)
-            .Select(x => x.TimeZoneId)
-            .SingleAsync(cancellationToken);
-        var projectionReference = timeProvider.GetUtcNow();
-        var projectionTimeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-        return new()
-        {
-            TimeZoneId = timeZone,
-            ProjectionReferenceUtc = projectionReference,
-            MessageEntries = replies.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
-            Counters = counters.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
-            Commands = commands.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
-            Announcements = announcements
-                .Select(x =>
-                    CustomCommandConfigurationMapper.ToEditor(
-                        x,
-                        projectionTimeZone,
-                        projectionReference
-                    )
-                )
-                .ToList(),
-        };
-    }
-
-    private static AnnouncementsSectionV1 SelectMissingAnnouncements(
-        CustomCommandConfiguration draft,
-        AnnouncementsSectionV1 imported
-    )
-    {
-        var existingNames = draft
-            .Announcements.Select(x => x.Name)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var items = imported.Items.Where(x => !existingNames.Contains(x.Name)).ToArray();
-        var replyIds = items.Select(x => x.MessageReplyId).ToHashSet(StringComparer.Ordinal);
-        return new(imported.Replies.Where(x => replyIds.Contains(x.Id)).ToArray(), items);
-    }
-
-    private static IEnumerable<CustomCommandEditor> LoadRetainedCommandsByName(
-        IEnumerable<BlokeBot.Persistence.Models.CustomCommand> entities,
-        IReadOnlySet<string> names
-    ) =>
-        entities
-            .Where(command => names.Contains(command.Name))
-            .Select(CustomCommandConfigurationMapper.ToEditor);
 
     private sealed record ImportedCustomCommands(
         List<CustomMessageLibraryEntryEditor> Replies,

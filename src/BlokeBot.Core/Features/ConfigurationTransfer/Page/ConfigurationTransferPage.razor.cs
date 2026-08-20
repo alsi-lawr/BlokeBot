@@ -13,6 +13,7 @@ public partial class ConfigurationTransferPage
     private readonly Dictionary<ConfigurationSectionId, ImportConflictStrategy> _strategies = [];
     private readonly Dictionary<string, ImportConflictResolution> _resolutions = [];
     private readonly Dictionary<string, string> _renames = [];
+    private readonly Dictionary<string, int> _guessingProfileTargets = [];
     private readonly HashSet<HostFeatureFlags> _enablementSelections = [];
     private readonly HashSet<ConfigurationSectionId> _importSections = [];
     private PageLoadState _loadState = new PageLoadState.Loading(
@@ -127,6 +128,16 @@ public partial class ConfigurationTransferPage
 
     private static string ConflictKey(ConfigurationImportConflict x) =>
         $"{x.Section}:{x.ImportedId}";
+
+    private static string GuessingMappingId(GuessingProfileMappingPreview mapping) =>
+        $"guessing-profile-map-{Uri.EscapeDataString(mapping.ImportedProfileId)}";
+
+    private string AutomaticTargetTitle(GuessingProfileMappingPreview mapping) =>
+        mapping.ExistingTargets.SingleOrDefault(x => x.TargetId == mapping.AutomaticTargetId)
+            is { } target
+        && !TargetMappedToAnotherProfile(mapping.ImportedProfileId, target.TargetId)
+            ? $"Automatic: {target.Name} ({target.Slug})"
+            : "Automatic: create a new profile";
 
     private static ConfigurationSectionId? ParseSection(string? value) =>
         value?.ToLowerInvariant() switch

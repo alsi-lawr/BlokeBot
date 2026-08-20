@@ -12,16 +12,18 @@ public sealed partial class ConfigurationImportPreviewService
         BotHost host,
         ConfigurationDocumentV1 document,
         SectionImportSelection selection,
+        ConfigurationImportSelection importSelection,
         CancellationToken cancellationToken
     )
     {
         var preview = selection.Section switch
         {
-            ConfigurationSectionId.CustomCommands => await PreviewCommandsAsync(
+            ConfigurationSectionId.CustomCommands => await PreviewCustomCommandsAsync(
                 db,
                 host.Id,
                 document.Sections.CustomCommands,
                 selection,
+                importSelection,
                 cancellationToken
             ),
             ConfigurationSectionId.Announcements => await PreviewNamesAsync(
