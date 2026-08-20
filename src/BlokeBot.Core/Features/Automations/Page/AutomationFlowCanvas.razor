@@ -23,7 +23,9 @@
          role="region"
          aria-label="Automation flow canvas"
          @ref="_root"
-         data-automation-canvas>
+         data-automation-canvas
+         data-disclosed-node-id="@(DisclosedNodeId?.Value.ToString("D") ?? string.Empty)"
+         data-disclosure-generation="@DisclosureGeneration">
         <div class="automation-canvas-stage-size" style="@_canvasStageStyle">
         <div class="automation-canvas-stage">
             <svg class="automation-edges" viewBox="0 0 @_canvasWidth @_canvasHeight" aria-label="Flow and Data connections">

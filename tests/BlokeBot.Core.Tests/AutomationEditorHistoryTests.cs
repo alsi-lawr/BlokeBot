@@ -347,7 +347,9 @@ public sealed class AutomationEditorHistoryTests
         history.StartLoaded(editor);
         history.IsDirty(editor).ShouldBeFalse();
 
-        transform.RenameTransformInput(declared.PortId, "payout").ShouldBeTrue();
+        transform
+            .RenameTransformInput(declared.PortId, "payout")
+            .ShouldBe(AutomationTransformInputRenameOutcome.Succeeded);
 
         history.Record(editor).ShouldBeTrue();
         history.UndoCount.ShouldBe(1);
@@ -371,6 +373,58 @@ public sealed class AutomationEditorHistoryTests
             .TransformOutputs.Select(static output => output.Source)
             .ShouldBe(["payout + \" value \"", "${payout} value"]);
         history.RedoCount.ShouldBe(0);
+    }
+
+    [Test]
+    public void CelIdentifierRename_InvalidOutputRejectsEveryMutationUntilRepaired()
+    {
+        var transformDefinition = new CoreAutomationCatalogModule()
+            .Definitions.Select(static definition => definition.Descriptor)
+            .Single(static definition => definition.Id == AutomationDefinitionIds.CelTransform);
+        var transform = AutomationEditorNode.Create(transformDefinition, new(new(48), new(72)));
+        var input = transform.TransformInputs.Single();
+        var validOutput = transform.TransformOutputs.Single();
+        transform.AddTransformOutput();
+        var invalidOutput = transform.TransformOutputs.Last();
+        transform.UpdateTransformOutput(
+            validOutput.PortId,
+            validOutput.DisplayName,
+            AutomationPortValueType.Number,
+            AutomationPortNullability.NonNullable,
+            "value + 1"
+        );
+        transform.UpdateTransformOutput(
+            invalidOutput.PortId,
+            invalidOutput.DisplayName,
+            AutomationPortValueType.Number,
+            AutomationPortNullability.NonNullable,
+            "value +"
+        );
+        var beforeIdentifier = input.Identifier;
+        var beforeOutputs = transform
+            .TransformOutputs.Select(static output => output.Source)
+            .ToArray();
+
+        transform
+            .RenameTransformInput(input.PortId, "payout")
+            .ShouldBe(AutomationTransformInputRenameOutcome.InvalidOutput);
+
+        transform.TransformInputs.Single().Identifier.ShouldBe(beforeIdentifier);
+        transform.TransformOutputs.Select(static output => output.Source).ShouldBe(beforeOutputs);
+
+        transform.UpdateTransformOutput(
+            invalidOutput.PortId,
+            invalidOutput.DisplayName,
+            AutomationPortValueType.Number,
+            AutomationPortNullability.NonNullable,
+            "value + 2"
+        );
+        transform
+            .RenameTransformInput(input.PortId, "payout")
+            .ShouldBe(AutomationTransformInputRenameOutcome.Succeeded);
+        transform
+            .TransformOutputs.Select(static output => output.Source)
+            .ShouldBe(["payout + 1", "payout + 2"]);
     }
 
     [Test]
@@ -478,81 +532,17 @@ public sealed class AutomationEditorHistoryTests
         editor.Name = "Unsaved again";
         history.Record(editor).ShouldBeTrue();
         history.IsDirty(editor).ShouldBeTrue();
-        history.Clear();
-
-        history.UndoCount.ShouldBe(0);
-        history.RedoCount.ShouldBe(0);
-        history.HasSavedDraft.ShouldBeFalse();
-        history.Undo(editor).ShouldBeNull();
-        history.Redo(editor).ShouldBeNull();
-    }
-
-    [Test]
-    public void History_UnavailableProviderRecovery_ClearsBothStacksAndSavedDraft()
-    {
-        var editor = AutomationEditorState.Create("Loaded flow");
-        var history = new AutomationEditorHistory();
-        history.StartLoaded(editor);
-        editor.Name = "First change";
-        history.Record(editor).ShouldBeTrue();
-        editor.Name = "Second change";
-        history.Record(editor).ShouldBeTrue();
         editor = history.Undo(editor).ShouldNotBeNull();
-
         history.UndoCount.ShouldBe(1);
         history.RedoCount.ShouldBe(1);
-        history.HasSavedDraft.ShouldBeTrue();
-
         history.Clear();
 
         history.UndoCount.ShouldBe(0);
         history.RedoCount.ShouldBe(0);
-        history.HasSavedDraft.ShouldBeFalse();
+        history.IsDirty(editor).ShouldBeTrue();
         history.Undo(editor).ShouldBeNull();
         history.Redo(editor).ShouldBeNull();
-        history.IsDirty(editor).ShouldBeTrue();
     }
-
-    [Test]
-    public void HistoryActions_UndoAndRedoTransferExactlyOneDiff_WhileUnknownDoesNothing()
-    {
-        var editor = AutomationEditorState.Create("Initial");
-        var history = new AutomationEditorHistory();
-        history.StartNew(editor);
-        editor.Name = "First";
-        history.Record(editor).ShouldBeTrue();
-        editor.Name = "Second";
-        history.Record(editor).ShouldBeTrue();
-
-        editor = ApplyAction(history, editor, "undo");
-        editor.Name.ShouldBe("First");
-        history.UndoCount.ShouldBe(1);
-        history.RedoCount.ShouldBe(1);
-        editor = ApplyAction(history, editor, "redo");
-        editor.Name.ShouldBe("Second");
-        history.UndoCount.ShouldBe(2);
-        history.RedoCount.ShouldBe(0);
-
-        editor = ApplyAction(history, editor, "reload");
-        editor.Name.ShouldBe("Second");
-        history.UndoCount.ShouldBe(2);
-        history.RedoCount.ShouldBe(0);
-        AutomationEditorHistoryShortcut
-            .Parse("reload")
-            .ShouldBe(AutomationEditorHistoryAction.None);
-    }
-
-    private static AutomationEditorState ApplyAction(
-        AutomationEditorHistory history,
-        AutomationEditorState editor,
-        string action
-    ) =>
-        AutomationEditorHistoryShortcut.Parse(action) switch
-        {
-            AutomationEditorHistoryAction.Undo => history.Undo(editor) ?? editor,
-            AutomationEditorHistoryAction.Redo => history.Redo(editor) ?? editor,
-            _ => editor,
-        };
 
     private static AutomationDefinitionDescriptor Definition(
         string id,

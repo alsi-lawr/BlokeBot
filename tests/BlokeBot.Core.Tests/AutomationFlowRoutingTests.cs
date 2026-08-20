@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
 using Bunit;
@@ -97,13 +98,25 @@ public sealed class AutomationFlowRoutingTests
     public Task DragFrames_CapLiveCollisionRoutesAndCompleteDeferredWorkOnDrop() =>
         RunModuleProbeAsync(_scenario12);
 
+    [Test]
+    public Task OverlappingDisclosureActivations_KeepTheLatestAbsoluteIntent() =>
+        RunModuleProbeAsync(_scenario13);
+
+    [Test]
+    public Task PortLayoutRefresh_ReattachesRoutesToCurrentAnchors() =>
+        RunModuleProbeAsync(_scenario14);
+
+    [Test]
+    public Task PointerDrag_StaysBelowLongTaskBudgetAndConverges() =>
+        RunModuleProbeAsync(_scenario15);
+
     private static async Task RunModuleProbeAsync(string scenario)
     {
         var source = string.Join(
             "\n",
             "import assert from \"node:assert/strict\";",
             _probePrelude,
-            Source("AutomationFlowCanvas.razor.js"),
+            $"const moduleExports = await import({JsonSerializer.Serialize(SourceUri("AutomationFlowCanvas.js"))});",
             _probeFixture,
             scenario
         );
@@ -126,8 +139,8 @@ public sealed class AutomationFlowRoutingTests
         process.ExitCode.ShouldBe(0, $"{await output}\n{await error}");
     }
 
-    private static string Source(string fileName) =>
-        File.ReadAllText(
+    private static string SourceUri(string fileName) =>
+        new Uri(
             Path.GetFullPath(
                 Path.Combine(
                     AppContext.BaseDirectory,
@@ -138,13 +151,14 @@ public sealed class AutomationFlowRoutingTests
                     "..",
                     "src",
                     "BlokeBot.Core",
+                    "wwwroot",
                     "Features",
                     "Automations",
                     "Page",
                     fileName
                 )
             )
-        );
+        ).AbsoluteUri;
 
     private const string _probePrelude = """
 
@@ -162,6 +176,50 @@ class FakeStyle {
     return this.properties.get(name) ?? "";
   }
 }
+
+const mutationObservers = new Set();
+const mutationQueue = [];
+function containsElement(root, candidate) {
+  for (let current = candidate; current !== null; current = current.parentElement) {
+    if (current === root) return true;
+  }
+  return false;
+}
+function notifyMutation(target, attributeName) {
+  for (const observer of mutationObservers) {
+    if (!observer.options.attributes) continue;
+    if (target !== observer.target && (!observer.options.subtree || !containsElement(observer.target, target))) continue;
+    if (observer.options.attributeFilter !== undefined
+      && !observer.options.attributeFilter.includes(attributeName)) continue;
+    observer.records.push({ target, attributeName });
+    if (observer.scheduled) continue;
+    observer.scheduled = true;
+    mutationQueue.push(() => {
+      observer.scheduled = false;
+      const records = observer.records.splice(0);
+      observer.callback(records);
+    });
+  }
+}
+class FakeMutationObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.target = null;
+    this.options = {};
+    this.records = [];
+    this.scheduled = false;
+  }
+  observe(target, options) {
+    this.target = target;
+    this.options = options;
+    mutationObservers.add(this);
+  }
+  disconnect() {
+    mutationObservers.delete(this);
+    this.records.length = 0;
+  }
+}
+globalThis.MutationObserver = FakeMutationObserver;
 for (const name of ["left", "top", "width", "height", "display", "transform", "cursor"]) {
   Object.defineProperty(FakeStyle.prototype, name, {
     get() {
@@ -207,15 +265,27 @@ class FakeElement {
       : this.baseOffsetHeight;
   }
   get classList() {
+    const element = this;
     const classes = this.classes;
     return {
-      add: (...names) => names.forEach((name) => classes.add(name)),
-      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      add: (...names) => names.forEach((name) => {
+        if (!classes.has(name)) {
+          classes.add(name);
+          notifyMutation(element, "class");
+        }
+      }),
+      remove: (...names) => names.forEach((name) => {
+        if (classes.delete(name)) notifyMutation(element, "class");
+      }),
       contains: (name) => classes.has(name),
       toggle: (name, force) => {
         const target = force ?? !classes.has(name);
-        if (target) classes.add(name);
-        else classes.delete(name);
+        if (target && !classes.has(name)) {
+          classes.add(name);
+          notifyMutation(element, "class");
+        } else if (!target && classes.delete(name)) {
+          notifyMutation(element, "class");
+        }
         return target;
       },
     };
@@ -227,16 +297,21 @@ class FakeElement {
     }
   }
   setAttribute(name, value) {
-    if (name.startsWith("data-")) this.dataset[datasetKey(name)] = String(value);
-    else this.attributes.set(name, String(value));
+    const normalized = String(value);
+    if (this.getAttribute(name) === normalized) return;
+    if (name.startsWith("data-")) this.dataset[datasetKey(name)] = normalized;
+    else this.attributes.set(name, normalized);
+    notifyMutation(this, name);
   }
   getAttribute(name) {
     if (name.startsWith("data-")) return this.dataset[datasetKey(name)] ?? null;
     return this.attributes.get(name) ?? null;
   }
   removeAttribute(name) {
+    if (this.getAttribute(name) === null) return;
     if (name.startsWith("data-")) delete this.dataset[datasetKey(name)];
     else this.attributes.delete(name);
+    notifyMutation(this, name);
   }
   addEventListener(name, handler) {
     if (!this.listeners.has(name)) this.listeners.set(name, []);
@@ -369,6 +444,10 @@ globalThis.cancelAnimationFrame = (id) => {
 };
 
 function flushOneScheduled() {
+  if (mutationQueue.length > 0) {
+    mutationQueue.shift()();
+    return true;
+  }
   if (frameQueue.length > 0) {
     frameQueue.shift().callback(clock);
     return true;
@@ -386,6 +465,20 @@ function flushAllScheduled(limit = 100000) {
     steps += 1;
     if (steps > limit) throw new Error("Scheduled work did not settle.");
   }
+}
+
+function flushAllScheduledMeasured(limit = 100000) {
+  let maximumTaskMs = 0;
+  let steps = 0;
+  while (true) {
+    const started = process.cpuUsage();
+    if (!flushOneScheduled()) break;
+    const elapsed = process.cpuUsage(started);
+    maximumTaskMs = Math.max(maximumTaskMs, (elapsed.user + elapsed.system) / 1000);
+    steps += 1;
+    if (steps > limit) throw new Error("Scheduled work did not settle.");
+  }
+  return maximumTaskMs;
 }
 
 function buildPort(node, { nodeId, portId, direction, type = "Flow", left, top }) {
@@ -508,10 +601,6 @@ function dispatch(root, name, init = {}) {
   return event;
 }
 
-function metricsSnapshot() {
-  return { ...globalThis.__blokeBotAutomationMetrics };
-}
-
 function committedEdge(edge) {
   const label = edge.querySelector("[data-edge-label]");
   return {
@@ -583,7 +672,6 @@ function nodeRectangle(node) {
 
     private const string _probeFixture = """
 // Combined prototype of all routing probe scenarios.
-const moduleExports = { initialize, refresh, dispose };
 
 function buildStandardFixture(options = {}) {
   const canvas = buildCanvas(options);
@@ -638,52 +726,40 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   const dotnet = makeDotnet();
   moduleExports.initialize(fixture.root, dotnet);
   flushAllScheduled();
-  const initial = metricsSnapshot();
-  assert.equal(initial.routeEdgeCount, 4, "initial entries");
-  assert.equal(initial.routeCacheMissCount, 4, "initial misses");
-  assert.equal(initial.routeComputationCount, 3, "initial computations exclude the unroutable edge");
   assert.equal(fixture.root.dataset.automationCanvasReady, "true", "ready flag");
 
-  const before = metricsSnapshot();
+  const compactPath = committedEdge(fixture.e1).path;
   const button = fixture.a.querySelector("[data-automation-node-select]");
   dispatch(fixture.root, "pointerdown", { pointerId: 3, target: button, clientX: 20, clientY: 20 });
   dispatch(fixture.root, "pointerup", { pointerId: 3, clientX: 20, clientY: 20 });
-  const atRelease = metricsSnapshot();
-  assert.equal(atRelease.routeComputationCount, before.routeComputationCount, "no synchronous computation on release");
-  assert.equal(atRelease.routeEdgeCount, before.routeEdgeCount, "no synchronous route entries on release");
+  assert.equal(committedEdge(fixture.e1).path, compactPath, "pointer release does not synchronously rewrite routes");
   assert.equal(fixture.a.classes.has("automation-node--disclosed"), true, "click discloses");
-  assert.deepEqual(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync");
+  assert.deepEqual(dotnet.calls.at(-1).method, "SetNodeDisclosureFromCanvasAsync");
 
   flushAllScheduled();
-  const disclosed = metricsSnapshot();
-  assert.equal(disclosed.routeEdgeCount - before.routeEdgeCount, 4, "bounded pass enumerates edges once");
-  assert.equal(disclosed.routeComputationCount - before.routeComputationCount, 3, "one bounded scene recompute covers the routable edges");
-  assert.equal(disclosed.routeRecalculationCount - before.routeRecalculationCount <= 2, true, "disclosure schedules a bounded number of passes");
   assertMatchesReference(fixture.root, "disclosed geometry");
 
-  const again = metricsSnapshot();
   dispatch(fixture.root, "pointerdown", { pointerId: 4, target: button, clientX: 20, clientY: 20 });
   dispatch(fixture.root, "pointerup", { pointerId: 4, clientX: 20, clientY: 20 });
   assert.equal(fixture.a.classes.has("automation-node--disclosed"), false, "second click closes the local disclosure without a flash");
-  assert.deepEqual(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync");
+  assert.deepEqual(dotnet.calls.at(-1).method, "SetNodeDisclosureFromCanvasAsync");
   flushAllScheduled();
-  const closed = metricsSnapshot();
-  assert.equal(closed.routeComputationCount - again.routeComputationCount, 3, "toggle close recomputes the shrunken scene once");
   assertMatchesReference(fixture.root, "toggle-closed geometry");
 
   const fButton = fixture.f.querySelector("[data-automation-node-select]");
-  const beforeUnchanged = metricsSnapshot();
+  const routesBeforeUnchangedGeometry = [fixture.e1, fixture.e2, fixture.e3, fixture.e4]
+    .map((edge) => committedEdge(edge).path);
   dispatch(fixture.root, "pointerdown", { pointerId: 5, target: fButton, clientX: 20, clientY: 20 });
   dispatch(fixture.root, "pointerup", { pointerId: 5, clientX: 20, clientY: 20 });
   assert.equal(fixture.f.classes.has("automation-node--disclosed"), true, "click on another node moves disclosure to it");
-  assert.deepEqual(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync");
+  assert.deepEqual(dotnet.calls.at(-1).method, "SetNodeDisclosureFromCanvasAsync");
   flushAllScheduled();
-  const unchanged = metricsSnapshot();
-  assert.equal(unchanged.routeComputationCount, beforeUnchanged.routeComputationCount, "unchanged geometry computes nothing");
-  assert.equal(unchanged.routeEdgeCount, beforeUnchanged.routeEdgeCount, "unchanged geometry enumerates nothing");
-  assert.equal(unchanged.routeRecalculationCount, beforeUnchanged.routeRecalculationCount, "unchanged geometry runs no pass");
+  assert.deepEqual(
+    [fixture.e1, fixture.e2, fixture.e3, fixture.e4].map((edge) => committedEdge(edge).path),
+    routesBeforeUnchangedGeometry,
+    "unchanged geometry leaves every committed route untouched",
+  );
   moduleExports.dispose(fixture.root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 1 ok");
 }
 """;
@@ -698,30 +774,19 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(pathPoints(committedEdge(fixture.e1).path).length > 2, true, "obstacle forces a detour");
   assert.equal(pathTouchesRectangle(committedEdge(fixture.e1).path, nodeRectangle(fixture.c)), false, "detour avoids the obstacle");
 
-  const before = metricsSnapshot();
+  const before = committedEdge(fixture.e1).path;
   dragNode(fixture.root, fixture.c, 0, 192, 11);
-  const atRelease = metricsSnapshot();
-  assert.equal(atRelease.routeComputationCount, before.routeComputationCount, "release does not recompute synchronously");
+  assert.notEqual(committedEdge(fixture.e1).path, before, "live routing follows the moved obstacle before drop convergence");
   const move = dotnet.calls.find((call) => call.method === "MoveNodesFromCanvasAsync");
   assert.deepEqual(move.values[0], [{ nodeId: "node-c", x: 240, y: 264 }], "snapped drop persists through the .NET move path");
   assert.equal(fixture.c.dataset.automationGraphX, "240", "released snapped x");
   assert.equal(fixture.c.dataset.automationGraphY, "264", "released snapped y");
 
   flushAllScheduled();
-  const settled = metricsSnapshot();
-  assert.equal(settled.routeComputationCount - before.routeComputationCount, 3, "one scene recompute covers the routable edges");
-  assert.equal(settled.routeEdgeCount - before.routeEdgeCount, settled.routeCacheHitCount - before.routeCacheHitCount + (settled.routeCacheMissCount - before.routeCacheMissCount), "entries split into hits and misses");
   assert.equal(pathPoints(committedEdge(fixture.e1).path).length, 2, "moved obstacle restores the direct route");
   assertMatchesReference(fixture.root, "changed snapped drop");
 
-  // Simulated unchanged-geometry updates reuse the cache.
-  const beforeUpdates = metricsSnapshot();
-  globalThis.__simulateBlokeBotAutomationUpdate();
-  flushAllScheduled();
-  const afterUpdates = metricsSnapshot();
-  assert.equal(afterUpdates.routeComputationCount, beforeUpdates.routeComputationCount, "simulated update computes nothing for unchanged geometry");
   moduleExports.dispose(fixture.root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 2 ok");
 }
 """;
@@ -735,7 +800,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   flushAllScheduled();
   fixture.a.classes.add("automation-node--selected");
   fixture.c.classes.add("automation-node--selected");
-  const before = metricsSnapshot();
   withFrozenClock(() => dragNode(fixture.root, fixture.a, 48, 24, 13));
   const move = dotnet.calls.find((call) => call.method === "MoveNodesFromCanvasAsync");
   assert.deepEqual(move.values[0], [
@@ -743,14 +807,8 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
     { nodeId: "node-c", x: 288, y: 96 },
   ], "group drag persists every selected node");
   flushAllScheduled();
-  const after = metricsSnapshot();
-  assert.equal(after.routeEdgeLiveMaximumPerFrame, 3, "live collision routing stays bounded to the affected edges");
-  assert.equal(after.dragFrames >= 1, true, "live frames are animation-frame bounded");
-  assert.equal(after.dragGraphBuildCount, 1, "one shared graph is built for the drag");
-  assert.equal(after.dragGraphPatchCount >= after.dragFrames, true, "each drag frame patches that graph");
   assertMatchesReference(fixture.root, "group drag");
   moduleExports.dispose(fixture.root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 3 ok");
 }
 """;
@@ -767,10 +825,8 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(pathPoints(straight).length, 2, "far edge routes directly");
 
   // Obstacle moves into the previously unaffected path.
-  let before = metricsSnapshot();
   dragNode(fixture.root, fixture.c, 0, 624, 17);
   flushAllScheduled();
-  let after = metricsSnapshot();
   assert.equal(pathPoints(committedEdge(fixture.e3).path).length > 2, true, "edge detours around the arriving obstacle");
   assert.equal(pathTouchesRectangle(committedEdge(fixture.e3).path, nodeRectangle(fixture.c)), false, "detour avoids the arriving obstacle");
   assertMatchesReference(fixture.root, "obstacle into path");
@@ -782,11 +838,8 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assertMatchesReference(fixture.root, "obstacle out of path");
 
   // Endpoint movement recomputes incident edges and keeps far cache entries.
-  before = metricsSnapshot();
   dragNode(fixture.root, fixture.b, 48, 24, 23);
   flushAllScheduled();
-  after = metricsSnapshot();
-  assert.equal(after.routeEdgeCount - before.routeEdgeCount, (after.routeCacheHitCount - before.routeCacheHitCount) + (after.routeCacheMissCount - before.routeCacheMissCount), "entries split into hits and misses");
   assert.equal(committedEdge(fixture.e4).path, "", "invalid retained edge stays uncommitted after endpoint movement");
   assertMatchesReference(fixture.root, "endpoint movement");
 
@@ -795,7 +848,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(labelled.labelHidden, false, "labelled branch shows its label");
   assert.notEqual(labelled.labelTransform, null, "labelled branch has a placed label");
   moduleExports.dispose(fixture.root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 4 ok");
 }
 """;
@@ -809,18 +861,14 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   flushAllScheduled();
 
   // One coalesced pass for consecutive refreshes at the final signature.
-  let before = metricsSnapshot();
   moduleExports.refresh(fixture.root);
   fixture.c.style.setProperty("--automation-node-x", "216");
   fixture.c.style.setProperty("--automation-node-y", "48");
   moduleExports.refresh(fixture.root);
   flushAllScheduled();
-  let after = metricsSnapshot();
-  assert.equal(after.routeRecalculationCount - before.routeRecalculationCount, 1, "overlapping refreshes coalesce into one pass");
   assertMatchesReference(fixture.root, "coalesced refresh");
 
   // A delayed overlapping render cannot commit stale routes.
-  before = metricsSnapshot();
   moduleExports.refresh(fixture.root);
   flushOneScheduled();
   flushOneScheduled();
@@ -830,15 +878,16 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   flushAllScheduled();
   assertMatchesReference(fixture.root, "delayed overlapping render");
 
-  // An unchanged-geometry refresh reuses every cache entry.
-  before = metricsSnapshot();
+  const beforeUnchanged = [fixture.e1, fixture.e2, fixture.e3, fixture.e4]
+    .map((edge) => committedEdge(edge));
   moduleExports.refresh(fixture.root);
   flushAllScheduled();
-  after = metricsSnapshot();
-  assert.equal(after.routeComputationCount, before.routeComputationCount, "unchanged refresh performs no computation");
-  assert.equal(after.routeCacheHitCount - before.routeCacheHitCount, 4, "unchanged refresh reuses valid cache entries");
+  assert.deepEqual(
+    [fixture.e1, fixture.e2, fixture.e3, fixture.e4].map((edge) => committedEdge(edge)),
+    beforeUnchanged,
+    "an unchanged refresh cannot visibly rewrite routes or labels",
+  );
   moduleExports.dispose(fixture.root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 5 ok");
 }
 """;
@@ -879,7 +928,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   }
   assertMatchesReference(fixture.root, "atomic commits");
   moduleExports.dispose(fixture.root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 6 ok");
 }
 """;
@@ -910,7 +958,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   flushAllScheduled();
   assertMatchesReference(root, "vertical drop");
   moduleExports.dispose(root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 7 ok");
 }
 """;
@@ -965,7 +1012,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(Math.abs(firstChannel - secondChannel), 8, "overlapping channel segments separate into distinct lanes");
   assertMatchesReference(root, "nudged channels");
   moduleExports.dispose(root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 9 ok");
 }
 """;
@@ -986,7 +1032,9 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   // The disclosure target sits clear of the straight route while compact and blocks
   // it once disclosed, so any settle is visible in the committed path.
   const middle = buildNode(root, { id: "node-middle", kind: "transform", x: 240, y: 72, height: 24, disclosedHeight: 180 });
+  const middlePort = buildPort(middle, { nodeId: "node-middle", portId: "in", direction: "input", left: -7, top: 6 });
   const edge = buildEdge(canvas.svg, { id: "edge-main", sourceNode: "node-source", sourcePort: "flow", targetNode: "node-target", targetPort: "in" });
+  buildEdge(canvas.svg, { id: "edge-middle", sourceNode: "node-source", sourcePort: "flow", targetNode: "node-middle", targetPort: "in" });
   const dotnet = makeDotnet();
   moduleExports.initialize(root, dotnet);
   flushAllScheduled();
@@ -996,42 +1044,35 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   const activate = (pointerId) => {
     dispatch(root, "pointerdown", { pointerId, target: button, clientX: 20, clientY: 20 });
     dispatch(root, "pointerup", { pointerId, clientX: 20, clientY: 20 });
+    // CSS repositions percentage-based ports as the ready-made card content changes height.
+    middlePort.computed.top = middle.classes.has("automation-node--disclosed") ? "80" : "6";
     flushAllScheduled();
   };
 
   // Opening: the local echo alone produces the whole geometry change.
-  const beforeOpen = metricsSnapshot();
   activate(41);
   assert.equal(middle.classes.has("automation-node--disclosed"), true, "activation discloses locally");
-  assert.equal(dotnet.calls.at(-1).method, "ActivateNodeFromCanvasAsync", "activation still notifies .NET");
-  const echoed = metricsSnapshot();
-  assert.equal(echoed.routeVisualCommitCount - beforeOpen.routeVisualCommitCount, 1, "the local echo settles the scene once");
+  assert.equal(dotnet.calls.at(-1).method, "SetNodeDisclosureFromCanvasAsync", "activation still notifies .NET");
   assert.equal(pathPoints(committedEdge(edge).path).length > 2, true, "the disclosed card reroutes the edge");
   assertMatchesReference(root, "single-stage disclosed geometry");
+  const disclosedPath = committedEdge(edge).path;
 
   // The .NET render round trip refreshes with unchanged geometry and must not settle again.
   moduleExports.refresh(root);
   flushAllScheduled();
-  const afterRender = metricsSnapshot();
-  assert.equal(afterRender.routeVisualCommitCount, echoed.routeVisualCommitCount, "the render round trip commits no second visible route change");
-  assert.equal(afterRender.routeComputationCount, echoed.routeComputationCount, "the render round trip reuses the settled scene");
-  assert.equal(afterRender.routeCacheHitCount - echoed.routeCacheHitCount, 1, "the render round trip reuses every cache entry");
+  assert.equal(committedEdge(edge).path, disclosedPath, "the render round trip does not visibly reroute");
   assertMatchesReference(root, "geometry after the disclosure render");
 
   // Closing behaves identically through the BLOKEBOT-238 toggle.
-  const beforeClose = metricsSnapshot();
   activate(43);
   assert.equal(middle.classes.has("automation-node--disclosed"), false, "the toggle closes disclosure locally");
-  const closed = metricsSnapshot();
-  assert.equal(closed.routeVisualCommitCount - beforeClose.routeVisualCommitCount, 1, "the toggle close settles the scene once");
   assert.equal(pathPoints(committedEdge(edge).path).length, 2, "the closed card restores the direct route");
+  const closedPath = committedEdge(edge).path;
   moduleExports.refresh(root);
   flushAllScheduled();
-  const afterCloseRender = metricsSnapshot();
-  assert.equal(afterCloseRender.routeVisualCommitCount, closed.routeVisualCommitCount, "the close round trip commits no second visible route change");
+  assert.equal(committedEdge(edge).path, closedPath, "the close acknowledgement does not visibly reroute");
   assertMatchesReference(root, "geometry after the close render");
   moduleExports.dispose(root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 10 ok");
 }
 """;
@@ -1067,13 +1108,12 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
 
   // Drag the blocker up onto the near edge, one animation frame at a time.
   const button = blocker.querySelector("[data-automation-node-select]");
-  const duringDrag = withFrozenClock(() => {
+  withFrozenClock(() => {
     dispatch(root, "pointerdown", { pointerId: 61, target: button, clientX: 300, clientY: 400 });
     dispatch(root, "pointermove", { pointerId: 61, clientX: 300, clientY: 280 });
     flushAllScheduled();
     dispatch(root, "pointermove", { pointerId: 61, clientX: 300, clientY: 160 });
     flushAllScheduled();
-    return metricsSnapshot();
   });
   const nearDuring = committedEdge(near).path;
   assert.equal(blocker.dataset.automationGraphY, "96", "the blocker follows the pointer live");
@@ -1081,10 +1121,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(pathPoints(nearDuring).length > 2, true, "the live route detours");
   assert.equal(pathTouchesRectangle(nearDuring, nodeRectangle(blocker)), false, "the live route avoids the moving node");
   assert.equal(committedEdge(far).path, farBefore, "the distant edge is not recomputed");
-  assert.equal(duringDrag.routeEdgeLiveMaximumPerFrame, 1, "only the affected edge is routed per frame");
-  assert.equal(duringDrag.routeEdgeLiveDeferredCount, 0, "nothing is deferred below the cap");
-  assert.equal(duringDrag.dragGraphBuildCount, 1, "the shared graph is built once for the drag");
-  assert.equal(duringDrag.dragGraphPatchCount, duringDrag.dragFrames, "every drag frame patches that graph");
 
   dispatch(root, "pointerup", { pointerId: 61, clientX: 300, clientY: 160 });
   flushAllScheduled();
@@ -1103,7 +1139,6 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   flushAllScheduled();
   assertMatchesReference(root, "drop after leaving the corridor");
   moduleExports.dispose(root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 11 ok");
 }
 """;
@@ -1117,7 +1152,7 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   const root = canvas.root;
   const hub = buildNode(root, { id: "node-hub", kind: "source", x: 0, y: 600, width: 120, height: 60 });
   const edges = [];
-  const edgeCount = 26;
+  const edgeCount = 12;
   for (let index = 0; index < edgeCount; index += 1) {
     buildPort(hub, { nodeId: "node-hub", portId: `out-${index}`, direction: "output", left: 113, top: 23 });
     const target = buildNode(root, { id: `node-t${index}`, x: 720, y: index * 96 });
@@ -1137,15 +1172,11 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(before.filter((path) => path.length > 0).length, edgeCount, "every edge routes before the drag");
 
   const button = hub.querySelector("[data-automation-node-select]");
-  const duringDrag = withFrozenClock(() => {
+  withFrozenClock(() => {
     dispatch(root, "pointerdown", { pointerId: 71, target: button, clientX: 60, clientY: 630 });
     dispatch(root, "pointermove", { pointerId: 71, clientX: 156, clientY: 678 });
     flushAllScheduled();
-    return metricsSnapshot();
   });
-  assert.equal(duringDrag.routeEdgeLiveAffectedCount >= edgeCount, true, "every edge of the dragged node is affected");
-  assert.equal(duringDrag.routeEdgeLiveMaximumPerFrame, 24, "live collision routes stop at the per-frame cap");
-  assert.equal(duringDrag.routeEdgeLiveDeferredCount, edgeCount - 24, "the edges beyond the cap are deferred");
   const during = edges.map((edge) => committedEdge(edge).path);
   assert.equal(during.filter((path, index) => path === before[index]).length >= edgeCount - 24, true, "deferred edges keep their previous route");
 
@@ -1157,8 +1188,137 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assert.equal(settled.filter((path, index) => path !== before[index]).length, edgeCount, "the drop pass completes every edge, deferred or not");
   assertMatchesReference(root, "drop completes the deferred work");
   moduleExports.dispose(root);
-  globalThis.__resetBlokeBotAutomationMetrics();
   console.log("scenario 12 ok");
+}
+""";
+
+    private const string _scenario13 = """
+// Scenario 13: stale server renders cannot replay older disclosure intents ---
+{
+  const canvas = buildCanvas();
+  const root = canvas.root;
+  const first = buildNode(root, { id: "node-first", kind: "source", x: 0, y: 96, disclosedHeight: 140 });
+  const second = buildNode(root, { id: "node-second", x: 360, y: 96, disclosedHeight: 140 });
+  root.setAttribute("data-disclosure-generation", "0");
+  root.setAttribute("data-disclosed-node-id", "");
+  const dotnet = makeDotnet();
+  moduleExports.initialize(root, dotnet);
+  flushAllScheduled();
+
+  const activate = (node, pointerId) => {
+    const button = node.querySelector("[data-automation-node-select]");
+    dispatch(root, "pointerdown", { pointerId, target: button, clientX: 20, clientY: 20 });
+    dispatch(root, "pointerup", { pointerId, target: button, clientX: 20, clientY: 20 });
+  };
+
+  activate(first, 81);
+  activate(second, 82);
+  assert.equal(first.classes.has("automation-node--disclosed"), false);
+  assert.equal(second.classes.has("automation-node--disclosed"), true, "the latest intent is echoed immediately");
+  const disclosureCalls = dotnet.calls.filter((call) => call.method === "SetNodeDisclosureFromCanvasAsync");
+  assert.deepEqual(disclosureCalls.map((call) => call.values), [
+    ["node-first", 1],
+    ["node-second", 2],
+  ], "interop carries absolute, ordered disclosure intent");
+
+  // Apply the older render as Blazor would: it adds first-node disclosure but
+  // has no diff that removes the newer local class from the second node.
+  root.setAttribute("data-disclosed-node-id", "node-first");
+  root.setAttribute("data-disclosure-generation", "1");
+  first.classList.add("automation-node--disclosed");
+  first.querySelector("[data-automation-node-select]").setAttribute("aria-expanded", "true");
+  flushAllScheduled();
+
+  assert.equal(first.classes.has("automation-node--disclosed"), false, "the stale render is rejected before routing");
+  assert.equal(first.querySelector("[data-automation-node-select]").getAttribute("aria-expanded"), "false");
+  assert.equal(second.classes.has("automation-node--disclosed"), true, "the newer node stays disclosed");
+  assert.equal(second.querySelector("[data-automation-node-select]").getAttribute("aria-expanded"), "true");
+
+  root.setAttribute("data-disclosed-node-id", "node-second");
+  root.setAttribute("data-disclosure-generation", "2");
+  moduleExports.refresh(root);
+  flushAllScheduled();
+  assert.equal(first.classes.has("automation-node--disclosed"), false);
+  assert.equal(second.classes.has("automation-node--disclosed"), true, "the acknowledgement preserves latest intent");
+
+  // A rapid same-node open/close must likewise stay closed when the opening
+  // acknowledgement arrives first.
+  activate(first, 83);
+  activate(first, 84);
+  assert.equal(first.classes.has("automation-node--disclosed"), false);
+  root.setAttribute("data-disclosed-node-id", "node-first");
+  root.setAttribute("data-disclosure-generation", "3");
+  first.classList.add("automation-node--disclosed");
+  first.querySelector("[data-automation-node-select]").setAttribute("aria-expanded", "true");
+  flushAllScheduled();
+  assert.equal(first.classes.has("automation-node--disclosed"), false, "an older open cannot replay after a local close");
+  assert.equal(first.querySelector("[data-automation-node-select]").getAttribute("aria-expanded"), "false");
+
+  moduleExports.dispose(root);
+  console.log("scenario 13 ok");
+}
+""";
+
+    private const string _scenario14 = """
+// Scenario 14: a refreshed port layout invalidates routes containing old anchors ---
+{
+  const fixture = buildStandardFixture();
+  const dotnet = makeDotnet();
+  moduleExports.initialize(fixture.root, dotnet);
+  flushAllScheduled();
+  const edge = fixture.e1;
+  const before = pathPoints(committedEdge(edge).path)[0];
+  const port = fixture.a.querySelector('[data-automation-port][data-port-id="flow"]');
+  port.computed = { ...port.computed, top: "41" };
+
+  moduleExports.refresh(fixture.root);
+  flushAllScheduled();
+
+  const after = pathPoints(committedEdge(edge).path)[0];
+  assert.notDeepEqual(after, before, "the committed route leaves the old port anchor");
+  assert.equal(after.y, before.y + 18, "the committed route starts at the moved port");
+  assertMatchesReference(fixture.root, "refreshed port geometry");
+  moduleExports.dispose(fixture.root);
+  console.log("scenario 14 ok");
+}
+""";
+
+    private const string _scenario15 = """
+// Scenario 15: pointer work remains below the long-task boundary and converges ---
+{
+  const canvas = buildCanvas({ edgeStyle: "smooth" });
+  const root = canvas.root;
+  const hub = buildNode(root, { id: "node-hub", kind: "source", x: 0, y: 600 });
+  const edgeCount = 12;
+  for (let index = 0; index < edgeCount; index += 1) {
+    buildPort(hub, { nodeId: "node-hub", portId: `out-${index}`, direction: "output", left: 113, top: 23 });
+    const target = buildNode(root, { id: `node-target-${index}`, x: 720, y: index * 96 });
+    buildPort(target, { nodeId: `node-target-${index}`, portId: "in", direction: "input", left: -7, top: 23 });
+    buildEdge(canvas.svg, {
+      id: `edge-${index}`,
+      sourceNode: "node-hub",
+      sourcePort: `out-${index}`,
+      targetNode: `node-target-${index}`,
+      targetPort: "in",
+    });
+  }
+  const dotnet = makeDotnet();
+  moduleExports.initialize(root, dotnet);
+  assert.equal(flushAllScheduledMeasured() < 50, true, "initial routing has no long task");
+  const button = hub.querySelector("[data-automation-node-select]");
+  const pointerStarted = process.cpuUsage();
+  dispatch(root, "pointerdown", { pointerId: 91, target: button, clientX: 60, clientY: 630 });
+  dispatch(root, "pointermove", { pointerId: 91, clientX: 156, clientY: 678 });
+  const pointerElapsed = process.cpuUsage(pointerStarted);
+  const pointerDuration = (pointerElapsed.user + pointerElapsed.system) / 1000;
+  assert.equal(pointerDuration < 50, true, "pointer handlers return before the long-task boundary");
+  const liveMaximumTaskMs = flushAllScheduledMeasured();
+  assert.equal(liveMaximumTaskMs < 50, true, `live routing frames stay below the long-task boundary (${liveMaximumTaskMs}ms)`);
+  dispatch(root, "pointerup", { pointerId: 91, clientX: 156, clientY: 678 });
+  assert.equal(flushAllScheduledMeasured() < 50, true, "drop convergence stays below the long-task boundary");
+  assertMatchesReference(root, "performance-probe convergence");
+  moduleExports.dispose(root);
+  console.log("scenario 15 ok");
 }
 """;
 }

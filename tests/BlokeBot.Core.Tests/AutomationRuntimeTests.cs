@@ -2294,7 +2294,9 @@ public sealed class AutomationRuntimeTests
             .Definition;
         var editorNode = AutomationEditorNode.Restore(persisted, descriptor);
 
-        editorNode.RenameTransformInput(new("amount-input"), "payout").ShouldBeTrue();
+        editorNode
+            .RenameTransformInput(new("amount-input"), "payout")
+            .ShouldBe(AutomationTransformInputRenameOutcome.Succeeded);
 
         var renamed = editorNode.Draft();
         _ = (
@@ -2561,22 +2563,8 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public void CelTransform_ArgumentsDescriptorPreservesOrderClassificationAndStaticProvenance()
+    public void CelTransform_ArgumentsPreserveOrderClassificationAndStaticProvenance()
     {
-        var descriptor = AutomationSafeTriggerView.Descriptor;
-        descriptor.Version.ShouldBe(AutomationSafeTriggerView.CurrentVersion);
-        descriptor.Fields.ShouldBe(
-            [
-                new(
-                    new("arguments"),
-                    "arguments",
-                    AutomationPortValueType.Arguments,
-                    AutomationPortNullability.NonNullable,
-                    AutomationValueProvenance.PublicChat
-                ),
-            ],
-            ignoreOrder: false
-        );
         var service = new AutomationSafeTriggerExpressionService();
         var port = new AutomationPortMetadata(
             new("arguments-input"),

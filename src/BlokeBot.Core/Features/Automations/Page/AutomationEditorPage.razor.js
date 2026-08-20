@@ -1,6 +1,7 @@
 let dirtyNavigation = null;
 let fullscreenState = null;
 let historyKeyboard = null;
+let toolboxKeyboard = null;
 
 function fullNavigationTarget(event) {
     if (
@@ -118,6 +119,33 @@ export function disposeHistoryKeyboard() {
     if (historyKeyboard === null) return;
     document.removeEventListener("keydown", historyKeyboard.keydown, true);
     historyKeyboard = null;
+}
+
+export function initializeToolboxKeyboard(dotnet) {
+    disposeToolboxKeyboard();
+    const keydown = (event) => {
+        if (
+            event.key !== "/"
+            || event.altKey
+            || event.ctrlKey
+            || event.metaKey
+            || !(event.target instanceof Element)
+            || isEditable(event.target)
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        void dotnet.invokeMethodAsync("OpenToolboxFromShortcutAsync");
+    };
+    toolboxKeyboard = { keydown, dotnet };
+    document.addEventListener("keydown", keydown, true);
+}
+
+export function disposeToolboxKeyboard() {
+    if (toolboxKeyboard === null) return;
+    document.removeEventListener("keydown", toolboxKeyboard.keydown, true);
+    toolboxKeyboard = null;
 }
 
 export async function toggleBrowserFullscreen() {

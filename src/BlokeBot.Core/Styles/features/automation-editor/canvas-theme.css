@@ -1,0 +1,84 @@
+.automation-workspace {
+    display: flex;
+    flex-direction: column;
+}
+
+.automation-canvas-wrap {
+    flex: 1;
+}
+
+.automation-canvas-tools {
+    left: auto;
+    right: 0.65rem;
+    width: auto;
+}
+
+.automation-edge-group--data {
+    color: var(--tone-violet-solid);
+}
+
+.automation-edge-group--data .automation-edge {
+    stroke-dasharray: 7 5;
+}
+
+.automation-edge-group--invalid {
+    color: var(--tone-red-solid);
+}
+
+.automation-edge-group--invalid .automation-edge {
+    stroke-dasharray: 2 5;
+}
+
+.automation-edges marker path {
+    fill: context-stroke;
+}
+
+.automation-node {
+    width: 184px;
+}
+
+.automation-node--disclosed {
+    height: auto;
+    min-height: 78px;
+    width: 270px;
+    z-index: 4;
+}
+
+.automation-node--disclosed .automation-node-select {
+    gap: 0.18rem;
+    grid-template-rows: none;
+    height: auto;
+    min-height: 76px;
+    padding: 0.5rem 0.58rem;
+}
+
+.automation-node--disclosed .automation-node-title {
+    align-items: flex-start;
+}
+
+.automation-node--disclosed .automation-node-title strong,
+.automation-node--disclosed .automation-node-status {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.automation-node-kind--value {
+    background: var(--tone-blue-bg);
+    color: var(--tone-blue-fg);
+}
+
+.automation-node-kind--transform {
+    background: var(--tone-violet-bg);
+    color: var(--tone-violet-fg);
+}
+
+.automation-port--data {
+    background: var(--tone-violet-solid);
+    border-radius: 0.15rem;
+    transform: translateY(-50%) rotate(45deg);
+}
+
+.automation-port--retained {
+    background: var(--tone-red-solid);
+    border-radius: 50%;
+}

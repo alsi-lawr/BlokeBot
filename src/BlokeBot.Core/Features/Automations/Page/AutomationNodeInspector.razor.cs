@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.Automations.Page;
 
@@ -13,7 +12,11 @@ public partial class AutomationNodeInspector
     private bool _pickerNeedsFocus;
     private AutomationNodeId? _rejectedRenameNodeId;
     private AutomationPortId? _rejectedRenamePortId;
+    private AutomationTransformInputRenameOutcome? _renameFailure;
     private int _renameAttempt;
+    private AutomationNodeId? _invalidFixedValueNodeId;
+    private AutomationPortId? _invalidFixedValuePortId;
+    private int _fixedValueAttempt;
 
     [Parameter]
     public AutomationEditorNode? Node { get; set; }
@@ -84,6 +87,28 @@ public partial class AutomationNodeInspector
         await Changed.InvokeAsync();
     }
 
+    private async Task SetComplexFixedValueAsync(AutomationPortId portId, object? value)
+    {
+        if (Node?.SetComplexFixedValue(portId, value?.ToString() ?? string.Empty) is not true)
+        {
+            _invalidFixedValueNodeId = Node?.Id;
+            _invalidFixedValuePortId = portId;
+            _fixedValueAttempt++;
+            return;
+        }
+
+        _invalidFixedValueNodeId = null;
+        _invalidFixedValuePortId = null;
+        await Changed.InvokeAsync();
+    }
+
+    private string? ComplexFixedValueDiagnostic(AutomationPortId portId) =>
+        Node is not null
+        && _invalidFixedValueNodeId == Node.Id
+        && _invalidFixedValuePortId == portId
+            ? "Enter valid JSON for this input type."
+            : null;
+
     private async Task SetBindingModeAsync(
         AutomationConfigurationFieldId fieldId,
         AutomationInputBindingMode mode
@@ -111,347 +136,6 @@ public partial class AutomationNodeInspector
         );
         await Connect.InvokeAsync(new(Node.Id, output.Id, target.Id, input.Id));
     }
-
-    private void OpenSourcePicker(AutomationPortMetadata input, Guid? edgeId)
-    {
-        _pickerInputId = input.Id;
-        _pickerEdgeId = edgeId;
-        _selectedSource = SourceChoices()
-            .FirstOrDefault(static choice => choice.Compatibility.IsCompatible);
-        _pickerNeedsFocus = true;
-    }
-
-    protected override void OnParametersSet()
-    {
-        if (_rejectedRenameNodeId is { } nodeId && Node?.Id != nodeId)
-        {
-            _rejectedRenameNodeId = null;
-            _rejectedRenamePortId = null;
-        }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (
-            _pickerNeedsFocus
-            && _selectedSource is { } source
-            && _sourceReferences.TryGetValue(source, out var reference)
-        )
-        {
-            _pickerNeedsFocus = false;
-            await reference.FocusAsync();
-        }
-    }
-
-    private async Task CancelSourcePickerAsync()
-    {
-        _pickerInputId = null;
-        _pickerEdgeId = null;
-        _selectedSource = null;
-        await InvokeAsync(StateHasChanged);
-        await _pickerOpener.FocusAsync();
-    }
-
-    private Task HandlePickerKeyAsync(KeyboardEventArgs args) =>
-        args.Key == "Escape" ? CancelSourcePickerAsync() : Task.CompletedTask;
-
-    private void SelectSource(AutomationSourceChoice choice) => _selectedSource = choice;
-
-    private async Task ConnectSelectedSourceAsync()
-    {
-        if (
-            Node is null
-            || _pickerInputId is not { } inputId
-            || _selectedSource is not { Compatibility.IsCompatible: true } source
-        )
-        {
-            return;
-        }
-        var request = new AutomationConnectionRequest(
-            source.Node.Id,
-            source.Port.Id,
-            Node.Id,
-            inputId
-        );
-        if (_pickerEdgeId is { } edgeId)
-        {
-            await Repair.InvokeAsync(new(edgeId, request));
-        }
-        else
-        {
-            await Connect.InvokeAsync(request);
-        }
-        await CancelSourcePickerAsync();
-    }
-
-    private IReadOnlyList<AutomationSourceChoice> SourceChoices()
-    {
-        if (
-            Node is null
-            || _pickerInputId is not { } inputId
-            || Node.Definition.Inputs.FirstOrDefault(port => port.Id == inputId) is not { } input
-        )
-        {
-            return [];
-        }
-        var choices = Nodes
-            .Where(candidate => candidate.Id != Node.Id)
-            .SelectMany(candidate =>
-                candidate
-                    .Definition.Outputs.Where(static port =>
-                        port.ValueType != AutomationPortValueType.Flow
-                    )
-                    .Select(port => new AutomationSourceChoice(
-                        candidate,
-                        port,
-                        AutomationConnections.Compatibility(candidate, port, Node, input),
-                        false
-                    ))
-            )
-            .OrderByDescending(static choice => choice.Compatibility.IsCompatible)
-            .ThenBy(static choice => choice.Node.EffectiveName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(static choice => choice.Port.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var first = Array.FindIndex(choices, static choice => choice.Compatibility.IsCompatible);
-        return choices
-            .Select((choice, index) => choice with { FirstCompatible = index == first })
-            .ToArray();
-    }
-
-    private AutomationFlowDraftEdge? IncomingDataEdge(AutomationPortId portId) =>
-        Node is null
-            ? null
-            : Edges.FirstOrDefault(edge =>
-                edge.Kind == AutomationEdgeKind.Data
-                && edge.TargetNodeId == Node.Id
-                && edge.TargetPortId == portId
-            );
-
-    private string ConnectedSourceLabel(AutomationFlowDraftEdge edge)
-    {
-        var source = Nodes.FirstOrDefault(node => node.Id == edge.SourceNodeId);
-        var port = source?.Definition.Outputs.FirstOrDefault(candidate =>
-            candidate.Id == edge.SourcePortId
-        );
-        return $"{source?.EffectiveName ?? "Unavailable node"} · {port?.Name ?? "Unavailable port"}";
-    }
-
-    private string ConnectedSourceType(AutomationFlowDraftEdge edge)
-    {
-        var source = Nodes.FirstOrDefault(node => node.Id == edge.SourceNodeId);
-        var port = source?.Definition.Outputs.FirstOrDefault(candidate =>
-            candidate.Id == edge.SourcePortId
-        );
-        return port is null ? "Unknown type" : AutomationConnections.TypeLabel(port);
-    }
-
-    private IReadOnlyList<AutomationGraphError> _genericErrors =>
-        Node is null
-            ? []
-            : Errors
-                .Where(error =>
-                    error.NodeId == Node.Id && error.FieldId is null && error.PortId is null
-                )
-                .ToArray();
-
-    private IReadOnlyList<AutomationGraphError> FieldErrors(
-        AutomationConfigurationFieldId fieldId
-    ) =>
-        Node is null
-            ? []
-            : Errors.Where(error => error.NodeId == Node.Id && error.FieldId == fieldId).ToArray();
-
-    private IReadOnlyList<AutomationEditorNode> CompatibleTargets(AutomationPortMetadata output) =>
-        Nodes
-            .Where(candidate =>
-                candidate.Id != Node?.Id
-                && candidate.Definition.Inputs.Any(input =>
-                    Node is not null
-                    && AutomationConnections
-                        .Compatibility(Node, output, candidate, input)
-                        .IsCompatible
-                )
-                && !Edges.Any(edge =>
-                    edge.SourceNodeId == Node?.Id
-                    && edge.SourcePortId == output.Id
-                    && edge.TargetNodeId == candidate.Id
-                )
-            )
-            .OrderBy(static candidate => candidate.EffectiveName)
-            .ToArray();
-
-    private IReadOnlyList<AutomationReferenceChoice> ChoicesFor(
-        AutomationConfigurationFieldMetadata field
-    ) =>
-        field.FieldType switch
-        {
-            AutomationConfigurationFieldType.Choice choice => choice
-                .Values.Select(value => new AutomationReferenceChoice(value, ChoiceLabel(value)))
-                .ToArray(),
-            AutomationConfigurationFieldType.Reference reference
-                when ReferenceChoices.TryGetValue(reference.ReferenceKind, out var choices) =>
-                choices,
-            _ => [],
-        };
-
-    private async Task AddTransformInputAsync()
-    {
-        Node?.AddTransformInput();
-        await Changed.InvokeAsync();
-    }
-
-    private async Task AddTransformOutputAsync()
-    {
-        Node?.AddTransformOutput();
-        await Changed.InvokeAsync();
-    }
-
-    private async Task RemoveTransformInputAsync(AutomationPortId portId)
-    {
-        Node?.RemoveTransformInput(portId);
-        await Changed.InvokeAsync();
-    }
-
-    private async Task RemoveTransformOutputAsync(AutomationPortId portId)
-    {
-        Node?.RemoveTransformOutput(portId);
-        await Changed.InvokeAsync();
-    }
-
-    private async Task UpdateTransformInputAsync(
-        AutomationCelTransformInput input,
-        string? displayName = null,
-        string? valueType = null,
-        string? nullability = null
-    )
-    {
-        if (Node is null)
-        {
-            return;
-        }
-        _ = Enum.TryParse(valueType, out AutomationPortValueType parsedType);
-        _ = Enum.TryParse(nullability, out AutomationPortNullability parsedNullability);
-        Node.UpdateTransformInput(
-            input.PortId,
-            displayName ?? input.DisplayName,
-            valueType is null ? input.ValueType : parsedType,
-            nullability is null ? input.Nullability : parsedNullability
-        );
-        await Changed.InvokeAsync();
-    }
-
-    private async Task RenameTransformInputAsync(
-        AutomationCelTransformInput input,
-        string? identifier
-    )
-    {
-        if (Node is null)
-        {
-            return;
-        }
-        if (!Node.RenameTransformInput(input.PortId, identifier ?? string.Empty))
-        {
-            _rejectedRenameNodeId = Node.Id;
-            _rejectedRenamePortId = input.PortId;
-            _renameAttempt++;
-            return;
-        }
-        _rejectedRenameNodeId = null;
-        _rejectedRenamePortId = null;
-        await Changed.InvokeAsync();
-    }
-
-    private string? RenameDiagnostic(AutomationPortId portId) =>
-        Node is not null && _rejectedRenameNodeId == Node.Id && _rejectedRenamePortId == portId
-            ? "Use a unique CEL name. Letters, digits and underscores only, not starting with a digit, and not a reserved word."
-            : null;
-
-    private async Task UpdateTransformOutputAsync(
-        AutomationCelTransformOutput output,
-        string? displayName = null,
-        string? valueType = null,
-        string? nullability = null,
-        string? source = null
-    )
-    {
-        if (Node is null)
-        {
-            return;
-        }
-        _ = Enum.TryParse(valueType, out AutomationPortValueType parsedType);
-        _ = Enum.TryParse(nullability, out AutomationPortNullability parsedNullability);
-        Node.UpdateTransformOutput(
-            output.PortId,
-            displayName ?? output.DisplayName,
-            valueType is null ? output.ValueType : parsedType,
-            nullability is null ? output.Nullability : parsedNullability,
-            source ?? output.Source
-        );
-        await Changed.InvokeAsync();
-    }
-
-    private static string FixedInputType(AutomationPortMetadata input) =>
-        input.ValueType == AutomationPortValueType.Number ? "number"
-        : input.ValueType == AutomationPortValueType.Timestamp ? "datetime-local"
-        : "text";
-
-    private static string GenericInputType(AutomationConfigurationFieldMetadata field) =>
-        field.FieldType
-            is AutomationConfigurationFieldType.Number
-                or AutomationConfigurationFieldType.Duration
-            ? "number"
-            : "text";
-
-    private static string FieldId(
-        AutomationNodeId nodeId,
-        AutomationConfigurationFieldId fieldId
-    ) => $"automation-{nodeId.Value:N}-{fieldId.Value}";
-
-    private static string DeclarationFieldId(AutomationPortId portId, string suffix) =>
-        $"automation-declaration-{portId.Value}-{suffix}";
-
-    private static string BindingModeHelpId(AutomationInputBindingMode mode) =>
-        $"automation-binding-mode-help-{mode.ToString().ToLowerInvariant()}";
-
-    private static string BindingModeHelp(AutomationInputBindingMode mode) =>
-        mode switch
-        {
-            AutomationInputBindingMode.Fixed => "Enter a value",
-            AutomationInputBindingMode.Connected => "Use another node",
-            AutomationInputBindingMode.Expression => "Calculate a value",
-            _ => string.Empty,
-        };
-
-    private static string ConnectionId(AutomationNodeId nodeId, AutomationPortId portId) =>
-        $"automation-connection-{nodeId.Value:N}-{portId.Value}";
-
-    private static string KindLabel(AutomationNodeKind kind) =>
-        kind switch
-        {
-            AutomationNodeKind.Source => "trigger",
-            AutomationNodeKind.Value => "value",
-            AutomationNodeKind.Transform => "transform",
-            AutomationNodeKind.Control => "control",
-            AutomationNodeKind.Action => "action",
-            _ => "node",
-        };
-
-    private static string ChoiceLabel(string value) =>
-        string.Join(
-            ' ',
-            value
-                .Split('-', StringSplitOptions.RemoveEmptyEntries)
-                .Select(static word => char.ToUpperInvariant(word[0]) + word[1..])
-        );
-
-    private static int? MaximumLength(AutomationConfigurationFieldMetadata field) =>
-        field.FieldType is AutomationConfigurationFieldType.Text text ? text.MaximumLength : null;
-
-    private static bool IsFlowPort(AutomationPortMetadata port) =>
-        port.ValueType == AutomationPortValueType.Flow;
-
-    private static bool IsDataPort(AutomationPortMetadata port) =>
-        port.ValueType != AutomationPortValueType.Flow && port.BindingFieldId is not null;
 }
 
 public sealed record AutomationConnectionRequest(
@@ -469,6 +153,5 @@ public sealed record AutomationRepairConnectionRequest(
 internal sealed record AutomationSourceChoice(
     AutomationEditorNode Node,
     AutomationPortMetadata Port,
-    AutomationConnectionCompatibility Compatibility,
-    bool FirstCompatible
+    AutomationConnectionCompatibility Compatibility
 );

@@ -1,0 +1,54 @@
+@if (Visible)
+{
+    <header class="automation-editor-bar">
+        <div class="automation-flow-name">
+            <label for="automation-flow-name">Flow name</label>
+            <input id="automation-flow-name" maxlength="200" value="@Name" @oninput="NameChanged" />
+            <span>@Subtitle</span>
+        </div>
+        <div class="automation-editor-actions">
+            <div class="automation-mode-switch" role="tablist" aria-label="Editor view">
+                <button type="button" role="tab" data-automation-mode="grid" aria-selected="@GridSelected" @onclick="SelectGrid"><AutomationIcon Name="grid" />Grid</button>
+                <button type="button" role="tab" data-automation-mode="list" aria-selected="@ListSelected" @onclick="SelectList"><AutomationIcon Name="list" />List</button>
+            </div>
+            <span class="@ValidationClass" role="status">@ValidationLabel</span>
+            <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Validate"><AutomationIcon Name="validate" />Validate</button>
+            <button class="btn-secondary" type="button" disabled="@(Busy || !HasNodes)" data-automation-test-flow @onclick="Test"><AutomationIcon Name="test" />Test flow</button>
+            <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Save"><AutomationIcon Name="save" />Save</button>
+            @if (FocusMode)
+            {
+                <button class="automation-focus-action" type="button" @onclick="Hide"><AutomationIcon Name="hide" />Hide tools</button>
+            }
+            <button class="@(Enabled ? "btn-secondary" : "btn-primary")"
+                    type="button"
+                    disabled="@(Busy || !Saved || HasChanges)"
+                    title="@(HasChanges ? "Save the flow before you change its state." : null)"
+                    @onclick="ToggleEnabled"><AutomationIcon Name="power" />@(Enabled ? "Disable" : EnableConfirmation ? "Enable anyway" : "Enable")</button>
+        </div>
+    </header>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string Subtitle { get; set; } = string.Empty;
+    [Parameter] public bool GridSelected { get; set; }
+    [Parameter] public bool ListSelected { get; set; }
+    [Parameter] public string ValidationClass { get; set; } = string.Empty;
+    [Parameter] public string ValidationLabel { get; set; } = string.Empty;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool HasNodes { get; set; }
+    [Parameter] public bool FocusMode { get; set; }
+    [Parameter] public bool Enabled { get; set; }
+    [Parameter] public bool Saved { get; set; }
+    [Parameter] public bool HasChanges { get; set; }
+    [Parameter] public bool EnableConfirmation { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> NameChanged { get; set; }
+    [Parameter] public EventCallback SelectGrid { get; set; }
+    [Parameter] public EventCallback SelectList { get; set; }
+    [Parameter] public EventCallback Validate { get; set; }
+    [Parameter] public EventCallback Test { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+    [Parameter] public EventCallback Hide { get; set; }
+    [Parameter] public EventCallback ToggleEnabled { get; set; }
+}

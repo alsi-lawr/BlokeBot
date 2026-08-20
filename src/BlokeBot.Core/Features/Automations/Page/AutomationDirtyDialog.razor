@@ -1,0 +1,26 @@
+@if (Open)
+{
+    <div class="automation-dirty-dialog-backdrop" @onclick="Cancel">
+        <section class="automation-dirty-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="automation-dirty-dialog-title"
+                 @onclick:stopPropagation="true">
+            <h2 id="automation-dirty-dialog-title">Are you sure?</h2>
+            <p>This flow has unsaved changes. Save the flow, discard the changes, or stay on this flow.</p>
+            <div class="automation-dirty-dialog-actions">
+                <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Cancel"><AutomationIcon Name="cancel" />Cancel</button>
+                <button class="automation-danger-button" type="button" disabled="@Busy" @onclick="Discard"><AutomationIcon Name="delete" />Discard</button>
+                <button class="btn-primary" type="button" disabled="@Busy" autofocus @onclick="Save"><AutomationIcon Name="save" />Save</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+    [Parameter] public EventCallback Discard { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+}

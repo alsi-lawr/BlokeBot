@@ -1,0 +1,32 @@
+@if (Visible)
+{
+    <footer class="automation-run-drawer" data-automation-run-kind="@Kind">
+        <div class="automation-run-summary">
+            <span class="@IconClass" aria-hidden="true">@Icon</span>
+            <div><strong>@Title</strong><span>@Description</span></div>
+        </div>
+        <div class="automation-run-actions">
+            @if (FocusMode)
+            {
+                <button class="btn-secondary" type="button" @onclick="Toggle"><AutomationIcon Name="hide" />Hide runs</button>
+            }
+            <button class="btn-secondary" type="button" disabled="@(!HasRecentRuns)" @onclick="ShowDetails"><AutomationIcon Name="history" />Run details</button>
+            <button class="btn-secondary" type="button" disabled="@(!CanRunSample)" @onclick="RunSample"><AutomationIcon Name="test" />Test again</button>
+        </div>
+    </footer>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public bool FocusMode { get; set; }
+    [Parameter] public bool HasRecentRuns { get; set; }
+    [Parameter] public bool CanRunSample { get; set; }
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string IconClass { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+    [Parameter] public EventCallback Toggle { get; set; }
+    [Parameter] public EventCallback ShowDetails { get; set; }
+    [Parameter] public EventCallback RunSample { get; set; }
+}

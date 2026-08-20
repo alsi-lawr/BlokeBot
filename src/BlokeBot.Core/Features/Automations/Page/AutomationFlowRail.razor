@@ -1,0 +1,100 @@
+@if (Visible)
+{
+    <aside class="automation-flow-rail" aria-label="Flow library">
+        <div class="automation-flow-rail-heading">
+            <strong>Flows</strong>
+            <span>
+                @if (FocusMode)
+                {
+                    <button type="button" aria-label="Hide flow list" title="Hide flow list" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button>
+                }
+                <button type="button" aria-label="New flow" title="New flow" @onclick="NewFlow"><AutomationIcon Name="add" /></button>
+            </span>
+        </div>
+        @foreach (var flow in Flows)
+        {
+            <button @key="flow.Draft.Id"
+                    type="button"
+                    class="@(flow.Draft.Id == CurrentFlowId ? "automation-flow-item automation-flow-item--active" : "automation-flow-item")"
+                    @onclick="() => Select.InvokeAsync(flow)">
+                <strong>@FlowDisplayName(flow)</strong>
+                <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
+            </button>
+        }
+        @if (CurrentFlowId is null)
+        {
+            <div class="automation-flow-item automation-flow-item--active">
+                <strong>@CurrentName</strong>
+                <span><span><i class="automation-status-dot automation-status-dot--draft"></i>Not saved</span><span>@CurrentNodeCount nodes</span></span>
+            </div>
+        }
+        @if (CurrentFlowId is not null)
+        {
+            <div class="automation-flow-rail-actions">
+                <button class="btn-secondary" type="button" @onclick="Duplicate"><AutomationIcon Name="duplicate" />Duplicate</button>
+                <button class="automation-danger-button" type="button" @onclick="Delete"><AutomationIcon Name="delete" />@(DeleteConfirmation ? "Confirm delete" : "Delete")</button>
+            </div>
+        }
+        <p>Flows use the selected channel. Duplicating copies the graph, not run history.</p>
+    </aside>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public required IReadOnlyList<AutomationFlowSnapshot> Flows { get; set; }
+
+    [Parameter, EditorRequired]
+    public AutomationFlowId? CurrentFlowId { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string CurrentName { get; set; }
+
+    [Parameter]
+    public int CurrentNodeCount { get; set; }
+
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public bool FocusMode { get; set; }
+
+    [Parameter]
+    public bool Validated { get; set; }
+
+    [Parameter]
+    public bool ValidationErrorsEmpty { get; set; }
+
+    [Parameter]
+    public bool DeleteConfirmation { get; set; }
+
+    [Parameter]
+    public EventCallback Toggle { get; set; }
+
+    [Parameter]
+    public EventCallback NewFlow { get; set; }
+
+    [Parameter]
+    public EventCallback<AutomationFlowSnapshot> Select { get; set; }
+
+    [Parameter]
+    public EventCallback Duplicate { get; set; }
+
+    [Parameter]
+    public EventCallback Delete { get; set; }
+
+    private string FlowStatusLabel(AutomationFlowSnapshot flow) =>
+        flow.Draft.IsEnabled ? "Enabled"
+        : flow.Draft.Id == CurrentFlowId && Validated && ValidationErrorsEmpty ? "Ready"
+        : "Draft";
+
+    private string FlowStatusDotClass(AutomationFlowSnapshot flow) =>
+        FlowStatusLabel(flow) == "Draft"
+            ? "automation-status-dot automation-status-dot--draft"
+            : "automation-status-dot";
+
+    private string FlowDisplayName(AutomationFlowSnapshot flow)
+    {
+        var name = flow.Draft.Id == CurrentFlowId ? CurrentName : flow.Draft.Name;
+        return string.IsNullOrWhiteSpace(name) ? "Untitled flow" : name;
+    }
+}

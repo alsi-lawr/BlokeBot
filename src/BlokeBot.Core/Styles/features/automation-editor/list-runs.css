@@ -1,0 +1,266 @@
+.automation-list-view {
+    min-height: 100%;
+    padding: 1rem;
+}
+
+.automation-list-heading {
+    align-items: flex-end;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.automation-list-heading p,
+.automation-list-heading h2 {
+    margin: 0;
+}
+
+.automation-list-heading p,
+.automation-list-heading > span {
+    color: var(--app-text-muted);
+    font-size: 0.7rem;
+}
+
+.automation-list-heading h2 {
+    font-size: 1rem;
+    margin-top: 0.15rem;
+}
+
+.automation-list-empty {
+    color: var(--app-text-muted);
+    padding: 4rem 1rem;
+    text-align: center;
+}
+
+.automation-run-drawer {
+    align-items: center;
+    background: var(--app-surface);
+    border-top: 1px solid var(--app-border);
+    display: flex;
+    gap: 1rem;
+    grid-area: runs;
+    justify-content: space-between;
+    min-height: 3.7rem;
+    padding: 0.65rem 1rem;
+}
+
+.automation-focus-action,
+.automation-restore-tab {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.45rem;
+    color: var(--app-text-medium);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 0.7rem;
+    font-weight: 800;
+    justify-content: center;
+    min-height: 2.35rem;
+    padding: 0.4rem 0.65rem;
+}
+
+.automation-icon {
+    display: block;
+    height: 1.05rem;
+    width: 1.05rem;
+}
+
+.automation-node-icon {
+    color: var(--tone-blue-fg);
+    display: block;
+    flex: none;
+    height: 1.2rem;
+    width: 1.2rem;
+}
+
+.automation-inspector-identity > .automation-node-icon {
+    height: 1.65rem;
+    width: 1.65rem;
+}
+
+.automation-focus-controls {
+    align-items: center;
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.55rem;
+    box-shadow: var(--app-shadow-sm);
+    display: flex;
+    gap: 0.15rem;
+    padding: 0.18rem;
+    position: absolute;
+    right: 0.7rem;
+    top: 0.7rem;
+    z-index: 45;
+}
+
+.automation-focus-controls button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.38rem;
+    color: var(--app-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    height: 2.2rem;
+    justify-content: center;
+    padding: 0;
+    width: 2.2rem;
+}
+
+.automation-focus-controls button:hover {
+    background: var(--app-control-hover);
+    color: var(--app-text-strong);
+}
+
+.automation-focus-controls button:focus-visible {
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 3px var(--tone-blue-ring);
+    outline: 0;
+}
+
+.automation-focus-controls button[aria-pressed="true"] {
+    background: var(--tone-blue-bg);
+    border-color: var(--tone-blue-ring);
+    color: var(--tone-blue-fg);
+}
+
+.automation-editor--focus {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    height: 100dvh;
+    inset: 0;
+    min-height: 0;
+    position: fixed;
+    width: 100vw;
+    z-index: 300;
+}
+
+.automation-editor--focus .automation-editor-bar {
+    padding-right: 6.2rem;
+}
+
+.automation-editor--tools-collapsed .automation-canvas-tools {
+    display: none;
+}
+
+.automation-editor--tools-collapsed .automation-inspector {
+    padding-top: 4.1rem;
+}
+
+.automation-restore-tab {
+    position: absolute;
+    z-index: 35;
+}
+
+.automation-restore-tab--flows {
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    writing-mode: vertical-rl;
+}
+
+.automation-restore-tab--tools {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    left: 0.55rem;
+    top: 0;
+}
+
+.automation-restore-tab--runs {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.automation-run-summary {
+    align-items: center;
+    display: flex;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.automation-run-icon {
+    align-items: center;
+    background: var(--tone-green-bg);
+    border-radius: 0.55rem;
+    color: var(--tone-green-fg);
+    display: inline-flex;
+    flex: none;
+    font-weight: 900;
+    height: 2.15rem;
+    justify-content: center;
+    width: 2.15rem;
+}
+
+.automation-run-icon--failed {
+    background: var(--tone-red-bg);
+    color: var(--tone-red-fg);
+}
+
+.automation-run-summary strong,
+.automation-run-summary span {
+    display: block;
+}
+
+.automation-run-summary strong {
+    font-size: 0.75rem;
+}
+
+.automation-run-summary div span {
+    color: var(--app-text-muted);
+    font-size: 0.68rem;
+    margin-top: 0.15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.automation-run-actions {
+    display: flex;
+    flex: none;
+    gap: 0.45rem;
+}
+
+.automation-dirty-dialog-backdrop {
+    align-items: center;
+    backdrop-filter: blur(3px);
+    background: rgb(5 8 11 / 63%);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 1.25rem;
+    position: fixed;
+    z-index: 500;
+}
+
+.automation-dirty-dialog {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.9rem;
+    box-shadow: var(--app-shadow-surface);
+    max-width: 100%;
+    padding: calc(1.35rem + 5px);
+    width: 27rem;
+}
+
+.automation-dirty-dialog h2,
+.automation-dirty-dialog p {
+    margin-top: 0;
+}
+
+.automation-dirty-dialog p {
+    color: var(--app-text-muted);
+    margin: 5px 0;
+}
+
+.automation-dirty-dialog-actions {
+    display: flex;
+    gap: 0.55rem;
+    justify-content: flex-end;
+}

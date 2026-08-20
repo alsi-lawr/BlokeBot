@@ -1,0 +1,188 @@
+.automation-workspace {
+    background: var(--app-background);
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.automation-canvas-wrap {
+    height: 100%;
+    min-height: 0;
+    position: relative;
+}
+
+.automation-canvas-tools {
+    align-items: center;
+    backdrop-filter: blur(6px);
+    background: color-mix(in srgb, var(--app-surface-solid) 88%, transparent);
+    border: 1px solid var(--app-border);
+    border-radius: 0.6rem;
+    color: var(--app-text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    left: 0.7rem;
+    padding: 0.4rem;
+    position: absolute;
+    right: 0.7rem;
+    top: 0.7rem;
+    z-index: 8;
+}
+
+.automation-canvas-tools label {
+    align-items: center;
+    display: flex;
+    gap: 0.35rem;
+}
+
+.automation-canvas-tools label span {
+    align-items: center;
+    display: inline-flex;
+    font-size: 0.62rem;
+    font-weight: 800;
+    gap: 0.28rem;
+    text-transform: uppercase;
+}
+
+.automation-canvas-tools button,
+.automation-canvas-tools select {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.4rem;
+    color: var(--app-text-strong);
+    font-size: 0.68rem;
+    min-height: 1.9rem;
+    padding: 0.3rem 0.5rem;
+}
+
+.automation-canvas-tools > button {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.3rem;
+}
+
+.automation-canvas-tool-group {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.automation-canvas-tool-group button {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+    padding: 0;
+    width: 1.9rem;
+}
+
+.automation-canvas-viewport {
+    background-color: var(--app-background);
+    background-image: radial-gradient(
+        circle,
+        color-mix(in srgb, var(--app-text-muted) 34%, transparent) var(--automation-grid-dot, 1.1px),
+        transparent var(--automation-grid-dot, 1.1px)
+    );
+    background-position: var(--automation-grid-x, 0) var(--automation-grid-y, 0);
+    background-size: var(--automation-grid-step, 24px) var(--automation-grid-step, 24px);
+    cursor: grab;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    touch-action: none;
+}
+
+.automation-canvas-viewport:focus-visible {
+    outline: 2px solid var(--tone-blue-solid);
+    outline-offset: -2px;
+}
+
+.automation-canvas--panning,
+.automation-canvas--node-dragging {
+    cursor: grabbing;
+}
+
+.automation-canvas-stage-size {
+    position: relative;
+}
+
+.automation-canvas-stage {
+    height: 100%;
+    position: relative;
+    transform-origin: 0 0;
+    will-change: transform;
+    width: 100%;
+}
+
+.automation-edges {
+    height: 100%;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+    position: absolute;
+    width: 100%;
+}
+
+.automation-edge-group {
+    color: var(--tone-blue-solid);
+    cursor: pointer;
+    pointer-events: stroke;
+}
+
+.automation-edge {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.5;
+    transition: stroke-width 120ms ease;
+}
+
+.automation-edge-hit {
+    fill: none;
+    pointer-events: stroke;
+    stroke: transparent;
+    stroke-width: 16;
+}
+
+.automation-edge-group--selected .automation-edge {
+    filter: drop-shadow(0 0 3px currentColor);
+    stroke-width: 4;
+}
+
+.automation-edge-group.automation-branch--true {
+    color: var(--tone-green-solid);
+}
+
+.automation-edge-group.automation-branch--false {
+    color: var(--tone-amber-solid);
+}
+
+.automation-edge-label {
+    pointer-events: none;
+}
+
+.automation-edge-label rect {
+    fill: var(--app-surface-solid);
+    stroke: currentColor;
+    stroke-width: 1px;
+}
+
+.automation-edge-label text {
+    fill: currentColor;
+    font-size: 11px;
+    font-weight: 900;
+    pointer-events: none;
+}
+
+.automation-edge--preview {
+    pointer-events: none;
+    stroke-dasharray: 7 5;
+}
+
+.automation-marquee {
+    background: color-mix(in srgb, var(--tone-blue-bg) 60%, transparent);
+    border: 1px solid var(--tone-blue-solid);
+    pointer-events: none;
+    position: absolute;
+    z-index: 6;
+}

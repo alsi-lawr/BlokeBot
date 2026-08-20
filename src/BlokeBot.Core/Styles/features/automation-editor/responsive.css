@@ -1,0 +1,223 @@
+@media (max-width: 74rem) {
+    .automation-editor-body {
+        grid-template-columns: 10.5rem minmax(26rem, 1fr);
+    }
+}
+
+@media (max-width: 48rem) {
+    .automation-page-actions {
+        margin-top: 0;
+        padding-bottom: 1rem;
+    }
+
+    .automation-page-actions > * {
+        flex: 1;
+    }
+
+    .automation-dirty-dialog-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .automation-dirty-dialog-actions .btn-primary {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .automation-editor {
+        display: block;
+        height: auto;
+        min-height: 47.5rem;
+    }
+
+    .automation-editor-bar {
+        align-items: flex-start;
+        display: block;
+        padding: 0.8rem 6.2rem 0.8rem 0.8rem;
+    }
+
+    .automation-flow-name {
+        margin-bottom: 0.75rem;
+    }
+
+    .automation-editor-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 0.2rem;
+    }
+
+    .automation-mode-switch {
+        flex: none;
+        min-width: 0;
+    }
+
+    .automation-mode-switch button {
+        flex: 1;
+    }
+
+    .automation-editor-actions > .btn-primary,
+    .automation-editor-actions > .btn-secondary,
+    .automation-validation,
+    .automation-toolbox-button {
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .automation-feedback,
+    .automation-enable-warning {
+        align-items: flex-start;
+        font-size: 0.75rem;
+    }
+
+    .automation-editor-body {
+        display: block;
+        height: auto;
+    }
+
+    .automation-flow-rail {
+        border-bottom: 1px solid var(--app-border);
+        border-right: 0;
+        padding: 0.75rem;
+    }
+
+    .automation-flow-rail-heading,
+    .automation-flow-rail .automation-flow-item:not(.automation-flow-item--active),
+    .automation-flow-rail-actions,
+    .automation-flow-rail > p {
+        display: none;
+    }
+
+    .automation-flow-item--active {
+        margin: 0;
+    }
+
+    .automation-workspace {
+        min-height: 30rem;
+    }
+
+    .automation-canvas-wrap {
+        height: var(--automation-mobile-canvas-height, 30rem);
+        min-height: 30rem;
+    }
+
+    .automation-canvas-tools {
+        display: flex;
+        flex-wrap: nowrap;
+        inset: auto;
+        margin: 0.45rem;
+        overflow-x: auto;
+        position: relative;
+        width: calc(100% - 0.9rem);
+    }
+
+    .automation-canvas-tool-group {
+        flex: none;
+    }
+
+    .automation-canvas-tools label {
+        align-items: center;
+        display: flex;
+        flex: none;
+    }
+
+    .automation-canvas-viewport {
+        height: calc(var(--automation-mobile-canvas-height, 30rem) - 3.7rem);
+        min-height: 26.3rem;
+    }
+
+    .automation-node {
+        width: 206px;
+    }
+
+    .automation-inspector {
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-bottom: 0;
+        border-radius: 1rem 1rem 0 0;
+        bottom: 0;
+        height: min(75dvh, 38rem);
+        left: 0;
+        max-height: none;
+        max-width: none;
+        position: fixed;
+        right: 0;
+        top: auto;
+        width: 100%;
+        z-index: 460;
+    }
+
+    .automation-run-drawer {
+        align-items: flex-start;
+        padding: 0.75rem;
+    }
+
+    .automation-run-summary div span {
+        white-space: normal;
+    }
+
+    .automation-run-actions > :first-child {
+        display: none;
+    }
+
+    .automation-editor--focus {
+        display: grid;
+        height: 100dvh;
+        min-height: 0;
+    }
+
+    .automation-editor--focus .automation-editor-bar {
+        padding: 3.4rem 0.8rem 0.8rem;
+    }
+
+    .automation-editor--focus .automation-editor-body {
+        display: grid;
+        grid-template-columns: 8rem minmax(0, 1fr);
+        height: auto;
+        min-height: 0;
+    }
+
+    .automation-editor--focus .automation-editor-body--flows-collapsed {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .automation-editor--focus .automation-flow-rail {
+        border-bottom: 0;
+        border-right: 1px solid var(--app-border);
+        overflow-y: auto;
+        padding: 0.55rem;
+    }
+
+    .automation-editor--focus .automation-flow-rail-heading,
+    .automation-editor--focus .automation-flow-rail-actions {
+        display: grid;
+    }
+
+    .automation-editor--focus .automation-flow-rail-heading {
+        display: flex;
+    }
+
+    .automation-editor--focus .automation-flow-rail .automation-flow-item,
+    .automation-editor--focus .automation-flow-rail > p {
+        display: block;
+    }
+
+    .automation-editor--focus .automation-canvas-wrap,
+    .automation-editor--focus .automation-canvas-viewport {
+        height: 100%;
+        min-height: 0;
+    }
+
+    .automation-editor--focus .automation-workspace {
+        min-height: 0;
+    }
+
+    .automation-editor--focus .automation-run-drawer {
+        display: flex;
+    }
+
+    .automation-editor--focus .automation-run-actions > :first-child {
+        display: inline-flex;
+    }
+}

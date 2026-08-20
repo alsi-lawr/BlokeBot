@@ -1,0 +1,166 @@
+.automation-list-connections span,
+.automation-list-inputs span,
+.automation-list-status span,
+.automation-list-status small {
+    display: block;
+}
+
+.automation-connection-node small,
+.automation-list-connections,
+.automation-list-inputs,
+.automation-list-status,
+.automation-list-actions {
+    color: var(--app-text-muted);
+    font-size: 0.61rem;
+    line-height: 1.35;
+}
+
+.automation-list-connections > strong,
+.automation-list-inputs > strong,
+.automation-list-status > strong,
+.automation-list-actions > strong {
+    display: block;
+    font-size: 0.52rem;
+    letter-spacing: 0.09em;
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+}
+
+.automation-list-inputs em {
+    background: var(--tone-violet-bg);
+    border-radius: 0.3rem;
+    color: var(--tone-violet-fg);
+    font-style: normal;
+    padding: 0.1rem 0.25rem;
+}
+
+.automation-list-actions button {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.4rem;
+    color: var(--app-text-strong);
+    margin-right: 0.25rem;
+    padding: 0.35rem;
+}
+
+@media (max-width: 74rem) and (min-width: 48.001rem) {
+    .automation-editor-body--toolbox-open {
+        grid-template-columns: 10.5rem 18rem minmax(26rem, 1fr);
+    }
+
+    .automation-editor-body--flows-collapsed.automation-editor-body--toolbox-open {
+        grid-template-columns: 18rem minmax(26rem, 1fr);
+    }
+}
+
+@media (max-width: 48rem) {
+    .automation-editor-body--toolbox-open {
+        display: block;
+    }
+
+    .automation-editor--focus .automation-editor-body--flows-collapsed.automation-editor-body--toolbox-open {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .automation-workspace-toolbar {
+        padding: 0.45rem;
+    }
+
+    .automation-connection-legend,
+    .automation-workspace-toolbar label {
+        display: none;
+    }
+
+    .automation-toolbox-backdrop {
+        background: rgb(15 23 42 / 0.58);
+        display: block;
+        inset: 0;
+        position: fixed;
+        z-index: 470;
+    }
+
+    .automation-toolbox {
+        border: 1px solid var(--app-border);
+        border-bottom: 0;
+        border-radius: 1rem 1rem 0 0;
+        bottom: 0;
+        height: min(42dvh, 24rem);
+        left: 0;
+        position: fixed;
+        right: 0;
+        width: 100%;
+        z-index: 480;
+    }
+
+    .automation-node--disclosed {
+        width: 238px;
+    }
+
+    .automation-inspector {
+        display: none;
+        height: min(82dvh, 42rem);
+    }
+
+    .automation-inspector--mobile-open {
+        display: block;
+    }
+
+    .automation-mobile-selection-summary {
+        align-items: center;
+        background: var(--tone-blue-bg);
+        border-bottom: 1px solid var(--tone-blue-ring);
+        border-top: 1px solid var(--tone-blue-ring);
+        color: var(--app-text-strong);
+        display: flex;
+        gap: 0.5rem;
+        justify-content: space-between;
+        padding: 0.45rem 0.55rem;
+    }
+
+    .automation-mobile-selection-summary div,
+    .automation-mobile-selection-summary small {
+        display: block;
+        min-width: 0;
+    }
+
+    .automation-mobile-selection-summary span,
+    .automation-mobile-selection-summary small {
+        color: var(--app-text-muted);
+        font-size: 0.62rem;
+    }
+
+    .automation-mobile-selection-summary small {
+        white-space: normal;
+    }
+
+    .automation-mobile-selection-summary button {
+        align-items: center;
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        border-radius: 0.45rem;
+        color: var(--app-text-strong);
+        display: inline-flex;
+        flex: none;
+        gap: 0.3rem;
+        padding: 0.4rem 0.55rem;
+    }
+
+    .automation-list-heading {
+        align-items: flex-start;
+        display: grid;
+        gap: 0.2rem;
+    }
+
+    .automation-connection-row {
+        grid-template-columns: 1fr;
+    }
+
+    .automation-connection-row > * {
+        border-left: 0;
+        border-top: 1px solid var(--app-border);
+    }
+
+    .automation-connection-row > :first-child {
+        border-top: 0;
+    }
+}

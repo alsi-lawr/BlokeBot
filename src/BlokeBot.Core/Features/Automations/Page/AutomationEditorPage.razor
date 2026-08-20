@@ -84,38 +84,28 @@
                      aria-label="Visual automation editor"
                      data-editor-mode="@ModeToken(_mode)"
                      data-automation-editor-history>
-                @if (!_focusMode || !_editorToolsCollapsed)
-                {
-                <header class="automation-editor-bar">
-                    <div class="automation-flow-name">
-                        <label for="automation-flow-name">Flow name</label>
-                        <input id="automation-flow-name"
-                               maxlength="200"
-                               value="@_editor.Name"
-                               @oninput="RenameFlow" />
-                        <span>@_flowSubtitle</span>
-                    </div>
-                    <div class="automation-editor-actions">
-                        <div class="automation-mode-switch" role="tablist" aria-label="Editor view">
-                            <button type="button" role="tab" data-automation-mode="grid" aria-selected="@(_mode == AutomationEditorMode.Grid ? "true" : "false")" @onclick="() => SetMode(AutomationEditorMode.Grid)"><AutomationIcon Name="grid" />Grid</button>
-                            <button type="button" role="tab" data-automation-mode="list" aria-selected="@(_mode == AutomationEditorMode.List ? "true" : "false")" @onclick="() => SetMode(AutomationEditorMode.List)"><AutomationIcon Name="list" />List</button>
-                        </div>
-                        <span class="@_validationClass" role="status">@_validationLabel</span>
-                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ValidateAsync"><AutomationIcon Name="validate" />Validate</button>
-                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" data-automation-test-flow @onclick="RunSampleAsync"><AutomationIcon Name="test" />Test flow</button>
-                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="SaveAsync"><AutomationIcon Name="save" />Save</button>
-                        @if (_focusMode)
-                        {
-                            <button class="automation-focus-action" type="button" @onclick="ToggleEditorTools"><AutomationIcon Name="hide" />Hide tools</button>
-                        }
-                        <button class="@(_editor.IsEnabled ? "btn-secondary" : "btn-primary")"
-                                type="button"
-                                disabled="@(_busy || _editor.Id is null || _hasChanges)"
-                                title="@(_hasChanges ? "Save the flow before you change its state." : null)"
-                                @onclick="ToggleEnabledAsync"><AutomationIcon Name="power" />@(_editor.IsEnabled ? "Disable" : _enableConfirmation ? "Enable anyway" : "Enable")</button>
-                    </div>
-                </header>
-                }
+                <AutomationEditorHeader Visible="@(!_focusMode || !_editorToolsCollapsed)"
+                                        Name="_editor.Name"
+                                        Subtitle="_flowSubtitle"
+                                        GridSelected="@(_mode == AutomationEditorMode.Grid)"
+                                        ListSelected="@(_mode == AutomationEditorMode.List)"
+                                        ValidationClass="_validationClass"
+                                        ValidationLabel="_validationLabel"
+                                        Busy="_busy"
+                                        HasNodes="@(_editor.Nodes.Count > 0)"
+                                        FocusMode="_focusMode"
+                                        Enabled="_editor.IsEnabled"
+                                        Saved="@(_editor.Id is not null)"
+                                        HasChanges="_hasChanges"
+                                        EnableConfirmation="_enableConfirmation"
+                                        NameChanged="RenameFlow"
+                                        SelectGrid="@(() => SetMode(AutomationEditorMode.Grid))"
+                                        SelectList="@(() => SetMode(AutomationEditorMode.List))"
+                                        Validate="ValidateAsync"
+                                        Test="RunSampleAsync"
+                                        Save="SaveAsync"
+                                        Hide="ToggleEditorTools"
+                                        ToggleEnabled="ToggleEnabledAsync" />
 
                 <div class="automation-focus-controls" role="group" aria-label="Editor focus controls" data-automation-focus-controls>
                     <button type="button"
@@ -165,82 +155,39 @@
                 }
 
                 <div class="@_editorBodyClass">
-                    @if (!_focusMode || !_flowRailCollapsed)
-                    {
-                    <aside class="automation-flow-rail" aria-label="Flow library">
-                        <div class="automation-flow-rail-heading">
-                            <strong>Flows</strong>
-                            <span>
-                                @if (_focusMode)
-                                {
-                                    <button type="button" aria-label="Hide flow list" title="Hide flow list" @onclick="ToggleFlowRail"><AutomationIcon Name="collapse-left" /></button>
-                                }
-                                <button type="button" aria-label="New flow" title="New flow" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" /></button>
-                            </span>
-                        </div>
-                        @foreach (var flow in _flowSnapshots)
-                        {
-                            <button @key="flow.Draft.Id"
-                                    type="button"
-                                    class="@(flow.Draft.Id == _editor.Id ? "automation-flow-item automation-flow-item--active" : "automation-flow-item")"
-                                    @onclick="() => RequestSelectFlowAsync(flow)">
-                                <strong>@FlowDisplayName(flow)</strong>
-                                <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
-                            </button>
-                        }
-                        @if (_editor.Id is null)
-                        {
-                            <div class="automation-flow-item automation-flow-item--active">
-                                <strong>@_editor.Name</strong>
-                                <span><span><i class="automation-status-dot automation-status-dot--draft"></i>Not saved</span><span>@_editor.Nodes.Count nodes</span></span>
-                            </div>
-                        }
-                        @if (_editor.Id is not null)
-                        {
-                            <div class="automation-flow-rail-actions">
-                                <button class="btn-secondary" type="button" @onclick="RequestDuplicateAsync"><AutomationIcon Name="duplicate" />Duplicate</button>
-                                <button class="automation-danger-button" type="button" @onclick="RequestDelete"><AutomationIcon Name="delete" />@(_deleteConfirmation ? "Confirm delete" : "Delete")</button>
-                            </div>
-                        }
-                        <p>Flows use the selected channel. Duplicating copies the graph, not run history.</p>
-                    </aside>
-                    }
+                    <AutomationFlowRail Visible="@(!_focusMode || !_flowRailCollapsed)"
+                                        FocusMode="_focusMode"
+                                        Flows="_flowSnapshots"
+                                        CurrentFlowId="_editor.Id"
+                                        CurrentName="_editor.Name"
+                                        CurrentNodeCount="_editor.Nodes.Count"
+                                        Validated="_validated"
+                                        ValidationErrorsEmpty="_validationErrors.IsEmpty"
+                                        DeleteConfirmation="_deleteConfirmation"
+                                        Toggle="ToggleFlowRail"
+                                        NewFlow="RequestNewFlowAsync"
+                                        Select="RequestSelectFlowAsync"
+                                        Duplicate="RequestDuplicateAsync"
+                                        Delete="RequestDelete" />
 
                     @if (_nodeLibraryOpen)
                     {
-                        <AutomationToolbox Definitions="_definitions"
+                        <AutomationToolbox @ref="_toolbox"
+                                           Definitions="_definitions"
                                            Nodes="_editor.Nodes"
                                            Add="AddNode"
                                            Close="CloseNodeLibraryAsync" />
                     }
 
                     <div class="automation-workspace" role="region" aria-label="Flow workspace" @onclick="CloseNodeLibraryFromOutsideAsync">
-                        <div class="automation-workspace-toolbar" role="toolbar" aria-label="Automation editor tools" @onclick:stopPropagation="true">
-                            <button class="automation-toolbox-button"
-                                    type="button"
-                                    aria-expanded="@_nodeLibraryOpen"
-                                    @ref="_toolboxOpener"
-                                    @onclick="ToggleNodeLibraryAsync"><AutomationIcon Name="add" />Toolbox</button>
-                            @if (_selectedNode is not null)
-                            {
-                                <button class="automation-mobile-inspector-button" type="button" @onclick="FocusInspectorAsync"><AutomationIcon Name="node" />Inspector</button>
-                            }
-                            <label><span class="sr-only">Flow direction</span><select value="@_editor.Canvas.Orientation" @onchange="ChangeOrientation"><option value="@AutomationFlowOrientation.Horizontal">Horizontal</option><option value="@AutomationFlowOrientation.Vertical">Vertical</option></select></label>
-                            <label><span class="sr-only">Connection style</span><select value="@_editor.Canvas.EdgeStyle" @onchange="ChangeEdgeStyle"><option value="@AutomationEdgeStyle.Angular">Angular</option><option value="@AutomationEdgeStyle.Smooth">Smooth</option></select></label>
-                            <span class="automation-connection-legend automation-connection-legend--flow">Flow schedules</span>
-                            <span class="automation-connection-legend automation-connection-legend--data">Data supplies values</span>
-                        </div>
-                        @if (_selectedNode is not null)
-                        {
-                            <div class="automation-mobile-selection-summary" aria-label="Selected node summary">
-                                <div>
-                                    <strong>@_selectedNode.EffectiveName</strong><span> · @_selectedNode.Definition.Display.Name</span>
-                                    <small>Inputs: @string.Join(", ", _selectedNode.Definition.Inputs.Select(static port => port.Name))</small>
-                                    <small>Outputs: @string.Join(", ", _selectedNode.Definition.Outputs.Select(static port => port.Name))</small>
-                                </div>
-                                <button type="button" @onclick="FocusInspectorAsync"><AutomationIcon Name="node" />Inspector</button>
-                            </div>
-                        }
+                        <AutomationWorkspaceToolbar @ref="_workspaceToolbar"
+                                                    ToolboxOpen="_nodeLibraryOpen"
+                                                    Settings="_editor.Canvas"
+                                                    SelectedNode="_selectedNode"
+                                                    ToggleToolbox="ToggleNodeLibraryAsync"
+                                                    FocusInspector="FocusInspectorAsync"
+                                                    OrientationChanged="ChangeOrientation"
+                                                    EdgeStyleChanged="ChangeEdgeStyle" />
                         @if (_mode == AutomationEditorMode.Grid)
                         {
                             <AutomationFlowCanvas @ref="_canvas"
@@ -248,6 +195,7 @@
                                                   Edges="_editor.Edges"
                                                   SelectedNodeIds="_selectedNodeIds"
                                                   DisclosedNodeId="_disclosedNodeId"
+                                                  DisclosureGeneration="_disclosureGeneration"
                                                   SelectedEdgeId="_selectedEdgeId"
                                                   Errors="_validationPresentation.VisibleErrors"
                                                   SampleOutcomes="_sampleOutcomes"
@@ -255,8 +203,7 @@
                                                   ViewportKey="_canvasViewportKey"
                                                   SelectionChanged="ChangeCanvasSelection"
                                                   PointerSelectionChanged="ChangeCanvasPointerSelection"
-                                                  NodeActivated="ActivateCanvasNode"
-                                                  DisclosureClosed="CloseCanvasNodeDisclosure"
+                                                  DisclosureChanged="SetCanvasNodeDisclosure"
                                                   MoveNodes="MoveNodes"
                                                   DeleteNodes="DeleteNodes"
                                                   DeleteEdge="DeleteEdge"
@@ -295,23 +242,18 @@
                     }
                 </div>
 
-                @if (!_focusMode || !_runDrawerCollapsed)
-                {
-                <footer class="automation-run-drawer" data-automation-run-kind="@(_sampleOutcomes.IsEmpty ? "history" : "sample")">
-                    <div class="automation-run-summary">
-                        <span class="@_runIconClass" aria-hidden="true">@_runIcon</span>
-                        <div><strong>@_runTitle</strong><span>@_runDescription</span></div>
-                    </div>
-                    <div class="automation-run-actions">
-                        @if (_focusMode)
-                        {
-                            <button class="btn-secondary" type="button" @onclick="ToggleRunDrawer"><AutomationIcon Name="hide" />Hide runs</button>
-                        }
-                        <button class="btn-secondary" type="button" disabled="@(_recentRuns.Length == 0)" @onclick="ShowRunDetails"><AutomationIcon Name="history" />Run details</button>
-                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" @onclick="RunSampleAsync"><AutomationIcon Name="test" />Test again</button>
-                    </div>
-                </footer>
-                }
+                <AutomationRunDrawer Visible="@(!_focusMode || !_runDrawerCollapsed)"
+                                     FocusMode="_focusMode"
+                                     HasRecentRuns="@(_recentRuns.Length > 0)"
+                                     CanRunSample="@(!_busy && _editor.Nodes.Count > 0)"
+                                     Kind="@(_sampleOutcomes.IsEmpty ? "history" : "sample")"
+                                     IconClass="_runIconClass"
+                                     Icon="_runIcon"
+                                     Title="_runTitle"
+                                     Description="_runDescription"
+                                     Toggle="ToggleRunDrawer"
+                                     ShowDetails="ShowRunDetails"
+                                     RunSample="RunSampleAsync" />
 
                 @if (_focusMode)
                 {
@@ -334,21 +276,8 @@
     }
 </DashboardPage>
 
-@if (_dirtyDialogOpen)
-{
-    <div class="automation-dirty-dialog-backdrop" @onclick="CancelDirtyTransition">
-        <section class="automation-dirty-dialog"
-                 role="dialog"
-                 aria-modal="true"
-                 aria-labelledby="automation-dirty-dialog-title"
-                 @onclick:stopPropagation="true">
-            <h2 id="automation-dirty-dialog-title">Are you sure?</h2>
-            <p>This flow has unsaved changes. Save the flow, discard the changes, or stay on this flow.</p>
-            <div class="automation-dirty-dialog-actions">
-                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelDirtyTransition"><AutomationIcon Name="cancel" />Cancel</button>
-                <button class="automation-danger-button" type="button" disabled="@_busy" @onclick="DiscardDirtyTransitionAsync"><AutomationIcon Name="delete" />Discard</button>
-                <button class="btn-primary" type="button" disabled="@_busy" autofocus @onclick="SaveDirtyTransitionAsync"><AutomationIcon Name="save" />Save</button>
-            </div>
-        </section>
-    </div>
-}
+<AutomationDirtyDialog Open="_dirtyDialogOpen"
+                       Busy="_busy"
+                       Cancel="CancelDirtyTransition"
+                       Discard="DiscardDirtyTransitionAsync"
+                       Save="SaveDirtyTransitionAsync" />

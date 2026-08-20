@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AngleSharp.Dom;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
@@ -64,7 +65,6 @@ public sealed class AutomationEditorInteractionTests
             .Single(static value => value.Id == AutomationDefinitionIds.SendChatAction);
         var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
         IReadOnlyList<AutomationNodeMoveRequest>? moved = null;
-        var disclosureClosures = 0;
         var canvas = context.Render<AutomationFlowCanvas>(parameters =>
             parameters
                 .Add(component => component.Nodes, [node])
@@ -75,7 +75,6 @@ public sealed class AutomationEditorInteractionTests
                 )
                 .Add(component => component.DisclosedNodeId, node.Id)
                 .Add(component => component.MoveNodes, requests => moved = requests)
-                .Add(component => component.DisclosureClosed, () => disclosureClosures++)
         );
 
         canvas
@@ -83,7 +82,6 @@ public sealed class AutomationEditorInteractionTests
             .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
 
         moved.ShouldBe([new AutomationNodeMoveRequest(node.Id, 72, 72)]);
-        disclosureClosures.ShouldBe(0);
         canvas.Find("[data-automation-node-select]").GetAttribute("aria-expanded").ShouldBe("true");
     }
 
@@ -105,7 +103,7 @@ public sealed class AutomationEditorInteractionTests
             ),
             new(new(288), new(72))
         );
-        AutomationNodeId? activated = null;
+        AutomationCanvasDisclosureRequest? disclosure = null;
         AutomationCanvasSelectionRequest? compactSelection = null;
         AutomationCanvasSelectionRequest? pointerSelection = null;
         var canvas = context.Render<AutomationFlowCanvas>(parameters =>
@@ -116,7 +114,7 @@ public sealed class AutomationEditorInteractionTests
                     component => component.SelectedNodeIds,
                     new HashSet<AutomationNodeId> { firstNode.Id, secondNode.Id }
                 )
-                .Add(component => component.NodeActivated, nodeId => activated = nodeId)
+                .Add(component => component.DisclosureChanged, request => disclosure = request)
                 .Add(component => component.SelectionChanged, value => compactSelection = value)
                 .Add(
                     component => component.PointerSelectionChanged,
@@ -135,8 +133,8 @@ public sealed class AutomationEditorInteractionTests
         pointerSelection.EdgeId.ShouldBeNull();
         compactSelection.ShouldBeNull();
 
-        await canvas.Instance.ActivateNodeFromCanvasAsync(firstNode.Id.Value);
-        activated.ShouldBe(firstNode.Id);
+        await canvas.Instance.SetNodeDisclosureFromCanvasAsync(firstNode.Id.Value, 1);
+        disclosure.ShouldBe(new(firstNode.Id, 1));
 
         canvas.Render(parameters =>
             parameters
@@ -314,7 +312,7 @@ public sealed class AutomationEditorInteractionTests
         await fixture.Page.InvokeAsync(() =>
             fixture
                 .Page.FindComponent<AutomationFlowCanvas>()
-                .Instance.ActivateNodeFromCanvasAsync(source.Id.Value)
+                .Instance.SetNodeDisclosureFromCanvasAsync(null, 2)
         );
         fixture.Page.WaitForAssertion(() =>
         {
@@ -326,7 +324,7 @@ public sealed class AutomationEditorInteractionTests
         await fixture.Page.InvokeAsync(() =>
             fixture
                 .Page.FindComponent<AutomationFlowCanvas>()
-                .Instance.ActivateNodeFromCanvasAsync(target.Id.Value)
+                .Instance.SetNodeDisclosureFromCanvasAsync(target.Id.Value, 4)
         );
         fixture.Page.WaitForAssertion(() =>
         {
@@ -337,75 +335,6 @@ public sealed class AutomationEditorInteractionTests
             NodeSelector(fixture.Page, source.Id).GetAttribute("aria-pressed").ShouldBe("false");
         });
     }
-
-    [Test]
-    public void TypedEditor_Canvas_RevealsPreRenderedDisclosedContentInOneStage()
-    {
-        using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var definition = ProductionDefinitions()
-            .Single(value => value.Id == AutomationDefinitionIds.ConditionControl);
-        var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
-        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [node])
-                .Add(component => component.Edges, [])
-                .Add(component => component.ViewportKey, "single-stage-reveal")
-        );
-
-        // Stage-1 readiness: the disclosed content is already in the document for an
-        // undisclosed node, so the local class toggle has nothing left to fetch.
-        var article = canvas.Find($"[data-automation-node='{node.Id.Value:D}']");
-        article.ClassList.ShouldNotContain("automation-node--disclosed");
-        canvas
-            .Find("[data-automation-node-select]")
-            .GetAttribute("aria-expanded")
-            .ShouldBe("false");
-        canvas
-            .Find(".automation-node-description")
-            .TextContent.Trim()
-            .ShouldBe(definition.Display.Description);
-        var compactPortRows = canvas
-            .FindAll(".automation-node-selected-ports > span")
-            .Select(static row => row.TextContent.Trim())
-            .ToArray();
-        foreach (var input in definition.Inputs)
-        {
-            compactPortRows.ShouldContain($"{AccessiblePortName(input)}in");
-        }
-        foreach (var output in definition.Outputs)
-        {
-            compactPortRows.ShouldContain($"{AccessiblePortName(output)}out");
-        }
-
-        var compactContent = DisclosedContentMarkup(canvas);
-        var compactNodeStyle = article.GetAttribute("style");
-        var compactClasses = article.ClassList.ToArray();
-
-        canvas.Render(parameters =>
-            parameters
-                .Add(component => component.Nodes, [node])
-                .Add(component => component.Edges, [])
-                .Add(component => component.ViewportKey, "single-stage-reveal")
-                .Add(component => component.DisclosedNodeId, node.Id)
-        );
-
-        var disclosedArticle = canvas.Find($"[data-automation-node='{node.Id.Value:D}']");
-        disclosedArticle.ClassList.ShouldContain("automation-node--disclosed");
-        canvas.Find("[data-automation-node-select]").GetAttribute("aria-expanded").ShouldBe("true");
-
-        // Disclosing changes nothing but the class and aria-expanded bookkeeping, so the
-        // Blazor patch that follows the local echo cannot produce a second geometry change.
-        DisclosedContentMarkup(canvas).ShouldBe(compactContent);
-        disclosedArticle.GetAttribute("style").ShouldBe(compactNodeStyle);
-        disclosedArticle
-            .ClassList.Where(static value => value != "automation-node--disclosed")
-            .ShouldBe(compactClasses);
-    }
-
-    private static string DisclosedContentMarkup(IRenderedComponent<AutomationFlowCanvas> canvas) =>
-        canvas.Find(".automation-node-description").OuterHtml
-        + canvas.Find(".automation-node-selected-ports").OuterHtml;
 
     [Test]
     public void TypedEditor_BindingModes_RoundTripWithoutDiscardingInactiveFixedOrExpressionPayloads()
@@ -444,6 +373,59 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    [Arguments(
+        AutomationPortValueType.Actor,
+        "{\"login\":\"viewer\",\"display-name\":\"Viewer\"}",
+        "{}"
+    )]
+    [Arguments(
+        AutomationPortValueType.Channel,
+        "{\"login\":\"channel\",\"display-name\":\"Channel\"}",
+        "[]"
+    )]
+    [Arguments(
+        AutomationPortValueType.Stream,
+        "{\"title\":\"Live\",\"game-name\":\"Game\",\"started-at\":\"2026-08-20T12:00:00Z\"}",
+        "{\"started-at\":\"later\"}"
+    )]
+    [Arguments(AutomationPortValueType.Arguments, "[\"first\",\"second\"]", "{}")]
+    public void TypedEditor_ComplexFixedValue_RoundTripsAndRejectsInvalidReplacement(
+        AutomationPortValueType valueType,
+        string source,
+        string invalid
+    )
+    {
+        var definition = ProductionDefinitions()
+            .Single(candidate => candidate.Id == AutomationDefinitionIds.CelTransform);
+        var transform = AutomationEditorNode.Create(definition, new(new(48), new(72)));
+        var input = transform.TransformInputs.Single();
+        transform.UpdateTransformInput(
+            input.PortId,
+            input.DisplayName,
+            valueType,
+            AutomationPortNullability.NonNullable
+        );
+
+        transform.SetComplexFixedValue(input.PortId, source).ShouldBeTrue();
+        var accepted = FixedValueJson(transform);
+        AssertFixedValuesEqual(
+            ParsedFixedValue(accepted, valueType),
+            ParsedFixedValue(source, valueType)
+        );
+
+        transform.SetComplexFixedValue(input.PortId, invalid).ShouldBeFalse();
+        FixedValueJson(transform).ShouldBe(accepted);
+
+        var restored = AutomationEditorNode.Restore(transform.Draft(), transform.Definition);
+        JsonNode
+            .DeepEquals(
+                JsonNode.Parse(restored.Value(input.BindingFieldId)),
+                JsonNode.Parse(accepted)
+            )
+            .ShouldBeTrue();
+    }
+
+    [Test]
     public void TypedEditor_ToolboxSearch_RanksAcrossStableCategoriesAndInterleavesAvailability()
     {
         var availableAction = Definition("send-message", AutomationNodeKind.Action, "Send message");
@@ -464,8 +446,8 @@ public sealed class AutomationEditorInteractionTests
             "message",
             definition =>
                 definition.Id == unavailableTrigger.Id
-                    ? (false, "BlokeBot needs permission to read chat events.")
-                    : (true, "Available in this flow.")
+                    ? new(false, "BlokeBot needs permission to read chat events.")
+                    : new(true, "Available in this flow.")
         );
 
         results
@@ -483,7 +465,7 @@ public sealed class AutomationEditorInteractionTests
                 [configuredTransform with { Outputs = [] }],
                 AutomationToolboxCategory.Values,
                 "message",
-                static _ => (true, "Available."),
+                static _ => new(true, "Available."),
                 [configuredTransform]
             )
             .ShouldHaveSingleItem()
@@ -494,7 +476,7 @@ public sealed class AutomationEditorInteractionTests
                 [availableAction],
                 AutomationToolboxCategory.Values,
                 "no result",
-                static _ => (true, "Available.")
+                static _ => new(true, "Available.")
             )
             .ShouldBeEmpty();
     }
@@ -519,6 +501,36 @@ public sealed class AutomationEditorInteractionTests
         selectedTab.ShouldBe(updatedTabs[2]);
         toolbox.Find("[data-automation-toolbox]").KeyDown(new KeyboardEventArgs { Key = "Escape" });
         closed.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task TypedEditor_Page_ToolboxOpenFocusesSearchAndEscapeReturnsToOpener()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync();
+        var opener = fixture.Page.Find("[data-automation-toolbox-toggle]");
+        var initialFocusCalls = fixture.FocusCalls;
+
+        opener.Click();
+
+        fixture.Page.WaitForAssertion(() =>
+        {
+            _ = fixture.Page.Find("[data-automation-toolbox-search]");
+            fixture.FocusCalls.ShouldBe(initialFocusCalls + 1);
+        });
+
+        fixture
+            .Page.Find("[data-automation-toolbox-search]")
+            .KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        fixture.Page.WaitForAssertion(() =>
+        {
+            fixture.Page.FindAll("[data-automation-toolbox]").ShouldBeEmpty();
+            fixture.FocusCalls.ShouldBe(initialFocusCalls + 2);
+            fixture
+                .Page.Find("[data-automation-toolbox-toggle]")
+                .GetAttribute("aria-expanded")
+                .ShouldNotBe("true");
+        });
     }
 
     [Test]
@@ -572,59 +584,6 @@ public sealed class AutomationEditorInteractionTests
         replacement.Position.ShouldBe(removedPosition);
         replacement.Position.ShouldNotBe(first.Position);
         replacement.Position.ShouldNotBe(third.Position);
-    }
-
-    [Test]
-    public void TypedEditor_TypedConnections_AllowFanOutAndRetainAnExactInvalidEdgeForRepair()
-    {
-        var sourceDefinition = Definition(
-            "number-source",
-            AutomationNodeKind.Value,
-            "Number source",
-            outputs: [Port("number", AutomationPortValueType.Number)]
-        );
-        var targetDefinition = Definition(
-            "boolean-target",
-            AutomationNodeKind.Control,
-            "Boolean target",
-            inputs:
-            [
-                Port(
-                    "predicate",
-                    AutomationPortValueType.Boolean,
-                    bindingFieldId: new("predicate")
-                ),
-            ]
-        );
-        var source = AutomationEditorNode.Create(sourceDefinition, new(new(48), new(72)));
-        var firstTarget = AutomationEditorNode.Create(targetDefinition, new(new(288), new(72)));
-        var secondTarget = AutomationEditorNode.Create(targetDefinition, new(new(288), new(240)));
-        var edges = new[]
-        {
-            new AutomationFlowDraftEdge(
-                Guid.NewGuid(),
-                AutomationEdgeKind.Data,
-                source.Id,
-                new("number"),
-                firstTarget.Id,
-                new("predicate")
-            ),
-            new AutomationFlowDraftEdge(
-                Guid.NewGuid(),
-                AutomationEdgeKind.Data,
-                source.Id,
-                new("number"),
-                secondTarget.Id,
-                new("predicate")
-            ),
-        };
-
-        edges.ShouldAllBe(edge => edge.SourceNodeId == source.Id);
-        edges.Select(static edge => edge.TargetNodeId).Distinct().Count().ShouldBe(2);
-        var issues = edges
-            .Select(edge => AutomationConnections.Issue(edge, [source, firstTarget, secondTarget]))
-            .ToArray();
-        issues.ShouldAllBe(static issue => !string.IsNullOrWhiteSpace(issue));
     }
 
     [Test]
@@ -807,8 +766,7 @@ public sealed class AutomationEditorInteractionTests
         var completion = ActivatePickerAction(
             nodes.Target,
             [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target],
-            [],
-            "Connect"
+            []
         );
 
         completion.Connection.ShouldBe(expected);
@@ -838,8 +796,7 @@ public sealed class AutomationEditorInteractionTests
         var completion = ActivatePickerAction(
             nodes.Target,
             [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target],
-            [retained],
-            "Connect"
+            [retained]
         );
 
         completion.Connection.ShouldBeNull();
@@ -874,16 +831,21 @@ public sealed class AutomationEditorInteractionTests
         var inspector = context.Render<AutomationNodeInspector>(parameters =>
             parameters
                 .Add(component => component.Node, nodes.Target)
-                .Add(component => component.Nodes, [nodes.IncompatibleSource, nodes.Target])
+                .Add(
+                    component => component.Nodes,
+                    [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target]
+                )
                 .Add(component => component.Edges, [])
                 .Add(component => component.Connect, request => connection = request)
                 .Add(component => component.Repair, request => repair = request)
         );
 
         inspector.Find("button[aria-haspopup=dialog]").Click();
-        inspector.Find("[role=dialog] button[aria-pressed=false]").Click();
+        inspector
+            .Find("[role=radiogroup] [role=radio][aria-checked=true]")
+            .KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
 
-        var selectedChoice = inspector.Find("[role=dialog] button[aria-pressed=true]");
+        var selectedChoice = inspector.Find("[role=radiogroup] [role=radio][aria-checked=true]");
         selectedChoice.TextContent.ShouldContain(compatibility.Reason);
         inspector.Find("[role=dialog] button[disabled]").Click();
         connection.ShouldBeNull();
@@ -1049,7 +1011,7 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
-    public void TypedEditor_Inspector_RetainedConnectionShowsDiagnosticWithoutFillerProse()
+    public void TypedEditor_Inspector_RetainedConnectionShowsDiagnosticAndRepairAction()
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -1075,44 +1037,7 @@ public sealed class AutomationEditorInteractionTests
         inspector
             .Find(".automation-connection-diagnostic[role=alert]")
             .TextContent.ShouldNotBeNullOrWhiteSpace();
-        inspector
-            .FindAll("button")
-            .ShouldContain(button => button.TextContent.Trim() == "Repair source");
-        inspector.Markup.ShouldNotContain("BlokeBot keeps");
-        inspector.Markup.ShouldNotContain("unused choices");
-    }
-
-    [Test]
-    public void TypedEditor_Inspector_BindingModeButtonsDescribeTheirOwnChoiceWithoutHelpProse()
-    {
-        using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var nodes = CreatePickerNodes();
-        var inspector = context.Render<AutomationNodeInspector>(parameters =>
-            parameters
-                .Add(component => component.Node, nodes.Target)
-                .Add(component => component.Nodes, [nodes.CompatibleSource, nodes.Target])
-                .Add(component => component.Edges, [])
-        );
-
-        var expected = new Dictionary<string, string>
-        {
-            ["Fixed"] = "Enter a value",
-            ["Connected"] = "Use another node",
-            ["Expression"] = "Calculate a value",
-        };
-        var buttons = inspector.FindAll(".automation-binding-mode-tabs button");
-        buttons.Count.ShouldBe(expected.Count);
-        foreach (var button in buttons)
-        {
-            var guidance = expected[button.TextContent.Trim()];
-            button.GetAttribute("title").ShouldBe(guidance);
-            var describedBy = button.GetAttribute("aria-describedby");
-            describedBy.ShouldNotBeNullOrWhiteSpace();
-            inspector.Find($"[id='{describedBy}']").TextContent.Trim().ShouldBe(guidance);
-        }
-
-        inspector.Markup.ShouldNotContain("Fixed: Enter a value");
+        _ = inspector.Find("button[data-automation-source-picker-open]");
     }
 
     [Test]
@@ -1310,8 +1235,7 @@ public sealed class AutomationEditorInteractionTests
     private static PickerCompletion ActivatePickerAction(
         AutomationEditorNode target,
         IReadOnlyList<AutomationEditorNode> nodes,
-        IReadOnlyList<AutomationFlowDraftEdge> edges,
-        string actionName
+        IReadOnlyList<AutomationFlowDraftEdge> edges
     )
     {
         using var context = new BunitContext();
@@ -1328,15 +1252,10 @@ public sealed class AutomationEditorInteractionTests
         );
         var opener = inspector.Find("button[aria-haspopup=dialog]");
         opener.Click();
-        inspector.Find("[role=dialog] button[aria-pressed=true]").Click();
+        inspector.Find("[role=radiogroup] [role=radio][aria-checked=true]").Click();
         var focusCalls = FocusCalls(context);
 
-        inspector
-            .FindAll("button")
-            .Single(button =>
-                string.Equals(button.TextContent.Trim(), actionName, StringComparison.Ordinal)
-            )
-            .Click();
+        inspector.Find("button[data-automation-source-picker-complete]").Click();
 
         inspector.FindAll("[role=dialog]").ShouldBeEmpty();
         FocusCalls(context).ShouldBe(focusCalls + 1);
@@ -1347,6 +1266,45 @@ public sealed class AutomationEditorInteractionTests
         context.JSInterop.Invocations.Count(static invocation =>
             invocation.Identifier == _focusInterop
         );
+
+    private static string FixedValueJson(AutomationEditorNode node) =>
+        node.Draft()
+            .Definition.Configuration.GetProperty("inputs")[0]
+            .GetProperty("fixed")
+            .GetRawText();
+
+    private static AutomationValue ParsedFixedValue(
+        string source,
+        AutomationPortValueType valueType
+    )
+    {
+        using var document = JsonDocument.Parse(source);
+        AutomationCelTransform
+            .TryValue(
+                document.RootElement,
+                valueType,
+                AutomationPortNullability.NonNullable,
+                out var value
+            )
+            .ShouldBeTrue();
+        return value;
+    }
+
+    private static void AssertFixedValuesEqual(AutomationValue actual, AutomationValue expected)
+    {
+        if (
+            actual is AutomationValue.Arguments actualArguments
+            && expected is AutomationValue.Arguments expectedArguments
+        )
+        {
+            actualArguments
+                .Values.Select(static argument => argument.Value)
+                .ShouldBe(expectedArguments.Values.Select(static argument => argument.Value));
+            return;
+        }
+
+        actual.ShouldBe(expected);
+    }
 
     private static AutomationConnectionRequest FlowConnection(
         AutomationEditorNode source,
@@ -1374,7 +1332,10 @@ public sealed class AutomationEditorInteractionTests
     {
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationFlowCanvas>()
-                .Instance.ActivateNodeFromCanvasAsync(nodeId.Value)
+                .Instance.SetNodeDisclosureFromCanvasAsync(
+                    nodeId.Value,
+                    page.FindComponent<AutomationFlowCanvas>().Instance.DisclosureGeneration + 1
+                )
         );
         page.WaitForAssertion(() => DisclosureCount(page).ShouldBe(1));
     }
@@ -1463,6 +1424,8 @@ public sealed class AutomationEditorInteractionTests
         private readonly BunitContext _context;
 
         internal IRenderedComponent<AutomationEditorPage> Page { get; }
+
+        internal int FocusCalls => AutomationEditorInteractionTests.FocusCalls(_context);
 
         internal static async Task<AutomationEditorPageFixture> CreateAsync(
             bool includeUnavailableFlow = false

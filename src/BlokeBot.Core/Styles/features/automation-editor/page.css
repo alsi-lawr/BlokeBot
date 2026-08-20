@@ -1,0 +1,60 @@
+.automation-page-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    margin-top: -4.2rem;
+    padding-bottom: 1.15rem;
+}
+
+.automation-page-actions > :first-child {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+    min-width: 2.5rem;
+}
+
+.automation-page-actions button,
+.automation-empty button,
+.automation-editor-actions button,
+.automation-flow-rail-actions button,
+.automation-run-actions button,
+.automation-dirty-dialog-actions button,
+.automation-inspector-footer button,
+.automation-restore-tab {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.35rem;
+    justify-content: center;
+}
+
+.automation-empty {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 4rem 1.5rem;
+    text-align: center;
+}
+
+.automation-empty h2,
+.automation-empty p {
+    margin: 0;
+}
+
+.automation-empty p {
+    color: var(--app-text-muted);
+    max-width: 34rem;
+}
+
+.automation-empty-icon {
+    align-items: center;
+    background: var(--tone-violet-bg);
+    border: 1px solid var(--tone-violet-ring);
+    border-radius: 0.8rem;
+    color: var(--tone-violet-fg);
+    display: inline-flex;
+    font-size: 1.5rem;
+    height: 3.25rem;
+    justify-content: center;
+    width: 3.25rem;
+}

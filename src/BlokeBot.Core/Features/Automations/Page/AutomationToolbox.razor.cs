@@ -13,6 +13,7 @@ public partial class AutomationToolbox
     private ElementReference _transformTab;
     private ElementReference _controlTab;
     private ElementReference _actionTab;
+    private ElementReference _searchInput;
 
     [Parameter, EditorRequired]
     public IReadOnlyList<AutomationDefinitionDescriptor> Definitions { get; set; } = [];
@@ -77,32 +78,10 @@ public partial class AutomationToolbox
     private Task AddAsync(AutomationToolboxItem item) =>
         item.IsAvailable ? Add.InvokeAsync(item.Definition) : Task.CompletedTask;
 
-    private (bool Available, string Reason) Availability(AutomationDefinitionDescriptor definition)
-    {
-        if (definition.TriggerContextRequirement is { } requirement)
-        {
-            var sources = Nodes.Where(static node =>
-                node.Definition.Kind == AutomationNodeKind.Source
-            );
-            var available =
-                sources.Any()
-                && sources.All(node => requirement.CompatibleSources.Contains(node.Definition.Id));
-            return available
-                ? (true, AvailableReason(definition))
-                : (false, requirement.UnavailableReason);
-        }
+    internal ValueTask FocusSearchAsync() => _searchInput.FocusAsync();
 
-        return (true, AvailableReason(definition));
-    }
-
-    private static string AvailableReason(AutomationDefinitionDescriptor definition) =>
-        definition.Kind switch
-        {
-            AutomationNodeKind.Source => "Available for this channel.",
-            AutomationNodeKind.Transform => "Available for declared node inputs.",
-            AutomationNodeKind.Value => "Available in this flow.",
-            _ => "Available in this flow.",
-        };
+    private AutomationNodeAvailability Availability(AutomationDefinitionDescriptor definition) =>
+        AutomationNodeAvailability.Evaluate(definition, Nodes);
 
     private static string AccessibleLabel(AutomationToolboxItem item) =>
         item.IsAvailable

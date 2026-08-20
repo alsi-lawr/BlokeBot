@@ -1,0 +1,104 @@
+.automation-source-picker-backdrop {
+    align-items: center;
+    background: rgb(15 23 42 / 0.58);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    z-index: 520;
+}
+
+.automation-source-picker {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 3rem rgb(15 23 42 / 0.35);
+    max-height: min(38rem, 85dvh);
+    max-width: calc(100vw - 2rem);
+    overflow: auto;
+    padding: 0.75rem;
+    width: 30rem;
+}
+
+.automation-source-picker-options {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.75rem 0;
+}
+
+.automation-source-picker-option {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.45rem;
+    color: var(--app-text-strong);
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.automation-source-picker-option span,
+.automation-source-picker-option small {
+    display: block;
+}
+
+.automation-source-picker-option em {
+    color: var(--app-text-muted);
+    font-size: 0.62rem;
+    font-style: normal;
+    max-width: 45%;
+    text-align: right;
+}
+
+.automation-source-picker-option--selected {
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 2px var(--tone-blue-ring);
+}
+
+.automation-source-picker footer {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.automation-connection-list {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.automation-connection-row {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.6rem;
+    display: grid;
+    grid-template-columns: 10rem 13.5rem minmax(17rem, 1fr) 7rem 5rem;
+    overflow: hidden;
+}
+
+.automation-connection-row--invalid {
+    border-color: var(--tone-red-ring);
+}
+
+.automation-connection-row > * {
+    border-left: 1px solid var(--app-border);
+    min-width: 0;
+    padding: 0.55rem;
+}
+
+.automation-connection-row > :first-child {
+    border-left: 0;
+}
+
+.automation-connection-node {
+    align-items: flex-start;
+    background: transparent;
+    border: 0;
+    color: var(--app-text-strong);
+    display: flex;
+    gap: 0.45rem;
+    text-align: left;
+}
+
+.automation-connection-node span,
+.automation-connection-node small,

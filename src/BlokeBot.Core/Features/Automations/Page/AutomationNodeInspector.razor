@@ -69,11 +69,6 @@ else
             </section>
         }
 
-        @if (Node.Definition.Inputs.Any(IsDataPort))
-        {
-            <div class="automation-binding-mode-help">@foreach (var mode in Enum.GetValues<AutomationInputBindingMode>()){<span id="@BindingModeHelpId(mode)">@BindingModeHelp(mode)</span>}</div>
-        }
-
         @foreach (var input in Node.Definition.Inputs.Where(IsDataPort))
         {
             var fieldId = input.BindingFieldId!.Value;
@@ -85,12 +80,26 @@ else
                 <div class="automation-binding-mode-tabs" role="group" aria-label="@input.Name input choice">
                     @foreach (var mode in Enum.GetValues<AutomationInputBindingMode>())
                     {
-                        <button type="button" aria-pressed="@(binding.Mode == mode ? "true" : "false")" aria-describedby="@BindingModeHelpId(mode)" title="@BindingModeHelp(mode)" @onclick="() => SetBindingModeAsync(fieldId, mode)">@mode</button>
+                        <span class="automation-binding-mode-option">
+                            <button type="button" aria-pressed="@(binding.Mode == mode ? "true" : "false")" aria-describedby="@BindingModeHelpId(input.Id, mode)" @onclick="() => SetBindingModeAsync(fieldId, mode)">@mode</button>
+                            <span id="@BindingModeHelpId(input.Id, mode)" role="tooltip" class="automation-binding-mode-tooltip">@BindingModeHelp(mode)</span>
+                        </span>
                     }
                 </div>
                 @if (binding.Mode == AutomationInputBindingMode.Fixed)
                 {
-                    <label class="automation-field"><span>Enter a value</span><input type="@FixedInputType(input)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
+                    @if (AutomationEditorNode.IsComplexFixedValue(input.ValueType))
+                    {
+                        <label class="automation-field"><span>Enter a JSON value</span><textarea @key="(input.Id, _fixedValueAttempt)" aria-invalid="@(ComplexFixedValueDiagnostic(input.Id) is null ? null : "true")" value="@Node.Value(fieldId)" @onchange="args => SetComplexFixedValueAsync(input.Id, args.Value)"></textarea></label>
+                        @if (ComplexFixedValueDiagnostic(input.Id) is { } fixedValueDiagnostic)
+                        {
+                            <span class="automation-field-error" role="alert">@fixedValueDiagnostic</span>
+                        }
+                    }
+                    else
+                    {
+                        <label class="automation-field"><span>Enter a value</span><input type="@FixedInputType(input)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
+                    }
                 }
                 else if (binding.Mode == AutomationInputBindingMode.Expression)
                 {
@@ -131,7 +140,7 @@ else
                         </div>
                     }
                     <div class="automation-repair-actions">
-                        <button type="button" aria-haspopup="dialog" aria-expanded="@(_pickerInputId == input.Id ? "true" : "false")" @ref="_pickerOpener" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : "Repair source")</button>
+                        <button type="button" data-automation-source-picker-open aria-haspopup="dialog" aria-expanded="@(_pickerInputId == input.Id ? "true" : "false")" @ref="_pickerOpener" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : "Repair source")</button>
                         @if (edge is not null)
                         {
                             <button class="automation-danger-button" type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)">Disconnect</button>
@@ -217,13 +226,13 @@ else
             <div class="automation-source-picker-backdrop" @onclick="CancelSourcePickerAsync">
                 <section class="automation-source-picker" role="dialog" aria-modal="true" aria-labelledby="automation-source-picker-title" @onkeydown="HandlePickerKeyAsync" @onclick:stopPropagation="true">
                     <header><div><span class="automation-inspector-eyebrow">Use another node</span><h3 id="automation-source-picker-title">Choose a source and port</h3></div><button class="automation-icon-button" type="button" aria-label="Cancel source choice" @onclick="CancelSourcePickerAsync"><AutomationIcon Name="close" /></button></header>
-                    <div class="automation-source-picker-options">
+                    <div class="automation-source-picker-options" role="radiogroup" aria-label="Available source ports">
                         @foreach (var choice in SourceChoices())
                         {
-                            <button type="button" class="@(choice == _selectedSource ? "automation-source-picker-option automation-source-picker-option--selected" : "automation-source-picker-option")" aria-pressed="@(choice == _selectedSource ? "true" : "false")" @ref="_sourceReferences[choice]" @onclick="() => SelectSource(choice)"><span><strong>@choice.Node.EffectiveName · @choice.Port.Name</strong><small>@choice.Node.Definition.Display.Name · @AutomationConnections.TypeLabel(choice.Port)</small></span><em>@choice.Compatibility.Reason</em></button>
+                            <button type="button" role="radio" class="@(choice == _selectedSource ? "automation-source-picker-option automation-source-picker-option--selected" : "automation-source-picker-option")" aria-checked="@(choice == _selectedSource ? "true" : "false")" tabindex="@(choice == _selectedSource ? 0 : -1)" @ref="_sourceReferences[choice]" @onclick="() => SelectSource(choice)" @onkeydown="args => HandleSourceChoiceKeyAsync(choice, args)"><span><strong>@choice.Node.EffectiveName · @choice.Port.Name</strong><small>@choice.Node.Definition.Display.Name · @AutomationConnections.TypeLabel(choice.Port)</small></span><em>@choice.Compatibility.Reason</em></button>
                         }
                     </div>
-                    <footer><button type="button" @onclick="CancelSourcePickerAsync">Cancel</button><button class="btn-primary" type="button" disabled="@(_selectedSource?.Compatibility.IsCompatible != true)" @onclick="ConnectSelectedSourceAsync">Connect</button></footer>
+                    <footer><button type="button" @onclick="CancelSourcePickerAsync">Cancel</button><button class="btn-primary" type="button" data-automation-source-picker-complete disabled="@(_selectedSource?.Compatibility.IsCompatible != true)" @onclick="ConnectSelectedSourceAsync">Connect</button></footer>
                 </section>
             </div>
         }

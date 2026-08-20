@@ -34,8 +34,6 @@ internal sealed class AutomationEditorHistory
 
     internal int RedoCount => _redo.Count;
 
-    internal bool HasSavedDraft => _saved is not null;
-
     internal void StartNew(AutomationEditorState editor) =>
         Reset(AutomationEditorDraftSnapshot.Capture(editor), null);
 
