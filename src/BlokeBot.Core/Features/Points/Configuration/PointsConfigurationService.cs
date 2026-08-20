@@ -75,12 +75,29 @@ public sealed class PointsConfigurationService(
     > ExecuteSaveAsync(int hostId, PointsConfigurationSaveCommand command, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var stageFailure = await StageAsync(db, hostId, command, ct);
+        if (stageFailure is not null)
+        {
+            return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Error(
+                stageFailure
+            );
+        }
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
+        return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Success(new());
+    }
+
+    internal static async Task<PointsConfigurationSaveFailure?> StageAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        PointsConfigurationSaveCommand command,
+        CancellationToken ct
+    )
+    {
         var aliasFailure = await ReplaceAliasesAsync(db, hostId, command.Aliases, ct);
         if (aliasFailure is not null)
         {
-            return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Error(
-                aliasFailure
-            );
+            return aliasFailure;
         }
 
         var settings = await db.PointsSettings.SingleOrDefaultAsync(x => x.HostId == hostId, ct);
@@ -99,9 +116,7 @@ public sealed class PointsConfigurationService(
             command.ReplyDelivery.Only(PointsReplyKeys.WhisperableKeys),
             ct
         );
-        _ = await db.SaveChangesAsync(ct);
-        _ = await changes.NotifyChangedAsync(ct);
-        return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Success(new());
+        return null;
     }
 
     private static void Apply(PointsSettings settings, PointsConfigurationSaveCommand command)

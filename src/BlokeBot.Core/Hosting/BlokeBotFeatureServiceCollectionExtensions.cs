@@ -206,6 +206,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<IHostFeatureChangeObserver>(static services =>
             services.GetRequiredService<BountyPauseObserver>()
         );
+        _ =
+            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.IConfigurationActivationObserver>(
+                static services => services.GetRequiredService<BountyPauseObserver>()
+            );
         _ = services.AddSingleton(
             new BountyExpirySchedulerPolicy
             {

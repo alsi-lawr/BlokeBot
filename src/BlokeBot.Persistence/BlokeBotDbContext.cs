@@ -199,6 +199,10 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         Set<CollectiveGoalHostTotal>();
     public DbSet<CollectiveLocalSetting> CollectiveLocalSettings => Set<CollectiveLocalSetting>();
     public DbSet<CollectiveAudit> CollectiveAudits => Set<CollectiveAudit>();
+    public DbSet<ConfigurationImportAudit> ConfigurationImportAudits =>
+        Set<ConfigurationImportAudit>();
+    public DbSet<ConfigurationActivation> ConfigurationActivations =>
+        Set<ConfigurationActivation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -228,6 +232,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureOverlays(modelBuilder);
         ConfigureAutomations(modelBuilder);
         ConfigureCollectives(modelBuilder);
+        ConfigureConfigurationTransfer(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>

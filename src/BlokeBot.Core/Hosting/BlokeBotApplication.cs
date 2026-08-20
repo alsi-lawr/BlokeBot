@@ -14,6 +14,7 @@ using BlokeBot.Core.Features.Collectives;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.Competitions;
+using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.HostConfig.Page;
@@ -119,6 +120,7 @@ public static class BlokeBotApplication
             .AddBlokeBotHostedChannels(
                 online ? HostBotAppAccessTokenMode.Twitch : HostBotAppAccessTokenMode.Unavailable
             )
+            .AddBlokeBotConfigurationTransfer()
             .AddBlokeBotAutomations()
             .AddBlokeBotHosts()
             .AddBlokeBotGuessing()
@@ -247,6 +249,7 @@ public static class BlokeBotApplication
         }
 
         app.MapHostConfigEndpoints();
+        app.MapConfigurationTransferEndpoints();
         app.MapViewerPassportEndpoints();
         return app;
     }

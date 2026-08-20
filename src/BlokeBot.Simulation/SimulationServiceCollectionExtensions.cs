@@ -36,6 +36,12 @@ internal static class SimulationServiceCollectionExtensions
             >()
         );
         _ = services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
+        _ = services.AddSingleton<SimulationConfigurationActivationObserver>();
+        _ =
+            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.IConfigurationActivationObserver>(
+                static provider =>
+                    provider.GetRequiredService<SimulationConfigurationActivationObserver>()
+            );
         _ = services.Replace(
             ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()

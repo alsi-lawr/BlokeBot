@@ -422,11 +422,11 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("ExpressionLanguageVersion")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("InputBindingsJson")
-                        .IsRequired()
+                    b.Property<Guid>("FlowId")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("FlowId")
+                    b.Property<string>("InputBindingsJson")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -3919,6 +3919,99 @@ namespace BlokeBot.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_competition_reward_receipts_WinsRequired", "WinsRequired IS NULL OR WinsRequired > 0");
                         });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ConfigurationActivation", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("DisabledChanges")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("EnabledChanges")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "Status");
+
+                    b.ToTable("configuration_activations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_configuration_activations_Status", "Status IN ('Complete', 'Failed', 'Pending', 'Processing')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ConfigurationImportAudit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ActorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SourceFormatVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SummaryJson")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "OccurredAtUtc");
+
+                    b.ToTable("configuration_import_audits", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomAnnouncement", b =>
@@ -9042,6 +9135,24 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Competition");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ConfigurationActivation", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ConfigurationImportAudit", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomAnnouncement", b =>

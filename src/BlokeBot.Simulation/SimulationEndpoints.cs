@@ -66,6 +66,19 @@ internal static class SimulationEndpoints
             .AllowAnonymous();
 
         _ = app.MapPost(
+                "/simulation/configuration-activation/{mode}",
+                static (string mode, SimulationConfigurationActivationObserver observer) =>
+                {
+                    if (!Enum.TryParse<SimulationActivationMode>(mode, true, out var parsed))
+                    {
+                        return Results.BadRequest();
+                    }
+                    observer.SetMode(parsed);
+                    return Results.Ok();
+                }
+            )
+            .AllowAnonymous();
+        _ = app.MapPost(
                 "/simulation/collectives/{state}",
                 static async (
                     string state,

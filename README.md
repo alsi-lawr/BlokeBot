@@ -4,6 +4,9 @@
 
 # BlokeBot
 
+The [channel configuration transfer format](docs/configuration-transfer-format-v1.md) documents
+portable section exports, compatibility, conflict behavior, and excluded runtime or secret data.
+
 [![Build and test](https://github.com/alsi-lawr/BlokeBot/actions/workflows/build-test.yml/badge.svg)](https://github.com/alsi-lawr/BlokeBot/actions/workflows/build-test.yml)
 [![Release](https://img.shields.io/github/v/release/alsi-lawr/BlokeBot?display_name=tag&sort=semver)](https://github.com/alsi-lawr/BlokeBot/releases/latest)
 

@@ -38,6 +38,8 @@
                         _ => null
                     );
                     var showHostConfig = session.CanOpenHostConfig(_existingHostIds);
+                    var showConfigurationTransfer =
+                        selection is not null && session.CanUseBotFunctions(_existingHostIds);
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showBounties = FeatureIsVisible(
@@ -169,6 +171,24 @@
                             <span class="nav-menu__label min-w-0">Channel setup</span>
                         </NavLink>
                         @RouteHelp("host", "Channel setup")
+                    </div>
+                }
+
+                @if (showConfigurationTransfer)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="configuration-transfer">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
+                                 href="configuration-transfer"
+                                 aria-label="Configuration transfer"
+                                 aria-describedby="@RouteHelpReference("configuration-transfer")"
+                                 aria-current="@CurrentRoute("configuration-transfer")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-teal-700" aria-hidden="true">⇄</span>
+                            <span class="nav-menu__label min-w-0">Configuration transfer</span>
+                        </NavLink>
+                        @RouteHelp("configuration-transfer", "Configuration transfer")
                     </div>
                 }
 

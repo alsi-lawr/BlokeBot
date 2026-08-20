@@ -19,6 +19,22 @@ public sealed class CustomCommandConfigurationGraphWriter(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var failure = await StageAsync(db, hostId, command, ct);
+        if (failure is not null)
+        {
+            return failure;
+        }
+        await transaction.CommitAsync(ct);
+        return null;
+    }
+
+    internal async Task<CustomCommandConfigurationSaveFailure?> StageAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CustomCommandConfigurationSaveCommand command,
+        CancellationToken ct
+    )
+    {
         var now = clock.GetUtcNow().UtcDateTime;
         var messageEntries = await db
             .CustomMessageLibraryEntries.Include(x => x.Variants)
@@ -108,7 +124,6 @@ public sealed class CustomCommandConfigurationGraphWriter(
             now
         );
         _ = await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
         return null;
     }
 

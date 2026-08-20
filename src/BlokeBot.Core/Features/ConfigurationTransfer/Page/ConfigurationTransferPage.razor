@@ -1,0 +1,140 @@
+@page "/configuration-transfer"
+@using BlokeBot.Core.Auth.Sessions
+@using BlokeBot.Core.Features.ConfigurationTransfer.Contracts
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@attribute [Authorize(Policy = "Operator")]
+@inherits AuthenticatedPageComponent
+
+<PageTitle>BlokeBot | Configuration transfer</PageTitle>
+
+<DashboardPage Kicker="Channel settings"
+               Title="Configuration transfer"
+               Description="Back up settings or bring a configuration into this channel."
+               Width="DashboardPageWidth.Wide"
+               LoadState="@_loadState">
+    <section class="configuration-transfer__destination" aria-label="Import destination">
+        <span aria-hidden="true">@_destinationInitial</span>
+        <span><small>Destination channel</small><strong>#@HostLogin</strong></span>
+        <span>Selected channel</span>
+    </section>
+
+    <div class="configuration-transfer__tabs" role="tablist" aria-label="Configuration transfer mode">
+        <button type="button" role="tab" aria-selected="@(_mode == TransferMode.Export)" @onclick="() => _mode = TransferMode.Export">Export settings</button>
+        <button type="button" role="tab" aria-selected="@(_mode == TransferMode.Import)" @onclick="() => _mode = TransferMode.Import">Import settings</button>
+    </div>
+
+    @if (_mode == TransferMode.Export)
+    {
+        <section class="card configuration-transfer__panel">
+            <header><span>1</span><div><h2>Choose what to export</h2><p>Only configuration is included. Runtime history, balances, credentials and queued work stay here.</p></div><small>JSON · format 1</small></header>
+            <div class="configuration-transfer__section-grid">
+                @foreach (var section in _sectionOptions)
+                {
+                    <label class="configuration-transfer__section-choice">
+                        <input type="checkbox" checked="@_exportSections.Contains(section.Id)" @onchange="args => ToggleExport(section.Id, args.Value is true)" />
+                        <span><strong>@section.Title</strong><small>@section.Description</small></span>
+                    </label>
+                }
+            </div>
+            <footer><span>@_exportSections.Count sections selected</span><a class="btn-primary" href="@_exportUrl" data-enhance-nav="false">Download configuration</a></footer>
+        </section>
+    }
+    else if (_applied is { } applied)
+    {
+        <section class="card configuration-transfer__panel configuration-transfer__result">
+            <span class="configuration-transfer__result-mark">✓</span>
+            <p class="configuration-transfer__result-kicker">Import applied</p>
+            <h2>Configuration saved to #@HostLogin</h2>
+            <p>@applied.ChangedSections.Count sections changed in one import. Runtime history and disabled configuration were preserved.</p>
+            <div class="configuration-transfer__operation"><span>Operation ID</span><code>@applied.OperationId</code></div>
+            @if (_activation is { } activation)
+            {
+                <div class="configuration-transfer__activation" data-status="@activation.Status.ToString().ToLowerInvariant()">
+                    <strong>Feature activation @ActivationLabel(activation.Status)</strong>
+                    <span>@activation.Status</span>
+                    <small>@ActivationDescription(activation.Status)</small>
+                    @if (activation.Status == ConfigurationActivationStatus.Failed)
+                    {
+                        <button class="btn-secondary" type="button" @onclick="RetryActivationAsync">Retry activation</button>
+                    }
+                </div>
+            }
+            <div class="configuration-transfer__links">
+                @foreach (var section in applied.ChangedSections)
+                {
+                    <a href="@SectionPath(section)">@SectionTitle(section)<span>Open settings →</span></a>
+                }
+            </div>
+            <button class="btn-primary" type="button" @onclick="ResetImport">Transfer another configuration</button>
+        </section>
+    }
+    else if (_preview is null)
+    {
+        <section class="card configuration-transfer__panel">
+            <header><span>1</span><div><h2>Add a configuration file</h2><p>Upload a BlokeBot JSON file or paste its contents. Nothing changes until you review and confirm.</p></div></header>
+            <FileDropInput Accept=".json,application/json" Label="Configuration file" Disabled="@_busy" OnChange="ReadFileAsync" />
+            <div class="configuration-transfer__or"><span>or paste JSON</span></div>
+            <textarea class="form-control min-h-36" aria-label="Configuration JSON" placeholder="Paste a BlokeBot configuration document" @bind="_pastedJson"></textarea>
+            @if (_parseIssue is { } issue)
+            {
+                <div class="configuration-transfer__error" role="alert"><strong>@issue.Location</strong><p>@issue.Message</p></div>
+            }
+            <footer><span></span><button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_pastedJson))" @onclick="PreviewPastedAsync">Validate and review</button></footer>
+        </section>
+    }
+    else
+    {
+        <section class="card configuration-transfer__panel">
+            <div class="configuration-transfer__progress" aria-label="Import progress"><span class="done">1<small>File</small></span><i></i><span class="active">2<small>Review</small></span><i></i><span>3<small>Apply</small></span></div>
+            <div class="configuration-transfer__source">
+                <span><small>Source</small><strong>#@_preview.Document.Source.ChannelLogin</strong></span>
+                <span><small>BlokeBot</small><strong>@(_preview.Document.Source.BlokeBotVersion ?? "Not provided")</strong></span>
+                <span><small>Format</small><strong>@_preview.Document.Version</strong></span>
+                <span><small>Exported</small><strong>@_preview.Document.ExportedAtUtc.ToLocalTime().ToString("g")</strong></span>
+            </div>
+            <header><span>2</span><div><h2>Review changes</h2><p>Choose each section and how it should combine with <strong>#@HostLogin</strong>. Enablement changes are selected separately.</p></div><small>✓ File valid</small></header>
+            <div class="configuration-transfer__reviews">
+                @foreach (var section in _preview.Sections)
+                {
+                    <article>
+                        <div><label><input type="checkbox" checked="@_importSections.Contains(section.Section)" @onchange="args => ToggleImport(section.Section, args.Value is true)" /><span><strong>@SectionTitle(section.Section)</strong><small>@CountSummary(section.Counts)</small></span></label></div>
+                        <select disabled="@(!_importSections.Contains(section.Section))" aria-label="@($"{SectionTitle(section.Section)} conflict strategy")" value="@_strategies[section.Section]" @onchange="args => SetStrategyAsync(section.Section, args.Value?.ToString())">
+                            @foreach (var strategy in Enum.GetValues<ImportConflictStrategy>()) { <option value="@strategy">@StrategyTitle(strategy)</option> }
+                        </select>
+                        @foreach (var issue in section.Issues.Where(_ => _importSections.Contains(section.Section))) { <div class="configuration-transfer__error"><strong>@issue.Location</strong><p>@issue.Message</p></div> }
+                        @foreach (var conflict in section.Conflicts.Where(_ => _importSections.Contains(section.Section)))
+                        {
+                            <div class="configuration-transfer__conflict">
+                                <div><strong>@conflict.ItemName</strong><small>@conflict.Message</small></div>
+                                <select aria-label="Resolve conflict" value="@ResolutionValue(conflict)" @onchange="args => SetResolution(conflict, args.Value?.ToString())">
+                                    <option value="Unresolved">Choose a decision</option>
+                                    @foreach (var resolution in conflict.AllowedResolutions) { <option value="@resolution">@ResolutionTitle(resolution)</option> }
+                                </select>
+                                @if (ResolutionValue(conflict) == ImportConflictResolution.Rename.ToString())
+                                {
+                                    <input class="form-control" aria-label="New alias" placeholder="New alias" value="@_renames.GetValueOrDefault(ConflictKey(conflict))" @oninput="args => SetRename(conflict, args.Value?.ToString())" />
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+                @if (_preview.EnablementChanges.Count > 0)
+                {
+                    <article>
+                        <div><strong>Chat Tools enablement</strong><small>Select each change independently</small></div>
+                        <div class="configuration-transfer__flags">
+                            @foreach (var change in _preview.EnablementChanges)
+                            {
+                                <label><input type="checkbox" checked="@_enablementSelections.Contains(change.Feature)" @onchange="args => ToggleEnablement(change.Feature, args.Value is true)" /><span>@FeatureTitle(change.Feature)<small>@(change.CurrentEnabled ? "On" : "Off") → @(change.ImportedEnabled ? "On" : "Off")</small></span></label>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+            @if (_applyIssue is { } applyIssue) { <div class="configuration-transfer__error" role="alert"><strong>Import not applied</strong><p>@applyIssue</p></div> }
+            <footer><button class="btn-secondary" type="button" @onclick="ResetImport">Choose another file</button><button class="btn-primary" type="button" disabled="@(_busy || !_allConflictsResolved)" @onclick="ApplyAsync">Apply selected sections</button></footer>
+        </section>
+    }
+</DashboardPage>

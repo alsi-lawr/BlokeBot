@@ -33,11 +33,6 @@ internal sealed class AutomationFeatureDisableObserver(
             return;
         }
 
-        if (feature == HostFeatureFlags.Automations)
-        {
-            host.AutomationGeneration++;
-        }
-
         var candidates = await db
             .AutomationFlowRuns.AsNoTracking()
             .Where(value =>

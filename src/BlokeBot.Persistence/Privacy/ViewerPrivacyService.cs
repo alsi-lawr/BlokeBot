@@ -269,6 +269,30 @@ public static class ViewerPrivacyService
             )
         );
         await AddAsync(
+            "configuration-imports.audits",
+            db.ConfigurationImportAudits.Where(x =>
+                    (
+                        x.ActorTwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(x.ActorTwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .Select(x => new
+                {
+                    x.HostId,
+                    x.OperationId,
+                    x.ActorTwitchUserId,
+                    x.ActorLogin,
+                    x.SourceFormatVersion,
+                    x.OccurredAtUtc,
+                    x.SummaryJson,
+                })
+        );
+        await AddAsync(
             "alerts.acknowledgements",
             db.DurableAlerts.Where(x =>
                     safeLoginClaims.Any(claim =>
@@ -1288,6 +1312,28 @@ public static class ViewerPrivacyService
             "commands.reset-audits.actor",
             await db
                 .CustomCommandInvocationResetAudits.Where(x =>
+                    (
+                        x.ActorTwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(x.ActorTwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ActorLogin, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "configuration-imports.audits.actor",
+            await db
+                .ConfigurationImportAudits.Where(x =>
                     (
                         x.ActorTwitchUserId == userId
                         || (

@@ -109,6 +109,7 @@ public partial class PageHelpButton
             "/automations" => new(_automationsHelp, "/automations"),
             "/automations/events" => new(_automationEventsHelp, "/automations/events"),
             "/host" => new(_hostConfigHelp, "/channels"),
+            "/configuration-transfer" => new(_configurationTransferHelp, "/channels"),
             "/requests" => new(_requestBoardsHelp, "/community/request-boards"),
             "/bounties" => new(_bountiesHelp, "/community/bounties"),
             "/community" => new(_communityProgressionHelp, "/community/progression"),
@@ -288,6 +289,30 @@ public partial class PageHelpButton
                 [
                     "Moderator-only commands never appear in the command list.",
                     "Choose the chat words that show viewers the command list.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _configurationTransferHelp = new(
+        "Configuration transfer",
+        [
+            new(
+                "Move configuration safely",
+                "Choose individual sections to export or review an imported file before saving anything.",
+                [
+                    "The selected channel is always the import destination.",
+                    "Each section has its own add, merge or replace policy.",
+                    "Runtime history, balances and credentials are never transferred.",
+                ]
+            ),
+            new(
+                "Chat Tools enablement",
+                "Enablement changes are selected separately from feature configuration.",
+                [
+                    "Importing configuration never turns that feature on implicitly.",
+                    "Disabled configuration remains saved and disabled.",
+                    "Enabling a feature does not replay work suppressed while it was disabled.",
                 ]
             ),
         ]
