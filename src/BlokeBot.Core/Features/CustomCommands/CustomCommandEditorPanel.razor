@@ -1,0 +1,17 @@
+<section id="@CustomCommandEditorIds.EditorRegion("Command", Command.Id)"
+         class="grid min-w-0 gap-3"
+         role="region"
+         aria-labelledby="@CustomCommandEditorIds.InventoryLabel("Command", Command.Id)"
+         data-selected-editor="command">
+    <CustomCommandBasicsAccessStages Command="Command" Context="Context" />
+    <CustomCommandActionStage Command="Command" Context="Context" />
+    <CustomCommandFineTuningStage Command="Command" Context="Context" />
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required CustomCommandEditor Command { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+}

@@ -12,7 +12,8 @@ public sealed class CustomCommandConfigurationService(
     CustomCommandConfigurationGraphWriter graphWriter,
     HostCustomCommandSettingsService hostSettings,
     ITwitchAnnouncementReadinessProvider twitchAnnouncementAccess,
-    EventBus<AppEventKind> events
+    EventBus<AppEventKind> events,
+    TimeProvider timeProvider
 )
 {
     public async Task<CustomCommandConfiguration> LoadConfigurationAsync(
@@ -75,16 +76,22 @@ public sealed class CustomCommandConfigurationService(
             )
             : await twitchAnnouncementAccess.GetReadinessAsync(channelLogin, ct);
 
+        var timeZoneId = await hostSettings.GetTimeZoneIdAsync(hostId, ct);
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        var projectionReference = timeProvider.GetUtcNow();
         return new CustomCommandConfiguration
         {
-            TimeZoneId = await hostSettings.GetTimeZoneIdAsync(hostId, ct),
+            TimeZoneId = timeZoneId,
+            ProjectionReferenceUtc = projectionReference,
             MessageEntries = messageEntries
                 .Select(CustomCommandConfigurationMapper.ToEditor)
                 .ToList(),
             Counters = counters.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
             Commands = commands.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
             Announcements = announcements
-                .Select(CustomCommandConfigurationMapper.ToEditor)
+                .Select(x =>
+                    CustomCommandConfigurationMapper.ToEditor(x, timeZone, projectionReference)
+                )
                 .ToList(),
             TwitchAnnouncementReadiness = twitchAnnouncementReadiness,
             AlertSummary = new CustomCommandAlertSummary

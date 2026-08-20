@@ -145,6 +145,52 @@ public sealed class ConfigurationTransferGuessingTests
         db.ChangeTracker.HasChanges().ShouldBeFalse();
     }
 
+    [Test]
+    public async Task AddMissing_MatchingProfile_RemainsUnchanged()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        int profileId;
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "destination",
+                DisplayName = "Destination",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = seed.Hosts.Add(host);
+            _ = await seed.SaveChangesAsync();
+            hostId = host.Id;
+            var profile = Profile(hostId, "Pack", "pack", true);
+            _ = seed.Profiles.Add(profile);
+            _ = await seed.SaveChangesAsync();
+            profileId = profile.Id;
+        }
+
+        await using (var db = await database.CreateDbContextAsync())
+        await using (var transaction = await db.Database.BeginTransactionAsync())
+        {
+            var issues = await GuessingConfigurationTransferAdapter.StageAsync(
+                db,
+                hostId,
+                new([ImportedProfile("profile-0001", "Pack", "pack", false)]),
+                new(ConfigurationSectionId.Guessing, ImportConflictStrategy.AddMissing, []),
+                CancellationToken.None
+            );
+            issues.ShouldBeEmpty();
+            _ = await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using var verify = await database.CreateDbContextAsync();
+        var stored = await verify.Profiles.SingleAsync();
+        stored.Id.ShouldBe(profileId);
+        stored.Slug.ShouldBe("pack");
+        stored.IsDefault.ShouldBeTrue();
+        stored.Revision.ShouldBe(0);
+    }
+
     private static GuessRoundProfile Profile(
         int hostId,
         string name,

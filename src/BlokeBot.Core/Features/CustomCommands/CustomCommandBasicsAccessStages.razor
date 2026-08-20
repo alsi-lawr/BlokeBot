@@ -1,0 +1,106 @@
+                            <StudioStage Key="basics"
+                                         Number="1"
+                                         Title="Basics"
+                                         Summary="@Context.BasicsSummary(Command)"
+                                         Open="@Context.BasicsOpen()"
+                                         OpenChanged="@(Context.SetBasicsOpen)">
+                                <div class="studio-grid">
+                                    <div class="studio-span-4">
+                                        <Field Id="@CustomCommandEditorIds.CommandName(Command)"
+                                               Label="Command name"
+                                               ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Name))"
+                                               FocusRequest="@Math.Max(Context.Validation.FocusRequest(CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Name)), Context.Validation.EditorFocusRequest(CustomCommandEditorIds.CommandName(Command)))"
+                                               @bind-Value="Command.Name"
+                                               Placeholder="Hello" />
+                                    </div>
+                                    <div class="studio-span-8">
+                                        <Field Id="@CustomCommandEditorIds.CommandAliases(Command)"
+                                               Label="Command words (without !)"
+                                               ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Aliases))"
+                                               FocusRequest="@Context.Validation.FocusRequest(CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Aliases))"
+                                               @bind-Value="Command.Aliases"
+                                               Placeholder="hello, hi" />
+                                        <p class="mt-1 text-xs text-muted-foreground">Viewers type @Context.CommandInvocation(Command) in chat.</p>
+                                    </div>
+                                    @if (Context.CommandPreviewLines(Command) is { Count: > 0 } previewLines)
+                                    {
+                                        <div class="studio-span-12">
+                                            <StudioChatPreview Lines="previewLines" />
+                                        </div>
+                                    }
+                                </div>
+                            </StudioStage>
+
+                            <StudioStage Key="who-can-use-it"
+                                         Number="2"
+                                         Title="Who can use it"
+                                         Summary="@Context.CommandAccessSummary(Command)"
+                                         Open="@Context.AccessOpen()"
+                                         OpenChanged="@(Context.SetAccessOpen)">
+                                <div class="studio-grid" data-command-access>
+                                    <div class="studio-span-12">
+                                        <StudioSegmentedPill TValue="bool"
+                                                             AriaLabel="Command access"
+                                                             Options="@Context.AccessOptions(Command)"
+                                                             Value="Command.AllowEveryone"
+                                                             ValueChanged="@(everyone => Context.SetCommandAccess(Command, everyone))" />
+                                    </div>
+                                    @if (Command.AllowedUserFeedback is not null)
+                                    {
+                                        <p class="studio-span-12 text-sm text-muted-foreground"
+                                           role="status"
+                                           data-allowed-user-feedback>@Command.AllowedUserFeedback</p>
+                                    }
+                                    @if (!Command.AllowEveryone)
+                                    {
+                                        <div class="studio-span-12 studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                            <StudioChip Id="@CustomCommandEditorIds.CommandModeratorAccess(Command)"
+                                                        Label="Moderators"
+                                                        Pressed="Command.AllowModerators"
+                                                        PressedChanged="@(_ => Context.ToggleModeratorAccess(Command))" />
+                                            @foreach (var user in Command.AllowedUsers)
+                                            {
+                                                <StudioChip @key="user"
+                                                            Label="@user.DisplayName"
+                                                            Note="@($"@{user.Login}")"
+                                                            RemoveLabel="@($"Remove {user.DisplayName}")"
+                                                            RemoveAction="remove-allowed-user"
+                                                            Remove="@(() => Context.RemoveAllowedUser(Command, user))"
+                                                            data-allowed-user-id="@user.TwitchUserId" />
+                                            }
+                                        </div>
+                                        @if (!Command.AllowModerators && Command.AllowedUsers.Count == 0)
+                                        {
+                                            <p class="studio-span-12 text-sm text-muted-foreground" data-streamer-only>
+                                                Only the streamer can use this Command.
+                                            </p>
+                                        }
+                                        <div class="studio-span-6">
+                                            <Field Id="@CustomCommandEditorIds.CommandAllowedUser(Command)"
+                                                   Label="Twitch login"
+                                                   ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.AllowedUsers))"
+                                                   FocusRequest="@Context.Validation.FocusRequest(CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.AllowedUsers))"
+                                                   @bind-Value="Command.AllowedUserLoginDraft"
+                                                   Placeholder="viewer_name" />
+                                        </div>
+                                        <div class="studio-span-6 content-end">
+                                            <button class="btn-secondary"
+                                                    type="button"
+                                                    data-action="add-allowed-user"
+                                                    disabled="@Command.AllowedUserLookupInProgress"
+                                                    @onclick="() => Context.AddAllowedUser(Command)">
+                                                @(Command.AllowedUserLookupInProgress ? "Looking up..." : "+ Add person")
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            </StudioStage>
+
+
+@code {
+    [Parameter, EditorRequired]
+    public required CustomCommandEditor Command { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+}

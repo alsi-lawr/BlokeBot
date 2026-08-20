@@ -1,0 +1,222 @@
+                @if (Visibility.ShowRaidCollaboration)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="raid-collaboration">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="raid-collaboration"
+                                 aria-label="Raid and collaboration"
+                                 aria-describedby="@Routes.RouteHelpReference("raid-collaboration")"
+                                 aria-current="@Routes.CurrentRoute("raid-collaboration")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">⇄</span>
+                            <span class="nav-menu__label min-w-0">Raid &amp; collaboration</span>
+                        </NavLink>
+                        @Routes.RouteHelp("raid-collaboration", "Raid & collaboration")
+                    </div>
+                }
+
+                @if (Visibility.ShowCollectives)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="collectives">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="collectives"
+                                 aria-label="Collectives"
+                                 aria-describedby="@Routes.RouteHelpReference("collectives")"
+                                 aria-current="@Routes.CurrentRoute("collectives")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-teal-700" aria-hidden="true">◎</span>
+                            <span class="nav-menu__label min-w-0">Collectives</span>
+                        </NavLink>
+                        @Routes.RouteHelp("collectives", "Collectives")
+                    </div>
+                }
+
+                @if (Visibility.ShowRequestBoards)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="requests">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="requests"
+                                 aria-label="Request boards"
+                                 aria-describedby="@Routes.RouteHelpReference("requests")"
+                                 aria-current="@Routes.CurrentRoute("requests")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sky-700" aria-hidden="true">☷</span>
+                            <span class="nav-menu__label min-w-0">Request boards</span>
+                        </NavLink>
+                        @Routes.RouteHelp("requests", "Request boards")
+                    </div>
+                }
+
+                @if (Visibility.ShowBounties)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="bounties">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="bounties"
+                                 aria-label="Bounties"
+                                 aria-describedby="@Routes.RouteHelpReference("bounties")"
+                                 aria-current="@Routes.CurrentRoute("bounties")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700" aria-hidden="true">◆</span>
+                            <span class="nav-menu__label min-w-0">Bounties</span>
+                        </NavLink>
+                        @Routes.RouteHelp("bounties", "Bounties")
+                    </div>
+                }
+
+                @if (Visibility.ShowCommunityProgression)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="community">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="community"
+                                 aria-label="Community progression"
+                                 aria-describedby="@Routes.RouteHelpReference("community")"
+                                 aria-current="@Routes.CurrentRoute("community")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true">★</span>
+                            <span class="nav-menu__label min-w-0">Community</span>
+                        </NavLink>
+                        @Routes.RouteHelp("community", "Community progression")
+                    </div>
+                }
+
+                @if (Visibility.ShowCooperativeGame)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="raid">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="raid"
+                                 aria-label="BlokeRaid"
+                                 aria-describedby="@Routes.RouteHelpReference("raid")"
+                                 aria-current="@Routes.CurrentRoute("raid")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-rose-700" aria-hidden="true">♜</span>
+                            <span class="nav-menu__label min-w-0">BlokeRaid</span>
+                        </NavLink>
+                        @Routes.RouteHelp("raid", "BlokeRaid")
+                    </div>
+                }
+
+                @if (Visibility.ShowViewerPassports)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="passports">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="passports"
+                                 aria-label="Viewer passports"
+                                 aria-describedby="@Routes.RouteHelpReference("passports")"
+                                 aria-current="@Routes.CurrentRoute("passports")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-indigo-700" aria-hidden="true">▣</span>
+                            <span class="nav-menu__label min-w-0">Viewer passports</span>
+                        </NavLink>
+                        @Routes.RouteHelp("passports", "Viewer passports")
+                    </div>
+                }
+
+                @if (Visibility.ShowBingo)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="bingo">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="bingo"
+                                 aria-label="Stream-event Bingo"
+                                 aria-describedby="@Routes.RouteHelpReference("bingo")"
+                                 aria-current="@Routes.CurrentRoute("bingo")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-cyan-700" aria-hidden="true">▦</span>
+                            <span class="nav-menu__label min-w-0">Bingo</span>
+                        </NavLink>
+                        @Routes.RouteHelp("bingo", "Stream-event Bingo")
+                    </div>
+                }
+
+                @if (Visibility.ShowCompetitions)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="competitions">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="competitions"
+                                 aria-label="Tournaments &amp; leagues"
+                                 aria-describedby="@Routes.RouteHelpReference("competitions")"
+                                 aria-current="@Routes.CurrentRoute("competitions")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-violet-700" aria-hidden="true">♜</span>
+                            <span class="nav-menu__label min-w-0">Tournaments &amp; leagues</span>
+                        </NavLink>
+                        @Routes.RouteHelp("competitions", "Tournaments & leagues")
+                    </div>
+                }
+
+                @if (Visibility.ShowPlayQueues)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="queues">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="queues"
+                                 aria-label="Play with viewers"
+                                 aria-describedby="@Routes.RouteHelpReference("queues")"
+                                 aria-current="@Routes.CurrentRoute("queues")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700" aria-hidden="true">♟</span>
+                            <span class="nav-menu__label min-w-0">Play with viewers</span>
+                        </NavLink>
+                        @Routes.RouteHelp("queues", "Play with viewers")
+                    </div>
+                }
+
+                @if (Visibility.ShowMoments)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="moments">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="moments"
+                                 aria-label="Moments"
+                                 aria-describedby="@Routes.RouteHelpReference("moments")"
+                                 aria-current="@Routes.CurrentRoute("moments")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-violet-700" aria-hidden="true">◆</span>
+                            <span class="nav-menu__label min-w-0">Moments</span>
+                        </NavLink>
+                        @Routes.RouteHelp("moments", "Moments")
+                    </div>
+                }
+
+                @if (Visibility.ShowOverlays)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="overlays">
+                        <NavLink class="@(Routes.GroupIsCurrent("overlays") ? "nav-menu__link nav-menu__item-active flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition" : "nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition")"
+                                 href="overlays#sources"
+                                 aria-label="Overlays"
+                                 aria-describedby="@Routes.RouteHelpReference("overlays")"
+                                 aria-current="@Routes.CurrentGroup("overlays")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true">▣</span>
+                            <span class="nav-menu__label min-w-0">Overlays</span>
+                        </NavLink>
+                        @Routes.RouteHelp("overlays", "Overlays")
+                    </div>
+                }
+
+@code {
+    [Parameter, EditorRequired]
+    public required NavMenuDirectFeatureVisibility Visibility { get; set; }
+
+    [Parameter, EditorRequired]
+    public required NavMenuRouteBindings Routes { get; set; }
+}

@@ -5,26 +5,26 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AnnouncementsSectionV1(
-    IReadOnlyList<MessageEntryV1> Replies,
-    IReadOnlyList<AnnouncementV1> Items
+    [property: JsonRequired] IReadOnlyList<MessageEntryV1> Replies,
+    [property: JsonRequired] IReadOnlyList<AnnouncementV1> Items
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AnnouncementV1(
-    string Id,
-    string Name,
-    bool Enabled,
-    string MessageReplyId,
-    CustomAnnouncementDeliveryType DeliveryType,
-    BlokeBot.Persistence.Models.TwitchAnnouncementColor AnnouncementColor,
-    int RetryDelaySeconds,
-    int OccurrenceLifetimeSeconds,
-    AnnouncementScheduleV1 Schedule
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] bool Enabled,
+    [property: JsonRequired] string MessageReplyId,
+    [property: JsonRequired] CustomAnnouncementDeliveryType DeliveryType,
+    [property: JsonRequired] BlokeBot.Persistence.Models.TwitchAnnouncementColor AnnouncementColor,
+    [property: JsonRequired] int RetryDelaySeconds,
+    [property: JsonRequired] int OccurrenceLifetimeSeconds,
+    [property: JsonRequired] AnnouncementScheduleV1 Schedule
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AnnouncementScheduleV1(
-    AnnouncementScheduleTypeV1 Type,
+    [property: JsonRequired] AnnouncementScheduleTypeV1 Type,
     int? IntervalMinutes = null,
     int? RequiredChatMessages = null,
     DayOfWeek? Day = null,

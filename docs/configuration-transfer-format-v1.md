@@ -27,7 +27,8 @@ a selected bundle and can import only selected sections from a bundle.
 
 - `customCommands`: time zone, reusable replies, counters, commands, aliases, cooldowns,
   invocation limits, permissions, and reply routes.
-- `announcements`: reusable replies, scheduled chat messages, and Twitch announcements.
+- `announcements`: reusable replies, scheduled chat messages, and Twitch announcements. Weekly
+  schedules store their UTC weekday and UTC time directly.
 - `guessing`: profiles, canonical slugs, accepted answers, aliases, rewards, and reply text.
 - `points`: terminology, aliases, reply text, gambling rules, and giveaway rules.
 - `channelToolEnablement`: one Boolean for each independent Chat Tools switch. Format 1 has 20
@@ -64,6 +65,11 @@ Feature configuration can be imported while its Chat Tools switch remains off. C
 not implicitly enable a feature. Explicitly selected enablement changes commit a durable activation
 record; activation pending, complete, or failed state is reported separately from import success.
 Activation repairs current subscriptions but does not replay work suppressed while disabled.
+
+Weekly announcement recurrence is fixed UTC domain data. A channel's time zone is only the editor
+and display projection: changing it can change the local weekday or time shown without changing the
+stored recurrence or due instant. Announcements-only import does not change the destination time
+zone, so the same imported UTC recurrence can display differently for different channels.
 
 ## Excluded data
 

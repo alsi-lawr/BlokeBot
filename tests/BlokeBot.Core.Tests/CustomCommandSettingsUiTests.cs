@@ -508,6 +508,9 @@ public sealed class CustomCommandSettingsUiTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var disclosureModule = context.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
         var cut = context.Render<CustomCommandSettingsPage>();
         cut.Find("button[data-action='edit-scheduled-message']").Click();
         cut.Find("button[aria-controls='custom-announcement-delivery-details']").Click();
@@ -522,12 +525,10 @@ public sealed class CustomCommandSettingsUiTests
             .ShouldBe("true");
         var invalid = cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay");
         invalid.GetAttribute("aria-invalid").ShouldBe("true");
-        context
-            .JSInterop.Invocations.Last(static invocation =>
-                invocation.Identifier == "Blazor._internal.domWrapper.focus"
-            )
+        disclosureModule
+            .Invocations.Last(static invocation => invocation.Identifier == "focusElement")
             .Arguments[0]
-            .ShouldBeElementReferenceTo(invalid);
+            .ShouldBe($"announcement-{seeded.AnnouncementId}-retry-delay");
     }
 
     [Test]

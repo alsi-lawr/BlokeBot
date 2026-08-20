@@ -1,0 +1,95 @@
+@using BlokeBot.Persistence.Models
+
+                        <section @key="Entry"
+                                 id="@CustomCommandEditorIds.EditorRegion("Reply", Entry.Id)"
+                                 class="studio-grid"
+                                 role="region"
+                                 aria-labelledby="@CustomCommandEditorIds.InventoryLabel("Reply", Entry.Id)"
+                                 data-selected-editor="reply">
+                            <div class="studio-span-6">
+                                <Field Id="@CustomCommandEditorIds.MessageEntryName(Entry)"
+                                       Label="Reply name"
+                                       ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.Name))"
+                                       FocusRequest="@Math.Max(Context.Validation.FocusRequest(CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.Name)), Context.Validation.EditorFocusRequest(CustomCommandEditorIds.MessageEntryName(Entry)))"
+                                       @bind-Value="Entry.Name"
+                                       Placeholder="welcome" />
+                            </div>
+                            <div class="studio-span-6 space-y-2">
+                                <div class="field">
+                                    <label class="field__label" for="@CustomCommandEditorIds.MessageSelection(Entry)">How the bot chooses</label>
+                                    <select id="@CustomCommandEditorIds.MessageSelection(Entry)"
+                                            class="field__input"
+                                            @attributes="Context.Validation.Attributes(CustomCommandEditorIds.MessageSelection(Entry), CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.SelectionMode))"
+                                            @ref="Context.Validation.Controls[CustomCommandEditorIds.MessageSelection(Entry)]"
+                                            @bind="Entry.SelectionMode">
+                                        @foreach (var mode in MessageSelectionModes)
+                                        {
+                                            <option value="@mode">@Context.MessageSelectionLabel(mode)</option>
+                                        }
+                                    </select>
+                                </div>
+                                @(Context.Validation.MessageFor(CustomCommandEditorIds.MessageSelection(Entry), CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.SelectionMode)))
+                            </div>
+                            <div class="studio-span-6">
+                                <div class="field">
+                                    <label class="field__label" for="@CustomCommandEditorIds.MessageCurrentVariant(Entry)">Next message</label>
+                                    <select id="@CustomCommandEditorIds.MessageCurrentVariant(Entry)"
+                                            class="field__input"
+                                            disabled="@(Entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
+                                            @bind="Entry.CurrentVariantIndex">
+                                        @for (var i = 0; i < Entry.Variants.Count; i++)
+                                        {
+                                            var index = i;
+                                            <option value="@index">Message @(index + 1)</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="studio-span-12 space-y-2">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Messages</p>
+                                    <button id="@CustomCommandEditorIds.AddMessageVariant(Entry)"
+                                            class="btn-secondary h-9 px-3 text-xs"
+                                            @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AddMessageVariant(Entry), CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.VariantText))"
+                                            @ref="Context.Validation.Controls[CustomCommandEditorIds.AddMessageVariant(Entry)]"
+                                            @onclick="() => Context.AddVariant(Entry)">Add message</button>
+                                    @(Context.Validation.MessageFor(CustomCommandEditorIds.AddMessageVariant(Entry), CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.VariantText)))
+                                </div>
+                                <p class="text-xs leading-5 text-muted-foreground">
+                                    Pick fresh values with <code>{random_from|one|two}</code>,
+                                    <code>{random_between|1|10}</code>, or <code>{random_viewer}</code>.
+                                </p>
+                                @for (var i = 0; i < Entry.Variants.Count; i++)
+                                {
+                                    var index = i;
+                                    var variant = Entry.Variants[index];
+                                    <div @key="variant" class="custom-command-variant">
+                                        <span class="rank-indicator mt-7">@(index + 1)</span>
+                                        <TextAreaField Id="@CustomCommandEditorIds.MessageVariant(Entry, variant)"
+                                                       Label="@($"Message {index + 1}")"
+                                                       ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.VariantTarget(Entry.Id, variant.Id))"
+                                                       FocusRequest="@Context.Validation.FocusRequest(CustomCommandEditorIds.VariantTarget(Entry.Id, variant.Id))"
+                                                       @bind-Value="variant.Text" />
+                                        <div class="mt-7 flex flex-wrap gap-2">
+                                            <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == 0)" @onclick="() => Context.MoveVariant(Entry, index, -1)">Up</button>
+                                            <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == Entry.Variants.Count - 1)" @onclick="() => Context.MoveVariant(Entry, index, 1)">Down</button>
+                                            <button class="btn-secondary h-9 px-3 text-xs" @onclick="() => Context.RemoveVariant(Entry, variant)">Remove</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="studio-span-12 flex justify-end">
+                                <button class="btn-secondary" @onclick="() => Context.RemoveMessageEntry(Entry)">Delete reply</button>
+                            </div>
+                        </section>
+
+@code {
+    private static readonly IReadOnlyList<CustomMessageSelectionMode> MessageSelectionModes =
+        Enum.GetValues<CustomMessageSelectionMode>();
+
+    [Parameter, EditorRequired]
+    public required CustomMessageLibraryEntryEditor Entry { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+}

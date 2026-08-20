@@ -1,0 +1,133 @@
+@using BlokeBot.Persistence.Models
+@using BlokeBot.Core.Features.Admin.SiteAccess
+
+        <div id="custom-bot" class="scroll-mt-24">
+        <StudioStage Key="custom-bot"
+                     Number="4"
+                     Title="Your own bot account"
+                     Summary="@BotAccountSummary"
+                     Open="@BotAccountOpen"
+                     OpenChanged="BotAccountOpenChanged">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                    <button type="button"
+                            id="custom-bot-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(State.BotOverride.Enabled ? "true" : "false")"
+                            aria-label="Use custom bot"
+                            @onclick="ToggleBotOverride"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Use a Twitch account you control as the bot for this channel</span>
+                </div>
+                <div class="studio-span-12">
+                    <BotAccountAuthorizationSection Status="@State.BotOverride.Status"
+                                                    AuthorizeButtonText="Connect custom bot"
+                                                    AuthorizationStartUrl="/oauth/host-bot/start"
+                                                    Disabled="@(!State.BotOverride.Enabled)"
+                                                    DisabledMessage="Turn this on before connecting your own bot account."
+                                                    ConfiguredAccountFallbackText="custom bot account"
+                                                    Clear="ClearBotOverrideAuthorization"
+                                                    Refresh="Reload" />
+                </div>
+                <div class="studio-span-12">
+                    <div class="surface-muted rounded-lg px-3 py-2.5">
+                        <div class="@(!State.BotOverride.Enabled ? "opacity-60" : null)">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button type="button"
+                                        id="whisper-responses-enabled"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(State.BotOverride.WhisperResponsesEnabled ? "true" : "false")"
+                                        aria-label="Reply with whispers from the custom bot"
+                                        disabled="@(!State.BotOverride.Enabled)"
+                                        @onclick="ToggleWhisperResponses"></button>
+                                <span class="text-sm font-semibold text-[var(--app-text-strong)]">Reply with whispers from the custom bot</span>
+                            </div>
+                            <p class="mt-2 text-xs font-medium text-slate-500">
+                                @(State.BotOverride.Enabled
+                                    ? "Reconnect the custom bot if Twitch asks for more access."
+                                    : "Turn on custom bot before enabling whisper responses.")
+                            </p>
+                        </div>
+                        <div class="mt-4 border-t border-slate-200 pt-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">New people whispered today</p>
+                                <span class="@WhisperQuotaBadgeClass whitespace-nowrap">
+                                    <span class="@WhisperQuotaDotClass"></span>
+                                    @WhisperQuotaText
+                                </span>
+                            </div>
+                            <p class="mt-2 text-xs font-medium text-slate-500">
+                                @(State.BotOverride.WhisperQuota.Exhausted
+                                    ? "Twitch has paused whispers to new people for today."
+                                    : $"The bot can whisper {State.BotOverride.WhisperQuota.Remaining} more new people today.")
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </StudioStage>
+        </div>
+
+        <div id="moderator-help"
+             class="host-config-fragment-target scroll-mt-24"
+             role="region"
+             aria-label="Moderator help"
+             tabindex="-1">
+        <StudioStage Key="moderator-help"
+                     Number="5"
+                     Title="Moderator help"
+                     Summary="@ModeratorHelpSummary"
+                     Open="@ModeratorHelpOpen"
+                     OpenChanged="ModeratorHelpOpenChanged"
+                     FocusElementId="moderator-help"
+                     FocusRequest="@ModeratorHelpFocusRequest">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                    <button type="button"
+                            id="moderator-help-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(State.ModAccess.ModsEnabled ? "true" : "false")"
+                            aria-label="Let moderators help"
+                            @onclick="ToggleModeratorHelp"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Let moderators help with this channel</span>
+                    <span class="text-xs text-muted-foreground">When this is off, your saved allow and block lists stay here, but mods cannot use them.</span>
+                </div>
+                <div class="studio-span-12">
+                    <StudioSegmentedPill TValue="bool"
+                                         AriaLabel="Who can help with this channel"
+                                         Options="@AccessModeOptions"
+                                         Value="@State.ModAccess.AllowModsByDefault"
+                                         ValueChanged="SetAllowModsByDefault" />
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        @(State.ModAccess.AllowModsByDefault ? "All channel mods can help unless they are blocked." : "Only mods on the allowed list can help.")
+                    </p>
+                </div>
+                <div class="studio-span-6">
+                    <AccessList Title="Allowed mods"
+                                Entries="WhitelistEntries"
+                                Placeholder="mod username"
+                                EmptyText="No mods added."
+                                DisabledText="@(State.ModAccess.ModsEnabled ? "Not used while “All mods” is selected. Kept for when you switch." : "Not used while moderator help is off. Kept for when you switch.")"
+                                NewLogin="@NewWhitelistLogin"
+                                NewLoginChanged="NewWhitelistLoginChanged"
+                                Add="() => AddAccess(AccessListEntryKind.Whitelist)"
+                                Remove="login => RemoveAccess((AccessListEntryKind.Whitelist, login))"
+                                Disabled="@(!State.ModAccess.ModsEnabled || State.ModAccess.AllowModsByDefault)" />
+                </div>
+                <div class="studio-span-6">
+                    <AccessList Title="Blocked mods"
+                                Entries="BlacklistEntries"
+                                Placeholder="mod username"
+                                EmptyText="No mods added."
+                                DisabledText="@(State.ModAccess.ModsEnabled ? "Not used while “Allowed list only” is selected. Kept for when you switch." : "Not used while moderator help is off. Kept for when you switch.")"
+                                NewLogin="@NewBlacklistLogin"
+                                NewLoginChanged="NewBlacklistLoginChanged"
+                                Add="() => AddAccess(AccessListEntryKind.Blacklist)"
+                                Remove="login => RemoveAccess((AccessListEntryKind.Blacklist, login))"
+                                Disabled="@(!State.ModAccess.ModsEnabled || !State.ModAccess.AllowModsByDefault)" />
+                </div>
+            </div>
+        </StudioStage>
+        </div>

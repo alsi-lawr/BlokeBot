@@ -5,44 +5,52 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CustomCommandsSectionV1(
-    string TimeZoneId,
-    IReadOnlyList<MessageEntryV1> Replies,
-    IReadOnlyList<CounterV1> Counters,
-    IReadOnlyList<CustomCommandV1> Commands
+    [property: JsonRequired] string TimeZoneId,
+    [property: JsonRequired] IReadOnlyList<MessageEntryV1> Replies,
+    [property: JsonRequired] IReadOnlyList<CounterV1> Counters,
+    [property: JsonRequired] IReadOnlyList<CustomCommandV1> Commands
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record MessageEntryV1(
-    string Id,
-    string Name,
-    CustomMessageSelectionMode SelectionMode,
-    IReadOnlyList<string> Variants
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] CustomMessageSelectionMode SelectionMode,
+    [property: JsonRequired] IReadOnlyList<string> Variants
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record CounterV1(string Id, string Name, long Value);
+public sealed record CounterV1(
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] long Value
+);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CustomCommandV1(
-    string Id,
-    string Name,
-    bool Enabled,
-    IReadOnlyList<string> Aliases,
-    bool AllowEveryone,
-    bool AllowModerators,
-    IReadOnlyList<AllowedUserV1> AllowedUsers,
-    int CooldownSeconds,
-    CustomCommandCooldownScope CooldownScope,
-    CustomCommandInvocationLimit InvocationLimit,
-    CustomCommandActionV1 Action
+    [property: JsonRequired] string Id,
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] bool Enabled,
+    [property: JsonRequired] IReadOnlyList<string> Aliases,
+    [property: JsonRequired] bool AllowEveryone,
+    [property: JsonRequired] bool AllowModerators,
+    [property: JsonRequired] IReadOnlyList<AllowedUserV1> AllowedUsers,
+    [property: JsonRequired] int CooldownSeconds,
+    [property: JsonRequired] CustomCommandCooldownScope CooldownScope,
+    [property: JsonRequired] CustomCommandInvocationLimit InvocationLimit,
+    [property: JsonRequired] CustomCommandActionV1 Action
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AllowedUserV1(string TwitchUserId, string Login, string DisplayName);
+public sealed record AllowedUserV1(
+    [property: JsonRequired] string TwitchUserId,
+    [property: JsonRequired] string Login,
+    [property: JsonRequired] string DisplayName
+);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CustomCommandActionV1(
-    CustomCommandActionTypeV1 Type,
+    [property: JsonRequired] CustomCommandActionTypeV1 Type,
     string? ZeroArgumentReplyId = null,
     string? OneArgumentReplyId = null,
     string? TwoArgumentReplyId = null,

@@ -9,14 +9,13 @@ public sealed partial class ConfigurationTransferCoordinator
 {
     private static string AuditSummary(
         ConfigurationDocumentV1 document,
-        ConfigurationImportSelection selection
+        ConfigurationImportSelection selection,
+        IReadOnlyCollection<ConfigurationSectionId> changedSections
     )
     {
         var sections = selection
-            .Sections.Select(x => new AuditSection(
-                CanonicalId(x.Section),
-                Count(document, x.Section)
-            ))
+            .Sections.Where(x => changedSections.Contains(x.Section))
+            .Select(x => new AuditSection(CanonicalId(x.Section), Count(document, x.Section)))
             .OrderBy(x => x.Id, StringComparer.Ordinal)
             .ToArray();
         return JsonSerializer.Serialize(new AuditSummaryV1(sections));

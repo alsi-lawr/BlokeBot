@@ -1,6 +1,4 @@
 using BlokeBot.Core.Auth.OAuth;
-using BlokeBot.Core.Auth.Sessions;
-using BlokeBot.Core.Auth.Web;
 using BlokeBot.Core.BotRuntime;
 using BlokeBot.Core.BotStatus;
 using BlokeBot.Core.Components;
@@ -17,13 +15,10 @@ using BlokeBot.Core.Features.Competitions;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
-using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
 using BlokeBot.Core.Features.Moments;
-using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Commands;
@@ -33,15 +28,11 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Eventing;
-using BlokeBot.Persistence;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;
 
-public static class BlokeBotApplication
+public static partial class BlokeBotApplication
 {
     public static WebApplicationBuilder AddBlokeBotCore(
         this WebApplicationBuilder builder,
@@ -192,168 +183,4 @@ public static class BlokeBotApplication
 
         return builder;
     }
-
-    public static async Task InitializeBlokeBotPersistenceAsync(
-        this WebApplication app,
-        CancellationToken cancellationToken
-    )
-    {
-        await app
-            .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
-            .InitializeAsync(cancellationToken);
-        await app
-            .Services.GetRequiredService<HostedChannelRuntimeLifecycleService>()
-            .RecoverInterruptedStopsAsync(cancellationToken);
-    }
-
-    public static WebApplication UseBlokeBotCore(
-        this WebApplication app,
-        BlokeBotRuntimeMode runtime
-    )
-    {
-        app.UseOverlayAccessLogRedaction();
-
-        if (!app.Environment.IsDevelopment())
-        {
-            _ = app.UseExceptionHandler("/Error", createScopeForErrors: true);
-            _ = app.UseHsts();
-        }
-
-        _ = app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-        _ = app.UseHttpsRedirection();
-        _ = app.UseAntiforgery();
-        _ = app.UseAuthentication();
-        _ = app.UseAuthorization();
-
-        app.MapOverlayBrowserSourceEndpoints();
-        _ = app.MapMethods(
-            "/favicon.ico",
-            ["GET", "HEAD"],
-            static () => Results.Redirect("/blokebot-mark.svg")
-        );
-        _ = app.UseStaticFiles();
-        _ = app.MapStaticAssets();
-        _ = app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
-        app.MapAuthEndpoints();
-        if (runtime == BlokeBotRuntimeMode.Online)
-        {
-            app.MapEventSubWebhookEndpoint();
-        }
-        if (runtime == BlokeBotRuntimeMode.Online)
-        {
-            app.MapBotOAuthEndpoints();
-        }
-        else
-        {
-            app.MapUnavailableBotOAuthEndpoint();
-        }
-
-        app.MapHostConfigEndpoints();
-        app.MapConfigurationTransferEndpoints();
-        app.MapViewerPassportEndpoints();
-        return app;
-    }
-
-    internal static void MapEventSubWebhookEndpoint(this WebApplication app) =>
-        _ = app.MapPost(
-                "/eventsub/twitch",
-                async (
-                    HttpRequest request,
-                    IEventSubWebhookIngress ingress,
-                    CancellationToken ct
-                ) =>
-                {
-                    const int MaxBodyBytes = 512 * 1024;
-                    if (request.ContentLength is > MaxBodyBytes)
-                    {
-                        return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-                    }
-
-                    await using var stream = new MemoryStream();
-                    var buffer = new byte[16 * 1024];
-                    var total = 0;
-                    while (true)
-                    {
-                        var read = await request.Body.ReadAsync(buffer, ct);
-                        if (read is 0)
-                        {
-                            break;
-                        }
-
-                        total += read;
-                        if (total > MaxBodyBytes)
-                        {
-                            return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-                        }
-
-                        await stream.WriteAsync(buffer.AsMemory(0, read), ct);
-                    }
-
-                    var result = await ingress.HandleAsync(
-                        request.Headers["Twitch-Eventsub-Message-Id"].FirstOrDefault(),
-                        request.Headers["Twitch-Eventsub-Message-Type"].FirstOrDefault(),
-                        request.Headers["Twitch-Eventsub-Message-Timestamp"].FirstOrDefault(),
-                        request.Headers["Twitch-Eventsub-Message-Signature"].FirstOrDefault(),
-                        request.Headers["Twitch-Eventsub-Subscription-Type"].FirstOrDefault(),
-                        request.Headers["Twitch-Eventsub-Subscription-Version"].FirstOrDefault(),
-                        stream.ToArray(),
-                        ct
-                    );
-                    return result.Challenge is null
-                        ? Results.StatusCode(result.StatusCode)
-                        : Results.Text(result.Challenge, "text/plain");
-                }
-            )
-            .AllowAnonymous()
-            .DisableAntiforgery()
-            .WithMetadata(new SkipStatusCodePagesAttribute());
-
-    private static void AddAuthentication(WebApplicationBuilder builder)
-    {
-        _ = builder
-            .Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(options =>
-            {
-                var webAuthOptions =
-                    builder.Configuration.GetSection("TwitchWebAuth").Get<WebAuthOptions>()
-                    ?? new WebAuthOptions();
-
-                options.AccessDeniedPath = "/auth/login";
-                options.Cookie.HttpOnly = true;
-                options.Cookie.IsEssential = true;
-                options.Cookie.Name = string.IsNullOrWhiteSpace(webAuthOptions.CookieName)
-                    ? "BlokeBot.Auth"
-                    : webAuthOptions.CookieName;
-                options.ExpireTimeSpan = TimeSpan.FromHours(8);
-                options.LoginPath = "/auth/login";
-                options.LogoutPath = "/auth/logout";
-                options.SlidingExpiration = false;
-                options.Events = new CookieAuthenticationEvents
-                {
-                    OnValidatePrincipal = context =>
-                        context
-                            .HttpContext.RequestServices.GetRequiredService<AuthCookieValidator>()
-                            .ValidateAsync(context),
-                };
-            });
-        _ = builder.Services.AddAuthorization(options =>
-        {
-            AddPolicy(options, "Operator", AuthSessionCapability.Operator);
-            AddPolicy(options, "HostSelected", AuthSessionCapability.HostSelected);
-            AddPolicy(options, "BotAdmin", AuthSessionCapability.BotAdmin);
-        });
-    }
-
-    private static void AddPolicy(
-        AuthorizationOptions options,
-        string name,
-        AuthSessionCapability capability
-    ) =>
-        options.AddPolicy(
-            name,
-            policy =>
-                policy
-                    .RequireAuthenticatedUser()
-                    .AddRequirements(new AuthSessionCapabilityRequirement(capability))
-        );
 }

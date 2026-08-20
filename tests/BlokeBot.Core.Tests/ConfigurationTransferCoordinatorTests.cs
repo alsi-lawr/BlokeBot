@@ -137,6 +137,39 @@ public sealed class ConfigurationTransferCoordinatorTests
     }
 
     [Test]
+    public async Task AddMissingExistingPoints_ReportsSkippedSectionInsteadOfChangedSection()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "destination");
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            _ = seed.PointsSettings.Add(new PointsSettings { HostId = hostId });
+            _ = await seed.SaveChangesAsync();
+        }
+        var selection = new ConfigurationImportSelection(
+            hostId,
+            [new(ConfigurationSectionId.Points, ImportConflictStrategy.AddMissing, [])],
+            new HashSet<HostFeatureFlags>()
+        );
+
+        var outcome = await Coordinator(database)
+            .ApplyAsync(
+                Session(hostId),
+                Document(points: Points()),
+                selection,
+                new("actor-id", "destination"),
+                CancellationToken.None
+            );
+
+        var applied = outcome.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>().Result;
+        applied.ChangedSections.ShouldBeEmpty();
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.ConfigurationImportAudits.SingleAsync()).SummaryJson.ShouldBe(
+            "{\"Sections\":[]}"
+        );
+    }
+
+    [Test]
     public async Task SelectedHostMismatch_IsRejectedWithoutMutation()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -206,7 +239,7 @@ public sealed class ConfigurationTransferCoordinatorTests
         );
         return new(
             database,
-            new(writer, new CustomCommandAliasRegistry()),
+            new(writer, new CustomCommandAliasRegistry(), TimeProvider.System),
             new GrantedAuthority(),
             new ConfigurationActivationQueue(),
             TimeProvider.System,

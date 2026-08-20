@@ -11,6 +11,28 @@ namespace BlokeBot.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                WITH migration_reference(value) AS (
+                    SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                )
+                UPDATE custom_announcement_schedules
+                SET WeeklyDay = blokebot_weekly_utc_day(
+                        WeeklyDay,
+                        WeeklyTime,
+                        (SELECT TimeZoneId FROM hosts WHERE hosts.Id = custom_announcement_schedules.HostId),
+                        (SELECT value FROM migration_reference)
+                    ),
+                    WeeklyTime = blokebot_weekly_utc_time(
+                        WeeklyDay,
+                        WeeklyTime,
+                        (SELECT TimeZoneId FROM hosts WHERE hosts.Id = custom_announcement_schedules.HostId),
+                        (SELECT value FROM migration_reference)
+                    )
+                WHERE ScheduleType = 'Weekly';
+                """
+            );
+
             migrationBuilder.CreateTable(
                 name: "configuration_activations",
                 columns: table => new

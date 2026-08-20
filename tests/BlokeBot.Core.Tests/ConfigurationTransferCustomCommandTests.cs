@@ -10,6 +10,41 @@ namespace BlokeBot.Core.Tests;
 public sealed class ConfigurationTransferCustomCommandTests
 {
     [Test]
+    [Arguments(ImportConflictStrategy.AddMissing, 1, 0, 1, 0)]
+    [Arguments(ImportConflictStrategy.Merge, 1, 1, 0, 0)]
+    [Arguments(ImportConflictStrategy.ReplaceSection, 1, 1, 0, 0)]
+    public async Task Preview_CommandCountsMatchSelectedConflictStrategy(
+        ImportConflictStrategy strategy,
+        int add,
+        int update,
+        int skip,
+        int remove
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostWithAliasAsync(database, "existing");
+        var imported = Commands(
+            MessageCommand("existing-command", "Existing", "existing"),
+            MessageCommand("new-command", "New", "new-command")
+        );
+
+        var outcome = await new ConfigurationImportPreviewService(database).PreviewAsync(
+            Document(imported),
+            new(
+                hostId,
+                [new(ConfigurationSectionId.CustomCommands, strategy, [])],
+                new HashSet<HostFeatureFlags>()
+            ),
+            CancellationToken.None
+        );
+
+        outcome
+            .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
+            .Preview.Sections.Single()
+            .Counts.ShouldBe(new ConfigurationPreviewCount(add, update, skip, remove));
+    }
+
+    [Test]
     public async Task Preview_ListsBuiltInExistingCustomAndUnsupportedActionConflicts()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -106,7 +141,8 @@ public sealed class ConfigurationTransferCustomCommandTests
         {
             var adapter = new CustomCommandConfigurationTransferAdapter(
                 new(database, null!, TimeProvider.System),
-                new()
+                new(),
+                TimeProvider.System
             );
             var issues = await adapter.StageAsync(
                 db,
@@ -143,7 +179,8 @@ public sealed class ConfigurationTransferCustomCommandTests
         var hostId = await SeedHostWithAliasAsync(database, null);
         var adapter = new CustomCommandConfigurationTransferAdapter(
             new(database, null!, TimeProvider.System),
-            new()
+            new(),
+            TimeProvider.System
         );
         var announcements = new AnnouncementsSectionV1(
             [
@@ -220,6 +257,66 @@ public sealed class ConfigurationTransferCustomCommandTests
         (await verify.CustomMessageVariants.SingleAsync()).Text.ShouldBe("After");
     }
 
+    [Test]
+    public async Task AnnouncementsOnlyImport_PersistsUtcRecurrenceWithoutChangingDestinationZone()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostWithAliasAsync(database, null);
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            var host = await seed.Hosts.SingleAsync();
+            host.TimeZoneId = "America/Los_Angeles";
+            _ = await seed.SaveChangesAsync();
+        }
+        var adapter = new CustomCommandConfigurationTransferAdapter(
+            new(database, null!, TimeProvider.System),
+            new(),
+            TimeProvider.System
+        );
+        var announcements = new AnnouncementsSectionV1(
+            [new("reply", "Weekly reply", CustomMessageSelectionMode.Sequential, ["Weekly"])],
+            [
+                new(
+                    "weekly",
+                    "Weekly",
+                    true,
+                    "reply",
+                    CustomAnnouncementDeliveryType.ChatMessage,
+                    BlokeBot.Persistence.Models.TwitchAnnouncementColor.Primary,
+                    2,
+                    30,
+                    new(
+                        AnnouncementScheduleTypeV1.Weekly,
+                        Day: DayOfWeek.Sunday,
+                        Time: new TimeOnly(1, 30)
+                    )
+                ),
+            ]
+        );
+
+        await StageAsync(
+            database,
+            adapter,
+            hostId,
+            new(
+                ConfigurationDocumentCodec.Format,
+                1,
+                DateTimeOffset.UtcNow,
+                new("unlike-source", "0.12.0"),
+                new(Announcements: announcements)
+            ),
+            new(ConfigurationSectionId.Announcements, ImportConflictStrategy.Merge, [])
+        );
+
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.Hosts.SingleAsync()).TimeZoneId.ShouldBe("America/Los_Angeles");
+        var schedule = await verify
+            .CustomAnnouncementSchedules.OfType<WeeklyCustomAnnouncementSchedule>()
+            .SingleAsync();
+        schedule.Day.ShouldBe(DayOfWeek.Sunday);
+        schedule.Time.ShouldBe(new TimeOnly(1, 30));
+    }
+
     private static async Task<int> SeedHostWithAliasAsync(
         SqliteBlokeBotDbFactory database,
         string? alias
@@ -280,6 +377,21 @@ public sealed class ConfigurationTransferCustomCommandTests
             [new("reply", "reply", CustomMessageSelectionMode.Sequential, ["Hello!"])],
             [],
             commands
+        );
+
+    private static CustomCommandV1 MessageCommand(string id, string name, string alias) =>
+        new(
+            id,
+            name,
+            true,
+            [alias],
+            true,
+            true,
+            [],
+            0,
+            CustomCommandCooldownScope.User,
+            CustomCommandInvocationLimit.Unlimited,
+            new(CustomCommandActionTypeV1.Message, ZeroArgumentReplyId: "reply")
         );
 
     private static ConfigurationDocumentV1 Document(CustomCommandsSectionV1 commands) =>

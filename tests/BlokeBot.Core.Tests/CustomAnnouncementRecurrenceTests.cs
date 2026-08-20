@@ -136,7 +136,7 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
     }
 
     [Test]
-    public async Task DueWeeklyAnnouncement_RunningRepeatedTick_SendsOnceAtScheduledLocalTime()
+    public async Task DueWeeklyAnnouncement_RunningRepeatedTick_SendsOnceAtScheduledUtcTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 20, TimeSpan.Zero);
@@ -152,8 +152,8 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
             hostId,
             new WeeklyCustomAnnouncementSchedule
             {
-                Day = DayOfWeek.Saturday,
-                Time = new TimeOnly(0, 0),
+                Day = DayOfWeek.Friday,
+                Time = new TimeOnly(12, 0),
             },
             ["Weekly"],
             createdAtUtc: now.AddDays(-7).UtcDateTime
@@ -224,8 +224,8 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
             hostId,
             new WeeklyCustomAnnouncementSchedule
             {
-                Day = DayOfWeek.Saturday,
-                Time = new TimeOnly(0, 0),
+                Day = DayOfWeek.Friday,
+                Time = new TimeOnly(12, 0),
             },
             ["Weekly"],
             createdAtUtc: missedAt.AddDays(-7).UtcDateTime

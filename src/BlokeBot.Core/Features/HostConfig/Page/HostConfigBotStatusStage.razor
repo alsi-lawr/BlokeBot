@@ -1,0 +1,198 @@
+        <div id="bot-status"
+             class="host-config-fragment-target scroll-mt-24"
+             role="region"
+             aria-label="Bot status"
+             tabindex="-1">
+        <StudioStage Key="bot-status"
+                     Number="1"
+                     Title="@($"#{State.DisplayName}")"
+                     Summary="@Summary"
+                     Open="@Open"
+                     OpenChanged="OpenChanged"
+                     FocusElementId="bot-status"
+                     FocusRequest="@FocusRequest">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="surface-muted rounded-lg px-3 py-2.5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat access</p>
+                        <span class="@AuthorizationBadgeClass">
+                            <span class="@AuthorizationDotClass"></span>
+                            <span class="status-pill__label">@AuthorizationText</span>
+                        </span>
+                    </div>
+                    @if (State.IsChannelBotAuthorized && State.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel has approved BlokeBot for chat.</p>
+                        @if (CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/channel-bot/start"
+                                                 PopupName="blokebot-channel-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="Reload">
+                                    Reconnect bot
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="ClearChannelAuthorization">Disconnect</button>
+                            </div>
+                        }
+                    }
+                    else if (State.IsChannelBotAuthorized)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">The bot needs a fresh Twitch connection for this channel.</p>
+                        @if (CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/channel-bot/start"
+                                                 PopupName="blokebot-channel-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="Reload">
+                                    Reconnect bot
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="ClearChannelAuthorization">Disconnect</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect this Twitch account.</p>
+                        }
+                    }
+                    else
+                    {
+                        @if (CanAuthorizeSelectedHost)
+                        {
+                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                             Url="/oauth/channel-bot/start"
+                                             PopupName="blokebot-channel-oauth"
+                                             OpeningText="Opening..."
+                                             OnClosed="Reload">
+                                Connect channel
+                            </AuthPopupButton>
+                        }
+                        else
+                        {
+                            <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this Twitch account.</p>
+                        }
+                    }
+                </div>
+                <div class="surface-muted rounded-lg px-3 py-2.5" data-twitch-integration>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch integration</p>
+                        <span class="@OperationsAuthorizationBadgeClass">
+                            <span class="@OperationsAuthorizationDotClass"></span>
+                            <span class="status-pill__label">@OperationsAuthorizationText</span>
+                        </span>
+                    </div>
+                    @if (State.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Ready)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">Connected for this channel.</p>
+                        @if (CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/broadcaster/start"
+                                                 PopupName="blokebot-broadcaster-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="Reload">
+                                    Reconnect
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
+                                        type="button"
+                                        data-twitch-integration-disconnect
+                                        @onclick="DisconnectTwitchIntegration">Disconnect</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="mt-2 text-xs font-medium text-slate-500">Only the channel owner can change this connection.</p>
+                        }
+                    }
+                    else if (State.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Stale)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect this integration.</p>
+                        @if (CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/broadcaster/start"
+                                                 PopupName="blokebot-broadcaster-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="Reload">
+                                    Reconnect
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
+                                        type="button"
+                                        data-twitch-integration-disconnect
+                                        @onclick="DisconnectTwitchIntegration">Disconnect</button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this integration.</p>
+                        @if (CanAuthorizeSelectedHost)
+                        {
+                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                             Url="/oauth/broadcaster/start"
+                                             PopupName="blokebot-broadcaster-oauth"
+                                             OpeningText="Opening..."
+                                             OnClosed="Reload">
+                                Connect
+                            </AuthPopupButton>
+                        }
+                    }
+                </div>
+                <HostBotChannelStatusPanel HostLogin="@State.Login" ReloadKey="@BotAccountStatusReloadKey" />
+                <FollowerOnlyChatStatusPanel HostLogin="@State.Login"
+                                             BotAccountName="@ActiveBotAccountName"
+                                             ReconnectUrl="@ActiveBotReconnectUrl"
+                                             ReloadKey="@BotAccountStatusReloadKey" />
+            </div>
+            <div class="runtime-control-card surface-muted mt-3 rounded-lg px-3 py-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>
+                    <span class="@RuntimeBadgeClass">
+                        <span class="@RuntimeDotClass"></span>
+                        <span class="status-pill__label">@RuntimeText</span>
+                    </span>
+                </div>
+                <div class="runtime-control-actions mt-3">
+                    <span class="block min-w-0" title="@StartRuntimeTooltip">
+                        <button class="primary-control grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                                disabled="@(!CanStart)"
+                                aria-label="Start bot"
+                                @onclick="Start">
+                            <span class="inline-flex h-9 w-9 items-center justify-center">
+                                <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M8 5.5v13l10-6.5Z" />
+                                </svg>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold">Start bot</span>
+                                <span class="mt-1 block text-xs font-medium opacity-75">Let the bot join chat</span>
+                            </span>
+                        </button>
+                    </span>
+                    <span class="block min-w-0" title="@StopRuntimeTooltip">
+                        <button class="control-surface grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                                disabled="@(!CanStop)"
+                                aria-label="Stop bot"
+                                @onclick="Stop">
+                            <span class="inline-flex h-9 w-9 items-center justify-center text-red-700">
+                                <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                                </svg>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold text-red-700">Stop bot</span>
+                                <span class="mt-1 block text-xs font-medium text-slate-500">Take the bot out of chat</span>
+                            </span>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </StudioStage>
+        </div>

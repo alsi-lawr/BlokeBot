@@ -318,7 +318,7 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
     }
 
     [Test]
-    public async Task InvalidTimeZoneAndBlankMessage_CompleteExplicitTerminalClassifications()
+    public async Task InvalidDisplayTimeZoneAndBlankMessage_UseUtcScheduleAndClassifyBlankMessage()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -356,11 +356,11 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
 
         await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
 
-        sender.Messages.ShouldBeEmpty();
+        sender.Messages.ShouldBe([new SentChatMessage("invalid-zone", "Message")]);
         await using var db = await dbFactory.CreateDbContextAsync();
         (
             await db.CustomAnnouncements.SingleAsync(x => x.Id == invalid.AnnouncementId)
-        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalInvalidTimeZone);
+        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
         var blankAnnouncement = await db.CustomAnnouncements.SingleAsync(x =>
             x.Id == blank.AnnouncementId
         );

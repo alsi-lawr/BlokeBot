@@ -20,9 +20,9 @@
         <span>Selected channel</span>
     </section>
 
-    <div class="configuration-transfer__tabs" role="tablist" aria-label="Configuration transfer mode">
-        <button type="button" role="tab" aria-selected="@(_mode == TransferMode.Export)" @onclick="() => _mode = TransferMode.Export">Export settings</button>
-        <button type="button" role="tab" aria-selected="@(_mode == TransferMode.Import)" @onclick="() => _mode = TransferMode.Import">Import settings</button>
+    <div class="configuration-transfer__tabs" role="group" aria-label="Configuration transfer mode">
+        <button type="button" aria-pressed="@(_mode == TransferMode.Export)" @onclick="() => _mode = TransferMode.Export">Export settings</button>
+        <button type="button" aria-pressed="@(_mode == TransferMode.Import)" @onclick="() => _mode = TransferMode.Import">Import settings</button>
     </div>
 
     @if (_mode == TransferMode.Export)
@@ -90,7 +90,7 @@
             <div class="configuration-transfer__progress" aria-label="Import progress"><span class="done">1<small>File</small></span><i></i><span class="active">2<small>Review</small></span><i></i><span>3<small>Apply</small></span></div>
             <div class="configuration-transfer__source">
                 <span><small>Source</small><strong>#@_preview.Document.Source.ChannelLogin</strong></span>
-                <span><small>BlokeBot</small><strong>@(_preview.Document.Source.BlokeBotVersion ?? "Not provided")</strong></span>
+                <span><small>BlokeBot</small><strong class="configuration-transfer__source-version">@(_preview.Document.Source.BlokeBotVersion ?? "Not provided")</strong></span>
                 <span><small>Format</small><strong>@_preview.Document.Version</strong></span>
                 <span><small>Exported</small><strong>@_preview.Document.ExportedAtUtc.ToLocalTime().ToString("g")</strong></span>
             </div>
@@ -108,7 +108,7 @@
                         {
                             <div class="configuration-transfer__conflict">
                                 <div><strong>@conflict.ItemName</strong><small>@conflict.Message</small></div>
-                                <select aria-label="Resolve conflict" value="@ResolutionValue(conflict)" @onchange="args => SetResolution(conflict, args.Value?.ToString())">
+                                <select aria-label="Resolve conflict" value="@ResolutionValue(conflict)" @onchange="args => SetResolutionAsync(conflict, args.Value?.ToString())">
                                     <option value="Unresolved">Choose a decision</option>
                                     @foreach (var resolution in conflict.AllowedResolutions) { <option value="@resolution">@ResolutionTitle(resolution)</option> }
                                 </select>

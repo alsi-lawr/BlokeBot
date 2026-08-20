@@ -1,0 +1,250 @@
+@using BlokeBot.Persistence.Models
+
+                        <section @key="Announcement"
+                                 id="@CustomCommandEditorIds.EditorRegion("ScheduledMessage", Announcement.Id)"
+                                 class="studio-grid"
+                                 role="region"
+                                 aria-labelledby="@CustomCommandEditorIds.InventoryLabel("ScheduledMessage", Announcement.Id)"
+                                 data-selected-editor="scheduled-message">
+                            <div class="studio-span-6">
+                                <Field Id="@CustomCommandEditorIds.AnnouncementName(Announcement)"
+                                       Label="Scheduled message name"
+                                       ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Name))"
+                                       FocusRequest="@Math.Max(Context.Validation.FocusRequest(CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Name)), Context.Validation.EditorFocusRequest(CustomCommandEditorIds.AnnouncementName(Announcement)))"
+                                       @bind-Value="Announcement.Name"
+                                       Placeholder="Hydrate reminder" />
+                            </div>
+                            <div class="studio-span-6 space-y-2">
+                                <div class="field">
+                                    <label class="field__label" for="@CustomCommandEditorIds.AnnouncementReply(Announcement)">Reply to send</label>
+                                    <select id="@CustomCommandEditorIds.AnnouncementReply(Announcement)"
+                                            class="field__input"
+                                            @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementReply(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Reply))"
+                                            @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementReply(Announcement)]"
+                                            @bind="Announcement.MessageLibraryEntryId">
+                                        @foreach (var entry in Context.Configuration.MessageEntries)
+                                        {
+                                            <option value="@entry.Id">@entry.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementReply(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Reply)))
+                            </div>
+                            <div class="studio-span-6 space-y-2">
+                                <div class="field">
+                                    <label class="field__label" for="@CustomCommandEditorIds.AnnouncementDelivery(Announcement)">Delivery type</label>
+                                    <select id="@CustomCommandEditorIds.AnnouncementDelivery(Announcement)"
+                                            class="field__input"
+                                            @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementDelivery(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Delivery))"
+                                            @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementDelivery(Announcement)]"
+                                            @bind="Announcement.DeliveryType">
+                                        @foreach (var type in AnnouncementDeliveryTypes)
+                                        {
+                                            <option value="@type">@Context.AnnouncementDeliveryTypeLabel(type)</option>
+                                        }
+                                    </select>
+                                </div>
+                                @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementDelivery(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Delivery)))
+                            </div>
+                            @if (Announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement)
+                            {
+                                <div class="studio-span-6 space-y-2">
+                                    <div class="field">
+                                        <label class="field__label" for="@CustomCommandEditorIds.AnnouncementColor(Announcement)">Twitch announcement color</label>
+                                        <select id="@CustomCommandEditorIds.AnnouncementColor(Announcement)"
+                                                class="field__input"
+                                                @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementColor(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Color))"
+                                                @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementColor(Announcement)]"
+                                                @bind="Announcement.AnnouncementColor">
+                                            @foreach (var color in TwitchAnnouncementColors)
+                                            {
+                                                <option value="@color">@Context.TwitchAnnouncementColorLabel(color)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementColor(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Color)))
+                                </div>
+                                <div class="studio-span-12 surface-row rounded-lg px-3 py-2 text-sm text-slate-700">
+                                    <p>@Context.TwitchAnnouncementCapabilityMessage(Context.Configuration.TwitchAnnouncementReadiness)</p>
+                                    @if (Context.Configuration.TwitchAnnouncementReadiness.Availability != TwitchAnnouncementAvailability.Available)
+                                    {
+                                        <a class="mt-1 inline-flex font-semibold text-blue-700" href="/host">Open Channel setup</a>
+                                    }
+                                    <p class="mt-1 text-xs text-slate-500">Twitch announcements use the selected reply; every reply message must be no longer than 500 characters.</p>
+                                </div>
+                            }
+                            <div class="studio-span-6 space-y-2">
+                                <div class="field">
+                                    <label class="field__label" for="@CustomCommandEditorIds.AnnouncementSchedule(Announcement)">When to send</label>
+                                    <select id="@CustomCommandEditorIds.AnnouncementSchedule(Announcement)"
+                                            class="field__input"
+                                            @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementSchedule(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Schedule))"
+                                            @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementSchedule(Announcement)]"
+                                            @bind="Announcement.ScheduleKind">
+                                        @foreach (var type in AnnouncementScheduleKinds)
+                                        {
+                                            <option value="@type">@Context.AnnouncementScheduleLabel(type)</option>
+                                        }
+                                    </select>
+                                </div>
+                                @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementSchedule(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Schedule)))
+                            </div>
+                            @if (Announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
+                            {
+                                <div class="studio-span-6 space-y-2">
+                                    <div class="field">
+                                        <label class="field__label" for="@CustomCommandEditorIds.AnnouncementInterval(Announcement)">Send every (minutes)</label>
+                                        <input id="@CustomCommandEditorIds.AnnouncementInterval(Announcement)"
+                                               class="field__input"
+                                               type="number"
+                                               min="1"
+                                               @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementInterval(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Interval))"
+                                               @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementInterval(Announcement)]"
+                                               @bind="interval.IntervalMinutes" />
+                                    </div>
+                                    @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementInterval(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Interval)))
+                                </div>
+                            }
+                            else if (Announcement.Schedule is IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat)
+                            {
+                                <div class="studio-span-6 space-y-2">
+                                    <div class="field">
+                                        <label class="field__label" for="@CustomCommandEditorIds.AnnouncementInterval(Announcement)">Send every (minutes)</label>
+                                        <input id="@CustomCommandEditorIds.AnnouncementInterval(Announcement)"
+                                               class="field__input"
+                                               type="number"
+                                               min="1"
+                                               @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementInterval(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Interval))"
+                                               @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementInterval(Announcement)]"
+                                               @bind="intervalAfterChat.IntervalMinutes" />
+                                    </div>
+                                    @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementInterval(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Interval)))
+                                </div>
+                                <div class="studio-span-6 space-y-2">
+                                    <div class="field">
+                                        <label class="field__label" for="@CustomCommandEditorIds.AnnouncementChatMessages(Announcement)">Chat messages needed</label>
+                                        <input id="@CustomCommandEditorIds.AnnouncementChatMessages(Announcement)"
+                                               class="field__input"
+                                               type="number"
+                                               min="1"
+                                               @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementChatMessages(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.ChatMessages))"
+                                               @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementChatMessages(Announcement)]"
+                                               @bind="intervalAfterChat.RequiredChatMessages" />
+                                    </div>
+                                    @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementChatMessages(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.ChatMessages)))
+                                </div>
+                            }
+                            else if (Announcement.Schedule is WeeklyCustomAnnouncementScheduleEditor weekly)
+                            {
+                                <div class="studio-span-6 space-y-2">
+                                    <div class="field">
+                                        <label class="field__label" for="@CustomCommandEditorIds.AnnouncementDay(Announcement)">Day</label>
+                                        <select id="@CustomCommandEditorIds.AnnouncementDay(Announcement)"
+                                                class="field__input"
+                                                @attributes="Context.Validation.Attributes(CustomCommandEditorIds.AnnouncementDay(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Day))"
+                                                @ref="Context.Validation.Controls[CustomCommandEditorIds.AnnouncementDay(Announcement)]"
+                                                @bind="weekly.Day">
+                                            @foreach (var day in DaysOfWeek)
+                                            {
+                                                <option value="@day">@day</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    @(Context.Validation.MessageFor(CustomCommandEditorIds.AnnouncementDay(Announcement), CustomCommandEditorIds.AnnouncementTarget(Announcement.Id, CustomCommandValidationFieldKind.Day)))
+                                </div>
+                                <div class="studio-span-6">
+                                    <div class="field">
+                                        <label class="field__label" for="@CustomCommandEditorIds.AnnouncementWeeklyTime(Announcement)">Time</label>
+                                        <input id="@CustomCommandEditorIds.AnnouncementWeeklyTime(Announcement)" class="field__input" type="time" @bind="weekly.Time" />
+                                    </div>
+                                </div>
+                            }
+                            <div class="studio-span-12" data-announcement-secondary="delivery-details">
+                                <CollapsibleSection ContentId="custom-announcement-delivery-details"
+                                                    Title="Delivery details"
+                                                    Description="Retry policy and latest delivery"
+                                                    InitiallyOpen="false"
+                                                    OpenRequest="@Context.AnnouncementAdvancedOpenRequest(Announcement.Id)"
+                                                    FocusElementId="@AdvancedFocusElementId"
+                                                    FocusRequest="@AdvancedFocusRequest">
+                                    <div class="studio-grid p-4">
+                                        @Context.AnnouncementDeliveryDetails(Announcement)
+                                    </div>
+                                </CollapsibleSection>
+                            </div>
+                            <p id="@($"announcement-{Announcement.Id}-delivery-timing-help")"
+                               class="studio-span-12 text-xs font-medium text-slate-500">These timings apply only when a scheduled send cannot happen.</p>
+                            <div class="studio-span-12" data-announcement-secondary="delivery-history">
+                                <CollapsibleSection ContentId="custom-announcement-delivery-history"
+                                                    Title="Delivery history"
+                                                    Description="Last send and latest result"
+                                                    InitiallyOpen="false">
+                                    <div class="studio-grid p-4">
+                                        <div class="studio-span-4 surface-row rounded-lg px-3 py-2">
+                                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">@Context.FormatLastSent(Announcement.LastSentAtUtc)</p>
+                                        </div>
+                                        <div class="studio-span-4 surface-row rounded-lg px-3 py-2">
+                                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">@Context.LatestDeliveryResultLabel(Announcement.LatestDeliveryResult)</p>
+                                        </div>
+                                        <div class="studio-span-4 surface-row rounded-lg px-3 py-2">
+                                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">@Announcement.ChatMessagesSinceLastSent</p>
+                                        </div>
+                                    </div>
+                                </CollapsibleSection>
+                            </div>
+                            <div class="studio-span-12 flex justify-end">
+                                <button class="btn-secondary" @onclick="() => Context.RemoveAnnouncement(Announcement)">Delete scheduled message</button>
+                            </div>
+                        </section>
+
+@code {
+    private static readonly IReadOnlyList<CustomAnnouncementDeliveryType> AnnouncementDeliveryTypes =
+        Enum.GetValues<CustomAnnouncementDeliveryType>();
+    private static readonly IReadOnlyList<BlokeBot.Persistence.Models.TwitchAnnouncementColor> TwitchAnnouncementColors =
+        Enum.GetValues<BlokeBot.Persistence.Models.TwitchAnnouncementColor>();
+    private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> AnnouncementScheduleKinds =
+        Enum.GetValues<CustomAnnouncementScheduleKind>();
+    private static readonly IReadOnlyList<DayOfWeek> DaysOfWeek = Enum.GetValues<DayOfWeek>();
+
+    private long AdvancedFocusRequest =>
+        Math.Max(
+            Context.Validation.FocusRequest(
+                CustomCommandEditorIds.AnnouncementTarget(
+                    Announcement.Id,
+                    CustomCommandValidationFieldKind.RetryDelay
+                )
+            ),
+            Context.Validation.FocusRequest(
+                CustomCommandEditorIds.AnnouncementTarget(
+                    Announcement.Id,
+                    CustomCommandValidationFieldKind.OccurrenceLifetime
+                )
+            )
+        );
+
+    private string AdvancedFocusElementId =>
+        Context.Validation.FocusRequest(
+            CustomCommandEditorIds.AnnouncementTarget(
+                Announcement.Id,
+                CustomCommandValidationFieldKind.RetryDelay
+            )
+        )
+        >= Context.Validation.FocusRequest(
+            CustomCommandEditorIds.AnnouncementTarget(
+                Announcement.Id,
+                CustomCommandValidationFieldKind.OccurrenceLifetime
+            )
+        )
+            ? CustomCommandEditorIds.AnnouncementRetryDelay(Announcement)
+            : CustomCommandEditorIds.AnnouncementOccurrenceLifetime(Announcement);
+
+    [Parameter, EditorRequired]
+    public required CustomAnnouncementEditor Announcement { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+
+}

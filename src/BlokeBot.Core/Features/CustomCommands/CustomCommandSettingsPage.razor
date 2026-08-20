@@ -96,884 +96,121 @@
                        ActiveKey="@KeyForTab(_activeTab)"
                        ActiveKeyChanged="HandleTabKeyChanged" />
 
-        <section id="@SegmentedTabs.PanelId("custom-command", KeyForTab(_activeTab))"
-                 class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]"
-                 data-active-fragment="@KeyForTab(_activeTab)"
-                 aria-label="Custom command studio"
-                 role="tabpanel"
-                 aria-labelledby="@SegmentedTabs.TabId("custom-command", KeyForTab(_activeTab))"
-                 tabindex="0">
-            <StudioRail AriaLabel="@(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "Saved replies" : "Commands, counters, and announcements")"
-                        SearchPlaceholder="Search"
-                        Groups="@_railGroups">
-                <Footer>
-                    @if (_activeTab == CustomCommandSettingsTab.MessageLibrary)
-                    {
-                        <button class="btn-primary w-full"
-                                data-action="add-reply"
-                                @onclick="AddMessageEntry">+ New reply</button>
-                    }
-                    else if (_config.MessageEntries.Count == 0)
-                    {
-                        <button class="btn-primary w-full"
-                                data-action="create-reply"
-                                @onclick="AddMessageEntry">Create a reply first</button>
-                    }
-                    else
-                    {
-                        <button class="btn-primary w-full"
-                                data-action="add-command"
-                                @onclick="AddCommand">+ New command</button>
-                    }
-                </Footer>
-            </StudioRail>
+            var studioContext = new CustomCommandStudioContext
+            {
+                Configuration = _config,
+                ActiveTab = _activeTab,
+                RailGroups = () => _railGroups,
+                AddMessageEntry = EventCallback.Factory.Create(this, AddMessageEntry),
+                AddCommand = AddCommand,
+                SelectedCommand = () => _selectedCommand,
+                SelectedCounter = () => _selectedCounter,
+                SelectedAnnouncement = () => _selectedAnnouncement,
+                SelectedReply = () => _selectedReply,
+                HeaderName = () => _headerName,
+                HeaderStats = () => _headerStats,
+                EmptyInspectorMessage = () => _emptyInspectorMessage,
+                HasChanges = () => _hasChanges,
+                Save = EventCallback.Factory.Create(this, SaveAsync),
+                Validation = new(
+                    ValidationMessage,
+                    FocusRequestFor,
+                    EditorFocusRequestFor,
+                    ValidationAttributes,
+                    ValidationMessageFor,
+                    _controls
+                ),
+                BasicsOpen = () => _openStages.IsOpen(CustomCommandStage.Basics),
+                SetBasicsOpen = open => _openStages.Set(CustomCommandStage.Basics, open),
+                AccessOpen = () => _openStages.IsOpen(CustomCommandStage.Access),
+                SetAccessOpen = open => _openStages.Set(CustomCommandStage.Access, open),
+                ActionOpen = () => _openStages.IsOpen(CustomCommandStage.Action),
+                SetActionOpen = open => _openStages.Set(CustomCommandStage.Action, open),
+                FineTuningOpen = () => _openStages.IsOpen(CustomCommandStage.FineTuning),
+                SetFineTuningOpen = open => _openStages.Set(CustomCommandStage.FineTuning, open),
+                BasicsSummary = BasicsSummary,
+                CommandInvocation = CommandInvocation,
+                CommandAccessSummary = CommandAccessSummary,
+                ActionKindLabel = ActionKindLabel,
+                CommandAdvancedSummary = CommandAdvancedSummary,
+                CommandPreviewLines = CommandPreviewLines,
+                AccessOptions = AccessOptions,
+                SetCommandAccess = SetCommandAccess,
+                ToggleModeratorAccess = ToggleModeratorAccess,
+                AddAllowedUser = AddAllowedUserAsync,
+                RemoveAllowedUser = RemoveAllowedUser,
+                AutomationsEnabled = _automationsEnabled,
+                OverlaysEnabled = _overlaysEnabled,
+                CueCatalog = _cueCatalog,
+                CueTestOutcome = _cueTestOutcome,
+                TestCue = TestCueAsync,
+                CueQueuePolicyLabel = CueQueuePolicyLabel,
+                CueReplyOrderLabel = CueReplyOrderLabel,
+                CooldownScopeLabel = CooldownScopeLabel,
+                InvocationLimitLabel = InvocationLimitLabel,
+                PendingResetAllCommandId = () => _pendingResetAllCommandId,
+                ResetViewer = ResetViewerAsync,
+                RequestResetAllViewers = RequestResetAllViewers,
+                ResetAllViewers = ResetAllViewersAsync,
+                CancelResetAllViewers = CancelResetAllViewers,
+                RemoveCommand = RemoveCommand,
+                RemoveCounter = RemoveCounter,
+                RemoveAnnouncement = RemoveAnnouncement,
+                RemoveMessageEntry = RemoveMessageEntry,
+                AddVariant = AddVariant,
+                MoveVariant = MoveVariant,
+                RemoveVariant = RemoveVariant,
+                MessageSelectionLabel = MessageSelectionLabel,
+                AnnouncementDeliveryTypeLabel = AnnouncementDeliveryTypeLabel,
+                TwitchAnnouncementColorLabel = TwitchAnnouncementColorLabel,
+                TwitchAnnouncementCapabilityMessage = TwitchAnnouncementCapabilityMessage,
+                AnnouncementScheduleLabel = AnnouncementScheduleLabel,
+                NativeDeliveryUnavailable = NativeDeliveryUnavailable,
+                AnnouncementAdvancedOpenRequest = AnnouncementAdvancedOpenRequest,
+                AnnouncementDeliveryDetails = AnnouncementDeliveryDetails,
+                FormatLastSent = FormatLastSent,
+                LatestDeliveryResultLabel = LatestDeliveryResultLabel,
+                TimeZones = _timeZones,
+                TimeZoneSectionOpenRequest = _timeZoneSectionOpenRequest,
+                SelectedTimeZoneLabel = () => _selectedTimeZoneLabel,
+                ChangeTimeZone = EventCallback.Factory.Create<ChangeEventArgs>(this, ChangeTimeZone),
+                AlertImportanceLabel = AlertImportanceLabel,
+            };
 
-            <div class="studio__inspector flex min-w-0 flex-col" data-sticky-save-scope>
-                <header class="studio__header flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] max-lg:rounded-tr-none">
-                    <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere @(_selectedCommand is not null ? "studio__title--mono font-mono" : null)">@_headerName</span>
-                    @if (_headerStats is { } stats)
-                    {
-                        <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@stats</span>
-                    }
-                    <span class="studio__spacer flex-1"></span>
-                    @if (_selectedCommand is { } toggledCommand)
-                    {
-                        <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Turned on</span>
-                        <button type="button"
-                                id="@CommandEnabledToggleId(toggledCommand)"
-                                class="studio-toggle"
-                                role="switch"
-                                aria-checked="@(toggledCommand.Enabled ? "true" : "false")"
-                                aria-label="Turned on"
-                                @onclick="() => toggledCommand.Enabled = !toggledCommand.Enabled"></button>
-                    }
-                    else if (_selectedAnnouncement is { } toggledAnnouncement)
-                    {
-                        <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Turned on</span>
-                        <button type="button"
-                                id="@AnnouncementEnabledToggleId(toggledAnnouncement)"
-                                class="studio-toggle"
-                                role="switch"
-                                aria-checked="@(toggledAnnouncement.Enabled ? "true" : "false")"
-                                aria-label="Turned on"
-                                disabled="@NativeDeliveryUnavailable(toggledAnnouncement)"
-                                @onclick="() => toggledAnnouncement.Enabled = !toggledAnnouncement.Enabled"></button>
-                    }
-                    <StickySaveRegion Scope="StickySaveScope.Editor">
-                        <SaveChangesButton AccessibleName="Save custom commands"
-                                           Disabled="@(!_hasChanges)"
-                                           HasChanges="@_hasChanges"
-                                           OnSave="SaveAsync" />
-                    </StickySaveRegion>
-                </header>
+        <CustomCommandStudio Context="studioContext" />
 
-                <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
-                    @if (_selectedCommand is { } command)
-                    {
-                        <section @key="command"
-                                 id="@EditorRegionId(CustomCommandEditorKind.Command, command.Id)"
-                                 class="grid min-w-0 gap-3"
-                                 role="region"
-                                 aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.Command, command.Id)"
-                                 data-selected-editor="command">
-
-                            <StudioStage Key="basics"
-                                         Number="1"
-                                         Title="Basics"
-                                         Summary="@BasicsSummary(command)"
-                                         Open="@_openStages.IsOpen(CustomCommandStage.Basics)"
-                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.Basics, open))">
-                                <div class="studio-grid">
-                                    <div class="studio-span-4">
-                                        <Field Id="@CommandNameFieldId(command)"
-                                               Label="Command name"
-                                               ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name))"
-                                               FocusRequest="@Math.Max(FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(CommandNameFieldId(command)))"
-                                               @bind-Value="command.Name"
-                                               Placeholder="Hello" />
-                                    </div>
-                                    <div class="studio-span-8">
-                                        <Field Id="@CommandAliasesFieldId(command)"
-                                               Label="Command words (without !)"
-                                               ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases))"
-                                               FocusRequest="@FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases))"
-                                               @bind-Value="command.Aliases"
-                                               Placeholder="hello, hi" />
-                                        <p class="mt-1 text-xs text-muted-foreground">Viewers type @CommandInvocation(command) in chat.</p>
-                                    </div>
-                                    @if (CommandPreviewLines(command) is { Count: > 0 } previewLines)
-                                    {
-                                        <div class="studio-span-12">
-                                            <StudioChatPreview Lines="previewLines" />
-                                        </div>
-                                    }
-                                </div>
-                            </StudioStage>
-
-                            <StudioStage Key="who-can-use-it"
-                                         Number="2"
-                                         Title="Who can use it"
-                                         Summary="@CommandAccessSummary(command)"
-                                         Open="@_openStages.IsOpen(CustomCommandStage.Access)"
-                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.Access, open))">
-                                <div class="studio-grid" data-command-access>
-                                    <div class="studio-span-12">
-                                        <StudioSegmentedPill TValue="bool"
-                                                             AriaLabel="Command access"
-                                                             Options="@AccessOptions(command)"
-                                                             Value="command.AllowEveryone"
-                                                             ValueChanged="@(everyone => SetCommandAccess(command, everyone))" />
-                                    </div>
-                                    @if (command.AllowedUserFeedback is not null)
-                                    {
-                                        <p class="studio-span-12 text-sm text-muted-foreground"
-                                           role="status"
-                                           data-allowed-user-feedback>@command.AllowedUserFeedback</p>
-                                    }
-                                    @if (!command.AllowEveryone)
-                                    {
-                                        <div class="studio-span-12 studio-chips flex flex-wrap items-center gap-[0.45rem]">
-                                            <StudioChip Id="@CommandModeratorAccessId(command)"
-                                                        Label="Moderators"
-                                                        Pressed="command.AllowModerators"
-                                                        PressedChanged="@(_ => ToggleModeratorAccess(command))" />
-                                            @foreach (var user in command.AllowedUsers)
-                                            {
-                                                <StudioChip @key="user"
-                                                            Label="@user.DisplayName"
-                                                            Note="@($"@{user.Login}")"
-                                                            RemoveLabel="@($"Remove {user.DisplayName}")"
-                                                            RemoveAction="remove-allowed-user"
-                                                            Remove="@(() => RemoveAllowedUser(command, user))"
-                                                            data-allowed-user-id="@user.TwitchUserId" />
-                                            }
-                                        </div>
-                                        @if (!command.AllowModerators && command.AllowedUsers.Count == 0)
-                                        {
-                                            <p class="studio-span-12 text-sm text-muted-foreground" data-streamer-only>
-                                                Only the streamer can use this command.
-                                            </p>
-                                        }
-                                        <div class="studio-span-6">
-                                            <Field Id="@CommandAllowedUserFieldId(command)"
-                                                   Label="Twitch login"
-                                                   ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.AllowedUsers))"
-                                                   FocusRequest="@FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.AllowedUsers))"
-                                                   @bind-Value="command.AllowedUserLoginDraft"
-                                                   Placeholder="viewer_name" />
-                                        </div>
-                                        <div class="studio-span-6 content-end">
-                                            <button class="btn-secondary"
-                                                    type="button"
-                                                    data-action="add-allowed-user"
-                                                    disabled="@command.AllowedUserLookupInProgress"
-                                                    @onclick="() => AddAllowedUserAsync(command)">
-                                                @(command.AllowedUserLookupInProgress ? "Looking up..." : "+ Add person")
-                                            </button>
-                                        </div>
-                                    }
-                                </div>
-                            </StudioStage>
-
-                            <StudioStage Key="what-happens"
-                                         Number="3"
-                                         Title="What happens"
-                                         Summary="@ActionKindLabel(command.ActionKind)"
-                                         Open="@_openStages.IsOpen(CustomCommandStage.Action)"
-                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.Action, open))">
-                                <div class="studio-grid">
-                                    <div class="studio-span-12">
-                                        <StudioChoiceCards id="@CommandActionFieldId(command)"
-                                                           AriaLabel="What happens"
-                                                           CaptureElement="@(element => _controls[CommandActionFieldId(command)] = element)"
-                                                           @attributes="ValidationAttributes(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action))">
-                                            @foreach (var choice in ActionChoices(command))
-                                            {
-                                                <StudioChoiceCard @key="choice.Kind"
-                                                                  data-action-kind="@choice.Kind"
-                                                                  Icon="@choice.Icon"
-                                                                  Title="@choice.Title"
-                                                                  Description="@choice.Description"
-                                                                  Pressed="@(command.ActionKind == choice.Kind)"
-                                                                  Select="@(() => command.ActionKind = choice.Kind)" />
-                                            }
-                                        </StudioChoiceCards>
-                                        @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
-                                    </div>
-                                    @if (command.Action is AutomationCustomCommandActionEditor)
-                                    {
-                                        <div class="studio-span-12 surface-muted space-y-2 rounded-lg p-3"
-                                             data-automation-command>
-                                            @if (_automationsEnabled)
-                                            {
-                                                <p class="text-sm font-semibold text-slate-900">Connected visual automations</p>
-                                                <p class="text-sm text-muted-foreground">
-                                                    This command starts every enabled flow whose Custom command event selects it. Build and inspect those connections in <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a>.
-                                                </p>
-                                            }
-                                            else
-                                            {
-                                                <p class="text-sm font-semibold text-slate-900">Automations are off</p>
-                                                <p class="text-sm text-muted-foreground" role="status">
-                                                    This action is retained, but flow starts and downstream actions stay paused. Turn Automations on in <a class="font-semibold text-blue-700 underline" href="/host#chat-tools">Channel setup</a>.
-                                                </p>
-                                            }
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        @foreach (var route in _replyRoutes)
-                                        {
-                                            <div class="studio-span-4 space-y-2" @key="route.Arguments">
-                                                <div class="field">
-                                                    <label class="field__label" for="@CommandReplyFieldId(command, route.Arguments)">@route.Label</label>
-                                                    <select id="@CommandReplyFieldId(command, route.Arguments)"
-                                                            class="field__input"
-                                                            @attributes="ValidationAttributes(CommandReplyFieldId(command, route.Arguments), CommandTarget(command.Id, route.Field))"
-                                                            @ref="_controls[CommandReplyFieldId(command, route.Arguments)]"
-                                                            value="@route.Get(command.Action.ReplyRoutes)"
-                                                            @onchange="args => route.Set(command.Action.ReplyRoutes, ParseEntryId(args.Value))">
-                                                        <option value="">Ignore</option>
-                                                        @foreach (var entry in _config.MessageEntries)
-                                                        {
-                                                            <option value="@entry.Id">@entry.Name</option>
-                                                        }
-                                                    </select>
-                                                </div>
-                                                @(ValidationMessageFor(CommandReplyFieldId(command, route.Arguments), CommandTarget(command.Id, route.Field)))
-                                            </div>
-                                        }
-                                        <p class="studio-span-12 text-xs text-muted-foreground">
-                                            @if (command.Action is OverlayCueCustomCommandActionEditor)
-                                            {
-                                                <text>Replies are optional for overlay cues. Unmapped counts still play the cue without a response.</text>
-                                            }
-                                            else
-                                            {
-                                                <text>Choose at least one reply. Unmapped counts and commands with more than two arguments are ignored without a response.</text>
-                                            }
-                                        </p>
-                                    }
-                                    @if (command.Action is OverlayCueCustomCommandActionEditor cueAction)
-                                    {
-                                        @if (!_overlaysEnabled)
-                                        {
-                                            <p class="studio-span-12 text-sm text-muted-foreground" role="status">
-                                                Overlays are off. This setup is retained, but cue playback and testing stay paused until you turn Overlays on in Channel setup.
-                                            </p>
-                                        }
-                                        <div class="studio-span-6 space-y-2" data-overlay-cue-command>
-                                            <div class="field">
-                                                <label class="field__label" for="@CommandOverlayTargetFieldId(command)">Overlay player</label>
-                                                <select id="@CommandOverlayTargetFieldId(command)"
-                                                        class="field__input"
-                                                        disabled="@(!_overlaysEnabled)"
-                                                        @attributes="ValidationAttributes(CommandOverlayTargetFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayTarget))"
-                                                        @ref="_controls[CommandOverlayTargetFieldId(command)]"
-                                                        @bind="cueAction.TargetOverlayPublicId">
-                                                    <option value="@Guid.Empty">Choose an overlay player</option>
-                                                    @if (cueAction.TargetOverlayPublicId != Guid.Empty && !_cueCatalog.Targets.Any(target => target.Id == cueAction.TargetOverlayPublicId))
-                                                    {
-                                                        <option value="@cueAction.TargetOverlayPublicId">Unavailable saved player</option>
-                                                    }
-                                                    @foreach (var target in _cueCatalog.Targets)
-                                                    {
-                                                        <option value="@target.Id">@target.Name</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            @(ValidationMessageFor(CommandOverlayTargetFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayTarget)))
-                                        </div>
-                                        <div class="studio-span-6 space-y-2">
-                                            <div class="field">
-                                                <label class="field__label" for="@CommandOverlayCueFieldId(command)">Cue</label>
-                                                <select id="@CommandOverlayCueFieldId(command)"
-                                                        class="field__input"
-                                                        disabled="@(!_overlaysEnabled)"
-                                                        @attributes="ValidationAttributes(CommandOverlayCueFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayCue))"
-                                                        @ref="_controls[CommandOverlayCueFieldId(command)]"
-                                                        @bind="cueAction.CuePublicId">
-                                                    <option value="@Guid.Empty">Choose a cue</option>
-                                                    @if (cueAction.CuePublicId != Guid.Empty && !_cueCatalog.Cues.Any(cue => cue.Id == cueAction.CuePublicId))
-                                                    {
-                                                        <option value="@cueAction.CuePublicId">Unavailable saved cue</option>
-                                                    }
-                                                    @foreach (var cue in _cueCatalog.Cues)
-                                                    {
-                                                        <option value="@cue.Id">@cue.Name</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            @(ValidationMessageFor(CommandOverlayCueFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayCue)))
-                                        </div>
-                                        <div class="studio-span-6 space-y-2">
-                                            <div class="field">
-                                                <label class="field__label" for="@CommandQueuePolicyFieldId(command)">When the player is busy</label>
-                                                <select id="@CommandQueuePolicyFieldId(command)"
-                                                        class="field__input"
-                                                        disabled="@(!_overlaysEnabled)"
-                                                        @attributes="ValidationAttributes(CommandQueuePolicyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.QueuePolicy))"
-                                                        @ref="_controls[CommandQueuePolicyFieldId(command)]"
-                                                        @bind="cueAction.QueuePolicy">
-                                                    @foreach (var policy in _cueQueuePolicies)
-                                                    {
-                                                        <option value="@policy">@CueQueuePolicyLabel(policy)</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            @(ValidationMessageFor(CommandQueuePolicyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.QueuePolicy)))
-                                        </div>
-                                        <div class="studio-span-6 space-y-2">
-                                            <div class="field">
-                                                <label class="field__label" for="@CommandReplyOrderFieldId(command)">Optional reply timing</label>
-                                                <select id="@CommandReplyOrderFieldId(command)"
-                                                        class="field__input"
-                                                        disabled="@(!_overlaysEnabled)"
-                                                        @attributes="ValidationAttributes(CommandReplyOrderFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.ReplyOrder))"
-                                                        @ref="_controls[CommandReplyOrderFieldId(command)]"
-                                                        @bind="cueAction.ReplyOrder">
-                                                    @foreach (var order in _cueReplyOrders)
-                                                    {
-                                                        <option value="@order">@CueReplyOrderLabel(order)</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            @(ValidationMessageFor(CommandReplyOrderFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.ReplyOrder)))
-                                        </div>
-                                        <div class="studio-span-12 flex flex-wrap items-center gap-3">
-                                            <button class="btn-secondary"
-                                                    type="button"
-                                                    disabled="@(!_overlaysEnabled || cueAction.TargetOverlayPublicId == Guid.Empty || cueAction.CuePublicId == Guid.Empty)"
-                                                    data-action="test-overlay-cue-command"
-                                                    @onclick="() => TestCueAsync(cueAction)">Test cue</button>
-                                            @if (_cueTestOutcome is not null)
-                                            {
-                                                <p class="text-sm text-muted-foreground" role="status" data-cue-test-outcome>@_cueTestOutcome</p>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </StudioStage>
-
-                            <StudioStage Key="fine-tuning"
-                                         Number="4"
-                                         Title="Fine-tuning"
-                                         Summary="@CommandAdvancedSummary(command)"
-                                         Open="@_openStages.IsOpen(CustomCommandStage.FineTuning)"
-                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.FineTuning, open))">
-                                <div class="studio-grid">
-                                    <div class="studio-span-4 space-y-2">
-                                        <div class="field">
-                                            <label class="field__label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
-                                            <input id="@CommandCooldownFieldId(command)"
-                                                   class="field__input"
-                                                   type="number"
-                                                   min="0"
-                                                   @attributes="ValidationAttributes(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown))"
-                                                   @ref="_controls[CommandCooldownFieldId(command)]"
-                                                   @bind="command.CooldownSeconds" />
-                                        </div>
-                                        @(ValidationMessageFor(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown)))
-                                    </div>
-                                    <div class="studio-span-4 space-y-2">
-                                        <div class="field">
-                                            <label class="field__label" for="@CommandCooldownScopeFieldId(command)">Who waits?</label>
-                                            <select id="@CommandCooldownScopeFieldId(command)"
-                                                    class="field__input"
-                                                    @attributes="ValidationAttributes(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope))"
-                                                    @ref="_controls[CommandCooldownScopeFieldId(command)]"
-                                                    @bind="command.CooldownScope">
-                                                @foreach (var scope in _cooldownScopes)
-                                                {
-                                                    <option value="@scope">@CooldownScopeLabel(scope)</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        @(ValidationMessageFor(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)))
-                                    </div>
-                                    <div class="studio-span-4 space-y-2">
-                                        <div class="field">
-                                            <label class="field__label" for="@CommandInvocationLimitFieldId(command)">Use limit</label>
-                                            <select id="@CommandInvocationLimitFieldId(command)"
-                                                    class="field__input"
-                                                    @attributes="ValidationAttributes(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
-                                                    @ref="_controls[CommandInvocationLimitFieldId(command)]"
-                                                    @bind="command.InvocationLimit">
-                                                @foreach (var limit in _invocationLimits)
-                                                {
-                                                    <option value="@limit">@InvocationLimitLabel(limit)</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        @(ValidationMessageFor(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit)))
-                                    </div>
-                                    @if (command.Action is CounterCustomCommandActionEditor counterAction)
-                                    {
-                                        <div class="studio-span-6 space-y-2">
-                                            <div class="field">
-                                                <label class="field__label" for="@CommandCounterFieldId(command)">Counter</label>
-                                                <select id="@CommandCounterFieldId(command)"
-                                                        class="field__input"
-                                                        @attributes="ValidationAttributes(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter))"
-                                                        @ref="_controls[CommandCounterFieldId(command)]"
-                                                        @bind="counterAction.CounterId">
-                                                    @if (_config.Counters.Count == 0)
-                                                    {
-                                                        <option value="0">Create a counter first</option>
-                                                    }
-                                                    @foreach (var counter in _config.Counters)
-                                                    {
-                                                        <option value="@counter.Id">@counter.Name</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                            @(ValidationMessageFor(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter)))
-                                        </div>
-                                    }
-                                    <p class="studio-span-12 text-xs text-muted-foreground">The wait is checked first. A use is only claimed after the wait passes; moderators follow the same use limit.</p>
-                                    @if (command.Id > 0)
-                                    {
-                                        <div class="studio-span-6 custom-command-reset-boundary">
-                                            <Field Id="@CommandResetViewerFieldId(command)"
-                                                   Label="Reset lifetime use for viewer"
-                                                   @bind-Value="command.ResetViewerLogin"
-                                                   Placeholder="viewer login" />
-                                        </div>
-                                        <div class="studio-span-6 content-end custom-command-reset-boundary flex flex-wrap gap-2">
-                                            <button class="btn-secondary"
-                                                    data-action="reset-viewer-use"
-                                                    @onclick="() => ResetViewerAsync(command)">Reset viewer</button>
-                                            <button class="btn-secondary"
-                                                    data-action="reset-all-viewer-uses"
-                                                    @onclick="() => RequestResetAllViewers(command)">Reset all viewers</button>
-                                        </div>
-                                        @if (_pendingResetAllCommandId == command.Id)
-                                        {
-                                            <div class="studio-span-12 flex flex-wrap items-center justify-end gap-2 text-sm" role="alert">
-                                                <span>Reset every lifetime viewer use for @command.Name?</span>
-                                                <button class="btn-secondary"
-                                                        data-action="confirm-reset-all-viewer-uses"
-                                                        @onclick="() => ResetAllViewersAsync(command)">Confirm reset all</button>
-                                                <button class="btn-secondary" @onclick="CancelResetAllViewers">Cancel</button>
-                                            </div>
-                                        }
-                                    }
-                                    <div class="studio-span-12 flex justify-end">
-                                        <button class="btn-secondary" @onclick="() => RemoveCommand(command)">Delete command</button>
-                                    </div>
-                                </div>
-                            </StudioStage>
-                        </section>
-                    }
-                    else if (_selectedCounter is { } counter)
-                    {
-                        <section @key="counter"
-                                 id="@EditorRegionId(CustomCommandEditorKind.Counter, counter.Id)"
-                                 class="studio-grid"
-                                 role="region"
-                                 aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.Counter, counter.Id)"
-                                 data-selected-editor="counter">
-                            <div class="studio-span-8">
-                                <Field Id="@CounterNameFieldId(counter)"
-                                       Label="Counter name"
-                                       ErrorMessage="@ValidationMessage(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name))"
-                                       FocusRequest="@Math.Max(FocusRequestFor(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(CounterNameFieldId(counter)))"
-                                       @bind-Value="counter.Name"
-                                       Placeholder="deaths" />
-                            </div>
-                            <div class="studio-span-4">
-                                <div class="field">
-                                    <label class="field__label" for="@CounterValueFieldId(counter)">Current number</label>
-                                    <input id="@CounterValueFieldId(counter)" class="field__input" type="number" @bind="counter.Value" />
-                                </div>
-                            </div>
-                            <div class="studio-span-12 flex justify-end">
-                                <button class="btn-secondary" @onclick="() => RemoveCounter(counter)">Delete counter</button>
-                            </div>
-                        </section>
-                    }
-                    else if (_selectedAnnouncement is { } announcement)
-                    {
-                        <section @key="announcement"
-                                 id="@EditorRegionId(CustomCommandEditorKind.ScheduledMessage, announcement.Id)"
-                                 class="studio-grid"
-                                 role="region"
-                                 aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.ScheduledMessage, announcement.Id)"
-                                 data-selected-editor="scheduled-message">
-                            <div class="studio-span-6">
-                                <Field Id="@AnnouncementNameFieldId(announcement)"
-                                       Label="Scheduled message name"
-                                       ErrorMessage="@ValidationMessage(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name))"
-                                       FocusRequest="@Math.Max(FocusRequestFor(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(AnnouncementNameFieldId(announcement)))"
-                                       @bind-Value="announcement.Name"
-                                       Placeholder="Hydrate reminder" />
-                            </div>
-                            <div class="studio-span-6 space-y-2">
-                                <div class="field">
-                                    <label class="field__label" for="@AnnouncementReplyFieldId(announcement)">Reply to send</label>
-                                    <select id="@AnnouncementReplyFieldId(announcement)"
-                                            class="field__input"
-                                            @attributes="ValidationAttributes(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply))"
-                                            @ref="_controls[AnnouncementReplyFieldId(announcement)]"
-                                            @bind="announcement.MessageLibraryEntryId">
-                                        @foreach (var entry in _config.MessageEntries)
-                                        {
-                                            <option value="@entry.Id">@entry.Name</option>
-                                        }
-                                    </select>
-                                </div>
-                                @(ValidationMessageFor(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply)))
-                            </div>
-                            <div class="studio-span-6 space-y-2">
-                                <div class="field">
-                                    <label class="field__label" for="@AnnouncementDeliveryFieldId(announcement)">Delivery type</label>
-                                    <select id="@AnnouncementDeliveryFieldId(announcement)"
-                                            class="field__input"
-                                            @attributes="ValidationAttributes(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery))"
-                                            @ref="_controls[AnnouncementDeliveryFieldId(announcement)]"
-                                            @bind="announcement.DeliveryType">
-                                        @foreach (var type in _announcementDeliveryTypes)
-                                        {
-                                            <option value="@type">@AnnouncementDeliveryTypeLabel(type)</option>
-                                        }
-                                    </select>
-                                </div>
-                                @(ValidationMessageFor(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery)))
-                            </div>
-                            @if (announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement)
-                            {
-                                <div class="studio-span-6 space-y-2">
-                                    <div class="field">
-                                        <label class="field__label" for="@AnnouncementColorFieldId(announcement)">Twitch announcement color</label>
-                                        <select id="@AnnouncementColorFieldId(announcement)"
-                                                class="field__input"
-                                                @attributes="ValidationAttributes(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color))"
-                                                @ref="_controls[AnnouncementColorFieldId(announcement)]"
-                                                @bind="announcement.AnnouncementColor">
-                                            @foreach (var color in _twitchAnnouncementColors)
-                                            {
-                                                <option value="@color">@TwitchAnnouncementColorLabel(color)</option>
-                                            }
-                                        </select>
-                                    </div>
-                                    @(ValidationMessageFor(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color)))
-                                </div>
-                                <div class="studio-span-12 surface-row rounded-lg px-3 py-2 text-sm text-slate-700">
-                                    <p>@TwitchAnnouncementCapabilityMessage(_config.TwitchAnnouncementReadiness)</p>
-                                    @if (_config.TwitchAnnouncementReadiness.Availability != TwitchAnnouncementAvailability.Available)
-                                    {
-                                        <a class="mt-1 inline-flex font-semibold text-blue-700" href="/host">Open Channel setup</a>
-                                    }
-                                    <p class="mt-1 text-xs text-slate-500">Twitch announcements use the selected reply; every reply message must be no longer than 500 characters.</p>
-                                </div>
-                            }
-                            <div class="studio-span-6 space-y-2">
-                                <div class="field">
-                                    <label class="field__label" for="@AnnouncementScheduleFieldId(announcement)">When to send</label>
-                                    <select id="@AnnouncementScheduleFieldId(announcement)"
-                                            class="field__input"
-                                            @attributes="ValidationAttributes(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule))"
-                                            @ref="_controls[AnnouncementScheduleFieldId(announcement)]"
-                                            @bind="announcement.ScheduleKind">
-                                        @foreach (var type in _announcementScheduleKinds)
-                                        {
-                                            <option value="@type">@AnnouncementScheduleLabel(type)</option>
-                                        }
-                                    </select>
-                                </div>
-                                @(ValidationMessageFor(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule)))
-                            </div>
-                            @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
-                            {
-                                <div class="studio-span-6 space-y-2">
-                                    <div class="field">
-                                        <label class="field__label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
-                                        <input id="@AnnouncementIntervalFieldId(announcement)"
-                                               class="field__input"
-                                               type="number"
-                                               min="1"
-                                               @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
-                                               @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
-                                               @bind="interval.IntervalMinutes" />
-                                    </div>
-                                    @(ValidationMessageFor(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval)))
-                                </div>
-                            }
-                            else if (announcement.Schedule is IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat)
-                            {
-                                <div class="studio-span-6 space-y-2">
-                                    <div class="field">
-                                        <label class="field__label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
-                                        <input id="@AnnouncementIntervalFieldId(announcement)"
-                                               class="field__input"
-                                               type="number"
-                                               min="1"
-                                               @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
-                                               @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
-                                               @bind="intervalAfterChat.IntervalMinutes" />
-                                    </div>
-                                    @(ValidationMessageFor(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval)))
-                                </div>
-                                <div class="studio-span-6 space-y-2">
-                                    <div class="field">
-                                        <label class="field__label" for="@AnnouncementChatMessagesFieldId(announcement)">Chat messages needed</label>
-                                        <input id="@AnnouncementChatMessagesFieldId(announcement)"
-                                               class="field__input"
-                                               type="number"
-                                               min="1"
-                                               @attributes="ValidationAttributes(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages))"
-                                               @ref="_controls[AnnouncementChatMessagesFieldId(announcement)]"
-                                               @bind="intervalAfterChat.RequiredChatMessages" />
-                                    </div>
-                                    @(ValidationMessageFor(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages)))
-                                </div>
-                            }
-                            else if (announcement.Schedule is WeeklyCustomAnnouncementScheduleEditor weekly)
-                            {
-                                <div class="studio-span-6 space-y-2">
-                                    <div class="field">
-                                        <label class="field__label" for="@AnnouncementDayFieldId(announcement)">Day</label>
-                                        <select id="@AnnouncementDayFieldId(announcement)"
-                                                class="field__input"
-                                                @attributes="ValidationAttributes(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day))"
-                                                @ref="_controls[AnnouncementDayFieldId(announcement)]"
-                                                @bind="weekly.Day">
-                                            @foreach (var day in _daysOfWeek)
-                                            {
-                                                <option value="@day">@day</option>
-                                            }
-                                        </select>
-                                    </div>
-                                    @(ValidationMessageFor(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day)))
-                                </div>
-                                <div class="studio-span-6">
-                                    <div class="field">
-                                        <label class="field__label" for="@AnnouncementWeeklyTimeFieldId(announcement)">Time</label>
-                                        <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="field__input" type="time" @bind="weekly.Time" />
-                                    </div>
-                                </div>
-                            }
-                            <div class="studio-span-12" data-announcement-secondary="delivery-details">
-                                <CollapsibleSection ContentId="custom-announcement-delivery-details"
-                                                    Title="Delivery details"
-                                                    Description="Retry policy and latest delivery"
-                                                    InitiallyOpen="false"
-                                                    OpenRequest="@AnnouncementAdvancedOpenRequest(announcement.Id)">
-                                    <div class="studio-grid p-4">
-                                        <div class="studio-span-6 space-y-2">
-                                            <div class="field">
-                                                <label class="field__label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
-                                                <input id="@AnnouncementRetryDelayFieldId(announcement)"
-                                                       class="field__input"
-                                                       type="number"
-                                                       min="1"
-                                                       max="59"
-                                                       @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
-                                                       @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
-                                                       @bind="announcement.RetryDelaySeconds" />
-                                            </div>
-                                            @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
-                                        </div>
-                                        <div class="studio-span-6 space-y-2">
-                                            <div class="field">
-                                                <label class="field__label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
-                                                <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
-                                                       class="field__input"
-                                                       type="number"
-                                                       min="1"
-                                                       max="60"
-                                                       @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
-                                                       @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
-                                                       @bind="announcement.OccurrenceLifetimeSeconds" />
-                                            </div>
-                                            @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
-                                        </div>
-                                    </div>
-                                </CollapsibleSection>
-                            </div>
-                            <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
-                               class="studio-span-12 text-xs font-medium text-slate-500">These timings apply only when a scheduled send cannot happen.</p>
-                            <div class="studio-span-12" data-announcement-secondary="delivery-history">
-                                <CollapsibleSection ContentId="custom-announcement-delivery-history"
-                                                    Title="Delivery history"
-                                                    Description="Last send and latest result"
-                                                    InitiallyOpen="false">
-                                    <div class="studio-grid p-4">
-                                        <div class="studio-span-4 surface-row rounded-lg px-3 py-2">
-                                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
-                                            <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
-                                        </div>
-                                        <div class="studio-span-4 surface-row rounded-lg px-3 py-2">
-                                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
-                                            <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
-                                        </div>
-                                        <div class="studio-span-4 surface-row rounded-lg px-3 py-2">
-                                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
-                                            <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
-                                        </div>
-                                    </div>
-                                </CollapsibleSection>
-                            </div>
-                            <div class="studio-span-12 flex justify-end">
-                                <button class="btn-secondary" @onclick="() => RemoveAnnouncement(announcement)">Delete scheduled message</button>
-                            </div>
-                        </section>
-                    }
-                    else if (_selectedReply is { } entry)
-                    {
-                        <section @key="entry"
-                                 id="@EditorRegionId(CustomCommandEditorKind.Reply, entry.Id)"
-                                 class="studio-grid"
-                                 role="region"
-                                 aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.Reply, entry.Id)"
-                                 data-selected-editor="reply">
-                            <div class="studio-span-6">
-                                <Field Id="@MessageEntryNameFieldId(entry)"
-                                       Label="Reply name"
-                                       ErrorMessage="@ValidationMessage(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name))"
-                                       FocusRequest="@Math.Max(FocusRequestFor(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(MessageEntryNameFieldId(entry)))"
-                                       @bind-Value="entry.Name"
-                                       Placeholder="welcome" />
-                            </div>
-                            <div class="studio-span-6 space-y-2">
-                                <div class="field">
-                                    <label class="field__label" for="@MessageSelectionFieldId(entry)">How the bot chooses</label>
-                                    <select id="@MessageSelectionFieldId(entry)"
-                                            class="field__input"
-                                            @attributes="ValidationAttributes(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode))"
-                                            @ref="_controls[MessageSelectionFieldId(entry)]"
-                                            @bind="entry.SelectionMode">
-                                        @foreach (var mode in _messageSelectionModes)
-                                        {
-                                            <option value="@mode">@MessageSelectionLabel(mode)</option>
-                                        }
-                                    </select>
-                                </div>
-                                @(ValidationMessageFor(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode)))
-                            </div>
-                            <div class="studio-span-6">
-                                <div class="field">
-                                    <label class="field__label" for="@MessageCurrentVariantFieldId(entry)">Next message</label>
-                                    <select id="@MessageCurrentVariantFieldId(entry)"
-                                            class="field__input"
-                                            disabled="@(entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
-                                            @bind="entry.CurrentVariantIndex">
-                                        @for (var i = 0; i < entry.Variants.Count; i++)
-                                        {
-                                            var index = i;
-                                            <option value="@index">Message @(index + 1)</option>
-                                        }
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="studio-span-12 space-y-2">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Messages</p>
-                                    <button id="@AddMessageVariantControlId(entry)"
-                                            class="btn-secondary h-9 px-3 text-xs"
-                                            @attributes="ValidationAttributes(AddMessageVariantControlId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.VariantText))"
-                                            @ref="_controls[AddMessageVariantControlId(entry)]"
-                                            @onclick="() => AddVariant(entry)">Add message</button>
-                                    @(ValidationMessageFor(AddMessageVariantControlId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.VariantText)))
-                                </div>
-                                <p class="text-xs leading-5 text-muted-foreground">
-                                    Pick fresh values with <code>{random_from|one|two}</code>,
-                                    <code>{random_between|1|10}</code>, or <code>{random_viewer}</code>.
-                                </p>
-                                @for (var i = 0; i < entry.Variants.Count; i++)
-                                {
-                                    var index = i;
-                                    var variant = entry.Variants[index];
-                                    <div @key="variant" class="custom-command-variant">
-                                        <span class="rank-indicator mt-7">@(index + 1)</span>
-                                        <TextAreaField Id="@MessageVariantFieldId(entry, variant)"
-                                                       Label="@($"Message {index + 1}")"
-                                                       ErrorMessage="@ValidationMessage(VariantTarget(entry.Id, variant.Id))"
-                                                       FocusRequest="@FocusRequestFor(VariantTarget(entry.Id, variant.Id))"
-                                                       @bind-Value="variant.Text" />
-                                        <div class="mt-7 flex flex-wrap gap-2">
-                                            <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == 0)" @onclick="() => MoveVariant(entry, index, -1)">Up</button>
-                                            <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == entry.Variants.Count - 1)" @onclick="() => MoveVariant(entry, index, 1)">Down</button>
-                                            <button class="btn-secondary h-9 px-3 text-xs" @onclick="() => RemoveVariant(entry, variant)">Remove</button>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                            <div class="studio-span-12 flex justify-end">
-                                <button class="btn-secondary" @onclick="() => RemoveMessageEntry(entry)">Delete reply</button>
-                            </div>
-                        </section>
-                    }
-                    else
-                    {
-                        <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground" data-empty-inspector>
-                            @_emptyInspectorMessage
-                        </p>
-                    }
-                </div>
-            </div>
-        </section>
-
-        <div class="settings-disclosure-stack" data-card-owner="custom-command-disclosure-cards">
-        <CollapsibleSection Title="Time zone"
-                            Description="Weekly scheduled messages use this local time."
-                            InitiallyOpen="false"
-                            OpenRequest="@_timeZoneSectionOpenRequest">
-            <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-                <div class="space-y-2">
-                    <div class="field">
-                        <label class="field__label" for="@_timeZoneControlId">Time zone</label>
-                        <select id="@_timeZoneControlId"
-                                class="field__input"
-                                @attributes="ValidationAttributes(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone))"
-                                @ref="_controls[_timeZoneControlId]"
-                                @bind="_config.TimeZoneId">
-                            @foreach (var timeZone in _timeZones)
-                            {
-                                <option value="@timeZone.Id">@TimeZoneLabel(timeZone)</option>
-                            }
-                        </select>
-                    </div>
-                    @(ValidationMessageFor(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone)))
-                </div>
-                <div class="surface-muted rounded-lg px-3 py-2.5">
-                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selected time zone</p>
-                    <p class="mt-1 break-words text-sm font-semibold text-slate-900">@_selectedTimeZoneLabel</p>
-                </div>
-            </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection Title="Alerts" Description="Problems that may need your attention." InitiallyOpen="false">
-            <div class="space-y-3 p-4">
-                <div class="surface-muted rounded-lg px-3 py-2.5">
-                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Active alerts</p>
-                    <p class="mt-1 text-sm font-semibold text-slate-900">@_config.AlertSummary.ActiveCount</p>
-                </div>
-                @if (_config.AlertSummary.ActiveAlerts.Count == 0)
-                {
-                    <p class="text-sm text-muted-foreground">No active alerts.</p>
-                }
-                else
-                {
-                    <div class="grid gap-3">
-                        @foreach (var alert in _config.AlertSummary.ActiveAlerts)
-                        {
-                            <div @key="alert" class="surface-row rounded-lg p-3">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <p class="text-sm font-bold text-slate-950">@alert.Title</p>
-                                    <span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">@AlertImportanceLabel(alert.Severity)</span>
-                                </div>
-                                <p class="mt-1 text-sm text-muted-foreground">@alert.Message</p>
-                                @if (!string.IsNullOrWhiteSpace(alert.LinkPath))
-                                {
-                                    <a class="mt-2 inline-flex text-sm font-semibold text-blue-700" href="@alert.LinkPath">Open alert</a>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-        </CollapsibleSection>
-        </div>
+        <CustomCommandSettingsDetails Context="studioContext" />
     }
 </div>
+
+@code {
+    private RenderFragment AnnouncementDeliveryDetails(CustomAnnouncementEditor announcement) =>
+        @<text>
+            <div class="studio-span-6 space-y-2">
+                <div class="field">
+                    <label class="field__label" for="@CustomCommandEditorIds.AnnouncementRetryDelay(announcement)">Wait before retrying (seconds)</label>
+                    <input id="@CustomCommandEditorIds.AnnouncementRetryDelay(announcement)"
+                           class="field__input"
+                           type="number"
+                           min="1"
+                           max="59"
+                           @attributes="ValidationAttributes(CustomCommandEditorIds.AnnouncementRetryDelay(announcement), CustomCommandEditorIds.AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
+                           @bind="announcement.RetryDelaySeconds" />
+                </div>
+                @(ValidationMessageFor(CustomCommandEditorIds.AnnouncementRetryDelay(announcement), CustomCommandEditorIds.AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
+            </div>
+            <div class="studio-span-6 space-y-2">
+                <div class="field">
+                    <label class="field__label" for="@CustomCommandEditorIds.AnnouncementOccurrenceLifetime(announcement)">Stop retrying after (seconds)</label>
+                    <input id="@CustomCommandEditorIds.AnnouncementOccurrenceLifetime(announcement)"
+                           class="field__input"
+                           type="number"
+                           min="1"
+                           max="60"
+                           @attributes="ValidationAttributes(CustomCommandEditorIds.AnnouncementOccurrenceLifetime(announcement), CustomCommandEditorIds.AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
+                           @bind="announcement.OccurrenceLifetimeSeconds" />
+                </div>
+                @(ValidationMessageFor(CustomCommandEditorIds.AnnouncementOccurrenceLifetime(announcement), CustomCommandEditorIds.AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
+            </div>
+        </text>;
+}

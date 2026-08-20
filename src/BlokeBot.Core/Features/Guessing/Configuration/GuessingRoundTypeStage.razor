@@ -1,0 +1,104 @@
+@using System.Globalization
+@using BlokeBot.Core.Features.Points.Balances
+
+<StudioStage Key="round-type"
+             Number="1"
+             Title="Round type"
+             Summary="@Summary()"
+             Open="@Open"
+             OpenChanged="OpenChanged">
+    <div class="studio-grid">
+        <div class="studio-span-12">
+            <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]" role="group" aria-label="Round type to edit">
+                @foreach (var profile in Configuration.Profiles)
+                {
+                    <StudioChip @key="profile.Id"
+                                Id="@RoundTypeChipId(profile.Id)"
+                                Label="@RoundTypeLabel(profile)"
+                                Pressed="@(profile.Id == Configuration.Profile.Id)"
+                                PressedNote="Editing this round type"
+                                ReleasedNote=""
+                                PressedChanged="@(_ => SelectProfile.InvokeAsync(profile.Id))" />
+                }
+            </div>
+            <p class="mt-2 text-xs text-muted-foreground">Switching with unsaved edits still asks: save, discard, or keep editing.</p>
+        </div>
+        <div class="studio-span-6">
+            <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")"
+                   Label="Round type name"
+                   @bind-Value="Configuration.Profile.Name"
+                   Placeholder="Round type name" />
+            <p class="mt-1 text-xs text-muted-foreground">Up to 128 characters. Names must be unique.</p>
+        </div>
+        <div class="studio-span-6 space-y-2">
+            <label class="label" for="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")">Points for a winning guess</label>
+            <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                <StudioStepper Id="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")"
+                               AriaLabel="Points for a winning guess"
+                               Unit="points"
+                               Step="10"
+                               Minimum="0"
+                               Maximum="@PointAmount.MaximumValue"
+                               @bind-Value="Configuration.Profile.WinningGuessPointReward" />
+            </div>
+            <p class="text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
+        </div>
+        <div class="studio-span-6 content-end">
+            <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
+                <span>Use by default</span>
+                <button type="button"
+                        class="studio-toggle"
+                        role="switch"
+                        aria-checked="@(Configuration.Profile.IsDefault ? "true" : "false")"
+                        aria-label="Use by default"
+                        @onclick="() => Configuration.Profile.IsDefault = !Configuration.Profile.IsDefault"></button>
+            </div>
+        </div>
+        <div class="studio-span-6 content-end">
+            <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                <input class="input min-w-0 flex-1"
+                       placeholder="new round type name"
+                       aria-label="New round type name"
+                       value="@NewProfileName"
+                       @oninput="args => NewProfileNameChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)" />
+                <button class="btn-secondary" data-action="create-round-type" @onclick="CreateProfile">Create</button>
+                <button class="btn-secondary" data-action="delete-round-type" @onclick="DeleteProfile">Delete</button>
+            </div>
+        </div>
+    </div>
+</StudioStage>
+
+@code {
+    [Parameter, EditorRequired]
+    public required GuessingConfiguration Configuration { get; set; }
+
+    [Parameter, EditorRequired]
+    public required Func<string> Summary { get; set; }
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<int> SelectProfile { get; set; }
+
+    [Parameter]
+    public string NewProfileName { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> NewProfileNameChanged { get; set; }
+
+    [Parameter]
+    public EventCallback CreateProfile { get; set; }
+
+    [Parameter]
+    public EventCallback DeleteProfile { get; set; }
+
+    private static string RoundTypeChipId(int profileId) =>
+        $"guessing-round-type-{profileId.ToString(CultureInfo.InvariantCulture)}";
+
+    private static string RoundTypeLabel(GuessRoundProfileSummary profile) =>
+        profile.IsDefault ? $"{profile.Name} (default)" : profile.Name;
+}

@@ -57,7 +57,7 @@
     font-weight: 800;
 }
 
-.configuration-transfer__tabs button[aria-selected="true"] {
+.configuration-transfer__tabs button[aria-pressed="true"] {
     border-bottom-color: #2563eb;
     color: #2563eb;
 }

@@ -10,6 +10,10 @@ internal static class ConfigurationDocumentValidator
             ? new("format", $"Expected format '{ConfigurationDocumentCodec.Format}'.")
         : document.Version != ConfigurationDocumentCodec.CurrentVersion
             ? new("version", $"Format version {document.Version} is not supported.")
+        : string.IsNullOrWhiteSpace(document.Source.ChannelLogin)
+            ? new("source.channelLogin", "The source channel login is required.")
+        : document.ExportedAtUtc.Offset != TimeSpan.Zero
+            ? new("exportedAtUtc", "The export timestamp must use UTC offset +00:00.")
         : ValidateCommands(document.Sections.CustomCommands)
             ?? ValidateAnnouncements(document.Sections.Announcements)
             ?? ValidateGuessing(document.Sections.Guessing)
@@ -122,6 +126,13 @@ internal static class ConfigurationDocumentValidator
                 return limit;
             }
         }
+        foreach (var item in section.Items)
+        {
+            if (ValidateAnnouncementSchedule(item) is { } scheduleIssue)
+            {
+                return scheduleIssue;
+            }
+        }
         var missing = section.Items.FirstOrDefault(x => !replies.Contains(x.MessageReplyId));
         return missing is null
             ? null
@@ -129,6 +140,37 @@ internal static class ConfigurationDocumentValidator
                 $"sections.announcements.items[{missing.Id}].messageReplyId",
                 "The announcement reply was not exported with this section."
             );
+    }
+
+    private static ConfigurationValidationIssue? ValidateAnnouncementSchedule(AnnouncementV1 item)
+    {
+        var path = $"sections.announcements.items[{item.Id}].schedule";
+        return item.Schedule.Type switch
+        {
+            AnnouncementScheduleTypeV1.Interval when item.Schedule.IntervalMinutes is null => new(
+                $"{path}.intervalMinutes",
+                "Interval minutes are required for this schedule."
+            ),
+            AnnouncementScheduleTypeV1.IntervalAfterChat
+                when item.Schedule.IntervalMinutes is null => new(
+                $"{path}.intervalMinutes",
+                "Interval minutes are required for this schedule."
+            ),
+            AnnouncementScheduleTypeV1.IntervalAfterChat
+                when item.Schedule.RequiredChatMessages is null => new(
+                $"{path}.requiredChatMessages",
+                "Required chat messages are required for this schedule."
+            ),
+            AnnouncementScheduleTypeV1.Weekly when item.Schedule.Day is null => new(
+                $"{path}.day",
+                "UTC weekday is required for a weekly schedule."
+            ),
+            AnnouncementScheduleTypeV1.Weekly when item.Schedule.Time is null => new(
+                $"{path}.time",
+                "UTC time is required for a weekly schedule."
+            ),
+            _ => null,
+        };
     }
 
     private static ConfigurationValidationIssue? ValidateGuessing(GuessingSectionV1? section)

@@ -50,11 +50,12 @@ public partial class ConfigurationTransferPage
         await RefreshPreviewAsync();
     }
 
-    private void SetResolution(ConfigurationImportConflict conflict, string? value)
+    private async Task SetResolutionAsync(ConfigurationImportConflict conflict, string? value)
     {
         if (Enum.TryParse<ImportConflictResolution>(value, out var parsed))
         {
             _resolutions[ConflictKey(conflict)] = parsed;
+            await RefreshPreviewAsync();
         }
     }
 

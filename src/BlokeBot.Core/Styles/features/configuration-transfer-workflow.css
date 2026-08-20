@@ -50,6 +50,21 @@
     display: block;
 }
 
+.configuration-transfer__source > span {
+    min-width: 0;
+}
+
+.configuration-transfer__source strong {
+    overflow-wrap: anywhere;
+}
+
+.configuration-transfer__source-version {
+    display: -webkit-box !important;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
 .configuration-transfer__reviews {
     display: grid;
     gap: 0.65rem;
@@ -195,7 +210,7 @@ html[data-theme="dark"] .configuration-transfer__result-kicker {
 }
 
 html[data-theme="dark"] .configuration-transfer__links a,
-html[data-theme="dark"] .configuration-transfer__tabs button[aria-selected="true"] {
+html[data-theme="dark"] .configuration-transfer__tabs button[aria-pressed="true"] {
     color: #60a5fa;
 }
 

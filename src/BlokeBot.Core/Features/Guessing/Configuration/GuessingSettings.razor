@@ -42,72 +42,15 @@
     else
     {
         <div class="settings-disclosure-stack">
-            <StudioStage Key="round-type"
-                         Number="1"
-                         Title="Round type"
-                         Summary="@RoundTypeSummary()"
-                         Open="@_openStages.IsOpen(GuessingStage.RoundType)"
-                         OpenChanged="@(open => _openStages.Set(GuessingStage.RoundType, open))">
-                <div class="studio-grid">
-                    <div class="studio-span-12">
-                        <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]" role="group" aria-label="Round type to edit">
-                            @foreach (var profile in _config.Profiles)
-                            {
-                                <StudioChip @key="profile.Id"
-                                            Id="@RoundTypeChipId(profile.Id)"
-                                            Label="@RoundTypeLabel(profile)"
-                                            Pressed="@(profile.Id == _config.Profile.Id)"
-                                            PressedNote="Editing this round type"
-                                            ReleasedNote=""
-                                            PressedChanged="@(_ => SelectProfileAsync(profile.Id))" />
-                            }
-                        </div>
-                        <p class="mt-2 text-xs text-muted-foreground">Switching with unsaved edits still asks: save, discard, or keep editing.</p>
-                    </div>
-                    <div class="studio-span-6">
-                        <Field Id="@($"guess-profile-{_config.Profile.Id}-name")"
-                               Label="Round type name"
-                               @bind-Value="_config.Profile.Name"
-                               Placeholder="Round type name" />
-                        <p class="mt-1 text-xs text-muted-foreground">Up to 128 characters. Names must be unique.</p>
-                    </div>
-                    <div class="studio-span-6 space-y-2">
-                        <label class="label" for="@($"guess-profile-{_config.Profile.Id}-winning-reward")">Points for a winning guess</label>
-                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
-                            <StudioStepper Id="@($"guess-profile-{_config.Profile.Id}-winning-reward")"
-                                           AriaLabel="Points for a winning guess"
-                                           Unit="points"
-                                           Step="10"
-                                           Minimum="0"
-                                           Maximum="@PointAmount.MaximumValue"
-                                           @bind-Value="_config.Profile.WinningGuessPointReward" />
-                        </div>
-                        <p class="text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
-                    </div>
-                    <div class="studio-span-6 content-end">
-                        <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
-                            <span>Use by default</span>
-                            <button type="button"
-                                    class="studio-toggle"
-                                    role="switch"
-                                    aria-checked="@(_config.Profile.IsDefault ? "true" : "false")"
-                                    aria-label="Use by default"
-                                    @onclick="() => _config.Profile.IsDefault = !_config.Profile.IsDefault"></button>
-                        </div>
-                    </div>
-                    <div class="studio-span-6 content-end">
-                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
-                            <input class="input min-w-0 flex-1"
-                                   placeholder="new round type name"
-                                   aria-label="New round type name"
-                                   value="@_newProfileName"
-                                   @oninput="args => _newProfileName = args.Value?.ToString() ?? string.Empty" />
-                            <button class="btn-secondary" data-action="create-round-type" @onclick="CreateProfileAsync">Create</button>
-                            <button class="btn-secondary" data-action="delete-round-type" @onclick="DeleteProfileAsync">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </StudioStage>
+            <GuessingRoundTypeStage Configuration="_config"
+                                    Summary="RoundTypeSummary"
+                                    Open="@_openStages.IsOpen(GuessingStage.RoundType)"
+                                    OpenChanged="@(open => _openStages.Set(GuessingStage.RoundType, open))"
+                                    SelectProfile="SelectProfileAsync"
+                                    NewProfileName="@_newProfileName"
+                                    NewProfileNameChanged="@(value => _newProfileName = value)"
+                                    CreateProfile="CreateProfileAsync"
+                                    DeleteProfile="DeleteProfileAsync" />
 
             <StudioStage Key="accepted-answers"
                          Number="2"
@@ -314,22 +257,7 @@
 
 @if (_pendingProfileId is not null)
 {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" data-unsaved-profile-dialog>
-        <section class="surface w-full max-w-lg rounded-xl p-6 shadow-xl"
-                 data-sticky-save-scope
-                 role="dialog"
-                 aria-modal="true"
-                 aria-labelledby="unsaved-profile-title"
-                 aria-describedby="unsaved-profile-description">
-            <h2 id="unsaved-profile-title" class="text-lg font-bold text-slate-950">Unsaved round type changes</h2>
-            <p id="unsaved-profile-description" class="mt-2 text-sm leading-6 text-slate-600">Choose what to do with your changes before switching round type.</p>
-            <div class="mt-5 grid gap-2 sm:grid-cols-3">
-                <StickySaveRegion Scope="StickySaveScope.Modal">
-                    <button class="btn-primary" @onclick="SaveAndSwitchAsync">Save and switch</button>
-                </StickySaveRegion>
-                <button class="btn-secondary" @onclick="DiscardAndSwitchAsync">Discard and switch</button>
-                <button class="btn-secondary" @onclick="KeepEditing">Keep editing</button>
-            </div>
-        </section>
-    </div>
+    <GuessingUnsavedProfileDialog SaveAndSwitch="SaveAndSwitchAsync"
+                                  DiscardAndSwitch="DiscardAndSwitchAsync"
+                                  KeepEditing="KeepEditing" />
 }

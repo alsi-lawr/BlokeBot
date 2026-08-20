@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
 using Shouldly;
 
@@ -25,14 +24,127 @@ public sealed class ConfigurationTransferContractTests
         var mapped = ChannelToolEnablementMapper.FromFlags(flags);
 
         ChannelToolEnablementMapper.ToFlags(mapped).ShouldBe(flags);
-        HostFeatureCatalog.Features.Count.ShouldBe(20);
-        HostFeatureFlags.NativeTwitchFeatures.ShouldBe(
-            HostFeatureFlags.Polls
-                | HostFeatureFlags.ClipsAndMarkers
-                | HostFeatureFlags.RewardsAndRedemptions
-                | HostFeatureFlags.Predictions
-                | HostFeatureFlags.RaidCollaboration
+    }
+
+    [Test]
+    public void TypedCodec_MissingRequiredNestedValues_ReturnsStructuralFailure()
+    {
+        const string Json = """
+            {
+              "format": "blokebot.channel-configuration",
+              "version": 1,
+              "exportedAtUtc": "2026-08-20T12:00:00Z",
+              "source": { "channelLogin": "source" },
+              "sections": {
+                "customCommands": {
+                  "timeZoneId": "UTC",
+                  "replies": [],
+                  "counters": [],
+                  "commands": [{
+                    "id": "command-1",
+                    "name": "hello",
+                    "aliases": [],
+                    "allowEveryone": true,
+                    "allowModerators": false,
+                    "allowedUsers": [],
+                    "cooldownSeconds": 0,
+                    "cooldownScope": "user",
+                    "invocationLimit": "unlimited",
+                    "action": { "type": "message" }
+                  }]
+                }
+              }
+            }
+            """;
+
+        var invalid = new ConfigurationDocumentCodec()
+            .Parse(Json)
+            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>();
+
+        invalid.Issue.Location.ShouldContain("customCommands.commands");
+        invalid.Issue.Message.ShouldContain("Enabled");
+    }
+
+    [Test]
+    public void PastedJson_ExceedingUtf8Limit_IsRejectedBeforeByteParsing()
+    {
+        var pasted = string.Concat(
+            Enumerable.Repeat("😀", ConfigurationDocumentCodec.MaximumBytes / 3)
         );
+        pasted.Length.ShouldBeLessThan(ConfigurationDocumentCodec.MaximumBytes);
+
+        var invalid = new ConfigurationDocumentCodec()
+            .Parse(pasted)
+            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>();
+
+        invalid.Issue.Message.ShouldContain("2 MB limit");
+    }
+
+    [Test]
+    public void TypedCodec_MissingRequiredObjectCollectionOrScheduleValue_IsRejected()
+    {
+        var malformed = new[]
+        {
+            (
+                Json: """
+                {
+                  "format": "blokebot.channel-configuration",
+                  "version": 1,
+                  "exportedAtUtc": "2026-08-20T12:00:00Z",
+                  "sections": {}
+                }
+                """,
+                Expected: "Source"
+            ),
+            (
+                Json: """
+                {
+                  "format": "blokebot.channel-configuration",
+                  "version": 1,
+                  "exportedAtUtc": "2026-08-20T12:00:00Z",
+                  "source": { "channelLogin": "source" },
+                  "sections": {
+                    "customCommands": { "timeZoneId": "UTC", "replies": [], "counters": [] }
+                  }
+                }
+                """,
+                Expected: "Commands"
+            ),
+            (
+                Json: """
+                {
+                  "format": "blokebot.channel-configuration",
+                  "version": 1,
+                  "exportedAtUtc": "2026-08-20T12:00:00Z",
+                  "source": { "channelLogin": "source" },
+                  "sections": {
+                    "announcements": {
+                      "replies": [{
+                        "id": "reply", "name": "reply", "selectionMode": "sequential",
+                        "variants": ["hello"]
+                      }],
+                      "items": [{
+                        "id": "weekly", "name": "weekly", "enabled": true,
+                        "messageReplyId": "reply", "deliveryType": "chatMessage",
+                        "announcementColor": "primary", "retryDelaySeconds": 2,
+                        "occurrenceLifetimeSeconds": 30,
+                        "schedule": { "type": "weekly", "time": "12:00:00" }
+                      }]
+                    }
+                  }
+                }
+                """,
+                Expected: "UTC weekday"
+            ),
+        };
+
+        foreach (var (json, expected) in malformed)
+        {
+            var invalid = new ConfigurationDocumentCodec()
+                .Parse(json)
+                .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>();
+            invalid.Issue.Message.ShouldContain(expected);
+        }
     }
 
     [Test]

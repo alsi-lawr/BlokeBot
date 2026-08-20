@@ -1,0 +1,127 @@
+                <AuthorizeView Policy="BotAdmin">
+                    <Authorized>
+                        <div class="nav-menu__route-item nav-menu__panel nav-menu__panel--admin rounded-xl p-1"
+                             data-nav-destination="admin">
+                            <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                     ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
+                                     href="admin"
+                                     aria-label="Admin"
+                                     aria-describedby="@Routes.RouteHelpReference("admin")"
+                                     aria-current="@Routes.CurrentRoute("admin")"
+                                     @onclick="Routes.NotifyNavigatedAsync">
+                                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
+                                        <path d="m9.5 12 1.7 1.7 3.6-4" />
+                                    </svg>
+                                </span>
+                                <span class="nav-menu__label min-w-0">Admin</span>
+                            </NavLink>
+                            @Routes.RouteHelp("admin", "Admin")
+                        </div>
+                        <div class="nav-menu__separator" aria-hidden="true"></div>
+                    </Authorized>
+                </AuthorizeView>
+
+                <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                     data-nav-destination="home">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                             ActiveClass="nav-menu__item-active"
+                             Match="NavLinkMatch.All"
+                             href=""
+                             aria-label="Home"
+                             aria-describedby="@Routes.RouteHelpReference("home")"
+                             aria-current="@Routes.CurrentRoute("", exact: true)"
+                             @onclick="Routes.NotifyNavigatedAsync">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600">
+                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 5h6v6H4Z" />
+                                <path d="M14 5h6v6h-6Z" />
+                                <path d="M4 15h6v4H4Z" />
+                                <path d="M14 15h6v4h-6Z" />
+                            </svg>
+                        </span>
+                        <span class="nav-menu__label min-w-0">Home</span>
+                    </NavLink>
+                    @Routes.RouteHelp("home", "Home")
+                </div>
+
+                @if (Visibility.ShowAlerts)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="alerts">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="alerts"
+                                 aria-label="Alerts"
+                                 aria-describedby="@Routes.RouteHelpReference("alerts")"
+                                 aria-current="@Routes.CurrentRoute("alerts")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M10.3 4.3 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+                                    <path d="M12 9v4" />
+                                    <path d="M12 17h.01" />
+                                </svg>
+                            </span>
+                            <span class="nav-menu__label min-w-0">Alerts</span>
+                        </NavLink>
+                        @Routes.RouteHelp("alerts", "Alerts")
+                    </div>
+                }
+
+                @if (Visibility.ShowHostConfig)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="host">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
+                                 href="host"
+                                 aria-label="Channel setup"
+                                 aria-describedby="@Routes.RouteHelpReference("host")"
+                                 aria-current="@Routes.CurrentRoute("host")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M4 10.5 12 4l8 6.5V20H4Z" />
+                                    <path d="M9 20v-6h6v6" />
+                                </svg>
+                            </span>
+                            <span class="nav-menu__label min-w-0">Channel setup</span>
+                        </NavLink>
+                        @Routes.RouteHelp("host", "Channel setup")
+                    </div>
+                }
+
+                @if (Visibility.ShowConfigurationTransfer)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="configuration-transfer">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
+                                 href="configuration-transfer"
+                                 aria-label="Configuration transfer"
+                                 aria-describedby="@Routes.RouteHelpReference("configuration-transfer")"
+                                 aria-current="@Routes.CurrentRoute("configuration-transfer")"
+                                 @onclick="Routes.NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-teal-700" aria-hidden="true">⇄</span>
+                            <span class="nav-menu__label min-w-0">Configuration transfer</span>
+                        </NavLink>
+                        @Routes.RouteHelp("configuration-transfer", "Configuration transfer")
+                    </div>
+                }
+
+                @if (Visibility.ShowChatTools)
+                {
+                    <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                        Chat tools
+                    </div>
+                }
+
+@code {
+    [Parameter, EditorRequired]
+    public required NavMenuPrimaryVisibility Visibility { get; set; }
+
+    [Parameter, EditorRequired]
+    public required NavMenuRouteBindings Routes { get; set; }
+}

@@ -1,0 +1,145 @@
+        <StudioStage Key="startup-message"
+                     Number="2"
+                     Title="Startup chat message"
+                     Summary="@StartupMessageSummary"
+                     Open="@StartupMessageOpen"
+                     OpenChanged="StartupMessageOpenChanged">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                    <button type="button"
+                            id="startup-message-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(StartupMessageEnabled ? "true" : "false")"
+                            aria-label="Send a startup message"
+                            @onclick="ToggleStartupMessageEnabled"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Send a message when the bot joins or reconnects</span>
+                </div>
+                <div class="studio-span-12">
+                    <div class="field">
+                        <label class="field__label" for="startup-chat-message">Message</label>
+                        <textarea id="startup-chat-message"
+                                  class="field__input mt-2 min-h-24 w-full"
+                                  maxlength="@(MaxChatMessageLength > 0 ? MaxChatMessageLength : null)"
+                                  disabled="@(!StartupMessageEnabled)"
+                                  value="@StartupMessageText"
+                                  @oninput="StartupMessageTextChanged"></textarea>
+                    </div>
+                    <p class="mt-1 text-xs font-medium text-slate-500">
+                        This applies on the next fresh join or Twitch reconnect. Saving does not restart the bot.
+                    </p>
+                </div>
+                <div class="studio-span-12">
+                    <SaveChangesButton AccessibleName="Save startup message"
+                                       Saving="@StartupMessageSaving"
+                                       OnSave="SaveStartupMessage" />
+                </div>
+            </div>
+        </StudioStage>
+
+        <StudioStage Key="commands"
+                     Number="3"
+                     Title="Commands"
+                     Summary="@CommandsSummary"
+                     Open="@CommandsOpen"
+                     OpenChanged="CommandsOpenChanged">
+            <div class="studio-grid" data-simulation-command-settings>
+                <div class="studio-span-8">
+                    <div class="field">
+                        <label class="field__label" for="commands-aliases">Command words</label>
+                        <input id="commands-aliases"
+                               class="field__input mt-2 w-full"
+                               value="@CommandsAliases"
+                               @oninput="args => CommandsAliasesChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)"
+                               placeholder="commands"
+                               autocomplete="off" />
+                    </div>
+                </div>
+                <div class="studio-span-4 flex items-center">
+                    <SaveChangesButton AccessibleName="Save commands"
+                                       Class="h-10 w-full"
+                                       Saving="@CommandsSaving"
+                                       OnSave="SaveCommands" />
+                </div>
+                <p class="studio-span-12 -mt-1 text-xs font-medium text-slate-500">
+                    Separate extra command words with commas. Leave this blank to disable the catalog.
+                </p>
+                @if (!string.IsNullOrWhiteSpace(State.Commands.ConflictAlias))
+                {
+                    <div class="studio-span-12 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-700"
+                         role="alert"
+                         data-command-conflict>
+                        !@State.Commands.ConflictAlias is already in use, so the default Commands command is disabled. Choose another word and save.
+                    </div>
+                }
+                <div class="studio-span-12">
+                    <StudioFold Key="command-inventory"
+                                Label="Viewer command inventory"
+                                Open="@CommandInventoryOpen"
+                                OpenChanged="CommandInventoryOpenChanged">
+                        <div class="space-y-3" aria-live="polite" data-command-catalog>
+                            @if (CommandCatalogLoading)
+                            {
+                                <p class="text-sm text-muted-foreground">Loading command inventory...</p>
+                            }
+                            else if (CommandCatalog is null)
+                            {
+                                <p class="text-sm text-muted-foreground">Open this list to check configured commands and current availability.</p>
+                            }
+                            else
+                            {
+                                @if (CommandCatalog.Conflicts.Count > 0)
+                                {
+                                    <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700"
+                                         role="alert"
+                                         data-command-catalog-conflicts>
+                                        @foreach (var conflict in CommandCatalog.Conflicts)
+                                        {
+                                            <p>@conflict</p>
+                                        }
+                                    </div>
+                                }
+                                @if (CommandCatalog.UnavailableFeatures.Count > 0)
+                                {
+                                    <div class="rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700"
+                                         data-command-catalog-unavailable>
+                                        @foreach (var unavailable in CommandCatalog.UnavailableFeatures)
+                                        {
+                                            <p>@unavailable</p>
+                                        }
+                                    </div>
+                                }
+                                @if (CommandCatalog.Entries.Count == 0)
+                                {
+                                    <p class="text-sm text-muted-foreground" data-command-catalog-empty>
+                                        No viewer commands are configured or currently available.
+                                    </p>
+                                }
+                                else
+                                {
+                                    <ul class="flex flex-wrap gap-2" aria-label="Viewer command inventory">
+                                        @foreach (var entry in CommandCatalog.Entries)
+                                        {
+                                            <li class="control-surface rounded-lg px-3 py-2 text-sm font-semibold"
+                                                data-command-source="@entry.Source.ToString().ToLowerInvariant()">
+                                                <span class="block">@entry.Name</span>
+                                                @if (entry.AccessSummary is not null)
+                                                {
+                                                    <span class="block text-xs font-medium text-muted-foreground"
+                                                          data-command-access-summary>@entry.AccessSummary</span>
+                                                }
+                                                @if (AvailabilitySummary(entry) is { } availability)
+                                                {
+                                                    <span class="block text-xs font-bold text-amber-700"
+                                                          data-command-availability>@availability</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                        </div>
+                    </StudioFold>
+                </div>
+            </div>
+        </StudioStage>

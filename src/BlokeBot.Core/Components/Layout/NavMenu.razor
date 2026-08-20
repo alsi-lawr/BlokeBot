@@ -79,623 +79,99 @@
                         showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showCooperativeGame || showViewerPassports || showBingo || showCompetitions || showRaidCollaboration || showCollectives || showCustomCommands || showAutomations || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
-                <AuthorizeView Policy="BotAdmin">
-                    <Authorized>
-                        <div class="nav-menu__route-item nav-menu__panel nav-menu__panel--admin rounded-xl p-1"
-                             data-nav-destination="admin">
-                            <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                     ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
-                                     href="admin"
-                                     aria-label="Admin"
-                                     aria-describedby="@RouteHelpReference("admin")"
-                                     aria-current="@CurrentRoute("admin")"
-                                     @onclick="NotifyNavigatedAsync">
-                                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
-                                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
-                                        <path d="m9.5 12 1.7 1.7 3.6-4" />
-                                    </svg>
-                                </span>
-                                <span class="nav-menu__label min-w-0">Admin</span>
-                            </NavLink>
-                            @RouteHelp("admin", "Admin")
-                        </div>
-                        <div class="nav-menu__separator" aria-hidden="true"></div>
-                    </Authorized>
-                </AuthorizeView>
-
-                <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                     data-nav-destination="home">
-                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                             ActiveClass="nav-menu__item-active"
-                             Match="NavLinkMatch.All"
-                             href=""
-                             aria-label="Home"
-                             aria-describedby="@RouteHelpReference("home")"
-                             aria-current="@CurrentRoute("", exact: true)"
-                             @onclick="NotifyNavigatedAsync">
-                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600">
-                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 5h6v6H4Z" />
-                                <path d="M14 5h6v6h-6Z" />
-                                <path d="M4 15h6v4H4Z" />
-                                <path d="M14 15h6v4h-6Z" />
-                            </svg>
-                        </span>
-                        <span class="nav-menu__label min-w-0">Home</span>
-                    </NavLink>
-                    @RouteHelp("home", "Home")
-                </div>
-
-                @if (showAlerts)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="alerts">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="alerts"
-                                 aria-label="Alerts"
-                                 aria-describedby="@RouteHelpReference("alerts")"
-                                 aria-current="@CurrentRoute("alerts")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700">
-                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M10.3 4.3 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
-                                    <path d="M12 9v4" />
-                                    <path d="M12 17h.01" />
-                                </svg>
-                            </span>
-                            <span class="nav-menu__label min-w-0">Alerts</span>
-                        </NavLink>
-                        @RouteHelp("alerts", "Alerts")
-                    </div>
+                @{
+                    var routes = new NavMenuRouteBindings(
+                        (route, exact) => CurrentRoute(route, exact),
+                        GroupIsCurrent,
+                        CurrentGroup,
+                        RouteHelpReference,
+                        RouteHelp,
+                        NotifyNavigatedAsync
+                    );
                 }
 
-                @if (showHostConfig)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="host">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
-                                 href="host"
-                                 aria-label="Channel setup"
-                                 aria-describedby="@RouteHelpReference("host")"
-                                 aria-current="@CurrentRoute("host")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
-                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M4 10.5 12 4l8 6.5V20H4Z" />
-                                    <path d="M9 20v-6h6v6" />
-                                </svg>
-                            </span>
-                            <span class="nav-menu__label min-w-0">Channel setup</span>
-                        </NavLink>
-                        @RouteHelp("host", "Channel setup")
-                    </div>
-                }
-
-                @if (showConfigurationTransfer)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="configuration-transfer">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
-                                 href="configuration-transfer"
-                                 aria-label="Configuration transfer"
-                                 aria-describedby="@RouteHelpReference("configuration-transfer")"
-                                 aria-current="@CurrentRoute("configuration-transfer")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-teal-700" aria-hidden="true">⇄</span>
-                            <span class="nav-menu__label min-w-0">Configuration transfer</span>
-                        </NavLink>
-                        @RouteHelp("configuration-transfer", "Configuration transfer")
-                    </div>
-                }
-
-                @if (showChatTools)
-                {
-                    <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                        Chat tools
-                    </div>
-                }
+                <NavMenuPrimaryRoutes Visibility="@(new(showAlerts, showHostConfig, showConfigurationTransfer, showChatTools))"
+                                      Routes="routes" />
 
                 @if (showNativeTwitch)
                 {
-                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
-                         data-nav-section="twitch-operations"
-                         data-open="@GroupIsOpen(NavigationGroup.NativeTwitch).ToString().ToLowerInvariant()">
-                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
-                                type="button"
-                                aria-label="Native Twitch"
-                                aria-describedby="@RouteHelpReference("twitch-operations-group")"
-                                aria-controls="@GroupBodyId(NavigationGroup.NativeTwitch)"
-                                aria-expanded="@GroupIsOpen(NavigationGroup.NativeTwitch).ToString().ToLowerInvariant()"
-                                aria-current="@CurrentGroup("twitch-operations")"
-                                data-current="@GroupIsCurrent("twitch-operations").ToString().ToLowerInvariant()"
-                                @onclick="() => ToggleGroupAsync(NavigationGroup.NativeTwitch)"
-                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.NativeTwitch, args)">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">✦</span>
-                            <span class="nav-menu__label min-w-0 flex-1">Native Twitch</span>
-                            <span class="nav-menu__badge" aria-label="@($"{nativeTwitchCount} destinations")">@nativeTwitchCount</span>
-                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
-                        @RouteHelp("twitch-operations-group", "Native Twitch")
-                        <div id="@GroupBodyId(NavigationGroup.NativeTwitch)"
-                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
-                             hidden="@(!GroupIsOpen(NavigationGroup.NativeTwitch))">
-                            <p class="nav-menu__flyout-title">Native Twitch</p>
-                            @if (showPolls)
-                            {
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="twitch-operations/polls"
-                                     aria-label="Polls"
-                                     aria-current="@CurrentRoute("twitch-operations/polls", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">Polls</NavLink>
-                            }
-                            @if (showClipsMarkers)
-                            {
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="twitch-operations/clips-markers"
-                                     aria-label="Clips and markers"
-                                     aria-current="@CurrentRoute("twitch-operations/clips-markers", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">Clips &amp; markers</NavLink>
-                            }
-                            @if (showRewardsRedemptions)
-                            {
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="twitch-operations/channel-points"
-                                     aria-label="Rewards and redemptions"
-                                     aria-current="@CurrentRoute("twitch-operations/channel-points", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">Rewards &amp; redemptions</NavLink>
-                            }
-                            @if (showPredictions)
-                            {
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="twitch-operations/predictions"
-                                     aria-label="Predictions"
-                                     aria-current="@CurrentRoute("twitch-operations/predictions", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">Predictions</NavLink>
-                            }
-                        </div>
-                    </div>
+                    <NavMenuNativeTwitchGroup Visibility="@(new(showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions, nativeTwitchCount))"
+                                               Group="@(new(
+                                                   GroupIsOpen(NavigationGroup.NativeTwitch),
+                                                   GroupBodyId(NavigationGroup.NativeTwitch),
+                                                   EventCallback.Factory.Create(
+                                                       this,
+                                                       () => ToggleGroupAsync(NavigationGroup.NativeTwitch)
+                                                   ),
+                                                   EventCallback.Factory.Create<KeyboardEventArgs>(
+                                                       this,
+                                                       args => CloseGroupOnEscape(NavigationGroup.NativeTwitch, args)
+                                                   )
+                                               ))"
+                                               Routes="routes" />
                 }
 
-                @if (showRaidCollaboration)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="raid-collaboration">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="raid-collaboration"
-                                 aria-label="Raid and collaboration"
-                                 aria-describedby="@RouteHelpReference("raid-collaboration")"
-                                 aria-current="@CurrentRoute("raid-collaboration")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">⇄</span>
-                            <span class="nav-menu__label min-w-0">Raid &amp; collaboration</span>
-                        </NavLink>
-                        @RouteHelp("raid-collaboration", "Raid & collaboration")
-                    </div>
-                }
+                <NavMenuDirectFeatureRoutes Visibility="@(new(
+                                                   showRaidCollaboration,
+                                                   showCollectives,
+                                                   showRequestBoards,
+                                                   showBounties,
+                                                   showCommunityProgression,
+                                                   showCooperativeGame,
+                                                   showViewerPassports,
+                                                   showBingo,
+                                                   showCompetitions,
+                                                   showPlayQueues,
+                                                   showMoments,
+                                                   showOverlays
+                                               ))"
+                                            Routes="routes" />
 
-                @if (showCollectives)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="collectives">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="collectives"
-                                 aria-label="Collectives"
-                                 aria-describedby="@RouteHelpReference("collectives")"
-                                 aria-current="@CurrentRoute("collectives")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-teal-700" aria-hidden="true">◎</span>
-                            <span class="nav-menu__label min-w-0">Collectives</span>
-                        </NavLink>
-                        @RouteHelp("collectives", "Collectives")
-                    </div>
-                }
-
-                @if (showRequestBoards)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="requests">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="requests"
-                                 aria-label="Request boards"
-                                 aria-describedby="@RouteHelpReference("requests")"
-                                 aria-current="@CurrentRoute("requests")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sky-700" aria-hidden="true">☷</span>
-                            <span class="nav-menu__label min-w-0">Request boards</span>
-                        </NavLink>
-                        @RouteHelp("requests", "Request boards")
-                    </div>
-                }
-
-                @if (showBounties)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="bounties">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="bounties"
-                                 aria-label="Bounties"
-                                 aria-describedby="@RouteHelpReference("bounties")"
-                                 aria-current="@CurrentRoute("bounties")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700" aria-hidden="true">◆</span>
-                            <span class="nav-menu__label min-w-0">Bounties</span>
-                        </NavLink>
-                        @RouteHelp("bounties", "Bounties")
-                    </div>
-                }
-
-                @if (showCommunityProgression)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="community">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="community"
-                                 aria-label="Community progression"
-                                 aria-describedby="@RouteHelpReference("community")"
-                                 aria-current="@CurrentRoute("community")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true">★</span>
-                            <span class="nav-menu__label min-w-0">Community</span>
-                        </NavLink>
-                        @RouteHelp("community", "Community progression")
-                    </div>
-                }
-
-                @if (showCooperativeGame)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="raid">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="raid"
-                                 aria-label="BlokeRaid"
-                                 aria-describedby="@RouteHelpReference("raid")"
-                                 aria-current="@CurrentRoute("raid")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-rose-700" aria-hidden="true">♜</span>
-                            <span class="nav-menu__label min-w-0">BlokeRaid</span>
-                        </NavLink>
-                        @RouteHelp("raid", "BlokeRaid")
-                    </div>
-                }
-
-                @if (showViewerPassports)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="passports">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="passports"
-                                 aria-label="Viewer passports"
-                                 aria-describedby="@RouteHelpReference("passports")"
-                                 aria-current="@CurrentRoute("passports")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-indigo-700" aria-hidden="true">▣</span>
-                            <span class="nav-menu__label min-w-0">Viewer passports</span>
-                        </NavLink>
-                        @RouteHelp("passports", "Viewer passports")
-                    </div>
-                }
-
-                @if (showBingo)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="bingo">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="bingo"
-                                 aria-label="Stream-event Bingo"
-                                 aria-describedby="@RouteHelpReference("bingo")"
-                                 aria-current="@CurrentRoute("bingo")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-cyan-700" aria-hidden="true">▦</span>
-                            <span class="nav-menu__label min-w-0">Bingo</span>
-                        </NavLink>
-                        @RouteHelp("bingo", "Stream-event Bingo")
-                    </div>
-                }
-
-                @if (showCompetitions)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="competitions">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="competitions"
-                                 aria-label="Tournaments &amp; leagues"
-                                 aria-describedby="@RouteHelpReference("competitions")"
-                                 aria-current="@CurrentRoute("competitions")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-violet-700" aria-hidden="true">♜</span>
-                            <span class="nav-menu__label min-w-0">Tournaments &amp; leagues</span>
-                        </NavLink>
-                        @RouteHelp("competitions", "Tournaments & leagues")
-                    </div>
-                }
-
-                @if (showPlayQueues)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="queues">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="queues"
-                                 aria-label="Play with viewers"
-                                 aria-describedby="@RouteHelpReference("queues")"
-                                 aria-current="@CurrentRoute("queues")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700" aria-hidden="true">♟</span>
-                            <span class="nav-menu__label min-w-0">Play with viewers</span>
-                        </NavLink>
-                        @RouteHelp("queues", "Play with viewers")
-                    </div>
-                }
-
-                @if (showMoments)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="moments">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="moments"
-                                 aria-label="Moments"
-                                 aria-describedby="@RouteHelpReference("moments")"
-                                 aria-current="@CurrentRoute("moments")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-violet-700" aria-hidden="true">◆</span>
-                            <span class="nav-menu__label min-w-0">Moments</span>
-                        </NavLink>
-                        @RouteHelp("moments", "Moments")
-                    </div>
-                }
-
-                @if (showOverlays)
-                {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="overlays">
-                        <NavLink class="@(GroupIsCurrent("overlays") ? "nav-menu__link nav-menu__item-active flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition" : "nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition")"
-                                 href="overlays#sources"
-                                 aria-label="Overlays"
-                                 aria-describedby="@RouteHelpReference("overlays")"
-                                 aria-current="@CurrentGroup("overlays")"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true">▣</span>
-                            <span class="nav-menu__label min-w-0">Overlays</span>
-                        </NavLink>
-                        @RouteHelp("overlays", "Overlays")
-                    </div>
-                }
-
-                @if (showGuessing)
-                {
-                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
-                         data-nav-section="guessing"
-                         data-open="@GroupIsOpen(NavigationGroup.Guessing).ToString().ToLowerInvariant()">
-                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
-                                type="button"
-                                aria-label="Guessing game"
-                                aria-describedby="@RouteHelpReference("guessing-group")"
-                                aria-controls="@GroupBodyId(NavigationGroup.Guessing)"
-                                aria-expanded="@GroupIsOpen(NavigationGroup.Guessing).ToString().ToLowerInvariant()"
-                                aria-current="@CurrentGroup("guessing")"
-                                data-current="@GroupIsCurrent("guessing").ToString().ToLowerInvariant()"
-                                @onclick="() => ToggleGroupAsync(NavigationGroup.Guessing)"
-                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.Guessing, args)">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
-                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M8.5 4h7l4 4v8l-4 4h-7l-4-4V8l4-4Z" />
-                                    <path d="M9 9h.01" />
-                                    <path d="M15 9h.01" />
-                                    <path d="M12 12h.01" />
-                                    <path d="M9 15h.01" />
-                                    <path d="M15 15h.01" />
-                                </svg>
-                            </span>
-                            <span class="nav-menu__label min-w-0 flex-1">Guessing game</span>
-                            <span class="nav-menu__badge" aria-label="2 destinations">2</span>
-                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
-                        @RouteHelp("guessing-group", "Guessing game")
-                        <div id="@GroupBodyId(NavigationGroup.Guessing)"
-                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
-                             hidden="@(!GroupIsOpen(NavigationGroup.Guessing))">
-                            <p class="nav-menu__flyout-title">Guessing game</p>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="guessing"
-                                     aria-label="Guessing dashboard"
-                                     aria-current="@CurrentRoute("guessing", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">
-                                Dashboard
-                            </NavLink>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     href="guessing/settings"
-                                     aria-label="Guessing settings"
-                                     aria-current="@CurrentRoute("guessing/settings")"
-                                     @onclick="NotifyNavigatedAsync">
-                                Settings
-                            </NavLink>
-                        </div>
-                    </div>
-                }
-
-                @if (showPoints)
-                {
-                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
-                         data-nav-section="points"
-                         data-open="@GroupIsOpen(NavigationGroup.Points).ToString().ToLowerInvariant()">
-                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
-                                type="button"
-                                aria-label="Points"
-                                aria-describedby="@RouteHelpReference("points-group")"
-                                aria-controls="@GroupBodyId(NavigationGroup.Points)"
-                                aria-expanded="@GroupIsOpen(NavigationGroup.Points).ToString().ToLowerInvariant()"
-                                aria-current="@CurrentGroup("points")"
-                                data-current="@GroupIsCurrent("points").ToString().ToLowerInvariant()"
-                                @onclick="() => ToggleGroupAsync(NavigationGroup.Points)"
-                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.Points, args)">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600">
-                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M12 3v18" />
-                                    <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
-                                </svg>
-                            </span>
-                            <span class="nav-menu__label min-w-0 flex-1">Points</span>
-                            <span class="nav-menu__badge" aria-label="2 destinations">2</span>
-                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
-                        @RouteHelp("points-group", "Points")
-                        <div id="@GroupBodyId(NavigationGroup.Points)"
-                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
-                             hidden="@(!GroupIsOpen(NavigationGroup.Points))">
-                            <p class="nav-menu__flyout-title">Points</p>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="points"
-                                     aria-label="Points dashboard"
-                                     aria-current="@CurrentRoute("points", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">
-                                Dashboard
-                            </NavLink>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     href="points/settings"
-                                     aria-label="Points settings"
-                                     aria-current="@CurrentRoute("points/settings")"
-                                     @onclick="NotifyNavigatedAsync">
-                                Settings
-                            </NavLink>
-                        </div>
-                    </div>
-                }
-
-                @if (showCustomCommands)
-                {
-                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
-                         data-nav-section="custom-commands"
-                         data-open="@GroupIsOpen(NavigationGroup.CustomCommands).ToString().ToLowerInvariant()">
-                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
-                                type="button"
-                                aria-label="Custom commands"
-                                aria-describedby="@RouteHelpReference("custom-commands-group")"
-                                aria-controls="@GroupBodyId(NavigationGroup.CustomCommands)"
-                                aria-expanded="@GroupIsOpen(NavigationGroup.CustomCommands).ToString().ToLowerInvariant()"
-                                aria-current="@CurrentGroup("custom-commands")"
-                                data-current="@GroupIsCurrent("custom-commands").ToString().ToLowerInvariant()"
-                                @onclick="() => ToggleGroupAsync(NavigationGroup.CustomCommands)"
-                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.CustomCommands, args)">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700">
-                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M4 7h16" />
-                                    <path d="M4 12h10" />
-                                    <path d="M4 17h7" />
-                                    <path d="m16 14 3 3-3 3" />
-                                </svg>
-                            </span>
-                            <span class="nav-menu__label min-w-0 flex-1">Custom commands</span>
-                            <span class="nav-menu__badge" aria-label="1 destination">1</span>
-                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
-                        @RouteHelp("custom-commands-group", "Custom commands")
-                        <div id="@GroupBodyId(NavigationGroup.CustomCommands)"
-                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
-                             hidden="@(!GroupIsOpen(NavigationGroup.CustomCommands))">
-                            <p class="nav-menu__flyout-title">Custom commands</p>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     href="custom-commands/settings"
-                                     aria-label="Custom command settings"
-                                     aria-current="@CurrentRoute("custom-commands/settings")"
-                                     @onclick="NotifyNavigatedAsync">
-                                Settings
-                            </NavLink>
-                        </div>
-                    </div>
-                }
-
-                @if (showAutomations)
-                {
-                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
-                         data-nav-section="automations"
-                         data-open="@GroupIsOpen(NavigationGroup.Automations).ToString().ToLowerInvariant()">
-                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
-                                type="button"
-                                aria-label="Automations"
-                                aria-describedby="@RouteHelpReference("automations-group")"
-                                aria-controls="@GroupBodyId(NavigationGroup.Automations)"
-                                aria-expanded="@GroupIsOpen(NavigationGroup.Automations).ToString().ToLowerInvariant()"
-                                aria-current="@CurrentGroup("automations")"
-                                data-current="@GroupIsCurrent("automations").ToString().ToLowerInvariant()"
-                                @onclick="() => ToggleGroupAsync(NavigationGroup.Automations)"
-                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.Automations, args)">
-                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700">
-                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                                    <circle cx="6" cy="6" r="2" />
-                                    <circle cx="18" cy="12" r="2" />
-                                    <circle cx="6" cy="18" r="2" />
-                                    <path d="M8 6h2a4 4 0 0 1 4 4M8 18h2a4 4 0 0 0 4-4" />
-                                </svg>
-                            </span>
-                            <span class="nav-menu__label min-w-0 flex-1">Automations</span>
-                            <span class="nav-menu__badge" aria-label="2 destinations">2</span>
-                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
-                        @RouteHelp("automations-group", "Automations")
-                        <div id="@GroupBodyId(NavigationGroup.Automations)"
-                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
-                             hidden="@(!GroupIsOpen(NavigationGroup.Automations))">
-                            <p class="nav-menu__flyout-title">Automations</p>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="automations"
-                                     aria-label="Visual automation flows"
-                                     aria-current="@CurrentRoute("automations", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">
-                                Flows
-                            </NavLink>
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     href="automations/events"
-                                     aria-label="Automation Twitch events"
-                                     aria-current="@CurrentRoute("automations/events")"
-                                     @onclick="NotifyNavigatedAsync">
-                                Twitch events
-                            </NavLink>
-                        </div>
-                    </div>
-                }
-
+                <NavMenuFeatureGroups Guessing="@(new(showGuessing, new(
+                                           GroupIsOpen(NavigationGroup.Guessing),
+                                           GroupBodyId(NavigationGroup.Guessing),
+                                           EventCallback.Factory.Create(
+                                               this,
+                                               () => ToggleGroupAsync(NavigationGroup.Guessing)
+                                           ),
+                                           EventCallback.Factory.Create<KeyboardEventArgs>(
+                                               this,
+                                               args => CloseGroupOnEscape(NavigationGroup.Guessing, args)
+                                           ))))"
+                                      Points="@(new(showPoints, new(
+                                          GroupIsOpen(NavigationGroup.Points),
+                                          GroupBodyId(NavigationGroup.Points),
+                                          EventCallback.Factory.Create(
+                                              this,
+                                              () => ToggleGroupAsync(NavigationGroup.Points)
+                                          ),
+                                          EventCallback.Factory.Create<KeyboardEventArgs>(
+                                              this,
+                                              args => CloseGroupOnEscape(NavigationGroup.Points, args)
+                                          ))))"
+                                      CustomCommands="@(new(showCustomCommands, new(
+                                                  GroupIsOpen(NavigationGroup.CustomCommands),
+                                                  GroupBodyId(NavigationGroup.CustomCommands),
+                                                  EventCallback.Factory.Create(
+                                                      this,
+                                                      () => ToggleGroupAsync(NavigationGroup.CustomCommands)
+                                                  ),
+                                                  EventCallback.Factory.Create<KeyboardEventArgs>(
+                                                      this,
+                                                      args => CloseGroupOnEscape(NavigationGroup.CustomCommands, args)
+                                                  ))))"
+                                      Automations="@(new(showAutomations, new(
+                                              GroupIsOpen(NavigationGroup.Automations),
+                                              GroupBodyId(NavigationGroup.Automations),
+                                              EventCallback.Factory.Create(
+                                                  this,
+                                                  () => ToggleGroupAsync(NavigationGroup.Automations)
+                                              ),
+                                              EventCallback.Factory.Create<KeyboardEventArgs>(
+                                                  this,
+                                                  args => CloseGroupOnEscape(NavigationGroup.Automations, args)
+                                              ))))"
+                                      Routes="routes" />
                 @if (selection is not null)
                 {
                     <div class="nav-menu__active-channel nav-menu__metadata mt-auto rounded-xl p-3">

@@ -1,0 +1,36 @@
+        <div id="chat-tools"
+             class="host-config-fragment-target scroll-mt-24"
+             role="region"
+             aria-label="Chat tools"
+             tabindex="-1">
+        <StudioStage Key="chat-tools"
+                     Number="6"
+                     Title="Chat tools"
+                     Summary="@Summary"
+                     Open="@Open"
+                     OpenChanged="OpenChanged"
+                     FocusElementId="chat-tools"
+                     FocusRequest="@FocusRequest">
+            <div class="application-card-collection sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">
+                @foreach (var feature in Features)
+                {
+                    <button class="@CardClass(feature)"
+                            type="button"
+                            aria-pressed="@feature.Enabled"
+                            @onclick="() => SetFeatureEnabled.InvokeAsync((feature.Feature, !feature.Enabled))">
+                        <span class="flex items-center gap-2.5">
+                            <span class="@IconClass(feature)">
+                                @Icon(feature.Feature)
+                            </span>
+                            <span class="min-w-0 flex-1 truncate text-sm font-bold text-[var(--app-text-strong)]">@feature.Name</span>
+                            <span class="@BadgeClass(feature)">
+                                <span class="@DotClass(feature)"></span>
+                                @(feature.Enabled ? "on" : "off")
+                            </span>
+                        </span>
+                        <span class="mt-1.5 block text-xs leading-5 text-muted-foreground">@feature.Description</span>
+                    </button>
+                }
+            </div>
+        </StudioStage>
+        </div>

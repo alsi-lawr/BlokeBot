@@ -1,0 +1,76 @@
+<div class="studio__inspector flex min-w-0 flex-col"
+     data-sticky-save-scope
+     @oninput="Changed"
+     @onchange="Changed"
+     @onclick="Changed">
+    <header class="studio__header flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] max-lg:rounded-tr-none">
+        <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere @(Context.SelectedCommand() is not null ? "studio__title--mono font-mono" : null)">@Context.HeaderName()</span>
+        @if (Context.HeaderStats() is { } stats)
+        {
+            <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@stats</span>
+        }
+        <span class="studio__spacer flex-1"></span>
+        @if (Context.SelectedCommand() is { } toggledCommand)
+        {
+            <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Turned on</span>
+            <button type="button"
+                    id="@CustomCommandEditorIds.CommandEnabled(toggledCommand)"
+                    class="studio-toggle"
+                    role="switch"
+                    aria-checked="@(toggledCommand.Enabled ? "true" : "false")"
+                    aria-label="Turned on"
+                    @onclick="() => toggledCommand.Enabled = !toggledCommand.Enabled"></button>
+        }
+        else if (Context.SelectedAnnouncement() is { } toggledAnnouncement)
+        {
+            <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Turned on</span>
+            <button type="button"
+                    id="@CustomCommandEditorIds.AnnouncementEnabled(toggledAnnouncement)"
+                    class="studio-toggle"
+                    role="switch"
+                    aria-checked="@(toggledAnnouncement.Enabled ? "true" : "false")"
+                    aria-label="Turned on"
+                    disabled="@Context.NativeDeliveryUnavailable(toggledAnnouncement)"
+                    @onclick="() => toggledAnnouncement.Enabled = !toggledAnnouncement.Enabled"></button>
+        }
+        <StickySaveRegion Scope="StickySaveScope.Editor">
+            <SaveChangesButton AccessibleName="Save custom commands"
+                               Disabled="@(!Context.HasChanges())"
+                               HasChanges="@Context.HasChanges()"
+                               OnSave="Context.Save" />
+        </StickySaveRegion>
+    </header>
+
+    <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
+        @if (Context.SelectedCommand() is { } command)
+        {
+            <CustomCommandEditorPanel @key="command" Command="command" Context="Context" />
+        }
+        else if (Context.SelectedCounter() is { } counter)
+        {
+            <CustomCounterEditorPanel @key="counter" Counter="counter" Context="Context" />
+        }
+        else if (Context.SelectedAnnouncement() is { } announcement)
+        {
+            <CustomAnnouncementEditorPanel @key="announcement" Announcement="announcement" Context="Context" />
+        }
+        else if (Context.SelectedReply() is { } entry)
+        {
+            <CustomReplyEditorPanel @key="entry" Entry="entry" Context="Context" />
+        }
+        else
+        {
+            <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground" data-empty-inspector>
+                @Context.EmptyInspectorMessage()
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+
+    [Parameter]
+    public EventCallback Changed { get; set; }
+}

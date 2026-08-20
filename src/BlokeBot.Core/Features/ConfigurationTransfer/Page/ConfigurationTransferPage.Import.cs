@@ -20,7 +20,7 @@ public partial class ConfigurationTransferPage
         }
         catch (IOException)
         {
-            _parseIssue = new("$", "The configuration file exceeds the 2 MB limit.");
+            _parseIssue = ConfigurationDocumentCodec.TooLarge().Issue;
         }
         finally
         {
@@ -28,13 +28,19 @@ public partial class ConfigurationTransferPage
         }
     }
 
-    private Task PreviewPastedAsync() => PreviewBytesAsync(Encoding.UTF8.GetBytes(_pastedJson));
+    private Task PreviewPastedAsync() => PreviewOutcomeAsync(_codec.Parse(_pastedJson));
 
     private async Task PreviewBytesAsync(byte[] bytes)
     {
         _parseIssue = null;
         _applyIssue = null;
-        var parsed = _codec.Parse(bytes);
+        await PreviewOutcomeAsync(_codec.Parse(bytes));
+    }
+
+    private async Task PreviewOutcomeAsync(ConfigurationDocumentParseOutcome parsed)
+    {
+        _parseIssue = null;
+        _applyIssue = null;
         if (parsed is ConfigurationDocumentParseOutcome.Invalid invalid)
         {
             _parseIssue = invalid.Issue;

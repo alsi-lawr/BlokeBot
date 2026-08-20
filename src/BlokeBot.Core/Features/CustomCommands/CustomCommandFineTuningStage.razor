@@ -1,0 +1,123 @@
+@using BlokeBot.Persistence.Models
+
+                            <StudioStage Key="fine-tuning"
+                                         Number="4"
+                                         Title="Fine-tuning"
+                                         Summary="@Context.CommandAdvancedSummary(Command)"
+                                         Open="@Context.FineTuningOpen()"
+                                         OpenChanged="@(Context.SetFineTuningOpen)">
+                                <div class="studio-grid">
+                                    <div class="studio-span-4 space-y-2">
+                                        <div class="field">
+                                            <label class="field__label" for="@CustomCommandEditorIds.CommandCooldown(Command)">Wait between uses (seconds)</label>
+                                            <input id="@CustomCommandEditorIds.CommandCooldown(Command)"
+                                                   class="field__input"
+                                                   type="number"
+                                                   min="0"
+                                                   @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandCooldown(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Cooldown))"
+                                                   @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandCooldown(Command)]"
+                                                   @bind="Command.CooldownSeconds" />
+                                        </div>
+                                        @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandCooldown(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Cooldown)))
+                                    </div>
+                                    <div class="studio-span-4 space-y-2">
+                                        <div class="field">
+                                            <label class="field__label" for="@CustomCommandEditorIds.CommandCooldownScope(Command)">Who waits?</label>
+                                            <select id="@CustomCommandEditorIds.CommandCooldownScope(Command)"
+                                                    class="field__input"
+                                                    @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandCooldownScope(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.CooldownScope))"
+                                                    @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandCooldownScope(Command)]"
+                                                    @bind="Command.CooldownScope">
+                                                @foreach (var scope in CooldownScopes)
+                                                {
+                                                    <option value="@scope">@Context.CooldownScopeLabel(scope)</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandCooldownScope(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.CooldownScope)))
+                                    </div>
+                                    <div class="studio-span-4 space-y-2">
+                                        <div class="field">
+                                            <label class="field__label" for="@CustomCommandEditorIds.CommandInvocationLimit(Command)">Use limit</label>
+                                            <select id="@CustomCommandEditorIds.CommandInvocationLimit(Command)"
+                                                    class="field__input"
+                                                    @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandInvocationLimit(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
+                                                    @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandInvocationLimit(Command)]"
+                                                    @bind="Command.InvocationLimit">
+                                                @foreach (var limit in InvocationLimits)
+                                                {
+                                                    <option value="@limit">@Context.InvocationLimitLabel(limit)</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandInvocationLimit(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.InvocationLimit)))
+                                    </div>
+                                    @if (Command.Action is CounterCustomCommandActionEditor counterAction)
+                                    {
+                                        <div class="studio-span-6 space-y-2">
+                                            <div class="field">
+                                                <label class="field__label" for="@CustomCommandEditorIds.CommandCounter(Command)">Counter</label>
+                                                <select id="@CustomCommandEditorIds.CommandCounter(Command)"
+                                                        class="field__input"
+                                                        @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandCounter(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Counter))"
+                                                        @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandCounter(Command)]"
+                                                        @bind="counterAction.CounterId">
+                                                    @if (Context.Configuration.Counters.Count == 0)
+                                                    {
+                                                        <option value="0">Create a counter first</option>
+                                                    }
+                                                    @foreach (var counter in Context.Configuration.Counters)
+                                                    {
+                                                        <option value="@counter.Id">@counter.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandCounter(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Counter)))
+                                        </div>
+                                    }
+                                    <p class="studio-span-12 text-xs text-muted-foreground">The wait is checked first. A use is only claimed after the wait passes; moderators follow the same use limit.</p>
+                                    @if (Command.Id > 0)
+                                    {
+                                        <div class="studio-span-6 custom-command-reset-boundary">
+                                            <Field Id="@CustomCommandEditorIds.CommandResetViewer(Command)"
+                                                   Label="Reset lifetime use for viewer"
+                                                   @bind-Value="Command.ResetViewerLogin"
+                                                   Placeholder="viewer login" />
+                                        </div>
+                                        <div class="studio-span-6 content-end custom-command-reset-boundary flex flex-wrap gap-2">
+                                            <button class="btn-secondary"
+                                                    data-action="reset-viewer-use"
+                                                    @onclick="() => Context.ResetViewer(Command)">Reset viewer</button>
+                                            <button class="btn-secondary"
+                                                    data-action="reset-all-viewer-uses"
+                                                    @onclick="() => Context.RequestResetAllViewers(Command)">Reset all viewers</button>
+                                        </div>
+                                        @if (Context.PendingResetAllCommandId() == Command.Id)
+                                        {
+                                            <div class="studio-span-12 flex flex-wrap items-center justify-end gap-2 text-sm" role="alert">
+                                                <span>Reset every lifetime viewer use for @Command.Name?</span>
+                                                <button class="btn-secondary"
+                                                        data-action="confirm-reset-all-viewer-uses"
+                                                        @onclick="() => Context.ResetAllViewers(Command)">Confirm reset all</button>
+                                                <button class="btn-secondary" @onclick="Context.CancelResetAllViewers">Cancel</button>
+                                            </div>
+                                        }
+                                    }
+                                    <div class="studio-span-12 flex justify-end">
+                                        <button class="btn-secondary" @onclick="() => Context.RemoveCommand(Command)">Delete command</button>
+                                    </div>
+                                </div>
+                            </StudioStage>
+
+@code {
+    private static readonly IReadOnlyList<CustomCommandCooldownScope> CooldownScopes =
+        Enum.GetValues<CustomCommandCooldownScope>();
+    private static readonly IReadOnlyList<CustomCommandInvocationLimit> InvocationLimits =
+        Enum.GetValues<CustomCommandInvocationLimit>();
+
+    [Parameter, EditorRequired]
+    public required CustomCommandEditor Command { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+}

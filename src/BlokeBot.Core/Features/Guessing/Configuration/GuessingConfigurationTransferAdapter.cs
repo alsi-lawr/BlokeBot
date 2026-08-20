@@ -115,7 +115,12 @@ public sealed class GuessingConfigurationTransferAdapter
             validated.Add((imported, ((ValidationResult.Valid)validation).Command));
         }
 
-        foreach (var target in matches.Values.Distinct())
+        var updatedTargets = validated
+            .Select(x => matches.GetValueOrDefault(x.Imported.Id))
+            .Where(x => x is not null)
+            .Cast<GuessRoundProfile>()
+            .Distinct();
+        foreach (var target in updatedTargets)
         {
             target.Slug = $"import-{Guid.NewGuid():N}";
             target.IsDefault = false;

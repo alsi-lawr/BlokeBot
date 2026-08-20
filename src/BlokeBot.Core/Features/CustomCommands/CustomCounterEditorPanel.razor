@@ -1,0 +1,31 @@
+<section id="@CustomCommandEditorIds.EditorRegion("Counter", Counter.Id)"
+         class="studio-grid"
+         role="region"
+         aria-labelledby="@CustomCommandEditorIds.InventoryLabel("Counter", Counter.Id)"
+         data-selected-editor="counter">
+    <div class="studio-span-8">
+        <Field Id="@CustomCommandEditorIds.CounterName(Counter)"
+               Label="Counter name"
+               ErrorMessage="@Context.Validation.Message(CustomCommandEditorIds.CounterTarget(Counter.Id, CustomCommandValidationFieldKind.Name))"
+               FocusRequest="@Math.Max(Context.Validation.FocusRequest(CustomCommandEditorIds.CounterTarget(Counter.Id, CustomCommandValidationFieldKind.Name)), Context.Validation.EditorFocusRequest(CustomCommandEditorIds.CounterName(Counter)))"
+               @bind-Value="Counter.Name"
+               Placeholder="deaths" />
+    </div>
+    <div class="studio-span-4">
+        <div class="field">
+            <label class="field__label" for="@CustomCommandEditorIds.CounterValue(Counter)">Current number</label>
+            <input id="@CustomCommandEditorIds.CounterValue(Counter)" class="field__input" type="number" @bind="Counter.Value" />
+        </div>
+    </div>
+    <div class="studio-span-12 flex justify-end">
+        <button class="btn-secondary" @onclick="() => Context.RemoveCounter(Counter)">Delete counter</button>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required CustomCounterEditor Counter { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+}

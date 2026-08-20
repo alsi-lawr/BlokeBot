@@ -7,7 +7,8 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 public sealed partial class CustomCommandConfigurationTransferAdapter(
     CustomCommandConfigurationGraphWriter graphWriter,
-    CustomCommandAliasRegistry aliasRegistry
+    CustomCommandAliasRegistry aliasRegistry,
+    TimeProvider timeProvider
 )
 {
     internal async Task<IReadOnlyList<ConfigurationValidationIssue>> StageAsync(
@@ -50,6 +51,11 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
             var originalReplyIds = imported.Replies.ToDictionary(x => x, x => x.Id);
             var originalCounterIds = imported.Counters.ToDictionary(x => x, x => x.Id);
             draft.TimeZoneId = custom.TimeZoneId;
+            if (customSelection.Strategy != ImportConflictStrategy.AddMissing)
+            {
+                var host = await db.Hosts.SingleAsync(x => x.Id == hostId, cancellationToken);
+                host.TimeZoneId = custom.TimeZoneId;
+            }
             draft.MessageEntries = Merge(
                 draft.MessageEntries,
                 imported.Replies,
@@ -75,6 +81,36 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                 static x => x.Id,
                 static (source, targetId) => source.Id = targetId
             );
+            if (customSelection.Strategy == ImportConflictStrategy.ReplaceSection)
+            {
+                var skippedNames = custom
+                    .Commands.Where(command =>
+                        customSelection.ItemResolutions.Any(resolution =>
+                            resolution.ImportedId == command.Id
+                            && resolution.Resolution == ImportConflictResolution.Skip
+                        )
+                    )
+                    .Select(command => command.Name)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (
+                    var retained in LoadRetainedCommandsByName(
+                        await db
+                            .CustomCommands.AsSplitQuery()
+                            .Include(x => x.Action)
+                            .Include(x => x.Aliases)
+                            .Include(x => x.AllowedUsers)
+                            .Where(x => x.HostId == hostId)
+                            .ToArrayAsync(cancellationToken),
+                        skippedNames
+                    )
+                )
+                {
+                    if (draft.Commands.All(x => x.Id != retained.Id))
+                    {
+                        draft.Commands.Add(retained);
+                    }
+                }
+            }
             foreach (var reply in retainedAnnouncementReplies)
             {
                 if (draft.MessageEntries.All(x => x.Id != reply.Id))
@@ -88,12 +124,23 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
             && document.Sections.Announcements is { } announcements
         )
         {
-            var imported = MapAnnouncements(announcements, ref nextId);
+            var selectedAnnouncements =
+                announcementSelection.Strategy == ImportConflictStrategy.AddMissing
+                    ? SelectMissingAnnouncements(draft, announcements)
+                    : announcements;
+            var imported = MapAnnouncements(
+                selectedAnnouncements,
+                TimeZoneInfo.FindSystemTimeZoneById(draft.TimeZoneId),
+                draft.ProjectionReferenceUtc,
+                ref nextId
+            );
             var originalReplyIds = imported.Replies.ToDictionary(x => x, x => x.Id);
             draft.MessageEntries = Merge(
                 draft.MessageEntries,
                 imported.Replies,
-                ImportConflictStrategy.Merge,
+                announcementSelection.Strategy == ImportConflictStrategy.AddMissing
+                    ? ImportConflictStrategy.AddMissing
+                    : ImportConflictStrategy.Merge,
                 static x => x.Name,
                 static x => x.Id,
                 static (source, targetId) => source.Id = targetId
@@ -163,7 +210,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
             );
     }
 
-    private static async Task<CustomCommandConfiguration> LoadDraftAsync(
+    private async Task<CustomCommandConfiguration> LoadDraftAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken cancellationToken
@@ -192,17 +239,47 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
             .Hosts.Where(x => x.Id == hostId)
             .Select(x => x.TimeZoneId)
             .SingleAsync(cancellationToken);
+        var projectionReference = timeProvider.GetUtcNow();
+        var projectionTimeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
         return new()
         {
             TimeZoneId = timeZone,
+            ProjectionReferenceUtc = projectionReference,
             MessageEntries = replies.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
             Counters = counters.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
             Commands = commands.Select(CustomCommandConfigurationMapper.ToEditor).ToList(),
             Announcements = announcements
-                .Select(CustomCommandConfigurationMapper.ToEditor)
+                .Select(x =>
+                    CustomCommandConfigurationMapper.ToEditor(
+                        x,
+                        projectionTimeZone,
+                        projectionReference
+                    )
+                )
                 .ToList(),
         };
     }
+
+    private static AnnouncementsSectionV1 SelectMissingAnnouncements(
+        CustomCommandConfiguration draft,
+        AnnouncementsSectionV1 imported
+    )
+    {
+        var existingNames = draft
+            .Announcements.Select(x => x.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var items = imported.Items.Where(x => !existingNames.Contains(x.Name)).ToArray();
+        var replyIds = items.Select(x => x.MessageReplyId).ToHashSet(StringComparer.Ordinal);
+        return new(imported.Replies.Where(x => replyIds.Contains(x.Id)).ToArray(), items);
+    }
+
+    private static IEnumerable<CustomCommandEditor> LoadRetainedCommandsByName(
+        IEnumerable<BlokeBot.Persistence.Models.CustomCommand> entities,
+        IReadOnlySet<string> names
+    ) =>
+        entities
+            .Where(command => names.Contains(command.Name))
+            .Select(CustomCommandConfigurationMapper.ToEditor);
 
     private sealed record ImportedCustomCommands(
         List<CustomMessageLibraryEntryEditor> Replies,

@@ -1,0 +1,78 @@
+                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
+                         data-nav-section="twitch-operations"
+                         data-open="@Group.IsOpen.ToString().ToLowerInvariant()">
+                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
+                                type="button"
+                                aria-label="Native Twitch"
+                                aria-describedby="@Routes.RouteHelpReference("twitch-operations-group")"
+                                aria-controls="@Group.BodyId"
+                                aria-expanded="@Group.IsOpen.ToString().ToLowerInvariant()"
+                                aria-current="@Routes.CurrentGroup("twitch-operations")"
+                                data-current="@Routes.GroupIsCurrent("twitch-operations").ToString().ToLowerInvariant()"
+                                @onclick="() => Group.ToggleAsync.InvokeAsync()"
+                                @onkeydown="args => Group.CloseOnEscape.InvokeAsync(args)">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">✦</span>
+                            <span class="nav-menu__label min-w-0 flex-1">Native Twitch</span>
+                            <span class="nav-menu__badge" aria-label="@($"{Visibility.DestinationCount} destinations")">@Visibility.DestinationCount</span>
+                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        @Routes.RouteHelp("twitch-operations-group", "Native Twitch")
+                        <div id="@Group.BodyId"
+                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
+                             hidden="@(!Group.IsOpen)">
+                            <p class="nav-menu__flyout-title">Native Twitch</p>
+                            @if (Visibility.ShowPolls)
+                            {
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/polls"
+                                     aria-label="Polls"
+                                     aria-current="@Routes.CurrentRoute("twitch-operations/polls", exact: true)"
+                                     @onclick="Routes.NotifyNavigatedAsync">Polls</NavLink>
+                            }
+                            @if (Visibility.ShowClipsMarkers)
+                            {
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/clips-markers"
+                                     aria-label="Clips and markers"
+                                     aria-current="@Routes.CurrentRoute("twitch-operations/clips-markers", exact: true)"
+                                     @onclick="Routes.NotifyNavigatedAsync">Clips &amp; markers</NavLink>
+                            }
+                            @if (Visibility.ShowRewardsRedemptions)
+                            {
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/channel-points"
+                                     aria-label="Rewards and redemptions"
+                                     aria-current="@Routes.CurrentRoute("twitch-operations/channel-points", exact: true)"
+                                     @onclick="Routes.NotifyNavigatedAsync">Rewards &amp; redemptions</NavLink>
+                            }
+                            @if (Visibility.ShowPredictions)
+                            {
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/predictions"
+                                     aria-label="Predictions"
+                                     aria-current="@Routes.CurrentRoute("twitch-operations/predictions", exact: true)"
+                                     @onclick="Routes.NotifyNavigatedAsync">Predictions</NavLink>
+                            }
+                        </div>
+                    </div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required NavMenuNativeTwitchVisibility Visibility { get; set; }
+
+    [Parameter, EditorRequired]
+    public required NavMenuGroupBindings Group { get; set; }
+
+    [Parameter, EditorRequired]
+    public required NavMenuRouteBindings Routes { get; set; }
+}

@@ -153,10 +153,10 @@ public sealed class CustomAnnouncementCandidateTests : CustomAnnouncementSchedul
     }
 
     [Test]
-    public async Task WeeklyAnnouncementInDstGap_RunningTick_SkipsInvalidLocalTime()
+    public async Task WeeklyUtcScheduleAtLocalDstGap_RunningTick_SendsAtStoredUtcTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var now = new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero);
+        var now = new DateTimeOffset(2026, 3, 29, 1, 30, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
         var hostId = await SeedHostAsync(
             dbFactory,
@@ -180,6 +180,6 @@ public sealed class CustomAnnouncementCandidateTests : CustomAnnouncementSchedul
 
         await scheduler.RunTickAsync(CancellationToken.None);
 
-        sender.Messages.ShouldBeEmpty();
+        sender.Messages.ShouldBe([new SentChatMessage("streamer", "DST")]);
     }
 }

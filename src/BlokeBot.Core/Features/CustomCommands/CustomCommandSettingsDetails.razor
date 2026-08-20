@@ -1,0 +1,69 @@
+        <div class="settings-disclosure-stack" data-card-owner="custom-command-disclosure-cards">
+        <CollapsibleSection Title="Time zone"
+                            Description="Weekly scheduled messages use this local time."
+                            InitiallyOpen="false"
+                            OpenRequest="@Context.TimeZoneSectionOpenRequest">
+            <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                <div class="space-y-2">
+                    <div class="field">
+                        <label class="field__label" for="@TimeZoneControlId">Time zone</label>
+                        <select id="@TimeZoneControlId"
+                                class="field__input"
+                                @attributes="Context.Validation.Attributes(TimeZoneControlId, CustomCommandEditorIds.ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone))"
+                                @ref="Context.Validation.Controls[TimeZoneControlId]"
+                                value="@Context.Configuration.TimeZoneId"
+                                @onchange="Context.ChangeTimeZone">
+                            @foreach (var timeZone in Context.TimeZones)
+                            {
+                                <option value="@timeZone.Id">@timeZone.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    @(Context.Validation.MessageFor(TimeZoneControlId, CustomCommandEditorIds.ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone)))
+                </div>
+                <div class="surface-muted rounded-lg px-3 py-2.5">
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selected time zone</p>
+                    <p class="mt-1 break-words text-sm font-semibold text-slate-900">@Context.SelectedTimeZoneLabel()</p>
+                </div>
+            </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection Title="Alerts" Description="Problems that may need your attention." InitiallyOpen="false">
+            <div class="space-y-3 p-4">
+                <div class="surface-muted rounded-lg px-3 py-2.5">
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Active alerts</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900">@Context.Configuration.AlertSummary.ActiveCount</p>
+                </div>
+                @if (Context.Configuration.AlertSummary.ActiveAlerts.Count == 0)
+                {
+                    <p class="text-sm text-muted-foreground">No active alerts.</p>
+                }
+                else
+                {
+                    <div class="grid gap-3">
+                        @foreach (var alert in Context.Configuration.AlertSummary.ActiveAlerts)
+                        {
+                            <div @key="alert" class="surface-row rounded-lg p-3">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <p class="text-sm font-bold text-slate-950">@alert.Title</p>
+                                    <span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">@Context.AlertImportanceLabel(alert.Severity)</span>
+                                </div>
+                                <p class="mt-1 text-sm text-muted-foreground">@alert.Message</p>
+                                @if (!string.IsNullOrWhiteSpace(alert.LinkPath))
+                                {
+                                    <a class="mt-2 inline-flex text-sm font-semibold text-blue-700" href="@alert.LinkPath">Open alert</a>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </CollapsibleSection>
+        </div>
+
+@code {
+    private const string TimeZoneControlId = "custom-command-time-zone";
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+}

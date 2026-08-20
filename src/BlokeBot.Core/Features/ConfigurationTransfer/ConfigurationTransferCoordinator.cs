@@ -76,12 +76,37 @@ public sealed partial class ConfigurationTransferCoordinator(
                 );
             }
 
+            var planned = new Dictionary<ConfigurationSectionId, ConfigurationSectionPreview>();
+            foreach (var selected in selection.Sections)
+            {
+                planned[selected.Section] =
+                    await ConfigurationImportPreviewService.PreviewSectionAsync(
+                        db,
+                        host,
+                        document,
+                        selected,
+                        cancellationToken
+                    );
+            }
+            var changingSelections = selection
+                .Sections.Where(selected =>
+                    selected.Section != ConfigurationSectionId.ChannelToolEnablement
+                    && WouldChange(planned[selected.Section].Counts)
+                )
+                .ToArray();
+            var stagingSelection = selection with { Sections = changingSelections };
             var issues = new List<ConfigurationValidationIssue>();
             issues.AddRange(
-                await customCommands.StageAsync(db, host.Id, document, selection, cancellationToken)
+                await customCommands.StageAsync(
+                    db,
+                    host.Id,
+                    document,
+                    stagingSelection,
+                    cancellationToken
+                )
             );
             if (
-                Selected(selection, ConfigurationSectionId.Guessing) is { } guessingSelection
+                Selected(stagingSelection, ConfigurationSectionId.Guessing) is { } guessingSelection
                 && document.Sections.Guessing is { } guessing
             )
             {
@@ -96,7 +121,7 @@ public sealed partial class ConfigurationTransferCoordinator(
                 );
             }
             if (
-                Selected(selection, ConfigurationSectionId.Points) is { } pointsSelection
+                Selected(stagingSelection, ConfigurationSectionId.Points) is { } pointsSelection
                 && document.Sections.Points is { } points
             )
             {
@@ -128,6 +153,11 @@ public sealed partial class ConfigurationTransferCoordinator(
                 selection,
                 cancellationToken
             );
+            var changedSections = changingSelections
+                .Select(x => x.Section)
+                .Concat(activation is null ? [] : [ConfigurationSectionId.ChannelToolEnablement])
+                .Distinct()
+                .ToArray();
             var now = timeProvider.GetUtcNow().UtcDateTime;
             _ = db.ConfigurationImportAudits.Add(
                 new ConfigurationImportAudit
@@ -140,7 +170,7 @@ public sealed partial class ConfigurationTransferCoordinator(
                     ActorLogin = actor.Login[..Math.Min(actor.Login.Length, 128)],
                     SourceFormatVersion = document.Version,
                     OccurredAtUtc = now,
-                    SummaryJson = AuditSummary(document, selection),
+                    SummaryJson = AuditSummary(document, selection, changedSections),
                 }
             );
             _ = await db.SaveChangesAsync(cancellationToken);
@@ -152,11 +182,7 @@ public sealed partial class ConfigurationTransferCoordinator(
             }
 
             return new ConfigurationImportApplyOutcome.Applied(
-                new(
-                    operationId,
-                    activation?.Id,
-                    selection.Sections.Select(x => x.Section).Distinct().ToArray()
-                )
+                new(operationId, activation?.Id, changedSections)
             );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -173,6 +199,9 @@ public sealed partial class ConfigurationTransferCoordinator(
             return new ConfigurationImportApplyOutcome.Failed(operationId, "persistence");
         }
     }
+
+    private static bool WouldChange(ConfigurationPreviewCount counts) =>
+        counts.Add > 0 || counts.Update > 0 || counts.Remove > 0;
 
     private async Task<ConfigurationActivation?> StageEnablementAsync(
         BlokeBotDbContext db,

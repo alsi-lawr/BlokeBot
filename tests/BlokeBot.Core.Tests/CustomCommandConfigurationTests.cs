@@ -836,7 +836,8 @@ public sealed class CustomCommandConfigurationTests
             ),
             new HostCustomCommandSettingsService(dbFactory, events),
             new AvailableTwitchAnnouncementReadinessProvider(availability),
-            events
+            events,
+            TimeProvider.System
         );
     }
 

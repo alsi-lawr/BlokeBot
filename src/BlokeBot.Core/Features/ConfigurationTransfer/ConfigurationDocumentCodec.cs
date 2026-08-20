@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
@@ -18,16 +19,16 @@ public sealed class ConfigurationDocumentCodec
         JsonUnmappedMemberHandling.Disallow
     );
 
+    public ConfigurationDocumentParseOutcome Parse(string json) =>
+        Encoding.UTF8.GetByteCount(json) > MaximumBytes
+            ? TooLarge()
+            : Parse(Encoding.UTF8.GetBytes(json));
+
     public ConfigurationDocumentParseOutcome Parse(ReadOnlyMemory<byte> json)
     {
         if (json.Length > MaximumBytes)
         {
-            return new ConfigurationDocumentParseOutcome.Invalid(
-                new(
-                    "$",
-                    $"The configuration file exceeds the {MaximumBytes / 1024 / 1024} MB limit."
-                )
-            );
+            return TooLarge();
         }
 
         try
@@ -79,13 +80,19 @@ public sealed class ConfigurationDocumentCodec
         catch (JsonException exception)
         {
             return new ConfigurationDocumentParseOutcome.Invalid(
-                new(exception.Path ?? "$", "The JSON structure or value is invalid.")
+                new(
+                    exception.Path ?? "$",
+                    $"The JSON structure or value is invalid. {exception.Message}"
+                )
             );
         }
     }
 
     public byte[] Serialize(ConfigurationDocumentV1 document) =>
         JsonSerializer.SerializeToUtf8Bytes(document, _documentOptions);
+
+    public static ConfigurationDocumentParseOutcome.Invalid TooLarge() =>
+        new(new("$", $"The configuration file exceeds the {MaximumBytes / 1024 / 1024} MB limit."));
 
     private static ConfigurationDocumentV1? Migrate(ConfigurationDocumentV0? document) =>
         document is null
@@ -102,6 +109,7 @@ public sealed class ConfigurationDocumentCodec
         new(JsonSerializerDefaults.Web)
         {
             WriteIndented = true,
+            RespectNullableAnnotations = true,
             UnmappedMemberHandling = handling,
             Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, false) },
         };

@@ -1,0 +1,229 @@
+@using BlokeBot.Persistence.Models
+
+                            <StudioStage Key="what-happens"
+                                         Number="3"
+                                         Title="What happens"
+                                         Summary="@Context.ActionKindLabel(Command.ActionKind)"
+                                         Open="@Context.ActionOpen()"
+                                         OpenChanged="@(Context.SetActionOpen)">
+                                <div class="studio-grid">
+                                    <div class="studio-span-12">
+                                        <StudioChoiceCards id="@CustomCommandEditorIds.CommandAction(Command)"
+                                                           AriaLabel="What happens"
+                                                           CaptureElement="@(element => Context.Validation.Controls[CustomCommandEditorIds.CommandAction(Command)] = element)"
+                                                           @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandAction(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Action))">
+                                            @foreach (var choice in ActionChoices())
+                                            {
+                                                <StudioChoiceCard @key="choice.Kind"
+                                                                  data-action-kind="@choice.Kind"
+                                                                  Icon="@choice.Icon"
+                                                                  Title="@choice.Title"
+                                                                  Description="@choice.Description"
+                                                                  Pressed="@(Command.ActionKind == choice.Kind)"
+                                                                  Select="@(() => Command.ActionKind = choice.Kind)" />
+                                            }
+                                        </StudioChoiceCards>
+                                        @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandAction(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Action)))
+                                    </div>
+                                    @if (Command.Action is AutomationCustomCommandActionEditor)
+                                    {
+                                        <div class="studio-span-12 surface-muted space-y-2 rounded-lg p-3"
+                                             data-automation-command>
+                                            @if (Context.AutomationsEnabled)
+                                            {
+                                                <p class="text-sm font-semibold text-slate-900">Connected visual automations</p>
+                                                <p class="text-sm text-muted-foreground">
+                                                    This Command starts every enabled flow whose Custom Command event selects it. Build and inspect those connections in <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a>.
+                                                </p>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-sm font-semibold text-slate-900">Automations are off</p>
+                                                <p class="text-sm text-muted-foreground" role="status">
+                                                    This action is retained, but flow starts and downstream actions stay paused. Turn Automations on in <a class="font-semibold text-blue-700 underline" href="/host#chat-tools">Channel setup</a>.
+                                                </p>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var route in ReplyRoutes)
+                                        {
+                                            <div class="studio-span-4 space-y-2" @key="route.Arguments">
+                                                <div class="field">
+                                                    <label class="field__label" for="@CustomCommandEditorIds.CommandReply(Command, route.Arguments)">@route.Label</label>
+                                                    <select id="@CustomCommandEditorIds.CommandReply(Command, route.Arguments)"
+                                                            class="field__input"
+                                                            @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandReply(Command, route.Arguments), CustomCommandEditorIds.CommandTarget(Command.Id, route.Field))"
+                                                            @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandReply(Command, route.Arguments)]"
+                                                            value="@route.Get(Command.Action.ReplyRoutes)"
+                                                            @onchange="args => route.Set(Command.Action.ReplyRoutes, ParseEntryId(args.Value))">
+                                                        <option value="">Ignore</option>
+                                                        @foreach (var entry in Context.Configuration.MessageEntries)
+                                                        {
+                                                            <option value="@entry.Id">@entry.Name</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandReply(Command, route.Arguments), CustomCommandEditorIds.CommandTarget(Command.Id, route.Field)))
+                                            </div>
+                                        }
+                                        <p class="studio-span-12 text-xs text-muted-foreground">
+                                            @if (Command.Action is OverlayCueCustomCommandActionEditor)
+                                            {
+                                                <text>Replies are optional for overlay cues. Unmapped counts still play the cue without a response.</text>
+                                            }
+                                            else
+                                            {
+                                                <text>Choose at least one reply. Unmapped counts and commands with more than two arguments are ignored without a response.</text>
+                                            }
+                                        </p>
+                                    }
+                                    @if (Command.Action is OverlayCueCustomCommandActionEditor cueAction)
+                                    {
+                                        @if (!Context.OverlaysEnabled)
+                                        {
+                                            <p class="studio-span-12 text-sm text-muted-foreground" role="status">
+                                                Overlays are off. This setup is retained, but cue playback and testing stay paused until you turn Overlays on in Channel setup.
+                                            </p>
+                                        }
+                                        <div class="studio-span-6 space-y-2" data-overlay-cue-command>
+                                            <div class="field">
+                                                <label class="field__label" for="@CustomCommandEditorIds.CommandOverlayTarget(Command)">Overlay player</label>
+                                                <select id="@CustomCommandEditorIds.CommandOverlayTarget(Command)"
+                                                        class="field__input"
+                                                        disabled="@(!Context.OverlaysEnabled)"
+                                                        @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandOverlayTarget(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.OverlayTarget))"
+                                                        @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandOverlayTarget(Command)]"
+                                                        @bind="cueAction.TargetOverlayPublicId">
+                                                    <option value="@Guid.Empty">Choose an overlay player</option>
+                                                    @if (cueAction.TargetOverlayPublicId != Guid.Empty && !Context.CueCatalog.Targets.Any(target => target.Id == cueAction.TargetOverlayPublicId))
+                                                    {
+                                                        <option value="@cueAction.TargetOverlayPublicId">Unavailable saved player</option>
+                                                    }
+                                                    @foreach (var target in Context.CueCatalog.Targets)
+                                                    {
+                                                        <option value="@target.Id">@target.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandOverlayTarget(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.OverlayTarget)))
+                                        </div>
+                                        <div class="studio-span-6 space-y-2">
+                                            <div class="field">
+                                                <label class="field__label" for="@CustomCommandEditorIds.CommandOverlayCue(Command)">Cue</label>
+                                                <select id="@CustomCommandEditorIds.CommandOverlayCue(Command)"
+                                                        class="field__input"
+                                                        disabled="@(!Context.OverlaysEnabled)"
+                                                        @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandOverlayCue(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.OverlayCue))"
+                                                        @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandOverlayCue(Command)]"
+                                                        @bind="cueAction.CuePublicId">
+                                                    <option value="@Guid.Empty">Choose a cue</option>
+                                                    @if (cueAction.CuePublicId != Guid.Empty && !Context.CueCatalog.Cues.Any(cue => cue.Id == cueAction.CuePublicId))
+                                                    {
+                                                        <option value="@cueAction.CuePublicId">Unavailable saved cue</option>
+                                                    }
+                                                    @foreach (var cue in Context.CueCatalog.Cues)
+                                                    {
+                                                        <option value="@cue.Id">@cue.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandOverlayCue(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.OverlayCue)))
+                                        </div>
+                                        <div class="studio-span-6 space-y-2">
+                                            <div class="field">
+                                                <label class="field__label" for="@CustomCommandEditorIds.CommandQueuePolicy(Command)">When the player is busy</label>
+                                                <select id="@CustomCommandEditorIds.CommandQueuePolicy(Command)"
+                                                        class="field__input"
+                                                        disabled="@(!Context.OverlaysEnabled)"
+                                                        @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandQueuePolicy(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.QueuePolicy))"
+                                                        @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandQueuePolicy(Command)]"
+                                                        @bind="cueAction.QueuePolicy">
+                                                    @foreach (var policy in CueQueuePolicies)
+                                                    {
+                                                        <option value="@policy">@Context.CueQueuePolicyLabel(policy)</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandQueuePolicy(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.QueuePolicy)))
+                                        </div>
+                                        <div class="studio-span-6 space-y-2">
+                                            <div class="field">
+                                                <label class="field__label" for="@CustomCommandEditorIds.CommandReplyOrder(Command)">Optional reply timing</label>
+                                                <select id="@CustomCommandEditorIds.CommandReplyOrder(Command)"
+                                                        class="field__input"
+                                                        disabled="@(!Context.OverlaysEnabled)"
+                                                        @attributes="Context.Validation.Attributes(CustomCommandEditorIds.CommandReplyOrder(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.ReplyOrder))"
+                                                        @ref="Context.Validation.Controls[CustomCommandEditorIds.CommandReplyOrder(Command)]"
+                                                        @bind="cueAction.ReplyOrder">
+                                                    @foreach (var order in CueReplyOrders)
+                                                    {
+                                                        <option value="@order">@Context.CueReplyOrderLabel(order)</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandReplyOrder(Command), CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.ReplyOrder)))
+                                        </div>
+                                        <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                                            <button class="btn-secondary"
+                                                    type="button"
+                                                    disabled="@(!Context.OverlaysEnabled || cueAction.TargetOverlayPublicId == Guid.Empty || cueAction.CuePublicId == Guid.Empty)"
+                                                    data-action="test-overlay-cue-command"
+                                                    @onclick="() => Context.TestCue(cueAction)">Test cue</button>
+                                            @if (Context.CueTestOutcome is not null)
+                                            {
+                                                <p class="text-sm text-muted-foreground" role="status" data-cue-test-outcome>@Context.CueTestOutcome</p>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </StudioStage>
+
+
+@code {
+    private sealed record ActionChoice(CustomCommandActionKind Kind, string Icon, string Title, string Description);
+    private sealed record ReplyRoute(
+        int Arguments,
+        string Label,
+        CustomCommandValidationFieldKind Field,
+        Func<CustomCommandReplyRoutesEditor, int?> Get,
+        Action<CustomCommandReplyRoutesEditor, int?> Set
+    );
+
+    private static readonly IReadOnlyList<ActionChoice> ActionChoiceCatalog =
+    [
+        new(CustomCommandActionKind.Message, "💬", "Send a message", "Reply in chat, with different replies for extra words."),
+        new(CustomCommandActionKind.OverlayCue, "✨", "Play an overlay cue", "Trigger sound or visuals on your stream overlay."),
+        new(CustomCommandActionKind.Counter, "🔢", "Update a counter", "Count things (deaths, wins, hugs) and say the total."),
+        new(CustomCommandActionKind.Automation, "⌘", "Run automation flows", "Start every enabled flow connected to this command."),
+    ];
+    private static readonly IReadOnlyList<ReplyRoute> ReplyRoutes =
+    [
+        new(0, "No arguments", CustomCommandValidationFieldKind.ZeroArgumentReply, static routes => routes.ZeroArgumentMessageLibraryEntryId, static (routes, id) => routes.ZeroArgumentMessageLibraryEntryId = id),
+        new(1, "One argument", CustomCommandValidationFieldKind.OneArgumentReply, static routes => routes.OneArgumentMessageLibraryEntryId, static (routes, id) => routes.OneArgumentMessageLibraryEntryId = id),
+        new(2, "Two arguments", CustomCommandValidationFieldKind.TwoArgumentReply, static routes => routes.TwoArgumentMessageLibraryEntryId, static (routes, id) => routes.TwoArgumentMessageLibraryEntryId = id),
+    ];
+    private static readonly IReadOnlyList<OverlayCueQueuePolicy> CueQueuePolicies =
+        Enum.GetValues<OverlayCueQueuePolicy>();
+    private static readonly IReadOnlyList<OverlayCueReplyOrder> CueReplyOrders =
+        Enum.GetValues<OverlayCueReplyOrder>();
+
+    [Parameter, EditorRequired]
+    public required CustomCommandEditor Command { get; set; }
+
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+
+    private IEnumerable<ActionChoice> ActionChoices() =>
+        ActionChoiceCatalog.Where(choice =>
+            choice.Kind != CustomCommandActionKind.Automation
+            || Context.AutomationsEnabled
+            || Command.ActionKind == CustomCommandActionKind.Automation
+        );
+
+    private static int? ParseEntryId(object? value) =>
+        int.TryParse(value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var id)
+            ? id
+            : null;
+}

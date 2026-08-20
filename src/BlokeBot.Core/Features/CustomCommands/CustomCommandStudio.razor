@@ -1,0 +1,46 @@
+<section id="@SegmentedTabs.PanelId("custom-command", KeyForTab(Context.ActiveTab))"
+         class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]"
+         data-active-fragment="@KeyForTab(Context.ActiveTab)"
+         aria-label="Custom command studio"
+         role="tabpanel"
+         aria-labelledby="@SegmentedTabs.TabId("custom-command", KeyForTab(Context.ActiveTab))"
+         tabindex="0">
+    <StudioRail AriaLabel="@(Context.ActiveTab == CustomCommandSettingsTab.MessageLibrary ? "Saved replies" : "Commands, counters, and announcements")"
+                SearchPlaceholder="Search"
+                Groups="@Context.RailGroups()">
+        <Footer>
+            @if (Context.ActiveTab == CustomCommandSettingsTab.MessageLibrary)
+            {
+                <button class="btn-primary w-full"
+                        data-action="add-reply"
+                        @onclick="Context.AddMessageEntry">+ New reply</button>
+            }
+            else if (Context.Configuration.MessageEntries.Count == 0)
+            {
+                <button class="btn-primary w-full"
+                        data-action="create-reply"
+                        @onclick="Context.AddMessageEntry">Create a reply first</button>
+            }
+            else
+            {
+                <button class="btn-primary w-full"
+                        data-action="add-command"
+                        @onclick="AddCommand">+ New command</button>
+            }
+        </Footer>
+    </StudioRail>
+
+    <CustomCommandInspector Context="Context" Changed="Refresh" />
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required CustomCommandStudioContext Context { get; set; }
+
+    private static string KeyForTab(CustomCommandSettingsTab tab) =>
+        tab == CustomCommandSettingsTab.MessageLibrary ? "message-library" : "commands";
+
+    private void AddCommand() => Context.AddCommand();
+
+    private void Refresh() { }
+}
