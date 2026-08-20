@@ -86,8 +86,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
 
         harness.Clock.Advance(TimeSpan.FromMinutes(1));
         harness.Diagnostics.Clear();
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         var recoveredReports = harness.Diagnostics.Reports;
         AssertFailure(
@@ -165,7 +164,8 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
             }
         );
 
-        harness.Session.TriggerReconciliation(
+        var reconciliation = ReconcileAsync(
+            harness.Session,
             ["bad", "good"],
             EventSubChannelRecoveryTrigger.Explicit
         );
@@ -178,7 +178,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
         operations.CompleteStopCount("bad").ShouldBe(0);
 
         releaseRecovery.Writer.TryWrite(true).ShouldBeTrue();
-        await harness.Session.DrainAsync();
+        await reconciliation;
         harness.Status.Current.Channels.ShouldAllBe(state =>
             state is EventSubChannelStatus.Healthy
         );

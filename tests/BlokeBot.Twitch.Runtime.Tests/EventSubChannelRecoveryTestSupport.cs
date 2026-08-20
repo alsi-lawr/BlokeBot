@@ -65,6 +65,18 @@ public abstract partial class EventSubChannelRecoveryTestBase
         );
     }
 
+    private protected static Task ReconcileAsync(
+        EventSubChannelSession session,
+        IReadOnlyList<string> desiredChannels,
+        EventSubChannelRecoveryTrigger trigger,
+        CancellationToken cancellationToken = default
+    ) =>
+        session.TriggerReconciliationAndDrainAsync(
+            _ => ValueTask.FromResult(desiredChannels),
+            trigger,
+            cancellationToken
+        );
+
     private protected static void AssertHealthy(
         EventSubChannelStatus.Healthy status,
         string channel,

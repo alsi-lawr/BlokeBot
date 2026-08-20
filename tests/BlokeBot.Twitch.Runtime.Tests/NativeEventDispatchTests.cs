@@ -154,7 +154,11 @@ public sealed class NativeEventDispatchTests
     {
         var envelope = EventSubNotificationTests.IncomingRaidEnvelope();
         var subscription = JsonNode.Parse(envelope.Subscription!.Value.GetRawText())!.AsObject();
-        subscription["condition"] = new JsonObject { ["from_broadcaster_user_id"] = "source-id" };
+        subscription["condition"] = new JsonObject
+        {
+            ["from_broadcaster_user_id"] = "source-id",
+            ["to_broadcaster_user_id"] = string.Empty,
+        };
         envelope = envelope with { Subscription = JsonSerializer.SerializeToElement(subscription) };
         var gate = new MutableNativeTwitchFeatureStateProvider { EnabledChannel = "source_login" };
         var observer = new RecordingIncomingRaidObserver();

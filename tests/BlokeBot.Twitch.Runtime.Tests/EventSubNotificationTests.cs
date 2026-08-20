@@ -92,6 +92,22 @@ public sealed class EventSubNotificationTests
     }
 
     [Test]
+    [Arguments("{}")]
+    [Arguments("{ \"from_broadcaster_user_id\": \"\", \"to_broadcaster_user_id\": \"\" }")]
+    [Arguments(
+        "{ \"from_broadcaster_user_id\": \"source-id\", \"to_broadcaster_user_id\": \"target-id\" }"
+    )]
+    [Arguments("{ \"from_broadcaster_user_id\": 42, \"to_broadcaster_user_id\": \"target-id\" }")]
+    public void RaidEnvelope_AmbiguousOrMalformedCondition_IsRejected(string conditionJson)
+    {
+        var malformed = JsonNode.Parse(_incomingRaidJson)!.AsObject();
+        malformed["subscription"]!["condition"] = JsonNode.Parse(conditionJson);
+
+        _ = Parse(malformed.ToJsonString(), "raid-message-1")
+            .ShouldBeOfType<EventSubNotification.Unknown>();
+    }
+
+    [Test]
     public void IncomingRaidEnvelope_UnsupportedVersion_IsRejected()
     {
         var wrongVersion = JsonNode.Parse(_incomingRaidJson)!.AsObject();

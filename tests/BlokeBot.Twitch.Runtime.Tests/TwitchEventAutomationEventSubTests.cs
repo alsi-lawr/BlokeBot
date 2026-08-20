@@ -619,8 +619,7 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
             EventSubOperationSubscriptionKind.AutomationCheers,
             false
         );
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(2);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);

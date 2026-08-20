@@ -55,6 +55,66 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
     }
 
     [Test]
+    public async Task QueuedPeriodicInventory_LoadsEvidenceAfterEarlierRepairCompletes()
+    {
+        var enteredReplacement = Channel.CreateUnbounded<bool>();
+        var releaseReplacement = Channel.CreateUnbounded<bool>();
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        operations.EnqueueAccount(
+            "channel",
+            async cancellationToken =>
+            {
+                enteredReplacement.Writer.TryWrite(true).ShouldBeTrue();
+                _ = await releaseReplacement.Reader.ReadAsync(cancellationToken);
+                return new BotAccount("channel-bot", "channel-secret");
+            }
+        );
+
+        var replacement = harness.Session.RepairRevokedSubscriptionAndDrainAsync(
+            "subscription-channel",
+            _ => ValueTask.FromResult<IReadOnlyList<string>>(["channel"]),
+            CancellationToken.None
+        );
+        _ = await enteredReplacement.Reader.ReadAsync();
+        var inventoryLoads = 0;
+        var desiredChannelLoads = 0;
+
+        var periodic = harness.Session.RepairMissingSubscriptionsAndDrainAsync(
+            ignored =>
+            {
+                _ = Interlocked.Increment(ref inventoryLoads);
+                return Task.FromResult<IReadOnlySet<string>>(
+                    new HashSet<string>(StringComparer.Ordinal) { "subscription-channel" }
+                );
+            },
+            ignored =>
+            {
+                _ = Interlocked.Increment(ref desiredChannelLoads);
+                return ValueTask.FromResult<IReadOnlyList<string>>(["channel"]);
+            },
+            CancellationToken.None
+        );
+
+        Volatile.Read(ref inventoryLoads).ShouldBe(0);
+        Volatile.Read(ref desiredChannelLoads).ShouldBe(0);
+        releaseReplacement.Writer.TryWrite(true).ShouldBeTrue();
+        await replacement;
+        await periodic;
+
+        Volatile.Read(ref inventoryLoads).ShouldBe(1);
+        Volatile.Read(ref desiredChannelLoads).ShouldBe(1);
+        operations.CreateCount("channel").ShouldBe(2);
+        operations.DeleteCount("channel").ShouldBe(1);
+        operations.CompleteStopCount("channel").ShouldBe(0);
+        _ = harness
+            .Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<EventSubChannelStatus.Healthy>();
+    }
+
+    [Test]
     public async Task Revocation_RecreatesOwningChannelWithoutTouchingSibling()
     {
         var operations = new ScriptedChannelOperations();
@@ -85,8 +145,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.EnqueueDeleteFailure("channel", failure);
         harness.Diagnostics.Clear();
 
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(2);
         operations.CompleteStopCount("channel").ShouldBe(1);
@@ -138,8 +197,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.EnqueueDeleteFailure("channel", failure);
         harness.Diagnostics.Clear();
 
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(2);
         operations.CompleteStopCount("channel").ShouldBe(1);
@@ -186,8 +244,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         }
 
         harness.Diagnostics.Clear();
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(3);
         operations.CreateCount("channel").ShouldBe(1);
@@ -229,8 +286,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.EnqueueDeleteFailure("bad", failure);
         harness.Diagnostics.Clear();
 
-        harness.Session.TriggerReconciliation(["good"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["good"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("bad").ShouldBe(1);
         operations.CompleteStopCount("bad").ShouldBe(0);
@@ -273,8 +329,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         harness.Session.Start(["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(1);
@@ -296,8 +351,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             new IOException("lifecycle store temporarily unavailable")
         );
 
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(2);
@@ -319,9 +373,8 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             new OperationCanceledException(cancellation.Token)
         );
 
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        var thrown = await Should.ThrowAsync<OperationCanceledException>(
-            harness.Session.DrainAsync
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
+            ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit)
         );
 
         thrown.CancellationToken.ShouldBe(cancellation.Token);
@@ -356,8 +409,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             "channel",
             new InvalidOperationException("old session delete secret")
         );
-        old.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await old.Session.DrainAsync();
+        await ReconcileAsync(old.Session, [], EventSubChannelRecoveryTrigger.Explicit);
         _ = sharedPendingDeletions.PendingDeletions.ShouldHaveSingleItem();
         sharedPendingDeletions.HasPendingReconciliation.ShouldBeTrue();
         await old.DisposeAsync();
@@ -409,7 +461,11 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
                 return new BotAccount("old-bot", "old-secret");
             }
         );
-        old.Session.TriggerReconciliation(["old"], EventSubChannelRecoveryTrigger.Explicit);
+        var oldReconciliation = ReconcileAsync(
+            old.Session,
+            ["old"],
+            EventSubChannelRecoveryTrigger.Explicit
+        );
         _ = await enteredRecovery.Reader.ReadAsync();
 
         var replacementOperations = new ScriptedChannelOperations();
@@ -423,6 +479,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         await replacement.Session.DrainAsync();
 
         await old.Session.DisposeAsync();
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => oldReconciliation);
         releaseRecovery.Writer.TryWrite(true).ShouldBeTrue();
 
         var replacementState = sharedStatus

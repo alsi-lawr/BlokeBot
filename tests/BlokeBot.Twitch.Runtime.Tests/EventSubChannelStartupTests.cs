@@ -15,11 +15,11 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         {
             initial.Session.Start(["channel"], CancellationToken.None);
             await initial.Session.DrainAsync();
-            initial.Session.TriggerReconciliation(
+            await ReconcileAsync(
+                initial.Session,
                 ["channel"],
                 EventSubChannelRecoveryTrigger.Explicit
             );
-            await initial.Session.DrainAsync();
         }
 
         operations.StartupDeliveryCount("channel").ShouldBe(1);
@@ -297,8 +297,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
 
         harness.Session.Start(["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         var degraded = harness
             .Status.Current.Channels.ShouldHaveSingleItem()
@@ -448,8 +447,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
 
         harness.Session.Start(["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 
         var deleted = operations.DeleteAttempts("channel").ShouldHaveSingleItem();
         deleted.SubscriptionId.ShouldBe("chat");

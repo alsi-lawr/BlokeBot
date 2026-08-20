@@ -92,7 +92,7 @@ internal abstract record EventSubNotification
                 payload,
                 options,
                 envelope.Metadata,
-                RaidDirection(envelope.Subscription)
+                envelope.Subscription
             ),
             "channel.poll.begin" or "channel.poll.progress" or "channel.poll.end" =>
                 payload.Deserialize<EventSubPollWireEvent>(options) is { } poll
@@ -209,6 +209,29 @@ internal abstract record EventSubNotification
         JsonElement payload,
         JsonSerializerOptions options,
         EventSubMetadata metadata,
+        JsonElement? subscription
+    ) =>
+        RaidDirection(subscription, options) switch
+        {
+            RaidSubscriptionConditionDirection.Incoming => ParseIncomingRaid(
+                payload,
+                options,
+                metadata,
+                EventSubRaidSubscriptionDirection.Incoming
+            ),
+            RaidSubscriptionConditionDirection.Outgoing => ParseIncomingRaid(
+                payload,
+                options,
+                metadata,
+                EventSubRaidSubscriptionDirection.Outgoing
+            ),
+            RaidSubscriptionConditionDirection.Invalid => new Unknown(),
+        };
+
+    private static EventSubNotification ParseIncomingRaid(
+        JsonElement payload,
+        JsonSerializerOptions options,
+        EventSubMetadata metadata,
         EventSubRaidSubscriptionDirection direction
     ) =>
         payload.Deserialize<EventSubIncomingRaidWireEvent>(options) switch
@@ -220,15 +243,40 @@ internal abstract record EventSubNotification
 
     // Twitch echoes both condition keys on every channel.raid notification, with the unused
     // side as an empty string, so only a non-empty value identifies the subscribed direction.
-    private static EventSubRaidSubscriptionDirection RaidDirection(JsonElement? subscription) =>
-        subscription is { ValueKind: JsonValueKind.Object } value
-        && value.TryGetProperty("condition", out var condition)
-        && condition.ValueKind is JsonValueKind.Object
-        && condition.TryGetProperty("from_broadcaster_user_id", out var fromBroadcaster)
-        && fromBroadcaster.ValueKind is JsonValueKind.String
-        && fromBroadcaster.GetString() is { Length: > 0 }
-            ? EventSubRaidSubscriptionDirection.Outgoing
-            : EventSubRaidSubscriptionDirection.Incoming;
+    private static RaidSubscriptionConditionDirection RaidDirection(
+        JsonElement? subscription,
+        JsonSerializerOptions options
+    ) =>
+        DeserializeRaidSubscription(subscription, options)?.Condition switch
+        {
+            { FromBroadcasterUserId: { Length: > 0 }, ToBroadcasterUserId: "" } =>
+                RaidSubscriptionConditionDirection.Outgoing,
+            { FromBroadcasterUserId: "", ToBroadcasterUserId: { Length: > 0 } } =>
+                RaidSubscriptionConditionDirection.Incoming,
+            _ => RaidSubscriptionConditionDirection.Invalid,
+        };
+
+    private static EventSubRaidSubscriptionWire? DeserializeRaidSubscription(
+        JsonElement? subscription,
+        JsonSerializerOptions options
+    )
+    {
+        try
+        {
+            return subscription?.Deserialize<EventSubRaidSubscriptionWire>(options);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private enum RaidSubscriptionConditionDirection
+    {
+        Invalid,
+        Incoming,
+        Outgoing,
+    }
 
     private static EventSubNotification ParsePrediction(
         EventSubPredictionWireEvent prediction,

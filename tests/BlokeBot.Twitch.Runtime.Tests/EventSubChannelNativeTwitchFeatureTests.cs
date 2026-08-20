@@ -39,8 +39,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
                 EventSubOperationSubscriptionKind.Polls,
             ]);
 
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations
             .OperationKinds("channel")
@@ -167,8 +166,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
             "channel",
             new InvalidOperationException("remote operation cleanup unavailable")
         );
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(2);
         _ = operations
@@ -186,16 +184,14 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
         operations.CompleteStopCount("channel").ShouldBe(0);
 
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(3);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
         operations.CompleteStopCount("channel").ShouldBe(0);
 
         operations.SetNativeTwitchEnabled("channel", true);
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.CreateCount("channel").ShouldBe(5);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
@@ -231,8 +227,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
             new InvalidOperationException("selected Native group cleanup unavailable")
         );
 
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(failingGroupIndex + 1);
         AssertAuthorization(
@@ -242,8 +237,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
         operations.CompleteStopCount("channel").ShouldBe(0);
 
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(6);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
@@ -251,8 +245,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
 
         QueueBroadcasterAccounts(operations);
         operations.SetNativeTwitchEnabled("channel", true);
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.CreateCount("channel").ShouldBe(11);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
@@ -268,8 +261,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         harness.Session.Start(["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
-        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 
         operations.DeleteCount("channel").ShouldBe(6);
         var attempts = operations.DeleteAttempts("channel");
