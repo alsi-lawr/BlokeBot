@@ -8,6 +8,35 @@ namespace BlokeBot.Core.Tests;
 public sealed class FollowerOnlyChatAlertIntegrationTests
 {
     [Test]
+    public async Task ExactFollowersOnlyTerminalRejection_PersistsOneChannelSetupAlert()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        var alerts = new DurableAlertService(
+            dbFactory,
+            new ManualTestTimeProvider(Utc(12, 0, 0)),
+            TestEventBus.Create<AppEventKind>()
+        );
+        var observer = new DurableFollowerOnlyChatAlertObserver(dbFactory, alerts);
+
+        await observer.TerminalRejectionAsync(
+            new PublicChatTerminalRejection("streamer", "followers_only"),
+            CancellationToken.None
+        );
+        await observer.TerminalRejectionAsync(
+            new PublicChatTerminalRejection("streamer", "followers_only"),
+            CancellationToken.None
+        );
+
+        var alert = (
+            await alerts.LoadStateAsync(hostId, CancellationToken.None)
+        ).Active.ShouldHaveSingleItem();
+        alert.Source.ShouldBe("twitch-follower-only-chat");
+        alert.SourceKey.ShouldBe("followers_only");
+        alert.LinkPath.ShouldBe("/host");
+    }
+
+    [Test]
     public async Task OtherProviderCodes_ObservingTerminalRejection_CreateNoFollowerOnlyAlert()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
