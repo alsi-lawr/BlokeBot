@@ -8,6 +8,9 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer.Page;
 
 public partial class ConfigurationTransferPage
 {
+    private const string _modeTabsId = "configuration-transfer-mode";
+    private const string _exportModeKey = "export";
+    private const string _importModeKey = "import";
     private readonly HashSet<ConfigurationSectionId> _exportSections =
         Enum.GetValues<ConfigurationSectionId>().ToHashSet();
     private readonly Dictionary<ConfigurationSectionId, ImportConflictStrategy> _strategies = [];
@@ -29,13 +32,19 @@ public partial class ConfigurationTransferPage
     private ConfigurationActivationView? _activation;
     private AuthenticatedSession _session = AuthenticatedSession.Anonymous;
     private bool _busy;
-    private bool _queryApplied;
+    private bool _sectionQueryApplied;
 
-    [Parameter, SupplyParameterFromQuery(Name = "mode")]
-    public string? RequestedMode { get; set; }
+    private static readonly SegmentedTabItem[] _modeTabs =
+    [
+        new(_exportModeKey, "Export"),
+        new(_importModeKey, "Import"),
+    ];
 
     [Parameter, SupplyParameterFromQuery(Name = "section")]
     public string? RequestedSection { get; set; }
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = default!;
 
     [Inject]
     private ConfigurationDocumentCodec _codec { get; set; } = default!;
@@ -80,6 +89,7 @@ public partial class ConfigurationTransferPage
 
     protected override async Task OnInitializedAsync()
     {
+        _mode = ModeFor(SegmentedTabs.CanonicalKey(_navigation, _modeTabs));
         var page = await LoadPageContextAsync();
         _session = page.Session;
         _loadState =
@@ -93,15 +103,12 @@ public partial class ConfigurationTransferPage
 
     protected override void OnParametersSet()
     {
-        if (_queryApplied)
+        if (_sectionQueryApplied)
         {
             return;
         }
 
-        _queryApplied = true;
-        _mode = string.Equals(RequestedMode, "import", StringComparison.OrdinalIgnoreCase)
-            ? TransferMode.Import
-            : TransferMode.Export;
+        _sectionQueryApplied = true;
         if (ParseSection(RequestedSection) is { } section)
         {
             _exportSections.Clear();
@@ -110,6 +117,7 @@ public partial class ConfigurationTransferPage
     }
 
     private string _destinationInitial => HostLogin.FirstOrDefault().ToString().ToUpperInvariant();
+    private string _activeModeKey => _mode == TransferMode.Import ? _importModeKey : _exportModeKey;
     private string _exportUrl =>
         $"/configuration-transfer/export?sections={Uri.EscapeDataString(string.Join(',', _exportSections.Order()))}";
     private bool _allConflictsResolved =>
@@ -118,26 +126,23 @@ public partial class ConfigurationTransferPage
             ?.Sections.Where(x => _importSections.Contains(x.Section))
             .SelectMany(x => x.Conflicts)
             .All(x =>
-                _resolutions.GetValueOrDefault(ConflictKey(x)) is { } resolution
+                _resolutions.GetValueOrDefault(ConfigurationTransferPresentation.ConflictKey(x))
+                    is { } resolution
                 && resolution != ImportConflictResolution.Unresolved
                 && (
                     resolution != ImportConflictResolution.Rename
-                    || !string.IsNullOrWhiteSpace(_renames.GetValueOrDefault(ConflictKey(x)))
+                    || !string.IsNullOrWhiteSpace(
+                        _renames.GetValueOrDefault(ConfigurationTransferPresentation.ConflictKey(x))
+                    )
                 )
             ) == true;
 
-    private static string ConflictKey(ConfigurationImportConflict x) =>
-        $"{x.Section}:{x.ImportedId}";
+    private void SetMode(string key) => _mode = ModeFor(key);
 
-    private static string GuessingMappingId(GuessingProfileMappingPreview mapping) =>
-        $"guessing-profile-map-{Uri.EscapeDataString(mapping.ImportedProfileId)}";
-
-    private string AutomaticTargetTitle(GuessingProfileMappingPreview mapping) =>
-        mapping.ExistingTargets.SingleOrDefault(x => x.TargetId == mapping.AutomaticTargetId)
-            is { } target
-        && !TargetMappedToAnotherProfile(mapping.ImportedProfileId, target.TargetId)
-            ? $"Automatic: {target.Name} ({target.Slug})"
-            : "Automatic: create a new profile";
+    private static TransferMode ModeFor(string key) =>
+        string.Equals(key, _importModeKey, StringComparison.Ordinal)
+            ? TransferMode.Import
+            : TransferMode.Export;
 
     private static ConfigurationSectionId? ParseSection(string? value) =>
         value?.ToLowerInvariant() switch

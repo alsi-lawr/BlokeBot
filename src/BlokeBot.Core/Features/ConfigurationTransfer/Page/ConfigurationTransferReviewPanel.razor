@@ -1,0 +1,207 @@
+@using BlokeBot.Core.Features.ConfigurationTransfer.Contracts
+@using BlokeBot.Persistence.Models
+@using static BlokeBot.Core.Features.ConfigurationTransfer.Page.ConfigurationTransferPresentation
+
+<TaskPanel Title="Review changes"
+           Description="@($"Choose each section and how it combines with #{DestinationLogin}. Enablement changes are selected separately.")">
+    <Actions>
+        <ConfigurationTransferImportProgress Stage="ConfigurationImportStage.Review" />
+    </Actions>
+    <ChildContent>
+        <div class="live-round-summary" aria-label="Configuration file summary">
+            <div class="live-round-summary__metric">
+                <span class="live-round-summary__label">Source</span>
+                <span class="live-round-summary__value">#@Preview.Document.Source.ChannelLogin</span>
+                <span class="live-round-summary__detail">File valid</span>
+            </div>
+            <div class="live-round-summary__metric">
+                <span class="live-round-summary__label">BlokeBot</span>
+                <span class="live-round-summary__value">@(Preview.Document.Source.BlokeBotVersion ?? "Not provided")</span>
+                <span class="live-round-summary__detail">Exporting version</span>
+            </div>
+            <div class="live-round-summary__metric">
+                <span class="live-round-summary__label">Format</span>
+                <span class="live-round-summary__value">@Preview.Document.Version</span>
+                <span class="live-round-summary__detail">JSON document</span>
+            </div>
+            <div class="live-round-summary__metric">
+                <span class="live-round-summary__label">Exported</span>
+                <span class="live-round-summary__value">@_exportedDate</span>
+                <span class="live-round-summary__detail">@_exportedTime</span>
+            </div>
+        </div>
+
+        @foreach (var section in _reviewSections)
+        {
+            var selected = SelectedSections.Contains(section.Section);
+            <div class="review-row" data-off="@(!selected ? "true" : "false")" @key="section.Section">
+                <div class="review-row__main">
+                    <div class="section-row__copy">
+                        <span class="section-row__title">@SectionTitle(section.Section)</span>
+                        <span class="review-row__counts">
+                            @if (section.Counts.Add > 0)
+                            {
+                                <span class="status-pill status-pill--green">@section.Counts.Add add</span>
+                            }
+                            @if (section.Counts.Update > 0)
+                            {
+                                <span class="status-pill status-pill--blue">@section.Counts.Update update</span>
+                            }
+                            @if (section.Counts.Skip > 0)
+                            {
+                                <span class="status-pill status-pill--slate">@section.Counts.Skip skip</span>
+                            }
+                            @if (section.Counts.Remove > 0)
+                            {
+                                <span class="status-pill status-pill--red">@section.Counts.Remove remove</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="strategy-field">
+                        <label class="label" for="@StrategyId(section.Section)">Conflict strategy</label>
+                        <select class="input"
+                                id="@StrategyId(section.Section)"
+                                disabled="@(!selected)"
+                                value="@Strategies[section.Section]"
+                                @onchange="args => ChangeStrategyAsync(section.Section, args.Value?.ToString())">
+                            @foreach (var strategy in Enum.GetValues<ImportConflictStrategy>())
+                            {
+                                <option value="@strategy">@StrategyTitle(strategy)</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="button"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(selected ? "true" : "false")"
+                            aria-label="@($"Import {SectionTitle(section.Section)}")"
+                            @onclick="() => ChangeSectionSelectionAsync(section.Section, !selected)"></button>
+                </div>
+
+                @if (selected && HasNestedContent(section))
+                {
+                    <div class="review-row__nested">
+                        @foreach (var issue in section.Issues)
+                        {
+                            <PageState Kind="PageStateKind.Failure"
+                                       Title="@issue.Location"
+                                       Description="@issue.Message" />
+                        }
+                        @foreach (var mapping in section.GuessingProfileMappings)
+                        {
+                            <div class="mapping-row" @key="mapping.ImportedProfileId">
+                                <div class="mapping-row__copy">
+                                    <strong>@mapping.ImportedProfileName</strong>
+                                    <small>Choose the destination profile for this imported profile.</small>
+                                </div>
+                                <div class="strategy-field">
+                                    <label class="label" for="@GuessingMappingId(mapping)">Destination profile</label>
+                                    <select class="input"
+                                            id="@GuessingMappingId(mapping)"
+                                            value="@GuessingProfileTargetValue(mapping.ImportedProfileId)"
+                                            @onchange="args => ChangeProfileTargetAsync(mapping.ImportedProfileId, args.Value?.ToString())">
+                                        <option value="">@AutomaticTargetTitle(mapping)</option>
+                                        @foreach (var target in mapping.ExistingTargets)
+                                        {
+                                            <option value="@target.TargetId"
+                                                    disabled="@TargetMappedToAnotherProfile(mapping.ImportedProfileId, target.TargetId)">
+                                                @target.Name (@target.Slug)
+                                            </option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        }
+                        @foreach (var conflict in section.Conflicts)
+                        {
+                            <div class="conflict-row" @key="conflict.ImportedId">
+                                <div class="conflict-row__line">
+                                    <div class="conflict-row__copy">
+                                        <strong>@conflict.ItemName</strong>
+                                        <small>@conflict.Message</small>
+                                    </div>
+                                    <div class="strategy-field">
+                                        <label class="label" for="@ConflictResolutionId(conflict)">Decision</label>
+                                        <select class="input"
+                                                id="@ConflictResolutionId(conflict)"
+                                                value="@ResolutionValue(conflict)"
+                                                @onchange="args => ChangeResolutionAsync(conflict, args.Value?.ToString())">
+                                            <option value="@ImportConflictResolution.Unresolved">Choose a decision</option>
+                                            @foreach (var resolution in LocalResolutions(conflict))
+                                            {
+                                                <option value="@resolution">@ResolutionTitle(resolution)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                                @if (ResolutionValue(conflict) == ImportConflictResolution.Rename.ToString())
+                                {
+                                    <div class="strategy-field strategy-field--rename">
+                                        <label class="label" for="@ConflictRenameId(conflict)">New alias</label>
+                                        <input class="input"
+                                               id="@ConflictRenameId(conflict)"
+                                               value="@Renames.GetValueOrDefault(ConflictKey(conflict))"
+                                               @oninput="args => ChangeRenameAsync(conflict, args.Value?.ToString())" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (Preview.EnablementChanges.Count > 0)
+        {
+            <div class="review-row">
+                <div class="review-row__main">
+                    <div class="section-row__copy">
+                        <span class="section-row__title">Chat Tools enablement</span>
+                        <span class="section-row__detail">Select each change independently</span>
+                    </div>
+                </div>
+                <div class="enablement-grid">
+                    @foreach (var change in Preview.EnablementChanges)
+                    {
+                        var selected = EnablementSelections.Contains(change.Feature);
+                        <div class="enablement-row" @key="change.Feature">
+                            <div class="enablement-row__copy">
+                                <strong>@FeatureTitle(change.Feature)</strong>
+                                <span class="enablement-row__change">
+                                    <span class="@EnablementPillClass(change.CurrentEnabled)">@EnabledLabel(change.CurrentEnabled)</span>
+                                    <span aria-hidden="true">→</span>
+                                    <span class="@EnablementPillClass(change.ImportedEnabled)">@EnabledLabel(change.ImportedEnabled)</span>
+                                </span>
+                            </div>
+                            <button type="button"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(selected ? "true" : "false")"
+                                    aria-label="@($"Apply {FeatureTitle(change.Feature)} enablement change")"
+                                    @onclick="() => ChangeEnablementSelectionAsync(change.Feature, !selected)"></button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (ApplyIssue is { } applyIssue)
+        {
+            <PageState Kind="PageStateKind.Failure"
+                       Title="Import not applied"
+                       Description="@applyIssue" />
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn-secondary" type="button" @onclick="Cancel">Cancel import</button>
+        <div class="task-panel__footer-actions">
+            <button id="configuration-transfer-apply"
+                    class="btn-primary"
+                    type="button"
+                    disabled="@(Busy || !AllConflictsResolved)"
+                    @onclick="Apply">
+                Apply selected sections
+            </button>
+        </div>
+    </Footer>
+</TaskPanel>

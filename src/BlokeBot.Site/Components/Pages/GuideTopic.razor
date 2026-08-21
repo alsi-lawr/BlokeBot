@@ -134,6 +134,19 @@
                     </ul>
                 }
 
+                @if (section.Facts.Count > 0)
+                {
+                    <dl class="guide-facts">
+                        @foreach (var fact in section.Facts)
+                        {
+                            <div>
+                                <dt>@fact.Term</dt>
+                                <dd>@fact.Description</dd>
+                            </div>
+                        }
+                    </dl>
+                }
+
                 @if (section.Links.Count > 0)
                 {
                     <ul class="link-list">

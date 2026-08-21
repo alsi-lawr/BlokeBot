@@ -2,9 +2,9 @@ using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer.Page;
 
-public partial class ConfigurationTransferPage
+internal static class ConfigurationTransferPresentation
 {
-    private static string SectionTitle(ConfigurationSectionId section) =>
+    public static string SectionTitle(ConfigurationSectionId section) =>
         section switch
         {
             ConfigurationSectionId.CustomCommands => "Custom commands",
@@ -15,7 +15,7 @@ public partial class ConfigurationTransferPage
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 
-    private static string SectionPath(ConfigurationSectionId section) =>
+    public static string SectionPath(ConfigurationSectionId section) =>
         section switch
         {
             ConfigurationSectionId.CustomCommands => "/custom-commands/settings",
@@ -26,19 +26,7 @@ public partial class ConfigurationTransferPage
             _ => "/configuration-transfer",
         };
 
-    private static string CountSummary(ConfigurationPreviewCount counts) =>
-        string.Join(
-            " · ",
-            new[]
-            {
-                counts.Add > 0 ? $"{counts.Add} add" : null,
-                counts.Update > 0 ? $"{counts.Update} update" : null,
-                counts.Skip > 0 ? $"{counts.Skip} skip" : null,
-                counts.Remove > 0 ? $"{counts.Remove} remove" : null,
-            }.Where(x => x is not null)
-        );
-
-    private static string StrategyTitle(ImportConflictStrategy strategy) =>
+    public static string StrategyTitle(ImportConflictStrategy strategy) =>
         strategy switch
         {
             ImportConflictStrategy.AddMissing => "Add missing",
@@ -47,7 +35,7 @@ public partial class ConfigurationTransferPage
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, null),
         };
 
-    private static string ResolutionTitle(ImportConflictResolution resolution) =>
+    public static string ResolutionTitle(ImportConflictResolution resolution) =>
         resolution switch
         {
             ImportConflictResolution.Skip => "Skip whole item",
@@ -59,7 +47,7 @@ public partial class ConfigurationTransferPage
             _ => throw new ArgumentOutOfRangeException(nameof(resolution), resolution, null),
         };
 
-    private static string FeatureTitle(HostFeatureFlags feature) =>
+    public static string FeatureTitle(HostFeatureFlags feature) =>
         feature switch
         {
             HostFeatureFlags.Automations => "Automations",
@@ -85,7 +73,7 @@ public partial class ConfigurationTransferPage
             _ => throw new ArgumentOutOfRangeException(nameof(feature), feature, null),
         };
 
-    private static string ActivationLabel(ConfigurationActivationStatus status) =>
+    public static string ActivationLabel(ConfigurationActivationStatus status) =>
         status switch
         {
             ConfigurationActivationStatus.Pending or ConfigurationActivationStatus.Processing =>
@@ -95,7 +83,7 @@ public partial class ConfigurationTransferPage
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
 
-    private static string ActivationDescription(ConfigurationActivationStatus status) =>
+    public static string ActivationDescription(ConfigurationActivationStatus status) =>
         status switch
         {
             ConfigurationActivationStatus.Pending or ConfigurationActivationStatus.Processing =>
@@ -106,4 +94,17 @@ public partial class ConfigurationTransferPage
                 "The import remains saved. Retry only the separate activation step.",
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
+
+    public static string ActivationPillClass(ConfigurationActivationStatus status) =>
+        status switch
+        {
+            ConfigurationActivationStatus.Pending or ConfigurationActivationStatus.Processing =>
+                "status-pill status-pill--amber",
+            ConfigurationActivationStatus.Complete => "status-pill status-pill--green",
+            ConfigurationActivationStatus.Failed => "status-pill status-pill--red",
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+        };
+
+    public static string ConflictKey(ConfigurationImportConflict conflict) =>
+        $"{conflict.Section}:{conflict.ImportedId}";
 }

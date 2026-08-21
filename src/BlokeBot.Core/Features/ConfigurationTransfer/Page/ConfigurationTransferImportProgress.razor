@@ -1,0 +1,19 @@
+<div class="configuration-transfer-stepper" aria-label="Import progress">
+    <span class="@PillClass(ConfigurationImportStage.File)">
+        @if (IsCurrent(ConfigurationImportStage.File))
+        {
+            <span class="status-pill__dot" aria-hidden="true"></span>
+        }
+        @StepLabel(ConfigurationImportStage.File, "File")
+    </span>
+    <span class="@PillClass(ConfigurationImportStage.Review)">
+        @if (IsCurrent(ConfigurationImportStage.Review))
+        {
+            <span class="status-pill__dot" aria-hidden="true"></span>
+        }
+        @StepLabel(ConfigurationImportStage.Review, "Review")
+    </span>
+    <span class="@PillClass(ConfigurationImportStage.Apply)">
+        @StepLabel(ConfigurationImportStage.Apply, "Apply")
+    </span>
+</div>

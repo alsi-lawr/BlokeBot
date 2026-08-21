@@ -1,0 +1,110 @@
+@layer components {
+    .operation-row {
+        align-items: center;
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: space-between;
+        padding: 0.65rem 0.85rem;
+    }
+
+    .operation-row__label {
+        color: var(--app-text-muted);
+        font-size: 0.8rem;
+        font-weight: 650;
+    }
+
+    .operation-row code {
+        color: var(--app-text-strong);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.8rem;
+        overflow-wrap: anywhere;
+    }
+
+    .activation-row {
+        background: var(--app-surface-solid);
+        border: 1px solid var(--tone-blue-ring);
+        border-radius: 0.5rem;
+        display: grid;
+        gap: 0.35rem;
+        padding: 0.75rem 0.85rem;
+    }
+
+    .activation-row[data-status="complete"] {
+        border-color: var(--tone-green-ring);
+    }
+
+    .activation-row[data-status="failed"] {
+        border-color: var(--tone-red-ring);
+    }
+
+    .activation-row__line {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        justify-content: space-between;
+    }
+
+    .activation-row__line strong {
+        color: var(--app-text-strong);
+        font-size: 0.875rem;
+    }
+
+    .activation-row .status-pill__dot {
+        background: currentcolor;
+    }
+
+    .activation-row small {
+        color: var(--app-text-muted);
+        font-size: 0.8rem;
+        line-height: 1.45;
+    }
+
+    .activation-row__actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 0.4rem;
+    }
+
+    .section-links {
+        display: grid;
+        gap: 0.45rem;
+    }
+
+    .section-links a {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 0.5rem;
+        color: var(--app-text-strong);
+        display: flex;
+        font-size: 0.875rem;
+        font-weight: 650;
+        gap: 0.75rem;
+        justify-content: space-between;
+        padding: 0.65rem 0.85rem;
+        text-decoration: none;
+        transition:
+            background-color 140ms ease,
+            border-color 140ms ease;
+    }
+
+    .section-links a:hover {
+        background: var(--app-control-hover);
+        border-color: var(--app-control-hover-border);
+    }
+
+    .section-links a strong {
+        flex: 1;
+    }
+
+    .section-links a span {
+        color: var(--tone-blue-fg);
+        flex: none;
+        font-size: 0.8rem;
+    }
+}

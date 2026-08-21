@@ -15,4 +15,10 @@
     <div class="task-panel__body">
         @ChildContent
     </div>
+    @if (Footer is not null)
+    {
+        <footer class="task-panel__footer">
+            @Footer
+        </footer>
+    }
 </section>

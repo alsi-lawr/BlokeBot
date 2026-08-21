@@ -24,7 +24,7 @@ public sealed class ConfigurationTransferGuessingUiTests
         );
         context
             .Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
-            .NavigateTo("configuration-transfer?mode=import");
+            .NavigateTo("configuration-transfer#import");
         var page = context.Render<ConfigurationTransferPage>();
 
         page.Find("#configuration-transfer-json").Change(json);

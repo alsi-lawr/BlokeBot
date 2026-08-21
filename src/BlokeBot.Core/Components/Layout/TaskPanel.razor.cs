@@ -13,6 +13,9 @@ public partial class TaskPanel
     [Parameter]
     public string Description { get; set; } = string.Empty;
 
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 }

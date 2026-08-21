@@ -4,6 +4,8 @@ internal sealed record SiteLink(string Label, string Href);
 
 internal sealed record SiteGuideNavigationGroup(string Label, IReadOnlyList<SiteLink> Links);
 
+internal sealed record SiteGuideFact(string Term, string Description);
+
 internal sealed record SiteMedia(
     string DarkPhoneSource,
     string LightPhoneSource,
@@ -39,6 +41,8 @@ internal sealed record SiteGuideSection
     internal IReadOnlyList<string> Steps { get; init; } = [];
 
     internal IReadOnlyList<string> Bullets { get; init; } = [];
+
+    internal IReadOnlyList<SiteGuideFact> Facts { get; init; } = [];
 
     internal IReadOnlyList<SiteLink> Links { get; init; } = [];
 

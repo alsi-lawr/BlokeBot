@@ -1,5 +1,3 @@
-using BlokeBot.Persistence.Models;
-
 namespace BlokeBot.Core.Features.ConfigurationTransfer.Page;
 
 public partial class ConfigurationTransferPage
@@ -28,11 +26,13 @@ public partial class ConfigurationTransferPage
         var conflicts =
             _preview
                 ?.Sections.SingleOrDefault(x => x.Section == section)
-                ?.Conflicts.Where(x => _resolutions.ContainsKey(ConflictKey(x)))
+                ?.Conflicts.Where(x =>
+                    _resolutions.ContainsKey(ConfigurationTransferPresentation.ConflictKey(x))
+                )
                 .Select(x => new ImportItemResolution(
                     x.ImportedId,
-                    _resolutions[ConflictKey(x)],
-                    _renames.GetValueOrDefault(ConflictKey(x)),
+                    _resolutions[ConfigurationTransferPresentation.ConflictKey(x)],
+                    _renames.GetValueOrDefault(ConfigurationTransferPresentation.ConflictKey(x)),
                     x.ImportedId.StartsWith("target-", StringComparison.Ordinal)
                     && int.TryParse(x.ImportedId.AsSpan(7), out var id)
                         ? id
@@ -53,54 +53,41 @@ public partial class ConfigurationTransferPage
             : conflicts;
     }
 
-    private async Task SetStrategyAsync(ConfigurationSectionId section, string? value)
+    private async Task SetStrategyAsync(
+        ConfigurationTransferReviewPanel.SectionStrategyChange change
+    )
     {
-        if (!Enum.TryParse<ImportConflictStrategy>(value, out var parsed))
-        {
-            return;
-        }
-
-        _strategies[section] = parsed;
+        _strategies[change.Section] = change.Strategy;
         await RefreshPreviewAsync();
     }
 
-    private async Task SetResolutionAsync(ConfigurationImportConflict conflict, string? value)
+    private async Task SetResolutionAsync(
+        ConfigurationTransferReviewPanel.ConflictResolutionChange change
+    )
     {
-        if (Enum.TryParse<ImportConflictResolution>(value, out var parsed))
-        {
-            _resolutions[ConflictKey(conflict)] = parsed;
-            await RefreshPreviewAsync();
-        }
+        _resolutions[ConfigurationTransferPresentation.ConflictKey(change.Conflict)] =
+            change.Resolution;
+        await RefreshPreviewAsync();
     }
 
-    private void SetRename(ConfigurationImportConflict conflict, string? value) =>
-        _renames[ConflictKey(conflict)] = value?.Trim() ?? string.Empty;
+    private void SetRename(ConfigurationTransferReviewPanel.ConflictRenameChange change) =>
+        _renames[ConfigurationTransferPresentation.ConflictKey(change.Conflict)] =
+            change.ReplacementName;
 
-    private async Task SetGuessingProfileTargetAsync(string importedProfileId, string? value)
+    private async Task SetGuessingProfileTargetAsync(
+        ConfigurationTransferReviewPanel.GuessingProfileTargetChange change
+    )
     {
-        if (int.TryParse(value, out var targetId))
+        if (change.TargetId is { } targetId)
         {
-            _guessingProfileTargets[importedProfileId] = targetId;
+            _guessingProfileTargets[change.ImportedProfileId] = targetId;
         }
         else
         {
-            _ = _guessingProfileTargets.Remove(importedProfileId);
+            _ = _guessingProfileTargets.Remove(change.ImportedProfileId);
         }
         await RefreshPreviewAsync();
     }
-
-    private string GuessingProfileTargetValue(string importedProfileId) =>
-        _guessingProfileTargets.TryGetValue(importedProfileId, out var targetId)
-            ? targetId.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            : string.Empty;
-
-    private bool TargetMappedToAnotherProfile(string importedProfileId, int targetId) =>
-        _guessingProfileTargets.Any(x => x.Key != importedProfileId && x.Value == targetId);
-
-    private string ResolutionValue(ConfigurationImportConflict conflict) =>
-        _resolutions
-            .GetValueOrDefault(ConflictKey(conflict), ImportConflictResolution.Unresolved)
-            .ToString();
 
     private void ToggleExport(ConfigurationSectionId section, bool enabled)
     {
@@ -114,27 +101,27 @@ public partial class ConfigurationTransferPage
         }
     }
 
-    private void ToggleEnablement(HostFeatureFlags feature, bool enabled)
+    private void ToggleEnablement(ConfigurationTransferReviewPanel.EnablementSelectionChange change)
     {
-        if (enabled)
+        if (change.Selected)
         {
-            _ = _enablementSelections.Add(feature);
+            _ = _enablementSelections.Add(change.Feature);
         }
         else
         {
-            _ = _enablementSelections.Remove(feature);
+            _ = _enablementSelections.Remove(change.Feature);
         }
     }
 
-    private void ToggleImport(ConfigurationSectionId section, bool enabled)
+    private void ToggleImport(ConfigurationTransferReviewPanel.SectionSelectionChange change)
     {
-        if (enabled)
+        if (change.Selected)
         {
-            _ = _importSections.Add(section);
+            _ = _importSections.Add(change.Section);
         }
         else
         {
-            _ = _importSections.Remove(section);
+            _ = _importSections.Remove(change.Section);
         }
     }
 
@@ -151,4 +138,6 @@ public partial class ConfigurationTransferPage
         _importSections.Clear();
         _guessingProfileTargets.Clear();
     }
+
+    private void CancelImport() => ResetImport();
 }

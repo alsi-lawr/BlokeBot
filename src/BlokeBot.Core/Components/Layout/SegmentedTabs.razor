@@ -23,7 +23,14 @@
                @onclick="() => SelectAsync(item)"
                @onclick:preventDefault="true"
                @onkeydown="args => HandleKeyDownAsync(args, item)">
-                @item.Label
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(item)
+                }
+                else
+                {
+                    @item.Label
+                }
             </a>
         }
         else if (item.Href is null)
@@ -39,7 +46,14 @@
                     @ref="_tabElements[item.Key]"
                     @onclick="() => SelectAsync(item)"
                     @onkeydown="args => HandleKeyDownAsync(args, item)">
-                @item.Label
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(item)
+                }
+                else
+                {
+                    @item.Label
+                }
             </button>
         }
         else
@@ -54,7 +68,14 @@
                tabindex="@TabIndexFor(item)"
                @ref="_tabElements[item.Key]"
                @onkeydown="args => HandleKeyDownAsync(args, item)">
-                @item.Label
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(item)
+                }
+                else
+                {
+                    @item.Label
+                }
             </a>
         }
     }

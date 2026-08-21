@@ -35,6 +35,7 @@ DEFINITIONS=(
   "community-guide-figures.lua:5473"
   "community-progression-figures-laptop.lua:5476"
   "community-progression-figures-phone.lua:5477"
+  "configuration-transfer.lua:5478"
 )
 
 only="${1:-}"

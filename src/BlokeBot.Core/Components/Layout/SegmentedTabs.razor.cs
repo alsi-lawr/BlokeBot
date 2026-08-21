@@ -21,6 +21,9 @@ public partial class SegmentedTabs : IDisposable
     public required IReadOnlyList<SegmentedTabItem> Items { get; set; }
 
     [Parameter]
+    public RenderFragment<SegmentedTabItem>? ItemTemplate { get; set; }
+
+    [Parameter]
     public string? Id { get; set; }
 
     /// <summary>

@@ -4,6 +4,7 @@
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+@using static BlokeBot.Core.Features.ConfigurationTransfer.Page.ConfigurationTransferPresentation
 @attribute [Authorize(Policy = "Operator")]
 @inherits AuthenticatedPageComponent
 
@@ -12,147 +13,237 @@
 <DashboardPage Kicker="Channel settings"
                Title="Configuration transfer"
                Description="Back up settings or bring a configuration into this channel."
-               Width="DashboardPageWidth.Wide"
-               LoadState="@_loadState">
-    <section class="configuration-transfer__destination" aria-label="Import destination">
-        <span aria-hidden="true">@_destinationInitial</span>
-        <span><small>Destination channel</small><strong>#@HostLogin</strong></span>
-        <span>Selected channel</span>
-    </section>
-
-    <div class="configuration-transfer__tabs" role="group" aria-label="Configuration transfer mode">
-        <button type="button" aria-pressed="@(_mode == TransferMode.Export)" @onclick="() => _mode = TransferMode.Export">Export settings</button>
-        <button type="button" aria-pressed="@(_mode == TransferMode.Import)" @onclick="() => _mode = TransferMode.Import">Import settings</button>
-    </div>
-
-    @if (_mode == TransferMode.Export)
-    {
-        <section class="card configuration-transfer__panel">
-            <header><span>1</span><div><h2>Choose what to export</h2><p>Only configuration is included. Runtime history, balances, credentials and queued work stay here.</p></div><small>JSON · format 1</small></header>
-            <div class="configuration-transfer__section-grid">
-                @foreach (var section in _sectionOptions)
+               LoadState="@_loadState"
+               data-configuration-transfer>
+    <Actions>
+        <div class="destination-chip">
+            <span class="destination-chip__avatar" aria-hidden="true">@_destinationInitial</span>
+            <span>
+                <span class="destination-chip__label">Destination channel</span>
+                <span class="destination-chip__channel">#@HostLogin</span>
+            </span>
+        </div>
+    </Actions>
+    <ChildContent>
+        <SegmentedTabs Id="@_modeTabsId"
+                       OwnsFragment
+                       AriaLabel="Configuration transfer mode"
+                       Items="@_modeTabs"
+                       ActiveKey="@_activeModeKey"
+                       ActiveKeyChanged="SetMode">
+            <ItemTemplate Context="mode">
+                @if (mode.Key == _exportModeKey)
                 {
-                    <label class="configuration-transfer__section-choice">
-                        <input type="checkbox" checked="@_exportSections.Contains(section.Id)" @onchange="args => ToggleExport(section.Id, args.Value is true)" />
-                        <span><strong>@section.Title</strong><small>@section.Description</small></span>
-                    </label>
+                    <svg class="segmented-motion__icon"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true"
+                         focusable="false">
+                        <path d="M12 3v12" />
+                        <path d="m7 10 5 5 5-5" />
+                        <path d="M5 20h14" />
+                    </svg>
                 }
-            </div>
-            <footer><span>@_exportSections.Count sections selected</span><a class="btn-primary" href="@_exportUrl" data-enhance-nav="false">Download configuration</a></footer>
-        </section>
-    }
-    else if (_applied is { } applied)
-    {
-        <section class="card configuration-transfer__panel configuration-transfer__result">
-            <span class="configuration-transfer__result-mark">✓</span>
-            <p class="configuration-transfer__result-kicker">Import applied</p>
-            <h2>Configuration saved to #@HostLogin</h2>
-            <p>@applied.ChangedSections.Count sections changed in one import. Runtime history and disabled configuration were preserved.</p>
-            <div class="configuration-transfer__operation"><span>Operation ID</span><code>@applied.OperationId</code></div>
-            @if (_activation is { } activation)
-            {
-                <div class="configuration-transfer__activation" data-status="@activation.Status.ToString().ToLowerInvariant()">
-                    <strong>Feature activation @ActivationLabel(activation.Status)</strong>
-                    <span>@activation.Status</span>
-                    <small>@ActivationDescription(activation.Status)</small>
-                    @if (activation.Status == ConfigurationActivationStatus.Failed)
-                    {
-                        <button class="btn-secondary" type="button" @onclick="RetryActivationAsync">Retry activation</button>
-                    }
-                </div>
-            }
-            <div class="configuration-transfer__links">
-                @foreach (var section in applied.ChangedSections)
+                else
                 {
-                    <a href="@SectionPath(section)">@SectionTitle(section)<span>Open settings →</span></a>
+                    <svg class="segmented-motion__icon"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true"
+                         focusable="false">
+                        <path d="M12 16V4" />
+                        <path d="m7 9 5-5 5 5" />
+                        <path d="M5 20h14" />
+                    </svg>
                 }
-            </div>
-            <button class="btn-primary" type="button" @onclick="ResetImport">Transfer another configuration</button>
-        </section>
-    }
-    else if (_preview is null)
-    {
-        <section class="card configuration-transfer__panel">
-            <header><span>1</span><div><h2>Add a configuration file</h2><p>Upload a BlokeBot JSON file or paste its contents. Nothing changes until you review and confirm.</p></div></header>
-            <FileDropInput Accept=".json,application/json" Label="Configuration file" Disabled="@_busy" OnChange="ReadFileAsync" />
-            <div class="configuration-transfer__or"><span>or paste JSON</span></div>
-            <textarea id="configuration-transfer-json" class="form-control min-h-36" aria-label="Configuration JSON" placeholder="Paste a BlokeBot configuration document" @bind="_pastedJson"></textarea>
-            @if (_parseIssue is { } issue)
-            {
-                <div class="configuration-transfer__error" role="alert"><strong>@issue.Location</strong><p>@issue.Message</p></div>
-            }
-            <footer><span></span><button id="configuration-transfer-preview" class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_pastedJson))" @onclick="PreviewPastedAsync">Validate and review</button></footer>
-        </section>
-    }
-    else
-    {
-        <section class="card configuration-transfer__panel">
-            <div class="configuration-transfer__progress" aria-label="Import progress"><span class="done">1<small>File</small></span><i></i><span class="active">2<small>Review</small></span><i></i><span>3<small>Apply</small></span></div>
-            <div class="configuration-transfer__source">
-                <span><small>Source</small><strong>#@_preview.Document.Source.ChannelLogin</strong></span>
-                <span><small>BlokeBot</small><strong class="configuration-transfer__source-version">@(_preview.Document.Source.BlokeBotVersion ?? "Not provided")</strong></span>
-                <span><small>Format</small><strong>@_preview.Document.Version</strong></span>
-                <span><small>Exported</small><strong>@_preview.Document.ExportedAtUtc.ToLocalTime().ToString("g")</strong></span>
-            </div>
-            <header><span>2</span><div><h2>Review changes</h2><p>Choose each section and how it should combine with <strong>#@HostLogin</strong>. Enablement changes are selected separately.</p></div><small>✓ File valid</small></header>
-            <div class="configuration-transfer__reviews">
-                @foreach (var section in _preview.Sections)
-                {
-                    <article>
-                        <div><label><input type="checkbox" checked="@_importSections.Contains(section.Section)" @onchange="args => ToggleImport(section.Section, args.Value is true)" /><span><strong>@SectionTitle(section.Section)</strong><small>@CountSummary(section.Counts)</small></span></label></div>
-                        <select disabled="@(!_importSections.Contains(section.Section))" aria-label="@($"{SectionTitle(section.Section)} conflict strategy")" value="@_strategies[section.Section]" @onchange="args => SetStrategyAsync(section.Section, args.Value?.ToString())">
-                            @foreach (var strategy in Enum.GetValues<ImportConflictStrategy>()) { <option value="@strategy">@StrategyTitle(strategy)</option> }
-                        </select>
-                        @foreach (var issue in section.Issues.Where(_ => _importSections.Contains(section.Section))) { <div class="configuration-transfer__error"><strong>@issue.Location</strong><p>@issue.Message</p></div> }
-                        @if (section.GuessingProfileMappings.Count > 0 && _importSections.Contains(section.Section))
+                <span>@mode.Label</span>
+            </ItemTemplate>
+        </SegmentedTabs>
+
+        @if (_mode == TransferMode.Export)
+        {
+            <div id="@SegmentedTabs.PanelId(_modeTabsId, _exportModeKey)"
+                 role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _exportModeKey)">
+                <TaskPanel Title="Choose what to export"
+                           Description="Only configuration is included. Runtime history, balances, credentials and queued work stay here.">
+                    <Actions>
+                        <span class="status-pill status-pill--slate">JSON · format 1</span>
+                    </Actions>
+                    <ChildContent>
+                        @foreach (var section in _sectionOptions)
                         {
-                            <div class="configuration-transfer__profile-mappings">
-                                @foreach (var mapping in section.GuessingProfileMappings)
+                            var selected = _exportSections.Contains(section.Id);
+                            <div class="section-row" @key="section.Id">
+                                <div class="section-row__copy">
+                                    <span class="section-row__title">@section.Title</span>
+                                    <span class="section-row__detail">@section.Description</span>
+                                </div>
+                                <button type="button"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(selected ? "true" : "false")"
+                                        aria-label="@($"Export {section.Title}")"
+                                        @onclick="() => ToggleExport(section.Id, !selected)"></button>
+                            </div>
+                        }
+                    </ChildContent>
+                    <Footer>
+                        <span class="task-panel__footer-note">@_exportSections.Count of @_sectionOptions.Length sections selected</span>
+                        <div class="task-panel__footer-actions">
+                            <a class="btn-primary"
+                               href="@_exportUrl"
+                               data-enhance-nav="false">
+                                Download configuration
+                            </a>
+                        </div>
+                    </Footer>
+                </TaskPanel>
+            </div>
+        }
+        else if (_applied is { } applied)
+        {
+            <div id="@SegmentedTabs.PanelId(_modeTabsId, _importModeKey)"
+                 role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _importModeKey)">
+                <TaskPanel Title="Import applied"
+                           Description="Runtime history and disabled configuration were preserved.">
+                    <Actions>
+                        <ConfigurationTransferImportProgress Stage="ConfigurationImportStage.Applied" />
+                    </Actions>
+                    <ChildContent>
+                        <PageState Kind="PageStateKind.Success"
+                                   Title="@($"Configuration saved to #{HostLogin}")"
+                                   Description="@($"{applied.ChangedSections.Count} sections changed in one import.")" />
+                        <div class="operation-row">
+                            <span class="operation-row__label">Operation ID</span>
+                            <code>@applied.OperationId</code>
+                        </div>
+                        @if (_activation is { } activation)
+                        {
+                            <div class="activation-row" data-status="@activation.Status.ToString().ToLowerInvariant()">
+                                <div class="activation-row__line">
+                                    <strong>Feature activation @ActivationLabel(activation.Status)</strong>
+                                    <span class="@ActivationPillClass(activation.Status)">
+                                        <span class="status-pill__dot" aria-hidden="true"></span>
+                                        @activation.Status
+                                    </span>
+                                </div>
+                                <small>@ActivationDescription(activation.Status)</small>
+                                @if (activation.Status == ConfigurationActivationStatus.Failed)
                                 {
-                                    <div>
-                                        <label for="@GuessingMappingId(mapping)"><strong>@mapping.ImportedProfileName</strong><small>Choose the destination profile for this imported profile.</small></label>
-                                        <select id="@GuessingMappingId(mapping)" value="@GuessingProfileTargetValue(mapping.ImportedProfileId)" @onchange="args => SetGuessingProfileTargetAsync(mapping.ImportedProfileId, args.Value?.ToString())">
-                                            <option value="">@AutomaticTargetTitle(mapping)</option>
-                                            @foreach (var target in mapping.ExistingTargets)
-                                            {
-                                                <option value="@target.TargetId" disabled="@TargetMappedToAnotherProfile(mapping.ImportedProfileId, target.TargetId)">@target.Name (@target.Slug)</option>
-                                            }
-                                        </select>
+                                    <div class="activation-row__actions">
+                                        <button class="btn-secondary"
+                                                type="button"
+                                                @onclick="RetryActivationAsync">
+                                            Retry activation
+                                        </button>
                                     </div>
                                 }
                             </div>
                         }
-                        @foreach (var conflict in section.Conflicts.Where(_ => _importSections.Contains(section.Section)))
-                        {
-                            <div class="configuration-transfer__conflict">
-                                <div><strong>@conflict.ItemName</strong><small>@conflict.Message</small></div>
-                                <select aria-label="Resolve conflict" value="@ResolutionValue(conflict)" @onchange="args => SetResolutionAsync(conflict, args.Value?.ToString())">
-                                    <option value="Unresolved">Choose a decision</option>
-                                    @foreach (var resolution in conflict.AllowedResolutions) { <option value="@resolution">@ResolutionTitle(resolution)</option> }
-                                </select>
-                                @if (ResolutionValue(conflict) == ImportConflictResolution.Rename.ToString())
-                                {
-                                    <input class="form-control" aria-label="New alias" placeholder="New alias" value="@_renames.GetValueOrDefault(ConflictKey(conflict))" @oninput="args => SetRename(conflict, args.Value?.ToString())" />
-                                }
-                            </div>
-                        }
-                    </article>
-                }
-                @if (_preview.EnablementChanges.Count > 0)
-                {
-                    <article>
-                        <div><strong>Chat Tools enablement</strong><small>Select each change independently</small></div>
-                        <div class="configuration-transfer__flags">
-                            @foreach (var change in _preview.EnablementChanges)
+                        <div class="section-links">
+                            @foreach (var section in applied.ChangedSections)
                             {
-                                <label><input type="checkbox" checked="@_enablementSelections.Contains(change.Feature)" @onchange="args => ToggleEnablement(change.Feature, args.Value is true)" /><span>@FeatureTitle(change.Feature)<small>@(change.CurrentEnabled ? "On" : "Off") → @(change.ImportedEnabled ? "On" : "Off")</small></span></label>
+                                <a href="@SectionPath(section)" @key="section">
+                                    <strong>@SectionTitle(section)</strong>
+                                    <span>Open settings →</span>
+                                </a>
                             }
                         </div>
-                    </article>
-                }
+                    </ChildContent>
+                    <Footer>
+                        <span class="task-panel__footer-note"></span>
+                        <div class="task-panel__footer-actions">
+                            <button class="btn-primary" type="button" @onclick="ResetImport">
+                                Transfer another configuration
+                            </button>
+                        </div>
+                    </Footer>
+                </TaskPanel>
             </div>
-            @if (_applyIssue is { } applyIssue) { <div class="configuration-transfer__error" role="alert"><strong>Import not applied</strong><p>@applyIssue</p></div> }
-            <footer><button class="btn-secondary" type="button" @onclick="ResetImport">Choose another file</button><button id="configuration-transfer-apply" class="btn-primary" type="button" disabled="@(_busy || !_allConflictsResolved)" @onclick="ApplyAsync">Apply selected sections</button></footer>
-        </section>
-    }
+        }
+        else if (_preview is null)
+        {
+            <div id="@SegmentedTabs.PanelId(_modeTabsId, _importModeKey)"
+                 role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _importModeKey)">
+                <TaskPanel Title="Add a configuration file"
+                           Description="Upload a BlokeBot JSON export or paste its contents. Nothing changes until you review and confirm.">
+                    <Actions>
+                        <ConfigurationTransferImportProgress Stage="ConfigurationImportStage.File" />
+                    </Actions>
+                    <ChildContent>
+                        <FileDropInput Accept=".json,application/json"
+                                       Label="Accepts a BlokeBot .json export"
+                                       Prompt="Drop a configuration file here"
+                                       Disabled="@_busy"
+                                       OnChange="ReadFileAsync" />
+                        <div class="paste-divider">or paste JSON</div>
+                        <div class="paste-field">
+                            <label class="label" for="configuration-transfer-json">Configuration JSON</label>
+                            <textarea id="configuration-transfer-json"
+                                      class="input"
+                                      placeholder="Paste a BlokeBot configuration document"
+                                      @bind="_pastedJson"></textarea>
+                        </div>
+                        @if (_parseIssue is { } issue)
+                        {
+                            <PageState Kind="PageStateKind.Failure"
+                                       Title="@issue.Location"
+                                       Description="@issue.Message" />
+                        }
+                    </ChildContent>
+                    <Footer>
+                        <button class="btn-secondary" type="button" @onclick="CancelImport">
+                            Cancel
+                        </button>
+                        <div class="task-panel__footer-actions">
+                            <button id="configuration-transfer-preview"
+                                    class="btn-primary"
+                                    type="button"
+                                    disabled="@(_busy || string.IsNullOrWhiteSpace(_pastedJson))"
+                                    @onclick="PreviewPastedAsync">
+                                Validate and review
+                            </button>
+                        </div>
+                    </Footer>
+                </TaskPanel>
+            </div>
+        }
+        else
+        {
+            <div id="@SegmentedTabs.PanelId(_modeTabsId, _importModeKey)"
+                 role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _importModeKey)">
+                <ConfigurationTransferReviewPanel Preview="@_preview"
+                                                  DestinationLogin="@HostLogin"
+                                                  SelectedSections="@_importSections"
+                                                  Strategies="@_strategies"
+                                                  Resolutions="@_resolutions"
+                                                  Renames="@_renames"
+                                                  GuessingProfileTargets="@_guessingProfileTargets"
+                                                  EnablementSelections="@_enablementSelections"
+                                                  Busy="@_busy"
+                                                  AllConflictsResolved="@_allConflictsResolved"
+                                                  ApplyIssue="@_applyIssue"
+                                                  SectionSelectionChanged="ToggleImport"
+                                                  SectionStrategyChanged="SetStrategyAsync"
+                                                  ConflictResolutionChanged="SetResolutionAsync"
+                                                  ConflictRenameChanged="SetRename"
+                                                  GuessingProfileTargetChanged="SetGuessingProfileTargetAsync"
+                                                  EnablementSelectionChanged="ToggleEnablement"
+                                                  Cancel="CancelImport"
+                                                  Apply="ApplyAsync" />
+            </div>
+        }
+    </ChildContent>
 </DashboardPage>

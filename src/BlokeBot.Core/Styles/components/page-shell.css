@@ -1,0 +1,89 @@
+@layer components {
+    .page-header {
+        background: transparent;
+        border: 0;
+        margin: 0;
+        padding: 0;
+        position: static;
+    }
+
+    .page-header__inner {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        justify-content: space-between;
+        min-width: 0;
+    }
+
+    .page-header__title {
+        color: var(--app-text-strong);
+        font-size: 1.5rem;
+        font-weight: 750;
+        letter-spacing: 0;
+        line-height: 1.15;
+    }
+
+    .page-header__description {
+        color: var(--app-text-muted);
+        font-size: 0.875rem;
+        line-height: 1.4;
+        max-width: 52rem;
+    }
+
+    .page-header__actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .dashboard-page {
+        display: grid;
+        gap: 1.5rem;
+        margin-inline: auto;
+        padding: 0;
+        width: 100%;
+    }
+
+    .dashboard-page--readable {
+        max-width: 58rem;
+    }
+
+    .dashboard-page--wide {
+        max-width: 96rem;
+    }
+
+    .dashboard-page__actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    @media (min-width: 40rem) {
+        .page-header__inner {
+            align-items: flex-end;
+            flex-direction: row;
+        }
+
+        .page-header__actions {
+            justify-content: end;
+            width: auto;
+        }
+    }
+
+    @media (max-width: 30rem) {
+        .dashboard-page__actions,
+        .page-header__actions {
+            align-self: stretch;
+            width: 100%;
+        }
+
+        .dashboard-page__actions > *,
+        .page-header__actions > * {
+            flex: 1 1 auto;
+        }
+    }
+}

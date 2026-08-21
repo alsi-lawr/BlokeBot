@@ -24,6 +24,9 @@ public partial class FileDropInput
     [Parameter, EditorRequired]
     public string Label { get; set; } = string.Empty;
 
+    [Parameter]
+    public string Prompt { get; set; } = "Drag and drop here";
+
     [Parameter, EditorRequired]
     public EventCallback<InputFileChangeEventArgs> OnChange { get; set; }
 
