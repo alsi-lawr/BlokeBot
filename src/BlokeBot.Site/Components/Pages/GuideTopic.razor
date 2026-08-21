@@ -3,6 +3,7 @@
 @page "/channels"
 @page "/connect"
 @page "/tools"
+@page "/configuration-transfer"
 @page "/overlays"
 @page "/overlays/cues"
 @page "/overlays/media"
@@ -78,6 +79,11 @@
         @foreach (var section in _page.Sections)
         {
             <section id="@section.Anchor">
+                @if (_page.Route == "/configuration-transfer")
+                {
+                    <h2>@section.Heading</h2>
+                }
+
                 @if (section.Media is not null)
                 {
                     <div style="display: contents">
@@ -92,7 +98,10 @@
                     </div>
                 }
 
-                <h2>@section.Heading</h2>
+                @if (_page.Route != "/configuration-transfer")
+                {
+                    <h2>@section.Heading</h2>
+                }
 
                 @foreach (var paragraph in section.Paragraphs)
                 {
@@ -137,6 +146,20 @@
                 @if (section.Note is not null)
                 {
                     <aside class="doc-note"><p>@section.Note</p></aside>
+                }
+
+                @if (SiteGuideCatalog.GetAdditionalSectionMedia(_page.Route, section.Anchor) is { } additionalMedia)
+                {
+                    <div style="display: contents">
+                        <DeviceShowcase
+                            DarkPhoneSource="@additionalMedia.DarkPhoneSource"
+                            LightPhoneSource="@additionalMedia.LightPhoneSource"
+                            PhoneAlt="@additionalMedia.PhoneAlt"
+                            DarkLaptopSource="@additionalMedia.DarkLaptopSource"
+                            LightLaptopSource="@additionalMedia.LightLaptopSource"
+                            LaptopAlt="@additionalMedia.LaptopAlt"
+                            Caption="@additionalMedia.Caption" />
+                    </div>
                 }
             </section>
         }

@@ -14,6 +14,7 @@ internal static class SiteRoutes
         "/channels",
         "/connect",
         "/tools",
+        "/configuration-transfer",
         "/overlays",
         "/overlays/cues",
         "/overlays/media",

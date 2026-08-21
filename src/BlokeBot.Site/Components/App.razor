@@ -36,6 +36,16 @@
     <Routes />
     <script>
         (() => {
+            const compactGuideSidebar = window.matchMedia("(max-width: 52rem)");
+            const setGuideSidebarState = () => {
+                const disclosure = document.querySelector(".guide-sidebar__disclosure");
+                if (disclosure)
+                    disclosure.toggleAttribute("open", !compactGuideSidebar.matches);
+            };
+
+            setGuideSidebarState();
+            compactGuideSidebar.addEventListener("change", setGuideSidebarState);
+
             const button = document.querySelector("[data-theme-toggle]");
             if (!button)
                 return;
