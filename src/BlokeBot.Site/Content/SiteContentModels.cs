@@ -30,6 +30,10 @@ internal sealed record SiteGuideSection
 
     internal SiteMedia? Media { get; init; }
 
+    internal SiteMedia? MediaAfterHeading { get; init; }
+
+    internal SiteMedia? MediaAfterContent { get; init; }
+
     internal IReadOnlyList<string> Paragraphs { get; init; } = [];
 
     internal IReadOnlyList<string> Steps { get; init; } = [];

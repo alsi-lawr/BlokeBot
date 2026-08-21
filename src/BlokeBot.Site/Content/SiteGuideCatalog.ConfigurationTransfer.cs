@@ -12,11 +12,6 @@ internal static partial class SiteGuideCatalog
         "The preview reports what will be added, updated, skipped or removed before anything is saved."
     );
 
-    internal static SiteMedia? GetAdditionalSectionMedia(string route, string sectionAnchor) =>
-        route == "/configuration-transfer" && sectionAnchor == "import"
-            ? _configurationTransferReviewMedia
-            : null;
-
     private static IEnumerable<SiteGuidePage> CreateConfigurationTransferPages()
     {
         yield return new SiteGuidePage
@@ -75,7 +70,7 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Import",
-                    Media = new SiteMedia(
+                    MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-upload.png",
                         LightPhoneSource: "media/configuration-transfer/phone-light-upload.png",
                         DarkLaptopSource: "media/configuration-transfer/laptop-dark-upload.png",
@@ -84,6 +79,7 @@ internal static partial class SiteGuideCatalog
                         LaptopAlt: "Configuration file upload and paste choices for Sample Channel on a wide screen.",
                         "Upload or paste a bounded BlokeBot JSON document. No setting changes before validation and confirmation."
                     ),
+                    MediaAfterContent = _configurationTransferReviewMedia,
                     Steps =
                     [
                         "Open Configuration transfer for the destination channel, then upload the JSON file or paste its contents.",
@@ -95,7 +91,7 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Conflicts",
-                    Media = new SiteMedia(
+                    MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-conflict.png",
                         LightPhoneSource: "media/configuration-transfer/phone-light-conflict.png",
                         DarkLaptopSource: "media/configuration-transfer/laptop-dark-conflict.png",
@@ -118,7 +114,7 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Apply",
-                    Media = new SiteMedia(
+                    MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-success.png",
                         LightPhoneSource: "media/configuration-transfer/phone-light-success.png",
                         DarkLaptopSource: "media/configuration-transfer/laptop-dark-success.png",
@@ -139,7 +135,7 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Recover",
-                    Media = new SiteMedia(
+                    MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-failed.png",
                         LightPhoneSource: "media/configuration-transfer/phone-light-failed.png",
                         DarkLaptopSource: "media/configuration-transfer/laptop-dark-failed.png",
