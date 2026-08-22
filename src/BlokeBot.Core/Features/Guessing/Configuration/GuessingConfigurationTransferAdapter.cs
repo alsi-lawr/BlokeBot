@@ -123,6 +123,53 @@ public sealed class GuessingConfigurationTransferAdapter
             validated.Add((imported, ((ValidationResult.Valid)validation).Command));
         }
 
+        var updatedProfileIds = validated
+            .Select(x => matches.GetValueOrDefault(x.Imported.Id)?.Id)
+            .Where(static id => id is not null)
+            .Select(static id => id!.Value)
+            .ToHashSet();
+        var retainedProfileIds =
+            selection.Strategy == ImportConflictStrategy.ReplaceSection
+                ? matches.Values.Select(x => x.Id).Concat(retained).ToHashSet()
+                : existing.Select(x => x.Id).ToHashSet();
+        var finalAliases = existing
+            .Where(profile =>
+                retainedProfileIds.Contains(profile.Id) && !updatedProfileIds.Contains(profile.Id)
+            )
+            .SelectMany(GuessingAliasCollisionValidator.Retained)
+            .Concat(
+                validated.SelectMany(x =>
+                    GuessingAliasCollisionValidator.Requested(
+                        x.Command.ProfileId,
+                        x.Command.Aliases
+                    )
+                )
+            )
+            .ToArray();
+        var aliasFailure = await GuessingAliasCollisionValidator.FindForFinalGraphAsync(
+            db,
+            hostId,
+            finalAliases,
+            cancellationToken
+        );
+        if (aliasFailure is not null)
+        {
+            var importedId = validated
+                .First(x =>
+                    GuessingAliasCollisionValidator
+                        .Requested(x.Command.ProfileId, x.Command.Aliases)
+                        .Any(alias => alias.Alias == aliasFailure.Alias)
+                )
+                .Imported.Id;
+            return
+            [
+                new(
+                    $"sections.guessing.profiles[{importedId}].commandAliases",
+                    aliasFailure.Message
+                ),
+            ];
+        }
+
         var updatedTargets = validated
             .Select(x => matches.GetValueOrDefault(x.Imported.Id))
             .Where(x => x is not null)
@@ -151,22 +198,6 @@ public sealed class GuessingConfigurationTransferAdapter
                 _ = db.Profiles.Add(profile);
             }
 
-            var aliasFailure = await GuessingConfigurationGraphStager.FindAliasFailureAsync(
-                db,
-                hostId,
-                command,
-                cancellationToken
-            );
-            if (aliasFailure is not null)
-            {
-                return
-                [
-                    new(
-                        $"sections.guessing.profiles[{imported.Id}].commandAliases",
-                        aliasFailure.Message
-                    ),
-                ];
-            }
             profile.Revision++;
             GuessingConfigurationGraphStager.ApplyProfile(db, hostId, profile, command);
         }

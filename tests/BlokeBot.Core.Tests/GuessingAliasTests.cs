@@ -97,6 +97,83 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
+    public async Task SameKindNonStartAliases_SavingAcrossProfiles_PersistsEveryOccurrence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        var service = ConfigurationService(dbFactory);
+        var first = await LoadConfigurationAsync(service, seed.Host.Id, seed.DefaultProfile.Id);
+        first.Aliases.StopAliases = "shared-stop";
+        first.Aliases.WinAliases = "shared-win";
+        first.Aliases.GuessAliases = "!Shared-Guess";
+        first.Aliases.GuessesAliases = "shared-choices";
+        var firstResult = await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(first))
+            .ExecuteAsync(CancellationToken.None);
+        firstResult.Match(static _ => true, static _ => false).ShouldBeTrue();
+        var second = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
+        second.Aliases.StopAliases = "shared-stop";
+        second.Aliases.WinAliases = "shared-win";
+        second.Aliases.GuessAliases = " shared-guess ";
+        second.Aliases.GuessesAliases = "shared-choices";
+
+        var result = await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(second))
+            .ExecuteAsync(CancellationToken.None);
+
+        result.Match(static _ => true, static _ => false).ShouldBeTrue();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var shared = await db
+            .CommandAliases.Where(alias => alias.Alias.StartsWith("shared-"))
+            .OrderBy(alias => alias.Kind)
+            .ThenBy(alias => alias.GuessRoundProfileId)
+            .ToArrayAsync();
+        shared.Length.ShouldBe(8);
+        shared
+            .GroupBy(alias => alias.Alias)
+            .ShouldAllBe(group =>
+                group.Count() == 2 && group.Select(alias => alias.Kind).Distinct().Count() == 1
+            );
+        var reloadedFirst = await LoadConfigurationAsync(
+            service,
+            seed.Host.Id,
+            seed.DefaultProfile.Id
+        );
+        var reloadedSecond = await LoadConfigurationAsync(
+            service,
+            seed.Host.Id,
+            seed.SpecialProfile.Id
+        );
+        reloadedFirst.Aliases.GuessAliases.ShouldBe("shared-guess");
+        reloadedSecond.Aliases.GuessAliases.ShouldBe("shared-guess");
+    }
+
+    [Test]
+    public async Task AliasUsedByDifferentGuessingKind_SavingConfiguration_RejectsWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        var service = ConfigurationService(dbFactory);
+        var first = await LoadConfigurationAsync(service, seed.Host.Id, seed.DefaultProfile.Id);
+        first.Aliases.StopAliases = "claimed";
+        _ = await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(first))
+            .ExecuteAsync(CancellationToken.None);
+        var second = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
+        second.Aliases.GuessAliases = "claimed";
+
+        var result = await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(second))
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match<GuessingConfigurationSaveFailure?>(static _ => null, static failure => failure)
+            .ShouldBe(new GuessingConfigurationSaveFailure.AliasAlreadyUsed("claimed"));
+        var unchanged = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
+        unchanged.Aliases.GuessAliases.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task AliasUsedByCustomCommand_SavingConfiguration_RejectsWithoutMutation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

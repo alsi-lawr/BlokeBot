@@ -123,7 +123,7 @@ public sealed class HostFeatureTests
             []
         );
         var aliases = new AppCommandAliasResolver(dbFactory);
-        var guessing = new GuessingCommandRouteResolver(aliases, features);
+        var guessing = new GuessingCommandRouteResolver(aliases, features, dbFactory);
         var points = new PointsCommandRouteResolver(aliases, features);
 
         var disabledGuessing = await guessing.ResolveAsync(
@@ -209,7 +209,8 @@ public sealed class HostFeatureTests
         );
         var resolver = new GuessingCommandRouteResolver(
             new AppCommandAliasResolver(dbFactory),
-            features
+            features,
+            dbFactory
         );
 
         var route = await resolver.ResolveAsync(
@@ -229,6 +230,87 @@ public sealed class HostFeatureTests
             .Route;
         resolved.Kind.ShouldBe(GuessCommandKind.Start);
         resolved.State.ShouldBe(new AppCommandRouteState.GuessingProfile(hostId, profileId));
+    }
+
+    [Test]
+    public async Task SharedNonStartAlias_ResolvingDuringClosedRound_UsesRoundProfile()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        int activeProfileId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var defaultProfile = new GuessRoundProfile
+            {
+                HostId = hostId,
+                Name = "Default",
+                Slug = "default",
+                IsDefault = true,
+                ReplySettings = new(),
+            };
+            var activeProfile = new GuessRoundProfile
+            {
+                HostId = hostId,
+                Name = "Active",
+                Slug = "active",
+                ReplySettings = new(),
+            };
+            db.Profiles.AddRange(defaultProfile, activeProfile);
+            _ = await db.SaveChangesAsync();
+            activeProfileId = activeProfile.Id;
+            db.CommandAliases.AddRange(
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    GuessRoundProfileId = defaultProfile.Id,
+                    Kind = AppCommandKind.Guess,
+                    Alias = "predict",
+                },
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    GuessRoundProfileId = activeProfile.Id,
+                    Kind = AppCommandKind.Guess,
+                    Alias = "predict",
+                }
+            );
+            var now = DateTime.UtcNow;
+            _ = db.Rounds.Add(
+                new GuessRound
+                {
+                    HostId = hostId,
+                    GuessRoundProfileId = activeProfile.Id,
+                    Status = GuessRoundStatus.Closed,
+                    StartedAtUtc = now.AddMinutes(-1),
+                    ClosedAtUtc = now,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var features = new HostFeatureService(
+            dbFactory,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            []
+        );
+        var resolver = new GuessingCommandRouteResolver(
+            new AppCommandAliasResolver(dbFactory),
+            features,
+            dbFactory
+        );
+
+        var route = await resolver.ResolveAsync(
+            CommandContext("streamer", "predict"),
+            CancellationToken.None
+        );
+
+        var resolved = route
+            .ShouldBeOfType<CommandRouteResolution<
+                GuessCommandKind,
+                AppCommandRouteState
+            >.Resolved>()
+            .Route;
+        resolved.Kind.ShouldBe(GuessCommandKind.Guess);
+        resolved.State.ShouldBe(new AppCommandRouteState.GuessingProfile(hostId, activeProfileId));
     }
 
     private static ChatCommandContext CommandContext(string channel, string commandName) =>

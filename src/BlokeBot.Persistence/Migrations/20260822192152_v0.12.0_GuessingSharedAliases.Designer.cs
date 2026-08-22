@@ -3,6 +3,7 @@ using System;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    partial class BlokeBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260822192152_v0.12.0_GuessingSharedAliases")]
+    partial class v0120_GuessingSharedAliases
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");

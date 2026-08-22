@@ -208,6 +208,23 @@ public sealed class PointsConfigurationService(
             return new PointsConfigurationSaveFailure(existingCollision);
         }
 
+        var stagedCommandCollision = db
+            .ChangeTracker.Entries<CommandAlias>()
+            .Where(static entry => entry.State is EntityState.Added or EntityState.Modified)
+            .Select(static entry => entry.Entity)
+            .Where(alias =>
+                alias.HostId == hostId
+                && requestedAliases.Contains(alias.Alias)
+                && (!ownedKinds.Contains(alias.Kind) || alias.GuessRoundProfileId != null)
+            )
+            .Select(static alias => alias.Alias)
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (stagedCommandCollision is not null)
+        {
+            return new PointsConfigurationSaveFailure(stagedCommandCollision);
+        }
+
         var customCollision = await db
             .CustomCommandAliases.AsNoTracking()
             .Where(alias => alias.HostId == hostId && requestedAliases.Contains(alias.Alias))
@@ -216,6 +233,19 @@ public sealed class PointsConfigurationService(
         if (customCollision is not null)
         {
             return new PointsConfigurationSaveFailure(customCollision);
+        }
+
+        var stagedCustomCollision = db
+            .ChangeTracker.Entries<CustomCommandAlias>()
+            .Where(static entry => entry.State is EntityState.Added or EntityState.Modified)
+            .Select(static entry => entry.Entity)
+            .Where(alias => alias.HostId == hostId && requestedAliases.Contains(alias.Alias))
+            .Select(static alias => alias.Alias)
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (stagedCustomCollision is not null)
+        {
+            return new PointsConfigurationSaveFailure(stagedCustomCollision);
         }
 
         db.CommandAliases.RemoveRange(

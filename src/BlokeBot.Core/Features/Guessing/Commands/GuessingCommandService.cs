@@ -29,6 +29,11 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         }
 
         var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
+        if (round is null)
+        {
+            return CommandResponse.Chat(string.Empty);
+        }
+
         var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, route, ct);
 
         var profile = await db.Profiles.LoadProfileWithOptionsAsync(

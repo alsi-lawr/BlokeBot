@@ -184,6 +184,57 @@ public sealed class GuessingSharedHelperTests
         response.Message.ShouldBe("special moderator");
     }
 
+    [Test]
+    public async Task AvailableGuesses_WithNoRoundThenClosedRound_SuppressesThenUsesRoundProfile()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        var responses = new List<CommandResponse>();
+        var command = TestCommandContext.Create(
+            "viewer",
+            seed.HostLogin,
+            "choices",
+            [],
+            (response, _) =>
+            {
+                responses.Add(response);
+                return ValueTask.CompletedTask;
+            }
+        );
+        var context = new CommandStrategyContext<GuessCommandKind, AppCommandRouteState>(
+            GuessCommandKind.Guesses,
+            new AppCommandRouteState.GuessingProfile(seed.HostId, seed.DefaultProfileId),
+            command,
+            []
+        );
+        var strategy = new AvailableGuessesCommandStrategy(new GuessingCommandService(dbFactory));
+
+        await strategy.ExecuteAsync(context, CancellationToken.None);
+
+        responses.ShouldBeEmpty();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var now = DateTime.UtcNow;
+            _ = db.Rounds.Add(
+                new GuessRound
+                {
+                    HostId = seed.HostId,
+                    GuessRoundProfileId = seed.SpecialProfileId,
+                    Status = GuessRoundStatus.Closed,
+                    StartedAtUtc = now.AddMinutes(-1),
+                    ClosedAtUtc = now,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        await strategy.ExecuteAsync(context, CancellationToken.None);
+
+        responses
+            .ShouldHaveSingleItem()
+            .ShouldBe(CommandResponse.Whisper("Special choices: alpha, zulu"));
+    }
+
     private static async Task<ProfileSeed> SeedProfilesAsync(SqliteBlokeBotDbFactory dbFactory)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -219,6 +270,7 @@ public sealed class GuessingSharedHelperTests
             {
                 NoOpenRoundReply = "special",
                 ModeratorOnlyReply = "special moderator",
+                AvailableGuessesReply = "{round} choices: {options}",
             },
             Options =
             [
@@ -242,6 +294,16 @@ public sealed class GuessingSharedHelperTests
                 Feature = ReplyFeature.Guessing,
                 ScopeId = specialProfile.Id,
                 ReplyKey = GuessingReplyKeys.NoOpenRound,
+                Target = ReplyDeliveryTarget.Whisper,
+            }
+        );
+        _ = db.ReplyDeliverySettings.Add(
+            new ReplyDeliverySetting
+            {
+                HostId = host.Id,
+                Feature = ReplyFeature.Guessing,
+                ScopeId = specialProfile.Id,
+                ReplyKey = GuessingReplyKeys.AvailableGuesses,
                 Target = ReplyDeliveryTarget.Whisper,
             }
         );

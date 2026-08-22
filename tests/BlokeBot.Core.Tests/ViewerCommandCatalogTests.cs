@@ -470,6 +470,39 @@ public sealed class ViewerCommandCatalogTests
     }
 
     [Test]
+    public async Task SharedActiveGuessAlias_LoadingCatalog_ListsOneCanonicalEntryWithoutConflict()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedCatalogFixtureAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var profile = new GuessRoundProfile
+            {
+                HostId = fixture.HostId,
+                Name = "Special",
+                Slug = "special",
+            };
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
+            _ = db.CommandAliases.Add(
+                AppAlias(fixture.HostId, profile.Id, AppCommandKind.Guess, "predict")
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+
+        var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
+
+        snapshot.Names.Count(name => name == "!predict").ShouldBe(1);
+        snapshot.Conflicts.ShouldNotContain(message => message.Contains("!predict"));
+    }
+
+    [Test]
     public async Task BountyRoutes_LoadingViewerCatalog_RequireBothSwitchesAndPublicState()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
