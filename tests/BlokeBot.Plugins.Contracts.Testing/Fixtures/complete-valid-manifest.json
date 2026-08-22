@@ -1,0 +1,176 @@
+{
+  "manifestVersion": 1,
+  "id": "community.link-queue",
+  "name": "Community link queue",
+  "description": "Collects community links and publishes them on a schedule.",
+  "release": {
+    "declaredVersion": "1.2.0",
+    "tag": "community-link-queue"
+  },
+  "compatibility": {
+    "minimumApiVersion": 1,
+    "maximumApiVersion": 1,
+    "minimumBlokeBotVersion": "0.13.0",
+    "maximumBlokeBotVersionExclusive": "0.14.0",
+    "luaVersion": "lua54"
+  },
+  "entryModule": "main",
+  "luaModules": [
+    { "id": "main", "path": "lua/main.lua" },
+    { "id": "events", "path": "lua/events.lua" },
+    { "id": "pages", "path": "lua/pages.lua" },
+    { "id": "migrations", "path": "lua/migrations.lua" }
+  ],
+  "assets": [
+    {
+      "id": "queue-document",
+      "path": "web/index.html",
+      "kind": "browser",
+      "mediaType": "text/html",
+      "maximumBytes": 65536
+    },
+    {
+      "id": "queue-script",
+      "path": "web/app.js",
+      "kind": "browser",
+      "mediaType": "application/javascript",
+      "maximumBytes": 65536
+    },
+    {
+      "id": "queue-icon",
+      "path": "media/icon.webp",
+      "kind": "media",
+      "mediaType": "image/webp",
+      "maximumBytes": 65536
+    }
+  ],
+  "settings": [
+    {
+      "id": "moderation-mode",
+      "name": "Moderation mode",
+      "description": "Controls how submitted links are admitted.",
+      "scope": "installation",
+      "valueKind": "choice",
+      "required": true,
+      "choices": ["manual", "automatic"]
+    },
+    {
+      "id": "publish-time",
+      "name": "Publish time",
+      "description": "Sets the channel publication time.",
+      "scope": "channel",
+      "valueKind": "string",
+      "required": true,
+      "choices": []
+    }
+  ],
+  "features": [
+    {
+      "id": "collection",
+      "name": "Link collection",
+      "description": "Collects links from chat.",
+      "settings": ["moderation-mode"],
+      "twitch": {
+        "scopes": ["moderator:read:chatters"],
+        "eventSubTypes": ["channel.chat.message"]
+      },
+      "automationTemplates": []
+    },
+    {
+      "id": "publishing",
+      "name": "Scheduled publishing",
+      "description": "Publishes approved links on a schedule.",
+      "settings": ["publish-time"],
+      "twitch": { "scopes": [], "eventSubTypes": [] },
+      "automationTemplates": ["publish-links"]
+    }
+  ],
+  "hostModules": [
+    { "id": "chat", "minimumVersion": 1, "maximumVersion": 1 }
+  ],
+  "migrations": [
+    {
+      "id": "settings-v1-v2",
+      "fromVersion": "1.0.0",
+      "toVersion": "1.2.0",
+      "module": "migrations",
+      "entryPoint": "migrate_settings"
+    }
+  ],
+  "automationDefinitions": [
+    {
+      "id": "queued-link",
+      "featureId": "publishing",
+      "kind": "source",
+      "name": "Queued link",
+      "description": "Provides the next approved link.",
+      "module": "events",
+      "entryPoint": "next_link",
+      "inputs": [],
+      "outputs": [
+        { "id": "link", "name": "Link", "valueKind": "string", "required": true }
+      ]
+    },
+    {
+      "id": "publish-link",
+      "featureId": "publishing",
+      "kind": "action",
+      "name": "Publish link",
+      "description": "Publishes one approved link.",
+      "module": "events",
+      "entryPoint": "publish_link",
+      "inputs": [
+        { "id": "link", "name": "Link", "valueKind": "string", "required": true }
+      ],
+      "outputs": []
+    }
+  ],
+  "automationTemplates": [
+    {
+      "id": "publish-links",
+      "featureId": "publishing",
+      "name": "Publish approved links",
+      "nodes": [
+        {
+          "id": "queued",
+          "definitionId": "queued-link",
+          "configuration": { "kind": "map", "properties": [] }
+        },
+        {
+          "id": "publish",
+          "definitionId": "publish-link",
+          "configuration": { "kind": "map", "properties": [] }
+        }
+      ],
+      "edges": [
+        {
+          "fromNode": "queued",
+          "fromOutput": "link",
+          "toNode": "publish",
+          "toInput": "link"
+        }
+      ]
+    }
+  ],
+  "generatedPages": [
+    {
+      "id": "queue-management",
+      "featureId": "collection",
+      "route": "queue-management",
+      "title": "Queue management",
+      "module": "pages",
+      "renderEntryPoint": "render_queue"
+    }
+  ],
+  "embeddedPages": [
+    {
+      "id": "queue-preview",
+      "featureId": "collection",
+      "route": "queue-preview",
+      "title": "Queue preview",
+      "documentAsset": "queue-document",
+      "assets": ["queue-document", "queue-script", "queue-icon"],
+      "messageOrigins": ["https://plugin.example"]
+    }
+  ]
+}
