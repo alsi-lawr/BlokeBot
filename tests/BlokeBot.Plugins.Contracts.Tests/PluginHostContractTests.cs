@@ -101,6 +101,117 @@ public sealed class PluginHostContractTests
             .Code.ShouldBe(PluginEngineFixtureFailureCode.CancellationFailed);
     }
 
+    [Test]
+    public void HostCompletions_AdmitEveryBoundedOutcome()
+    {
+        var call = HostCall(new PluginInvocationContext.Installation(InstallationIdentity()));
+        var module = PluginContractFixtures.CompatibleHost().HostModules.ShouldHaveSingleItem();
+        PluginHostCallOutcome[] outcomes =
+        [
+            new PluginHostCallOutcome.Returned(new PluginValue.Nil()),
+            new PluginHostCallOutcome.Failed(
+                new(PluginHostFailureCode.Unavailable, "Temporarily unavailable.")
+            ),
+            new PluginHostCallOutcome.Cancelled(PluginCancellationReason.CallerRequested),
+        ];
+
+        foreach (var outcome in outcomes)
+        {
+            var completion = new PluginHostCallCompletion(call.CallId, call.CoroutineId, outcome);
+
+            _ = PluginHostCallValidator
+                .ValidateCompletion(call, completion, module)
+                .ShouldBeOfType<PluginHostCallValidationOutcome.Valid>();
+        }
+    }
+
+    [Test]
+    public void HostCompletions_RejectOversizedFailuresAndMismatchedBindings()
+    {
+        var call = HostCall(new PluginInvocationContext.Installation(InstallationIdentity()));
+        var module = PluginContractFixtures.CompatibleHost().HostModules.ShouldHaveSingleItem();
+        var oversizedFailure = new PluginHostCallOutcome.Failed(
+            new(
+                PluginHostFailureCode.Unavailable,
+                new string('x', PluginContractLimits.MaximumHostFailureSafeMessageCharacters + 1)
+            )
+        );
+        var oversizedCompletion = new PluginHostCallCompletion(
+            call.CallId,
+            call.CoroutineId,
+            oversizedFailure
+        );
+        var oversizedUtf8Completion = new PluginHostCallCompletion(
+            call.CallId,
+            call.CoroutineId,
+            new PluginHostCallOutcome.Failed(
+                new(
+                    PluginHostFailureCode.Unavailable,
+                    new string(
+                        '\u20AC',
+                        (PluginContractLimits.MaximumHostFailureSafeMessageBytes / 3) + 1
+                    )
+                )
+            )
+        );
+        var mismatchedCompletion = new PluginHostCallCompletion(
+            PluginContractFixtures.HostCallId(),
+            PluginContractFixtures.CoroutineId(),
+            new PluginHostCallOutcome.Returned(new PluginValue.Nil())
+        );
+
+        CompletionErrorCodes(call, oversizedCompletion, module)
+            .ShouldContain(PluginHostCallErrorCode.FailureMessageTooLarge);
+        CompletionErrorCodes(call, oversizedUtf8Completion, module)
+            .ShouldContain(PluginHostCallErrorCode.FailureMessageTooLarge);
+        var bindingErrors = CompletionErrorCodes(call, mismatchedCompletion, module);
+        bindingErrors.ShouldContain(PluginHostCallErrorCode.CallIdMismatch);
+        bindingErrors.ShouldContain(PluginHostCallErrorCode.CoroutineIdMismatch);
+    }
+
+    [Test]
+    public void ProtocolIdentifiers_RejectEmptyValuesAndBindCancellation()
+    {
+        PluginHostCallId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
+        PluginCoroutineId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
+        PluginAutomationInvocationId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
+        PluginPageSessionId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
+        var call = HostCall(new PluginInvocationContext.Installation(InstallationIdentity()));
+        var cancellation = new PluginHostCallCancellation(
+            PluginContractFixtures.HostCallId(),
+            PluginContractFixtures.CoroutineId(),
+            PluginCancellationReason.CallerRequested
+        );
+
+        var errors = PluginHostCallValidator
+            .ValidateCancellation(call, cancellation)
+            .ShouldBeOfType<PluginHostCallValidationOutcome.Invalid>()
+            .Errors.Select(error => error.Code)
+            .ToArray();
+
+        errors.ShouldContain(PluginHostCallErrorCode.CallIdMismatch);
+        errors.ShouldContain(PluginHostCallErrorCode.CoroutineIdMismatch);
+    }
+
+    [Test]
+    public async Task EngineContractFixture_RejectsDeepMappedValuesWithoutRecursing()
+    {
+        PluginValue deepValue = new PluginValue.Nil();
+        for (var depth = 0; depth <= PluginContractLimits.MaximumPluginValueDepth; depth++)
+        {
+            deepValue = new PluginValue.Array([deepValue]);
+        }
+        var adapter = new FixtureEngineAdapter(breakCancellation: false, mappedValue: deepValue);
+
+        var outcome = await PluginEngineContractFixtures.RunAsync(adapter, CancellationToken.None);
+
+        outcome
+            .ShouldBeOfType<PluginEngineFixtureOutcome.Failed>()
+            .Failures.ShouldHaveSingleItem()
+            .Code.ShouldBe(PluginEngineFixtureFailureCode.MappedValueInvalid);
+        PluginValueComparer.SemanticallyEquals(new PluginValue.Nil(), deepValue).ShouldBeFalse();
+    }
+
     private static IReadOnlyList<PluginValueErrorCode> ValueErrorCodes(PluginValue value) =>
         PluginValueValidator
             .Validate(value)
@@ -110,8 +221,8 @@ public sealed class PluginHostContractTests
 
     private static PluginHostCall HostCall(PluginInvocationContext context) =>
         new(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
+            PluginContractFixtures.HostCallId(),
+            PluginContractFixtures.CoroutineId(),
             PluginContractFixtures.HostModuleId("chat"),
             PluginContractFixtures.HostOperationId("send-message"),
             context,
@@ -127,8 +238,21 @@ public sealed class PluginHostContractTests
         );
     }
 
-    private sealed class FixtureEngineAdapter(bool breakCancellation)
-        : IPluginEngineContractFixtureAdapter
+    private static IReadOnlyList<PluginHostCallErrorCode> CompletionErrorCodes(
+        PluginHostCall call,
+        PluginHostCallCompletion completion,
+        PluginHostModuleDescriptor module
+    ) =>
+        PluginHostCallValidator
+            .ValidateCompletion(call, completion, module)
+            .ShouldBeOfType<PluginHostCallValidationOutcome.Invalid>()
+            .Errors.Select(error => error.Code)
+            .ToArray();
+
+    private sealed class FixtureEngineAdapter(
+        bool breakCancellation,
+        PluginValue? mappedValue = null
+    ) : IPluginEngineContractFixtureAdapter
     {
         public PluginEngineDescriptor Descriptor { get; } =
             PluginContractFixtures.CompatibleEngine();
@@ -137,7 +261,7 @@ public sealed class PluginHostContractTests
             string program,
             PluginValue expectedValue,
             CancellationToken cancellationToken
-        ) => ValueTask.FromResult(expectedValue);
+        ) => ValueTask.FromResult(mappedValue ?? expectedValue);
 
         public ValueTask<PluginValue> ExecuteStandardLibraryAsync(
             string program,

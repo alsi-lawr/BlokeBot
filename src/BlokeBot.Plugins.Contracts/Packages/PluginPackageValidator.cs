@@ -89,7 +89,7 @@ public static class PluginPackageValidator
             if (entry is PluginPackageEntry.File file)
             {
                 totalBytes += file.Content.Length;
-                ValidateDisallowedPayload(file.Path, errors);
+                ValidateDisallowedPayload(file, errors);
             }
         }
 
@@ -113,20 +113,19 @@ public static class PluginPackageValidator
         List<PluginPackageError> errors
     )
     {
-        if (!PluginPackagePath.IsValid(entry.Path))
+        if (!PluginPackagePath.TryCanonicalize(entry.Path, out var canonicalPath))
         {
             errors.Add(
                 new PluginPackageError.Entry(PluginPackageEntryErrorCode.InvalidPath, entry.Path)
             );
         }
-
-        if (!exactPaths.Add(entry.Path))
+        else if (!exactPaths.Add(canonicalPath))
         {
             errors.Add(
                 new PluginPackageError.Entry(PluginPackageEntryErrorCode.DuplicatePath, entry.Path)
             );
         }
-        else if (!foldedPaths.Add(entry.Path))
+        else if (!foldedPaths.Add(canonicalPath))
         {
             errors.Add(
                 new PluginPackageError.Entry(
@@ -147,9 +146,12 @@ public static class PluginPackageValidator
         }
     }
 
-    private static void ValidateDisallowedPayload(string path, List<PluginPackageError> errors)
+    private static void ValidateDisallowedPayload(
+        PluginPackageEntry.File file,
+        List<PluginPackageError> errors
+    )
     {
-        var extension = Path.GetExtension(path);
+        var extension = Path.GetExtension(file.Path);
         var code =
             _nativeExtensions.Contains(extension)
                 ? PluginPackageEntryErrorCode.NativePayloadNotPermitted
@@ -161,7 +163,13 @@ public static class PluginPackageValidator
             : (PluginPackageEntryErrorCode?)null;
         if (code is { } disallowed)
         {
-            errors.Add(new PluginPackageError.Entry(disallowed, path));
+            errors.Add(new PluginPackageError.Entry(disallowed, file.Path));
+            return;
+        }
+
+        if (PluginPackagePayloadPolicy.Classify(file.Content.Span) is { } signature)
+        {
+            errors.Add(new PluginPackageError.Entry(signature, file.Path));
         }
     }
 

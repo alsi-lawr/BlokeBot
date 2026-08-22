@@ -29,6 +29,7 @@ public static class PluginValueValidator
         state.Nodes++;
         if (state.Nodes > PluginContractLimits.MaximumPluginValueNodes)
         {
+            state.NodeLimitReached = true;
             AddOnce(state, PluginValueErrorCode.NodeCountExceeded, location);
             return;
         }
@@ -61,6 +62,10 @@ public static class PluginValueValidator
                 for (var index = 0; index < array.Items.Length; index++)
                 {
                     Validate(array.Items[index], $"{location}[{index}]", depth + 1, state);
+                    if (state.NodeLimitReached)
+                    {
+                        break;
+                    }
                 }
                 break;
             case PluginValue.Map map:
@@ -77,9 +82,10 @@ public static class PluginValueValidator
     )
     {
         var keys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var property in map.Properties)
+        for (var index = 0; index < map.Properties.Length; index++)
         {
-            var propertyLocation = $"{location}.{property.Name}";
+            var property = map.Properties[index];
+            var propertyLocation = $"{location}[{index}]";
             if (
                 string.IsNullOrWhiteSpace(property.Name)
                 || property.Name.Length > PluginContractLimits.MaximumNameCharacters
@@ -88,13 +94,21 @@ public static class PluginValueValidator
             {
                 state.Errors.Add(new(PluginValueErrorCode.InvalidMapKey, propertyLocation));
             }
-            else if (!keys.Add(property.Name))
+            else
             {
-                state.Errors.Add(new(PluginValueErrorCode.DuplicateMapKey, propertyLocation));
+                propertyLocation = $"{location}.{property.Name}";
+                if (!keys.Add(property.Name))
+                {
+                    state.Errors.Add(new(PluginValueErrorCode.DuplicateMapKey, propertyLocation));
+                }
             }
 
             AddString(property.Name, propertyLocation, state);
             Validate(property.Value, propertyLocation, depth + 1, state);
+            if (state.NodeLimitReached)
+            {
+                break;
+            }
         }
     }
 
@@ -121,6 +135,8 @@ public static class PluginValueValidator
         internal int Nodes { get; set; }
 
         internal long Bytes { get; set; }
+
+        internal bool NodeLimitReached { get; set; }
 
         internal List<PluginValueError> Errors { get; } = [];
     }

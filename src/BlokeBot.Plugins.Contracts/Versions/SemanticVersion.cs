@@ -116,6 +116,14 @@ public sealed record SemanticVersion : IComparable<SemanticVersion>
 
     public override string ToString() => Value;
 
+    public bool HasSamePrecedenceAs(SemanticVersion other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return CompareTo(other) == 0;
+    }
+
+    internal int GetPrecedenceHashCode() => HashCode.Combine(Major, Minor, Patch, PreRelease);
+
     private static bool TryParseComponent(string component, out int value)
     {
         value = 0;

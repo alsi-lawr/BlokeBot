@@ -50,7 +50,7 @@ public abstract record PluginInvocationContext
         PluginHostId Host,
         PluginFeatureId Feature,
         PluginAutomationDefinitionId Definition,
-        Guid InvocationId
+        PluginAutomationInvocationId InvocationId
     ) : PluginInvocationContext
     {
         [JsonIgnore]
@@ -72,7 +72,7 @@ public abstract record PluginInvocationContext
         PluginInstallationIdentity Plugin,
         PluginHostId Host,
         PluginPageId PageId,
-        Guid SessionId
+        PluginPageSessionId SessionId
     ) : PluginInvocationContext
     {
         [JsonIgnore]

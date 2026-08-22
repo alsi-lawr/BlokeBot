@@ -15,4 +15,6 @@ public static class PluginContractLimits
     public const int MaximumPluginValueNodes = 1_024;
     public const int MaximumPluginValueStringBytes = 64 * 1024;
     public const int MaximumPluginValuePayloadBytes = 256 * 1024;
+    public const int MaximumHostFailureSafeMessageCharacters = 1_000;
+    public const int MaximumHostFailureSafeMessageBytes = 2 * 1024;
 }

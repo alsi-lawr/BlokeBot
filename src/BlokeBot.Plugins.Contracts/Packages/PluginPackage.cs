@@ -33,6 +33,7 @@ public enum PluginPackageEntryErrorCode
     LinkNotPermitted,
     NativePayloadNotPermitted,
     DotNetPayloadNotPermitted,
+    BrowserExecutablePayloadNotPermitted,
     LuaRocksPayloadNotPermitted,
     UndeclaredContent,
     MissingDeclaredContent,

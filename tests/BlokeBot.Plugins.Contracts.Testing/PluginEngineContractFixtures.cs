@@ -68,13 +68,13 @@ public interface IPluginEngineContractFixtureAdapter
 }
 
 public sealed record PluginCoroutineFixtureObservation(
-    Guid SuspendedCoroutineId,
+    PluginCoroutineId SuspendedCoroutineId,
     PluginHostCallOutcome Outcome,
     int ResumeCount
 );
 
 public sealed record PluginCancellationFixtureObservation(
-    Guid SuspendedCoroutineId,
+    PluginCoroutineId SuspendedCoroutineId,
     PluginHostCallOutcome Outcome,
     int ResumeCount
 );
@@ -82,6 +82,7 @@ public sealed record PluginCancellationFixtureObservation(
 public enum PluginEngineFixtureFailureCode
 {
     IncompatibleEngineDescriptor,
+    MappedValueInvalid,
     ValueMappingFailed,
     StandardLibraryFailed,
     CoroutineFailed,
@@ -124,7 +125,14 @@ public static class PluginEngineContractFixtures
             expectedValue,
             cancellationToken
         );
-        if (!PluginValueComparer.SemanticallyEquals(expectedValue, mapped))
+        if (
+            mapped is null
+            || PluginValueValidator.Validate(mapped) is PluginValueValidationOutcome.Invalid
+        )
+        {
+            failures.Add(new(PluginEngineFixtureFailureCode.MappedValueInvalid));
+        }
+        else if (!PluginValueComparer.SemanticallyEquals(expectedValue, mapped))
         {
             failures.Add(new(PluginEngineFixtureFailureCode.ValueMappingFailed));
         }
@@ -217,8 +225,8 @@ public static class PluginEngineContractFixtures
         var tag = GitTag("community-link-queue");
         var host = HostId(1);
         return new(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
+            PluginContractFixtures.HostCallId(),
+            PluginContractFixtures.CoroutineId(),
             PluginContractFixtures.HostModuleId("chat"),
             PluginContractFixtures.HostOperationId("send-message"),
             new PluginInvocationContext.Channel(new(plugin, new(version, tag)), host),

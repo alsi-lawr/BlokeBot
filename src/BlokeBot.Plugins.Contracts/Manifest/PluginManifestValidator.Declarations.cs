@@ -120,11 +120,16 @@ public static partial class PluginManifestValidator
         var folded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in paths)
         {
-            if (!exact.Add(path))
+            if (!PluginPackagePath.TryCanonicalize(path, out var canonicalPath))
+            {
+                continue;
+            }
+
+            if (!exact.Add(canonicalPath))
             {
                 errors.Add(new(PluginManifestErrorCode.DuplicatePath, path));
             }
-            else if (!folded.Add(path))
+            else if (!folded.Add(canonicalPath))
             {
                 errors.Add(new(PluginManifestErrorCode.CaseCollidingPath, path));
             }

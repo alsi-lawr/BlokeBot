@@ -51,6 +51,7 @@ public static class PluginManifestJson
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
         {
+            AllowDuplicateProperties = false,
             AllowTrailingCommas = false,
             MaxDepth = PluginContractLimits.MaximumPluginValueDepth + 16,
             NumberHandling = JsonNumberHandling.Strict,

@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 namespace BlokeBot.Plugins.Contracts;
 
 public sealed record PluginHostCall(
-    Guid CallId,
-    Guid CoroutineId,
+    PluginHostCallId CallId,
+    PluginCoroutineId CoroutineId,
     PluginHostModuleId Module,
     PluginHostOperationId Operation,
     PluginInvocationContext Context,
@@ -49,14 +49,14 @@ public abstract record PluginHostCallOutcome
 }
 
 public sealed record PluginHostCallCompletion(
-    Guid CallId,
-    Guid CoroutineId,
+    PluginHostCallId CallId,
+    PluginCoroutineId CoroutineId,
     PluginHostCallOutcome Outcome
 );
 
 public sealed record PluginHostCallCancellation(
-    Guid CallId,
-    Guid CoroutineId,
+    PluginHostCallId CallId,
+    PluginCoroutineId CoroutineId,
     PluginCancellationReason Reason
 );
 

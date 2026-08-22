@@ -25,7 +25,9 @@ public static partial class PluginManifestValidator
         }
 
         var moduleIds = manifest.LuaModules.Select(module => module.Id).ToHashSet();
-        var transitions = new HashSet<(SemanticVersion From, SemanticVersion To)>();
+        var transitions = new HashSet<PluginMigrationTransition>(
+            PluginMigrationTransitionPrecedenceComparer.Instance
+        );
         foreach (var migration in manifest.Migrations)
         {
             if (
@@ -33,11 +35,34 @@ public static partial class PluginManifestValidator
                 || migration.ToVersion.CompareTo(manifest.Release.DeclaredVersion) > 0
                 || !moduleIds.Contains(migration.Module)
                 || !ValidEntryPoint(migration.EntryPoint)
-                || !transitions.Add((migration.FromVersion, migration.ToVersion))
+                || !transitions.Add(new(migration.FromVersion, migration.ToVersion))
             )
             {
                 errors.Add(new(PluginManifestErrorCode.InvalidMigration, "$.migrations"));
             }
         }
+    }
+
+    private sealed record PluginMigrationTransition(SemanticVersion From, SemanticVersion To);
+
+    private sealed class PluginMigrationTransitionPrecedenceComparer
+        : IEqualityComparer<PluginMigrationTransition>
+    {
+        internal static PluginMigrationTransitionPrecedenceComparer Instance { get; } = new();
+
+        public bool Equals(PluginMigrationTransition? left, PluginMigrationTransition? right) =>
+            ReferenceEquals(left, right)
+            || (
+                left is not null
+                && right is not null
+                && left.From.HasSamePrecedenceAs(right.From)
+                && left.To.HasSamePrecedenceAs(right.To)
+            );
+
+        public int GetHashCode(PluginMigrationTransition transition) =>
+            HashCode.Combine(
+                transition.From.GetPrecedenceHashCode(),
+                transition.To.GetPrecedenceHashCode()
+            );
     }
 }

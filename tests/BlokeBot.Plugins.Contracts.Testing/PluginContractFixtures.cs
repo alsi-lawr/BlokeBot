@@ -105,6 +105,26 @@ public static class PluginContractFixtures
             ? id
             : throw new InvalidOperationException($"Invalid engine ID fixture '{value}'.");
 
+    public static PluginHostCallId HostCallId() =>
+        PluginHostCallId.TryCreate(Guid.NewGuid(), out var id)
+            ? id
+            : throw new InvalidOperationException("Invalid host call ID fixture.");
+
+    public static PluginCoroutineId CoroutineId() =>
+        PluginCoroutineId.TryCreate(Guid.NewGuid(), out var id)
+            ? id
+            : throw new InvalidOperationException("Invalid coroutine ID fixture.");
+
+    public static PluginAutomationInvocationId AutomationInvocationId() =>
+        PluginAutomationInvocationId.TryCreate(Guid.NewGuid(), out var id)
+            ? id
+            : throw new InvalidOperationException("Invalid automation invocation ID fixture.");
+
+    public static PluginPageSessionId PageSessionId() =>
+        PluginPageSessionId.TryCreate(Guid.NewGuid(), out var id)
+            ? id
+            : throw new InvalidOperationException("Invalid page session ID fixture.");
+
     public static SemanticVersion SemanticVersion(string value) =>
         BlokeBot.Plugins.Contracts.SemanticVersion.TryCreate(value, out var version)
             ? version

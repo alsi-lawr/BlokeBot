@@ -6,7 +6,13 @@ public static class PluginValueComparer
     {
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
-        return (left, right) switch
+        return PluginValueValidator.Validate(left) is PluginValueValidationOutcome.Valid
+            && PluginValueValidator.Validate(right) is PluginValueValidationOutcome.Valid
+            && SemanticallyEqualsValidated(left, right);
+    }
+
+    private static bool SemanticallyEqualsValidated(PluginValue left, PluginValue right) =>
+        (left, right) switch
         {
             (PluginValue.Nil, PluginValue.Nil) => true,
             (PluginValue.Boolean first, PluginValue.Boolean second) => first.Value == second.Value,
@@ -27,14 +33,13 @@ public static class PluginValueComparer
             ),
             _ => false,
         };
-    }
 
     private static bool SequencesEqual(
         IReadOnlyList<PluginValue> left,
         IReadOnlyList<PluginValue> right
     ) =>
         left.Count == right.Count
-        && left.Select((value, index) => SemanticallyEquals(value, right[index]))
+        && left.Select((value, index) => SemanticallyEqualsValidated(value, right[index]))
             .All(value => value);
 
     private static bool MapsEqual(
@@ -55,7 +60,7 @@ public static class PluginValueComparer
             .Select(
                 (property, index) =>
                     property.Name.Equals(orderedRight[index].Name, StringComparison.Ordinal)
-                    && SemanticallyEquals(property.Value, orderedRight[index].Value)
+                    && SemanticallyEqualsValidated(property.Value, orderedRight[index].Value)
             )
             .All(value => value);
     }
