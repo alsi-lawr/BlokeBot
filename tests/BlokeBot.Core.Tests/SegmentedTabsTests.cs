@@ -233,6 +233,7 @@ public sealed class SegmentedTabsTests
         var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
         navigation.NavigateTo("/overlays?channel=sample#sources");
         var tabs = RenderFragmentTabs(context);
+        tabs.Find("#overlays-cues-tab").GetAttribute("href").ShouldBe("#cues");
 
         navigation.NavigateTo("/configuration-transfer/export?sections=Overlays");
 

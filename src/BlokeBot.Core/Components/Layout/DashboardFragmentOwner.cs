@@ -86,6 +86,8 @@ public sealed class DashboardFragmentOwner : IDisposable
         return pageUri + "#" + key;
     }
 
+    internal string HrefFor(string key) => _onOwnedPath ? $"#{key}" : UriFor(key);
+
     private void Normalize()
     {
         if (!_onOwnedPath)

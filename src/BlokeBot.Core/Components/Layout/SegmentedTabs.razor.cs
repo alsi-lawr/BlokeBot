@@ -183,7 +183,7 @@ public partial class SegmentedTabs : IDisposable
     }
 
     private string FragmentHref(SegmentedTabItem item) =>
-        _fragment?.UriFor(item.Key) ?? $"#{item.Key}";
+        _fragment?.HrefFor(item.Key) ?? $"#{item.Key}";
 
     private string? TabIdFor(SegmentedTabItem item) => Id is null ? null : TabId(Id, item.Key);
 
