@@ -14,7 +14,7 @@ public static partial class PluginManifestValidator
         ValidateName(manifest.Name, "$.name", errors);
         ValidateText(manifest.Description, "$.description", required: true, errors);
         ValidateCompatibilityRanges(manifest.Compatibility, errors);
-        ValidateModulesAndAssets(manifest, errors);
+        ValidateModulesAssetsAndPayloads(manifest, errors);
         ValidateSettingsAndFeatures(manifest, errors);
         ValidateHostModulesAndMigrations(manifest, errors);
         ValidateAutomations(manifest, errors);
@@ -22,10 +22,32 @@ public static partial class PluginManifestValidator
 
         if (
             PluginCompatibilityEvaluator.Evaluate(manifest, target)
-            is PluginCompatibilityOutcome.Incompatible
+            is PluginCompatibilityOutcome.Incompatible incompatible
         )
         {
-            errors.Add(new(PluginManifestErrorCode.IncompatibleDeclaration, "$.compatibility"));
+            var incompatibleTargetLocations = incompatible
+                .Failures.Where(failure =>
+                    failure.Code == PluginCompatibilityFailureCode.IncompatiblePayloadTarget
+                )
+                .Select(failure =>
+                    manifest.Assets.Any(asset => asset.Path == failure.Subject)
+                        ? "$.assets.runtimeIdentifiers"
+                        : "$.payloads.runtimeIdentifiers"
+                )
+                .Distinct(StringComparer.Ordinal);
+            foreach (var location in incompatibleTargetLocations)
+            {
+                errors.Add(new(PluginManifestErrorCode.IncompatiblePayloadTarget, location));
+            }
+
+            if (
+                incompatible.Failures.Any(failure =>
+                    failure.Code != PluginCompatibilityFailureCode.IncompatiblePayloadTarget
+                )
+            )
+            {
+                errors.Add(new(PluginManifestErrorCode.IncompatibleDeclaration, "$.compatibility"));
+            }
         }
 
         return errors.Count == 0
@@ -56,16 +78,17 @@ public static partial class PluginManifestValidator
         List<PluginManifestError> errors
     )
     {
-        if (
-            value is null
-            || (required && string.IsNullOrWhiteSpace(value))
-            || value.Length > PluginContractLimits.MaximumDescriptionCharacters
-            || value.Any(char.IsControl)
-        )
+        if (!IsValidText(value, required))
         {
             errors.Add(new(PluginManifestErrorCode.InvalidText, location));
         }
     }
+
+    private static bool IsValidText(string? value, bool required) =>
+        value is not null
+        && (!required || !string.IsNullOrWhiteSpace(value))
+        && value.Length <= PluginContractLimits.MaximumDescriptionCharacters
+        && !value.Any(char.IsControl);
 
     private static void ValidateName(
         string? value,

@@ -1,10 +1,30 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
+
+public enum PluginRuntimeIdentifier
+{
+    [JsonStringEnumMemberName("linux-x64")]
+    LinuxX64,
+
+    [JsonStringEnumMemberName("linux-arm64")]
+    LinuxArm64,
+
+    [JsonStringEnumMemberName("osx-arm64")]
+    MacOsArm64,
+
+    [JsonStringEnumMemberName("win-x64")]
+    WindowsX64,
+
+    [JsonStringEnumMemberName("win-arm64")]
+    WindowsArm64,
+}
 
 public sealed record PluginHostCompatibilityTarget(
     SemanticVersion BlokeBotVersion,
     PluginApiVersion ApiVersion,
+    PluginRuntimeIdentifier RuntimeIdentifier,
     ImmutableArray<PluginHostModuleDescriptor> HostModules
 );
 
@@ -16,6 +36,7 @@ public enum PluginCompatibilityFailureCode
     UnsupportedLuaVersion,
     MissingHostModule,
     IncompatibleHostModuleVersion,
+    IncompatiblePayloadTarget,
     IncompatibleEngine,
 }
 

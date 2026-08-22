@@ -28,7 +28,6 @@ public sealed record PluginHostOperationDescriptor(
     ImmutableArray<PluginInvocationContextKind> PermittedContexts,
     ImmutableArray<PluginValueKind> ArgumentKinds,
     PluginValueKind ResultKind,
-    bool SupportsCancellation,
     int MaximumArgumentBytes,
     int MaximumResultBytes
 );

@@ -102,33 +102,19 @@ public sealed class PluginHostContractTests
     }
 
     [Test]
-    public void HostCompletions_AdmitEveryBoundedOutcome()
+    public async Task EngineContractFixture_AcceptsCancellationAfterExternalEffect()
     {
-        var call = HostCall(new PluginInvocationContext.Installation(InstallationIdentity()));
-        var module = PluginContractFixtures.CompatibleHost().HostModules.ShouldHaveSingleItem();
-        PluginHostCallOutcome[] outcomes =
-        [
-            new PluginHostCallOutcome.Returned(new PluginValue.Nil()),
-            new PluginHostCallOutcome.Failed(
-                new(PluginHostFailureCode.Unavailable, "Temporarily unavailable.")
-            ),
-            new PluginHostCallOutcome.Cancelled(PluginCancellationReason.CallerRequested),
-        ];
+        var adapter = new FixtureEngineAdapter(breakCancellation: false);
 
-        foreach (var outcome in outcomes)
-        {
-            var completion = new PluginHostCallCompletion(call.CallId, call.CoroutineId, outcome);
+        var outcome = await PluginEngineContractFixtures.RunAsync(adapter, CancellationToken.None);
 
-            _ = PluginHostCallValidator
-                .ValidateCompletion(call, completion, module)
-                .ShouldBeOfType<PluginHostCallValidationOutcome.Valid>();
-        }
+        _ = outcome.ShouldBeOfType<PluginEngineFixtureOutcome.Passed>();
     }
 
     [Test]
     public void HostCompletions_RejectOversizedFailuresAndMismatchedBindings()
     {
-        var call = HostCall(new PluginInvocationContext.Installation(InstallationIdentity()));
+        var call = ValidHostCall();
         var module = PluginContractFixtures.CompatibleHost().HostModules.ShouldHaveSingleItem();
         var oversizedFailure = new PluginHostCallOutcome.Failed(
             new(
@@ -170,27 +156,63 @@ public sealed class PluginHostContractTests
     }
 
     [Test]
-    public void ProtocolIdentifiers_RejectEmptyValuesAndBindCancellation()
+    public void CancellationBinding_AdmitsMatchingAndRejectsMismatchedIdentities()
     {
-        PluginHostCallId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
-        PluginCoroutineId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
-        PluginAutomationInvocationId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
-        PluginPageSessionId.TryCreate(Guid.Empty, out _).ShouldBeFalse();
-        var call = HostCall(new PluginInvocationContext.Installation(InstallationIdentity()));
-        var cancellation = new PluginHostCallCancellation(
+        var call = ValidHostCall();
+        var matching = new PluginHostCallCancellation(
+            call.CallId,
+            call.CoroutineId,
+            PluginCancellationReason.CallerRequested
+        );
+        var mismatched = new PluginHostCallCancellation(
             PluginContractFixtures.HostCallId(),
             PluginContractFixtures.CoroutineId(),
             PluginCancellationReason.CallerRequested
         );
 
+        _ = PluginHostCallValidator
+            .ValidateCancellation(call, matching)
+            .ShouldBeOfType<PluginHostCallValidationOutcome.Valid>();
         var errors = PluginHostCallValidator
-            .ValidateCancellation(call, cancellation)
+            .ValidateCancellation(call, mismatched)
             .ShouldBeOfType<PluginHostCallValidationOutcome.Invalid>()
             .Errors.Select(error => error.Code)
             .ToArray();
 
         errors.ShouldContain(PluginHostCallErrorCode.CallIdMismatch);
         errors.ShouldContain(PluginHostCallErrorCode.CoroutineIdMismatch);
+    }
+
+    [Test]
+    public async Task EngineContractFixture_RejectsCancellationRollback()
+    {
+        var adapter = new FixtureEngineAdapter(
+            breakCancellation: false,
+            rollbackCancellationEffect: true
+        );
+
+        var outcome = await PluginEngineContractFixtures.RunAsync(adapter, CancellationToken.None);
+
+        outcome
+            .ShouldBeOfType<PluginEngineFixtureOutcome.Failed>()
+            .Failures.ShouldHaveSingleItem()
+            .Code.ShouldBe(PluginEngineFixtureFailureCode.CancellationFailed);
+    }
+
+    [Test]
+    public async Task EngineContractFixture_RejectsLateResultAfterCancellation()
+    {
+        var adapter = new FixtureEngineAdapter(
+            breakCancellation: false,
+            admitLateCancellationResult: true
+        );
+
+        var outcome = await PluginEngineContractFixtures.RunAsync(adapter, CancellationToken.None);
+
+        outcome
+            .ShouldBeOfType<PluginEngineFixtureOutcome.Failed>()
+            .Failures.ShouldHaveSingleItem()
+            .Code.ShouldBe(PluginEngineFixtureFailureCode.CancellationFailed);
     }
 
     [Test]
@@ -229,6 +251,9 @@ public sealed class PluginHostContractTests
             [new PluginValue.String("hello")]
         );
 
+    private static PluginHostCall ValidHostCall() =>
+        HostCall(new PluginInvocationContext.Channel(InstallationIdentity(), HostId(1)));
+
     private static PluginInstallationIdentity InstallationIdentity()
     {
         PluginGitTag.TryCreate("community-link-queue", out var tag).ShouldBeTrue();
@@ -237,6 +262,11 @@ public sealed class PluginHostContractTests
             new(PluginContractFixtures.SemanticVersion("1.2.0"), tag)
         );
     }
+
+    private static PluginHostId HostId(int value) =>
+        PluginHostId.TryCreate(value, out var hostId)
+            ? hostId
+            : throw new InvalidOperationException($"Invalid host ID fixture '{value}'.");
 
     private static IReadOnlyList<PluginHostCallErrorCode> CompletionErrorCodes(
         PluginHostCall call,
@@ -251,6 +281,8 @@ public sealed class PluginHostContractTests
 
     private sealed class FixtureEngineAdapter(
         bool breakCancellation,
+        bool rollbackCancellationEffect = false,
+        bool admitLateCancellationResult = false,
         PluginValue? mappedValue = null
     ) : IPluginEngineContractFixtureAdapter
     {
@@ -294,7 +326,13 @@ public sealed class PluginHostContractTests
                     breakCancellation
                         ? new PluginHostCallOutcome.Returned(new PluginValue.Nil())
                         : new PluginHostCallOutcome.Cancelled(cancellation.Reason),
-                    ResumeCount: 1
+                    ResumeCount: admitLateCancellationResult ? 2 : 1,
+                    admitLateCancellationResult
+                        ? PluginCancellationLateResultState.Admitted
+                        : PluginCancellationLateResultState.Discarded,
+                    rollbackCancellationEffect
+                        ? PluginCancellationExternalEffectState.RolledBack
+                        : PluginCancellationExternalEffectState.RemainedCompleted
                 )
             );
 

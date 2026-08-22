@@ -160,6 +160,22 @@ public sealed record PluginAssetId
         );
 }
 
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginPayloadId>))]
+public sealed record PluginPayloadId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginPayloadId>
+{
+    private PluginPayloadId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginPayloadId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginPayloadId(value),
+            out identifier
+        );
+}
+
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginAutomationFieldId>))]
 public sealed record PluginAutomationFieldId
     : PluginContractIdentifier,

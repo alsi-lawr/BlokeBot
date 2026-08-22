@@ -20,18 +20,27 @@ installation records do not have a commit-SHA identity field.
 
 ## Package content
 
-The canonical package contains `blokebot.plugin.json`, declared `.lua` source modules, and declared
-bounded browser or media assets. It does not contain native binaries, .NET assemblies, LuaRocks
-artifacts, native dependencies, undeclared files, path escapes, case-colliding paths, or links.
-Every file is subject to per-entry and total package limits.
+The canonical package contains `blokebot.plugin.json`, declared `.lua` source modules, and any
+marketplace-reviewed declared payloads. Payloads can include browser or media assets, native files,
+.NET assemblies, WebAssembly, and other plugin-managed files. Every payload declares its path,
+purpose, maximum size, and explicit supported BlokeBot release RIDs. The validator enforces target,
+declaration, archive, path, collision, and link rules without classifying trusted payload bytes.
+The supported RIDs are `linux-x64`, `linux-arm64`, `osx-arm64`, `win-x64`, and `win-arm64`.
+
+Lua modules are the only BlokeBot-managed entrypoints. Other payloads are available only for the
+trusted plugin's own use; BlokeBot does not load them as managed plugin entrypoints or resolve their
+external dependencies. Undeclared files, path escapes, case-colliding paths, and links are rejected.
 
 ## Host boundary
 
 The host API exchanges closed typed values and outcomes. Calls identify their host module,
 operation, coroutine, and installation, channel, automation, migration, or page context. A host call
 can complete with a value, a typed failure, or cancellation. Asynchronous host work suspends only
-the originating Lua coroutine and resumes it at most once. Cancellation is cooperative and is
-addressed to the same call and coroutine IDs.
+the originating Lua coroutine and resumes it at most once. Every host-call wait is cancellable; an
+operation does not declare optional cancellation support. Cancellation is addressed to the same
+call and coroutine IDs. When cancellation wins, the caller stops waiting and a later result is not
+admitted or resumed. Provider cooperation can be requested, but an external effect that already
+occurred is not rolled back.
 
 Manifests declare requirements and descriptors only. They do not register live features, discover
 Razor components, run Lua, fetch marketplace archives, manage workers, or change lifecycle state.

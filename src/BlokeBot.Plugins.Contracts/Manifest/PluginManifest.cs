@@ -12,6 +12,7 @@ public sealed record PluginManifest(
     PluginLuaModuleId EntryModule,
     ImmutableArray<PluginLuaModuleDescriptor> LuaModules,
     ImmutableArray<PluginAssetDescriptor> Assets,
+    ImmutableArray<PluginPayloadDescriptor> Payloads,
     ImmutableArray<PluginSettingDescriptor> Settings,
     ImmutableArray<PluginFeatureDescriptor> Features,
     ImmutableArray<PluginHostModuleRequirement> HostModules,

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace BlokeBot.Plugins.Contracts;
 
 public static partial class PluginManifestValidator
@@ -29,15 +31,17 @@ public static partial class PluginManifestValidator
         "video/webm",
     };
 
-    private static void ValidateModulesAndAssets(
+    private static void ValidateModulesAssetsAndPayloads(
         PluginManifest manifest,
         List<PluginManifestError> errors
     )
     {
         ValidateCount(manifest.LuaModules, "$.luaModules", errors);
         ValidateCount(manifest.Assets, "$.assets", errors);
+        ValidateCount(manifest.Payloads, "$.payloads", errors);
         ValidateDistinct(manifest.LuaModules.Select(module => module.Id), "$.luaModules", errors);
         ValidateDistinct(manifest.Assets.Select(asset => asset.Id), "$.assets", errors);
+        ValidateDistinct(manifest.Payloads.Select(payload => payload.Id), "$.payloads", errors);
 
         foreach (var module in manifest.LuaModules)
         {
@@ -63,11 +67,21 @@ public static partial class PluginManifestValidator
             }
         }
 
+        foreach (var payload in manifest.Payloads)
+        {
+            if (!ValidPayload(payload))
+            {
+                errors.Add(new(PluginManifestErrorCode.InvalidPayload, "$.payloads"));
+            }
+        }
+
         ValidateDeclaredPaths(manifest, errors);
     }
 
     private static bool ValidAsset(PluginAssetDescriptor asset) =>
         PluginPackagePath.IsValid(asset.Path)
+        && IsValidText(asset.Purpose, required: true)
+        && ValidRuntimeIdentifiers(asset.RuntimeIdentifiers)
         && asset.MaximumBytes > 0
         && asset.Kind switch
         {
@@ -80,6 +94,20 @@ public static partial class PluginManifestValidator
                 && _mediaTypes.Contains(asset.MediaType)
                 && AssetExtensionMatches(asset),
         };
+
+    private static bool ValidPayload(PluginPayloadDescriptor payload) =>
+        PluginPackagePath.IsValid(payload.Path)
+        && IsValidText(payload.Purpose, required: true)
+        && ValidRuntimeIdentifiers(payload.RuntimeIdentifiers)
+        && payload.MaximumBytes is > 0 and <= PluginContractLimits.MaximumDeclaredPayloadBytes;
+
+    private static bool ValidRuntimeIdentifiers(
+        ImmutableArray<PluginRuntimeIdentifier> runtimeIdentifiers
+    ) =>
+        !runtimeIdentifiers.IsDefaultOrEmpty
+        && runtimeIdentifiers.Length <= PluginContractLimits.MaximumDeclarationsPerSurface
+        && runtimeIdentifiers.All(Enum.IsDefined)
+        && runtimeIdentifiers.Distinct().Count() == runtimeIdentifiers.Length;
 
     private static bool AssetExtensionMatches(PluginAssetDescriptor asset)
     {
@@ -114,6 +142,7 @@ public static partial class PluginManifestValidator
         var paths = manifest
             .LuaModules.Select(module => module.Path)
             .Concat(manifest.Assets.Select(asset => asset.Path))
+            .Concat(manifest.Payloads.Select(payload => payload.Path))
             .Prepend(PluginPackage.ManifestPath)
             .ToArray();
         var exact = new HashSet<string>(StringComparer.Ordinal);

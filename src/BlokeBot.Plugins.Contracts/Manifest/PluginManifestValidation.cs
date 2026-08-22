@@ -13,6 +13,8 @@ public enum PluginManifestErrorCode
     InvalidPath,
     InvalidLuaModule,
     InvalidAsset,
+    InvalidPayload,
+    IncompatiblePayloadTarget,
     InvalidSetting,
     InvalidFeature,
     InvalidTwitchDeclaration,

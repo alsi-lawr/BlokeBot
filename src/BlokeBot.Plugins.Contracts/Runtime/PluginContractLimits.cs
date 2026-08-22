@@ -8,6 +8,7 @@ public static class PluginContractLimits
     public const int MaximumLuaModuleBytes = 1024 * 1024;
     public const int MaximumBrowserAssetBytes = 4 * 1024 * 1024;
     public const int MaximumMediaAssetBytes = 32 * 1024 * 1024;
+    public const long MaximumDeclaredPayloadBytes = MaximumPackageBytes;
     public const int MaximumDeclarationsPerSurface = 128;
     public const int MaximumNameCharacters = 120;
     public const int MaximumDescriptionCharacters = 1_000;

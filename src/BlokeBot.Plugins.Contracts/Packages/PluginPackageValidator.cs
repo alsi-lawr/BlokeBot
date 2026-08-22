@@ -2,28 +2,6 @@ namespace BlokeBot.Plugins.Contracts;
 
 public static class PluginPackageValidator
 {
-    private static readonly HashSet<string> _nativeExtensions = new(
-        StringComparer.OrdinalIgnoreCase
-    )
-    {
-        ".so",
-        ".dylib",
-        ".a",
-        ".lib",
-        ".o",
-        ".obj",
-        ".wasm",
-    };
-
-    private static readonly HashSet<string> _dotNetExtensions = new(
-        StringComparer.OrdinalIgnoreCase
-    )
-    {
-        ".dll",
-        ".exe",
-        ".pdb",
-    };
-
     public static PluginPackageValidationOutcome Validate(
         IReadOnlyList<PluginPackageEntry> entries,
         PluginHostCompatibilityTarget target
@@ -89,7 +67,6 @@ public static class PluginPackageValidator
             if (entry is PluginPackageEntry.File file)
             {
                 totalBytes += file.Content.Length;
-                ValidateDisallowedPayload(file, errors);
             }
         }
 
@@ -146,33 +123,6 @@ public static class PluginPackageValidator
         }
     }
 
-    private static void ValidateDisallowedPayload(
-        PluginPackageEntry.File file,
-        List<PluginPackageError> errors
-    )
-    {
-        var extension = Path.GetExtension(file.Path);
-        var code =
-            _nativeExtensions.Contains(extension)
-                ? PluginPackageEntryErrorCode.NativePayloadNotPermitted
-            : _dotNetExtensions.Contains(extension)
-                ? PluginPackageEntryErrorCode.DotNetPayloadNotPermitted
-            : extension.Equals(".rock", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".rockspec", StringComparison.OrdinalIgnoreCase)
-                ? PluginPackageEntryErrorCode.LuaRocksPayloadNotPermitted
-            : (PluginPackageEntryErrorCode?)null;
-        if (code is { } disallowed)
-        {
-            errors.Add(new PluginPackageError.Entry(disallowed, file.Path));
-            return;
-        }
-
-        if (PluginPackagePayloadPolicy.Classify(file.Content.Span) is { } signature)
-        {
-            errors.Add(new PluginPackageError.Entry(signature, file.Path));
-        }
-    }
-
     private static void ValidateDeclaredContent(
         IReadOnlyList<PluginPackageEntry> entries,
         PluginManifest manifest,
@@ -186,6 +136,12 @@ public static class PluginPackageValidator
             ))
             .Concat(
                 manifest.Assets.Select(asset => new DeclaredFile(asset.Path, asset.MaximumBytes))
+            )
+            .Concat(
+                manifest.Payloads.Select(payload => new DeclaredFile(
+                    payload.Path,
+                    payload.MaximumBytes
+                ))
             )
             .Prepend(new(PluginPackage.ManifestPath, PluginContractLimits.MaximumManifestBytes))
             .ToDictionary(file => file.Path, StringComparer.Ordinal);

@@ -23,6 +23,7 @@ public static class PluginContractFixtures
         new(
             SemanticVersion("0.13.0"),
             PluginApiVersion.V1,
+            PluginRuntimeIdentifier.LinuxX64,
             [
                 new(
                     HostModuleId("chat"),
@@ -36,7 +37,6 @@ public static class PluginContractFixtures
                             ],
                             [PluginValueKind.String],
                             PluginValueKind.Nil,
-                            SupportsCancellation: true,
                             MaximumArgumentBytes: PluginContractLimits.MaximumPluginValuePayloadBytes,
                             MaximumResultBytes: PluginContractLimits.MaximumPluginValuePayloadBytes
                         ),
@@ -60,6 +60,18 @@ public static class PluginContractFixtures
             ),
             new PluginPackageEntry.File("web/app.js", Encoding.UTF8.GetBytes("export {};")),
             new PluginPackageEntry.File("media/icon.webp", new byte[] { 0x52, 0x49, 0x46, 0x46 }),
+            new PluginPackageEntry.File(
+                "payloads/linux-x64/libqueue.so",
+                new byte[] { 0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01 }
+            ),
+            new PluginPackageEntry.File(
+                "payloads/managed/Queue.Helper.dll",
+                new byte[] { 0x4D, 0x5A, 0x90, 0x00 }
+            ),
+            new PluginPackageEntry.File(
+                "payloads/portable/queue.wasm",
+                new byte[] { 0x00, 0x61, 0x73, 0x6D, 0x01, 0x00 }
+            ),
         ]);
     }
 

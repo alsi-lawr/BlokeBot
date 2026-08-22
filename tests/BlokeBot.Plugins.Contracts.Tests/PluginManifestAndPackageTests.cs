@@ -6,7 +6,7 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginManifestAndPackageTests
 {
     [Test]
-    public void CompleteManifestAndPackage_AreAccepted()
+    public void DeclaredMixedPayloadPackage_IsAcceptedForMatchingTarget()
     {
         var target = PluginContractFixtures.CompatibleHost();
 
@@ -116,34 +116,50 @@ public sealed class PluginManifestAndPackageTests
     }
 
     [Test]
-    public void PackagePolicy_RejectsNativeDotNetAndLuaRocksPayloads()
+    public void PayloadDeclarations_RequirePurposeAndSupportedTargets()
     {
-        var cases = new[]
+        var missingPurpose = PluginContractFixtures.ManifestReplacing(
+            "Provides the plugin-managed native queue helper.",
+            ""
+        );
+        var missingTargets = PluginContractFixtures.ManifestReplacing("[\"linux-x64\"]", "[]");
+        var unsupportedTarget = PluginContractFixtures.ManifestReplacing(
+            "[\"linux-x64\"]",
+            "[\"freebsd-x64\"]"
+        );
+
+        ManifestErrors(
+                PluginManifestJson.Validate(missingPurpose, PluginContractFixtures.CompatibleHost())
+            )
+            .Select(error => error.Code)
+            .ShouldContain(PluginManifestErrorCode.InvalidPayload);
+        ManifestErrors(
+                PluginManifestJson.Validate(
+                    unsupportedTarget,
+                    PluginContractFixtures.CompatibleHost()
+                )
+            )
+            .Select(error => error.Code)
+            .ShouldContain(PluginManifestErrorCode.MalformedJson);
+        ManifestErrors(
+                PluginManifestJson.Validate(missingTargets, PluginContractFixtures.CompatibleHost())
+            )
+            .Select(error => error.Code)
+            .ShouldContain(PluginManifestErrorCode.InvalidPayload);
+    }
+
+    [Test]
+    public void PackagePolicy_RejectsTargetIncompatiblePayload()
+    {
+        var target = PluginContractFixtures.CompatibleHost() with
         {
-            (
-                new PluginPackageEntry.File("native/module.so", ReadOnlyMemory<byte>.Empty),
-                PluginPackageEntryErrorCode.NativePayloadNotPermitted
-            ),
-            (
-                new PluginPackageEntry.File("managed/Plugin.dll", ReadOnlyMemory<byte>.Empty),
-                PluginPackageEntryErrorCode.DotNetPayloadNotPermitted
-            ),
-            (
-                new PluginPackageEntry.File("rocks/plugin.rockspec", ReadOnlyMemory<byte>.Empty),
-                PluginPackageEntryErrorCode.LuaRocksPayloadNotPermitted
-            ),
+            RuntimeIdentifier = PluginRuntimeIdentifier.WindowsX64,
         };
 
-        foreach (var (entry, expected) in cases)
-        {
-            PackageEntryCodes(
-                    PluginPackageValidator.Validate(
-                        PluginContractFixtures.PackageWith(entry),
-                        PluginContractFixtures.CompatibleHost()
-                    )
-                )
-                .ShouldContain(expected);
-        }
+        PackageManifestErrorCodes(
+                PluginPackageValidator.Validate(PluginContractFixtures.CompletePackage(), target)
+            )
+            .ShouldContain(PluginManifestErrorCode.IncompatiblePayloadTarget);
     }
 
     [Test]
@@ -200,13 +216,16 @@ public sealed class PluginManifestAndPackageTests
         );
         var missing = PluginContractFixtures
             .CompletePackage()
-            .Where(entry => entry.Path != "web/app.js")
+            .Where(entry => entry.Path != "payloads/linux-x64/libqueue.so")
             .ToArray();
         var oversized = PluginContractFixtures
             .CompletePackage()
             .Select(entry =>
-                entry.Path == "web/app.js"
-                    ? new PluginPackageEntry.File("web/app.js", new byte[65_537])
+                entry.Path == "payloads/linux-x64/libqueue.so"
+                    ? new PluginPackageEntry.File(
+                        "payloads/linux-x64/libqueue.so",
+                        new byte[65_537]
+                    )
                     : entry
             )
             .ToArray();
@@ -235,6 +254,16 @@ public sealed class PluginManifestAndPackageTests
         outcome
             .ShouldBeOfType<PluginPackageValidationOutcome.Rejected>()
             .Errors.OfType<PluginPackageError.Entry>()
+            .Select(error => error.Code)
+            .ToArray();
+
+    private static IReadOnlyList<PluginManifestErrorCode> PackageManifestErrorCodes(
+        PluginPackageValidationOutcome outcome
+    ) =>
+        outcome
+            .ShouldBeOfType<PluginPackageValidationOutcome.Rejected>()
+            .Errors.OfType<PluginPackageError.Manifest>()
+            .SelectMany(error => error.Errors)
             .Select(error => error.Code)
             .ToArray();
 }

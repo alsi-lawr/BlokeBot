@@ -27,6 +27,8 @@
       "path": "web/index.html",
       "kind": "browser",
       "mediaType": "text/html",
+      "purpose": "Provides the embedded queue preview document.",
+      "runtimeIdentifiers": ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"],
       "maximumBytes": 65536
     },
     {
@@ -34,6 +36,8 @@
       "path": "web/app.js",
       "kind": "browser",
       "mediaType": "application/javascript",
+      "purpose": "Runs the embedded queue preview client.",
+      "runtimeIdentifiers": ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"],
       "maximumBytes": 65536
     },
     {
@@ -41,6 +45,31 @@
       "path": "media/icon.webp",
       "kind": "media",
       "mediaType": "image/webp",
+      "purpose": "Displays the queue feature icon.",
+      "runtimeIdentifiers": ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"],
+      "maximumBytes": 65536
+    }
+  ],
+  "payloads": [
+    {
+      "id": "native-helper",
+      "path": "payloads/linux-x64/libqueue.so",
+      "purpose": "Provides the plugin-managed native queue helper.",
+      "runtimeIdentifiers": ["linux-x64"],
+      "maximumBytes": 65536
+    },
+    {
+      "id": "managed-helper",
+      "path": "payloads/managed/Queue.Helper.dll",
+      "purpose": "Provides a plugin-managed portable .NET helper.",
+      "runtimeIdentifiers": ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"],
+      "maximumBytes": 65536
+    },
+    {
+      "id": "wasm-helper",
+      "path": "payloads/portable/queue.wasm",
+      "purpose": "Provides a plugin-managed WebAssembly helper.",
+      "runtimeIdentifiers": ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"],
       "maximumBytes": 65536
     }
   ],

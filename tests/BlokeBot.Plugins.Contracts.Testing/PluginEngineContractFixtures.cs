@@ -25,7 +25,7 @@ public static class PluginEngineFixturePrograms
         "return blokebot.host.call('chat', 'send-message', 'fixture message')";
 
     public const string Cancellation =
-        "return blokebot.host.call('chat', 'send-message', 'cancel fixture')";
+        "return blokebot.host.call('chat', 'send-message', 'cancel after external effect')";
 
     public const string Packaging =
         "local module = require('fixture_module'); return module.answer";
@@ -76,8 +76,22 @@ public sealed record PluginCoroutineFixtureObservation(
 public sealed record PluginCancellationFixtureObservation(
     PluginCoroutineId SuspendedCoroutineId,
     PluginHostCallOutcome Outcome,
-    int ResumeCount
+    int ResumeCount,
+    PluginCancellationLateResultState LateResult,
+    PluginCancellationExternalEffectState ExternalEffect
 );
+
+public enum PluginCancellationLateResultState
+{
+    Discarded,
+    Admitted,
+}
+
+public enum PluginCancellationExternalEffectState
+{
+    RemainedCompleted,
+    RolledBack,
+}
 
 public enum PluginEngineFixtureFailureCode
 {
@@ -146,8 +160,8 @@ public static class PluginEngineContractFixtures
             failures.Add(new(PluginEngineFixtureFailureCode.StandardLibraryFailed));
         }
 
-        var call = HostCall();
-        var returned = new PluginHostCallOutcome.Returned(new PluginValue.String("resumed"));
+        var call = HostCall("fixture message");
+        var returned = new PluginHostCallOutcome.Returned(new PluginValue.Nil());
         var completion = new PluginHostCallCompletion(call.CallId, call.CoroutineId, returned);
         var coroutine = await adapter.ExecuteCoroutineAsync(
             PluginEngineFixturePrograms.Coroutine,
@@ -164,20 +178,23 @@ public static class PluginEngineContractFixtures
             failures.Add(new(PluginEngineFixtureFailureCode.CoroutineFailed));
         }
 
+        var cancellationCall = HostCall("cancel after external effect");
         var cancellation = new PluginHostCallCancellation(
-            call.CallId,
-            call.CoroutineId,
+            cancellationCall.CallId,
+            cancellationCall.CoroutineId,
             PluginCancellationReason.CallerRequested
         );
         var cancelled = await adapter.ExecuteCancellationAsync(
             PluginEngineFixturePrograms.Cancellation,
-            call,
+            cancellationCall,
             cancellation,
             cancellationToken
         );
         if (
-            cancelled.SuspendedCoroutineId != call.CoroutineId
+            cancelled.SuspendedCoroutineId != cancellationCall.CoroutineId
             || cancelled.ResumeCount != 1
+            || cancelled.LateResult != PluginCancellationLateResultState.Discarded
+            || cancelled.ExternalEffect != PluginCancellationExternalEffectState.RemainedCompleted
             || cancelled.Outcome
                 is not PluginHostCallOutcome.Cancelled
                 {
@@ -218,7 +235,7 @@ public static class PluginEngineContractFixtures
             ),
         ]);
 
-    private static PluginHostCall HostCall()
+    private static PluginHostCall HostCall(string message)
     {
         var plugin = PluginContractFixtures.PluginId("community.link-queue");
         var version = PluginContractFixtures.SemanticVersion("1.2.0");
@@ -230,7 +247,7 @@ public static class PluginEngineContractFixtures
             PluginContractFixtures.HostModuleId("chat"),
             PluginContractFixtures.HostOperationId("send-message"),
             new PluginInvocationContext.Channel(new(plugin, new(version, tag)), host),
-            [new PluginValue.String("fixture message")]
+            [new PluginValue.String(message)]
         );
     }
 
