@@ -3,7 +3,6 @@ using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Guessing.Configuration;
 
@@ -14,45 +13,13 @@ internal static class GuessingConfigurationGraphStager
         int hostId,
         GuessingConfigurationSaveCommand command,
         CancellationToken cancellationToken
-    )
-    {
-        var requestedAliases = command
-            .Aliases.ToDrafts()
-            .SelectMany(draft => BlokeBot.Commands.CommandAliasNormalizer.Split(draft.Aliases))
-            .ToArray();
-        var fixedCollision = FixedChatCommandRoutes.FindCollision(requestedAliases);
-        if (fixedCollision is not null)
-        {
-            return new GuessingConfigurationSaveFailure.AliasAlreadyUsed(fixedCollision);
-        }
-
-        var ownedKinds = GuessingAppCommandKindMap.AppKinds.ToArray();
-        var collision = await db
-            .CommandAliases.AsNoTracking()
-            .Where(alias => requestedAliases.Contains(alias.Alias))
-            .Where(alias =>
-                alias.HostId == hostId
-                && (
-                    !ownedKinds.Contains(alias.Kind)
-                    || alias.GuessRoundProfileId != command.ProfileId
-                )
-            )
-            .Select(alias => alias.Alias)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (collision is not null)
-        {
-            return new GuessingConfigurationSaveFailure.AliasAlreadyUsed(collision);
-        }
-
-        var customCollision = await db
-            .CustomCommandAliases.AsNoTracking()
-            .Where(alias => alias.HostId == hostId && requestedAliases.Contains(alias.Alias))
-            .Select(alias => alias.Alias)
-            .FirstOrDefaultAsync(cancellationToken);
-        return customCollision is null
-            ? null
-            : new GuessingConfigurationSaveFailure.AliasAlreadyUsed(customCollision);
-    }
+    ) =>
+        await GuessingAliasCollisionValidator.FindForSaveAsync(
+            db,
+            hostId,
+            command,
+            cancellationToken
+        );
 
     public static void ApplyProfile(
         BlokeBotDbContext db,

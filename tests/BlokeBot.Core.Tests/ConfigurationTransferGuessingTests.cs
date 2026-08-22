@@ -277,6 +277,137 @@ public sealed class ConfigurationTransferGuessingTests
         stored.Revision.ShouldBe(0);
     }
 
+    [Test]
+    public async Task FormatOneExportImport_SharedAndUniqueAliases_RoundTripByProfile()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int sourceHostId;
+        int destinationHostId;
+        GuessingSectionV1 exported;
+        await using (var source = await database.CreateDbContextAsync())
+        {
+            var sourceHost = new BotHost
+            {
+                Login = "source",
+                DisplayName = "Source",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            var destinationHost = new BotHost
+            {
+                Login = "destination",
+                DisplayName = "Destination",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            source.Hosts.AddRange(sourceHost, destinationHost);
+            _ = await source.SaveChangesAsync();
+            sourceHostId = sourceHost.Id;
+            destinationHostId = destinationHost.Id;
+            var standard = Profile(sourceHostId, "Standard", "standard", true);
+            var special = Profile(sourceHostId, "Special", "special", false);
+            source.Profiles.AddRange(standard, special);
+            _ = await source.SaveChangesAsync();
+            source.CommandAliases.AddRange(
+                Alias(sourceHostId, standard.Id, AppCommandKind.Start, "start-standard"),
+                Alias(sourceHostId, special.Id, AppCommandKind.Start, "start-special"),
+                Alias(sourceHostId, standard.Id, AppCommandKind.Guess, "predict"),
+                Alias(sourceHostId, special.Id, AppCommandKind.Guess, "predict"),
+                Alias(sourceHostId, standard.Id, AppCommandKind.Guesses, "choices"),
+                Alias(sourceHostId, special.Id, AppCommandKind.Stop, "halt-special")
+            );
+            _ = await source.SaveChangesAsync();
+            exported = await ConfigurationExportMappers.GuessingAsync(
+                source,
+                sourceHostId,
+                CancellationToken.None
+            );
+        }
+
+        await using (var destination = await database.CreateDbContextAsync())
+        await using (var transaction = await destination.Database.BeginTransactionAsync())
+        {
+            var issues = await GuessingConfigurationTransferAdapter.StageAsync(
+                destination,
+                destinationHostId,
+                exported,
+                new(ConfigurationSectionId.Guessing, ImportConflictStrategy.Merge, []),
+                CancellationToken.None
+            );
+            issues.ShouldBeEmpty();
+            _ = await destination.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using var verify = await database.CreateDbContextAsync();
+        var profiles = await verify
+            .Profiles.Where(profile => profile.HostId == destinationHostId)
+            .OrderBy(profile => profile.Slug)
+            .ToArrayAsync();
+        profiles.Select(profile => profile.Slug).ShouldBe(["special", "standard"]);
+        var aliases = await verify
+            .CommandAliases.Where(alias => alias.HostId == destinationHostId)
+            .OrderBy(alias => alias.Alias)
+            .ThenBy(alias => alias.GuessRoundProfileId)
+            .ToArrayAsync();
+        aliases.Where(alias => alias.Alias == "predict").Count().ShouldBe(2);
+        aliases
+            .Where(alias => alias.Alias == "predict")
+            .ShouldAllBe(alias => alias.Kind == AppCommandKind.Guess);
+        aliases.ShouldContain(alias => alias.Alias == "choices");
+        aliases.ShouldContain(alias => alias.Alias == "halt-special");
+        aliases.Count(alias => alias.Kind == AppCommandKind.Start).ShouldBe(2);
+    }
+
+    [Test]
+    public async Task FormatOneStaging_StartAndCrossKindOverlaps_RejectBeforeMutation()
+    {
+        var cases = new[]
+        {
+            (First: AppCommandKind.Start, Second: AppCommandKind.Start),
+            (First: AppCommandKind.Guess, Second: AppCommandKind.Win),
+        };
+        foreach (var (first, second) in cases)
+        {
+            await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            int hostId;
+            await using (var seed = await database.CreateDbContextAsync())
+            {
+                var host = new BotHost
+                {
+                    Login = "destination",
+                    DisplayName = "Destination",
+                    CreatedAtUtc = DateTime.UtcNow,
+                };
+                _ = seed.Hosts.Add(host);
+                _ = await seed.SaveChangesAsync();
+                hostId = host.Id;
+            }
+            var section = new GuessingSectionV1([
+                ImportedProfile("first", "First", "first", true) with
+                {
+                    CommandAliases = [new(first, ["shared"])],
+                },
+                ImportedProfile("second", "Second", "second", false) with
+                {
+                    CommandAliases = [new(second, ["shared"])],
+                },
+            ]);
+            await using var db = await database.CreateDbContextAsync();
+
+            var issues = await GuessingConfigurationTransferAdapter.StageAsync(
+                db,
+                hostId,
+                section,
+                new(ConfigurationSectionId.Guessing, ImportConflictStrategy.Merge, []),
+                CancellationToken.None
+            );
+
+            issues
+                .ShouldHaveSingleItem()
+                .Message.ShouldBe("!shared is already used by another bot command.");
+            db.ChangeTracker.HasChanges().ShouldBeFalse();
+        }
+    }
+
     private static GuessRoundProfile Profile(
         int hostId,
         string name,
@@ -309,6 +440,20 @@ public sealed class ConfigurationTransferGuessingTests
             new("", "", "", "", "", "", "", "", "", "", "", "", ""),
             [new("answer", "answer", ReplyDeliveryTarget.Chat)]
         );
+
+    private static CommandAlias Alias(
+        int hostId,
+        int profileId,
+        AppCommandKind kind,
+        string alias
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            GuessRoundProfileId = profileId,
+            Kind = kind,
+            Alias = alias,
+        };
 
     private static ConfigurationDocumentV1 Document(GuessingSectionV1 guessing) =>
         new(

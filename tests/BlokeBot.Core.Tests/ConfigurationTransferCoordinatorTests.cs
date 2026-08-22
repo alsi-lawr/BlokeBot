@@ -193,6 +193,64 @@ public sealed class ConfigurationTransferCoordinatorTests
     }
 
     [Test]
+    public async Task GuessingAndPointsSharedAlias_ApplyingTogether_RejectsAndRollsBack()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "destination");
+
+        var outcome = await Coordinator(database)
+            .ApplyAsync(
+                Session(hostId),
+                Document(guessing: Guessing("shared"), points: Points("shared")),
+                Selection(hostId, ConfigurationSectionId.Guessing, ConfigurationSectionId.Points),
+                new("actor-id", "destination"),
+                CancellationToken.None
+            );
+
+        outcome
+            .ShouldBeOfType<ConfigurationImportApplyOutcome.Invalid>()
+            .Issues.ShouldContain(issue =>
+                issue.Message == "!shared is already used by another bot command."
+            );
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.Profiles.CountAsync()).ShouldBe(0);
+        (await verify.PointsSettings.CountAsync()).ShouldBe(0);
+        (await verify.CommandAliases.CountAsync()).ShouldBe(0);
+        (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CustomAndGuessingSharedAlias_ApplyingTogether_RejectsAndRollsBack()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "destination");
+
+        var outcome = await Coordinator(database)
+            .ApplyAsync(
+                Session(hostId),
+                Document(commands: Commands("shared"), guessing: Guessing("shared")),
+                Selection(
+                    hostId,
+                    ConfigurationSectionId.CustomCommands,
+                    ConfigurationSectionId.Guessing
+                ),
+                new("actor-id", "destination"),
+                CancellationToken.None
+            );
+
+        outcome
+            .ShouldBeOfType<ConfigurationImportApplyOutcome.Invalid>()
+            .Issues.ShouldContain(issue =>
+                issue.Message == "!shared is already used by another bot command."
+            );
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.Profiles.CountAsync()).ShouldBe(0);
+        (await verify.CustomCommands.CountAsync()).ShouldBe(0);
+        (await verify.CommandAliases.CountAsync()).ShouldBe(0);
+        (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task SelectedHostMismatch_IsRejectedWithoutMutation()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -336,6 +394,7 @@ public sealed class ConfigurationTransferCoordinatorTests
 
     private static ConfigurationDocumentV1 Document(
         CustomCommandsSectionV1? commands = null,
+        GuessingSectionV1? guessing = null,
         PointsSectionV1? points = null,
         ChannelToolEnablementV1? enablement = null
     ) =>
@@ -344,10 +403,10 @@ public sealed class ConfigurationTransferCoordinatorTests
             1,
             DateTimeOffset.UtcNow,
             new("source-channel", "0.12.0"),
-            new(commands, Points: points, ChannelToolEnablement: enablement)
+            new(commands, Guessing: guessing, Points: points, ChannelToolEnablement: enablement)
         );
 
-    private static CustomCommandsSectionV1 Commands() =>
+    private static CustomCommandsSectionV1 Commands(string alias = "hello-transfer") =>
         new(
             "UTC",
             [new("reply-0001", "hello reply", CustomMessageSelectionMode.Sequential, ["Hello!"])],
@@ -357,7 +416,7 @@ public sealed class ConfigurationTransferCoordinatorTests
                     "command-0001",
                     "hello command",
                     true,
-                    ["hello-transfer"],
+                    [alias],
                     true,
                     true,
                     0,
@@ -368,12 +427,26 @@ public sealed class ConfigurationTransferCoordinatorTests
             ]
         );
 
-    private static PointsSectionV1 Points()
+    private static GuessingSectionV1 Guessing(string alias) =>
+        new([
+            new(
+                "profile-0001",
+                "Imported",
+                "imported",
+                true,
+                "0",
+                [new(AppCommandKind.Guess, [alias])],
+                new("", "", "", "", "", "", "", "", "", "", "", "", ""),
+                [new("answer", "answer", ReplyDeliveryTarget.Chat)]
+            ),
+        ]);
+
+    private static PointsSectionV1 Points(string? alias = null)
     {
         var value = new PointsSettings();
         return new(
             value.PointLabel,
-            [],
+            alias is null ? [] : [new(AppCommandKind.Points, [alias])],
             new(
                 value.BalanceReply,
                 value.OtherBalanceReply,

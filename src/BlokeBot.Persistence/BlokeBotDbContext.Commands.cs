@@ -61,7 +61,17 @@ public sealed partial class BlokeBotDbContext
                 )
                 .HasMaxLength(64);
             _ = b.Property(static x => x.Alias).HasMaxLength(64);
-            _ = b.HasIndex(static x => new { x.HostId, x.Alias }).IsUnique();
+            _ = b.HasIndex(static x => new { x.HostId, x.Alias })
+                .IsUnique()
+                .HasFilter("\"GuessRoundProfileId\" IS NULL");
+            _ = b.HasIndex(static x => new
+                {
+                    x.HostId,
+                    x.GuessRoundProfileId,
+                    x.Alias,
+                })
+                .IsUnique()
+                .HasFilter("\"GuessRoundProfileId\" IS NOT NULL");
             _ = b.HasIndex(static x => new { x.HostId, x.GuessRoundProfileId });
             _ = b.HasOne<BotHost>()
                 .WithMany()
