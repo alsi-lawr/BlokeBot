@@ -1,5 +1,4 @@
 @using System.Globalization
-@using BlokeBot.Core.Features.Points.Balances
 
 <StudioStage Key="round-type"
              Number="1"
@@ -24,27 +23,18 @@
             <p class="mt-2 text-xs text-muted-foreground">Switching with unsaved edits still asks: save, discard, or keep editing.</p>
         </div>
         <div class="studio-span-6">
-            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
-            <div class="mt-2 max-md:mt-0">
-                <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")"
-                       Label="Round type name"
-                       @bind-Value="Configuration.Profile.Name"
-                       Placeholder="Round type name" />
-            </div>
+            <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")"
+                   Label="Round type name"
+                   @bind-Value="Configuration.Profile.Name"
+                   Placeholder="Round type name" />
             <p class="mt-1 text-xs text-muted-foreground">Up to 128 characters. Names must be unique.</p>
         </div>
-        <div class="studio-span-6 space-y-2">
-            <label class="label" for="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")">Points for a winning guess</label>
-            <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
-                <StudioStepper Id="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")"
-                               AriaLabel="Points for a winning guess"
-                               Unit="points"
-                               Step="10"
-                               Minimum="0"
-                               Maximum="@PointAmount.MaximumValue"
-                               @bind-Value="Configuration.Profile.WinningGuessPointReward" />
-            </div>
-            <p class="text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
+        <div class="studio-span-6">
+            <Field Id="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")"
+                   Label="Points for a winning guess"
+                   @bind-Value="Configuration.Profile.WinningGuessPointReward"
+                   Placeholder="0" />
+            <p class="mt-1 text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
         </div>
         <div class="studio-span-6 content-end">
             <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
