@@ -44,7 +44,7 @@ public sealed class ViewerPassportCommandTests
         );
         var services = new ServiceCollection();
         _ = services.AddSingleton(service);
-        _ = services.AddSingleton<IOptions<BlokeBotOptions>>(Options.Create(new BlokeBotOptions()));
+        _ = services.AddSingleton(PublicSiteLinks("https://localhost/oauth/callback"));
         _ = services.AddChatCommands().AddCommandModule<ViewerPassportCommandModule>();
         await using var provider = services.BuildServiceProvider();
         var dispatcher = provider.GetRequiredService<ChatCommandDispatcher>();
@@ -53,7 +53,7 @@ public sealed class ViewerPassportCommandTests
         await DispatchAsync(dispatcher, responses);
 
         responses.Single().ShouldContain("Viewer: 0 points");
-        responses.Single().ShouldContain("/passport/streamer/viewer");
+        responses.Single().ShouldContain("https://localhost/passport/streamer/viewer");
         responses.Single().ShouldNotContain("PUBLIC-LINE");
         _ = Success(
             await service.SaveAsync(
@@ -65,7 +65,9 @@ public sealed class ViewerPassportCommandTests
 
         await DispatchAsync(dispatcher, responses);
 
-        responses.Single().ShouldBe("Open your viewer passport: /passports/streamer/me");
+        responses
+            .Single()
+            .ShouldBe("Open your viewer passport: https://localhost/passports/streamer/me");
         responses.Single().ShouldNotContain("PRIVATE-LINE");
         _ = Success(
             await service.SaveAsync(
@@ -77,7 +79,9 @@ public sealed class ViewerPassportCommandTests
 
         await DispatchAsync(dispatcher, responses);
 
-        responses.Single().ShouldBe("Open your viewer passport: /passports/streamer/me");
+        responses
+            .Single()
+            .ShouldBe("Open your viewer passport: https://localhost/passports/streamer/me");
         responses.Single().ShouldNotContain("MEMBERS-LINE");
     }
 
@@ -106,7 +110,7 @@ public sealed class ViewerPassportCommandTests
     }
 
     [Test]
-    public async Task Summary_SendsAFullLinkOnlyWhenAPublicBaseIsConfigured()
+    public async Task Summary_UsesTheConfiguredPublicBaseOrTheTwitchRedirectOrigin()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         int hostId;
@@ -134,13 +138,11 @@ public sealed class ViewerPassportCommandTests
             await service.SaveAsync(Save(hostId, ViewerPassportVisibility.Public, "LINE"), default)
         );
 
-        async Task<string> ReplyAsync(string? publicBaseUrl)
+        async Task<string> ReplyAsync(string? publicBaseUrl, string redirectUri)
         {
             var services = new ServiceCollection();
             _ = services.AddSingleton(service);
-            _ = services.AddSingleton<IOptions<BlokeBotOptions>>(
-                Options.Create(new BlokeBotOptions { PublicBaseUrl = publicBaseUrl })
-            );
+            _ = services.AddSingleton(PublicSiteLinks(redirectUri, publicBaseUrl));
             _ = services.AddChatCommands().AddCommandModule<ViewerPassportCommandModule>();
             await using var provider = services.BuildServiceProvider();
             var responses = new List<string>();
@@ -148,18 +150,38 @@ public sealed class ViewerPassportCommandTests
             return responses.Single();
         }
 
-        (await ReplyAsync("https://bot.example.com")).ShouldContain(
-            "https://bot.example.com/passport/streamer/viewer"
-        );
-        (await ReplyAsync("https://bot.example.com/prefix")).ShouldContain(
-            "https://bot.example.com/prefix/passport/streamer/viewer"
-        );
-
-        // An unusable value degrades to the path the reply already used.
-        (await ReplyAsync("not a url")).ShouldContain("/passport/streamer/viewer");
-        (await ReplyAsync("not a url")).ShouldNotContain("http");
-        (await ReplyAsync(null)).ShouldContain("/passport/streamer/viewer");
+        (
+            await ReplyAsync("https://bot.example.com", "http://localhost/oauth/callback")
+        ).ShouldContain("https://bot.example.com/passport/streamer/viewer");
+        (
+            await ReplyAsync("https://bot.example.com/prefix", "http://localhost/oauth/callback")
+        ).ShouldContain("https://bot.example.com/prefix/passport/streamer/viewer");
+        (
+            await ReplyAsync(null, "http://127.0.0.1:5080/oauth/callback?source=twitch#complete")
+        ).ShouldContain("http://127.0.0.1:5080/passport/streamer/viewer");
     }
+
+    [Test]
+    [Arguments("not a url")]
+    [Arguments("ftp://bot.example.com")]
+    [Arguments("https://user:secret@bot.example.com")]
+    [Arguments("https://bot.example.com?tenant=one")]
+    [Arguments("https://bot.example.com#passport")]
+    public void InvalidConfiguredPublicBase_FailsStartupOptionValidation(string publicBaseUrl) =>
+        BlokeBotOptionsValidation
+            .IsValid(new BlokeBotOptions { PublicBaseUrl = publicBaseUrl })
+            .ShouldBeFalse();
+
+    private static PublicSiteLinks PublicSiteLinks(
+        string redirectUri,
+        string? publicBaseUrl = null
+    ) =>
+        new(
+            Options.Create(new BlokeBotOptions { PublicBaseUrl = publicBaseUrl }),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { RedirectUri = redirectUri } }
+            )
+        );
 
     private static async Task DispatchAsync(
         ChatCommandDispatcher dispatcher,

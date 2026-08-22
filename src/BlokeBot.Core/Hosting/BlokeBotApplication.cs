@@ -44,6 +44,7 @@ public static partial class BlokeBotApplication
         _ = builder.Services.AddCascadingAuthenticationState();
         _ = builder.Services.AddHttpContextAccessor();
         _ = builder.Services.AddSingleton(BlokeBotBuildIdentity.Current);
+        _ = builder.Services.AddSingleton<PublicSiteLinks>();
         _ = builder.Services.AddSingleton<UiFaultTelemetry>();
         _ = builder.Services.AddScoped<DashboardFragmentState>();
 

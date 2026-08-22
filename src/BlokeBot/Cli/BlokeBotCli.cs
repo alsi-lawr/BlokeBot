@@ -113,6 +113,10 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
               RedirectUri  TwitchBot__Identity__RedirectUri; the OAuth callback URL, which
                            must exactly match the callback registered with Twitch.
 
+            Optional public URL configuration:
+              PublicBaseUrl BlokeBot__PublicBaseUrl; the public dashboard URL used in chat links.
+                            If unset, BlokeBot uses the protocol, host, and port from RedirectUri.
+
             Required privacy configuration for online mode:
               ControllerName BlokeBotPrivacy__ControllerName; who operates this deployment,
                              as named in its privacy notice.

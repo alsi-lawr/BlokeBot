@@ -22,10 +22,8 @@ public sealed record BlokeBotOptions
     public string? HelpSiteBaseUrl { get; init; }
 
     /// <summary>
-    /// Optional base address this deployment is reached on. Chat replies that point a viewer at a
-    /// page use it to send a full link instead of a bare path. It follows
-    /// <see cref="HelpSiteBaseUrl"/> in staying outside <see cref="BlokeBotOptionsValidation"/>, so
-    /// a bad value degrades the reply to the path it already used and never prevents startup.
+    /// Optional base address this deployment is reached on. When omitted, public links use the
+    /// origin of <c>TwitchBot:Identity:RedirectUri</c>.
     /// </summary>
     public string? PublicBaseUrl { get; init; }
 }
@@ -60,6 +58,9 @@ public sealed record BlokeBotOverlayMediaOptions
 
 public static class BlokeBotOptionsValidation
 {
+    internal const string PublicBaseUrlFailure =
+        "BlokeBot:PublicBaseUrl must be an absolute HTTP or HTTPS URL without credentials, a query, or a fragment.";
+
     public static bool IsValid(BlokeBotOptions options) =>
         options.BotStateChangeCooldownSeconds >= 0
         && options.CustomCommands.MinimumCooldownSeconds >= 0
@@ -69,5 +70,6 @@ public static class BlokeBotOptionsValidation
         && options.Overlays.Media.MaximumHostStorageBytes
             >= options.Overlays.Media.MaximumUploadBytes
         && options.Overlays.Media.MaximumHostStorageBytes <= 20L * 1024 * 1024 * 1024
-        && options.Overlays.Media.DisconnectedQueueExpirySeconds is >= 1 and <= 300;
+        && options.Overlays.Media.DisconnectedQueueExpirySeconds is >= 1 and <= 300
+        && PublicSiteLinks.HasValidConfiguredBaseAddress(options.PublicBaseUrl);
 }
