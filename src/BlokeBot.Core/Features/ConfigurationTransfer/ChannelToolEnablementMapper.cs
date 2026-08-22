@@ -6,6 +6,11 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal static class ChannelToolEnablementMapper
 {
+    private const HostFeatureFlags _retiredShoutouts = (HostFeatureFlags)(1UL << 3);
+
+    public static bool CanRepresent(HostFeatureFlags flags) =>
+        (flags & ~(HostFeatureFlags.All | _retiredShoutouts)) == 0;
+
     public static ChannelToolEnablementV1 FromFlags(HostFeatureFlags flags) =>
         new(
             Has(flags, HostFeatureFlags.Automations),

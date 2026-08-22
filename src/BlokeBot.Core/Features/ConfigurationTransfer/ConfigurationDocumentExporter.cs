@@ -29,13 +29,15 @@ public sealed class ConfigurationDocumentExporter(
         {
             return new ConfigurationExportOutcome.NotFound();
         }
-        if ((host.EnabledFeatures & ~Persistence.Models.HostFeatureFlags.All) != 0)
+        if (
+            selection.Sections.Contains(ConfigurationSectionId.ChannelToolEnablement)
+            && !ChannelToolEnablementMapper.CanRepresent(host.EnabledFeatures)
+        )
         {
             return new ConfigurationExportOutcome.Unsupported(
                 "Channel tool enablement contains a flag that format 1 cannot represent."
             );
         }
-
         if (
             selection.Sections.Contains(ConfigurationSectionId.Overlays)
             && selection.Overlay.UrlLayers

@@ -289,6 +289,55 @@ public sealed class ConfigurationTransferContractTests
     }
 
     [Test]
+    public async Task RetiredShoutoutFlag_DoesNotBlockCurrentChannelToolProjection()
+    {
+        const HostFeatureFlags RetiredShoutouts = (HostFeatureFlags)(1UL << 3);
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "legacy-shoutouts",
+                DisplayName = "Legacy shoutouts",
+                EnabledFeatures =
+                    RetiredShoutouts
+                    | HostFeatureFlags.RaidCollaboration
+                    | HostFeatureFlags.CustomCommands,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+        }
+        var automation = ConfigurationTransferAutomationTestServices.Create(database);
+        var exported = (
+            await new ConfigurationDocumentExporter(
+                database,
+                new(),
+                automation.Catalog,
+                automation.Flows,
+                NullLogger<ConfigurationDocumentExporter>.Instance,
+                TimeProvider.System
+            ).ExportAsync(
+                hostId,
+                new(
+                    new HashSet<ConfigurationSectionId>
+                    {
+                        ConfigurationSectionId.ChannelToolEnablement,
+                    },
+                    new(false, false, false)
+                ),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
+
+        ChannelToolEnablementMapper
+            .ToFlags(exported.Document.Sections.ChannelToolEnablement!)
+            .ShouldBe(HostFeatureFlags.RaidCollaboration | HostFeatureFlags.CustomCommands);
+    }
+
+    [Test]
     [Arguments(HostFeatureFlags.None)]
     [Arguments(HostFeatureFlags.Polls)]
     [Arguments(
