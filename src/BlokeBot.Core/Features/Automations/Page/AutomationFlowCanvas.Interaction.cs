@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Components;
-
 namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationFlowCanvas
@@ -25,16 +23,6 @@ public partial class AutomationFlowCanvas
                 return new AutomationNodeMoveRequest(node.Id, position.X.Value, position.Y.Value);
             })
             .ToArray();
-
-    private Task ChangeOrientationAsync(ChangeEventArgs args) =>
-        Enum.TryParse<AutomationFlowOrientation>(args.Value?.ToString(), out var orientation)
-            ? SettingsChanged.InvokeAsync(Settings with { Orientation = orientation })
-            : Task.CompletedTask;
-
-    private Task ChangeEdgeStyleAsync(ChangeEventArgs args) =>
-        Enum.TryParse<AutomationEdgeStyle>(args.Value?.ToString(), out var edgeStyle)
-            ? SettingsChanged.InvokeAsync(Settings with { EdgeStyle = edgeStyle })
-            : Task.CompletedTask;
 
     private int DisplayMax(Func<AutomationCanvasPosition, AutomationCanvasCoordinate> selector) =>
         Nodes.Count == 0

@@ -30,7 +30,7 @@ export function beginNodeDrag(state, event, node) {
   } else if (!selected.has(nodeId)) {
     selected = new Set([nodeId]);
   }
-  setLocalSelection(state.root, selected, null);
+  setLocalSelection(state, selected, null);
   void notifyPointerSelection(state);
   if (!selected.has(nodeId)) return;
   node.querySelector("[data-automation-node-select]")?.focus({ preventScroll: true });
@@ -193,7 +193,7 @@ export function applyMarqueeSelection(state) {
       && rectangle.top < top + height
       && rectangle.bottom > top)
     .map(({ id }) => id);
-  setLocalSelection(state.root, ids, null);
+  setLocalSelection(state, ids, null);
 }
 
 export function scheduleMarqueeUpdate(state) {
@@ -224,7 +224,7 @@ export function finishBackgroundAction(state, event) {
     }
     state.root.classList.remove("automation-canvas--panning");
     if (deselect) {
-      setLocalSelection(state.root, [], null);
+      setLocalSelection(state, [], null);
       scheduleRoutePass(state);
       state.root.focus({ preventScroll: true });
       void notifyCompactSelection(state);

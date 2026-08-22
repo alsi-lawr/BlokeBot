@@ -119,16 +119,41 @@ public sealed partial class AutomationEditorNode
                         DateTimeStyles.RoundtripKind,
                         out var timestamp
                     ) => new AutomationValue.Timestamp(timestamp),
-                AutomationPortValueType.Arguments => new AutomationValue.Arguments([]),
-                AutomationPortValueType.Actor => new AutomationValue.Actor(
-                    new(string.Empty, string.Empty)
-                ),
-                AutomationPortValueType.Channel => new AutomationValue.Channel(
-                    new(string.Empty, string.Empty)
-                ),
-                AutomationPortValueType.Stream => new AutomationValue.Stream(new(null, null, null)),
+                _ when IsComplexFixedValue(valueType)
+                        && TryParseComplexFixedValue(
+                            value,
+                            valueType,
+                            nullability,
+                            out var complexValue
+                        ) => complexValue,
+                AutomationPortValueType.Arguments
+                or AutomationPortValueType.Actor
+                or AutomationPortValueType.Channel
+                or AutomationPortValueType.Stream => CanonicalComplexFixedValue(valueType),
                 _ => new AutomationValue.Null(valueType),
             };
+
+    private static AutomationValue CanonicalComplexFixedValue(AutomationPortValueType valueType) =>
+        valueType switch
+        {
+            AutomationPortValueType.Arguments => new AutomationValue.Arguments([]),
+            AutomationPortValueType.Actor => new AutomationValue.Actor(
+                new(string.Empty, string.Empty)
+            ),
+            AutomationPortValueType.Channel => new AutomationValue.Channel(
+                new(string.Empty, string.Empty)
+            ),
+            AutomationPortValueType.Stream => new AutomationValue.Stream(new(null, null, null)),
+            AutomationPortValueType.Flow
+            or AutomationPortValueType.Text
+            or AutomationPortValueType.Number
+            or AutomationPortValueType.Boolean
+            or AutomationPortValueType.Timestamp => throw new ArgumentOutOfRangeException(
+                nameof(valueType),
+                valueType,
+                null
+            ),
+        };
 
     internal static bool IsComplexFixedValue(AutomationPortValueType valueType) =>
         valueType

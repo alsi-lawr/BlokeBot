@@ -9,6 +9,7 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -213,6 +214,21 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
+    public async Task TypedEditor_Page_RendersAndPersistsTheCurrentFlowName()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync();
+        var name = fixture.Page.Find("#automation-flow-name");
+
+        name.GetAttribute("value").ShouldBe("Available flow");
+
+        name.Input("Renamed flow");
+        fixture.Page.Find("[data-automation-save-flow]").Click();
+
+        fixture.Page.Find("#automation-flow-name").GetAttribute("value").ShouldBe("Renamed flow");
+        (await fixture.PersistedFlowNameAsync()).ShouldBe("Renamed flow");
+    }
+
+    [Test]
     public async Task TypedEditor_Page_DisclosureDoesNotChangeDraftDirtyStateOrHistoryDepth()
     {
         await using var fixture = await AutomationEditorPageFixture.CreateAsync();
@@ -413,16 +429,94 @@ public sealed class AutomationEditorInteractionTests
             ParsedFixedValue(source, valueType)
         );
 
+        transform.UpdateTransformInput(
+            input.PortId,
+            "Renamed input",
+            valueType,
+            AutomationPortNullability.Nullable
+        );
+        AssertFixedValuesEqual(
+            ParsedFixedValue(FixedValueJson(transform), valueType),
+            ParsedFixedValue(accepted, valueType)
+        );
+
         transform.SetComplexFixedValue(input.PortId, invalid).ShouldBeFalse();
         FixedValueJson(transform).ShouldBe(accepted);
 
         var restored = AutomationEditorNode.Restore(transform.Draft(), transform.Definition);
+        AssertFixedValuesEqual(
+            ParsedFixedValue(FixedValueJson(restored), valueType),
+            ParsedFixedValue(accepted, valueType)
+        );
         JsonNode
             .DeepEquals(
                 JsonNode.Parse(restored.Value(input.BindingFieldId)),
                 JsonNode.Parse(accepted)
             )
             .ShouldBeTrue();
+    }
+
+    [Test]
+    public void TypedEditor_TransformInput_TypeChangesToComplexCommitCanonicalDefaults()
+    {
+        const string ActorValue = "{\"login\":\"viewer\",\"display-name\":\"Viewer\"}";
+        var transform = CelTransformNode();
+        var input = transform.TransformInputs.Single();
+        transform.SetValue(input.BindingFieldId, ActorValue);
+        transform.UpdateTransformInput(
+            input.PortId,
+            "Actor input",
+            AutomationPortValueType.Actor,
+            AutomationPortNullability.NonNullable
+        );
+
+        transform
+            .TransformInputs.Single()
+            .FixedValue.ShouldBe(new AutomationValue.Actor(new(string.Empty, string.Empty)));
+        transform.SetComplexFixedValue(input.PortId, ActorValue).ShouldBeTrue();
+
+        transform.UpdateTransformInput(
+            input.PortId,
+            "Channel input",
+            AutomationPortValueType.Channel,
+            AutomationPortNullability.NonNullable
+        );
+
+        var updated = transform.TransformInputs.Single();
+        updated.DisplayName.ShouldBe("Channel input");
+        updated.ValueType.ShouldBe(AutomationPortValueType.Channel);
+        updated.Nullability.ShouldBe(AutomationPortNullability.NonNullable);
+        updated.FixedValue.ShouldBe(new AutomationValue.Channel(new(string.Empty, string.Empty)));
+        ParsedFixedValue(transform.Value(input.BindingFieldId), AutomationPortValueType.Channel)
+            .ShouldBe(updated.FixedValue);
+    }
+
+    [Test]
+    public void TypedEditor_TransformInput_RequiredComplexNullCommitsCanonicalDefault()
+    {
+        var transform = CelTransformNode();
+        var input = transform.TransformInputs.Single();
+        transform.UpdateTransformInput(
+            input.PortId,
+            "Optional actor",
+            AutomationPortValueType.Actor,
+            AutomationPortNullability.Nullable
+        );
+
+        transform.UpdateTransformInput(
+            input.PortId,
+            "Required actor",
+            AutomationPortValueType.Actor,
+            AutomationPortNullability.NonNullable
+        );
+
+        var updated = transform.TransformInputs.Single();
+        updated.DisplayName.ShouldBe("Required actor");
+        updated.ValueType.ShouldBe(AutomationPortValueType.Actor);
+        updated.Nullability.ShouldBe(AutomationPortNullability.NonNullable);
+        updated.FixedValue.ShouldBe(new AutomationValue.Actor(new(string.Empty, string.Empty)));
+        ParsedFixedValue(transform.Value(input.BindingFieldId), AutomationPortValueType.Actor)
+            .ShouldBe(updated.FixedValue);
     }
 
     [Test]
@@ -1426,6 +1520,12 @@ public sealed class AutomationEditorInteractionTests
         internal IRenderedComponent<AutomationEditorPage> Page { get; }
 
         internal int FocusCalls => AutomationEditorInteractionTests.FocusCalls(_context);
+
+        internal async Task<string> PersistedFlowNameAsync()
+        {
+            await using var db = await _database.CreateDbContextAsync();
+            return await db.AutomationFlows.Select(static flow => flow.Name).SingleAsync();
+        }
 
         internal static async Task<AutomationEditorPageFixture> CreateAsync(
             bool includeUnavailableFlow = false

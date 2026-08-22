@@ -177,8 +177,6 @@ public partial class AutomationEditorPage
         EditorChanged();
     }
 
-    private void MoveNode(AutomationNodeMoveRequest request) => MoveNodes([request]);
-
     private void MoveNodes(IReadOnlyList<AutomationNodeMoveRequest> requests)
     {
         if (_editor is null)

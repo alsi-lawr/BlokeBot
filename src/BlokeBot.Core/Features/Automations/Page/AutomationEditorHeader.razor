@@ -14,7 +14,7 @@
             <span class="@ValidationClass" role="status">@ValidationLabel</span>
             <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Validate"><AutomationIcon Name="validate" />Validate</button>
             <button class="btn-secondary" type="button" disabled="@(Busy || !HasNodes)" data-automation-test-flow @onclick="Test"><AutomationIcon Name="test" />Test flow</button>
-            <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Save"><AutomationIcon Name="save" />Save</button>
+            <button class="btn-secondary" type="button" disabled="@Busy" data-automation-save-flow @onclick="Save"><AutomationIcon Name="save" />Save</button>
             @if (FocusMode)
             {
                 <button class="automation-focus-action" type="button" @onclick="Hide"><AutomationIcon Name="hide" />Hide tools</button>

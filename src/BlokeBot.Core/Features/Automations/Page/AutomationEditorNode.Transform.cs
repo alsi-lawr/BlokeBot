@@ -99,7 +99,10 @@ public sealed partial class AutomationEditorNode
         }
 
         var current = _transform.Inputs[index];
-        var fixedValue = ParseFixedValue(_values[current.BindingFieldId], valueType, nullability);
+        var fixedValue =
+            IsComplexFixedValue(valueType) && current.ValueType != valueType
+                ? CanonicalComplexFixedValue(valueType)
+                : ParseFixedValue(_values[current.BindingFieldId], valueType, nullability);
         _transform = _transform with
         {
             Inputs = _transform.Inputs.SetItem(

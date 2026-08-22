@@ -35,8 +35,16 @@ export function selectionIds(root) {
   return selectedNodes(root).map((node) => node.dataset.automationNode);
 }
 
-export function setLocalSelection(root, nodeIds, edgeId = null) {
+export function setLocalSelection(state, nodeIds, edgeId = null) {
+  const root = state.root;
   const selected = new Set(nodeIds);
+  const disclosed = root.querySelector("[data-automation-node].automation-node--disclosed");
+  if (
+    disclosed instanceof HTMLElement
+    && !selected.has(disclosed.dataset.automationNode)
+  ) {
+    requestDisclosure(state, null);
+  }
   for (const node of root.querySelectorAll("[data-automation-node]")) {
     const isSelected = selected.has(node.dataset.automationNode);
     node.classList.toggle("automation-node--selected", isSelected);

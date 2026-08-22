@@ -154,7 +154,7 @@ export function initialize(root, dotnet) {
         return;
       }
       const wasDisclosed = nodeElement.classList.contains("automation-node--disclosed");
-      setLocalSelection(state.root, [nodeId], null);
+      setLocalSelection(state, [nodeId], null);
       requestDisclosure(state, wasDisclosed ? null : nodeId);
       scheduleRoutePass(state);
       return;

@@ -211,24 +211,6 @@ public partial class AutomationEditorPage
     private static string ModeToken(AutomationEditorMode mode) =>
         mode == AutomationEditorMode.Grid ? "grid" : "list";
 
-    private static string KindToken(AutomationNodeKind kind) =>
-        kind switch
-        {
-            AutomationNodeKind.Source => "source",
-            AutomationNodeKind.Control => "control",
-            AutomationNodeKind.Action => "action",
-            _ => "node",
-        };
-
-    private static string KindLabel(AutomationNodeKind kind) =>
-        kind switch
-        {
-            AutomationNodeKind.Source => "Event",
-            AutomationNodeKind.Control => "Control",
-            AutomationNodeKind.Action => "Action",
-            _ => "Node",
-        };
-
     private static string RecentRunTitle(AutomationRunSummary run) =>
         run.State switch
         {

@@ -99,7 +99,7 @@ public sealed class AutomationFlowRoutingTests
         RunModuleProbeAsync(_scenario12);
 
     [Test]
-    public Task OverlappingDisclosureActivations_KeepTheLatestAbsoluteIntent() =>
+    public Task LocalDisclosureIntents_RejectStaleRendersAcrossObserverBoundaries() =>
         RunModuleProbeAsync(_scenario13);
 
     [Test]
@@ -109,6 +109,10 @@ public sealed class AutomationFlowRoutingTests
     [Test]
     public Task PointerDrag_StaysBelowLongTaskBudgetAndConverges() =>
         RunModuleProbeAsync(_scenario15);
+
+    [Test]
+    public Task CtrlWheel_ZoomsCanvasAndSuppressesBrowserDefault() =>
+        RunModuleProbeAsync(_scenario16);
 
     private static async Task RunModuleProbeAsync(string scenario)
     {
@@ -1193,7 +1197,7 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
 """;
 
     private const string _scenario13 = """
-// Scenario 13: stale server renders cannot replay older disclosure intents ---
+// Scenario 13: local selection closure rejects stale disclosure renders ---
 {
   const canvas = buildCanvas();
   const root = canvas.root;
@@ -1205,54 +1209,82 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   moduleExports.initialize(root, dotnet);
   flushAllScheduled();
 
-  const activate = (node, pointerId) => {
-    const button = node.querySelector("[data-automation-node-select]");
-    dispatch(root, "pointerdown", { pointerId, target: button, clientX: 20, clientY: 20 });
-    dispatch(root, "pointerup", { pointerId, target: button, clientX: 20, clientY: 20 });
-  };
+  const firstButton = first.querySelector("[data-automation-node-select]");
+  const secondButton = second.querySelector("[data-automation-node-select]");
+  dispatch(root, "pointerdown", { pointerId: 81, target: firstButton, clientX: 20, clientY: 20 });
+  dispatch(root, "pointerup", { pointerId: 81, target: firstButton, clientX: 20, clientY: 20 });
+  root.setAttribute("data-disclosed-node-id", "node-first");
+  root.setAttribute("data-disclosure-generation", "1");
+  moduleExports.refresh(root);
+  flushAllScheduled();
+  assert.equal(first.classes.has("automation-node--disclosed"), true, "the first disclosure is acknowledged");
 
-  activate(first, 81);
-  activate(second, 82);
-  assert.equal(first.classes.has("automation-node--disclosed"), false);
-  assert.equal(second.classes.has("automation-node--disclosed"), true, "the latest intent is echoed immediately");
+  dispatch(root, "pointerdown", { pointerId: 82, target: secondButton, clientX: 20, clientY: 20 });
+  assert.equal(first.classes.has("automation-node--disclosed"), false, "selecting another node closes disclosure immediately");
+  flushOneScheduled();
+  assert.equal(first.classes.has("automation-node--disclosed"), false, "the observer cannot replay stale disclosure before pointerup");
+  dispatch(root, "pointerup", { pointerId: 82, target: secondButton, clientX: 20, clientY: 20 });
+  assert.equal(second.classes.has("automation-node--disclosed"), true, "pointerup discloses the newly selected node");
+
   const disclosureCalls = dotnet.calls.filter((call) => call.method === "SetNodeDisclosureFromCanvasAsync");
   assert.deepEqual(disclosureCalls.map((call) => call.values), [
     ["node-first", 1],
-    ["node-second", 2],
+    [null, 2],
+    ["node-second", 3],
   ], "interop carries absolute, ordered disclosure intent");
 
-  // Apply the older render as Blazor would: it adds first-node disclosure but
-  // has no diff that removes the newer local class from the second node.
-  root.setAttribute("data-disclosed-node-id", "node-first");
-  root.setAttribute("data-disclosure-generation", "1");
-  first.classList.add("automation-node--disclosed");
-  first.querySelector("[data-automation-node-select]").setAttribute("aria-expanded", "true");
+  root.setAttribute("data-disclosed-node-id", "");
+  root.setAttribute("data-disclosure-generation", "2");
   flushAllScheduled();
-
-  assert.equal(first.classes.has("automation-node--disclosed"), false, "the stale render is rejected before routing");
-  assert.equal(first.querySelector("[data-automation-node-select]").getAttribute("aria-expanded"), "false");
-  assert.equal(second.classes.has("automation-node--disclosed"), true, "the newer node stays disclosed");
-  assert.equal(second.querySelector("[data-automation-node-select]").getAttribute("aria-expanded"), "true");
+  assert.equal(second.classes.has("automation-node--disclosed"), true, "the stale close render is rejected");
 
   root.setAttribute("data-disclosed-node-id", "node-second");
-  root.setAttribute("data-disclosure-generation", "2");
+  root.setAttribute("data-disclosure-generation", "3");
   moduleExports.refresh(root);
   flushAllScheduled();
   assert.equal(first.classes.has("automation-node--disclosed"), false);
   assert.equal(second.classes.has("automation-node--disclosed"), true, "the acknowledgement preserves latest intent");
 
-  // A rapid same-node open/close must likewise stay closed when the opening
-  // acknowledgement arrives first.
-  activate(first, 83);
-  activate(first, 84);
-  assert.equal(first.classes.has("automation-node--disclosed"), false);
-  root.setAttribute("data-disclosed-node-id", "node-first");
-  root.setAttribute("data-disclosure-generation", "3");
-  first.classList.add("automation-node--disclosed");
-  first.querySelector("[data-automation-node-select]").setAttribute("aria-expanded", "true");
+  dispatch(root, "pointerdown", { pointerId: 83, target: root, clientX: 800, clientY: 600 });
+  dispatch(root, "pointerup", { pointerId: 83, target: root, clientX: 800, clientY: 600 });
+  assert.equal(second.classes.has("automation-node--disclosed"), false, "background deselection closes disclosure immediately");
+  flushOneScheduled();
+  assert.equal(second.classes.has("automation-node--disclosed"), false, "the observer cannot replay disclosure after background deselection");
+  assert.deepEqual(
+    dotnet.calls.filter((call) => call.method === "SetNodeDisclosureFromCanvasAsync").at(-1).values,
+    [null, 4],
+    "background deselection advances the same absolute disclosure generation",
+  );
+
+  root.setAttribute("data-disclosed-node-id", "");
+  root.setAttribute("data-disclosure-generation", "4");
+  moduleExports.refresh(root);
   flushAllScheduled();
-  assert.equal(first.classes.has("automation-node--disclosed"), false, "an older open cannot replay after a local close");
-  assert.equal(first.querySelector("[data-automation-node-select]").getAttribute("aria-expanded"), "false");
+
+  dispatch(root, "pointerdown", { pointerId: 84, target: firstButton, clientX: 20, clientY: 20 });
+  dispatch(root, "pointerup", { pointerId: 84, target: firstButton, clientX: 20, clientY: 20 });
+  dispatch(root, "pointerdown", { pointerId: 85, target: firstButton, clientX: 20, clientY: 20 });
+  dispatch(root, "pointerup", { pointerId: 85, target: firstButton, clientX: 20, clientY: 20 });
+  assert.equal(first.classes.has("automation-node--disclosed"), false, "a rapid same-node toggle closes locally");
+  assert.deepEqual(
+    dotnet.calls
+      .filter((call) => call.method === "SetNodeDisclosureFromCanvasAsync")
+      .slice(-2)
+      .map((call) => call.values),
+    [
+      ["node-first", 5],
+      [null, 6],
+    ],
+    "the rapid open and close retain absolute generation order",
+  );
+
+  root.setAttribute("data-disclosed-node-id", "node-first");
+  root.setAttribute("data-disclosure-generation", "5");
+  first.classList.add("automation-node--disclosed");
+  firstButton.setAttribute("aria-expanded", "true");
+  flushAllScheduled();
+  assert.equal(first.classes.has("automation-node--disclosed"), false, "the older open acknowledgement cannot replay after the local close");
+  assert.equal(firstButton.getAttribute("aria-expanded"), "false");
 
   moduleExports.dispose(root);
   console.log("scenario 13 ok");
@@ -1319,6 +1351,47 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   assertMatchesReference(root, "performance-probe convergence");
   moduleExports.dispose(root);
   console.log("scenario 15 ok");
+}
+""";
+
+    private const string _scenario16 = """
+// Scenario 16: Ctrl+wheel changes canvas scale ---
+{
+  const baseline = buildCanvas();
+  const baselineNode = buildNode(baseline.root, { id: "node-baseline", x: 0, y: 0 });
+  const baselineDotnet = makeDotnet();
+  moduleExports.initialize(baseline.root, baselineDotnet);
+  dragNode(baseline.root, baselineNode, 108, 0, 101);
+  const baselineMove = baselineDotnet.calls.find((call) => call.method === "MoveNodesFromCanvasAsync");
+  moduleExports.dispose(baseline.root);
+
+  const zoomed = buildCanvas();
+  const zoomedNode = buildNode(zoomed.root, { id: "node-zoomed", x: 0, y: 0 });
+  const zoomedDotnet = makeDotnet();
+  moduleExports.initialize(zoomed.root, zoomedDotnet);
+  let prevented = false;
+
+  dispatch(zoomed.root, "wheel", {
+    ctrlKey: true,
+    deltaY: -1,
+    clientX: 0,
+    clientY: 0,
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  dragNode(zoomed.root, zoomedNode, 108, 0, 103);
+  const zoomedMove = zoomedDotnet.calls.find((call) => call.method === "MoveNodesFromCanvasAsync");
+
+  assert.equal(prevented, true, "canvas zoom suppresses the browser Ctrl+wheel default");
+  assert.equal(
+    zoomedMove.values[0][0].x < baselineMove.values[0][0].x,
+    true,
+    "the same screen movement covers less graph distance after zooming in",
+  );
+
+  moduleExports.dispose(zoomed.root);
+  console.log("scenario 16 ok");
 }
 """;
 }
