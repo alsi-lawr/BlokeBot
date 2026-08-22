@@ -179,6 +179,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         Set<OverlayInstanceDomainEvent>();
     public DbSet<OverlayCue> OverlayCues => Set<OverlayCue>();
     public DbSet<OverlayMediaAsset> OverlayMediaAssets => Set<OverlayMediaAsset>();
+    public DbSet<OverlayMediaDocument> OverlayMediaDocuments => Set<OverlayMediaDocument>();
     public DbSet<OverlayCueMediaAssetReference> OverlayCueMediaAssetReferences =>
         Set<OverlayCueMediaAssetReference>();
     public DbSet<OverlayEventFeedItem> OverlayEventFeedItems => Set<OverlayEventFeedItem>();

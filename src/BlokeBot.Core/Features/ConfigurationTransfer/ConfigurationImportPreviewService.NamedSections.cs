@@ -13,6 +13,7 @@ public sealed partial class ConfigurationImportPreviewService
         CustomCommandsSectionV1? section,
         SectionImportSelection selection,
         ConfigurationImportSelection importSelection,
+        ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
     )
     {
@@ -55,7 +56,20 @@ public sealed partial class ConfigurationImportPreviewService
                     .ToArray()
                 : section.Commands;
         var requestedAliases = conflictCommands
-            .SelectMany(x => x.Aliases)
+            .SelectMany(command =>
+                command.Aliases.SelectMany(alias =>
+                    new[]
+                    {
+                        ConfigurationConflictIds.NormalizeCustomCommandAlias(alias),
+                        ConfigurationConflictIds.SelectedCustomCommandAlias(
+                            command.Id,
+                            alias,
+                            selection.ItemResolutions
+                        ),
+                    }
+                )
+            )
+            .Where(static alias => alias.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var occupiedFeatureAliases = await db
@@ -68,25 +82,43 @@ public sealed partial class ConfigurationImportPreviewService
             .Where(x => x.HostId == hostId && requestedAliases.Contains(x.Alias))
             .Select(x => new { x.Alias, x.CustomCommandId })
             .ToArrayAsync(cancellationToken);
-        var conflicts = CommandConflicts(
+        var commandConflicts = CommandConflicts(
             section with
             {
                 Commands = conflictCommands,
             },
             existingCommands.Select(x => (x.Id, x.Name)).ToArray(),
             occupiedFeatureAliases,
-            occupiedCustomAliases.Select(x => (x.Alias, x.CustomCommandId)).ToArray()
+            occupiedCustomAliases.Select(x => (x.Alias, x.CustomCommandId)).ToArray(),
+            selection.ItemResolutions,
+            references
         );
-        var skipped = selection
-            .ItemResolutions.Where(x => x.Resolution == ImportConflictResolution.Skip)
-            .Select(x => x.ImportedId)
+        var skipped = section
+            .Commands.Where(command =>
+                ConfigurationConflictIds.SkipsCustomCommand(command, selection.ItemResolutions)
+            )
+            .ToArray();
+        var selectedSkipIds = selection
+            .ItemResolutions.Where(resolution =>
+                resolution.Resolution == ImportConflictResolution.Skip
+            )
+            .Select(resolution => resolution.ImportedId)
             .ToHashSet(StringComparer.Ordinal);
-        var imported = section.Commands.Where(x => !skipped.Contains(x.Id)).ToArray();
+        var conflicts = commandConflicts
+            .Conflicts.Where(conflict =>
+                !skipped.Any(command =>
+                    ConfigurationConflictIds.BelongsToCustomCommand(command, conflict.ImportedId)
+                ) || selectedSkipIds.Contains(conflict.ImportedId)
+            )
+            .ToList();
+        var skippedIds = skipped.Select(command => command.Id).ToHashSet(StringComparer.Ordinal);
+        var imported = section
+            .Commands.Where(command => !skippedIds.Contains(command.Id))
+            .ToArray();
         var retainedCommands = existingCommands
             .Where(existing =>
-                section.Commands.Any(importedCommand =>
-                    skipped.Contains(importedCommand.Id)
-                    && string.Equals(
+                skipped.Any(importedCommand =>
+                    string.Equals(
                         importedCommand.Name,
                         existing.Name,
                         StringComparison.OrdinalIgnoreCase
@@ -201,7 +233,7 @@ public sealed partial class ConfigurationImportPreviewService
                     ),
                 Remove = counts.Remove - retainedRemovals,
             },
-            [],
+            commandConflicts.Issues,
             conflicts
         );
     }
@@ -216,66 +248,4 @@ public sealed partial class ConfigurationImportPreviewService
             left.Skip + right.Skip,
             left.Remove + right.Remove
         );
-
-    private static List<ConfigurationImportConflict> CommandConflicts(
-        CustomCommandsSectionV1 section,
-        IReadOnlyList<(int Id, string Name)> existingCommands,
-        IReadOnlyList<string> occupiedFeatureAliases,
-        IReadOnlyList<(string Alias, int CustomCommandId)> occupiedCustomAliases
-    )
-    {
-        var conflicts = section
-            .Commands.Where(x =>
-                x.Action.Type
-                    is CustomCommandActionTypeV1.Automation
-                        or CustomCommandActionTypeV1.OverlayCue
-            )
-            .Select(x => new ConfigurationImportConflict(
-                ConfigurationSectionId.CustomCommands,
-                x.Id,
-                x.Name,
-                $"This command uses an unsupported {x.Action.Type} dependency.",
-                [ImportConflictResolution.Skip, ImportConflictResolution.Abort]
-            ))
-            .ToList();
-        foreach (var command in section.Commands)
-        {
-            var matchedId = existingCommands
-                .SingleOrDefault(x =>
-                    string.Equals(x.Name, command.Name, StringComparison.OrdinalIgnoreCase)
-                )
-                .Id;
-            foreach (var alias in command.Aliases)
-            {
-                var occupied =
-                    FixedChatCommandRoutes.All.Contains(alias)
-                    || occupiedFeatureAliases.Contains(alias, StringComparer.OrdinalIgnoreCase)
-                    || occupiedCustomAliases.Any(x =>
-                        string.Equals(x.Alias, alias, StringComparison.OrdinalIgnoreCase)
-                        && x.CustomCommandId != matchedId
-                    )
-                    || section.Commands.Any(other =>
-                        other.Id != command.Id
-                        && other.Aliases.Contains(alias, StringComparer.OrdinalIgnoreCase)
-                    );
-                if (occupied)
-                {
-                    conflicts.Add(
-                        new(
-                            ConfigurationSectionId.CustomCommands,
-                            ConfigurationConflictIds.CustomCommandAlias(command.Id, alias),
-                            $"!{alias} on {command.Name}",
-                            "This alias is already used by a built-in, another feature, or another custom command.",
-                            [
-                                ImportConflictResolution.Rename,
-                                ImportConflictResolution.Skip,
-                                ImportConflictResolution.Abort,
-                            ]
-                        )
-                    );
-                }
-            }
-        }
-        return conflicts;
-    }
 }

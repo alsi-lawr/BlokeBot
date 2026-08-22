@@ -1,5 +1,6 @@
 @page "/points/settings"
 @using BlokeBot.Eventing
+@using BlokeBot.Core.Features.ConfigurationTransfer
 @using BlokeBot.Core.Features.HostedChannels
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
@@ -10,15 +11,14 @@
 @inject ToastService _toasts
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
-
 <div class="mx-auto max-w-7xl space-y-6" data-sticky-save-scope>
     <PageHeader Title="Points settings"
                 Description="Choose point names, chat commands, chances of winning, giveaways, and what the bot says.">
-        <a class="btn-secondary" href="/configuration-transfer?section=points#export">Import or export</a>
+        <ConfigurationTransferActions Section="ConfigurationSectionId.Points" />
+        <StickySaveRegion>
+            <SaveChangesButton Disabled="@(!_featureEnabled || _config is null)" OnSave="SaveAsync" />
+        </StickySaveRegion>
     </PageHeader>
-    <StickySaveRegion>
-        <SaveChangesButton Disabled="@(!_featureEnabled || _config is null)" OnSave="SaveAsync" />
-    </StickySaveRegion>
 
     @if (Host is null)
     {

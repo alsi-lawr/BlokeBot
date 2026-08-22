@@ -3,7 +3,7 @@ using BlokeBot.Core.Features.Guessing.Profiles;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
-internal static class ConfigurationDocumentValidator
+internal static partial class ConfigurationDocumentValidator
 {
     public static ConfigurationValidationIssue? Validate(ConfigurationDocumentV1 document) =>
         !string.Equals(document.Format, ConfigurationDocumentCodec.Format, StringComparison.Ordinal)
@@ -17,81 +17,9 @@ internal static class ConfigurationDocumentValidator
         : ValidateCommands(document.Sections.CustomCommands)
             ?? ValidateAnnouncements(document.Sections.Announcements)
             ?? ValidateGuessing(document.Sections.Guessing)
-            ?? ValidatePoints(document.Sections.Points);
-
-    private static ConfigurationValidationIssue? ValidateCommands(CustomCommandsSectionV1? section)
-    {
-        if (section is null)
-        {
-            return null;
-        }
-
-        var issue =
-            Limit("sections.customCommands.replies", section.Replies.Count)
-            ?? Limit("sections.customCommands.counters", section.Counters.Count)
-            ?? Limit("sections.customCommands.commands", section.Commands.Count)
-            ?? DuplicateIds("sections.customCommands.replies", section.Replies.Select(x => x.Id))
-            ?? DuplicateIds("sections.customCommands.counters", section.Counters.Select(x => x.Id))
-            ?? DuplicateIds("sections.customCommands.commands", section.Commands.Select(x => x.Id));
-        if (issue is not null)
-        {
-            return issue;
-        }
-
-        var replies = section.Replies.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
-        var counters = section.Counters.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (var reply in section.Replies)
-        {
-            if (
-                Limit(
-                    $"sections.customCommands.replies[{reply.Id}].variants",
-                    reply.Variants.Count
-                ) is
-                { } limit
-            )
-            {
-                return limit;
-            }
-        }
-        foreach (var command in section.Commands)
-        {
-            var path = $"sections.customCommands.commands[{command.Id}]";
-            if (Limit($"{path}.aliases", command.Aliases.Count) is { } aliasLimit)
-            {
-                return aliasLimit;
-            }
-
-            if (Limit($"{path}.allowedUsers", command.AllowedUsers.Count) is { } userLimit)
-            {
-                return userLimit;
-            }
-
-            foreach (var reference in ReplyReferences(command.Action))
-            {
-                if (reference is not null && !replies.Contains(reference))
-                {
-                    return new(
-                        $"{path}.action",
-                        $"Reply reference '{reference}' was not exported with this section."
-                    );
-                }
-            }
-            if (command.Action.Type == CustomCommandActionTypeV1.Counter)
-            {
-                if (
-                    command.Action.CounterId is null
-                    || !counters.Contains(command.Action.CounterId)
-                )
-                {
-                    return new(
-                        $"{path}.action.counterId",
-                        "The counter action does not reference an exported counter."
-                    );
-                }
-            }
-        }
-        return null;
-    }
+            ?? ValidatePoints(document.Sections.Points)
+            ?? ValidateOverlays(document.Sections.Overlays)
+            ?? ValidateAutomations(document.Sections.Automations);
 
     private static ConfigurationValidationIssue? ValidateAnnouncements(
         AnnouncementsSectionV1? section
@@ -281,11 +209,4 @@ internal static class ConfigurationDocumentValidator
                 location,
                 $"This collection exceeds the {ConfigurationDocumentCodec.MaximumRecordsPerCollection} record limit."
             );
-
-    private static IEnumerable<string?> ReplyReferences(CustomCommandActionV1 action)
-    {
-        yield return action.ZeroArgumentReplyId;
-        yield return action.OneArgumentReplyId;
-        yield return action.TwoArgumentReplyId;
-    }
 }

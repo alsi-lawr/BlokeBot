@@ -1,6 +1,7 @@
 @page "/host"
 @using BlokeBot.Core.Auth.Sessions
 @using BlokeBot.Eventing
+@using BlokeBot.Core.Features.ConfigurationTransfer
 @using BlokeBot.Core.Features.AccessLists
 @using BlokeBot.Core.Features.Admin.Authorization
 @using BlokeBot.Core.Features.Admin.SiteAccess
@@ -39,7 +40,7 @@
     <PageHeader Kicker="Channel setup"
                 Title="Channel setup"
                 Description="Connect the bot, choose who can help, and turn chat tools on or off.">
-        <a class="btn-secondary" href="/configuration-transfer?section=channelToolEnablement#export">Import or export</a>
+        <ConfigurationTransferActions Section="ConfigurationSectionId.ChannelToolEnablement" />
     </PageHeader>
 
     @if (_blockedByMode)

@@ -225,6 +225,23 @@ public sealed class SegmentedTabsTests
         navigation.Uri.ShouldEndWith("/guessing");
     }
 
+    [Test]
+    public void FragmentTabs_AfterFullNavigation_ReturnToTheirOwnedPage()
+    {
+        using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/overlays?channel=sample#sources");
+        var tabs = RenderFragmentTabs(context);
+
+        navigation.NavigateTo("/configuration-transfer/export?sections=Overlays");
+
+        var cues = tabs.Find("#overlays-cues-tab");
+        cues.GetAttribute("href").ShouldEndWith("/overlays?channel=sample#cues");
+        cues.Click();
+        navigation.Uri.ShouldEndWith("/overlays?channel=sample#cues");
+    }
+
     private static IRenderedComponent<FragmentTabsHost> RenderFragmentTabs(
         BunitContext context,
         Action<string>? onActiveKeyChanged = null

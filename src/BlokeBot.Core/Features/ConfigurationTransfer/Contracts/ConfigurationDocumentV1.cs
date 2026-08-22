@@ -23,7 +23,9 @@ public sealed record ConfigurationSectionsV1(
     AnnouncementsSectionV1? Announcements = null,
     GuessingSectionV1? Guessing = null,
     PointsSectionV1? Points = null,
-    ChannelToolEnablementV1? ChannelToolEnablement = null
+    ChannelToolEnablementV1? ChannelToolEnablement = null,
+    OverlaysSectionV1? Overlays = null,
+    AutomationsSectionV1? Automations = null
 );
 
 internal sealed record ConfigurationDocumentHeader(

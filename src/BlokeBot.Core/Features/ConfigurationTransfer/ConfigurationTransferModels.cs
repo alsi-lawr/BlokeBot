@@ -10,7 +10,20 @@ public enum ConfigurationSectionId
     Guessing,
     Points,
     ChannelToolEnablement,
+    Overlays,
+    Automations,
 }
+
+public sealed record OverlayExportSelection(
+    bool UrlLayers,
+    bool MediaDocumentLinks,
+    bool UrlWarningAcknowledged
+);
+
+public sealed record ConfigurationExportSelection(
+    IReadOnlySet<ConfigurationSectionId> Sections,
+    OverlayExportSelection Overlay
+);
 
 public enum ImportConflictStrategy
 {
@@ -112,4 +125,7 @@ public sealed record ConfigurationImportApplied(
     Guid OperationId,
     Guid? ActivationId,
     IReadOnlyList<ConfigurationSectionId> ChangedSections
-);
+)
+{
+    public IReadOnlyList<ConfigurationPostCommitFailure> PostCommitFailures { get; init; } = [];
+}

@@ -1,4 +1,5 @@
 using System.Reflection;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,12 +9,15 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 public sealed class ConfigurationDocumentExporter(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     ConfigurationDocumentCodec codec,
+    AutomationCatalogService automationCatalog,
+    AutomationFlowService automationFlows,
+    ILogger<ConfigurationDocumentExporter> logger,
     TimeProvider timeProvider
 )
 {
     public async Task<ConfigurationExportOutcome> ExportAsync(
         int hostId,
-        IReadOnlySet<ConfigurationSectionId> selectedSections,
+        ConfigurationExportSelection selection,
         CancellationToken cancellationToken
     )
     {
@@ -32,39 +36,107 @@ public sealed class ConfigurationDocumentExporter(
             );
         }
 
+        if (
+            selection.Sections.Contains(ConfigurationSectionId.Overlays)
+            && selection.Overlay.UrlLayers
+            && !selection.Overlay.UrlWarningAcknowledged
+        )
+        {
+            return new ConfigurationExportOutcome.Unsupported(
+                "Confirm the URL warning before exporting complete Overlay URLs."
+            );
+        }
+
+        var references = await ConfigurationExportReferencePlan.LoadAsync(
+            db,
+            hostId,
+            cancellationToken
+        );
         var commandGraph =
-            selectedSections.Contains(ConfigurationSectionId.CustomCommands)
-            || selectedSections.Contains(ConfigurationSectionId.Announcements)
+            selection.Sections.Contains(ConfigurationSectionId.CustomCommands)
+            || selection.Sections.Contains(ConfigurationSectionId.Announcements)
                 ? await ConfigurationExportMappers.LoadCommandGraphAsync(
                     db,
                     hostId,
                     cancellationToken
                 )
                 : null;
-        var document = new ConfigurationDocumentV1(
-            ConfigurationDocumentCodec.Format,
-            ConfigurationDocumentCodec.CurrentVersion,
-            timeProvider.GetUtcNow(),
-            new(host.Login, CurrentVersion()),
-            new(
-                selectedSections.Contains(ConfigurationSectionId.CustomCommands)
-                    ? ConfigurationExportMappers.CustomCommands(commandGraph!, host.TimeZoneId)
-                    : null,
-                selectedSections.Contains(ConfigurationSectionId.Announcements)
-                    ? ConfigurationExportMappers.Announcements(commandGraph!)
-                    : null,
-                selectedSections.Contains(ConfigurationSectionId.Guessing)
-                    ? await ConfigurationExportMappers.GuessingAsync(db, hostId, cancellationToken)
-                    : null,
-                selectedSections.Contains(ConfigurationSectionId.Points)
-                    ? await ConfigurationExportMappers.PointsAsync(db, hostId, cancellationToken)
-                    : null,
-                selectedSections.Contains(ConfigurationSectionId.ChannelToolEnablement)
-                    ? ChannelToolEnablementMapper.FromFlags(host.EnabledFeatures)
-                    : null
-            )
-        );
-        return new ConfigurationExportOutcome.Success(document, codec.Serialize(document));
+        try
+        {
+            var automations = selection.Sections.Contains(ConfigurationSectionId.Automations)
+                ? await ConfigurationExportMappers.AutomationsAsync(
+                    db,
+                    hostId,
+                    references,
+                    automationCatalog,
+                    automationFlows,
+                    cancellationToken
+                )
+                : null;
+            var document = new ConfigurationDocumentV1(
+                ConfigurationDocumentCodec.Format,
+                ConfigurationDocumentCodec.CurrentVersion,
+                timeProvider.GetUtcNow(),
+                new(host.Login, CurrentVersion()),
+                new(
+                    selection.Sections.Contains(ConfigurationSectionId.CustomCommands)
+                        ? ConfigurationExportMappers.CustomCommands(
+                            commandGraph!,
+                            host.TimeZoneId,
+                            references
+                        )
+                        : null,
+                    selection.Sections.Contains(ConfigurationSectionId.Announcements)
+                        ? ConfigurationExportMappers.Announcements(commandGraph!)
+                        : null,
+                    selection.Sections.Contains(ConfigurationSectionId.Guessing)
+                        ? await ConfigurationExportMappers.GuessingAsync(
+                            db,
+                            hostId,
+                            cancellationToken
+                        )
+                        : null,
+                    selection.Sections.Contains(ConfigurationSectionId.Points)
+                        ? await ConfigurationExportMappers.PointsAsync(
+                            db,
+                            hostId,
+                            cancellationToken
+                        )
+                        : null,
+                    selection.Sections.Contains(ConfigurationSectionId.ChannelToolEnablement)
+                        ? ChannelToolEnablementMapper.FromFlags(host.EnabledFeatures)
+                        : null,
+                    selection.Sections.Contains(ConfigurationSectionId.Overlays)
+                        ? await ConfigurationExportMappers.OverlaysAsync(
+                            db,
+                            hostId,
+                            references,
+                            selection.Overlay,
+                            cancellationToken
+                        )
+                        : null,
+                    automations?.Section
+                )
+            );
+            var json = codec.Serialize(document);
+            if (automations is not null)
+            {
+                AutomationTransferDiagnostics.LogExport(logger, hostId, automations.Diagnostics);
+            }
+            return new ConfigurationExportOutcome.Success(document, json);
+        }
+        catch (Format1AutomationExportException exception)
+        {
+            return new ConfigurationExportOutcome.Unsupported(
+                $"Automation node '{exception.DefinitionId}' is not a core Format 1 node."
+            );
+        }
+        catch (Format1AutomationConfigurationExportException exception)
+        {
+            return new ConfigurationExportOutcome.Unsupported(
+                $"Automation node '{exception.DefinitionId}' cannot be exported in Format 1. {exception.Reason}"
+            );
+        }
     }
 
     private static string CurrentVersion() =>

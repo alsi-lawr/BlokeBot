@@ -6,26 +6,64 @@ using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Core.Hosts;
 
-public sealed class BotHostRemovalService(
+internal sealed class BotHostRemovalService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
     IOptions<BlokeBotOptions> options,
+    OverlayMediaMaintenanceService mediaMaintenance,
+    TimeProvider timeProvider,
     ILogger<BotHostRemovalService> logger
 )
 {
     public async Task<HostRemovalResult> RemoveAsync(int hostId, CancellationToken ct)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-        var removed = await db.Hosts.Where(host => host.Id == hostId).ExecuteDeleteAsync(ct);
-        if (removed == 0)
+        await mediaMaintenance.Gate.WaitAsync(ct);
+        bool wasRemoved;
+        try
         {
-            return new HostRemovalResult(Removed: false, RemoveMedia(hostId));
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            var documentIds = await db
+                .OverlayMediaAssets.Where(reference => reference.HostId == hostId)
+                .Select(reference => reference.DocumentId)
+                .Distinct()
+                .ToArrayAsync(ct);
+
+            var removed = await db.Hosts.Where(host => host.Id == hostId).ExecuteDeleteAsync(ct);
+            if (removed > 0 && documentIds.Length > 0)
+            {
+                var orphans = await db
+                    .OverlayMediaDocuments.Where(document =>
+                        documentIds.Contains(document.Id)
+                        && !db.OverlayMediaAssets.Any(reference =>
+                            reference.DocumentId == document.Id
+                        )
+                    )
+                    .ToArrayAsync(ct);
+                var now = timeProvider.GetUtcNow().UtcDateTime;
+                foreach (var document in orphans)
+                {
+                    document.State = Persistence.Models.OverlayMediaDocumentState.Orphaned;
+                    document.OrphanedAtUtc = now;
+                    document.UpdatedAtUtc = now;
+                }
+                _ = await db.SaveChangesAsync(ct);
+            }
+
+            await transaction.CommitAsync(ct);
+            wasRemoved = removed > 0;
+        }
+        finally
+        {
+            _ = mediaMaintenance.Gate.Release();
         }
 
-        await transaction.CommitAsync(ct);
         var media = RemoveMedia(hostId);
+        mediaMaintenance.Schedule();
+        if (!wasRemoved)
+        {
+            return new HostRemovalResult(Removed: false, media);
+        }
         _ = await changes.NotifyChangedAsync(ct);
         return new HostRemovalResult(Removed: true, media);
     }

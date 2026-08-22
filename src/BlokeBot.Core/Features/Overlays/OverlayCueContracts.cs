@@ -21,6 +21,8 @@ public sealed record OverlayMediaAssetView(
     string ContentType,
     long ByteLength,
     int ContentRevision,
+    bool IsAvailable,
+    long ChargedByteLength,
     DateTimeOffset UpdatedAtUtc
 );
 

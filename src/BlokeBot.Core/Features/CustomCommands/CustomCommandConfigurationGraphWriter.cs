@@ -31,7 +31,8 @@ public sealed partial class CustomCommandConfigurationGraphWriter(
         BlokeBotDbContext db,
         int hostId,
         CustomCommandConfigurationSaveCommand command,
-        CancellationToken ct
+        CancellationToken ct,
+        bool validateOverlayCueReferences = true
     )
     {
         var now = clock.GetUtcNow().UtcDateTime;
@@ -53,10 +54,13 @@ public sealed partial class CustomCommandConfigurationGraphWriter(
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
 
-        var cueFailure = await ValidateOverlayCueReferencesAsync(hostId, command.Commands, ct);
-        if (cueFailure is not null)
+        if (validateOverlayCueReferences)
         {
-            return cueFailure;
+            var cueFailure = await ValidateOverlayCueReferencesAsync(hostId, command.Commands, ct);
+            if (cueFailure is not null)
+            {
+                return cueFailure;
+            }
         }
 
         var staleEntity = FindStaleEntity(

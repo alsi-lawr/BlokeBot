@@ -7,12 +7,13 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 public sealed partial class ConfigurationImportPreviewService
 {
-    internal static async Task<ConfigurationSectionPreview> PreviewSectionAsync(
+    internal async Task<ConfigurationSectionPreview> PreviewSectionAsync(
         BlokeBotDbContext db,
         BotHost host,
         ConfigurationDocumentV1 document,
         SectionImportSelection selection,
         ConfigurationImportSelection importSelection,
+        ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
     )
     {
@@ -24,6 +25,7 @@ public sealed partial class ConfigurationImportPreviewService
                 document.Sections.CustomCommands,
                 selection,
                 importSelection,
+                references,
                 cancellationToken
             ),
             ConfigurationSectionId.Announcements => await PreviewNamesAsync(
@@ -50,6 +52,22 @@ public sealed partial class ConfigurationImportPreviewService
                 new(0, 0, 0, 0),
                 [],
                 []
+            ),
+            ConfigurationSectionId.Overlays => await _overlays.PreviewAsync(
+                db,
+                host,
+                document.Sections.Overlays,
+                selection,
+                references,
+                cancellationToken
+            ),
+            ConfigurationSectionId.Automations => await _automations.PreviewAsync(
+                db,
+                host,
+                document.Sections.Automations,
+                selection,
+                references,
+                cancellationToken
             ),
             _ => new(
                 selection.Section,
@@ -88,6 +106,8 @@ public sealed partial class ConfigurationImportPreviewService
                 HostFeatureFlags.CustomCommands,
             ConfigurationSectionId.Guessing => HostFeatureFlags.Guessing,
             ConfigurationSectionId.Points => HostFeatureFlags.Points,
+            ConfigurationSectionId.Overlays => HostFeatureFlags.Overlays,
+            ConfigurationSectionId.Automations => HostFeatureFlags.Automations,
             ConfigurationSectionId.ChannelToolEnablement => null,
             _ => null,
         };
@@ -98,6 +118,8 @@ public sealed partial class ConfigurationImportPreviewService
             HostFeatureFlags.CustomCommands => "Custom commands",
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
+            HostFeatureFlags.Overlays => "Overlays",
+            HostFeatureFlags.Automations => "Automations",
             _ => throw new ArgumentOutOfRangeException(nameof(feature), feature, null),
         };
 
@@ -109,6 +131,8 @@ public sealed partial class ConfigurationImportPreviewService
             ConfigurationSectionId.Guessing => "guessing",
             ConfigurationSectionId.Points => "points",
             ConfigurationSectionId.ChannelToolEnablement => "channelToolEnablement",
+            ConfigurationSectionId.Overlays => "overlays",
+            ConfigurationSectionId.Automations => "automations",
             _ => "sections",
         };
 }

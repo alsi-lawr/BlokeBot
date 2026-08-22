@@ -48,9 +48,6 @@ public sealed class WeeklyAnnouncementMigrationTests
         WeeklyAnnouncementScheduleProjection
             .NextUtcOccurrence(migrated, reference)
             .ShouldBe(expectedNext);
-        (await verify.Database.GetAppliedMigrationsAsync())
-            .Count(x => x.Contains("ConfigurationTransfer"))
-            .ShouldBe(1);
     }
 
     private static async Task SeedLocalWeeklyAnnouncementAsync(

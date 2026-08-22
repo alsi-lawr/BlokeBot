@@ -34,18 +34,10 @@ public sealed record CustomCommandV1(
     [property: JsonRequired] IReadOnlyList<string> Aliases,
     [property: JsonRequired] bool AllowEveryone,
     [property: JsonRequired] bool AllowModerators,
-    [property: JsonRequired] IReadOnlyList<AllowedUserV1> AllowedUsers,
     [property: JsonRequired] int CooldownSeconds,
     [property: JsonRequired] CustomCommandCooldownScope CooldownScope,
     [property: JsonRequired] CustomCommandInvocationLimit InvocationLimit,
     [property: JsonRequired] CustomCommandActionV1 Action
-);
-
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AllowedUserV1(
-    [property: JsonRequired] string TwitchUserId,
-    [property: JsonRequired] string Login,
-    [property: JsonRequired] string DisplayName
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -54,7 +46,13 @@ public sealed record CustomCommandActionV1(
     string? ZeroArgumentReplyId = null,
     string? OneArgumentReplyId = null,
     string? TwoArgumentReplyId = null,
-    string? CounterId = null
+    string? CounterId = null,
+    string? OverlayTargetId = null,
+    string? OverlayTargetName = null,
+    string? OverlayCueId = null,
+    string? OverlayCueName = null,
+    OverlayCueQueuePolicy? OverlayQueuePolicy = null,
+    OverlayCueReplyOrder? OverlayReplyOrder = null
 );
 
 public enum CustomCommandActionTypeV1

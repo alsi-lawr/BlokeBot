@@ -1,0 +1,97 @@
+<div class="review-row">
+    <div class="review-row__main">
+        <div class="section-row__copy">
+            <span id="configuration-transfer-overlays-title" class="section-row__title">Overlays</span>
+            <span class="section-row__detail">Browser Source configuration, cue layers and selected media-document links</span>
+        </div>
+        <button type="button"
+                class="studio-toggle"
+                role="switch"
+                aria-checked="@(Selected ? "true" : "false")"
+                aria-label="Export Overlays"
+                @onclick="() => SelectedChanged.InvokeAsync(!Selected)"></button>
+    </div>
+    @if (Selected)
+    {
+        <fieldset class="review-row__nested"
+                  aria-labelledby="configuration-transfer-overlays-title">
+            <legend class="sr-only">Overlay export options</legend>
+            <div class="enablement-grid">
+                <div role="group"
+                     aria-labelledby="configuration-transfer-overlay-urls-title">
+                    <div class="enablement-row">
+                        <div class="enablement-row__copy">
+                            <strong id="configuration-transfer-overlay-urls-title">URL layers</strong>
+                            <span class="section-row__detail">Include remote media and external web layers with their exact URLs</span>
+                        </div>
+                        <button type="button"
+                                class="studio-toggle"
+                                role="switch"
+                                aria-checked="@(UrlLayers ? "true" : "false")"
+                                aria-label="Export Overlay URL layers"
+                                @onclick="() => UrlLayersChanged.InvokeAsync(!UrlLayers)"></button>
+                    </div>
+                    @if (UrlLayers)
+                    {
+                        <div class="conflict-row">
+                            <div class="section-row">
+                                <div class="section-row__copy">
+                                    <span class="section-row__title">Complete URLs can contain credentials</span>
+                                    <span class="section-row__detail">The export keeps every URL exactly, including query strings that can contain access keys or other credentials. Confirm before download.</span>
+                                </div>
+                                <button type="button"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(UrlWarningAcknowledged ? "true" : "false")"
+                                        aria-label="Confirm complete Overlay URL warning"
+                                        @onclick="() => UrlWarningAcknowledgedChanged.InvokeAsync(!UrlWarningAcknowledged)"></button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="enablement-row">
+                    <div class="enablement-row__copy">
+                        <strong>Media-document links</strong>
+                        <span class="section-row__detail">Include same-instance document IDs and channel-local media names, never media bytes</span>
+                    </div>
+                    <button type="button"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(MediaDocumentLinks ? "true" : "false")"
+                            aria-label="Export Overlay media-document links"
+                            @onclick="() => MediaDocumentLinksChanged.InvokeAsync(!MediaDocumentLinks)"></button>
+                </div>
+            </div>
+            @if (!UrlLayers && !MediaDocumentLinks)
+            {
+                <span class="section-row__detail">Overlay cues have no selected layers, so they will be omitted and reported in the export.</span>
+            }
+        </fieldset>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public bool Selected { get; set; }
+
+    [Parameter]
+    public bool UrlLayers { get; set; }
+
+    [Parameter]
+    public bool MediaDocumentLinks { get; set; }
+
+    [Parameter]
+    public bool UrlWarningAcknowledged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> SelectedChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> UrlLayersChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> MediaDocumentLinksChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> UrlWarningAcknowledgedChanged { get; set; }
+}

@@ -211,17 +211,55 @@ public sealed class OverlayMediaAsset
 
     public string Name { get; set; } = string.Empty;
 
-    public string ContentType { get; set; } = string.Empty;
-
-    public long ByteLength { get; set; }
-
     public int ContentRevision { get; set; }
 
-    public string StorageKey { get; set; } = string.Empty;
+    public Guid DocumentId { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
+
+    public OverlayMediaDocument Document { get; set; } = null!;
+}
+
+public enum OverlayMediaDocumentState
+{
+    [PersistedToken("publishing")]
+    Publishing,
+
+    [PersistedToken("available")]
+    Available,
+
+    [PersistedToken("unavailable")]
+    Unavailable,
+
+    [PersistedToken("orphaned")]
+    Orphaned,
+}
+
+public sealed class OverlayMediaDocument
+{
+    public Guid Id { get; set; }
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public long ByteLength { get; set; }
+
+    public string StorageKey { get; set; } = string.Empty;
+
+    public OverlayMediaDocumentState State { get; set; }
+
+    public int? LegacyHostId { get; set; }
+
+    public string? LegacyStorageKey { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+
+    public DateTime? OrphanedAtUtc { get; set; }
+
+    public List<OverlayMediaAsset> References { get; set; } = [];
 }
 
 public sealed class OverlayCueMediaAssetReference

@@ -111,7 +111,6 @@ public static partial class BlokeBotApplication
             .AddBlokeBotHostedChannels(
                 online ? HostBotAppAccessTokenMode.Twitch : HostBotAppAccessTokenMode.Unavailable
             )
-            .AddBlokeBotConfigurationTransfer()
             .AddBlokeBotAutomations()
             .AddBlokeBotHosts()
             .AddBlokeBotGuessing()
@@ -131,6 +130,7 @@ public static partial class BlokeBotApplication
             .AddBlokeBotPlayWithViewers()
             .AddBlokeBotMoments()
             .AddBlokeBotOverlays()
+            .AddBlokeBotConfigurationTransfer()
             .AddBlokeBotToasts()
             .AddBlokeBotTwitchOperations()
             .AddBlokeBotAuth();

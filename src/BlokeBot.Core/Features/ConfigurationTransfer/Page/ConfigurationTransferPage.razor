@@ -82,25 +82,44 @@
                         @foreach (var section in _sectionOptions)
                         {
                             var selected = _exportSections.Contains(section.Id);
-                            <div class="section-row" @key="section.Id">
-                                <div class="section-row__copy">
-                                    <span class="section-row__title">@section.Title</span>
-                                    <span class="section-row__detail">@section.Description</span>
+                            @if (section.Id == ConfigurationSectionId.Overlays)
+                            {
+                                <ConfigurationTransferOverlayExportOptions Selected="@selected"
+                                                                           UrlLayers="@_exportOverlayUrls"
+                                                                           MediaDocumentLinks="@_exportOverlayMedia"
+                                                                           UrlWarningAcknowledged="@_urlWarningAcknowledged"
+                                                                           SelectedChanged="enabled => ToggleExport(section.Id, enabled)"
+                                                                           UrlLayersChanged="ToggleOverlayUrls"
+                                                                           MediaDocumentLinksChanged="ToggleOverlayMedia"
+                                                                           UrlWarningAcknowledgedChanged="ToggleUrlWarning"
+                                                                           @key="section.Id" />
+                            }
+                            else
+                            {
+                                <div class="section-row">
+                                    <div class="section-row__copy">
+                                        <span class="section-row__title">@section.Title</span>
+                                        <span class="section-row__detail">@section.Description</span>
+                                    </div>
+                                    <button type="button"
+                                            class="studio-toggle"
+                                            role="switch"
+                                            aria-checked="@(selected ? "true" : "false")"
+                                            aria-label="@($"Export {section.Title}")"
+                                            @onclick="() => ToggleExport(section.Id, !selected)"></button>
                                 </div>
-                                <button type="button"
-                                        class="studio-toggle"
-                                        role="switch"
-                                        aria-checked="@(selected ? "true" : "false")"
-                                        aria-label="@($"Export {section.Title}")"
-                                        @onclick="() => ToggleExport(section.Id, !selected)"></button>
-                            </div>
+                            }
                         }
                     </ChildContent>
                     <Footer>
                         <span class="task-panel__footer-note">@_exportSections.Count of @_sectionOptions.Length sections selected</span>
                         <div class="task-panel__footer-actions">
-                            <a class="btn-primary"
-                               href="@_exportUrl"
+                            <a id="configuration-transfer-download"
+                               class="btn-primary"
+                               href="@(_canExport ? _exportUrl : null)"
+                               download
+                               aria-disabled="@(!_canExport)"
+                               tabindex="@(_canExport ? null : "-1")"
                                data-enhance-nav="false">
                                 Download configuration
                             </a>
@@ -122,7 +141,13 @@
                     <ChildContent>
                         <PageState Kind="PageStateKind.Success"
                                    Title="@($"Configuration saved to #{HostLogin}")"
-                                   Description="@($"{applied.ChangedSections.Count} sections changed in one import.")" />
+                                   Description="@($"{applied.ChangedSections.Count} {(applied.ChangedSections.Count == 1 ? "section" : "sections")} changed in one import.")" />
+                        @foreach (var failure in applied.PostCommitFailures)
+                        {
+                            <PageState Kind="PageStateKind.Failure"
+                                       Title="@($"{SectionTitle(failure.Section)} reconciliation needs attention")"
+                                       Description="The configuration is saved. Runtime reconciliation failed separately and can be retried without reapplying the import." />
+                        }
                         <div class="operation-row">
                             <span class="operation-row__label">Operation ID</span>
                             <code>@applied.OperationId</code>
@@ -203,7 +228,10 @@
                         }
                     </ChildContent>
                     <Footer>
-                        <button class="btn-secondary" type="button" @onclick="CancelImport">
+                        <button id="configuration-transfer-cancel"
+                                class="btn-secondary"
+                                type="button"
+                                @onclick="CancelImport">
                             Cancel
                         </button>
                         <div class="task-panel__footer-actions">
@@ -238,7 +266,7 @@
                                                   SectionSelectionChanged="ToggleImport"
                                                   SectionStrategyChanged="SetStrategyAsync"
                                                   ConflictResolutionChanged="SetResolutionAsync"
-                                                  ConflictRenameChanged="SetRename"
+                                                  ConflictRenameChanged="SetRenameAsync"
                                                   GuessingProfileTargetChanged="SetGuessingProfileTargetAsync"
                                                   EnablementSelectionChanged="ToggleEnablement"
                                                   Cancel="CancelImport"

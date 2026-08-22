@@ -5,17 +5,37 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
-public sealed partial class ConfigurationImportPreviewService(
-    IDbContextFactory<BlokeBotDbContext> dbFactory
-)
+public sealed partial class ConfigurationImportPreviewService
 {
+    private readonly IDbContextFactory<BlokeBotDbContext> _dbFactory;
+    private readonly IOverlayConfigurationTransferAdapter _overlays;
+    private readonly IAutomationConfigurationTransferAdapter _automations;
+
+    public ConfigurationImportPreviewService(IDbContextFactory<BlokeBotDbContext> dbFactory)
+        : this(
+            dbFactory,
+            UnavailableOverlayConfigurationTransferAdapter.Instance,
+            UnavailableAutomationConfigurationTransferAdapter.Instance
+        ) { }
+
+    internal ConfigurationImportPreviewService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        IOverlayConfigurationTransferAdapter overlays,
+        IAutomationConfigurationTransferAdapter automations
+    )
+    {
+        _dbFactory = dbFactory;
+        _overlays = overlays;
+        _automations = automations;
+    }
+
     public async Task<ConfigurationPreviewOutcome> PreviewAsync(
         ConfigurationDocumentV1 document,
         ConfigurationImportSelection selection,
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db
             .Hosts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == selection.DestinationHostId, cancellationToken);
@@ -23,6 +43,37 @@ public sealed partial class ConfigurationImportPreviewService(
         {
             return new ConfigurationPreviewOutcome.HostNotFound();
         }
+        if (ConfigurationDocumentValidator.Validate(document) is { } documentIssue)
+        {
+            return new ConfigurationPreviewOutcome.Success(
+                new(
+                    Guid.NewGuid(),
+                    host.Id,
+                    host.Login,
+                    document,
+                    selection
+                        .Sections.Select(
+                            (selected, index) =>
+                                new ConfigurationSectionPreview(
+                                    selected.Section,
+                                    new(0, 0, 0, 0),
+                                    index == 0 ? [documentIssue] : [],
+                                    []
+                                )
+                        )
+                        .ToArray(),
+                    []
+                )
+            );
+        }
+
+        var references = await ConfigurationImportReferencePlan.BuildAsync(
+            db,
+            host.Id,
+            document,
+            selection,
+            cancellationToken
+        );
 
         var previews = new List<ConfigurationSectionPreview>();
         foreach (var selected in selection.Sections)
@@ -34,6 +85,7 @@ public sealed partial class ConfigurationImportPreviewService(
                     document,
                     selected,
                     selection,
+                    references,
                     cancellationToken
                 )
             );

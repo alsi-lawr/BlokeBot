@@ -8,6 +8,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
     private static ImportedCustomCommands MapCustomCommands(
         CustomCommandsSectionV1 section,
         SectionImportSelection selection,
+        ConfigurationImportReferencePlan referencePlan,
         ref int nextId
     )
     {
@@ -35,10 +36,18 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
         var commands = new List<CustomCommandEditor>();
         foreach (var command in section.Commands)
         {
+            if (ConfigurationConflictIds.SkipsCustomCommand(command, selection.ItemResolutions))
+            {
+                continue;
+            }
             if (
-                command.Action.Type
-                is CustomCommandActionTypeV1.Automation
-                    or CustomCommandActionTypeV1.OverlayCue
+                command.Action.Type == CustomCommandActionTypeV1.OverlayCue
+                && (
+                    command.Action.OverlayTargetId is null
+                    || command.Action.OverlayCueId is null
+                    || !referencePlan.OverlayInstances.ContainsKey(command.Action.OverlayTargetId)
+                    || !referencePlan.OverlayCues.ContainsKey(command.Action.OverlayCueId)
+                )
             )
             {
                 if (
@@ -52,31 +61,21 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
                 issues.Add(
                     new(
                         $"sections.customCommands.commands[{command.Id}].action",
-                        $"!{command.Aliases.FirstOrDefault() ?? command.Name} uses an unsupported {command.Action.Type} dependency. Skip the whole command or abort."
+                        $"!{command.Aliases.FirstOrDefault() ?? command.Name} has an unresolved Overlay dependency. Skip the whole command or abort."
                     )
                 );
                 continue;
             }
-            var mapped = MapCommand(command, replyIds, counterIds, nextId--);
+            var mapped = MapCommand(command, replyIds, counterIds, referencePlan, nextId--);
             var selectedAliases = new List<string>(command.Aliases.Count);
             foreach (var alias in command.Aliases)
             {
-                var resolution = resolutions.GetValueOrDefault(
-                    ConfigurationConflictIds.CustomCommandAlias(command.Id, alias)
-                );
-                if (resolution?.Resolution == ImportConflictResolution.Skip)
-                {
-                    continue;
-                }
-
                 selectedAliases.Add(
-                    resolution
-                        is {
-                            Resolution: ImportConflictResolution.Rename,
-                            ReplacementName: { Length: > 0 } renamed
-                        }
-                        ? renamed
-                        : alias
+                    ConfigurationConflictIds.SelectedCustomCommandAlias(
+                        command.Id,
+                        alias,
+                        selection.ItemResolutions
+                    )
                 );
             }
             mapped.Aliases = string.Join(", ", selectedAliases);
@@ -113,6 +112,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
         CustomCommandV1 value,
         IReadOnlyDictionary<string, int> replies,
         IReadOnlyDictionary<string, int> counters,
+        ConfigurationImportReferencePlan referencePlan,
         int id
     )
     {
@@ -124,23 +124,28 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
             Enabled = value.Enabled,
             AllowEveryone = value.AllowEveryone,
             AllowModerators = value.AllowModerators,
-            AllowedUsers = value
-                .AllowedUsers.Select(x => new CustomCommandAllowedUserEditor(
-                    x.TwitchUserId,
-                    x.Login,
-                    x.DisplayName
-                ))
-                .ToList(),
+            AllowedUsers = [],
             CooldownSeconds = value.CooldownSeconds,
             CooldownScope = value.CooldownScope,
             InvocationLimit = value.InvocationLimit,
-            Action =
-                value.Action.Type == CustomCommandActionTypeV1.Counter
-                    ? new CounterCustomCommandActionEditor
-                    {
-                        CounterId = counters[value.Action.CounterId!],
-                    }
-                    : new MessageCustomCommandActionEditor(),
+            Action = value.Action.Type switch
+            {
+                CustomCommandActionTypeV1.Counter => new CounterCustomCommandActionEditor
+                {
+                    CounterId = counters[value.Action.CounterId!],
+                },
+                CustomCommandActionTypeV1.Automation => new AutomationCustomCommandActionEditor(),
+                CustomCommandActionTypeV1.OverlayCue => new OverlayCueCustomCommandActionEditor
+                {
+                    TargetOverlayPublicId = referencePlan.OverlayInstances[
+                        value.Action.OverlayTargetId!
+                    ],
+                    CuePublicId = referencePlan.OverlayCues[value.Action.OverlayCueId!],
+                    QueuePolicy = value.Action.OverlayQueuePolicy!.Value,
+                    ReplyOrder = value.Action.OverlayReplyOrder!.Value,
+                },
+                _ => new MessageCustomCommandActionEditor(),
+            },
         };
         editor.Action.ReplyRoutes = new()
         {

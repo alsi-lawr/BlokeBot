@@ -94,6 +94,9 @@ public sealed class AutomationCatalogService
         return false;
     }
 
+    internal bool IsFormat1Definition(string definitionId) =>
+        _catalog.IsFormat1Definition(new(definitionId));
+
     public async Task<AutomationConfigurationCheck> ValidateBeforeExecutionAsync(
         AutomationHostId requestedHostId,
         AutomationContext context,

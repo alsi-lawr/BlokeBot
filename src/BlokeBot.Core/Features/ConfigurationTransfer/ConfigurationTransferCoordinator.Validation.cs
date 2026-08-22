@@ -35,7 +35,11 @@ public sealed partial class ConfigurationTransferCoordinator
                 is null
                 ? 0
                 : 1,
-            _ => 0,
+            ConfigurationSectionId.Overlays => document.Sections.Overlays is { } overlays
+                ? overlays.Instances.Count + overlays.MediaReferences.Count + overlays.Cues.Count
+                : 0,
+            ConfigurationSectionId.Automations => document.Sections.Automations?.Flows.Count ?? 0,
+            _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 
     private static ConfigurationValidationIssue? ValidateSelection(
@@ -93,6 +97,8 @@ public sealed partial class ConfigurationTransferCoordinator
             ConfigurationSectionId.Points => document.Sections.Points is not null,
             ConfigurationSectionId.ChannelToolEnablement => document.Sections.ChannelToolEnablement
                 is not null,
+            ConfigurationSectionId.Overlays => document.Sections.Overlays is not null,
+            ConfigurationSectionId.Automations => document.Sections.Automations is not null,
             _ => false,
         };
 
@@ -104,6 +110,8 @@ public sealed partial class ConfigurationTransferCoordinator
             ConfigurationSectionId.Guessing => "guessing",
             ConfigurationSectionId.Points => "points",
             ConfigurationSectionId.ChannelToolEnablement => "channelToolEnablement",
+            ConfigurationSectionId.Overlays => "overlays",
+            ConfigurationSectionId.Automations => "automations",
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 

@@ -70,9 +70,12 @@ public partial class ConfigurationTransferPage
         await RefreshPreviewAsync();
     }
 
-    private void SetRename(ConfigurationTransferReviewPanel.ConflictRenameChange change) =>
+    private async Task SetRenameAsync(ConfigurationTransferReviewPanel.ConflictRenameChange change)
+    {
         _renames[ConfigurationTransferPresentation.ConflictKey(change.Conflict)] =
             change.ReplacementName;
+        await RefreshPreviewAsync();
+    }
 
     private async Task SetGuessingProfileTargetAsync(
         ConfigurationTransferReviewPanel.GuessingProfileTargetChange change
@@ -100,6 +103,19 @@ public partial class ConfigurationTransferPage
             _ = _exportSections.Remove(section);
         }
     }
+
+    private void ToggleOverlayUrls(bool enabled)
+    {
+        _exportOverlayUrls = enabled;
+        if (!enabled)
+        {
+            _urlWarningAcknowledged = false;
+        }
+    }
+
+    private void ToggleOverlayMedia(bool enabled) => _exportOverlayMedia = enabled;
+
+    private void ToggleUrlWarning(bool enabled) => _urlWarningAcknowledged = enabled;
 
     private void ToggleEnablement(ConfigurationTransferReviewPanel.EnablementSelectionChange change)
     {

@@ -4,7 +4,7 @@ namespace BlokeBot.Core.Features.Automations;
 
 public sealed class AutomationCatalogRegistrationException(string message) : Exception(message);
 
-internal sealed class AutomationDefinitionCatalog
+internal sealed partial class AutomationDefinitionCatalog
 {
     internal const int SupportedSchemaVersion = 1;
 
@@ -12,12 +12,17 @@ internal sealed class AutomationDefinitionCatalog
         AutomationDefinitionId,
         IAutomationDefinition
     > _definitions;
+    private readonly ImmutableDictionary<AutomationDefinitionId, AutomationModuleId> _modules;
 
     public AutomationDefinitionCatalog(IEnumerable<IAutomationCatalogModule> modules)
     {
         var definitions = ImmutableDictionary.CreateBuilder<
             AutomationDefinitionId,
             IAutomationDefinition
+        >();
+        var definitionModules = ImmutableDictionary.CreateBuilder<
+            AutomationDefinitionId,
+            AutomationModuleId
         >();
         var moduleIds = new HashSet<AutomationModuleId>();
         foreach (var module in modules)
@@ -39,10 +44,12 @@ internal sealed class AutomationDefinitionCatalog
                         $"Automation definition identifier '{definition.Descriptor.Id.Value}' is registered more than once."
                     );
                 }
+                definitionModules.Add(definition.Descriptor.Id, module.Id);
             }
         }
 
         _definitions = definitions.ToImmutable();
+        _modules = definitionModules.ToImmutable();
         ValidateTriggerContextRequirements(_definitions);
         Descriptors = _definitions
             .Values.Select(static definition => definition.Descriptor)
@@ -54,6 +61,14 @@ internal sealed class AutomationDefinitionCatalog
 
     internal bool TryResolve(AutomationDefinitionId id, out IAutomationDefinition definition) =>
         _definitions.TryGetValue(id, out definition!);
+
+    internal bool IsFormat1Definition(AutomationDefinitionId id) =>
+        _modules.TryGetValue(id, out var module)
+        && module.Value
+            is "blokebot.core"
+                or "blokebot.native-operations"
+                or "blokebot.twitch-events"
+                or "blokebot.competitions";
 
     internal static bool IsValidEffectiveDescriptor(
         AutomationDefinitionDescriptor registered,
@@ -120,298 +135,4 @@ internal sealed class AutomationDefinitionCatalog
             }
         }
     }
-
-    private static void Validate(
-        AutomationDefinitionDescriptor descriptor,
-        AutomationModuleId moduleId
-    )
-    {
-        ValidateStableId(descriptor.Id.Value, "definition");
-        if (!Enum.IsDefined(descriptor.Kind))
-        {
-            throw Invalid(descriptor, moduleId, "The definition declares an unknown node kind.");
-        }
-
-        if (descriptor.Scope != AutomationDefinitionScope.Host)
-        {
-            throw Invalid(descriptor, moduleId, "Every automation definition must be host-scoped.");
-        }
-
-        if (
-            descriptor.Schema.Current.Value is <= 0 or > SupportedSchemaVersion
-            || descriptor.Schema.OldestReadable.Value <= 0
-            || descriptor.Schema.OldestReadable.Value > descriptor.Schema.Current.Value
-        )
-        {
-            throw Invalid(
-                descriptor,
-                moduleId,
-                $"Schema versions must be within 1..{SupportedSchemaVersion} and the oldest readable version cannot exceed the current version."
-            );
-        }
-
-        if (
-            descriptor.Kind != AutomationNodeKind.Action
-            && descriptor.Capabilities != AutomationActionCapabilities.None
-        )
-        {
-            throw Invalid(
-                descriptor,
-                moduleId,
-                "Only action definitions may declare action capabilities."
-            );
-        }
-
-        if (
-            !Enum.IsDefined(descriptor.RetrySafety)
-            || (
-                descriptor.Kind == AutomationNodeKind.Action
-                    ? descriptor.RetrySafety == AutomationActionRetrySafety.NotApplicable
-                    : descriptor.RetrySafety != AutomationActionRetrySafety.NotApplicable
-            )
-        )
-        {
-            throw Invalid(
-                descriptor,
-                moduleId,
-                "Actions must declare retry safety and non-actions cannot declare it."
-            );
-        }
-
-        var supportedCapabilities =
-            AutomationActionCapabilities.SendsChat
-            | AutomationActionCapabilities.PlaysOverlays
-            | AutomationActionCapabilities.ChangesPoints
-            | AutomationActionCapabilities.CallsTwitchApi
-            | AutomationActionCapabilities.RunsScripts;
-        if ((descriptor.Capabilities & ~supportedCapabilities) != 0)
-        {
-            throw Invalid(descriptor, moduleId, "The definition declares unknown capabilities.");
-        }
-
-        if (
-            string.IsNullOrWhiteSpace(descriptor.Display.Name)
-            || string.IsNullOrWhiteSpace(descriptor.Display.Description)
-            || string.IsNullOrWhiteSpace(descriptor.Display.Category)
-        )
-        {
-            throw Invalid(descriptor, moduleId, "Display metadata must be complete.");
-        }
-
-        ValidateFields(descriptor, moduleId);
-        ValidatePorts(descriptor, moduleId, descriptor.Inputs, isInput: true);
-        ValidatePorts(descriptor, moduleId, descriptor.Outputs, isInput: false);
-
-        if (
-            descriptor.Kind == AutomationNodeKind.Action
-            && descriptor.Outputs.Any(static port => port.ValueType != AutomationPortValueType.Flow)
-        )
-        {
-            throw Invalid(descriptor, moduleId, "Effectful actions cannot declare Data outputs.");
-        }
-
-        if (
-            descriptor.Kind == AutomationNodeKind.Transform
-            && descriptor.Inputs.Any(static port =>
-                port.ValueType != AutomationPortValueType.Flow
-                && port.Sensitivity != AutomationDataSensitivity.Safe
-            )
-        )
-        {
-            throw Invalid(descriptor, moduleId, "Transforms cannot accept Sensitive Data inputs.");
-        }
-    }
-
-    private static void ValidatePorts(
-        AutomationDefinitionDescriptor descriptor,
-        AutomationModuleId moduleId,
-        ImmutableArray<AutomationPortMetadata> ports,
-        bool isInput
-    )
-    {
-        var direction = isInput ? "input" : "output";
-        var ids = new HashSet<AutomationPortId>();
-        foreach (var port in ports)
-        {
-            ValidateStableId(port.Id.Value, $"{direction} port");
-            if (!ids.Add(port.Id))
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"The {direction} port identifier '{port.Id.Value}' is duplicated."
-                );
-            }
-
-            if (
-                string.IsNullOrWhiteSpace(port.Name)
-                || string.IsNullOrWhiteSpace(port.Description)
-                || !Enum.IsDefined(port.ValueType)
-                || !Enum.IsDefined(port.Sensitivity)
-                || !Enum.IsDefined(port.Nullability)
-            )
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"The {direction} port '{port.Id.Value}' needs complete display metadata."
-                );
-            }
-
-            if (
-                port.ValueType == AutomationPortValueType.Flow
-                && (
-                    port.Sensitivity != AutomationDataSensitivity.Safe
-                    || port.Nullability != AutomationPortNullability.NonNullable
-                    || port.BindingFieldId is not null
-                )
-            )
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"The {direction} Flow port '{port.Id.Value}' cannot declare Data metadata."
-                );
-            }
-
-            if (!isInput && port.BindingFieldId is not null)
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"The output port '{port.Id.Value}' cannot bind a configuration field."
-                );
-            }
-
-            if (isInput && port.ValueType != AutomationPortValueType.Flow)
-            {
-                var field = descriptor.Configuration.SingleOrDefault(candidate =>
-                    candidate.Id == port.BindingFieldId
-                );
-                if (
-                    field is null
-                    || FieldValueType(field.FieldType) != port.ValueType
-                    || field.Sensitivity != port.Sensitivity
-                    || (
-                        field.Required
-                            ? AutomationPortNullability.NonNullable
-                            : AutomationPortNullability.Nullable
-                    ) != port.Nullability
-                )
-                {
-                    throw Invalid(
-                        descriptor,
-                        moduleId,
-                        $"The Data input port '{port.Id.Value}' must bind a matching configuration field."
-                    );
-                }
-            }
-        }
-    }
-
-    private static AutomationPortValueType? FieldValueType(
-        AutomationConfigurationFieldType fieldType
-    ) =>
-        fieldType switch
-        {
-            AutomationConfigurationFieldType.Text => AutomationPortValueType.Text,
-            AutomationConfigurationFieldType.Choice => AutomationPortValueType.Text,
-            AutomationConfigurationFieldType.Reference => AutomationPortValueType.Text,
-            AutomationConfigurationFieldType.Number => AutomationPortValueType.Number,
-            AutomationConfigurationFieldType.Duration => AutomationPortValueType.Number,
-            AutomationConfigurationFieldType.Data data => data.ValueType,
-            _ => null,
-        };
-
-    private static void ValidateFields(
-        AutomationDefinitionDescriptor descriptor,
-        AutomationModuleId moduleId
-    )
-    {
-        var ids = new HashSet<AutomationConfigurationFieldId>();
-        foreach (var field in descriptor.Configuration)
-        {
-            ValidateStableId(field.Id.Value, "configuration field");
-            if (!ids.Add(field.Id))
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"Configuration field identifier '{field.Id.Value}' is duplicated."
-                );
-            }
-
-            if (
-                string.IsNullOrWhiteSpace(field.Name)
-                || string.IsNullOrWhiteSpace(field.Description)
-                || !Enum.IsDefined(field.Sensitivity)
-            )
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"Configuration field '{field.Id.Value}' needs complete display metadata."
-                );
-            }
-
-            var validType = field.FieldType switch
-            {
-                AutomationConfigurationFieldType.Text text => text.MaximumLength is null or > 0,
-                AutomationConfigurationFieldType.Duration duration => duration.Minimum
-                    > TimeSpan.Zero
-                    && (duration.Maximum is null || duration.Maximum >= duration.Minimum),
-                AutomationConfigurationFieldType.Number number => number.Maximum is null
-                    || number.Maximum >= number.Minimum,
-                AutomationConfigurationFieldType.Data data => data.ValueType
-                    != AutomationPortValueType.Flow
-                    && Enum.IsDefined(data.ValueType),
-                AutomationConfigurationFieldType.Reference reference => Enum.IsDefined(
-                    reference.ReferenceKind
-                ),
-                AutomationConfigurationFieldType.Choice choice => !choice.Values.IsEmpty
-                    && choice.Values.All(static value => !string.IsNullOrWhiteSpace(value))
-                    && choice.Values.Distinct(StringComparer.Ordinal).Count()
-                        == choice.Values.Length,
-                _ => false,
-            };
-            if (!validType)
-            {
-                throw Invalid(
-                    descriptor,
-                    moduleId,
-                    $"Configuration field '{field.Id.Value}' has invalid type metadata."
-                );
-            }
-        }
-    }
-
-    private static void ValidateStableId(string value, string subject)
-    {
-        if (
-            string.IsNullOrWhiteSpace(value)
-            || value.Length > 96
-            || value[0] is < 'a' or > 'z'
-            || value.Any(static character =>
-                character
-                    is not (>= 'a' and <= 'z')
-                        and not (>= '0' and <= '9')
-                        and not '-'
-                        and not '.'
-            )
-        )
-        {
-            throw new AutomationCatalogRegistrationException(
-                $"Automation {subject} identifier '{value}' must use lowercase letters, numbers, dots, or hyphens and start with a letter."
-            );
-        }
-    }
-
-    private static AutomationCatalogRegistrationException Invalid(
-        AutomationDefinitionDescriptor descriptor,
-        AutomationModuleId moduleId,
-        string reason
-    ) =>
-        new(
-            $"Automation definition '{descriptor.Id.Value}' from module '{moduleId.Value}' is incompatible: {reason}"
-        );
 }

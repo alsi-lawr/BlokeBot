@@ -24,10 +24,13 @@
             <p class="mt-2 text-xs text-muted-foreground">Switching with unsaved edits still asks: save, discard, or keep editing.</p>
         </div>
         <div class="studio-span-6">
-            <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")"
-                   Label="Round type name"
-                   @bind-Value="Configuration.Profile.Name"
-                   Placeholder="Round type name" />
+            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+            <div class="mt-2 max-md:mt-0">
+                <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")"
+                       Label="Round type name"
+                       @bind-Value="Configuration.Profile.Name"
+                       Placeholder="Round type name" />
+            </div>
             <p class="mt-1 text-xs text-muted-foreground">Up to 128 characters. Names must be unique.</p>
         </div>
         <div class="studio-span-6 space-y-2">

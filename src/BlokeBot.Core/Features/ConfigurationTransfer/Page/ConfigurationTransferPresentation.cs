@@ -12,6 +12,8 @@ internal static class ConfigurationTransferPresentation
             ConfigurationSectionId.Guessing => "Guessing game",
             ConfigurationSectionId.Points => "Points & giveaways",
             ConfigurationSectionId.ChannelToolEnablement => "Chat Tools enablement",
+            ConfigurationSectionId.Overlays => "Overlays",
+            ConfigurationSectionId.Automations => "Automations",
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 
@@ -23,6 +25,8 @@ internal static class ConfigurationTransferPresentation
             ConfigurationSectionId.Guessing => "/guessing/settings",
             ConfigurationSectionId.Points => "/points/settings",
             ConfigurationSectionId.ChannelToolEnablement => "/host#chat-tools",
+            ConfigurationSectionId.Overlays => "/overlays",
+            ConfigurationSectionId.Automations => "/automations",
             _ => "/configuration-transfer",
         };
 

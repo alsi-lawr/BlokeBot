@@ -37,7 +37,6 @@ internal static partial class ConfigurationExportMappers
                 .AsSplitQuery()
                 .Include(x => x.Action)
                 .Include(x => x.Aliases)
-                .Include(x => x.AllowedUsers)
                 .Where(x => x.HostId == hostId)
                 .OrderBy(x => x.Name)
                 .ToArrayAsync(cancellationToken),
@@ -50,16 +49,23 @@ internal static partial class ConfigurationExportMappers
                 .ToArrayAsync(cancellationToken)
         );
 
-    internal static CustomCommandsSectionV1 CustomCommands(CommandGraph graph, string timeZoneId)
+    internal static CustomCommandsSectionV1 CustomCommands(
+        CommandGraph graph,
+        string timeZoneId,
+        ConfigurationExportReferencePlan references
+    )
     {
         var replyIds = LocalIds("reply", graph.Replies.Select(x => x.Id));
         var counterIds = LocalIds("counter", graph.Counters.Select(x => x.Id));
-        var commandIds = LocalIds("command", graph.Commands.Select(x => x.Id));
         return new(
             timeZoneId,
             graph.Replies.Select(x => Reply(x, replyIds[x.Id])).ToArray(),
             graph.Counters.Select(x => new CounterV1(counterIds[x.Id], x.Name, x.Value)).ToArray(),
-            graph.Commands.Select(x => Command(x, commandIds[x.Id], replyIds, counterIds)).ToArray()
+            graph
+                .Commands.Select(x =>
+                    Command(x, references.Commands[x.Id].Id, replyIds, counterIds, references)
+                )
+                .ToArray()
         );
     }
 
@@ -89,7 +95,8 @@ internal static partial class ConfigurationExportMappers
         CustomCommand value,
         string id,
         IReadOnlyDictionary<int, string> replyIds,
-        IReadOnlyDictionary<int, string> counterIds
+        IReadOnlyDictionary<int, string> counterIds,
+        ConfigurationExportReferencePlan references
     ) =>
         new(
             id,
@@ -102,22 +109,27 @@ internal static partial class ConfigurationExportMappers
                 .ToArray(),
             value.AllowEveryone,
             value.AllowModerators,
-            value
-                .AllowedUsers.OrderBy(x => x.Login)
-                .Select(x => new AllowedUserV1(x.TwitchUserId, x.Login, x.DisplayName))
-                .ToArray(),
             value.CooldownSeconds,
             value.CooldownScope,
             value.InvocationLimit,
-            Action(value.Action, replyIds, counterIds)
+            Action(value.Action, replyIds, counterIds, references)
         );
 
     private static CustomCommandActionV1 Action(
         CustomCommandAction value,
         IReadOnlyDictionary<int, string> replyIds,
-        IReadOnlyDictionary<int, string> counterIds
-    ) =>
-        new(
+        IReadOnlyDictionary<int, string> counterIds,
+        ConfigurationExportReferencePlan references
+    )
+    {
+        var overlay = value as OverlayCueCustomCommandAction;
+        var target = overlay is null
+            ? null
+            : references.OverlayInstances.GetValueOrDefault(overlay.TargetOverlayPublicId);
+        var cue = overlay is null
+            ? null
+            : references.OverlayCues.GetValueOrDefault(overlay.CuePublicId);
+        return new(
             value switch
             {
                 MessageCustomCommandAction => CustomCommandActionTypeV1.Message,
@@ -129,8 +141,15 @@ internal static partial class ConfigurationExportMappers
             Reference(value.ZeroArgumentMessageLibraryEntryId, replyIds),
             Reference(value.OneArgumentMessageLibraryEntryId, replyIds),
             Reference(value.TwoArgumentMessageLibraryEntryId, replyIds),
-            value is CounterCustomCommandAction counter ? counterIds[counter.CounterId] : null
+            value is CounterCustomCommandAction counter ? counterIds[counter.CounterId] : null,
+            target?.Id,
+            target?.Name,
+            cue?.Id,
+            cue?.Name,
+            overlay?.QueuePolicy,
+            overlay?.ReplyOrder
         );
+    }
 
     private static AnnouncementV1 Announcement(
         CustomAnnouncement value,

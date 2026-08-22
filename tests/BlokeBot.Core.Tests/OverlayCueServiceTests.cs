@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Net;
 using System.Threading.Channels;
 using BlokeBot.Core.Auth.Moderation;
@@ -9,6 +8,7 @@ using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -17,6 +17,111 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class OverlayCueServiceTests
 {
+    [Test]
+    public async Task SharedDocument_RetargetAndReferenceRemovalStayHostIsolatedUntilLastOrphan()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var content = new MemoryStream(Mp4Bytes());
+        var first = (
+            await fixture.Cues.UploadAssetAsync(
+                Session(fixture.HostId),
+                "Shared",
+                "video/mp4",
+                content,
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+            .Value;
+        Guid documentId;
+        Guid secondId;
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var firstReference = await db.OverlayMediaAssets.SingleAsync(value =>
+                value.PublicId == first.Id
+            );
+            documentId = firstReference.DocumentId;
+            secondId = Guid.NewGuid();
+            _ = db.OverlayMediaAssets.Add(
+                new()
+                {
+                    PublicId = secondId,
+                    HostId = fixture.OtherHostId,
+                    Name = "Shared from another channel",
+                    ContentRevision = 1,
+                    DocumentId = documentId,
+                    CreatedAtUtc = fixture.Clock.GetUtcNow().UtcDateTime,
+                    UpdatedAtUtc = fixture.Clock.GetUtcNow().UtcDateTime,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var secondBefore = await fixture.Cues.ResolveContentAsync(
+            fixture.OtherHostId,
+            secondId,
+            1,
+            CancellationToken.None
+        );
+        _ = secondBefore.ShouldNotBeNull();
+        var secondBytes = File.ReadAllBytes(secondBefore.Path);
+        (
+            await fixture.Cues.ResolveContentAsync(
+                fixture.OtherHostId,
+                documentId,
+                1,
+                CancellationToken.None
+            )
+        ).ShouldBeNull();
+
+        await using var replacement = new MemoryStream(Mp4Bytes(24));
+        _ = (
+            await fixture.Cues.ReplaceAssetAsync(
+                Session(fixture.HostId),
+                new(first.Id, first.ContentRevision, "video/mp4", replacement),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>();
+        var secondAfter = await fixture.Cues.ResolveContentAsync(
+            fixture.OtherHostId,
+            secondId,
+            1,
+            CancellationToken.None
+        );
+        _ = secondAfter.ShouldNotBeNull();
+        secondAfter.Path.ShouldBe(secondBefore.Path);
+        File.ReadAllBytes(secondAfter.Path).ShouldBe(secondBytes);
+
+        _ = (
+            await fixture.Cues.DeleteAssetAsync(
+                Session(fixture.HostId),
+                first.Id,
+                first.ContentRevision + 1,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayCueResult<Guid>.Succeeded>();
+        await fixture.Maintenance.RecoverAsync(CancellationToken.None);
+        File.Exists(secondAfter.Path).ShouldBeTrue();
+        await using (var verify = await fixture.Database.CreateDbContextAsync())
+        {
+            (
+                await verify.OverlayMediaDocuments.CountAsync(value => value.Id == documentId)
+            ).ShouldBe(1);
+        }
+
+        _ = (
+            await fixture.Cues.DeleteAssetAsync(
+                Session(fixture.OtherHostId),
+                secondId,
+                1,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayCueResult<Guid>.Succeeded>();
+        await fixture.Maintenance.RecoverAsync(CancellationToken.None);
+        File.Exists(secondAfter.Path).ShouldBeFalse();
+        await using var final = await fixture.Database.CreateDbContextAsync();
+        (await final.OverlayMediaDocuments.CountAsync(value => value.Id == documentId)).ShouldBe(0);
+    }
+
     [Test]
     public async Task AssetLifecycle_IsHostBoundRetainsDataAndPreventsReferencedDelete()
     {
@@ -35,13 +140,6 @@ public sealed class OverlayCueServiceTests
         )
             .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
             .Value;
-        File.Exists(fixture.ContentPath(uploaded.Id)).ShouldBeTrue();
-        fixture
-            .ContentPath(uploaded.Id)
-            .ShouldContain(
-                Path.Combine("overlay-media", fixture.HostId.ToString(CultureInfo.InvariantCulture))
-            );
-        fixture.ContentPath(uploaded.Id).ShouldNotContain("wwwroot");
         (await fixture.Cues.ListAssetsAsync(Session(fixture.OtherHostId), CancellationToken.None))
             .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded>()
             .Value.ShouldBeEmpty();
@@ -132,6 +230,7 @@ public sealed class OverlayCueServiceTests
 
         replaced.ContentType.ShouldBe("video/webm");
         replaced.ContentRevision.ShouldBe(uploaded.ContentRevision + 1);
+        await fixture.Maintenance.RecoverAsync(CancellationToken.None);
         File.Exists(originalPath).ShouldBeFalse();
         var published = await fixture.Cues.ResolveContentAsync(
             fixture.HostId,
@@ -401,7 +500,7 @@ public sealed class OverlayCueServiceTests
     }
 
     [Test]
-    public async Task DeleteAsset_StorageFailureRetainsMetadataBytesAndQuota()
+    public async Task DeleteAsset_StorageFailureLeavesRetryableOrphanWithoutChargingHostQuota()
     {
         var deletion = new ControlledMediaFileDeletion();
         await using var fixture = await Fixture.CreateAsync(
@@ -431,15 +530,14 @@ public sealed class OverlayCueServiceTests
                 uploaded.ContentRevision,
                 CancellationToken.None
             )
-        )
-            .ShouldBeOfType<OverlayCueResult<Guid>.Rejected>()
-            .Reason.ShouldBeOfType<OverlayCueRejection.StorageUnavailable>();
+        ).ShouldBeOfType<OverlayCueResult<Guid>.Succeeded>();
+
+        await fixture.Maintenance.RecoverAsync(CancellationToken.None);
 
         File.Exists(originalPath).ShouldBeTrue();
         (await fixture.Cues.ListAssetsAsync(session, CancellationToken.None))
             .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded>()
-            .Value.ShouldHaveSingleItem()
-            .ShouldBe(uploaded);
+            .Value.ShouldBeEmpty();
         await using var additional = new MemoryStream(Mp4Bytes());
         _ = (
             await fixture.Cues.UploadAssetAsync(
@@ -449,13 +547,11 @@ public sealed class OverlayCueServiceTests
                 additional,
                 CancellationToken.None
             )
-        )
-            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>()
-            .Reason.ShouldBeOfType<OverlayCueRejection.Invalid>();
+        ).ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>();
     }
 
     [Test]
-    public async Task ReplaceAsset_StorageFailureRetainsOldRevisionBytesAndQuota()
+    public async Task ReplaceAsset_StorageFailureRetargetsReferenceAndLeavesRetryableOldOrphan()
     {
         var deletion = new ControlledMediaFileDeletion();
         await using var fixture = await Fixture.CreateAsync(
@@ -479,21 +575,23 @@ public sealed class OverlayCueServiceTests
         deletion.StorageKeysUnavailable = true;
         await using var replacement = new MemoryStream(Mp4Bytes());
 
-        _ = (
+        var replaced = (
             await fixture.Cues.ReplaceAssetAsync(
                 session,
                 new(uploaded.Id, uploaded.ContentRevision, "video/mp4", replacement),
                 CancellationToken.None
             )
         )
-            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>()
-            .Reason.ShouldBeOfType<OverlayCueRejection.StorageUnavailable>();
+            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+            .Value;
+
+        await fixture.Maintenance.RecoverAsync(CancellationToken.None);
 
         File.Exists(originalPath).ShouldBeTrue();
         (await fixture.Cues.ListAssetsAsync(session, CancellationToken.None))
             .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded>()
             .Value.ShouldHaveSingleItem()
-            .ShouldBe(uploaded);
+            .ShouldBe(replaced);
         var survivingFiles = Directory
             .EnumerateFiles(fixture.MediaRoot, "*", SearchOption.AllDirectories)
             .ToArray();
@@ -509,13 +607,11 @@ public sealed class OverlayCueServiceTests
                 additional,
                 CancellationToken.None
             )
-        )
-            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>()
-            .Reason.ShouldBeOfType<OverlayCueRejection.Invalid>();
+        ).ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>();
     }
 
     [Test]
-    public async Task Upload_StaleTemporaryFileConsumesQuotaButCurrentUploadDoesNot()
+    public async Task Upload_StaleTemporaryFileDoesNotConsumeLogicalHostQuota()
     {
         var deletion = new ControlledMediaFileDeletion { TemporaryFilesUnavailable = true };
         await using var fixture = await Fixture.CreateAsync(
@@ -543,7 +639,7 @@ public sealed class OverlayCueServiceTests
         deletion.TemporaryFilesUnavailable = false;
         await using var additional = new MemoryStream(Mp4Bytes());
 
-        (
+        _ = (
             await fixture.Cues.UploadAssetAsync(
                 session,
                 "Additional",
@@ -551,16 +647,48 @@ public sealed class OverlayCueServiceTests
                 additional,
                 CancellationToken.None
             )
-        )
-            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>()
-            .Reason.ShouldBeOfType<OverlayCueRejection.Invalid>()
-            .Message.ShouldContain("quota");
+        ).ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>();
 
         File.Exists(staleUpload).ShouldBeTrue();
+        var files = Directory
+            .EnumerateFiles(fixture.MediaRoot, "*", SearchOption.AllDirectories)
+            .ToArray();
+        files.Length.ShouldBe(2);
+        files.ShouldContain(staleUpload);
+    }
+
+    [Test]
+    public async Task Upload_ReferenceCommitFailureRecoversDurablePublicationWithoutExposingBytes()
+    {
+        await using var fixture = await Fixture.CreateAsync(
+            interceptor: new FailMediaReferenceSaveInterceptor()
+        );
+        await using var content = new MemoryStream(Mp4Bytes());
+
+        var rejected = (
+            await fixture.Cues.UploadAssetAsync(
+                Session(fixture.HostId),
+                "Interrupted",
+                "video/mp4",
+                content,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>();
+
+        _ = rejected.Reason.ShouldBeOfType<OverlayCueRejection.StorageUnavailable>();
+        await using (var interrupted = await fixture.Database.CreateDbContextAsync())
+        {
+            (await interrupted.OverlayMediaAssets.CountAsync()).ShouldBe(0);
+            (await interrupted.OverlayMediaDocuments.SingleAsync()).State.ShouldBe(
+                OverlayMediaDocumentState.Publishing
+            );
+        }
+        await fixture.Maintenance.RecoverAsync(CancellationToken.None);
+        await using var recovered = await fixture.Database.CreateDbContextAsync();
+        (await recovered.OverlayMediaDocuments.CountAsync()).ShouldBe(0);
         Directory
             .EnumerateFiles(fixture.MediaRoot, "*", SearchOption.AllDirectories)
-            .ShouldHaveSingleItem()
-            .ShouldBe(staleUpload);
+            .ShouldBeEmpty();
     }
 
     [Test]
@@ -793,7 +921,8 @@ public sealed class OverlayCueServiceTests
             FakePresence presence,
             FakeTransport transport,
             EventBus<AppEventKind> events,
-            ManualTimeProvider clock
+            ManualTimeProvider clock,
+            OverlayMediaMaintenanceService maintenance
         )
         {
             Database = database;
@@ -806,6 +935,7 @@ public sealed class OverlayCueServiceTests
             Transport = transport;
             Events = events;
             Clock = clock;
+            Maintenance = maintenance;
         }
 
         internal SqliteBlokeBotDbFactory Database { get; }
@@ -818,14 +948,18 @@ public sealed class OverlayCueServiceTests
         internal FakeTransport Transport { get; }
         internal EventBus<AppEventKind> Events { get; }
         internal ManualTimeProvider Clock { get; }
+        internal OverlayMediaMaintenanceService Maintenance { get; }
 
         internal static async Task<Fixture> CreateAsync(
             long maximumHostStorageBytes = 2048,
             IOverlayMediaFileDeletion? fileDeletion = null,
-            long maximumUploadBytes = 1024
+            long maximumUploadBytes = 1024,
+            IInterceptor? interceptor = null
         )
         {
-            var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var database = interceptor is null
+                ? await SqliteBlokeBotDbFactory.CreateAsync()
+                : await SqliteBlokeBotDbFactory.CreateAsync(interceptor);
             int hostId;
             int otherHostId;
             await using (var db = await database.CreateDbContextAsync())
@@ -866,6 +1000,14 @@ public sealed class OverlayCueServiceTests
                 new GrantedModeratorAuthority()
             );
             var events = TestEventBus.Create<AppEventKind>();
+            var deletion = fileDeletion ?? new SystemOverlayMediaFileDeletion();
+            var maintenance = new OverlayMediaMaintenanceService(
+                database,
+                options,
+                deletion,
+                clock,
+                NullLogger<OverlayMediaMaintenanceService>.Instance
+            );
             var cues = new OverlayCueService(
                 database,
                 authority,
@@ -873,7 +1015,8 @@ public sealed class OverlayCueServiceTests
                 options,
                 events,
                 clock,
-                fileDeletion ?? new SystemOverlayMediaFileDeletion()
+                deletion,
+                maintenance
             );
             var presence = new FakePresence();
             var transport = new FakeTransport();
@@ -897,7 +1040,8 @@ public sealed class OverlayCueServiceTests
                 presence,
                 transport,
                 events,
-                clock
+                clock,
+                maintenance
             );
         }
 
@@ -959,12 +1103,8 @@ public sealed class OverlayCueServiceTests
         {
             using var db = Database.CreateDbContext();
             var asset = db.OverlayMediaAssets.Single(value => value.PublicId == assetId);
-            return Path.Combine(
-                MediaRoot,
-                "overlay-media",
-                HostId.ToString(CultureInfo.InvariantCulture),
-                asset.StorageKey
-            );
+            var document = db.OverlayMediaDocuments.Single(value => value.Id == asset.DocumentId);
+            return Path.Combine(MediaRoot, "overlay-media", "documents", document.StorageKey);
         }
 
         public async ValueTask DisposeAsync()
@@ -983,6 +1123,22 @@ public sealed class OverlayCueServiceTests
                 EnabledFeatures = HostFeatureFlags.Overlays,
                 CreatedAtUtc = DateTime.UtcNow,
             };
+    }
+
+    private sealed class FailMediaReferenceSaveInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default
+        ) =>
+            eventData
+                .Context?.ChangeTracker.Entries<OverlayMediaAsset>()
+                .Any(value => value.State == EntityState.Added) == true
+                ? ValueTask.FromException<InterceptionResult<int>>(
+                    new DbUpdateException("Planned media reference commit failure.")
+                )
+                : ValueTask.FromResult(result);
     }
 
     private sealed class GrantedModeratorAuthority : IModeratorAuthorityService

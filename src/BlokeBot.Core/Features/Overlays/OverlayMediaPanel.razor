@@ -34,7 +34,7 @@
                                 <div class="mt-2 h-2 overflow-hidden rounded-full border border-[var(--app-border)] bg-[var(--app-surface-muted)]">
                                     <div class="h-full rounded-full bg-[var(--app-affirmative-dot)]" style="@StorageMeterStyle()" data-storage-meter></div>
                                 </div>
-                                <p class="mt-1 text-xs text-muted-foreground">@ByteLabel(UsedBytes()) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used. Uploads stay in private channel storage.</p>
+                                <p class="mt-1 text-xs text-muted-foreground">@ByteLabel(UsedBytes()) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used. Each distinct media document linked to this channel counts once.</p>
                             </div>
                         </div>
                     </div>
@@ -53,7 +53,11 @@
                                                  Subline="@($"{OverlayMediaTypes.Label(asset.ContentType)} · {ByteLabel(asset.ByteLength)}")"
                                                  ThumbnailClass="@ThumbnailClass(asset)">
                                 <Thumbnail>
-                                    @if (_previewTarget is { } target)
+                                    @if (!asset.IsAvailable)
+                                    {
+                                        <span class="px-4 text-center text-sm font-semibold text-muted-foreground">File unavailable</span>
+                                    }
+                                    else if (_previewTarget is { } target)
                                     {
                                         var url = $"/overlays/preview/{target:D}/media/{asset.Id:D}/{asset.ContentRevision}";
                                         @if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Image) { <img class="size-full object-contain" src="@url" alt="@asset.Name" /> }

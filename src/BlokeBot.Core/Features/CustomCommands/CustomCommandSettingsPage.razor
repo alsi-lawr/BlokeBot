@@ -1,5 +1,6 @@
 @page "/custom-commands/settings"
 @using BlokeBot.Eventing
+@using BlokeBot.Core.Features.ConfigurationTransfer
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.Overlays
 @using BlokeBot.Persistence.Models
@@ -22,7 +23,7 @@
 <div class="custom-command-page mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Custom commands"
                 Description="Create chat commands, choose what the bot says, keep counters, and schedule messages.">
-        <a class="btn-secondary" href="/configuration-transfer?section=customCommands#export">Import or export</a>
+        <ConfigurationTransferActions Section="ConfigurationSectionId.CustomCommands" />
     </PageHeader>
 
     @if (_loadFailureMessage is not null)

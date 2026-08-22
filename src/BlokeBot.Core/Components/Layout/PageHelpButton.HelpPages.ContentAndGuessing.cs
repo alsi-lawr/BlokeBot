@@ -31,9 +31,9 @@ public partial class PageHelpButton
         [
             new(
                 "Manage cue media",
-                "Files stay in private channel storage.",
+                "Each channel controls its own media links.",
                 [
-                    "Another channel cannot use the files.",
+                    "A shared file stays available while any channel still links to it.",
                     "Upload cue media.",
                     "Preview cue media.",
                     "Replace cue media.",

@@ -2,24 +2,14 @@ using System.Data;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
-using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Configuration;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Configuration;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
-public sealed partial class ConfigurationTransferCoordinator(
-    IDbContextFactory<BlokeBotDbContext> dbFactory,
-    CustomCommandConfigurationTransferAdapter customCommands,
-    IModeratorAuthorityService moderatorAuthority,
-    ConfigurationActivationQueue activationQueue,
-    TimeProvider timeProvider,
-    ILogger<ConfigurationTransferCoordinator> logger
-)
+public sealed partial class ConfigurationTransferCoordinator
 {
     public async Task<ConfigurationImportApplyOutcome> ApplyAsync(
         AuthenticatedSession session,
@@ -30,6 +20,10 @@ public sealed partial class ConfigurationTransferCoordinator(
     )
     {
         var operationId = Guid.NewGuid();
+        if (ConfigurationDocumentValidator.Validate(document) is { } documentIssue)
+        {
+            return new ConfigurationImportApplyOutcome.Invalid(operationId, [documentIssue]);
+        }
         if (ValidateSelection(document, selection) is { } selectionIssue)
         {
             return new ConfigurationImportApplyOutcome.Invalid(operationId, [selectionIssue]);
@@ -43,7 +37,7 @@ public sealed partial class ConfigurationTransferCoordinator(
         }
         if (!session.CanManageSelectedHostConfig)
         {
-            var authority = await moderatorAuthority.AuthorizeAsync(
+            var authority = await _moderatorAuthority.AuthorizeAsync(
                 session,
                 selection.DestinationHostId,
                 cancellationToken
@@ -57,9 +51,16 @@ public sealed partial class ConfigurationTransferCoordinator(
             }
         }
 
+        SemaphoreSlim? overlayMediaGate = null;
+        if (Selected(selection, ConfigurationSectionId.Overlays) is not null)
+        {
+            overlayMediaGate = _overlayMediaGate;
+            await overlayMediaGate.WaitAsync(cancellationToken);
+        }
+
         try
         {
-            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable,
                 cancellationToken
@@ -77,17 +78,36 @@ public sealed partial class ConfigurationTransferCoordinator(
             }
 
             var planned = new Dictionary<ConfigurationSectionId, ConfigurationSectionPreview>();
+            var references = await ConfigurationImportReferencePlan.BuildAsync(
+                db,
+                host.Id,
+                document,
+                selection,
+                cancellationToken
+            );
             foreach (var selected in selection.Sections)
             {
-                planned[selected.Section] =
-                    await ConfigurationImportPreviewService.PreviewSectionAsync(
-                        db,
-                        host,
-                        document,
-                        selected,
-                        selection,
-                        cancellationToken
-                    );
+                planned[selected.Section] = await _previews.PreviewSectionAsync(
+                    db,
+                    host,
+                    document,
+                    selected,
+                    selection,
+                    references,
+                    cancellationToken
+                );
+            }
+            var blockingPreviewIssues = planned
+                .Values.SelectMany(value => value.Issues)
+                .Where(value => value.BlocksApply)
+                .Distinct()
+                .ToArray();
+            if (blockingPreviewIssues.Length > 0)
+            {
+                return new ConfigurationImportApplyOutcome.Invalid(
+                    operationId,
+                    blockingPreviewIssues
+                );
             }
             var changingSelections = selection
                 .Sections.Where(selected =>
@@ -97,15 +117,50 @@ public sealed partial class ConfigurationTransferCoordinator(
                 .ToArray();
             var stagingSelection = selection with { Sections = changingSelections };
             var issues = new List<ConfigurationValidationIssue>();
+            IReadOnlyList<AutomationTransferDiagnostic> automationDiagnostics = [];
+            if (
+                Selected(stagingSelection, ConfigurationSectionId.Overlays) is { } overlaySelection
+                && document.Sections.Overlays is { } overlaySection
+            )
+            {
+                issues.AddRange(
+                    await _overlays.StageAsync(
+                        db,
+                        host,
+                        overlaySection,
+                        overlaySelection,
+                        references,
+                        cancellationToken
+                    )
+                );
+            }
             issues.AddRange(
-                await customCommands.StageAsync(
+                await _customCommands.StageAsync(
                     db,
                     host.Id,
                     document,
                     stagingSelection,
+                    references,
                     cancellationToken
                 )
             );
+            if (
+                Selected(stagingSelection, ConfigurationSectionId.Automations)
+                    is { } automationSelection
+                && document.Sections.Automations is { } automationSection
+            )
+            {
+                var automationStage = await _automations.StageAsync(
+                    db,
+                    host,
+                    automationSection,
+                    automationSelection,
+                    references,
+                    cancellationToken
+                );
+                issues.AddRange(automationStage.Issues);
+                automationDiagnostics = automationStage.Diagnostics;
+            }
             if (
                 Selected(stagingSelection, ConfigurationSectionId.Guessing) is { } guessingSelection
                 && document.Sections.Guessing is { } guessing
@@ -159,7 +214,7 @@ public sealed partial class ConfigurationTransferCoordinator(
                 .Concat(activation is null ? [] : [ConfigurationSectionId.ChannelToolEnablement])
                 .Distinct()
                 .ToArray();
-            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _ = db.ConfigurationImportAudits.Add(
                 new ConfigurationImportAudit
                 {
@@ -176,14 +231,23 @@ public sealed partial class ConfigurationTransferCoordinator(
             );
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            AutomationTransferDiagnostics.LogImport(_logger, host.Id, automationDiagnostics);
 
             if (activation is not null)
             {
-                activationQueue.Wake();
+                _activationQueue.Wake();
             }
+
+            var postCommitFailures = await _importObservers.DispatchAsync(
+                host.Id,
+                changedSections.ToHashSet()
+            );
 
             return new ConfigurationImportApplyOutcome.Applied(
                 new(operationId, activation?.Id, changedSections)
+                {
+                    PostCommitFailures = postCommitFailures,
+                }
             );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -192,81 +256,24 @@ public sealed partial class ConfigurationTransferCoordinator(
         }
         catch (Exception exception)
         {
-            logger.LogError(
+            _logger.LogError(
                 exception,
                 "Configuration import {OperationId} failed before commit.",
                 operationId
             );
             return new ConfigurationImportApplyOutcome.Failed(operationId, "persistence");
         }
+        finally
+        {
+            if (overlayMediaGate is not null)
+            {
+                _ = overlayMediaGate.Release();
+            }
+        }
     }
 
     private static bool WouldChange(ConfigurationPreviewCount counts) =>
         counts.Add > 0 || counts.Update > 0 || counts.Remove > 0;
-
-    private async Task<ConfigurationActivation?> StageEnablementAsync(
-        BlokeBotDbContext db,
-        BotHost host,
-        ConfigurationDocumentV1 document,
-        ConfigurationImportSelection selection,
-        CancellationToken cancellationToken
-    )
-    {
-        if (
-            Selected(selection, ConfigurationSectionId.ChannelToolEnablement) is null
-            || document.Sections.ChannelToolEnablement is not { } imported
-            || selection.EnablementChanges.Count == 0
-        )
-        {
-            return null;
-        }
-        var importedFlags = ChannelToolEnablementMapper.ToFlags(imported);
-        var previous = host.EnabledFeatures;
-        var updated = previous;
-        foreach (var feature in selection.EnablementChanges)
-        {
-            updated = importedFlags.Contains(feature) ? updated | feature : updated & ~feature;
-        }
-        if (updated == previous)
-        {
-            return null;
-        }
-
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        await HostFeatureTransitionStager.StageAsync(db, host, updated, now, cancellationToken);
-        var enabled = updated & ~previous;
-        var disabled = previous & ~updated;
-        var pending = await db.ConfigurationActivations.SingleOrDefaultAsync(
-            x =>
-                x.HostId == host.Id
-                && (
-                    x.Status == ConfigurationActivationStatus.Pending
-                    || x.Status == ConfigurationActivationStatus.Processing
-                ),
-            cancellationToken
-        );
-        if (pending is null)
-        {
-            pending = new ConfigurationActivation
-            {
-                Id = Guid.NewGuid(),
-                HostId = host.Id,
-                Status = ConfigurationActivationStatus.Pending,
-                CreatedAtUtc = now,
-            };
-            _ = db.ConfigurationActivations.Add(pending);
-        }
-        var queuedEnabled = pending.EnabledChanges;
-        var queuedDisabled = pending.DisabledChanges;
-        pending.EnabledChanges = (queuedEnabled & ~disabled) | (enabled & ~queuedDisabled);
-        pending.DisabledChanges = (queuedDisabled & ~enabled) | (disabled & ~queuedEnabled);
-        pending.Status = ConfigurationActivationStatus.Pending;
-        pending.Revision++;
-        pending.UpdatedAtUtc = now;
-        pending.FailureCode = null;
-        pending.CompletedAtUtc = null;
-        return pending;
-    }
 }
 
 public abstract record ConfigurationImportApplyOutcome

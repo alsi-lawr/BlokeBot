@@ -13,6 +13,58 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostLifecycleTests
 {
     [Test]
+    public async Task RemovingHost_PreservesImmutableMediaReferencedBySiblingHost()
+    {
+        var stateDirectory = TemporaryDirectory();
+        try
+        {
+            await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var removedHostId = await SeedHostedChannelGraphAsync(database, "removed-media");
+            var siblingHostId = await SeedHostedChannelGraphAsync(database, "sibling-media");
+            var databasePath = Path.Combine(stateDirectory, "blokebot.db");
+            var documentId = Guid.NewGuid();
+            var storageKey = new string('a', 32);
+            var documentDirectory = OverlayMediaDirectory.DocumentDirectory(databasePath);
+            _ = Directory.CreateDirectory(documentDirectory);
+            var path = Path.Combine(documentDirectory, storageKey);
+            await File.WriteAllBytesAsync(path, [1, 2, 3]);
+            await using (var seed = await database.CreateDbContextAsync())
+            {
+                var document = new OverlayMediaDocument
+                {
+                    Id = documentId,
+                    ContentType = "video/mp4",
+                    ByteLength = 3,
+                    StorageKey = storageKey,
+                    State = OverlayMediaDocumentState.Available,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                };
+                seed.OverlayMediaAssets.AddRange(
+                    Reference(removedHostId, "Removed host", document),
+                    Reference(siblingHostId, "Sibling host", document)
+                );
+                _ = await seed.SaveChangesAsync();
+            }
+
+            var result = await Service(database, TestEventBus.Create<AppEventKind>(), databasePath)
+                .RemoveAsync(removedHostId, CancellationToken.None);
+
+            result.Removed.ShouldBeTrue();
+            File.Exists(path).ShouldBeTrue();
+            await using var verify = await database.CreateDbContextAsync();
+            var sibling = await verify.OverlayMediaAssets.SingleAsync();
+            sibling.HostId.ShouldBe(siblingHostId);
+            sibling.DocumentId.ShouldBe(documentId);
+            (await verify.OverlayMediaDocuments.CountAsync()).ShouldBe(1);
+        }
+        finally
+        {
+            Directory.Delete(stateDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task HostWithOwnedGraphAndMedia_Removing_CascadesHostDataAndPreservesSiblings()
     {
         var stateDirectory = TemporaryDirectory();
@@ -176,13 +228,31 @@ public sealed class HostLifecycleTests
         SqliteBlokeBotDbFactory dbFactory,
         EventBus<AppEventKind> events,
         string databasePath
-    ) =>
-        new(
+    ) => ServiceCore(dbFactory, events, databasePath);
+
+    private static BotHostRemovalService ServiceCore(
+        SqliteBlokeBotDbFactory dbFactory,
+        EventBus<AppEventKind> events,
+        string databasePath
+    )
+    {
+        var options = Options.Create(new BlokeBotOptions { DatabasePath = databasePath });
+        var maintenance = new OverlayMediaMaintenanceService(
+            dbFactory,
+            options,
+            new SystemOverlayMediaFileDeletion(),
+            TimeProvider.System,
+            NullLogger<OverlayMediaMaintenanceService>.Instance
+        );
+        return new(
             dbFactory,
             new HostedChannelChangeNotifier(events),
-            Options.Create(new BlokeBotOptions { DatabasePath = databasePath }),
+            options,
+            maintenance,
+            TimeProvider.System,
             NullLogger<BotHostRemovalService>.Instance
         );
+    }
 
     private static string SeedMediaDirectory(string databasePath, int hostId)
     {
@@ -191,6 +261,22 @@ public sealed class HostLifecycleTests
         File.WriteAllText(Path.Combine(directory, "asset.bin"), "media");
         return directory;
     }
+
+    private static OverlayMediaAsset Reference(
+        int hostId,
+        string name,
+        OverlayMediaDocument document
+    ) =>
+        new()
+        {
+            PublicId = Guid.NewGuid(),
+            HostId = hostId,
+            Name = name,
+            ContentRevision = 1,
+            Document = document,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
 
     private static void ResetPermissions(string root)
     {

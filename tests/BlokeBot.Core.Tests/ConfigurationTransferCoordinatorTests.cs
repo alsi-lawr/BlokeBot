@@ -21,7 +21,8 @@ public sealed class ConfigurationTransferCoordinatorTests
             new FailImportAuditSaveInterceptor()
         );
         var hostId = await SeedHostAsync(database, "destination");
-        var coordinator = Coordinator(database);
+        var observer = new AuditObserver(database, ConfigurationSectionId.Points);
+        var coordinator = Coordinator(database, observer);
         var selection = Selection(
             hostId,
             ConfigurationSectionId.CustomCommands,
@@ -52,6 +53,7 @@ public sealed class ConfigurationTransferCoordinatorTests
         (await verify.ConfigurationActivations.CountAsync()).ShouldBe(0);
         (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(0);
         (await verify.Hosts.SingleAsync()).EnabledFeatures.ShouldBe(HostFeatureFlags.None);
+        observer.Calls.ShouldBe(0);
     }
 
     [Test]
@@ -134,6 +136,27 @@ public sealed class ConfigurationTransferCoordinatorTests
         await using var verify = await database.CreateDbContextAsync();
         (await verify.Hosts.SingleAsync()).EnabledFeatures.ShouldBe(HostFeatureFlags.None);
         (await verify.ConfigurationActivations.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task ImportObserver_RunsOnlyAfterCommittedAuditIsVisible()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "destination");
+        var observer = new AuditObserver(database, ConfigurationSectionId.Points);
+
+        var outcome = await Coordinator(database, observer)
+            .ApplyAsync(
+                Session(hostId),
+                Document(points: Points()),
+                Selection(hostId, ConfigurationSectionId.Points),
+                new("actor-id", "destination"),
+                CancellationToken.None
+            );
+
+        _ = outcome.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
+        observer.Calls.ShouldBe(1);
+        observer.SawCommittedAudit.ShouldBeTrue();
     }
 
     [Test]
@@ -230,21 +253,46 @@ public sealed class ConfigurationTransferCoordinatorTests
         (await verify.Hosts.SingleAsync()).EnabledFeatures.ShouldBe(HostFeatureFlags.None);
     }
 
-    private static ConfigurationTransferCoordinator Coordinator(SqliteBlokeBotDbFactory database)
+    private static ConfigurationTransferCoordinator Coordinator(
+        SqliteBlokeBotDbFactory database,
+        IConfigurationImportObserver? observer = null
+    )
     {
         var writer = new CustomCommandConfigurationGraphWriter(
             database,
             null!,
             TimeProvider.System
         );
-        return new(
-            database,
-            new(writer, new CustomCommandAliasRegistry(), TimeProvider.System),
-            new GrantedAuthority(),
-            new ConfigurationActivationQueue(),
-            TimeProvider.System,
-            NullLogger<ConfigurationTransferCoordinator>.Instance
+        var customCommands = new CustomCommandConfigurationTransferAdapter(
+            writer,
+            new CustomCommandAliasRegistry(),
+            TimeProvider.System
         );
+        return observer is null
+            ? new(
+                database,
+                customCommands,
+                new GrantedAuthority(),
+                new ConfigurationActivationQueue(),
+                TimeProvider.System,
+                NullLogger<ConfigurationTransferCoordinator>.Instance
+            )
+            : new(
+                database,
+                customCommands,
+                new GrantedAuthority(),
+                new ConfigurationActivationQueue(),
+                TimeProvider.System,
+                NullLogger<ConfigurationTransferCoordinator>.Instance,
+                new(database),
+                UnavailableOverlayConfigurationTransferAdapter.Instance,
+                UnavailableAutomationConfigurationTransferAdapter.Instance,
+                new ConfigurationImportObserverDispatcher(
+                    [observer],
+                    NullLogger<ConfigurationImportObserverDispatcher>.Instance
+                ),
+                new(1, 1)
+            );
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)
@@ -312,7 +360,6 @@ public sealed class ConfigurationTransferCoordinatorTests
                     ["hello-transfer"],
                     true,
                     true,
-                    [],
                     0,
                     CustomCommandCooldownScope.User,
                     CustomCommandInvocationLimit.Unlimited,
@@ -370,6 +417,28 @@ public sealed class ConfigurationTransferCoordinatorTests
             int requestedHostId,
             CancellationToken ct
         ) => Task.FromResult<ModeratorAuthorityOutcome>(new ModeratorAuthorityOutcome.Granted());
+    }
+
+    private sealed class AuditObserver(
+        SqliteBlokeBotDbFactory database,
+        ConfigurationSectionId section
+    ) : IConfigurationImportObserver
+    {
+        public ConfigurationSectionId Section => section;
+
+        public int Calls { get; private set; }
+
+        public bool SawCommittedAudit { get; private set; }
+
+        public async ValueTask ImportedAsync(int hostId, CancellationToken cancellationToken)
+        {
+            Calls++;
+            await using var db = await database.CreateDbContextAsync(cancellationToken);
+            SawCommittedAudit = await db.ConfigurationImportAudits.AnyAsync(
+                value => value.HostId == hostId,
+                cancellationToken
+            );
+        }
     }
 
     private sealed class FailImportAuditSaveInterceptor : SaveChangesInterceptor

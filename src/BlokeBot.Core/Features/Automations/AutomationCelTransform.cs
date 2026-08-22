@@ -49,7 +49,8 @@ internal static partial class AutomationCelTransform
             ),
             Parse,
             Validate,
-            configuration => Descriptor(id, display, configuration)
+            configuration => Descriptor(id, display, configuration),
+            configurationShapeOwnedByParser: true
         );
 
     internal static AutomationPureHandlerContract HandlerContract(AutomationDefinitionId id) =>
@@ -58,20 +59,19 @@ internal static partial class AutomationCelTransform
     private static AutomationConfigurationParseResult Parse(JsonElement json)
     {
         if (
-            json.ValueKind != JsonValueKind.Object
-            || !json.TryGetProperty("inputs", out var inputsJson)
-            || inputsJson.ValueKind != JsonValueKind.Array
-            || !json.TryGetProperty("outputs", out var outputsJson)
-            || outputsJson.ValueKind != JsonValueKind.Array
+            !AutomationCelTransformDocumentSerializer.TryDeserialize<AutomationCelTransformDocument>(
+                json,
+                out var document
+            )
         )
         {
             return Invalid("schema", "Declare the Transform inputs and outputs.");
         }
 
         var inputs = ImmutableArray.CreateBuilder<AutomationCelTransformInput>();
-        foreach (var inputJson in inputsJson.EnumerateArray())
+        foreach (var inputDocument in document.Inputs)
         {
-            if (!TryParseInput(inputJson, out var input))
+            if (!TryParseInput(inputDocument, out var input))
             {
                 return Invalid("schema", "Repair the persisted Transform input schema.");
             }
@@ -80,9 +80,9 @@ internal static partial class AutomationCelTransform
         }
 
         var outputs = ImmutableArray.CreateBuilder<AutomationCelTransformOutput>();
-        foreach (var outputJson in outputsJson.EnumerateArray())
+        foreach (var outputDocument in document.Outputs)
         {
-            if (!TryParseOutput(outputJson, out var output))
+            if (!TryParseOutput(outputDocument, out var output))
             {
                 return Invalid("schema", "Repair the persisted Transform output schema.");
             }

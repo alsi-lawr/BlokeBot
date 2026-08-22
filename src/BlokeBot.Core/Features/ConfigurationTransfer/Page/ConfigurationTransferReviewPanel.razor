@@ -34,7 +34,11 @@
         @foreach (var section in _reviewSections)
         {
             var selected = SelectedSections.Contains(section.Section);
-            <div class="review-row" data-off="@(!selected ? "true" : "false")" @key="section.Section">
+            var requiresSectionSelection = SelectedSections.Count == 0;
+            <div class="review-row"
+                 data-off="@(!selected ? "true" : "false")"
+                 data-blocking="@(requiresSectionSelection ? "true" : null)"
+                 @key="section.Section">
                 <div class="review-row__main">
                     <div class="section-row__copy">
                         <span class="section-row__title">@SectionTitle(section.Section)</span>
@@ -57,9 +61,9 @@
                             }
                         </span>
                     </div>
-                    <div class="strategy-field">
-                        <label class="label" for="@StrategyId(section.Section)">Conflict strategy</label>
-                        <select class="input"
+                    <div class="strategy-field field">
+                        <label class="field__label" for="@StrategyId(section.Section)">Conflict strategy</label>
+                        <select class="field__input"
                                 id="@StrategyId(section.Section)"
                                 disabled="@(!selected)"
                                 value="@Strategies[section.Section]"
@@ -94,9 +98,9 @@
                                     <strong>@mapping.ImportedProfileName</strong>
                                     <small>Choose the destination profile for this imported profile.</small>
                                 </div>
-                                <div class="strategy-field">
-                                    <label class="label" for="@GuessingMappingId(mapping)">Destination profile</label>
-                                    <select class="input"
+                                <div class="strategy-field field">
+                                    <label class="field__label" for="@GuessingMappingId(mapping)">Destination profile</label>
+                                    <select class="field__input"
                                             id="@GuessingMappingId(mapping)"
                                             value="@GuessingProfileTargetValue(mapping.ImportedProfileId)"
                                             @onchange="args => ChangeProfileTargetAsync(mapping.ImportedProfileId, args.Value?.ToString())">
@@ -114,17 +118,25 @@
                         }
                         @foreach (var conflict in section.Conflicts)
                         {
-                            <div class="conflict-row" @key="conflict.ImportedId">
+                            var resolutionValue = ResolutionValue(conflict);
+                            var resolutionMissing = resolutionValue == ImportConflictResolution.Unresolved.ToString();
+                            var renameSelected = resolutionValue == ImportConflictResolution.Rename.ToString();
+                            var renameMissing = renameSelected && string.IsNullOrWhiteSpace(Renames.GetValueOrDefault(ConflictKey(conflict)));
+                            <div class="conflict-row"
+                                 data-blocking="@((resolutionMissing || renameMissing) ? "true" : null)"
+                                 @key="conflict.ImportedId">
                                 <div class="conflict-row__line">
                                     <div class="conflict-row__copy">
                                         <strong>@conflict.ItemName</strong>
                                         <small>@conflict.Message</small>
                                     </div>
-                                    <div class="strategy-field">
-                                        <label class="label" for="@ConflictResolutionId(conflict)">Decision</label>
-                                        <select class="input"
+                                    <div class="strategy-field field"
+                                         data-blocking="@(resolutionMissing ? "true" : null)">
+                                        <label class="field__label" for="@ConflictResolutionId(conflict)">Decision</label>
+                                        <select class="field__input"
                                                 id="@ConflictResolutionId(conflict)"
-                                                value="@ResolutionValue(conflict)"
+                                                value="@resolutionValue"
+                                                aria-invalid="@(resolutionMissing ? "true" : null)"
                                                 @onchange="args => ChangeResolutionAsync(conflict, args.Value?.ToString())">
                                             <option value="@ImportConflictResolution.Unresolved">Choose a decision</option>
                                             @foreach (var resolution in LocalResolutions(conflict))
@@ -134,14 +146,16 @@
                                         </select>
                                     </div>
                                 </div>
-                                @if (ResolutionValue(conflict) == ImportConflictResolution.Rename.ToString())
+                                @if (renameSelected)
                                 {
-                                    <div class="strategy-field strategy-field--rename">
-                                        <label class="label" for="@ConflictRenameId(conflict)">New alias</label>
-                                        <input class="input"
+                                    <div class="strategy-field strategy-field--rename field"
+                                         data-blocking="@(renameMissing ? "true" : null)">
+                                        <label class="field__label" for="@ConflictRenameId(conflict)">New alias</label>
+                                        <input class="field__input"
                                                id="@ConflictRenameId(conflict)"
                                                value="@Renames.GetValueOrDefault(ConflictKey(conflict))"
-                                               @oninput="args => ChangeRenameAsync(conflict, args.Value?.ToString())" />
+                                               aria-invalid="@(renameMissing ? "true" : null)"
+                                               @onchange="args => ChangeRenameAsync(conflict, args.Value?.ToString())" />
                                     </div>
                                 }
                             </div>

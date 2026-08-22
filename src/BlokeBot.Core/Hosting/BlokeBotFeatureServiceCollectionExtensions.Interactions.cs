@@ -66,6 +66,10 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
         _ = services.AddSingleton<OverlayRemoteUrlPolicy>();
         _ = services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
+        _ = services.AddSingleton<OverlayMediaMaintenanceService>();
+        _ = services.AddHostedService(static serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayMediaMaintenanceService>()
+        );
         _ = services.AddSingleton<OverlayCueService>();
         _ = services.AddSingleton<OverlayServerEpoch>();
         _ = services.AddSingleton<OverlayEventFeedService>();

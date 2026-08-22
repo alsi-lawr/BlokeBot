@@ -11,6 +11,75 @@ namespace BlokeBot.Core.Tests;
 public sealed class ConfigurationTransferNavigationTests
 {
     [Test]
+    public async Task OverlayExportChildren_AreUnavailableWithParentAndRemainIndependent()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        await using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddBlokeBotConfigurationTransfer();
+        var page = context.Render<ConfigurationTransferPage>();
+        var overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeFalse();
+
+        await page.InvokeAsync(() => overlay.Instance.MediaDocumentLinksChanged.InvokeAsync(false));
+        overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        overlay.Instance.MediaDocumentLinks.ShouldBeFalse();
+        overlay.Instance.UrlLayers.ShouldBeTrue();
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeFalse();
+
+        await page.InvokeAsync(() => overlay.Instance.UrlLayersChanged.InvokeAsync(false));
+        overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        overlay.Instance.UrlLayers.ShouldBeFalse();
+        overlay.Instance.MediaDocumentLinks.ShouldBeFalse();
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeTrue();
+
+        var selectedChanged = overlay.Instance.SelectedChanged;
+        await page.InvokeAsync(() => selectedChanged.InvokeAsync(false));
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeTrue();
+
+        await page.InvokeAsync(() => selectedChanged.InvokeAsync(true));
+        overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        overlay.Instance.UrlLayers.ShouldBeFalse();
+        overlay.Instance.MediaDocumentLinks.ShouldBeFalse();
+
+        await page.InvokeAsync(() => overlay.Instance.MediaDocumentLinksChanged.InvokeAsync(true));
+        overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        overlay.Instance.UrlLayers.ShouldBeFalse();
+        overlay.Instance.MediaDocumentLinks.ShouldBeTrue();
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeTrue();
+
+        await page.InvokeAsync(() => overlay.Instance.UrlLayersChanged.InvokeAsync(true));
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeFalse();
+        overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        await page.InvokeAsync(() =>
+            overlay.Instance.UrlWarningAcknowledgedChanged.InvokeAsync(true)
+        );
+        page.FindComponent<ConfigurationTransferOverlayExportOptions>()
+            .Instance.UrlWarningAcknowledged.ShouldBeTrue();
+        page.Find("#configuration-transfer-download").HasAttribute("href").ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task DeselectingOverlays_AllowsExportWithoutHiddenUrlAcknowledgement()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        await using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddBlokeBotConfigurationTransfer();
+        var page = context.Render<ConfigurationTransferPage>();
+        var download = page.Find("#configuration-transfer-download");
+        download.HasAttribute("aria-disabled").ShouldBeTrue();
+        download.HasAttribute("href").ShouldBeFalse();
+
+        var overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        await page.InvokeAsync(() => overlay.Instance.SelectedChanged.InvokeAsync(false));
+
+        download = page.Find("#configuration-transfer-download");
+        download.HasAttribute("aria-disabled").ShouldBeFalse();
+        _ = download.GetAttribute("href").ShouldNotBeNull();
+    }
+
+    [Test]
     public async Task CancelImport_ReturnsToEmptyImportAtImportFragment()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -21,11 +90,10 @@ public sealed class ConfigurationTransferNavigationTests
         navigation.NavigateTo("configuration-transfer#import");
         var page = context.Render<ConfigurationTransferPage>();
 
-        page.FindAll("button").Single(button => button.TextContent.Trim() == "Cancel").Click();
+        page.Find("#configuration-transfer-cancel").Click();
 
         navigation.Uri.ShouldEndWith("/configuration-transfer#import");
         _ = page.Find("#configuration-transfer-json");
-        page.Find("[aria-selected='true']").TextContent.Trim().ShouldBe("Import");
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

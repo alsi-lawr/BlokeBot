@@ -17,6 +17,29 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
         ConfigurationDocumentV1 document,
         ConfigurationImportSelection selection,
         CancellationToken cancellationToken
+    ) =>
+        await StageAsync(
+            db,
+            hostId,
+            document,
+            selection,
+            await ConfigurationImportReferencePlan.BuildAsync(
+                db,
+                hostId,
+                document,
+                selection,
+                cancellationToken
+            ),
+            cancellationToken
+        );
+
+    internal async Task<IReadOnlyList<ConfigurationValidationIssue>> StageAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        ConfigurationDocumentV1 document,
+        ConfigurationImportSelection selection,
+        ConfigurationImportReferencePlan referencePlan,
+        CancellationToken cancellationToken
     )
     {
         var customSelection = selection.Sections.SingleOrDefault(x =>
@@ -48,9 +71,9 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                         draft.Commands,
                         replacement
                             .Commands.Where(command =>
-                                customSelection.ItemResolutions.Any(resolution =>
-                                    resolution.ImportedId == command.Id
-                                    && resolution.Resolution == ImportConflictResolution.Skip
+                                ConfigurationConflictIds.SkipsCustomCommand(
+                                    command,
+                                    customSelection.ItemResolutions
                                 )
                             )
                             .Select(command => command.Name)
@@ -81,13 +104,15 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
             .Counters.Where(counter => retainedCommandCounterIds.Contains(counter.Id))
             .ToArray();
         var nextId = -1;
+        IReadOnlyList<CustomCommandEditor> changedCommands = [];
         if (customSelection is not null && document.Sections.CustomCommands is { } custom)
         {
-            var imported = MapCustomCommands(custom, customSelection, ref nextId);
+            var imported = MapCustomCommands(custom, customSelection, referencePlan, ref nextId);
             if (imported.Issues.Count > 0)
             {
                 return imported.Issues;
             }
+            PreserveDestinationAllowedUsers(imported.Commands, draft.Commands);
             var originalReplyIds = imported.Replies.ToDictionary(x => x, x => x.Id);
             var originalCounterIds = imported.Counters.ToDictionary(x => x, x => x.Id);
             draft.TimeZoneId = custom.TimeZoneId;
@@ -121,6 +146,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                 static x => x.Id,
                 static (source, targetId) => source.Id = targetId
             );
+            changedCommands = imported.Commands.Where(draft.Commands.Contains).ToArray();
             if (customSelection.Strategy == ImportConflictStrategy.ReplaceSection)
             {
                 foreach (var retained in retainedCommands)
@@ -186,9 +212,9 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
         var aliasConflict = await aliasRegistry.FindConflictAsync(
             db,
             hostId,
-            draft.Commands.Where(x => x.Id > 0).Select(x => x.Id).ToHashSet(),
-            draft
-                .Commands.SelectMany(x => BlokeBot.Commands.CommandAliasNormalizer.Split(x.Aliases))
+            changedCommands.Where(x => x.Id > 0).Select(x => x.Id).ToHashSet(),
+            changedCommands
+                .SelectMany(x => BlokeBot.Commands.CommandAliasNormalizer.Split(x.Aliases))
                 .ToArray(),
             cancellationToken
         );
@@ -213,7 +239,8 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                         db,
                         hostId,
                         command,
-                        cancellationToken
+                        cancellationToken,
+                        validateOverlayCueReferences: false
                     );
                     return failure is null
                         ? []
@@ -248,4 +275,18 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
         List<CustomMessageLibraryEntryEditor> Replies,
         List<CustomAnnouncementEditor> Announcements
     );
+
+    private static void PreserveDestinationAllowedUsers(
+        IEnumerable<CustomCommandEditor> imported,
+        IEnumerable<CustomCommandEditor> destination
+    )
+    {
+        foreach (var command in imported)
+        {
+            var matched = destination.SingleOrDefault(value =>
+                string.Equals(value.Name, command.Name, StringComparison.OrdinalIgnoreCase)
+            );
+            command.AllowedUsers = matched is null ? [] : [.. matched.AllowedUsers];
+        }
+    }
 }

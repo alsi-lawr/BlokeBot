@@ -90,7 +90,7 @@ public partial class OverlayMediaPanel
     private static string ByteLabel(long value) =>
         value >= 1024 * 1024 ? $"{value / (1024m * 1024m):0.##} MB" : $"{value / 1024m:0.##} KB";
 
-    private long UsedBytes() => _items.Sum(asset => asset.ByteLength);
+    private long UsedBytes() => _items.Sum(asset => asset.ChargedByteLength);
 
     private string StorageMeterStyle()
     {

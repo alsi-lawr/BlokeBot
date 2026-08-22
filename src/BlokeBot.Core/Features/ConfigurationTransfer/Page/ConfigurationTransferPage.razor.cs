@@ -33,6 +33,9 @@ public partial class ConfigurationTransferPage
     private AuthenticatedSession _session = AuthenticatedSession.Anonymous;
     private bool _busy;
     private bool _sectionQueryApplied;
+    private bool _exportOverlayUrls = true;
+    private bool _exportOverlayMedia = true;
+    private bool _urlWarningAcknowledged;
 
     private static readonly SegmentedTabItem[] _modeTabs =
     [
@@ -85,6 +88,16 @@ public partial class ConfigurationTransferPage
             "Chat Tools enablement",
             "Every independent feature switch"
         ),
+        new(
+            ConfigurationSectionId.Overlays,
+            "Overlays",
+            "Browser Source configuration, cue layers and selected media-document links"
+        ),
+        new(
+            ConfigurationSectionId.Automations,
+            "Automations",
+            "Core visual flows, graph layout, bindings and policies"
+        ),
     ];
 
     protected override async Task OnInitializedAsync()
@@ -119,23 +132,38 @@ public partial class ConfigurationTransferPage
     private string _destinationInitial => HostLogin.FirstOrDefault().ToString().ToUpperInvariant();
     private string _activeModeKey => _mode == TransferMode.Import ? _importModeKey : _exportModeKey;
     private string _exportUrl =>
-        $"/configuration-transfer/export?sections={Uri.EscapeDataString(string.Join(',', _exportSections.Order()))}";
+        $"/configuration-transfer/export?sections={Uri.EscapeDataString(string.Join(',', _exportSections.Order()))}"
+        + $"&overlayUrls={_exportOverlayUrls.ToString().ToLowerInvariant()}"
+        + $"&overlayMedia={_exportOverlayMedia.ToString().ToLowerInvariant()}"
+        + $"&urlWarningAcknowledged={_urlWarningAcknowledged.ToString().ToLowerInvariant()}";
+    private bool _canExport =>
+        _exportSections.Count > 0
+        && (
+            !_exportSections.Contains(ConfigurationSectionId.Overlays)
+            || !_exportOverlayUrls
+            || _urlWarningAcknowledged
+        );
     private bool _allConflictsResolved =>
         _importSections.Count > 0
-        && _preview
-            ?.Sections.Where(x => _importSections.Contains(x.Section))
-            .SelectMany(x => x.Conflicts)
-            .All(x =>
-                _resolutions.GetValueOrDefault(ConfigurationTransferPresentation.ConflictKey(x))
-                    is { } resolution
-                && resolution != ImportConflictResolution.Unresolved
-                && (
-                    resolution != ImportConflictResolution.Rename
-                    || !string.IsNullOrWhiteSpace(
-                        _renames.GetValueOrDefault(ConfigurationTransferPresentation.ConflictKey(x))
+        && _preview is { } preview
+        && preview
+            .Sections.Where(x => _importSections.Contains(x.Section))
+            .All(section =>
+                section.Issues.All(issue => !issue.BlocksApply)
+                && section.Conflicts.All(x =>
+                    _resolutions.GetValueOrDefault(ConfigurationTransferPresentation.ConflictKey(x))
+                        is { } resolution
+                    && resolution != ImportConflictResolution.Unresolved
+                    && (
+                        resolution != ImportConflictResolution.Rename
+                        || !string.IsNullOrWhiteSpace(
+                            _renames.GetValueOrDefault(
+                                ConfigurationTransferPresentation.ConflictKey(x)
+                            )
+                        )
                     )
                 )
-            ) == true;
+            );
 
     private void SetMode(string key) => _mode = ModeFor(key);
 
@@ -152,6 +180,8 @@ public partial class ConfigurationTransferPage
             "guessing" => ConfigurationSectionId.Guessing,
             "points" => ConfigurationSectionId.Points,
             "channeltoolenablement" => ConfigurationSectionId.ChannelToolEnablement,
+            "overlays" => ConfigurationSectionId.Overlays,
+            "automations" => ConfigurationSectionId.Automations,
             _ => null,
         };
 
@@ -169,6 +199,8 @@ public partial class ConfigurationTransferPage
                     ConfigurationSectionId.ChannelToolEnablement,
                     x.Sections.ChannelToolEnablement is not null
                 ),
+                (ConfigurationSectionId.Overlays, x.Sections.Overlays is not null),
+                (ConfigurationSectionId.Automations, x.Sections.Automations is not null),
             }
                 .Where(x => x.Item2)
                 .Select(x => x.Item1),

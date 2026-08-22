@@ -4,28 +4,26 @@ namespace BlokeBot.Core.Features.Automations;
 
 internal static partial class AutomationCelTransform
 {
-    private static bool TryParseInput(JsonElement json, out AutomationCelTransformInput input)
+    private static bool TryParseInput(
+        AutomationCelTransformInputDocument document,
+        out AutomationCelTransformInput input
+    )
     {
         input = null!;
         if (
-            !TryString(json, "port-id", out var portId)
-            || !TryString(json, "cel-identifier", out var identifier)
-            || !TryString(json, "display-name", out var displayName)
-            || !TryString(json, "binding-field-id", out var bindingFieldId)
-            || !TryType(json, out var valueType)
-            || !TryNullability(json, out var nullability)
-            || !json.TryGetProperty("fixed", out var fixedJson)
-            || !TryValue(fixedJson, valueType, nullability, out var fixedValue)
+            !TryEnum(document.ValueType, out AutomationPortValueType valueType)
+            || !TryEnum(document.Nullability, out AutomationPortNullability nullability)
+            || !TryValue(document.FixedValue, valueType, nullability, out var fixedValue)
         )
         {
             return false;
         }
 
         input = new(
-            new(portId),
-            new(identifier),
-            displayName,
-            new(bindingFieldId),
+            new(document.PortId),
+            new(document.Identifier),
+            document.DisplayName,
+            new(document.BindingFieldId),
             valueType,
             nullability,
             fixedValue
@@ -33,21 +31,27 @@ internal static partial class AutomationCelTransform
         return true;
     }
 
-    private static bool TryParseOutput(JsonElement json, out AutomationCelTransformOutput output)
+    private static bool TryParseOutput(
+        AutomationCelTransformOutputDocument document,
+        out AutomationCelTransformOutput output
+    )
     {
         output = null!;
         if (
-            !TryString(json, "port-id", out var portId)
-            || !TryString(json, "display-name", out var displayName)
-            || !TryType(json, out var valueType)
-            || !TryNullability(json, out var nullability)
-            || !TryString(json, "cel", out var source)
+            !TryEnum(document.ValueType, out AutomationPortValueType valueType)
+            || !TryEnum(document.Nullability, out AutomationPortNullability nullability)
         )
         {
             return false;
         }
 
-        output = new(new(portId), displayName, valueType, nullability, source);
+        output = new(
+            new(document.PortId),
+            document.DisplayName,
+            valueType,
+            nullability,
+            document.Source
+        );
         return true;
     }
 
@@ -99,24 +103,28 @@ internal static partial class AutomationCelTransform
     }
 
     private static AutomationValue? TryActor(JsonElement json) =>
-        TryString(json, "login", out var login)
-        && TryString(json, "display-name", out var displayName)
-            ? new AutomationValue.Actor(new(login, displayName))
+        AutomationCelTransformDocumentSerializer.TryDeserialize<AutomationCelIdentityDocument>(
+            json,
+            out var identity
+        )
+            ? new AutomationValue.Actor(new(identity.Login, identity.DisplayName))
             : null;
 
     private static AutomationValue? TryChannel(JsonElement json) =>
-        TryString(json, "login", out var login)
-        && TryString(json, "display-name", out var displayName)
-            ? new AutomationValue.Channel(new(login, displayName))
+        AutomationCelTransformDocumentSerializer.TryDeserialize<AutomationCelIdentityDocument>(
+            json,
+            out var identity
+        )
+            ? new AutomationValue.Channel(new(identity.Login, identity.DisplayName))
             : null;
 
     private static AutomationValue? TryStream(JsonElement json) =>
-        json.ValueKind != JsonValueKind.Object
-        || !TryOptionalString(json, "title", out var title)
-        || !TryOptionalString(json, "game-name", out var gameName)
-        || !TryOptionalTimestamp(json, "started-at", out var startedAt)
-            ? null
-            : new AutomationValue.Stream(new(title, gameName, startedAt));
+        AutomationCelTransformDocumentSerializer.TryDeserialize<AutomationCelStreamDocument>(
+            json,
+            out var stream
+        )
+            ? new AutomationValue.Stream(new(stream.Title, stream.GameName, stream.StartedAt))
+            : null;
 
     private static AutomationValue? TryArguments(JsonElement json) =>
         json.ValueKind == JsonValueKind.Array
@@ -134,77 +142,11 @@ internal static partial class AutomationCelTransform
             ])
             : null;
 
-    private static bool TryOptionalString(JsonElement json, string name, out string? result)
-    {
-        result = null;
-        if (!json.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
-        {
-            return true;
-        }
-
-        if (value.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        result = value.GetString();
-        return true;
-    }
-
-    private static bool TryOptionalTimestamp(
-        JsonElement json,
-        string name,
-        out DateTimeOffset? result
-    )
-    {
-        result = null;
-        if (!json.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
-        {
-            return true;
-        }
-
-        if (
-            value.ValueKind != JsonValueKind.String
-            || !value.TryGetDateTimeOffset(out var timestamp)
-        )
-        {
-            return false;
-        }
-
-        result = timestamp;
-        return true;
-    }
-
-    private static bool TryString(JsonElement json, string name, out string value)
-    {
-        value = string.Empty;
-        if (
-            json.ValueKind != JsonValueKind.Object
-            || !json.TryGetProperty(name, out var property)
-            || property.ValueKind != JsonValueKind.String
-        )
-        {
-            return false;
-        }
-
-        value = property.GetString()!;
-        return true;
-    }
-
-    private static bool TryType(JsonElement json, out AutomationPortValueType value) =>
-        TryEnum(json, "type", out value);
-
-    private static bool TryNullability(JsonElement json, out AutomationPortNullability value) =>
-        TryEnum(json, "nullability", out value);
-
-    private static bool TryEnum<T>(JsonElement json, string name, out T value)
+    private static bool TryEnum<T>(string text, out T value)
         where T : struct, Enum
     {
         value = default;
-        return TryString(json, name, out var text)
-            && Enum.TryParse(text, out value)
-            && Enum.IsDefined(value)
-            && text == value.ToString();
+        return Enum.TryParse(text, out value) && Enum.IsDefined(value) && text == value.ToString();
     }
 
     private static bool HasDuplicates(IEnumerable<string> values) =>

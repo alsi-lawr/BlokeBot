@@ -22,6 +22,7 @@ public sealed class DashboardFragmentOwner : IDisposable
     private readonly IReadOnlyList<string> _keys;
     private readonly Func<Func<Task>, Task> _dispatch;
     private readonly Func<string, Task> _selectionChanged;
+    private readonly string _ownedUri;
     private readonly string _path;
     private string _selected;
 
@@ -40,7 +41,9 @@ public sealed class DashboardFragmentOwner : IDisposable
         _selected = selected;
         _dispatch = dispatch;
         _selectionChanged = selectionChanged;
-        _path = navigation.ToAbsoluteUri(navigation.Uri).AbsolutePath;
+        var currentUri = navigation.ToAbsoluteUri(navigation.Uri);
+        _ownedUri = currentUri.GetLeftPart(UriPartial.Query);
+        _path = currentUri.AbsolutePath;
         navigation.LocationChanged += HandleLocationChanged;
         Normalize();
     }
@@ -76,8 +79,12 @@ public sealed class DashboardFragmentOwner : IDisposable
             StringComparison.Ordinal
         );
 
-    private string UriFor(string key) =>
-        _navigation.ToAbsoluteUri(_navigation.Uri).GetLeftPart(UriPartial.Query) + "#" + key;
+    internal string UriFor(string key)
+    {
+        var currentUri = _navigation.ToAbsoluteUri(_navigation.Uri);
+        var pageUri = _onOwnedPath ? currentUri.GetLeftPart(UriPartial.Query) : _ownedUri;
+        return pageUri + "#" + key;
+    }
 
     private void Normalize()
     {

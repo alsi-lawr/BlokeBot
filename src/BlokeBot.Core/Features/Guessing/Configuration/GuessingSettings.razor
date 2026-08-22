@@ -1,5 +1,6 @@
 @page "/guessing/settings"
 @using BlokeBot.Eventing
+@using BlokeBot.Core.Features.ConfigurationTransfer
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.Points.Balances
 @using Microsoft.AspNetCore.Authorization
@@ -15,11 +16,11 @@
 <div class="mx-auto max-w-7xl space-y-6" data-sticky-save-scope>
     <PageHeader Title="Round settings"
                 Description="Choose game types, answers, chat commands, and what the bot says.">
-        <a class="btn-secondary" href="/configuration-transfer?section=guessing#export">Import or export</a>
+        <ConfigurationTransferActions Section="ConfigurationSectionId.Guessing" />
+        <StickySaveRegion>
+            <SaveChangesButton Disabled="@(!_featureEnabled || _config is null)" OnSave="SaveAsync" />
+        </StickySaveRegion>
     </PageHeader>
-    <StickySaveRegion>
-        <SaveChangesButton Disabled="@(!_featureEnabled || _config is null)" OnSave="SaveAsync" />
-    </StickySaveRegion>
 
     @if (Host is null)
     {

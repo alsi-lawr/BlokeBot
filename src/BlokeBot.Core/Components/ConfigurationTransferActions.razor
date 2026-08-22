@@ -1,0 +1,38 @@
+@using BlokeBot.Core.Features.ConfigurationTransfer
+
+<div class="inline-flex items-center gap-2">
+    <a class="btn-secondary h-10 w-10 px-0"
+       href="@_exportHref"
+       title="Export configuration"
+       aria-label="Export configuration">
+        <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]"
+             viewBox="0 0 24 24"
+             aria-hidden="true">
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M5 20h14" />
+        </svg>
+    </a>
+    <a class="btn-secondary h-10 w-10 px-0"
+       href="@_importHref"
+       title="Import configuration"
+       aria-label="Import configuration">
+        <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]"
+             viewBox="0 0 24 24"
+             aria-hidden="true">
+            <path d="M12 16V4" />
+            <path d="m7 9 5-5 5 5" />
+            <path d="M5 20h14" />
+        </svg>
+    </a>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ConfigurationSectionId Section { get; set; }
+
+    private string _baseHref =>
+        $"/configuration-transfer?section={Section.ToString().ToLowerInvariant()}";
+    private string _exportHref => $"{_baseHref}#export";
+    private string _importHref => $"{_baseHref}#import";
+}

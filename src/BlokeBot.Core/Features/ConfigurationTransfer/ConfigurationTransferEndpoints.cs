@@ -10,6 +10,9 @@ public static class ConfigurationTransferEndpoints
                 async (
                     HttpContext context,
                     string? sections,
+                    bool? overlayUrls,
+                    bool? overlayMedia,
+                    bool? urlWarningAcknowledged,
                     BlokeBotPageContextAccessor pageContexts,
                     ConfigurationDocumentExporter exporter,
                     CancellationToken cancellationToken
@@ -28,7 +31,18 @@ public static class ConfigurationTransferEndpoints
                     var selected = ParseSections(sections);
                     return selected.Count == 0
                         ? Results.BadRequest("Choose at least one configuration section.")
-                        : await exporter.ExportAsync(host.Id, selected, cancellationToken) switch
+                        : await exporter.ExportAsync(
+                            host.Id,
+                            new(
+                                selected,
+                                new(
+                                    overlayUrls.GetValueOrDefault(),
+                                    overlayMedia.GetValueOrDefault(),
+                                    urlWarningAcknowledged.GetValueOrDefault()
+                                )
+                            ),
+                            cancellationToken
+                        ) switch
                         {
                             ConfigurationExportOutcome.Success success => Results.File(
                                 success.Json,

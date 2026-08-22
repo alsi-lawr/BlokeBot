@@ -47,11 +47,11 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Export a file",
-                    Paragraphs = ["BlokeBot selects all five sections by default."],
+                    Paragraphs = ["BlokeBot selects all seven sections by default."],
                     Steps =
                     [
                         "Open Configuration transfer for the source channel.",
-                        "Check the five selected sections.",
+                        "Check the seven selected sections.",
                         "Clear each section that you do not need.",
                         "Download the JSON file.",
                         "Store the file in a private location.",
@@ -64,7 +64,7 @@ internal static partial class SiteGuideCatalog
                     [
                         new SiteGuideFact(
                             "Custom commands",
-                            "The section includes the dashboard time zone, reusable replies, and counter names and values. It includes command names, aliases, access rules, allowed users, cooldowns, limits, actions, and routes. It also records whether each command is enabled. Configuration transfer does not have a separate switch for access settings."
+                            "The section includes the dashboard time zone, reusable replies, and counter names and values. It includes command names, aliases, general access rules, cooldowns, limits, actions, and routes. It also records whether each command is enabled. Viewer allow lists stay local to the destination channel."
                         ),
                         new SiteGuideFact(
                             "Announcements",
@@ -86,9 +86,17 @@ internal static partial class SiteGuideCatalog
                             "Chat Tools enablement",
                             "The section includes twenty independent feature switches. The import applies only the switch changes that you select."
                         ),
+                        new SiteGuideFact(
+                            "Overlays",
+                            "The section includes portable core Browser Sources, appearance, cues, and queue policies. Select URL layers and media-document links independently. Complete URLs can contain credentials in query strings. Media links contain same-instance document IDs, never media bytes."
+                        ),
+                        new SiteGuideFact(
+                            "Automations",
+                            "The section includes core visual flow definitions, graph layout, nodes, bindings, expressions, policies, aliases, positions, and edges. Safely stored invalid core flows also transfer for repair. Fixed Actor and Channel identities and unresolved local references become invalid identity-free placeholders. Runs and history do not enter the file."
+                        ),
                     ],
                     Note =
-                        "Keep every export private. A Custom commands export can contain Twitch IDs, logins, and display names for allowed users.",
+                        "Keep every export private. Complete Overlay URLs can contain credentials. Configuration transfer does not include viewer IDs, logins, display names, or command viewer allow lists.",
                 },
                 new SiteGuideSection
                 {
@@ -109,11 +117,11 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Linked definitions",
-                            "Exports do not contain Automation definitions, Overlay Cue definitions, or raw database keys. References in the export replace database keys."
+                            "Exports replace source database keys with deterministic local references. An Automation reference that cannot be mapped becomes an identity-free placeholder for repair. Overlay media uses immutable same-instance document IDs without bytes."
                         ),
                         new SiteGuideFact(
                             "Format and limits",
-                            "BlokeBot exports UTF-8 JSON with the identifier blokebot.channel-configuration and format version 1. The maximum file size is 2 MB. Each collection can contain a maximum of 1,000 records. Format 1 rejects unknown properties and enum values. BlokeBot accepts format 1 and adapts format 0. BlokeBot rejects all other format versions. This rule also applies to future versions."
+                            "BlokeBot exports UTF-8 JSON with the identifier blokebot.channel-configuration and format version 1. The maximum file size is 2 MB. Each collection can contain a maximum of 1,000 records. The envelope and typed section records reject unknown properties and enum values. A known core Automation configuration object can remain invalid for repair. BlokeBot accepts format 1 and adapts format 0. BlokeBot rejects all other format versions."
                         ),
                     ],
                 },
@@ -184,7 +192,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Aliases and dependencies",
-                            "For an alias conflict, rename or omit the alias. For an absent Automation or Overlay Cue dependency, skip the complete command. Stop the import if you cannot resolve either conflict."
+                            "For an alias conflict, rename or omit the alias. For an absent command, Overlay, cue, reward, or other host-local dependency, skip the complete imported item or stop the import."
                         ),
                     ],
                     Note =
@@ -215,6 +223,10 @@ internal static partial class SiteGuideCatalog
                         new SiteGuideFact(
                             "Replay prevention",
                             "An import does not run general catch-up. BlokeBot does not replay work from a disabled period. Feature changes can move transition boundaries for pause, generation, accept-after, and announcement occurrences."
+                        ),
+                        new SiteGuideFact(
+                            "Post-commit reconciliation",
+                            "Overlay refresh and Automation EventSub reconciliation start only after the database commit. If reconciliation fails, the imported configuration remains saved and the failure is reported separately."
                         ),
                     ],
                     Note =

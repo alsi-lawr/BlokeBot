@@ -5678,18 +5678,14 @@ namespace BlokeBot.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<long>("ByteLength")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("ContentRevision")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(32)
+                    b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("CreatedAtUtc")
+                    b.Property<string>("DocumentId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
@@ -5704,6 +5700,58 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "Name", "PublicId");
+
+                    b.ToTable("overlay_media_assets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_overlay_media_assets_Length", "ContentRevision > 0");
+
+                            t.HasCheckConstraint("CK_overlay_media_assets_Name", "length(Name) BETWEEN 1 AND 128");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayMediaDocument", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ByteLength")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("LegacyHostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LegacyStorageKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("OrphanedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("StorageKey")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -5714,23 +5762,22 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PublicId")
-                        .IsUnique();
-
                     b.HasIndex("StorageKey")
                         .IsUnique();
 
-                    b.HasIndex("HostId", "Name", "PublicId");
+                    b.HasIndex("State", "UpdatedAtUtc");
 
-                    b.ToTable("overlay_media_assets", null, t =>
+                    b.ToTable("overlay_media_documents", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_media_assets_ContentType", "ContentType LIKE 'image/%' OR ContentType LIKE 'audio/%' OR ContentType LIKE 'video/%'");
+                            t.HasCheckConstraint("CK_overlay_media_documents_ContentType", "ContentType LIKE 'image/%' OR ContentType LIKE 'audio/%' OR ContentType LIKE 'video/%'");
 
-                            t.HasCheckConstraint("CK_overlay_media_assets_Length", "ByteLength > 0 AND ContentRevision > 0");
+                            t.HasCheckConstraint("CK_overlay_media_documents_Legacy", "(LegacyHostId IS NULL AND LegacyStorageKey IS NULL) OR (LegacyHostId IS NOT NULL AND length(LegacyStorageKey) = 32)");
 
-                            t.HasCheckConstraint("CK_overlay_media_assets_Name", "length(Name) BETWEEN 1 AND 128");
+                            t.HasCheckConstraint("CK_overlay_media_documents_Length", "ByteLength > 0");
 
-                            t.HasCheckConstraint("CK_overlay_media_assets_StorageKey", "length(StorageKey) = 32");
+                            t.HasCheckConstraint("CK_overlay_media_documents_State", "State IN ('available', 'orphaned', 'publishing', 'unavailable')");
+
+                            t.HasCheckConstraint("CK_overlay_media_documents_StorageKey", "length(StorageKey) = 32");
                         });
                 });
 
@@ -9670,11 +9717,19 @@ namespace BlokeBot.Persistence.Migrations
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayMediaAsset", b =>
                 {
+                    b.HasOne("BlokeBot.Persistence.Models.OverlayMediaDocument", "Document")
+                        .WithMany("References")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Document");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.PlayQueue", b =>
@@ -10394,6 +10449,11 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Suggestions");
 
                     b.Navigation("Votes");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayMediaDocument", b =>
+                {
+                    b.Navigation("References");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.PlayQueue", b =>
