@@ -65,6 +65,8 @@ public sealed partial class PluginWorkerClient : IAsyncDisposable
         };
     }
 
+    public Task<PluginWorkerFailure> Termination => _connection.Terminal;
+
     public ValueTask<PluginWorkerInvocationResult> PrepareAsync(
         PluginWorkerInvocationIdentity identity,
         PluginPreparationInvocation invocation,

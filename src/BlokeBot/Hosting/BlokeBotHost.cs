@@ -1,6 +1,7 @@
 using BlokeBot.Cli;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
+using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -97,6 +98,7 @@ internal static class BlokeBotHost
                 )
         );
         _ = builder.Services.AddBlokeBotPersistence(statePaths.DatabasePath);
+        _ = builder.Services.AddBlokeBotPluginRuntime();
         ConfigureDataProtection(builder.Services, statePaths);
         var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
         _ = builder.AddBlokeBotCore(twitch.Mode);
