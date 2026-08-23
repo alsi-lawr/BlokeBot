@@ -101,7 +101,8 @@ public sealed class PluginRuntimeAdmission : IAsyncDisposable
 internal sealed record PluginRuntimeSlot(
     PluginRuntimeEntry Entry,
     PluginAdmissionTracker Tracker,
-    IPluginLifecycleWorkerSession? Worker
+    IPluginLifecycleWorkerSession? Worker,
+    PluginLifecycleFence? RuntimeFence
 );
 
 internal sealed class PluginAdmissionTracker

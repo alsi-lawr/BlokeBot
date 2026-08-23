@@ -37,7 +37,7 @@ public interface IPluginLifecycleChangeNotifier
     );
 }
 
-public sealed class PluginRuntimeSnapshotRegistry
+public sealed partial class PluginRuntimeSnapshotRegistry
     : IPluginRuntimeSnapshotProvider,
         IPluginLifecycleChangeNotifier
 {
@@ -113,41 +113,6 @@ public sealed class PluginRuntimeSnapshotRegistry
     public PluginFenceOutcome ValidateCancellation(PluginId pluginId, PluginLifecycleFence fence) =>
         Validate(pluginId, fence);
 
-    internal PluginRuntimeSlot? Publish(
-        PluginLifecycleState state,
-        IPluginLifecycleWorkerSession? worker
-    )
-    {
-        PluginRuntimeSlot? previous;
-        TaskCompletionSource<PluginLifecycleChangeVersion> change;
-        PluginLifecycleChangeVersion version;
-        lock (_sync)
-        {
-            _ = _current.Slots.TryGetValue(state.PluginId, out previous);
-            var slot = new PluginRuntimeSlot(
-                new(
-                    state.SelectedInstallation,
-                    state.Phase,
-                    state.OperationId,
-                    state.SelectedGeneration,
-                    worker?.Mode
-                ),
-                new(),
-                worker
-            );
-            Volatile.Write(
-                ref _current,
-                new PluginRuntimeSnapshot(_current.Slots.SetItem(state.PluginId, slot))
-            );
-            version = new(++_changeVersion);
-            change = _change;
-            _change = NewChangeCompletion();
-        }
-
-        _ = change.TrySetResult(version);
-        return previous;
-    }
-
     internal bool IsCurrent(PluginId pluginId, PluginLifecycleFence fence, object worker)
     {
         lock (_sync)
@@ -166,45 +131,6 @@ public sealed class PluginRuntimeSnapshotRegistry
                 ? slot
                 : null;
         }
-    }
-
-    internal PluginRuntimeSlot? Remove(PluginId pluginId)
-    {
-        PluginRuntimeSlot? previous;
-        TaskCompletionSource<PluginLifecycleChangeVersion> change;
-        PluginLifecycleChangeVersion version;
-        lock (_sync)
-        {
-            _ = _current.Slots.TryGetValue(pluginId, out previous);
-            Volatile.Write(
-                ref _current,
-                new PluginRuntimeSnapshot(_current.Slots.Remove(pluginId))
-            );
-            version = new(++_changeVersion);
-            change = _change;
-            _change = NewChangeCompletion();
-        }
-
-        _ = change.TrySetResult(version);
-        return previous;
-    }
-
-    internal void Restore(PluginId pluginId, PluginRuntimeSlot? previous)
-    {
-        TaskCompletionSource<PluginLifecycleChangeVersion> change;
-        PluginLifecycleChangeVersion version;
-        lock (_sync)
-        {
-            var slots = previous is null
-                ? _current.Slots.Remove(pluginId)
-                : _current.Slots.SetItem(pluginId, previous);
-            Volatile.Write(ref _current, new PluginRuntimeSnapshot(slots));
-            version = new(++_changeVersion);
-            change = _change;
-            _change = NewChangeCompletion();
-        }
-
-        _ = change.TrySetResult(version);
     }
 
     internal async ValueTask<bool> DrainAsync(

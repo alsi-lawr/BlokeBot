@@ -286,19 +286,74 @@ public sealed class PluginLifecyclePersistenceTests
                 DateTimeOffset.UtcNow
             )
         );
+        var missingSource = intent with { FaultedFrom = null };
+        var invalidNonFault = active with
+        {
+            FaultedFrom = PluginLifecyclePhase.Active,
+            Revision = active.Revision + 1,
+        };
+
+        _ = (
+            await store.WriteAsync(active, missingSource, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
+        _ = (
+            await store.WriteAsync(active, invalidNonFault, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
         await WriteAsync(store, active, intent);
-        var invalid = intent with
+        var mismatchedSource = intent with
         {
             FaultedFrom = PluginLifecyclePhase.Migrating,
             Revision = intent.Revision + 1,
         };
+        var otherInstallation = new LifecycleHarness().Package("2.0.0", "v2").Installation;
+        var mismatchedInstallation = intent with
+        {
+            ActiveRuntime = new(otherInstallation, intent.SelectedFence),
+            Revision = intent.Revision + 1,
+        };
+        PluginWorkerGeneration
+            .TryCreate(intent.SelectedGeneration.Value + 1, out var mismatchedGeneration)
+            .ShouldBeTrue();
+        var mismatchedFence = intent with
+        {
+            ActiveRuntime = new(
+                intent.SelectedInstallation,
+                new(intent.OperationId, mismatchedGeneration)
+            ),
+            Revision = intent.Revision + 1,
+        };
 
-        _ = await Should.ThrowAsync<DbUpdateException>(async () =>
-            _ = await store.WriteAsync(intent, invalid, CancellationToken.None)
-        );
+        _ = (
+            await store.WriteAsync(intent, mismatchedSource, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
+        _ = (
+            await store.WriteAsync(intent, mismatchedInstallation, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
+        _ = (
+            await store.WriteAsync(intent, mismatchedFence, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
         (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
             intent
         );
+        await using (var db = database.CreateDbContext())
+        {
+            _ = await Should.ThrowAsync<SqliteException>(async () =>
+                _ = await db.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"plugin_lifecycles\" SET \"FaultedFrom\" = NULL;"
+                )
+            );
+            _ = await Should.ThrowAsync<SqliteException>(async () =>
+                _ = await db.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"plugin_lifecycles\" SET \"ActiveVersion\" = '2.0.0';"
+                )
+            );
+            _ = await Should.ThrowAsync<SqliteException>(async () =>
+                _ = await db.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"plugin_lifecycles\" SET \"ActiveGeneration\" = \"SelectedGeneration\" + 1;"
+                )
+            );
+        }
+
         PluginLifecycleSafeDetail
             .TryCreate("The plugin worker could not be terminated cleanly.", out var detail)
             .ShouldBeTrue();
@@ -320,6 +375,9 @@ public sealed class PluginLifecyclePersistenceTests
             PluginLifecycleFailureCode.WorkerDisposalFailed
         );
         reloaded.LatestOutcome.Detail.ShouldBe(detail);
+        _ = PluginLifecycleStateMachine
+            .BeginRestart(reloaded, PluginLifecycleOperationId.New(), DateTimeOffset.UtcNow)
+            .ShouldBeOfType<PluginLifecycleTransitionOutcome.Applied>();
     }
 
     private static async ValueTask<PluginLifecycleState> AdvanceToPurgingAsync(

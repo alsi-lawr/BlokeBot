@@ -32,6 +32,11 @@ public static partial class PluginLifecycleStateMachine
         DateTimeOffset now
     )
     {
+        if (current is not null && !HasValidFaultInvariant(current))
+        {
+            return Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
+        }
+
         if (current is not null && IsBusy(current.Phase))
         {
             return Rejected(PluginLifecycleTransitionFailureCode.Busy);
@@ -64,7 +69,7 @@ public static partial class PluginLifecycleStateMachine
         }
 
         selectedGeneration ??= GenerationOne();
-        return new PluginLifecycleTransitionOutcome.Applied(
+        return Applied(
             new(
                 installation.PluginId,
                 installation,
@@ -259,7 +264,9 @@ public static partial class PluginLifecycleStateMachine
                 or PluginLifecyclePhase.Purging;
 
     private static PluginLifecycleTransitionOutcome.Applied Applied(PluginLifecycleState state) =>
-        new(state);
+        HasValidFaultInvariant(state)
+            ? new(state)
+            : throw new InvalidOperationException("The lifecycle fault invariant is invalid.");
 
     private static PluginLifecycleTransitionOutcome.Rejected Rejected(
         PluginLifecycleTransitionFailureCode code

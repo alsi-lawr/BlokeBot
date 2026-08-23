@@ -164,7 +164,11 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
         Exception? exception;
         lock (_sync)
         {
-            if (!_states.TryGetValue(expected.PluginId, out var current) || current != expected)
+            if (
+                !_states.TryGetValue(expected.PluginId, out var current)
+                || current != expected
+                || !PluginLifecycleStateMachine.HasValidFaultInvariant(next)
+            )
             {
                 return new PluginLifecycleStoreWriteOutcome.Conflict(current);
             }
@@ -237,6 +241,8 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
 
     internal Exception? NextDisposalException { get; set; }
 
+    internal Action? BeforeStartAdmitted { get; set; }
+
     internal TaskCompletionSource ValidationStarted { get; private set; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -274,6 +280,7 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
         CancellationToken cancellationToken
     )
     {
+        BeforeStartAdmitted?.Invoke();
         if (AdmittedFailuresRemaining > 0)
         {
             AdmittedFailuresRemaining--;

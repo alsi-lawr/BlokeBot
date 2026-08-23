@@ -34,11 +34,14 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_FaultedFrom",
-                        "\"FaultedFrom\" IS NULL OR \"FaultedFrom\" IN ('Preparing', 'Migrating', 'Activating', 'Active', 'Draining', 'Removing', 'Removed', 'Purging', 'Faulted')"
+                        "(\"Phase\" = 'Faulted' AND \"FaultedFrom\" IS NOT NULL AND \"FaultedFrom\" IN ('Preparing', 'Migrating', 'Activating', 'Active', 'Draining', 'Removing', 'Purging')) OR "
+                            + "(\"Phase\" <> 'Faulted' AND \"FaultedFrom\" IS NULL)"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_FaultShutdown",
-                        "\"Phase\" <> 'Faulted' OR \"ActiveOperationId\" IS NULL OR \"FaultedFrom\" = 'Active'"
+                        "\"Phase\" <> 'Faulted' OR \"ActiveOperationId\" IS NULL OR "
+                            + "(\"FaultedFrom\" = 'Active' AND \"ActiveVersion\" = \"SelectedVersion\" AND \"ActiveTag\" = \"SelectedTag\" AND "
+                            + "\"ActiveOperationId\" = \"OperationId\" AND \"ActiveGeneration\" = \"SelectedGeneration\")"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_OperationKind",

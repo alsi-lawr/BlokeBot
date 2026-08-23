@@ -1,3 +1,4 @@
+using BlokeBot.Plugins.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Plugins.Runtime;
@@ -134,14 +135,15 @@ public sealed partial class PluginLifecycleCoordinator
         var intent = Applied(
             PluginLifecycleStateMachine.BeginFaultShutdown(state, code, detail, Now())
         );
+        var previous = _snapshots.StopAdmission(intent);
         var written = await _store.WriteAsync(state, intent, cancellationToken);
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            return Conflict(conflict.Current);
+            _ = await StopRuntimeAsync(intent, previous, cancellationToken);
+            return PublishConflict(state.PluginId, conflict.Current);
         }
 
         intent = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
-        var previous = _snapshots.Publish(intent, worker: null);
         return await CompleteFaultShutdownAsync(intent, previous, cancellationToken);
     }
 
@@ -164,16 +166,7 @@ public sealed partial class PluginLifecycleCoordinator
         var written = await _store.WriteAsync(intent, completed, cancellationToken);
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            if (conflict.Current is null)
-            {
-                _ = _snapshots.Remove(intent.PluginId);
-            }
-            else
-            {
-                _ = _snapshots.Publish(conflict.Current, worker: null);
-            }
-
-            return Conflict(conflict.Current);
+            return PublishConflict(intent.PluginId, conflict.Current);
         }
 
         completed = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
@@ -186,7 +179,7 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var previous = _snapshots.Publish(intent, worker: null);
+        var previous = _snapshots.StopAdmission(intent);
         _ = await CompleteFaultShutdownAsync(intent, previous, cancellationToken);
     }
 
@@ -204,21 +197,29 @@ public sealed partial class PluginLifecycleCoordinator
         var written = await _store.WriteAsync(state, faulted, cancellationToken);
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            if (conflict.Current is null)
-            {
-                _ = _snapshots.Remove(state.PluginId);
-            }
-            else
-            {
-                _ = _snapshots.Publish(conflict.Current, worker: null);
-            }
-
-            return Conflict(conflict.Current);
+            return PublishConflict(state.PluginId, conflict.Current);
         }
 
         faulted = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
         _ = _snapshots.Publish(faulted, worker: null);
         return Failed(faulted);
+    }
+
+    private PluginLifecycleCommandOutcome PublishConflict(
+        PluginId pluginId,
+        PluginLifecycleState? current
+    )
+    {
+        if (current is null)
+        {
+            _ = _snapshots.Remove(pluginId);
+        }
+        else
+        {
+            _ = _snapshots.Publish(current, worker: null);
+        }
+
+        return Conflict(current);
     }
 
     private static PluginLifecycleSafeDetail? SafeDetail(string value) =>

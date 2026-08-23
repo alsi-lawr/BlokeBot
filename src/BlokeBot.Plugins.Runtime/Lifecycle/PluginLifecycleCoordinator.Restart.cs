@@ -11,6 +11,12 @@ public sealed partial class PluginLifecycleCoordinator
     )
     {
         await using var lease = await _serialization.AcquireAsync(pluginId, cancellationToken);
+        var pendingFault = await CompletePendingFaultShutdownAsync(pluginId, cancellationToken);
+        if (pendingFault is not null)
+        {
+            return pendingFault;
+        }
+
         var current = await _store.LoadAsync(pluginId, cancellationToken);
         if (current is null)
         {

@@ -2,6 +2,19 @@ namespace BlokeBot.Plugins.Runtime;
 
 public static partial class PluginLifecycleStateMachine
 {
+    public static bool HasValidFaultInvariant(PluginLifecycleState state) =>
+        state.Phase == PluginLifecyclePhase.Faulted
+            ? IsLegalFaultSource(state.FaultedFrom)
+                && (
+                    state.ActiveRuntime is not { } pending
+                    || (
+                        state.FaultedFrom == PluginLifecyclePhase.Active
+                        && pending.Installation == state.SelectedInstallation
+                        && pending.Fence == state.SelectedFence
+                    )
+                )
+            : state.FaultedFrom is null;
+
     public static PluginLifecycleTransitionOutcome BeginRemoval(
         PluginLifecycleState state,
         PluginLifecycleOperationId operationId,
@@ -26,6 +39,7 @@ public static partial class PluginLifecycleStateMachine
                 OperationId = operationId,
                 Phase = phase,
                 OperationKind = kind,
+                FaultedFrom = null,
                 Revision = state.Revision + 1,
                 UpdatedAtUtc = now,
             }
@@ -248,4 +262,14 @@ public static partial class PluginLifecycleStateMachine
 
     private static bool IsTerminal(PluginLifecyclePhase phase) =>
         phase is PluginLifecyclePhase.Removed or PluginLifecyclePhase.Faulted;
+
+    private static bool IsLegalFaultSource(PluginLifecyclePhase? phase) =>
+        phase
+            is PluginLifecyclePhase.Preparing
+                or PluginLifecyclePhase.Migrating
+                or PluginLifecyclePhase.Activating
+                or PluginLifecyclePhase.Active
+                or PluginLifecyclePhase.Draining
+                or PluginLifecyclePhase.Removing
+                or PluginLifecyclePhase.Purging;
 }

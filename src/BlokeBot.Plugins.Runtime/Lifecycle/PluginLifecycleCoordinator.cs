@@ -62,6 +62,15 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
             package.Installation.PluginId,
             cancellationToken
         );
+        var pendingFault = await CompletePendingFaultShutdownAsync(
+            package.Installation.PluginId,
+            cancellationToken
+        );
+        if (pendingFault is not null)
+        {
+            return pendingFault;
+        }
+
         var begun = await _store.BeginActivationAsync(
             new(package.Installation, operationId, Now()),
             cancellationToken

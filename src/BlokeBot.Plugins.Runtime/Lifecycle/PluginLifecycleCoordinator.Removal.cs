@@ -43,7 +43,7 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         var started = Applied(transition);
-        var previous = _snapshots.Publish(started, worker: null);
+        var previous = _snapshots.StopAdmission(started);
         var written = await _store.WriteAsync(current, started, cancellationToken);
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {

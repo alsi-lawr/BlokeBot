@@ -20,7 +20,7 @@ internal static class PluginLifecycleRecordMapper
             : PluginLifecycleSafeDetail.TryCreate(record.OutcomeDetail, out var parsedDetail)
                 ? parsedDetail
             : throw new InvalidOperationException("Persisted lifecycle detail is invalid.");
-        return new(
+        var state = new PluginLifecycleState(
             pluginId,
             selected,
             operationId,
@@ -35,6 +35,9 @@ internal static class PluginLifecycleRecordMapper
             record.Revision,
             Utc(record.UpdatedAtUtc)
         );
+        return PluginLifecycleStateMachine.HasValidFaultInvariant(state)
+            ? state
+            : throw new InvalidOperationException("Persisted lifecycle fault state is invalid.");
     }
 
     internal static PluginLifecycleRecord FromDomain(PluginLifecycleState state)
@@ -46,6 +49,11 @@ internal static class PluginLifecycleRecordMapper
 
     internal static void Apply(PluginLifecycleRecord record, PluginLifecycleState state)
     {
+        if (!PluginLifecycleStateMachine.HasValidFaultInvariant(state))
+        {
+            throw new InvalidOperationException("Lifecycle fault state is invalid.");
+        }
+
         record.SelectedVersion = state.SelectedInstallation.Release.DeclaredVersion.Value;
         record.SelectedTag = state.SelectedInstallation.Release.Tag.Value;
         record.OperationId = state.OperationId.Value;

@@ -17,7 +17,7 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         var migrating = Applied(PluginLifecycleStateMachine.PreparationSucceeded(state, Now()));
-        var previous = _snapshots.Publish(migrating, worker: null);
+        var previous = _snapshots.StopAdmission(migrating);
         var migrationFence = await _store.WriteAsync(state, migrating, cancellationToken);
         if (migrationFence is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
