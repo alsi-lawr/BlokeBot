@@ -20,6 +20,11 @@
     "hash": "sha256-EXvojddPu+9JKgOG9NSQgUTfWq1RpOYw7adxDPKDJ6o="
   },
   {
+    "pname": "KeraLua",
+    "version": "1.4.9",
+    "hash": "sha256-xR8Ram6RX6B2kd+KYpa6URIzOW6SGrKLU33yi1nv5UU="
+  },
+  {
     "pname": "Microsoft.Build.Framework",
     "version": "17.11.31",
     "hash": "sha256-YS4oASrmC5dmZrx5JPS7SfKmUpIJErlUpVDsU3VrfFE="

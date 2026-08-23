@@ -54,6 +54,21 @@ def _run_cli(executable: Path, command: str) -> str:
     return completed.stdout
 
 
+def _run_worker_probe(executable: Path, state_directory: Path) -> None:
+    worker_name = "BlokeBot.PluginWorker.exe" if os.name == "nt" else "BlokeBot.PluginWorker"
+    worker = executable.parent / "plugin-worker" / worker_name
+    completed = subprocess.run(
+        [str(worker), "--deployment-probe", str(state_directory / "worker-probe")],
+        check=False,
+        capture_output=True,
+        env=_offline_environment(),
+    )
+    if completed.returncode != 0:
+        raise NativeSmokeError(
+            f"plugin worker deployment probe failed with exit code {completed.returncode}"
+        )
+
+
 def _available_port() -> int:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -143,6 +158,7 @@ def smoke(executable: Path, version: str) -> None:
     process: subprocess.Popen[bytes] | None = None
     process_has_exited = False
     try:
+        _run_worker_probe(executable, data_directory)
         process = subprocess.Popen(
             [
                 str(executable),

@@ -1,10 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\BlokeBot.Plugins.Contracts.Testing\BlokeBot.Plugins.Contracts.Testing.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Plugins.Runtime\BlokeBot.Plugins.Runtime.csproj" />
+    <ProjectReference
+      Include="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      ReferenceOutputAssembly="false"
+    />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
+
+  <Target Name="PublishPluginWorkerForTests" AfterTargets="Build">
+    <PropertyGroup>
+      <_PluginWorkerTestPublishDir>$([System.IO.Path]::GetFullPath('$(OutDir)plugin-worker'))</_PluginWorkerTestPublishDir>
+    </PropertyGroup>
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(NETCoreSdkRuntimeIdentifier);SelfContained=false;PublishDir=$(_PluginWorkerTestPublishDir);NoRestore=true"
+    />
+  </Target>
 </Project>

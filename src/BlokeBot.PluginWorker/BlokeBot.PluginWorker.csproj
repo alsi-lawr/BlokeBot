@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>BlokeBot.PluginWorker</AssemblyName>
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64;win-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlokeBot.Plugins.Runtime\BlokeBot.Plugins.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="KeraLua" />
+  </ItemGroup>
+</Project>

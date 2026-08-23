@@ -51,7 +51,10 @@ public static class PluginContractFixtures
         return Array.AsReadOnly<PluginPackageEntry>([
             new PluginPackageEntry.File(PluginPackage.ManifestPath, CompleteManifestJson()),
             new PluginPackageEntry.File("lua/main.lua", lua),
-            new PluginPackageEntry.File("lua/events.lua", lua),
+            new PluginPackageEntry.File(
+                "lua/events.lua",
+                Encoding.UTF8.GetBytes("return { answer = 42 }\n")
+            ),
             new PluginPackageEntry.File("lua/pages.lua", lua),
             new PluginPackageEntry.File("lua/migrations.lua", lua),
             new PluginPackageEntry.File(

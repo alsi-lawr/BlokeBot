@@ -27,8 +27,7 @@ public static class PluginEngineFixturePrograms
     public const string Cancellation =
         "return blokebot.host.call('chat', 'send-message', 'cancel after external effect')";
 
-    public const string Packaging =
-        "local module = require('fixture_module'); return module.answer";
+    public const string Packaging = "local module = require('events'); return module.answer";
 }
 
 public interface IPluginEngineContractFixtureAdapter

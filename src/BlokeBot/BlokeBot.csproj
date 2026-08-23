@@ -2,6 +2,10 @@
   <ItemGroup>
     <ProjectReference Include="..\BlokeBot.Core\BlokeBot.Core.csproj" />
     <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference
+      Include="..\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      ReferenceOutputAssembly="false"
+    />
   </ItemGroup>
 
   <PropertyGroup>
@@ -22,4 +26,20 @@
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Spectre.Console.Cli" />
   </ItemGroup>
+
+  <Target Name="PublishPluginWorker" AfterTargets="Publish">
+    <PropertyGroup>
+      <_PluginWorkerPublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)plugin-worker'))</_PluginWorkerPublishDir>
+      <_PluginWorkerRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''"
+        >$(RuntimeIdentifier)</_PluginWorkerRuntimeIdentifier>
+      <_PluginWorkerRuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''"
+        >$(NETCoreSdkRuntimeIdentifier)</_PluginWorkerRuntimeIdentifier>
+    </PropertyGroup>
+    <MSBuild
+      Projects="..\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(_PluginWorkerRuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(_PluginWorkerPublishDir);NoRestore=true"
+    />
+  </Target>
 </Project>

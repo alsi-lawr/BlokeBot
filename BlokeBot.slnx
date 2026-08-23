@@ -14,12 +14,14 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/BlokeBot.PluginWorker/BlokeBot.PluginWorker.csproj" />
     <Project Path="src/BlokeBot.Commands/BlokeBot.Commands.csproj" />
     <Project Path="src/BlokeBot.Core/BlokeBot.Core.csproj" />
     <Project Path="src/BlokeBot.Eventing/BlokeBot.Eventing.csproj" />
     <Project Path="src/BlokeBot.Functional/BlokeBot.Functional.csproj" />
     <Project Path="src/BlokeBot.Persistence/BlokeBot.Persistence.csproj" />
     <Project Path="src/BlokeBot.Plugins.Contracts/BlokeBot.Plugins.Contracts.csproj" />
+    <Project Path="src/BlokeBot.Plugins.Runtime/BlokeBot.Plugins.Runtime.csproj" />
     <Project Path="src/BlokeBot.Twitch.Auth/BlokeBot.Twitch.Auth.csproj" />
     <Project Path="src/BlokeBot.Twitch.Runtime/BlokeBot.Twitch.Runtime.csproj" />
     <Project Path="src/BlokeBot.Twitch/BlokeBot.Twitch.csproj" />

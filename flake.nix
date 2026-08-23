@@ -39,6 +39,9 @@
               ./src/BlokeBot.Eventing
               ./src/BlokeBot.Functional
               ./src/BlokeBot.Persistence
+              ./src/BlokeBot.PluginWorker
+              ./src/BlokeBot.Plugins.Contracts
+              ./src/BlokeBot.Plugins.Runtime
               ./src/BlokeBot.Twitch
               ./src/BlokeBot.Twitch.Auth
               ./src/BlokeBot.Twitch.Runtime
@@ -61,6 +64,7 @@
         let
           pkgs = pkgsFor system;
           src = botSource pkgs;
+          dotnetRuntime = pkgs.dotnet-aspnetcore_10;
         in
         pkgs.buildDotnetModule {
           pname = "blokebot";
@@ -71,7 +75,7 @@
           projectFile = "src/BlokeBot/BlokeBot.csproj";
           nugetDeps = ./packaging/nix/deps.json;
           dotnet-sdk = pkgs.dotnet-sdk_10;
-          dotnet-runtime = pkgs.dotnet-aspnetcore_10;
+          dotnet-runtime = dotnetRuntime;
           dotnetBuildFlags = [ "-p:SourceRevisionId=${imageRevision}" ];
           executables = [ "blokebot" ];
           makeWrapperArgs = [
@@ -79,6 +83,13 @@
             "ASPNETCORE_CONTENTROOT"
             "${placeholder "out"}/lib/blokebot"
           ];
+
+          postFixup = ''
+            rm "$out/lib/blokebot/plugin-worker/BlokeBot.PluginWorker"
+            makeWrapper "${dotnetRuntime}/bin/dotnet" \
+              "$out/lib/blokebot/plugin-worker/BlokeBot.PluginWorker" \
+              --add-flags "$out/lib/blokebot/plugin-worker/BlokeBot.PluginWorker.dll"
+          '';
 
           npmRoot = "src/BlokeBot.Core";
           npmDeps = pkgs.fetchNpmDeps {

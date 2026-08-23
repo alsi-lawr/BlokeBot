@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import PurePosixPath
 import subprocess
 import sys
 import time
@@ -95,6 +96,20 @@ def _assert_bot_framework_script(port: str) -> None:
         raise ContainerSmokeError(f"{url} returned HTML instead of the Blazor framework script")
 
 
+def _run_worker_probe(image: str, executable: str) -> None:
+    package_root = PurePosixPath(executable).parent.parent
+    worker = package_root / "lib" / "blokebot" / "plugin-worker" / "BlokeBot.PluginWorker"
+    _docker(
+        "run",
+        "--rm",
+        "--entrypoint",
+        str(worker),
+        image,
+        "--deployment-probe",
+        "/tmp/blokebot-worker-probe",
+    )
+
+
 def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) -> None:
     inspected = _inspect(image)
     config = inspected.get("Config")
@@ -137,6 +152,7 @@ def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) 
         actual_version = _docker("run", "--rm", "--entrypoint", executable, image, "version")
         if actual_version != f"blokebot {cli_version}":
             raise ContainerSmokeError(f"Unexpected container version output: {actual_version!r}")
+        _run_worker_probe(image, executable)
         internal_port = "8080"
         path = "/auth/login"
         markers = (

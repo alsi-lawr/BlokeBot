@@ -7,6 +7,9 @@
 !src/BlokeBot.Eventing/**
 !src/BlokeBot.Functional/**
 !src/BlokeBot.Persistence/**
+!src/BlokeBot.PluginWorker/**
+!src/BlokeBot.Plugins.Contracts/**
+!src/BlokeBot.Plugins.Runtime/**
 !src/BlokeBot.Twitch.Auth/**
 !src/BlokeBot.Twitch.Runtime/**
 !src/BlokeBot.Twitch/**
