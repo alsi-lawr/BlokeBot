@@ -140,12 +140,11 @@ public sealed partial class PluginLifecycleCoordinator
             }
         }
 
-        var purged = Applied(PluginLifecycleStateMachine.PurgeSucceeded(state, Now()));
-        var persisted = await _store.CompletePurgeAsync(
-            state,
-            purged.LatestOutcome,
-            cancellationToken
+        var purgedOutcome = PluginLifecycleOutcome.Progress(
+            PluginLifecycleOutcomeCode.Purged,
+            Now()
         );
+        var persisted = await _store.CompletePurgeAsync(state, purgedOutcome, cancellationToken);
         if (persisted is PluginLifecycleStorePurgeOutcome.Conflict conflict)
         {
             return Conflict(conflict.Current);

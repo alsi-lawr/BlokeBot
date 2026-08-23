@@ -34,7 +34,11 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_FaultedFrom",
-                        "\"FaultedFrom\" IS NULL OR \"FaultedFrom\" IN ('Preparing', 'Migrating', 'Activating', 'Active', 'Draining', 'Removing', 'Removed', 'Purging', 'Purged', 'Faulted')"
+                        "\"FaultedFrom\" IS NULL OR \"FaultedFrom\" IN ('Preparing', 'Migrating', 'Activating', 'Active', 'Draining', 'Removing', 'Removed', 'Purging', 'Faulted')"
+                    );
+                    _ = table.HasCheckConstraint(
+                        "CK_plugin_lifecycles_FaultShutdown",
+                        "\"Phase\" <> 'Faulted' OR \"ActiveOperationId\" IS NULL OR \"FaultedFrom\" = 'Active'"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_OperationKind",
@@ -46,7 +50,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_FailureCode",
-                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('PreparationRejected', 'PreparationFailed', 'MigrationFailed', 'ActivationFailed', 'WorkerStartFailed', 'WorkerExited', 'DrainTimedOut', 'CancellationFailed', 'RemovalFailed', 'PurgeFailed', 'RecoveryPackageUnavailable', 'RecoveryFailed', 'GenerationExhausted')"
+                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('PreparationRejected', 'PreparationFailed', 'MigrationFailed', 'ActivationFailed', 'WorkerStartFailed', 'WorkerDisposalFailed', 'WorkerExited', 'DrainTimedOut', 'CancellationFailed', 'RemovalFailed', 'PurgeFailed', 'RecoveryPackageUnavailable', 'RecoveryFailed', 'GenerationExhausted')"
                     );
                 }
             );
@@ -91,7 +95,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycle_outcomes_FailureCode",
-                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('PreparationRejected', 'PreparationFailed', 'MigrationFailed', 'ActivationFailed', 'WorkerStartFailed', 'WorkerExited', 'DrainTimedOut', 'CancellationFailed', 'RemovalFailed', 'PurgeFailed', 'RecoveryPackageUnavailable', 'RecoveryFailed', 'GenerationExhausted')"
+                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('PreparationRejected', 'PreparationFailed', 'MigrationFailed', 'ActivationFailed', 'WorkerStartFailed', 'WorkerDisposalFailed', 'WorkerExited', 'DrainTimedOut', 'CancellationFailed', 'RemovalFailed', 'PurgeFailed', 'RecoveryPackageUnavailable', 'RecoveryFailed', 'GenerationExhausted')"
                     );
                 }
             );

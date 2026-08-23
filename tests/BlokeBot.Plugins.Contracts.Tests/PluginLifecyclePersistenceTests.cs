@@ -68,9 +68,10 @@ public sealed class PluginLifecyclePersistenceTests
             )
         );
         await WriteAsync(store, purging, winner);
-        var staleOutcome = Applied(
-            PluginLifecycleStateMachine.PurgeSucceeded(purging, DateTimeOffset.UtcNow)
-        ).LatestOutcome;
+        var staleOutcome = PluginLifecycleOutcome.Progress(
+            PluginLifecycleOutcomeCode.Purged,
+            DateTimeOffset.UtcNow
+        );
 
         var conflict = (
             await store.CompletePurgeAsync(purging, staleOutcome, CancellationToken.None)
@@ -86,27 +87,18 @@ public sealed class PluginLifecyclePersistenceTests
     }
 
     [Test]
-    public async Task LifecycleStore_RejectsGenericPurgedWriteAndDatabaseRow()
+    public async Task LifecycleDatabase_RejectsHistoricalPurgedLifecycleRow()
     {
         await using var database = await LifecycleDatabase.CreateAsync();
         var store = new EfPluginLifecycleStore(database);
         var package = new LifecycleHarness().Package("1.0.0", "v1");
         var purging = await AdvanceToPurgingAsync(store, package);
-        var purged = Applied(
-            PluginLifecycleStateMachine.PurgeSucceeded(purging, DateTimeOffset.UtcNow)
-        );
-
-        var rejected = (
-            await store.WriteAsync(purging, purged, CancellationToken.None)
-        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
-
-        rejected.Current.ShouldBe(purging);
         await using (var db = database.CreateDbContext())
         {
-            var record = await db.PluginLifecycles.SingleAsync();
-            record.Phase = PluginLifecyclePhase.Purged;
-            _ = await Should.ThrowAsync<DbUpdateException>(async () =>
-                _ = await db.SaveChangesAsync()
+            _ = await Should.ThrowAsync<SqliteException>(async () =>
+                _ = await db.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purged';"
+                )
             );
         }
 
@@ -171,24 +163,13 @@ public sealed class PluginLifecyclePersistenceTests
         var harness = new LifecycleHarness();
         var firstPackage = harness.Package("1.0.0", "v1");
         var purging = await AdvanceToPurgingAsync(store, firstPackage);
-        var purged = (
-            (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.PurgeSucceeded(
-                    purging,
-                    new DateTimeOffset(2026, 8, 23, 16, 0, 0, TimeSpan.Zero)
-                )
-        ).State;
+        var purged = PluginLifecycleOutcome.Progress(
+            PluginLifecycleOutcomeCode.Purged,
+            new DateTimeOffset(2026, 8, 23, 16, 0, 0, TimeSpan.Zero)
+        );
 
-        var completed = await store.CompletePurgeAsync(
-            purging,
-            purged.LatestOutcome,
-            CancellationToken.None
-        );
-        var repeated = await store.CompletePurgeAsync(
-            purging,
-            purged.LatestOutcome,
-            CancellationToken.None
-        );
+        var completed = await store.CompletePurgeAsync(purging, purged, CancellationToken.None);
+        var repeated = await store.CompletePurgeAsync(purging, purged, CancellationToken.None);
 
         var tombstone = completed
             .ShouldBeOfType<PluginLifecycleStorePurgeOutcome.Completed>()
@@ -261,7 +242,7 @@ public sealed class PluginLifecyclePersistenceTests
                     SelectedTag = package.Installation.Release.Tag.Value,
                     OperationId = PluginLifecycleOperationId.New().Value,
                     SelectedGeneration = 7,
-                    Phase = PluginLifecyclePhase.Purged,
+                    Phase = PluginLifecyclePhase.Removed,
                     OperationKind = PluginLifecycleOperationKind.Purge,
                     OutcomeCode = PluginLifecycleOutcomeCode.Purged,
                     OutcomeOccurredAtUtc = occurredAt.UtcDateTime,
@@ -270,6 +251,9 @@ public sealed class PluginLifecyclePersistenceTests
                 }
             );
             _ = await db.SaveChangesAsync();
+            _ = await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purged';"
+            );
         }
 
         await database.MigrateToLatestAsync();
@@ -287,7 +271,80 @@ public sealed class PluginLifecyclePersistenceTests
         );
     }
 
+    [Test]
+    public async Task LifecycleMigration_ConstrainsAndRoundTripsFaultShutdownCheckpoint()
+    {
+        await using var database = await LifecycleDatabase.CreateAsync();
+        var store = new EfPluginLifecycleStore(database);
+        var package = new LifecycleHarness().Package("1.0.0", "v1");
+        var active = await AdvanceToActiveAsync(store, package);
+        var intent = Applied(
+            PluginLifecycleStateMachine.BeginFaultShutdown(
+                active,
+                PluginLifecycleFailureCode.GenerationExhausted,
+                null,
+                DateTimeOffset.UtcNow
+            )
+        );
+        await WriteAsync(store, active, intent);
+        var invalid = intent with
+        {
+            FaultedFrom = PluginLifecyclePhase.Migrating,
+            Revision = intent.Revision + 1,
+        };
+
+        _ = await Should.ThrowAsync<DbUpdateException>(async () =>
+            _ = await store.WriteAsync(intent, invalid, CancellationToken.None)
+        );
+        (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
+            intent
+        );
+        PluginLifecycleSafeDetail
+            .TryCreate("The plugin worker could not be terminated cleanly.", out var detail)
+            .ShouldBeTrue();
+        var completed = Applied(
+            PluginLifecycleStateMachine.CompleteFaultShutdown(
+                intent,
+                PluginLifecycleFailureCode.WorkerDisposalFailed,
+                detail,
+                DateTimeOffset.UtcNow
+            )
+        );
+        await WriteAsync(store, intent, completed);
+
+        var reloaded = (
+            await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)
+        )!;
+        reloaded.ActiveRuntime.ShouldBeNull();
+        reloaded.LatestOutcome.FailureCode.ShouldBe(
+            PluginLifecycleFailureCode.WorkerDisposalFailed
+        );
+        reloaded.LatestOutcome.Detail.ShouldBe(detail);
+    }
+
     private static async ValueTask<PluginLifecycleState> AdvanceToPurgingAsync(
+        IPluginLifecycleStore store,
+        PluginLifecyclePackage package
+    )
+    {
+        var active = await AdvanceToActiveAsync(store, package);
+        var draining = Applied(
+            PluginLifecycleStateMachine.BeginRemoval(
+                active,
+                PluginLifecycleOperationId.New(),
+                purge: true,
+                DateTimeOffset.UtcNow
+            )
+        );
+        await WriteAsync(store, active, draining);
+        var purging = Applied(
+            PluginLifecycleStateMachine.DrainSucceeded(draining, DateTimeOffset.UtcNow)
+        );
+        await WriteAsync(store, draining, purging);
+        return purging;
+    }
+
+    private static async ValueTask<PluginLifecycleState> AdvanceToActiveAsync(
         IPluginLifecycleStore store,
         PluginLifecyclePackage package
     )
@@ -312,20 +369,7 @@ public sealed class PluginLifecyclePersistenceTests
             PluginLifecycleStateMachine.ActivationSucceeded(activating, DateTimeOffset.UtcNow)
         );
         await WriteAsync(store, activating, active);
-        var draining = Applied(
-            PluginLifecycleStateMachine.BeginRemoval(
-                active,
-                PluginLifecycleOperationId.New(),
-                purge: true,
-                DateTimeOffset.UtcNow
-            )
-        );
-        await WriteAsync(store, active, draining);
-        var purging = Applied(
-            PluginLifecycleStateMachine.DrainSucceeded(draining, DateTimeOffset.UtcNow)
-        );
-        await WriteAsync(store, draining, purging);
-        return purging;
+        return active;
     }
 
     private static async ValueTask WriteAsync(

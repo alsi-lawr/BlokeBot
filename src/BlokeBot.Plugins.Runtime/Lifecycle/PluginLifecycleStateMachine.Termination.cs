@@ -14,11 +14,6 @@ public static partial class PluginLifecycleStateMachine
             return Rejected(PluginLifecycleTransitionFailureCode.Busy);
         }
 
-        if (state.Phase == PluginLifecyclePhase.Purged)
-        {
-            return Rejected(PluginLifecycleTransitionFailureCode.NotFound);
-        }
-
         var kind = purge ? PluginLifecycleOperationKind.Purge : PluginLifecycleOperationKind.Remove;
         var phase = state.ActiveRuntime is null
             ? purge
@@ -77,25 +72,17 @@ public static partial class PluginLifecycleStateMachine
             now
         );
 
-    internal static PluginLifecycleTransitionOutcome PurgeSucceeded(
-        PluginLifecycleState state,
-        DateTimeOffset now
-    ) =>
-        Terminal(
-            state,
-            PluginLifecyclePhase.Purging,
-            PluginLifecyclePhase.Purged,
-            PluginLifecycleOutcomeCode.Purged,
-            now
-        );
-
     public static PluginLifecycleTransitionOutcome BeginRestart(
         PluginLifecycleState state,
         PluginLifecycleOperationId operationId,
         DateTimeOffset now
     )
     {
-        if (state.Phase != PluginLifecyclePhase.Faulted || state.FaultedFrom is null)
+        if (
+            state.Phase != PluginLifecyclePhase.Faulted
+            || state.FaultedFrom is null
+            || state.ActiveRuntime is not null
+        )
         {
             return Rejected(PluginLifecycleTransitionFailureCode.NotFaulted);
         }
@@ -110,7 +97,6 @@ public static partial class PluginLifecycleStateMachine
             PluginLifecyclePhase.Removing => PluginLifecyclePhase.Removing,
             PluginLifecyclePhase.Purging => PluginLifecyclePhase.Purging,
             PluginLifecyclePhase.Removed => (PluginLifecyclePhase?)null,
-            PluginLifecyclePhase.Purged => null,
             PluginLifecyclePhase.Faulted => null,
         };
         var operationKind = state.FaultedFrom.Value
@@ -156,13 +142,60 @@ public static partial class PluginLifecycleStateMachine
         DateTimeOffset now
     ) => Fault(state, failedPhase, PluginLifecycleOutcome.Failure(failureCode, detail, now), now);
 
+    internal static PluginLifecycleTransitionOutcome BeginFaultShutdown(
+        PluginLifecycleState state,
+        PluginLifecycleFailureCode failureCode,
+        PluginLifecycleSafeDetail? detail,
+        DateTimeOffset now
+    ) =>
+        state is { Phase: PluginLifecyclePhase.Active, ActiveRuntime: not null }
+            ? Applied(
+                state with
+                {
+                    Phase = PluginLifecyclePhase.Faulted,
+                    FaultedFrom = PluginLifecyclePhase.Active,
+                    RestartNotBeforeUtc = null,
+                    LatestOutcome = PluginLifecycleOutcome.Failure(failureCode, detail, now),
+                    Revision = state.Revision + 1,
+                    UpdatedAtUtc = now,
+                }
+            )
+            : Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
+
+    internal static PluginLifecycleTransitionOutcome CompleteFaultShutdown(
+        PluginLifecycleState state,
+        PluginLifecycleFailureCode? shutdownFailureCode,
+        PluginLifecycleSafeDetail? detail,
+        DateTimeOffset now
+    ) =>
+        state
+            is {
+                Phase: PluginLifecyclePhase.Faulted,
+                FaultedFrom: PluginLifecyclePhase.Active,
+                ActiveRuntime: not null,
+            }
+            ? Applied(
+                state with
+                {
+                    ActiveRuntime = null,
+                    LatestOutcome = shutdownFailureCode is { } code
+                        ? PluginLifecycleOutcome.Failure(code, detail, now)
+                        : state.LatestOutcome,
+                    Revision = state.Revision + 1,
+                    UpdatedAtUtc = now,
+                }
+            )
+            : Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
+
     private static PluginLifecycleTransitionOutcome Fault(
         PluginLifecycleState state,
         PluginLifecyclePhase failedPhase,
         PluginLifecycleOutcome outcome,
         DateTimeOffset now
     ) =>
-        state.Phase != failedPhase || IsTerminal(state.Phase)
+        state.Phase != failedPhase
+        || state.Phase == PluginLifecyclePhase.Active
+        || IsTerminal(state.Phase)
             ? Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition)
             : Applied(
                 state with
@@ -214,8 +247,5 @@ public static partial class PluginLifecycleStateMachine
             : Rejected(PluginLifecycleTransitionFailureCode.GenerationExhausted);
 
     private static bool IsTerminal(PluginLifecyclePhase phase) =>
-        phase
-            is PluginLifecyclePhase.Removed
-                or PluginLifecyclePhase.Purged
-                or PluginLifecyclePhase.Faulted;
+        phase is PluginLifecyclePhase.Removed or PluginLifecyclePhase.Faulted;
 }

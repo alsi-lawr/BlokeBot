@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace BlokeBot.Plugins.Runtime;
 
 public sealed partial class PluginLifecycleCoordinator
@@ -44,30 +46,76 @@ public sealed partial class PluginLifecycleCoordinator
     )
     {
         var priorFence = state.ActiveRuntime?.Fence ?? previous?.Entry.Fence;
-        var cancellation = priorFence is null
-            ? new PluginLifecycleOwnerOutcome.Succeeded()
-            : await _pendingWork.CancelAsync(state.PluginId, priorFence, cancellationToken);
+        PluginRuntimeStopOutcome.Failed? failure = null;
+        try
+        {
+            var cancellation = priorFence is null
+                ? new PluginLifecycleOwnerOutcome.Succeeded()
+                : await _pendingWork.CancelAsync(state.PluginId, priorFence, cancellationToken);
+            if (cancellation is PluginLifecycleOwnerOutcome.Failed cancellationFailure)
+            {
+                failure = new(
+                    PluginLifecycleFailureCode.CancellationFailed,
+                    cancellationFailure.Detail
+                );
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Plugin pending-work cancellation failed for {PluginId}.",
+                state.PluginId.Value
+            );
+            failure = new(
+                PluginLifecycleFailureCode.CancellationFailed,
+                SafeDetail("Plugin pending-work cancellation failed.")
+            );
+        }
+
         var drained = await _snapshots.DrainAsync(
             previous,
             _options.DrainTimeout,
             _timeProvider,
             cancellationToken
         );
-        if (previous?.Worker is { } worker)
+        if (!drained && failure is null)
         {
-            await worker.DisposeAsync();
-        }
-
-        return cancellation is PluginLifecycleOwnerOutcome.Failed cancellationFailure
-                ? new PluginRuntimeStopOutcome.Failed(
-                    PluginLifecycleFailureCode.CancellationFailed,
-                    cancellationFailure.Detail
-                )
-            : drained ? new PluginRuntimeStopOutcome.Succeeded()
-            : new PluginRuntimeStopOutcome.Failed(
+            failure = new(
                 PluginLifecycleFailureCode.DrainTimedOut,
                 SafeDetail("Plugin callbacks exceeded the drain bound.")
             );
+        }
+
+        if (previous?.Worker is { } worker)
+        {
+            try
+            {
+                await worker.DisposeAsync();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Plugin worker disposal failed for {PluginId}.",
+                    state.PluginId.Value
+                );
+                failure = new(
+                    PluginLifecycleFailureCode.WorkerDisposalFailed,
+                    SafeDetail("The plugin worker could not be terminated cleanly.")
+                );
+            }
+        }
+
+        return failure is null ? new PluginRuntimeStopOutcome.Succeeded() : failure;
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> FaultAsync(
@@ -83,18 +131,63 @@ public sealed partial class PluginLifecycleCoordinator
             return await PersistFaultAsync(state, failedPhase, code, detail, cancellationToken);
         }
 
-        var pending = Applied(
-            PluginLifecycleStateMachine.Fault(state, failedPhase, code, detail, Now())
+        var intent = Applied(
+            PluginLifecycleStateMachine.BeginFaultShutdown(state, code, detail, Now())
         );
-        var previous = _snapshots.Publish(pending, worker: null);
-        var stopped = await StopRuntimeAsync(state, previous, cancellationToken);
-        if (stopped is PluginRuntimeStopOutcome.Failed failed)
+        var written = await _store.WriteAsync(state, intent, cancellationToken);
+        if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            code = failed.Code;
-            detail = failed.Detail;
+            return Conflict(conflict.Current);
         }
 
-        return await PersistFaultAsync(state, failedPhase, code, detail, cancellationToken);
+        intent = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
+        var previous = _snapshots.Publish(intent, worker: null);
+        return await CompleteFaultShutdownAsync(intent, previous, cancellationToken);
+    }
+
+    private async ValueTask<PluginLifecycleCommandOutcome> CompleteFaultShutdownAsync(
+        PluginLifecycleState intent,
+        PluginRuntimeSlot? previous,
+        CancellationToken cancellationToken
+    )
+    {
+        var stopped = await StopRuntimeAsync(intent, previous, cancellationToken);
+        var failed = stopped as PluginRuntimeStopOutcome.Failed;
+        var completed = Applied(
+            PluginLifecycleStateMachine.CompleteFaultShutdown(
+                intent,
+                failed?.Code,
+                failed?.Detail,
+                Now()
+            )
+        );
+        var written = await _store.WriteAsync(intent, completed, cancellationToken);
+        if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
+        {
+            if (conflict.Current is null)
+            {
+                _ = _snapshots.Remove(intent.PluginId);
+            }
+            else
+            {
+                _ = _snapshots.Publish(conflict.Current, worker: null);
+            }
+
+            return Conflict(conflict.Current);
+        }
+
+        completed = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
+        _ = _snapshots.Publish(completed, worker: null);
+        return Failed(completed);
+    }
+
+    private async ValueTask RecoverFaultShutdownAsync(
+        PluginLifecycleState intent,
+        CancellationToken cancellationToken
+    )
+    {
+        var previous = _snapshots.Publish(intent, worker: null);
+        _ = await CompleteFaultShutdownAsync(intent, previous, cancellationToken);
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> PersistFaultAsync(

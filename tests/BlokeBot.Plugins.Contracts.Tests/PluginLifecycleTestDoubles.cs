@@ -7,6 +7,7 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
     private readonly object _sync = new();
     private readonly Dictionary<PluginId, PluginLifecycleState> _states = [];
     private readonly Dictionary<PluginId, PluginLifecycleTombstone> _tombstones = [];
+    private TaskCompletionSource? _writeGate;
 
     internal int Count
     {
@@ -29,6 +30,19 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
             }
         }
     }
+
+    internal TaskCompletionSource WriteStarted { get; private set; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal Exception? ExceptionAfterNextWrite { get; set; }
+
+    internal void PauseNextWrite()
+    {
+        WriteStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _writeGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    internal void ResumeWrite() => _writeGate?.TrySetResult();
 
     public ValueTask<PluginLifecycleState?> LoadAsync(
         PluginId pluginId,
@@ -133,30 +147,35 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
         }
     }
 
-    public ValueTask<PluginLifecycleStoreWriteOutcome> WriteAsync(
+    public async ValueTask<PluginLifecycleStoreWriteOutcome> WriteAsync(
         PluginLifecycleState expected,
         PluginLifecycleState next,
         CancellationToken cancellationToken
     )
     {
+        if (_writeGate is { } gate)
+        {
+            _ = WriteStarted.TrySetResult();
+            await gate.Task.WaitAsync(cancellationToken);
+            _writeGate = null;
+        }
+
+        PluginLifecycleStoreWriteOutcome outcome;
+        Exception? exception;
         lock (_sync)
         {
-            if (
-                !_states.TryGetValue(expected.PluginId, out var current)
-                || current != expected
-                || next.Phase == PluginLifecyclePhase.Purged
-            )
+            if (!_states.TryGetValue(expected.PluginId, out var current) || current != expected)
             {
-                return ValueTask.FromResult<PluginLifecycleStoreWriteOutcome>(
-                    new PluginLifecycleStoreWriteOutcome.Conflict(current)
-                );
+                return new PluginLifecycleStoreWriteOutcome.Conflict(current);
             }
 
             _states[expected.PluginId] = next;
-            return ValueTask.FromResult<PluginLifecycleStoreWriteOutcome>(
-                new PluginLifecycleStoreWriteOutcome.Written(next)
-            );
+            outcome = new PluginLifecycleStoreWriteOutcome.Written(next);
+            exception = ExceptionAfterNextWrite;
+            ExceptionAfterNextWrite = null;
         }
+
+        return exception is null ? outcome : throw exception;
     }
 
     internal void Seed(PluginLifecycleState state)
@@ -216,6 +235,8 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
 
     internal int AdmittedFailuresRemaining { get; set; }
 
+    internal Exception? NextDisposalException { get; set; }
+
     internal TaskCompletionSource ValidationStarted { get; private set; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -264,7 +285,11 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
             );
         }
 
-        var worker = new FakeLifecycleWorkerSession(PluginWorkerMode.Admitted);
+        var worker = new FakeLifecycleWorkerSession(
+            PluginWorkerMode.Admitted,
+            NextDisposalException
+        );
+        NextDisposalException = null;
         Admitted.Add(worker);
         StartedInstallations.Add(package.Installation);
         return ValueTask.FromResult<PluginLifecycleWorkerStartOutcome>(
@@ -273,8 +298,10 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
     }
 }
 
-internal sealed class FakeLifecycleWorkerSession(PluginWorkerMode mode)
-    : IPluginLifecycleWorkerSession
+internal sealed class FakeLifecycleWorkerSession(
+    PluginWorkerMode mode,
+    Exception? disposalException = null
+) : IPluginLifecycleWorkerSession
 {
     private readonly TaskCompletionSource<PluginWorkerFailure> _termination = new(
         TaskCreationOptions.RunContinuationsAsynchronously
@@ -293,7 +320,9 @@ internal sealed class FakeLifecycleWorkerSession(PluginWorkerMode mode)
     public ValueTask DisposeAsync()
     {
         _ = Disposed.TrySetResult();
-        return ValueTask.CompletedTask;
+        return disposalException is null
+            ? ValueTask.CompletedTask
+            : ValueTask.FromException(disposalException);
     }
 }
 
@@ -373,11 +402,26 @@ internal sealed class RecordingPurgeOwner : IPluginPurgeDataOwner
 
 internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCanceller
 {
+    private TaskCompletionSource? _gate;
+
     internal int Calls { get; private set; }
 
     internal List<PluginLifecycleFence> CancelledFences { get; } = [];
 
     internal int FailuresRemaining { get; set; }
+
+    internal Exception? ExceptionToThrow { get; set; }
+
+    internal TaskCompletionSource Started { get; private set; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal void Pause()
+    {
+        Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    internal void Resume() => _gate?.TrySetResult();
 
     internal async Task WaitForCallsAsync(int expected)
     {
@@ -395,7 +439,7 @@ internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCancelle
         throw new TimeoutException("Pending work cancellation was not observed.");
     }
 
-    public ValueTask<PluginLifecycleOwnerOutcome> CancelAsync(
+    public async ValueTask<PluginLifecycleOwnerOutcome> CancelAsync(
         PluginId pluginId,
         PluginLifecycleFence fence,
         CancellationToken cancellationToken
@@ -403,16 +447,34 @@ internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCancelle
     {
         Calls++;
         CancelledFences.Add(fence);
+        _ = Started.TrySetResult();
+        if (_gate is { } gate)
+        {
+            try
+            {
+                await gate.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                _gate = null;
+            }
+        }
+
+        if (ExceptionToThrow is { } exception)
+        {
+            ExceptionToThrow = null;
+            throw exception;
+        }
+
         if (FailuresRemaining > 0)
         {
             FailuresRemaining--;
-            return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
-                new PluginLifecycleOwnerOutcome.Failed(PluginLifecycleOwnerFailureCode.Failed, null)
+            return new PluginLifecycleOwnerOutcome.Failed(
+                PluginLifecycleOwnerFailureCode.Failed,
+                null
             );
         }
 
-        return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
-            new PluginLifecycleOwnerOutcome.Succeeded()
-        );
+        return new PluginLifecycleOwnerOutcome.Succeeded();
     }
 }

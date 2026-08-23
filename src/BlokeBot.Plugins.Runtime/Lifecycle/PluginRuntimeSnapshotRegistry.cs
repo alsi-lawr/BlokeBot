@@ -220,8 +220,20 @@ public sealed class PluginRuntimeSnapshotRegistry
         }
 
         var drained = slot.Tracker.Drained();
-        var bound = Task.Delay(timeout, timeProvider, cancellationToken);
-        return await Task.WhenAny(drained, bound) == drained;
+        var bound = Task.Delay(timeout, timeProvider, CancellationToken.None);
+        if (!cancellationToken.CanBeCanceled)
+        {
+            return await Task.WhenAny(drained, bound) == drained;
+        }
+
+        var canceled = Task.Delay(Timeout.InfiniteTimeSpan, timeProvider, cancellationToken);
+        var completed = await Task.WhenAny(drained, bound, canceled);
+        if (completed == canceled)
+        {
+            await canceled;
+        }
+
+        return completed == drained;
     }
 
     private PluginFenceOutcome Validate(PluginId pluginId, PluginLifecycleFence fence)
@@ -247,8 +259,7 @@ public sealed class PluginRuntimeSnapshotRegistry
     ) =>
         entry.OperationId != expected.OperationId ? PluginAdmissionRejectionCode.StaleOperation
         : entry.Generation != expected.Generation ? PluginAdmissionRejectionCode.StaleGeneration
-        : entry.Phase is PluginLifecyclePhase.Removed or PluginLifecyclePhase.Purged
-            ? PluginAdmissionRejectionCode.Removed
+        : entry.Phase == PluginLifecyclePhase.Removed ? PluginAdmissionRejectionCode.Removed
         : entry.Phase == PluginLifecyclePhase.Faulted ? PluginAdmissionRejectionCode.Faulted
         : entry.Phase != PluginLifecyclePhase.Active ? PluginAdmissionRejectionCode.NotActive
         : entry.WorkerMode == PluginWorkerMode.Staging ? PluginAdmissionRejectionCode.Staging

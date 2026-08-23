@@ -84,14 +84,15 @@ public sealed partial class PluginLifecycleCoordinator
                 }
 
                 var next = ((PluginLifecycleTransitionOutcome.Applied)transition).State;
+                var previous = _snapshots.Publish(next, worker: null);
                 var written = await _store.WriteAsync(current, next, CancellationToken.None);
                 if (written is not PluginLifecycleStoreWriteOutcome.Written restarted)
                 {
+                    _snapshots.Restore(current.PluginId, previous);
                     return;
                 }
 
                 var draining = restarted.State;
-                var previous = _snapshots.Publish(draining, worker: null);
                 var drain = await CancelDrainAndCheckpointAsync(
                     draining,
                     previous,

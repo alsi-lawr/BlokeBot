@@ -12,7 +12,6 @@ public enum PluginLifecyclePhase
     Removing,
     Removed,
     Purging,
-    Purged,
     Faulted,
 }
 
@@ -31,6 +30,7 @@ public enum PluginLifecycleFailureCode
     MigrationFailed,
     ActivationFailed,
     WorkerStartFailed,
+    WorkerDisposalFailed,
     WorkerExited,
     DrainTimedOut,
     CancellationFailed,

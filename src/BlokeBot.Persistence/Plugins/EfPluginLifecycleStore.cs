@@ -117,11 +117,7 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
         CancellationToken cancellationToken
     )
     {
-        if (
-            next.PluginId != expected.PluginId
-            || next.Revision != expected.Revision + 1
-            || next.Phase == PluginLifecyclePhase.Purged
-        )
+        if (next.PluginId != expected.PluginId || next.Revision != expected.Revision + 1)
         {
             return new PluginLifecycleStoreWriteOutcome.Conflict(
                 await LoadAsync(expected.PluginId, cancellationToken)
