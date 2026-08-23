@@ -16,6 +16,15 @@ public sealed partial class PluginLifecycleCoordinator
         var current = await _store.LoadAsync(pluginId, cancellationToken);
         if (current is null)
         {
+            if (purge)
+            {
+                var tombstone = await _store.LoadTombstoneAsync(pluginId, cancellationToken);
+                if (tombstone is not null)
+                {
+                    return Purged(tombstone);
+                }
+            }
+
             return new PluginLifecycleCommandOutcome.Rejected(
                 PluginLifecycleCommandRejectionCode.NotFound,
                 null
@@ -130,14 +139,17 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         var purged = Applied(PluginLifecycleStateMachine.PurgeSucceeded(state, Now()));
-        var written = await _store.WriteAsync(state, purged, cancellationToken);
-        if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
+        var persisted = await _store.CompletePurgeAsync(
+            state,
+            purged.LatestOutcome,
+            cancellationToken
+        );
+        if (persisted is PluginLifecycleStorePurgeOutcome.Conflict conflict)
         {
             return Conflict(conflict.Current);
         }
 
-        purged = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
         _ = _snapshots.Publish(purged, worker: null);
-        return Succeeded(purged);
+        return Purged(((PluginLifecycleStorePurgeOutcome.Completed)persisted).Tombstone);
     }
 }

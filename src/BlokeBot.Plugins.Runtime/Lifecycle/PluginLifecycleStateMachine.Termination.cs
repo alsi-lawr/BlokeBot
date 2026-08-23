@@ -140,50 +140,15 @@ public static partial class PluginLifecycleStateMachine
         PluginLifecycleState state,
         DateTimeOffset restartNotBeforeUtc,
         DateTimeOffset now
-    ) =>
-        state.Phase == PluginLifecyclePhase.Active && !state.AutomaticRestartConsumed
-            ? Applied(
-                state with
-                {
-                    Phase = PluginLifecyclePhase.Activating,
-                    ActiveRuntime = null,
-                    OperationKind = PluginLifecycleOperationKind.Restart,
-                    AutomaticRestartConsumed = true,
-                    RestartNotBeforeUtc = restartNotBeforeUtc,
-                    LatestOutcome = PluginLifecycleOutcome.Progress(
-                        PluginLifecycleOutcomeCode.RestartScheduled,
-                        now
-                    ),
-                    Revision = state.Revision + 1,
-                    UpdatedAtUtc = now,
-                }
-            )
-            : Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
+    ) => ScheduleWorkerReplacement(state, restartNotBeforeUtc, now, consumeRestart: true);
 
     public static PluginLifecycleTransitionOutcome ScheduleExpectedRestart(
         PluginLifecycleState state,
         DateTimeOffset restartNotBeforeUtc,
         DateTimeOffset now
-    ) =>
-        state.Phase == PluginLifecyclePhase.Active
-            ? Applied(
-                state with
-                {
-                    Phase = PluginLifecyclePhase.Activating,
-                    ActiveRuntime = null,
-                    OperationKind = PluginLifecycleOperationKind.Restart,
-                    RestartNotBeforeUtc = restartNotBeforeUtc,
-                    LatestOutcome = PluginLifecycleOutcome.Progress(
-                        PluginLifecycleOutcomeCode.RestartScheduled,
-                        now
-                    ),
-                    Revision = state.Revision + 1,
-                    UpdatedAtUtc = now,
-                }
-            )
-            : Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
+    ) => ScheduleWorkerReplacement(state, restartNotBeforeUtc, now, consumeRestart: false);
 
-    public static PluginLifecycleTransitionOutcome Fault(
+    internal static PluginLifecycleTransitionOutcome Fault(
         PluginLifecycleState state,
         PluginLifecyclePhase failedPhase,
         PluginLifecycleFailureCode failureCode,
@@ -197,16 +162,61 @@ public static partial class PluginLifecycleStateMachine
         PluginLifecycleOutcome outcome,
         DateTimeOffset now
     ) =>
-        Applied(
-            state with
-            {
-                Phase = PluginLifecyclePhase.Faulted,
-                ActiveRuntime = null,
-                FaultedFrom = failedPhase,
-                RestartNotBeforeUtc = null,
-                LatestOutcome = outcome,
-                Revision = state.Revision + 1,
-                UpdatedAtUtc = now,
-            }
-        );
+        state.Phase != failedPhase || IsTerminal(state.Phase)
+            ? Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition)
+            : Applied(
+                state with
+                {
+                    Phase = PluginLifecyclePhase.Faulted,
+                    ActiveRuntime = null,
+                    FaultedFrom = failedPhase,
+                    RestartNotBeforeUtc = null,
+                    LatestOutcome = outcome,
+                    Revision = state.Revision + 1,
+                    UpdatedAtUtc = now,
+                }
+            );
+
+    private static PluginLifecycleTransitionOutcome ScheduleWorkerReplacement(
+        PluginLifecycleState state,
+        DateTimeOffset restartNotBeforeUtc,
+        DateTimeOffset now,
+        bool consumeRestart
+    ) =>
+        state.Phase != PluginLifecyclePhase.Active
+        || (consumeRestart && state.AutomaticRestartConsumed)
+            ? Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition)
+            : ScheduleFreshWorkerReplacement(state, restartNotBeforeUtc, now, consumeRestart);
+
+    private static PluginLifecycleTransitionOutcome ScheduleFreshWorkerReplacement(
+        PluginLifecycleState state,
+        DateTimeOffset restartNotBeforeUtc,
+        DateTimeOffset now,
+        bool consumeRestart
+    ) =>
+        PluginLifecycleGenerations.TryNext(state.SelectedGeneration, out var generation)
+            ? Applied(
+                state with
+                {
+                    SelectedGeneration = generation,
+                    Phase = PluginLifecyclePhase.Activating,
+                    ActiveRuntime = null,
+                    OperationKind = PluginLifecycleOperationKind.Restart,
+                    AutomaticRestartConsumed = consumeRestart || state.AutomaticRestartConsumed,
+                    RestartNotBeforeUtc = restartNotBeforeUtc,
+                    LatestOutcome = PluginLifecycleOutcome.Progress(
+                        PluginLifecycleOutcomeCode.RestartScheduled,
+                        now
+                    ),
+                    Revision = state.Revision + 1,
+                    UpdatedAtUtc = now,
+                }
+            )
+            : Rejected(PluginLifecycleTransitionFailureCode.GenerationExhausted);
+
+    private static bool IsTerminal(PluginLifecyclePhase phase) =>
+        phase
+            is PluginLifecyclePhase.Removed
+                or PluginLifecyclePhase.Purged
+                or PluginLifecyclePhase.Faulted;
 }

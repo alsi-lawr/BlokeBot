@@ -7,6 +7,7 @@ public enum PluginLifecycleCommandRejectionCode
     NotFound,
     Busy,
     AlreadyActive,
+    FaultedInstallation,
     NotFaulted,
     Conflict,
     InvalidPackageIdentity,
@@ -20,6 +21,8 @@ public abstract record PluginLifecycleCommandOutcome
     public sealed record Succeeded(PluginLifecycleView View) : PluginLifecycleCommandOutcome;
 
     public sealed record Failed(PluginLifecycleView View) : PluginLifecycleCommandOutcome;
+
+    public sealed record Purged(PluginLifecycleTombstone Tombstone) : PluginLifecycleCommandOutcome;
 
     public sealed record Rejected(
         PluginLifecycleCommandRejectionCode Code,

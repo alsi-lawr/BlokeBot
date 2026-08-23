@@ -8,7 +8,11 @@ public sealed partial class BlokeBotDbContext
 {
     public DbSet<PluginLifecycleRecord> PluginLifecycles => Set<PluginLifecycleRecord>();
 
-    private static void ConfigurePluginLifecycles(ModelBuilder modelBuilder) =>
+    public DbSet<PluginLifecycleOutcomeRecord> PluginLifecycleOutcomes =>
+        Set<PluginLifecycleOutcomeRecord>();
+
+    private static void ConfigurePluginLifecycles(ModelBuilder modelBuilder)
+    {
         _ = modelBuilder.Entity<PluginLifecycleRecord>(static entity =>
         {
             _ = entity.ToTable(
@@ -74,4 +78,36 @@ public sealed partial class BlokeBotDbContext
                 .HasMaxLength(PluginLifecycleSafeDetail.MaximumLength);
             _ = entity.Property(value => value.Revision).IsConcurrencyToken();
         });
+
+        _ = modelBuilder.Entity<PluginLifecycleOutcomeRecord>(static entity =>
+        {
+            _ = entity.ToTable(
+                "plugin_lifecycle_outcomes",
+                table =>
+                {
+                    _ = table.HasCheckConstraint(
+                        "CK_plugin_lifecycle_outcomes_OutcomeCode",
+                        "\"OutcomeCode\" IN ('Preparing', 'Migrating', 'Activated', 'Removed', 'Purged', 'RestartScheduled', 'Restarted', 'Faulted', 'Recovered')"
+                    );
+                    _ = table.HasCheckConstraint(
+                        "CK_plugin_lifecycle_outcomes_FailureCode",
+                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('PreparationRejected', 'PreparationFailed', 'MigrationFailed', 'ActivationFailed', 'WorkerStartFailed', 'WorkerExited', 'DrainTimedOut', 'CancellationFailed', 'RemovalFailed', 'PurgeFailed', 'RecoveryPackageUnavailable', 'RecoveryFailed', 'GenerationExhausted')"
+                    );
+                }
+            );
+            _ = entity.HasKey(value => value.PluginId);
+            _ = entity.Property(value => value.PluginId).HasMaxLength(128);
+            _ = entity
+                .Property(value => value.OutcomeCode)
+                .HasConversion<string>()
+                .HasMaxLength(24);
+            _ = entity
+                .Property(value => value.FailureCode)
+                .HasConversion<string>()
+                .HasMaxLength(40);
+            _ = entity
+                .Property(value => value.OutcomeDetail)
+                .HasMaxLength(PluginLifecycleSafeDetail.MaximumLength);
+        });
+    }
 }

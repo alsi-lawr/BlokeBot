@@ -91,8 +91,12 @@ public sealed partial class PluginLifecycleCoordinator
     )
     {
         var current = await _store.LoadAsync(pluginId, cancellationToken);
-        return current is null ? Conflict(null)
-            : current.Phase == PluginLifecyclePhase.Faulted ? Failed(current)
-            : Succeeded(current);
+        if (current is null)
+        {
+            var tombstone = await _store.LoadTombstoneAsync(pluginId, cancellationToken);
+            return tombstone is null ? Conflict(null) : Purged(tombstone);
+        }
+
+        return current.Phase == PluginLifecyclePhase.Faulted ? Failed(current) : Succeeded(current);
     }
 }

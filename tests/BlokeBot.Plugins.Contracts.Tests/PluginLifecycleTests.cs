@@ -35,7 +35,7 @@ public sealed class PluginLifecycleTests
             .Snapshots.Admit(harness.PluginId, oldFence, PluginFeatureAdmissionReadiness.Ready)
             .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
             .Code.ShouldBe(PluginAdmissionRejectionCode.StaleOperation);
-        harness.Workers.ValidationModes.ShouldAllBe(mode => mode == PluginWorkerMode.Staging);
+        harness.PendingWork.CancelledFences.ShouldBe([oldFence]);
     }
 
     [Test]
@@ -101,6 +101,50 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
+    public async Task Preparation_UsesARealStagingWorkerBesideTheAdmittedWorker()
+    {
+        await using var package = await MaterializedPluginTestPackage.CreateAsync(
+            "return { prepare = function() return true end }"
+        );
+        await using var coordinator = new PluginWorkerCoordinator();
+        var admitted = await coordinator.StartAsync(
+            package.StartOptions(PluginWorkerMode.Admitted, "lifecycle-admitted"),
+            CancellationToken.None
+        );
+        await using var admittedLease = admitted
+            .ShouldBeOfType<PluginWorkerReservationOutcome.Started>()
+            .Lease;
+        var manager = new PluginLifecycleWorkerManager(coordinator);
+        var stateRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"blokebot-lifecycle-staging-{Guid.NewGuid():N}"
+        );
+        var lifecyclePackage = new PluginLifecyclePackage(
+            package.Package.Descriptor.Plugin,
+            package.Package,
+            stateRoot,
+            new ReturningTestDispatcher(new PluginValue.Nil()),
+            NullLogger<PluginWorkerClient>.Instance
+        );
+
+        try
+        {
+            var validation = await manager.ValidateAsync(lifecyclePackage, CancellationToken.None);
+
+            validation
+                .ShouldBeOfType<PluginLifecycleWorkerStartOutcome.Started>()
+                .Worker.Mode.ShouldBe(PluginWorkerMode.Staging);
+        }
+        finally
+        {
+            if (Directory.Exists(stateRoot))
+            {
+                Directory.Delete(stateRoot, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public async Task Remove_CancelsPendingWorkAndTerminatesAtDrainBoundWithoutPurgingData()
     {
         var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
@@ -120,13 +164,59 @@ public sealed class PluginLifecycleTests
             .ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>()
             .View.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.DrainTimedOut);
         harness.PendingWork.Calls.ShouldBe(1);
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
         harness.Purge.Calls.ShouldBe(0);
         harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
         await admission.DisposeAsync();
     }
 
     [Test]
-    public async Task Purge_RetryConvergesAfterInterruptionWhileRemoveRetainsData()
+    public async Task PersistedDrainingRecovery_CancelsTheDurablePriorRuntimeFence()
+    {
+        var harness = new LifecycleHarness();
+        var active = ActiveState(harness.Package("1.0.0", "v1"));
+        var draining = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.BeginRemoval(
+                    active,
+                    Operation(),
+                    purge: false,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        harness.Store.Seed(draining);
+
+        await harness.Coordinator.RecoverAsync(CancellationToken.None);
+
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!.Phase.ShouldBe(
+            PluginLifecyclePhase.Removed
+        );
+        harness.PendingWork.CancelledFences.ShouldBe([active.SelectedFence]);
+    }
+
+    [Test]
+    public async Task RemoveThenReinstall_RetainsOwnedDataAndAdvancesChangedRelease()
+    {
+        var harness = new LifecycleHarness();
+        var first = await harness.ActivateAsync("1.0.0", "v1");
+        _ = await harness.Coordinator.RemoveAsync(
+            harness.PluginId,
+            Operation(),
+            CancellationToken.None
+        );
+
+        var reinstalled = await harness.ActivateAsync("2.0.0", "v2");
+
+        reinstalled.View.Generation.Value.ShouldBe(first.View.Generation.Value + 1);
+        reinstalled.View.Phase.ShouldBe(PluginLifecyclePhase.Active);
+        harness.Purge.Calls.ShouldBe(0);
+        (
+            await harness.Store.LoadTombstoneAsync(harness.PluginId, CancellationToken.None)
+        ).ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Purge_RetryAndRepeatConvergeToOneRetainedOutcome()
     {
         var purge = new RecordingPurgeOwner { FailuresRemaining = 1 };
         var harness = new LifecycleHarness(purge: purge);
@@ -156,12 +246,21 @@ public sealed class PluginLifecycleTests
             Operation(),
             CancellationToken.None
         );
-        var view = converged.ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>().View;
-        view.Phase.ShouldBe(PluginLifecyclePhase.Purged);
-        view.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Purged);
-        view.LatestOutcome.FailureCode.ShouldBeNull();
+        var tombstone = converged.ShouldBeOfType<PluginLifecycleCommandOutcome.Purged>().Tombstone;
+        var repeated = await harness.Coordinator.PurgeAsync(
+            harness.PluginId,
+            Operation(),
+            CancellationToken.None
+        );
+
+        repeated
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Purged>()
+            .Tombstone.ShouldBe(tombstone);
+        tombstone.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Purged);
+        tombstone.LatestOutcome.FailureCode.ShouldBeNull();
         purge.Calls.ShouldBe(2);
-        harness.Store.Count.ShouldBe(1);
+        harness.Store.Count.ShouldBe(0);
+        harness.Store.TombstoneCount.ShouldBe(1);
     }
 
     [Test]
@@ -179,7 +278,19 @@ public sealed class PluginLifecycleTests
                 && state.AutomaticRestartConsumed
                 && harness.Workers.Admitted.Count >= 3
         );
-        restarted.SelectedGeneration.ShouldBe(first.View.Generation);
+        restarted.SelectedGeneration.Value.ShouldBe(first.View.Generation.Value + 1);
+        harness
+            .Snapshots.ValidateWorkerResult(harness.PluginId, Fence(first))
+            .ShouldBeOfType<PluginFenceOutcome.Rejected>()
+            .Code.ShouldBe(PluginFenceRejectionCode.StaleGeneration);
+        harness
+            .Snapshots.AdmitDurableRun(
+                harness.PluginId,
+                Fence(first),
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.StaleGeneration);
 
         harness.Workers.Admitted.Last().Exit(PluginWorkerFailureCode.WorkerExited);
         var faulted = await harness.Store.WaitForAsync(
@@ -199,7 +310,7 @@ public sealed class PluginLifecycleTests
     public async Task CancellationTermination_RestartsWithoutConsumingUnexpectedExitBudget()
     {
         var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
-        _ = await harness.ActivateAsync("1.0.0", "v1");
+        var active = await harness.ActivateAsync("1.0.0", "v1");
 
         harness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerTerminated);
         var restarted = await harness.Store.WaitForAsync(
@@ -209,6 +320,11 @@ public sealed class PluginLifecycleTests
         );
 
         restarted.AutomaticRestartConsumed.ShouldBeFalse();
+        restarted.SelectedGeneration.Value.ShouldBe(active.View.Generation.Value + 1);
+        harness
+            .Snapshots.ValidateCallbackCompletion(harness.PluginId, Fence(active))
+            .ShouldBeOfType<PluginFenceOutcome.Rejected>()
+            .Code.ShouldBe(PluginFenceRejectionCode.StaleGeneration);
     }
 
     [Test]
@@ -235,10 +351,51 @@ public sealed class PluginLifecycleTests
         );
 
         var view = restarted.ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>().View;
-        view.Generation.ShouldBe(activated.View.Generation);
+        view.Generation.Value.ShouldBe(activated.View.Generation.Value + 1);
         view.AutomaticRestartConsumed.ShouldBeFalse();
         view.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Restarted);
         faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.WorkerExited);
+    }
+
+    [Test]
+    public async Task ActivateFaultedInstallation_RejectsSameAndAllowsDifferentRelease()
+    {
+        var harness = new LifecycleHarness();
+        var faultedPackage = harness.Package("1.0.0", "v1");
+        harness.Workers.ValidationFailure = new(
+            PluginLifecycleFailureCode.PreparationRejected,
+            null
+        );
+        var faulted = (
+            await harness.Coordinator.ActivateAsync(
+                Operation(),
+                faultedPackage,
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>()
+            .View;
+
+        var sameInstallation = await harness.Coordinator.ActivateAsync(
+            Operation(),
+            faultedPackage,
+            CancellationToken.None
+        );
+        harness.Workers.ValidationFailure = null;
+        var differentInstallation = await harness.Coordinator.ActivateAsync(
+            Operation(),
+            harness.Package("2.0.0", "v2"),
+            CancellationToken.None
+        );
+
+        sameInstallation
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Rejected>()
+            .Code.ShouldBe(PluginLifecycleCommandRejectionCode.FaultedInstallation);
+        var activated = differentInstallation
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
+            .View;
+        activated.Generation.Value.ShouldBe(faulted.Generation.Value + 1);
+        activated.Installation.Release.DeclaredVersion.Value.ShouldBe("2.0.0");
     }
 
     [Test]
@@ -344,6 +501,7 @@ public sealed class PluginLifecycleTests
         migration.Calls.ShouldBe(callsBeforeRecovery + 1);
         harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
         harness.Workers.Admitted.Count.ShouldBe(workersBeforeRecovery + 1);
+        harness.PendingWork.CancelledFences.ShouldBe([oldFence]);
         _ = harness
             .Snapshots.Admit(harness.PluginId, oldFence, PluginFeatureAdmissionReadiness.Ready)
             .ShouldBeOfType<PluginAdmissionOutcome.Rejected>();
@@ -507,8 +665,67 @@ public sealed class PluginLifecycleTests
 
         (
             await purgeHarness.Store.LoadAsync(purgeHarness.PluginId, CancellationToken.None)
-        )!.Phase.ShouldBe(PluginLifecyclePhase.Purged);
+        ).ShouldBeNull();
+        (
+            await purgeHarness.Store.LoadTombstoneAsync(
+                purgeHarness.PluginId,
+                CancellationToken.None
+            )
+        )!.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Purged);
         purgeHarness.Purge.Calls.ShouldBe(1);
+    }
+
+    [Test]
+    public void FaultTransition_RejectsMismatchedAndTerminalPhases()
+    {
+        var package = new LifecycleHarness().Package("1.0.0", "v1");
+        var active = ActiveState(package);
+        var mismatched = PluginLifecycleStateMachine.Fault(
+            active,
+            PluginLifecyclePhase.Migrating,
+            PluginLifecycleFailureCode.MigrationFailed,
+            null,
+            DateTimeOffset.UtcNow
+        );
+        var faulted = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.Fault(
+                    active,
+                    PluginLifecyclePhase.Active,
+                    PluginLifecycleFailureCode.WorkerExited,
+                    null,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        var removing = RemovingState(package);
+        var removed = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.RemovalSucceeded(removing, DateTimeOffset.UtcNow)
+        ).State;
+        var drainingForPurge = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.BeginRemoval(
+                    active,
+                    Operation(),
+                    purge: true,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        var purging = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.DrainSucceeded(drainingForPurge, DateTimeOffset.UtcNow)
+        ).State;
+        var purged = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.PurgeSucceeded(purging, DateTimeOffset.UtcNow)
+        ).State;
+
+        mismatched
+            .ShouldBeOfType<PluginLifecycleTransitionOutcome.Rejected>()
+            .Code.ShouldBe(PluginLifecycleTransitionFailureCode.InvalidTransition);
+        AssertFaultRejected(removed);
+        AssertFaultRejected(purged);
+        AssertFaultRejected(faulted);
     }
 
     private static PluginLifecycleFence Fence(PluginLifecycleCommandOutcome.Succeeded outcome) =>
@@ -521,7 +738,19 @@ public sealed class PluginLifecycleTests
             ? generation
             : throw new InvalidOperationException("Invalid test generation.");
 
-    private static PluginLifecycleState RemovingState(PluginLifecyclePackage package)
+    private static void AssertFaultRejected(PluginLifecycleState state) =>
+        PluginLifecycleStateMachine
+            .Fault(
+                state,
+                state.Phase,
+                PluginLifecycleFailureCode.RecoveryFailed,
+                null,
+                DateTimeOffset.UtcNow
+            )
+            .ShouldBeOfType<PluginLifecycleTransitionOutcome.Rejected>()
+            .Code.ShouldBe(PluginLifecycleTransitionFailureCode.InvalidTransition);
+
+    private static PluginLifecycleState ActiveState(PluginLifecyclePackage package)
     {
         var preparing = (
             (PluginLifecycleTransitionOutcome.Applied)
@@ -540,10 +769,15 @@ public sealed class PluginLifecycleTests
             (PluginLifecycleTransitionOutcome.Applied)
                 PluginLifecycleStateMachine.MigrationSucceeded(migrating, DateTimeOffset.UtcNow)
         ).State;
-        var active = (
+        return (
             (PluginLifecycleTransitionOutcome.Applied)
                 PluginLifecycleStateMachine.ActivationSucceeded(activating, DateTimeOffset.UtcNow)
         ).State;
+    }
+
+    private static PluginLifecycleState RemovingState(PluginLifecyclePackage package)
+    {
+        var active = ActiveState(package);
         var draining = (
             (PluginLifecycleTransitionOutcome.Applied)
                 PluginLifecycleStateMachine.BeginRemoval(

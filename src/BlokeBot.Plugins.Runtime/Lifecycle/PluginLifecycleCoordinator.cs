@@ -100,6 +100,8 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
                     PluginLifecycleCommandRejectionCode.Busy,
                 PluginLifecycleTransitionFailureCode.AlreadyActive =>
                     PluginLifecycleCommandRejectionCode.AlreadyActive,
+                PluginLifecycleTransitionFailureCode.FaultedInstallation =>
+                    PluginLifecycleCommandRejectionCode.FaultedInstallation,
                 PluginLifecycleTransitionFailureCode.NotFound =>
                     PluginLifecycleCommandRejectionCode.NotFound,
                 PluginLifecycleTransitionFailureCode.NotFaulted =>
@@ -123,4 +125,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
 
     private static PluginLifecycleCommandOutcome Failed(PluginLifecycleState state) =>
         new PluginLifecycleCommandOutcome.Failed(PluginLifecycleView.From(state));
+
+    private static PluginLifecycleCommandOutcome Purged(PluginLifecycleTombstone tombstone) =>
+        new PluginLifecycleCommandOutcome.Purged(tombstone);
 }

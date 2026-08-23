@@ -8,25 +8,24 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        if (previous is null)
+        var priorFence = state.ActiveRuntime?.Fence ?? previous?.Entry.Fence;
+        if (priorFence is null && previous is null)
         {
             return null;
         }
 
-        var cancellation = await _pendingWork.CancelAsync(
-            state.PluginId,
-            state.SelectedFence,
-            cancellationToken
-        );
+        var cancellation = priorFence is null
+            ? new PluginLifecycleOwnerOutcome.Succeeded()
+            : await _pendingWork.CancelAsync(state.PluginId, priorFence, cancellationToken);
         var drained = await _snapshots.DrainAsync(
             previous,
             _options.DrainTimeout,
             _timeProvider,
             cancellationToken
         );
-        if (previous.Worker is not null)
+        if (previous?.Worker is { } worker)
         {
-            await previous.Worker.DisposeAsync();
+            await worker.DisposeAsync();
         }
 
         return cancellation is PluginLifecycleOwnerOutcome.Failed cancellationFailure

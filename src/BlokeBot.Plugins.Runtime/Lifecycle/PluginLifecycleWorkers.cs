@@ -22,7 +22,7 @@ internal interface IPluginLifecycleWorkerSession : IAsyncDisposable
     Task<PluginWorkerFailure> Termination { get; }
 }
 
-internal interface IPluginLifecycleWorkerManager : IAsyncDisposable
+internal interface IPluginLifecycleWorkerManager
 {
     ValueTask<PluginLifecycleWorkerStartOutcome> ValidateAsync(
         PluginLifecyclePackage package,
@@ -56,8 +56,6 @@ internal sealed class PluginLifecycleWorkerManager(PluginWorkerCoordinator coord
         PluginLifecyclePackage package,
         CancellationToken cancellationToken
     ) => StartAsync(package, PluginWorkerMode.Admitted, cancellationToken);
-
-    public ValueTask DisposeAsync() => coordinator.DisposeAsync();
 
     private async ValueTask<PluginLifecycleWorkerStartOutcome> StartAsync(
         PluginLifecyclePackage package,

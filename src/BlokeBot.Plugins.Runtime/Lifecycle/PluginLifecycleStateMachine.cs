@@ -6,6 +6,7 @@ public enum PluginLifecycleTransitionFailureCode
 {
     Busy,
     AlreadyActive,
+    FaultedInstallation,
     NotFound,
     NotFaulted,
     InvalidTransition,
@@ -42,6 +43,14 @@ public static partial class PluginLifecycleStateMachine
         )
         {
             return Rejected(PluginLifecycleTransitionFailureCode.AlreadyActive);
+        }
+
+        if (
+            current is { Phase: PluginLifecyclePhase.Faulted }
+            && current.SelectedInstallation == installation
+        )
+        {
+            return Rejected(PluginLifecycleTransitionFailureCode.FaultedInstallation);
         }
 
         var releaseChanged = current is null || current.SelectedInstallation != installation;

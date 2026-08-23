@@ -6,6 +6,7 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 {
     private readonly object _sync = new();
     private readonly Dictionary<PluginId, PluginLifecycleState> _states = [];
+    private readonly Dictionary<PluginId, PluginLifecycleTombstone> _tombstones = [];
 
     internal int Count
     {
@@ -14,6 +15,17 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
             lock (_sync)
             {
                 return _states.Count;
+            }
+        }
+    }
+
+    internal int TombstoneCount
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _tombstones.Count;
             }
         }
     }
@@ -42,6 +54,18 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
         }
     }
 
+    public ValueTask<PluginLifecycleTombstone?> LoadTombstoneAsync(
+        PluginId pluginId,
+        CancellationToken cancellationToken
+    )
+    {
+        lock (_sync)
+        {
+            _ = _tombstones.TryGetValue(pluginId, out var tombstone);
+            return ValueTask.FromResult(tombstone);
+        }
+    }
+
     public ValueTask<PluginLifecycleStoreBeginOutcome> BeginActivationAsync(
         PluginLifecycleBeginRequest request,
         CancellationToken cancellationToken
@@ -65,8 +89,46 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 
             var begun = ((PluginLifecycleTransitionOutcome.Applied)transition).State;
             _states[begun.PluginId] = begun;
+            _ = _tombstones.Remove(begun.PluginId);
             return ValueTask.FromResult<PluginLifecycleStoreBeginOutcome>(
                 new PluginLifecycleStoreBeginOutcome.Begun(begun)
+            );
+        }
+    }
+
+    public ValueTask<PluginLifecycleStorePurgeOutcome> CompletePurgeAsync(
+        PluginLifecycleState expected,
+        PluginLifecycleOutcome outcome,
+        CancellationToken cancellationToken
+    )
+    {
+        lock (_sync)
+        {
+            if (!_states.TryGetValue(expected.PluginId, out var current))
+            {
+                return ValueTask.FromResult<PluginLifecycleStorePurgeOutcome>(
+                    _tombstones.TryGetValue(expected.PluginId, out var retained)
+                        ? new PluginLifecycleStorePurgeOutcome.Completed(retained)
+                        : new PluginLifecycleStorePurgeOutcome.Conflict(null)
+                );
+            }
+
+            if (
+                current != expected
+                || expected.Phase != PluginLifecyclePhase.Purging
+                || outcome is not { Code: PluginLifecycleOutcomeCode.Purged, FailureCode: null }
+            )
+            {
+                return ValueTask.FromResult<PluginLifecycleStorePurgeOutcome>(
+                    new PluginLifecycleStorePurgeOutcome.Conflict(current)
+                );
+            }
+
+            var tombstone = new PluginLifecycleTombstone(expected.PluginId, outcome);
+            _ = _states.Remove(expected.PluginId);
+            _tombstones[expected.PluginId] = tombstone;
+            return ValueTask.FromResult<PluginLifecycleStorePurgeOutcome>(
+                new PluginLifecycleStorePurgeOutcome.Completed(tombstone)
             );
         }
     }
@@ -98,6 +160,7 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
         lock (_sync)
         {
             _states[state.PluginId] = state;
+            _ = _tombstones.Remove(state.PluginId);
         }
     }
 
@@ -143,8 +206,6 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
 {
     private TaskCompletionSource? _validationGate;
 
-    internal List<PluginWorkerMode> ValidationModes { get; } = [];
-
     internal List<FakeLifecycleWorkerSession> Admitted { get; } = [];
 
     internal int AdmittedFailuresRemaining { get; set; }
@@ -167,7 +228,6 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
         CancellationToken cancellationToken
     )
     {
-        ValidationModes.Add(PluginWorkerMode.Staging);
         _ = ValidationStarted.TrySetResult();
         if (_validationGate is not null)
         {
@@ -203,14 +263,6 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
         return ValueTask.FromResult<PluginLifecycleWorkerStartOutcome>(
             new PluginLifecycleWorkerStartOutcome.Started(worker)
         );
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var worker in Admitted)
-        {
-            await worker.DisposeAsync();
-        }
     }
 }
 
@@ -301,6 +353,8 @@ internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCancelle
 {
     internal int Calls { get; private set; }
 
+    internal List<PluginLifecycleFence> CancelledFences { get; } = [];
+
     public ValueTask<PluginLifecycleOwnerOutcome> CancelAsync(
         PluginId pluginId,
         PluginLifecycleFence fence,
@@ -308,6 +362,7 @@ internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCancelle
     )
     {
         Calls++;
+        CancelledFences.Add(fence);
         return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
             new PluginLifecycleOwnerOutcome.Succeeded()
         );

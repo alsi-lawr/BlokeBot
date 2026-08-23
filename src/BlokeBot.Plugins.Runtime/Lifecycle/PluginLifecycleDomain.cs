@@ -90,6 +90,11 @@ public sealed record PluginLifecycleOutcome(
     ) => new(PluginLifecycleOutcomeCode.Faulted, failureCode, detail, occurredAtUtc);
 }
 
+public sealed record PluginLifecycleTombstone(
+    PluginId PluginId,
+    PluginLifecycleOutcome LatestOutcome
+);
+
 public sealed record PluginLifecycleActiveRuntime(
     PluginInstallationIdentity Installation,
     PluginLifecycleFence Fence

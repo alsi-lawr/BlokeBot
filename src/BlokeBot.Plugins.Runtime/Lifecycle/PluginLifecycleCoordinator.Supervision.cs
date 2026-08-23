@@ -67,7 +67,23 @@ public sealed partial class PluginLifecycleCoordinator
                             restartAt,
                             Now()
                         );
-                var next = Applied(transition);
+                if (transition is PluginLifecycleTransitionOutcome.Rejected rejected)
+                {
+                    if (rejected.Code == PluginLifecycleTransitionFailureCode.GenerationExhausted)
+                    {
+                        _ = await FaultAsync(
+                            current,
+                            PluginLifecyclePhase.Active,
+                            PluginLifecycleFailureCode.GenerationExhausted,
+                            SafeDetail("The plugin activation generation is exhausted."),
+                            CancellationToken.None
+                        );
+                    }
+
+                    return;
+                }
+
+                var next = ((PluginLifecycleTransitionOutcome.Applied)transition).State;
                 var written = await _store.WriteAsync(current, next, CancellationToken.None);
                 if (written is not PluginLifecycleStoreWriteOutcome.Written restarted)
                 {
