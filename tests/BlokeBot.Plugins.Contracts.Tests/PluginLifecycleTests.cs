@@ -326,6 +326,222 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
+    public async Task UpdateCheckpointWriteFailure_RestoresOrReconcilesRuntimeOwnership()
+    {
+        var conflict = new LifecycleHarness();
+        var conflictActive = await conflict.ActivateAsync("1.0.0", "v1");
+        var conflictSlot = conflict.Snapshots.FindCurrent(
+            conflict.PluginId,
+            Fence(conflictActive)
+        )!;
+        var conflictWorker = conflict.Workers.Admitted.Single();
+        conflict.Store.PauseNextWrite();
+        var conflictedUpdate = conflict
+            .Coordinator.ActivateAsync(
+                Operation(),
+                conflict.Package("2.0.0", "v2"),
+                CancellationToken.None
+            )
+            .AsTask();
+        await conflict.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var winner = ActiveState(conflict.Package("3.0.0", "v3"));
+        conflict.Store.Seed(winner);
+        conflict.Store.ResumeWrite();
+
+        _ = (
+            await conflictedUpdate.WaitAsync(TimeSpan.FromSeconds(2))
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Rejected>();
+        await AssertWinnerReconciledAsync(conflict, conflictActive, winner, conflictWorker);
+        ReferenceEquals(
+                conflict.Snapshots.FindCurrent(conflict.PluginId, winner.SelectedFence),
+                conflictSlot
+            )
+            .ShouldBeFalse();
+
+        var retained = new LifecycleHarness();
+        var retainedActive = await retained.ActivateAsync("1.0.0", "v1");
+        var retainedState = (
+            await retained.Store.LoadAsync(retained.PluginId, CancellationToken.None)
+        )!;
+        var retainedSlot = retained.Snapshots.FindCurrent(
+            retained.PluginId,
+            Fence(retainedActive)
+        )!;
+        var retainedWorker = retained.Workers.Admitted.Single();
+        retained.Store.PauseNextWrite();
+        var retainedUpdate = retained
+            .Coordinator.ActivateAsync(
+                Operation(),
+                retained.Package("2.0.0", "v2"),
+                CancellationToken.None
+            )
+            .AsTask();
+        await retained.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var activeWinner = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.ActiveRecoverySucceeded(
+                    retainedState,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        retained.Store.Seed(activeWinner);
+        retained.Store.ResumeWrite();
+
+        _ = (
+            await retainedUpdate.WaitAsync(TimeSpan.FromSeconds(2))
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Rejected>();
+        await AssertOriginalRuntimeRestoredAsync(
+            retained,
+            retainedActive,
+            activeWinner,
+            retainedSlot,
+            retainedWorker
+        );
+
+        var canceled = new LifecycleHarness();
+        var canceledActive = await canceled.ActivateAsync("1.0.0", "v1");
+        var canceledSlot = canceled.Snapshots.FindCurrent(
+            canceled.PluginId,
+            Fence(canceledActive)
+        )!;
+        var canceledWorker = canceled.Workers.Admitted.Single();
+        canceled.Store.PauseNextWrite();
+        using var cancellation = new CancellationTokenSource();
+        var canceledUpdate = canceled
+            .Coordinator.ActivateAsync(
+                Operation(),
+                canceled.Package("2.0.0", "v2"),
+                cancellation.Token
+            )
+            .AsTask();
+        await canceled.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var canceledState = (
+            await canceled.Store.LoadAsync(canceled.PluginId, CancellationToken.None)
+        )!;
+        canceledState.Phase.ShouldBe(PluginLifecyclePhase.Preparing);
+
+        cancellation.Cancel();
+        _ = await Should.ThrowAsync<OperationCanceledException>(async () => await canceledUpdate);
+        await AssertOriginalRuntimeRestoredAsync(
+            canceled,
+            canceledActive,
+            canceledState,
+            canceledSlot,
+            canceledWorker
+        );
+
+        var failed = new LifecycleHarness();
+        var failedActive = await failed.ActivateAsync("1.0.0", "v1");
+        var failedSlot = failed.Snapshots.FindCurrent(failed.PluginId, Fence(failedActive))!;
+        var failedWorker = failed.Workers.Admitted.Single();
+        failed.Store.ExceptionBeforeNextWrite = new InvalidOperationException(
+            "simulated pre-write failure"
+        );
+        failed.Store.PauseNextWrite();
+        var failedUpdate = failed
+            .Coordinator.ActivateAsync(
+                Operation(),
+                failed.Package("2.0.0", "v2"),
+                CancellationToken.None
+            )
+            .AsTask();
+        await failed.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var failedState = (await failed.Store.LoadAsync(failed.PluginId, CancellationToken.None))!;
+        failedState.Phase.ShouldBe(PluginLifecyclePhase.Preparing);
+
+        failed.Store.ResumeWrite();
+        _ = await Should.ThrowAsync<InvalidOperationException>(async () => await failedUpdate);
+        await AssertOriginalRuntimeRestoredAsync(
+            failed,
+            failedActive,
+            failedState,
+            failedSlot,
+            failedWorker
+        );
+    }
+
+    [Test]
+    public async Task RemoveCheckpointWriteFailure_RestoresOrReconcilesRuntimeOwnership()
+    {
+        var conflict = new LifecycleHarness();
+        var conflictActive = await conflict.ActivateAsync("1.0.0", "v1");
+        var conflictSlot = conflict.Snapshots.FindCurrent(
+            conflict.PluginId,
+            Fence(conflictActive)
+        )!;
+        var conflictWorker = conflict.Workers.Admitted.Single();
+        conflict.Store.PauseNextWrite();
+        var conflictedRemoval = conflict
+            .Coordinator.RemoveAsync(conflict.PluginId, Operation(), CancellationToken.None)
+            .AsTask();
+        await conflict.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var winner = ActiveState(conflict.Package("2.0.0", "v2"));
+        conflict.Store.Seed(winner);
+        conflict.Store.ResumeWrite();
+
+        _ = (
+            await conflictedRemoval.WaitAsync(TimeSpan.FromSeconds(2))
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Rejected>();
+        await AssertWinnerReconciledAsync(conflict, conflictActive, winner, conflictWorker);
+        ReferenceEquals(
+                conflict.Snapshots.FindCurrent(conflict.PluginId, winner.SelectedFence),
+                conflictSlot
+            )
+            .ShouldBeFalse();
+
+        var canceled = new LifecycleHarness();
+        var canceledActive = await canceled.ActivateAsync("1.0.0", "v1");
+        var canceledState = (
+            await canceled.Store.LoadAsync(canceled.PluginId, CancellationToken.None)
+        )!;
+        var canceledSlot = canceled.Snapshots.FindCurrent(
+            canceled.PluginId,
+            Fence(canceledActive)
+        )!;
+        var canceledWorker = canceled.Workers.Admitted.Single();
+        canceled.Store.PauseNextWrite();
+        using var cancellation = new CancellationTokenSource();
+        var canceledRemoval = canceled
+            .Coordinator.RemoveAsync(canceled.PluginId, Operation(), cancellation.Token)
+            .AsTask();
+        await canceled.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        cancellation.Cancel();
+        _ = await Should.ThrowAsync<OperationCanceledException>(async () => await canceledRemoval);
+        await AssertOriginalRuntimeRestoredAsync(
+            canceled,
+            canceledActive,
+            canceledState,
+            canceledSlot,
+            canceledWorker
+        );
+
+        var failed = new LifecycleHarness();
+        var failedActive = await failed.ActivateAsync("1.0.0", "v1");
+        var failedState = (await failed.Store.LoadAsync(failed.PluginId, CancellationToken.None))!;
+        var failedSlot = failed.Snapshots.FindCurrent(failed.PluginId, Fence(failedActive))!;
+        var failedWorker = failed.Workers.Admitted.Single();
+        failed.Store.ExceptionBeforeNextWrite = new InvalidOperationException(
+            "simulated pre-write failure"
+        );
+        failed.Store.PauseNextWrite();
+        var failedRemoval = failed
+            .Coordinator.RemoveAsync(failed.PluginId, Operation(), CancellationToken.None)
+            .AsTask();
+        await failed.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        failed.Store.ResumeWrite();
+        _ = await Should.ThrowAsync<InvalidOperationException>(async () => await failedRemoval);
+        await AssertOriginalRuntimeRestoredAsync(
+            failed,
+            failedActive,
+            failedState,
+            failedSlot,
+            failedWorker
+        );
+    }
+
+    [Test]
     public async Task PersistedDrainingRecovery_CancelsTheDurablePriorRuntimeFence()
     {
         var harness = new LifecycleHarness();
@@ -1626,6 +1842,63 @@ public sealed class PluginLifecycleTests
         PluginWorkerGeneration.TryCreate(value, out var generation)
             ? generation
             : throw new InvalidOperationException("Invalid test generation.");
+
+    private static async ValueTask AssertOriginalRuntimeRestoredAsync(
+        LifecycleHarness harness,
+        PluginLifecycleCommandOutcome.Succeeded active,
+        PluginLifecycleState expectedState,
+        PluginRuntimeSlot expectedSlot,
+        FakeLifecycleWorkerSession expectedWorker
+    )
+    {
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)).ShouldBe(
+            expectedState
+        );
+        ReferenceEquals(
+                harness.Snapshots.FindCurrent(harness.PluginId, Fence(active)),
+                expectedSlot
+            )
+            .ShouldBeTrue();
+        expectedWorker.Disposed.Task.IsCompleted.ShouldBeFalse();
+        harness.Workers.Admitted.Count.ShouldBe(1);
+        var admission = harness
+            .Snapshots.Admit(harness.PluginId, Fence(active), PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
+        await admission.DisposeAsync();
+    }
+
+    private static async ValueTask AssertWinnerReconciledAsync(
+        LifecycleHarness harness,
+        PluginLifecycleCommandOutcome.Succeeded original,
+        PluginLifecycleState winner,
+        FakeLifecycleWorkerSession originalWorker
+    )
+    {
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)).ShouldBe(winner);
+        var entry = harness.Snapshots.Current.Entries[harness.PluginId];
+        entry.Installation.ShouldBe(winner.SelectedInstallation);
+        entry.Phase.ShouldBe(winner.Phase);
+        entry.Fence.ShouldBe(winner.SelectedFence);
+        entry.WorkerMode.ShouldBeNull();
+        originalWorker.Disposed.Task.IsCompleted.ShouldBeTrue();
+        harness.Workers.Admitted.Count.ShouldBe(1);
+        _ = harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                Fence(original),
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>();
+        harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                winner.SelectedFence,
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.NotActive);
+    }
 
     private static PluginLifecycleCoordinator RecoveryCoordinator(
         InMemoryLifecycleStore store,

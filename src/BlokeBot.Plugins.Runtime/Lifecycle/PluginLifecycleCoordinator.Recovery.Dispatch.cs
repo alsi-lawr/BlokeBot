@@ -15,14 +15,14 @@ public sealed partial class PluginLifecycleCoordinator
             case PluginLifecyclePhase.Migrating:
                 await RecoverMigrationAsync(
                     state,
-                    _snapshots.StopAdmission(state),
+                    _snapshots.StopAdmission(state).Ownership,
                     cancellationToken
                 );
                 break;
             case PluginLifecyclePhase.Activating:
                 await RecoverActivationAsync(
                     state,
-                    _snapshots.StopAdmission(state),
+                    _snapshots.StopAdmission(state).Ownership,
                     cancellationToken
                 );
                 break;

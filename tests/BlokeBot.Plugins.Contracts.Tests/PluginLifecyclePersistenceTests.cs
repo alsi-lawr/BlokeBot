@@ -4,6 +4,7 @@ using BlokeBot.Persistence.Plugins;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Plugins.Contracts.Tests;
@@ -380,6 +381,96 @@ public sealed class PluginLifecyclePersistenceTests
             .ShouldBeOfType<PluginLifecycleTransitionOutcome.Applied>();
     }
 
+    [Test]
+    public async Task LifecycleMigration_NormalizesParentLegalRemoveFromFaultRows()
+    {
+        await using var database = await LifecycleDatabase.CreateAsync(
+            "20260823180232_v0.13.0_PluginLifecycleFaultShutdown"
+        );
+        var harness = new LifecycleHarness();
+        var removingId = harness.PackageFor("fault-removing", "1.0.0", "v1").Installation.PluginId;
+        var removedId = harness.PackageFor("fault-removed", "1.0.0", "v1").Installation.PluginId;
+        var purgingId = harness.PackageFor("fault-purging", "1.0.0", "v1").Installation.PluginId;
+        var now = new DateTimeOffset(2026, 8, 23, 18, 30, 0, TimeSpan.Zero);
+        await using (var db = database.CreateDbContext())
+        {
+            db.PluginLifecycles.AddRange(
+                ParentLegalRemoveFromFaultRecord(
+                    removingId,
+                    PluginLifecyclePhase.Removing,
+                    PluginLifecycleOperationKind.Remove,
+                    now
+                ),
+                ParentLegalRemoveFromFaultRecord(
+                    removedId,
+                    PluginLifecyclePhase.Removed,
+                    PluginLifecycleOperationKind.Remove,
+                    now
+                ),
+                ParentLegalRemoveFromFaultRecord(
+                    purgingId,
+                    PluginLifecyclePhase.Purging,
+                    PluginLifecycleOperationKind.Purge,
+                    now
+                )
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        await database.MigrateToLatestAsync();
+
+        var store = new EfPluginLifecycleStore(database);
+        var normalized = (await store.LoadAllAsync(CancellationToken.None)).ToDictionary(state =>
+            state.PluginId
+        );
+        normalized.Keys.ShouldBe([removingId, removedId, purgingId], ignoreOrder: true);
+        foreach (var state in normalized.Values)
+        {
+            state.FaultedFrom.ShouldBeNull();
+            PluginLifecycleStateMachine.HasValidFaultInvariant(state).ShouldBeTrue();
+        }
+
+        var coordinator = new PluginLifecycleCoordinator(
+            store,
+            new FakePackageResolver(),
+            [new RecordingMigrationOwner()],
+            [new RecordingPurgeOwner()],
+            new RecordingPendingWorkCanceller(),
+            new FakeLifecycleWorkers(),
+            new PluginRuntimeSnapshotRegistry(),
+            new PluginLifecycleSerialization(),
+            new(TimeSpan.FromSeconds(2), TimeSpan.Zero),
+            TimeProvider.System,
+            NullLogger<PluginLifecycleCoordinator>.Instance
+        );
+
+        await coordinator.RecoverAsync(CancellationToken.None);
+
+        (await store.LoadAsync(removingId, CancellationToken.None))!.Phase.ShouldBe(
+            PluginLifecyclePhase.Removed
+        );
+        (await store.LoadAsync(removedId, CancellationToken.None))!.Phase.ShouldBe(
+            PluginLifecyclePhase.Removed
+        );
+        (await store.LoadAsync(purgingId, CancellationToken.None)).ShouldBeNull();
+        _ = (await store.LoadTombstoneAsync(purgingId, CancellationToken.None)).ShouldNotBeNull();
+        await using (var db = database.CreateDbContext())
+        {
+            _ = await Should.ThrowAsync<SqliteException>(async () =>
+                _ = await db.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"plugin_lifecycles\" SET \"FaultedFrom\" = 'Active' "
+                        + "WHERE \"PluginId\" = 'fault-removing';"
+                )
+            );
+            _ = await Should.ThrowAsync<SqliteException>(async () =>
+                _ = await db.Database.ExecuteSqlRawAsync(
+                    "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Faulted' "
+                        + "WHERE \"PluginId\" = 'fault-removed';"
+                )
+            );
+        }
+    }
+
     private static async ValueTask<PluginLifecycleState> AdvanceToPurgingAsync(
         IPluginLifecycleStore store,
         PluginLifecyclePackage package
@@ -429,6 +520,29 @@ public sealed class PluginLifecyclePersistenceTests
         await WriteAsync(store, activating, active);
         return active;
     }
+
+    private static PluginLifecycleRecord ParentLegalRemoveFromFaultRecord(
+        PluginId pluginId,
+        PluginLifecyclePhase phase,
+        PluginLifecycleOperationKind operationKind,
+        DateTimeOffset now
+    ) =>
+        new()
+        {
+            PluginId = pluginId.Value,
+            SelectedVersion = "1.0.0",
+            SelectedTag = "v1",
+            OperationId = PluginLifecycleOperationId.New().Value,
+            SelectedGeneration = 1,
+            Phase = phase,
+            OperationKind = operationKind,
+            FaultedFrom = PluginLifecyclePhase.Active,
+            OutcomeCode = PluginLifecycleOutcomeCode.Faulted,
+            FailureCode = PluginLifecycleFailureCode.WorkerExited,
+            OutcomeOccurredAtUtc = now.UtcDateTime,
+            Revision = 5,
+            UpdatedAtUtc = now.UtcDateTime,
+        };
 
     private static async ValueTask WriteAsync(
         IPluginLifecycleStore store,

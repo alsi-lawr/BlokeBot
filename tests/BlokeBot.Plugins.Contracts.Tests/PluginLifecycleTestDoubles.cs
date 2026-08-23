@@ -36,6 +36,8 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 
     internal Exception? ExceptionAfterNextWrite { get; set; }
 
+    internal Exception? ExceptionBeforeNextWrite { get; set; }
+
     internal void PauseNextWrite()
     {
         WriteStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -156,8 +158,20 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
         if (_writeGate is { } gate)
         {
             _ = WriteStarted.TrySetResult();
-            await gate.Task.WaitAsync(cancellationToken);
-            _writeGate = null;
+            try
+            {
+                await gate.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                _writeGate = null;
+            }
+        }
+
+        if (ExceptionBeforeNextWrite is { } beforeWrite)
+        {
+            ExceptionBeforeNextWrite = null;
+            throw beforeWrite;
         }
 
         PluginLifecycleStoreWriteOutcome outcome;

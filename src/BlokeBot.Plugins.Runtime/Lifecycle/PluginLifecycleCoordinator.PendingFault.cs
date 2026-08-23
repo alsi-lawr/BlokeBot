@@ -15,7 +15,7 @@ public sealed partial class PluginLifecycleCoordinator
             return null;
         }
 
-        var ownership = _snapshots.StopAdmission(current);
+        var ownership = _snapshots.StopAdmission(current).Ownership;
         var completed = await CompleteFaultShutdownAsync(current, ownership, cancellationToken);
         return completed is PluginLifecycleCommandOutcome.Rejected ? completed : null;
     }

@@ -1,4 +1,3 @@
-using BlokeBot.Plugins.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Plugins.Runtime;
@@ -135,16 +134,29 @@ public sealed partial class PluginLifecycleCoordinator
         var intent = Applied(
             PluginLifecycleStateMachine.BeginFaultShutdown(state, code, detail, Now())
         );
-        var previous = _snapshots.StopAdmission(intent);
-        var written = await _store.WriteAsync(state, intent, cancellationToken);
+        var publication = _snapshots.StopAdmission(intent);
+        PluginLifecycleStoreWriteOutcome written;
+        try
+        {
+            written = await _store.WriteAsync(state, intent, cancellationToken);
+        }
+        catch
+        {
+            await ReconcileTerminatedCheckpointExceptionAsync(intent, publication.Ownership);
+            throw;
+        }
+
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            _ = await StopRuntimeAsync(intent, previous, cancellationToken);
-            return PublishConflict(state.PluginId, conflict.Current);
+            return await SettleAndPublishConflictAsync(
+                intent,
+                publication.Ownership,
+                conflict.Current
+            );
         }
 
         intent = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
-        return await CompleteFaultShutdownAsync(intent, previous, cancellationToken);
+        return await CompleteFaultShutdownAsync(intent, publication.Ownership, cancellationToken);
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> CompleteFaultShutdownAsync(
@@ -179,7 +191,7 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var previous = _snapshots.StopAdmission(intent);
+        var previous = _snapshots.StopAdmission(intent).Ownership;
         _ = await CompleteFaultShutdownAsync(intent, previous, cancellationToken);
     }
 
@@ -203,23 +215,6 @@ public sealed partial class PluginLifecycleCoordinator
         faulted = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
         _ = _snapshots.Publish(faulted, worker: null);
         return Failed(faulted);
-    }
-
-    private PluginLifecycleCommandOutcome PublishConflict(
-        PluginId pluginId,
-        PluginLifecycleState? current
-    )
-    {
-        if (current is null)
-        {
-            _ = _snapshots.Remove(pluginId);
-        }
-        else
-        {
-            _ = _snapshots.Publish(current, worker: null);
-        }
-
-        return Conflict(current);
     }
 
     private static PluginLifecycleSafeDetail? SafeDetail(string value) =>

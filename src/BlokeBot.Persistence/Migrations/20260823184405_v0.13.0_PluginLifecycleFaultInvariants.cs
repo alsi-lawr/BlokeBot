@@ -10,6 +10,11 @@ namespace BlokeBot.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                "UPDATE \"plugin_lifecycles\" SET \"FaultedFrom\" = NULL "
+                    + "WHERE \"Phase\" <> 'Faulted' AND \"FaultedFrom\" IS NOT NULL;"
+            );
+
             migrationBuilder.DropCheckConstraint(
                 name: "CK_plugin_lifecycles_FaultedFrom",
                 table: "plugin_lifecycles"

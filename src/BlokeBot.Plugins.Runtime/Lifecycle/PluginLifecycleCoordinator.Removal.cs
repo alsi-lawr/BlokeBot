@@ -43,18 +43,36 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         var started = Applied(transition);
-        var previous = _snapshots.StopAdmission(started);
-        var written = await _store.WriteAsync(current, started, cancellationToken);
+        var publication = _snapshots.StopAdmission(started);
+        PluginLifecycleStoreWriteOutcome written;
+        try
+        {
+            written = await _store.WriteAsync(current, started, cancellationToken);
+        }
+        catch
+        {
+            await ReconcileCommandCheckpointExceptionAsync(current, started, publication);
+            throw;
+        }
+
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            _snapshots.Restore(pluginId, previous);
-            return Conflict(conflict.Current);
+            return await ReconcileCommandCheckpointConflictAsync(
+                current,
+                started,
+                publication,
+                conflict.Current
+            );
         }
 
         current = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
         if (current.Phase == PluginLifecyclePhase.Draining)
         {
-            var drain = await CancelDrainAndCheckpointAsync(current, previous, cancellationToken);
+            var drain = await CancelDrainAndCheckpointAsync(
+                current,
+                publication.Ownership,
+                cancellationToken
+            );
             if (drain is PluginRuntimeDrainOutcome.Failed drainFailure)
             {
                 return drainFailure.Outcome;

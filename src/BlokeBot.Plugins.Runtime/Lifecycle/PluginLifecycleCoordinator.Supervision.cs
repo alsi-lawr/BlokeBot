@@ -84,12 +84,25 @@ public sealed partial class PluginLifecycleCoordinator
                 }
 
                 var next = ((PluginLifecycleTransitionOutcome.Applied)transition).State;
-                var previous = _snapshots.StopAdmission(next);
-                var written = await _store.WriteAsync(current, next, CancellationToken.None);
+                var publication = _snapshots.StopAdmission(next);
+                PluginLifecycleStoreWriteOutcome written;
+                try
+                {
+                    written = await _store.WriteAsync(current, next, CancellationToken.None);
+                }
+                catch
+                {
+                    await ReconcileTerminatedCheckpointExceptionAsync(next, publication.Ownership);
+                    throw;
+                }
+
                 if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
                 {
-                    _ = await StopRuntimeAsync(next, previous, CancellationToken.None);
-                    _ = PublishConflict(current.PluginId, conflict.Current);
+                    _ = await SettleAndPublishConflictAsync(
+                        next,
+                        publication.Ownership,
+                        conflict.Current
+                    );
                     return;
                 }
 
@@ -97,7 +110,7 @@ public sealed partial class PluginLifecycleCoordinator
                 var draining = restarted.State;
                 var drain = await CancelDrainAndCheckpointAsync(
                     draining,
-                    previous,
+                    publication.Ownership,
                     CancellationToken.None
                 );
                 if (drain is PluginRuntimeDrainOutcome.Failed)

@@ -19,7 +19,7 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         return Replace(state.PluginId, slot).Previous;
     }
 
-    internal PluginRuntimeSlot? StopAdmission(PluginLifecycleState state)
+    internal PluginAdmissionStopPublication StopAdmission(PluginLifecycleState state)
     {
         var runtimeFence = state.ActiveRuntime?.Fence;
         PluginRuntimeSlot? previous;
@@ -39,7 +39,7 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         }
 
         Notify(notification);
-        return runtimeFence is null ? null : stopped;
+        return new(state.PluginId, previous, runtimeFence is null ? null : stopped);
     }
 
     internal PluginRuntimeSlot? Remove(PluginId pluginId)
@@ -56,15 +56,15 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         return previous;
     }
 
-    internal void Restore(PluginId pluginId, PluginRuntimeSlot? previous)
+    internal void RestoreOriginal(PluginAdmissionStopPublication publication)
     {
         ChangeNotification notification;
         lock (_sync)
         {
             notification = PublishLocked(
-                previous is null
-                    ? _current.Slots.Remove(pluginId)
-                    : _current.Slots.SetItem(pluginId, previous)
+                publication.Original is null
+                    ? _current.Slots.Remove(publication.PluginId)
+                    : _current.Slots.SetItem(publication.PluginId, publication.Original)
             );
         }
 

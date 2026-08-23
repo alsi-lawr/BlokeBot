@@ -240,7 +240,7 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var previous = _snapshots.StopAdmission(state);
+        var previous = _snapshots.StopAdmission(state).Ownership;
         var drain = await CancelDrainAndCheckpointAsync(state, previous, cancellationToken);
         if (drain is PluginRuntimeDrainOutcome.Failed)
         {

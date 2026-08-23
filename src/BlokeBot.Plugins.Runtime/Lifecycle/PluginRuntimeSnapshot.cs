@@ -105,6 +105,12 @@ internal sealed record PluginRuntimeSlot(
     PluginLifecycleFence? RuntimeFence
 );
 
+internal sealed record PluginAdmissionStopPublication(
+    PluginId PluginId,
+    PluginRuntimeSlot? Original,
+    PluginRuntimeSlot? Ownership
+);
+
 internal sealed class PluginAdmissionTracker
 {
     private readonly object _sync = new();
