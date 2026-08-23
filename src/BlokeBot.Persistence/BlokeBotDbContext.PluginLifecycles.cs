@@ -30,7 +30,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_Phase",
-                        "\"Phase\" IN ('Preparing', 'Migrating', 'Activating', 'Active', 'Draining', 'Removing', 'Removed', 'Purging', 'Purged', 'Faulted')"
+                        "\"Phase\" IN ('Preparing', 'Migrating', 'Activating', 'Active', 'Draining', 'Removing', 'Removed', 'Purging', 'Faulted')"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_FaultedFrom",

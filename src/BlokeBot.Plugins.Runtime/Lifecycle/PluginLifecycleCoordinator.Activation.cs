@@ -26,9 +26,15 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         state = ((PluginLifecycleStoreWriteOutcome.Written)migrationFence).State;
-        var cancellation = await CancelAndDrainAsync(state, previous, cancellationToken);
-        return cancellation
-            ?? await MigrateAndActivateAsync(state, package, recovered: false, cancellationToken);
+        var drain = await CancelDrainAndCheckpointAsync(state, previous, cancellationToken);
+        return drain is PluginRuntimeDrainOutcome.Failed drainFailure
+            ? drainFailure.Outcome
+            : await MigrateAndActivateAsync(
+                ((PluginRuntimeDrainOutcome.Ready)drain).State,
+                package,
+                recovered: false,
+                cancellationToken
+            );
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> MigrateAndActivateAsync(

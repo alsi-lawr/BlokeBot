@@ -264,13 +264,54 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
+    public async Task Purge_RemovesRuntimeSlotAndNotifiesLifecycleListeners()
+    {
+        var purge = new RecordingPurgeOwner();
+        var harness = new LifecycleHarness(purge: purge);
+        _ = await harness.ActivateAsync("1.0.0", "v1");
+        _ = await harness.Coordinator.RemoveAsync(
+            harness.PluginId,
+            Operation(),
+            CancellationToken.None
+        );
+        purge.Pause();
+        var purging = harness
+            .Coordinator.PurgeAsync(harness.PluginId, Operation(), CancellationToken.None)
+            .AsTask();
+        await purge.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var observed = harness.Snapshots.CurrentVersion;
+        var changed = harness
+            .Snapshots.WaitForChangeAsync(observed, CancellationToken.None)
+            .AsTask();
+
+        purge.Resume();
+        _ = (await purging).ShouldBeOfType<PluginLifecycleCommandOutcome.Purged>();
+        var notified = await changed;
+
+        notified.Value.ShouldBeGreaterThan(observed.Value);
+        harness.Snapshots.Current.Entries.ContainsKey(harness.PluginId).ShouldBeFalse();
+    }
+
+    [Test]
     public async Task UnexpectedWorkerExit_RestartsOnceThenFaultsOnlyThatPlugin()
     {
-        var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
+        var harness = new LifecycleHarness(options: new(TimeSpan.FromSeconds(2), TimeSpan.Zero));
         var first = await harness.ActivateAsync("1.0.0", "v1");
         var other = await harness.ActivateOtherAsync("other-plugin", "1.0.0", "v1");
+        var firstCallback = harness
+            .Snapshots.Admit(harness.PluginId, Fence(first), PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
 
         harness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerExited);
+        await harness.PendingWork.WaitForCallsAsync(1);
+        harness.Workers.Admitted.Count.ShouldBe(2);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeFalse();
+        harness
+            .Snapshots.Admit(harness.PluginId, Fence(first), PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.StaleGeneration);
+        await firstCallback.DisposeAsync();
         var restarted = await harness.Store.WaitForAsync(
             harness.PluginId,
             state =>
@@ -291,14 +332,39 @@ public sealed class PluginLifecycleTests
             )
             .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
             .Code.ShouldBe(PluginAdmissionRejectionCode.StaleGeneration);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
 
-        harness.Workers.Admitted.Last().Exit(PluginWorkerFailureCode.WorkerExited);
+        var restartedFence = restarted.SelectedFence;
+        var restartedCallback = harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                restartedFence,
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
+        var restartedWorker = harness.Workers.Admitted.Last();
+        restartedWorker.Exit(PluginWorkerFailureCode.WorkerExited);
+        await harness.PendingWork.WaitForCallsAsync(2);
+        restartedWorker.Disposed.Task.IsCompleted.ShouldBeFalse();
+        harness.Workers.Admitted.Count.ShouldBe(3);
+        harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                restartedFence,
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.Faulted);
+        await restartedCallback.DisposeAsync();
         var faulted = await harness.Store.WaitForAsync(
             harness.PluginId,
             state => state.Phase == PluginLifecyclePhase.Faulted
         );
 
         faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.WorkerExited);
+        restartedWorker.Disposed.Task.IsCompleted.ShouldBeTrue();
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(first), restartedFence]);
         var otherAdmission = harness
             .Snapshots.Admit(other.PluginId, other.Fence, PluginFeatureAdmissionReadiness.Ready)
             .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
@@ -309,10 +375,22 @@ public sealed class PluginLifecycleTests
     [Test]
     public async Task CancellationTermination_RestartsWithoutConsumingUnexpectedExitBudget()
     {
-        var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
+        var harness = new LifecycleHarness(options: new(TimeSpan.FromSeconds(2), TimeSpan.Zero));
         var active = await harness.ActivateAsync("1.0.0", "v1");
+        var callback = harness
+            .Snapshots.Admit(harness.PluginId, Fence(active), PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
 
         harness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerTerminated);
+        await harness.PendingWork.WaitForCallsAsync(1);
+        harness.Workers.Admitted.Count.ShouldBe(1);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeFalse();
+        harness
+            .Snapshots.Admit(harness.PluginId, Fence(active), PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.StaleGeneration);
+        await callback.DisposeAsync();
         var restarted = await harness.Store.WaitForAsync(
             harness.PluginId,
             state =>
@@ -321,10 +399,155 @@ public sealed class PluginLifecycleTests
 
         restarted.AutomaticRestartConsumed.ShouldBeFalse();
         restarted.SelectedGeneration.Value.ShouldBe(active.View.Generation.Value + 1);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
         harness
             .Snapshots.ValidateCallbackCompletion(harness.PluginId, Fence(active))
             .ShouldBeOfType<PluginFenceOutcome.Rejected>()
             .Code.ShouldBe(PluginFenceRejectionCode.StaleGeneration);
+    }
+
+    [Test]
+    public async Task ColdReplacementRecovery_CancelsPersistedOldFenceBeforeStartingWorker()
+    {
+        var source = new LifecycleHarness();
+        var package = source.Package("1.0.0", "v1");
+        var active = ActiveState(package);
+        var scheduled = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.ScheduleAutomaticRestart(
+                    active,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        source.Store.Seed(scheduled);
+        var packages = new FakePackageResolver();
+        packages.Add(package);
+        var pendingWork = new RecordingPendingWorkCanceller();
+        var workers = new FakeLifecycleWorkers();
+        var snapshots = new PluginRuntimeSnapshotRegistry();
+        var coordinator = new PluginLifecycleCoordinator(
+            source.Store,
+            packages,
+            [new RecordingMigrationOwner()],
+            [new RecordingPurgeOwner()],
+            pendingWork,
+            workers,
+            snapshots,
+            new PluginLifecycleSerialization(),
+            new(TimeSpan.FromSeconds(2), TimeSpan.Zero),
+            TimeProvider.System,
+            NullLogger<PluginLifecycleCoordinator>.Instance
+        );
+
+        await coordinator.RecoverAsync(CancellationToken.None);
+
+        var recovered = (await source.Store.LoadAsync(source.PluginId, CancellationToken.None))!;
+        recovered.Phase.ShouldBe(PluginLifecyclePhase.Active);
+        recovered.SelectedGeneration.ShouldBe(scheduled.SelectedGeneration);
+        pendingWork.CancelledFences.ShouldBe([active.SelectedFence]);
+        workers.StartedInstallations.ShouldBe([package.Installation]);
+    }
+
+    [Test]
+    public async Task WorkerReplacement_StopFailureFaultsWithoutStartingReplacement()
+    {
+        var drainHarness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
+        var drainActive = await drainHarness.ActivateAsync("1.0.0", "v1");
+        var callback = drainHarness
+            .Snapshots.Admit(
+                drainHarness.PluginId,
+                Fence(drainActive),
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
+
+        drainHarness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerExited);
+        var drainFault = await drainHarness.Store.WaitForAsync(
+            drainHarness.PluginId,
+            state => state.Phase == PluginLifecyclePhase.Faulted
+        );
+
+        drainFault.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.DrainTimedOut);
+        drainHarness.Workers.Admitted.Count.ShouldBe(1);
+        drainHarness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
+        drainHarness.PendingWork.CancelledFences.ShouldBe([Fence(drainActive)]);
+        await callback.DisposeAsync();
+
+        var cancellationHarness = new LifecycleHarness(
+            options: new(TimeSpan.FromSeconds(2), TimeSpan.Zero)
+        );
+        var cancellationActive = await cancellationHarness.ActivateAsync("1.0.0", "v1");
+        cancellationHarness.PendingWork.FailuresRemaining = 1;
+
+        cancellationHarness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerExited);
+        var cancellationFault = await cancellationHarness.Store.WaitForAsync(
+            cancellationHarness.PluginId,
+            state => state.Phase == PluginLifecyclePhase.Faulted
+        );
+
+        cancellationFault.LatestOutcome.FailureCode.ShouldBe(
+            PluginLifecycleFailureCode.CancellationFailed
+        );
+        cancellationHarness.Workers.Admitted.Count.ShouldBe(1);
+        cancellationHarness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
+        cancellationHarness.PendingWork.CancelledFences.ShouldBe([Fence(cancellationActive)]);
+    }
+
+    [Test]
+    public async Task WorkerReplacement_GenerationExhaustionFaultsAndKeepsOtherPluginAvailable()
+    {
+        var harness = new LifecycleHarness(options: new(TimeSpan.FromSeconds(2), TimeSpan.Zero));
+        var package = harness.Package("1.0.0", "v1");
+        var active = ActiveState(package);
+        var maximumGeneration = Generation(long.MaxValue);
+        var exhaustedFence = new PluginLifecycleFence(active.OperationId, maximumGeneration);
+        var exhausted = active with
+        {
+            SelectedGeneration = maximumGeneration,
+            ActiveRuntime = new(package.Installation, exhaustedFence),
+        };
+        harness.Store.Seed(exhausted);
+        harness.Packages.Add(package);
+        await harness.Coordinator.RecoverAsync(CancellationToken.None);
+        var other = await harness.ActivateOtherAsync("other-plugin", "1.0.0", "v1");
+        var callback = harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                exhaustedFence,
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
+
+        harness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerExited);
+        await harness.PendingWork.WaitForCallsAsync(1);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeFalse();
+        harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                exhaustedFence,
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.Faulted);
+        await callback.DisposeAsync();
+        var faulted = await harness.Store.WaitForAsync(
+            harness.PluginId,
+            state => state.Phase == PluginLifecyclePhase.Faulted
+        );
+
+        faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.GenerationExhausted);
+        harness.PendingWork.CancelledFences.ShouldBe([exhaustedFence]);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
+        harness.Workers.Admitted.Count.ShouldBe(2);
+        var otherAdmission = harness
+            .Snapshots.Admit(other.PluginId, other.Fence, PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
+        await otherAdmission.DisposeAsync();
     }
 
     [Test]
@@ -355,6 +578,43 @@ public sealed class PluginLifecycleTests
         view.AutomaticRestartConsumed.ShouldBeFalse();
         view.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Restarted);
         faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.WorkerExited);
+    }
+
+    [Test]
+    public async Task FailedUpdatePreparation_RestoresConsumedRestartBudget()
+    {
+        var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
+        _ = await harness.ActivateAsync("1.0.0", "v1");
+        harness.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerExited);
+        var restarted = await harness.Store.WaitForAsync(
+            harness.PluginId,
+            state => state.Phase == PluginLifecyclePhase.Active && state.AutomaticRestartConsumed
+        );
+        var workersAfterRestart = harness.Workers.Admitted.Count;
+        harness.Workers.ValidationFailure = new(
+            PluginLifecycleFailureCode.PreparationRejected,
+            null
+        );
+
+        var failedUpdate = await harness.Coordinator.ActivateAsync(
+            Operation(),
+            harness.Package("2.0.0", "v2"),
+            CancellationToken.None
+        );
+
+        var restored = failedUpdate.ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>().View;
+        restored.Installation.ShouldBe(restarted.SelectedInstallation);
+        restored.Generation.ShouldBe(restarted.SelectedGeneration);
+        restored.AutomaticRestartConsumed.ShouldBeTrue();
+
+        harness.Workers.Admitted.Last().Exit(PluginWorkerFailureCode.WorkerExited);
+        var faulted = await harness.Store.WaitForAsync(
+            harness.PluginId,
+            state => state.Phase == PluginLifecyclePhase.Faulted
+        );
+
+        faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.WorkerExited);
+        harness.Workers.Admitted.Count.ShouldBe(workersAfterRestart);
     }
 
     [Test]
@@ -468,42 +728,62 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
-    public async Task MigrationRecovery_ReplaysIdempotentOwnerWithoutRestoringOldGeneration()
+    public async Task ColdMigrationRecovery_CancelsPersistedOldFenceWithoutRestartingOldCode()
     {
-        var migration = new RecordingMigrationOwner();
-        var harness = new LifecycleHarness(migration: migration);
+        var harness = new LifecycleHarness();
         var previous = await harness.ActivateAsync("1.0.0", "v1");
         var oldFence = Fence(previous);
-        var callsBeforeRecovery = migration.Calls;
-        var workersBeforeRecovery = harness.Workers.Admitted.Count;
+        var previousPackage = harness.Package("1.0.0", "v1");
         var package = harness.Package("2.0.0", "v2");
-        harness.Packages.Add(package);
-        var current = (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!;
         var preparing = (
-            (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.BeginActivation(
-                    current,
-                    package.Installation,
-                    Operation(),
-                    DateTimeOffset.UtcNow
-                )
-        ).State;
+            await harness.Store.BeginActivationAsync(
+                new(package.Installation, Operation(), DateTimeOffset.UtcNow),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginLifecycleStoreBeginOutcome.Begun>()
+            .State;
         var migrating = (
             (PluginLifecycleTransitionOutcome.Applied)
                 PluginLifecycleStateMachine.PreparationSucceeded(preparing, DateTimeOffset.UtcNow)
         ).State;
-        harness.Store.Seed(migrating);
+        _ = (
+            await harness.Store.WriteAsync(preparing, migrating, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Written>();
+        migrating.ActiveRuntime!.Fence.ShouldBe(oldFence);
 
-        await harness.Coordinator.RecoverAsync(CancellationToken.None);
+        var coldPackages = new FakePackageResolver();
+        coldPackages.Add(previousPackage);
+        coldPackages.Add(package);
+        var coldMigration = new RecordingMigrationOwner();
+        var coldPendingWork = new RecordingPendingWorkCanceller();
+        var coldWorkers = new FakeLifecycleWorkers();
+        var coldSnapshots = new PluginRuntimeSnapshotRegistry();
+        var coldCoordinator = new PluginLifecycleCoordinator(
+            harness.Store,
+            coldPackages,
+            [coldMigration],
+            [new RecordingPurgeOwner()],
+            coldPendingWork,
+            coldWorkers,
+            coldSnapshots,
+            new PluginLifecycleSerialization(),
+            new(TimeSpan.FromSeconds(2), TimeSpan.Zero),
+            TimeProvider.System,
+            NullLogger<PluginLifecycleCoordinator>.Instance
+        );
+        coldSnapshots.Current.Entries.ShouldBeEmpty();
+
+        await coldCoordinator.RecoverAsync(CancellationToken.None);
 
         var recovered = (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!;
         recovered.Phase.ShouldBe(PluginLifecyclePhase.Active);
-        migration.Calls.ShouldBe(callsBeforeRecovery + 1);
-        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
-        harness.Workers.Admitted.Count.ShouldBe(workersBeforeRecovery + 1);
-        harness.PendingWork.CancelledFences.ShouldBe([oldFence]);
-        _ = harness
-            .Snapshots.Admit(harness.PluginId, oldFence, PluginFeatureAdmissionReadiness.Ready)
+        recovered.SelectedInstallation.ShouldBe(package.Installation);
+        coldMigration.Calls.ShouldBe(1);
+        coldPendingWork.CancelledFences.ShouldBe([oldFence]);
+        coldWorkers.StartedInstallations.ShouldBe([package.Installation]);
+        _ = coldSnapshots
+            .Admit(harness.PluginId, oldFence, PluginFeatureAdmissionReadiness.Ready)
             .ShouldBeOfType<PluginAdmissionOutcome.Rejected>();
     }
 

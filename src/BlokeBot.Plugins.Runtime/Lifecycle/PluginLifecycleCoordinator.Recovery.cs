@@ -54,8 +54,11 @@ public sealed partial class PluginLifecycleCoordinator
                 );
                 break;
             case PluginLifecyclePhase.Activating:
-                _ = _snapshots.Publish(state, worker: null);
-                await RecoverActivationAsync(state, cancellationToken);
+                await RecoverActivationAsync(
+                    state,
+                    _snapshots.Publish(state, worker: null),
+                    cancellationToken
+                );
                 break;
             case PluginLifecyclePhase.Active:
                 await RecoverActiveAsync(state, cancellationToken);
@@ -166,11 +169,13 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var drainFailure = await CancelAndDrainAsync(state, previous, cancellationToken);
-        if (drainFailure is not null)
+        var drain = await CancelDrainAndCheckpointAsync(state, previous, cancellationToken);
+        if (drain is PluginRuntimeDrainOutcome.Failed)
         {
             return;
         }
+
+        state = ((PluginRuntimeDrainOutcome.Ready)drain).State;
 
         var resolved = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
         if (resolved is PluginLifecyclePackageResolution.Available available)
@@ -195,9 +200,17 @@ public sealed partial class PluginLifecycleCoordinator
 
     private async ValueTask RecoverActivationAsync(
         PluginLifecycleState state,
+        PluginRuntimeSlot? previous,
         CancellationToken cancellationToken
     )
     {
+        var drain = await CancelDrainAndCheckpointAsync(state, previous, cancellationToken);
+        if (drain is PluginRuntimeDrainOutcome.Failed)
+        {
+            return;
+        }
+
+        state = ((PluginRuntimeDrainOutcome.Ready)drain).State;
         if (state.RestartNotBeforeUtc is { } notBefore)
         {
             await DelayUntilAsync(notBefore, cancellationToken);
@@ -274,11 +287,13 @@ public sealed partial class PluginLifecycleCoordinator
     )
     {
         var previous = _snapshots.Publish(state, worker: null);
-        var failure = await CancelAndDrainAsync(state, previous, cancellationToken);
-        if (failure is not null)
+        var drain = await CancelDrainAndCheckpointAsync(state, previous, cancellationToken);
+        if (drain is PluginRuntimeDrainOutcome.Failed)
         {
             return;
         }
+
+        state = ((PluginRuntimeDrainOutcome.Ready)drain).State;
 
         var drained = Applied(PluginLifecycleStateMachine.DrainSucceeded(state, Now()));
         var written = await _store.WriteAsync(state, drained, cancellationToken);

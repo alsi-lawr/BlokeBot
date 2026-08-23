@@ -86,6 +86,36 @@ public sealed class PluginLifecyclePersistenceTests
     }
 
     [Test]
+    public async Task LifecycleStore_RejectsGenericPurgedWriteAndDatabaseRow()
+    {
+        await using var database = await LifecycleDatabase.CreateAsync();
+        var store = new EfPluginLifecycleStore(database);
+        var package = new LifecycleHarness().Package("1.0.0", "v1");
+        var purging = await AdvanceToPurgingAsync(store, package);
+        var purged = Applied(
+            PluginLifecycleStateMachine.PurgeSucceeded(purging, DateTimeOffset.UtcNow)
+        );
+
+        var rejected = (
+            await store.WriteAsync(purging, purged, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreWriteOutcome.Conflict>();
+
+        rejected.Current.ShouldBe(purging);
+        await using (var db = database.CreateDbContext())
+        {
+            var record = await db.PluginLifecycles.SingleAsync();
+            record.Phase = PluginLifecyclePhase.Purged;
+            _ = await Should.ThrowAsync<DbUpdateException>(async () =>
+                _ = await db.SaveChangesAsync()
+            );
+        }
+
+        (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
+            purging
+        );
+    }
+
+    [Test]
     public async Task LifecycleMigration_RoundTripsGenerationAndLatestRedactedOutcome()
     {
         await using var database = await LifecycleDatabase.CreateAsync();

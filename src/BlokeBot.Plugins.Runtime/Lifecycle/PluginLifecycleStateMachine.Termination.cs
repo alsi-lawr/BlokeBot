@@ -77,7 +77,7 @@ public static partial class PluginLifecycleStateMachine
             now
         );
 
-    public static PluginLifecycleTransitionOutcome PurgeSucceeded(
+    internal static PluginLifecycleTransitionOutcome PurgeSucceeded(
         PluginLifecycleState state,
         DateTimeOffset now
     ) =>
@@ -200,7 +200,6 @@ public static partial class PluginLifecycleStateMachine
                 {
                     SelectedGeneration = generation,
                     Phase = PluginLifecyclePhase.Activating,
-                    ActiveRuntime = null,
                     OperationKind = PluginLifecycleOperationKind.Restart,
                     AutomaticRestartConsumed = consumeRestart || state.AutomaticRestartConsumed,
                     RestartNotBeforeUtc = restartNotBeforeUtc,

@@ -74,7 +74,8 @@ public static partial class PluginLifecycleStateMachine
                 PluginLifecyclePhase.Preparing,
                 PluginLifecycleOperationKind.Activate,
                 null,
-                AutomaticRestartConsumed: false,
+                AutomaticRestartConsumed: current
+                    is { Phase: PluginLifecyclePhase.Active, AutomaticRestartConsumed: true },
                 RestartNotBeforeUtc: null,
                 PluginLifecycleOutcome.Progress(PluginLifecycleOutcomeCode.Preparing, now),
                 (current?.Revision ?? -1) + 1,
@@ -92,7 +93,12 @@ public static partial class PluginLifecycleStateMachine
                 state with
                 {
                     Phase = PluginLifecyclePhase.Migrating,
-                    ActiveRuntime = null,
+                    AutomaticRestartConsumed =
+                        state.AutomaticRestartConsumed
+                        && (
+                            state.ActiveRuntime is not { Fence.Generation: var activeGeneration }
+                            || activeGeneration == state.SelectedGeneration
+                        ),
                     LatestOutcome = PluginLifecycleOutcome.Progress(
                         PluginLifecycleOutcomeCode.Migrating,
                         now
@@ -135,14 +141,40 @@ public static partial class PluginLifecycleStateMachine
     public static PluginLifecycleTransitionOutcome MigrationSucceeded(
         PluginLifecycleState state,
         DateTimeOffset now
-    ) => Move(state, PluginLifecyclePhase.Migrating, PluginLifecyclePhase.Activating, now);
+    ) =>
+        state is { Phase: PluginLifecyclePhase.Migrating, ActiveRuntime: null }
+            ? Applied(
+                state with
+                {
+                    Phase = PluginLifecyclePhase.Activating,
+                    Revision = state.Revision + 1,
+                    UpdatedAtUtc = now,
+                }
+            )
+            : Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
+
+    internal static PluginLifecycleTransitionOutcome RuntimeStopped(
+        PluginLifecycleState state,
+        DateTimeOffset now
+    ) =>
+        state.ActiveRuntime is not null
+        && state.Phase is PluginLifecyclePhase.Migrating or PluginLifecyclePhase.Activating
+            ? Applied(
+                state with
+                {
+                    ActiveRuntime = null,
+                    Revision = state.Revision + 1,
+                    UpdatedAtUtc = now,
+                }
+            )
+            : Rejected(PluginLifecycleTransitionFailureCode.InvalidTransition);
 
     public static PluginLifecycleTransitionOutcome ActivationSucceeded(
         PluginLifecycleState state,
         DateTimeOffset now,
         bool recovered = false
     ) =>
-        state.Phase == PluginLifecyclePhase.Activating
+        state is { Phase: PluginLifecyclePhase.Activating, ActiveRuntime: null }
             ? Applied(
                 state with
                 {

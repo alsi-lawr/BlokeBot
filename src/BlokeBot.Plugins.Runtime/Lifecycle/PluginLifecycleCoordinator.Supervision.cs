@@ -90,9 +90,19 @@ public sealed partial class PluginLifecycleCoordinator
                     return;
                 }
 
-                scheduled = restarted.State;
-                _ = _snapshots.Publish(scheduled, worker: null);
-                await worker.DisposeAsync();
+                var draining = restarted.State;
+                var previous = _snapshots.Publish(draining, worker: null);
+                var drain = await CancelDrainAndCheckpointAsync(
+                    draining,
+                    previous,
+                    CancellationToken.None
+                );
+                if (drain is PluginRuntimeDrainOutcome.Failed)
+                {
+                    return;
+                }
+
+                scheduled = ((PluginRuntimeDrainOutcome.Ready)drain).State;
             }
 
             await DelayUntilAsync(scheduled!.RestartNotBeforeUtc!.Value, CancellationToken.None);

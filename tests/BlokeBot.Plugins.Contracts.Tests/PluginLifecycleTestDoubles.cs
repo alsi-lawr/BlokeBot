@@ -141,7 +141,11 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
     {
         lock (_sync)
         {
-            if (!_states.TryGetValue(expected.PluginId, out var current) || current != expected)
+            if (
+                !_states.TryGetValue(expected.PluginId, out var current)
+                || current != expected
+                || next.Phase == PluginLifecyclePhase.Purged
+            )
             {
                 return ValueTask.FromResult<PluginLifecycleStoreWriteOutcome>(
                     new PluginLifecycleStoreWriteOutcome.Conflict(current)
@@ -208,6 +212,8 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
 
     internal List<FakeLifecycleWorkerSession> Admitted { get; } = [];
 
+    internal List<PluginInstallationIdentity> StartedInstallations { get; } = [];
+
     internal int AdmittedFailuresRemaining { get; set; }
 
     internal TaskCompletionSource ValidationStarted { get; private set; } =
@@ -260,6 +266,7 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
 
         var worker = new FakeLifecycleWorkerSession(PluginWorkerMode.Admitted);
         Admitted.Add(worker);
+        StartedInstallations.Add(package.Installation);
         return ValueTask.FromResult<PluginLifecycleWorkerStartOutcome>(
             new PluginLifecycleWorkerStartOutcome.Started(worker)
         );
@@ -326,26 +333,41 @@ internal sealed class ThrowingMigrationOwner : IPluginMigrationDataOwner
 
 internal sealed class RecordingPurgeOwner : IPluginPurgeDataOwner
 {
+    private TaskCompletionSource? _gate;
+
     internal int Calls { get; private set; }
 
     internal int FailuresRemaining { get; set; }
 
-    public ValueTask<PluginLifecycleOwnerOutcome> PurgeAsync(
+    internal TaskCompletionSource Started { get; private set; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal void Pause()
+    {
+        Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    internal void Resume() => _gate?.TrySetResult();
+
+    public async ValueTask<PluginLifecycleOwnerOutcome> PurgeAsync(
         PluginPurgeContext context,
         CancellationToken cancellationToken
     )
     {
         Calls++;
+        _ = Started.TrySetResult();
+        if (_gate is not null)
+        {
+            await _gate.Task.WaitAsync(cancellationToken);
+            _gate = null;
+        }
+
         var failed = FailuresRemaining > 0;
         FailuresRemaining = Math.Max(0, FailuresRemaining - 1);
-        return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
-            failed
-                ? new PluginLifecycleOwnerOutcome.Failed(
-                    PluginLifecycleOwnerFailureCode.Failed,
-                    null
-                )
-                : new PluginLifecycleOwnerOutcome.Succeeded()
-        );
+        return failed
+            ? new PluginLifecycleOwnerOutcome.Failed(PluginLifecycleOwnerFailureCode.Failed, null)
+            : new PluginLifecycleOwnerOutcome.Succeeded();
     }
 }
 
@@ -355,6 +377,24 @@ internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCancelle
 
     internal List<PluginLifecycleFence> CancelledFences { get; } = [];
 
+    internal int FailuresRemaining { get; set; }
+
+    internal async Task WaitForCallsAsync(int expected)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(3);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (Calls >= expected)
+            {
+                return;
+            }
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException("Pending work cancellation was not observed.");
+    }
+
     public ValueTask<PluginLifecycleOwnerOutcome> CancelAsync(
         PluginId pluginId,
         PluginLifecycleFence fence,
@@ -363,6 +403,14 @@ internal sealed class RecordingPendingWorkCanceller : IPluginPendingWorkCancelle
     {
         Calls++;
         CancelledFences.Add(fence);
+        if (FailuresRemaining > 0)
+        {
+            FailuresRemaining--;
+            return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
+                new PluginLifecycleOwnerOutcome.Failed(PluginLifecycleOwnerFailureCode.Failed, null)
+            );
+        }
+
         return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
             new PluginLifecycleOwnerOutcome.Succeeded()
         );

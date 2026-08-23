@@ -168,6 +168,27 @@ public sealed class PluginRuntimeSnapshotRegistry
         }
     }
 
+    internal PluginRuntimeSlot? Remove(PluginId pluginId)
+    {
+        PluginRuntimeSlot? previous;
+        TaskCompletionSource<PluginLifecycleChangeVersion> change;
+        PluginLifecycleChangeVersion version;
+        lock (_sync)
+        {
+            _ = _current.Slots.TryGetValue(pluginId, out previous);
+            Volatile.Write(
+                ref _current,
+                new PluginRuntimeSnapshot(_current.Slots.Remove(pluginId))
+            );
+            version = new(++_changeVersion);
+            change = _change;
+            _change = NewChangeCompletion();
+        }
+
+        _ = change.TrySetResult(version);
+        return previous;
+    }
+
     internal void Restore(PluginId pluginId, PluginRuntimeSlot? previous)
     {
         TaskCompletionSource<PluginLifecycleChangeVersion> change;

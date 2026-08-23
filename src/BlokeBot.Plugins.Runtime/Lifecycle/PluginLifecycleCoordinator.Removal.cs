@@ -54,11 +54,13 @@ public sealed partial class PluginLifecycleCoordinator
         current = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
         if (current.Phase == PluginLifecyclePhase.Draining)
         {
-            var drainFailure = await CancelAndDrainAsync(current, previous, cancellationToken);
-            if (drainFailure is not null)
+            var drain = await CancelDrainAndCheckpointAsync(current, previous, cancellationToken);
+            if (drain is PluginRuntimeDrainOutcome.Failed drainFailure)
             {
-                return drainFailure;
+                return drainFailure.Outcome;
             }
+
+            current = ((PluginRuntimeDrainOutcome.Ready)drain).State;
 
             var drained = Applied(PluginLifecycleStateMachine.DrainSucceeded(current, Now()));
             written = await _store.WriteAsync(current, drained, cancellationToken);
@@ -149,7 +151,7 @@ public sealed partial class PluginLifecycleCoordinator
             return Conflict(conflict.Current);
         }
 
-        _ = _snapshots.Publish(purged, worker: null);
+        _ = _snapshots.Remove(state.PluginId);
         return Purged(((PluginLifecycleStorePurgeOutcome.Completed)persisted).Tombstone);
     }
 }
