@@ -35,8 +35,11 @@ public sealed class ChatCommandDispatcher
         var matched = _plan.Routes.TryGetValue(route, out var handler);
         if (matched && handler is not null)
         {
-            await handler(context, args, cancellationToken);
-            return;
+            var handled = await handler(context, args, cancellationToken);
+            if (handled.Match(static _ => false, static _ => true))
+            {
+                return;
+            }
         }
 
         foreach (var dynamicHandler in _plan.DynamicHandlers)

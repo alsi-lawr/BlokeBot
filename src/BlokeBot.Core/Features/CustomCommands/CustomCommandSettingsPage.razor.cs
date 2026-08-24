@@ -706,6 +706,14 @@ public partial class CustomCommandSettingsPage
             : CommandInvocation(command);
     }
 
+    private IReadOnlyList<string> BuiltInShadows(CustomCommandEditor command) =>
+        _config is null
+            ? []
+            : CommandAliasNormalizer
+                .SplitPreservingOrder(command.Aliases)
+                .Where(_config.BuiltInAliases.Contains)
+                .ToArray();
+
     private string _previewInvokerName => HostLogin.Length > 0 ? HostLogin : "viewer";
 
     private IReadOnlyList<StudioChatLine> CommandPreviewLines(CustomCommandEditor command)
@@ -972,7 +980,6 @@ public partial class CustomCommandSettingsPage
         CustomCommandConfigurationSaveFailure failure
     ) =>
         failure.Match<CustomCommandConfigurationValidationTarget?>(
-            builtInAliasCollision => CommandAliasesTarget(builtInAliasCollision.Alias),
             customAliasCollision => CommandAliasesTarget(customAliasCollision.Alias),
             _ => null,
             cueReference => CommandTarget(cueReference.CommandId, cueReference.Field)

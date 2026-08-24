@@ -899,7 +899,7 @@ public sealed class CommunityProgressionServiceTests
             delayedTimestamp,
             default
         );
-        await commands[FixedChatCommandRoutes.Progress](command, [], default);
+        _ = await commands[FixedChatCommandRoutes.Progress](command, [], default);
 
         responses.ShouldBeEmpty();
         clock.Advance(TimeSpan.FromMinutes(2));
@@ -1276,20 +1276,40 @@ public sealed class CommunityProgressionServiceTests
 
     private sealed class RecordingCommandBuilder : IChatCommandBuilder
     {
-        private readonly Dictionary<string, ChatCommandHandler> _handlers = new(
+        private readonly Dictionary<string, DynamicChatCommandHandler> _handlers = new(
             StringComparer.Ordinal
         );
 
-        public ChatCommandHandler this[FixedChatCommandRoute route] => _handlers[route.Value];
+        public DynamicChatCommandHandler this[FixedChatCommandRoute route] =>
+            _handlers[route.Value];
 
         public IChatCommandBuilder Map(string route, ChatCommandHandler handler)
         {
-            _handlers.Add(route, handler);
+            _handlers.Add(route, HandleAsync);
             return this;
+
+            async ValueTask<CommandHandlingOutcome> HandleAsync(
+                ChatCommandContext context,
+                IReadOnlyList<string> args,
+                CancellationToken cancellationToken
+            )
+            {
+                await handler(context, args, cancellationToken);
+                return new CommandHandlingOutcome.Handled();
+            }
         }
 
         public IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler) =>
             Map(route.Value, handler);
+
+        public IChatCommandBuilder MapContextual(
+            FixedChatCommandRoute route,
+            DynamicChatCommandHandler handler
+        )
+        {
+            _handlers.Add(route.Value, handler);
+            return this;
+        }
 
         public IChatCommandBuilder MapDynamic(DynamicChatCommandHandler handler) => this;
 

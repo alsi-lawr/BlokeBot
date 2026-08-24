@@ -79,6 +79,7 @@ public sealed class CustomCommandConfigurationService(
         var timeZoneId = await hostSettings.GetTimeZoneIdAsync(hostId, ct);
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
         var projectionReference = timeProvider.GetUtcNow();
+        var builtInAliases = await aliasRegistry.ListBuiltInAliasesAsync(db, hostId, ct);
         return new CustomCommandConfiguration
         {
             TimeZoneId = timeZoneId,
@@ -93,6 +94,7 @@ public sealed class CustomCommandConfigurationService(
                     CustomCommandConfigurationMapper.ToEditor(x, timeZone, projectionReference)
                 )
                 .ToList(),
+            BuiltInAliases = builtInAliases,
             TwitchAnnouncementReadiness = twitchAnnouncementReadiness,
             AlertSummary = new CustomCommandAlertSummary
             {
@@ -128,7 +130,7 @@ public sealed class CustomCommandConfigurationService(
         ).ToHashSet();
         foreach (var configured in command.Commands)
         {
-            var conflict = await aliasRegistry.FindConflictAsync(
+            var conflict = await aliasRegistry.FindCustomConflictAsync(
                 db,
                 hostId,
                 managedCommandIds,
@@ -140,7 +142,9 @@ public sealed class CustomCommandConfigurationService(
                 return Result<
                     CustomCommandConfigurationSaved,
                     CustomCommandConfigurationSaveFailure
-                >.Error(AliasFailure(conflict));
+                >.Error(
+                    new CustomCommandConfigurationSaveFailure.CustomAliasCollision(conflict.Alias)
+                );
             }
         }
 
@@ -166,18 +170,6 @@ public sealed class CustomCommandConfigurationService(
             CustomCommandConfigurationSaveFailure
         >.Success(new());
     }
-
-    private static CustomCommandConfigurationSaveFailure AliasFailure(
-        CustomCommandAliasConflict conflict
-    ) =>
-        conflict.Match<CustomCommandConfigurationSaveFailure>(
-            static builtIn => new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision(
-                builtIn.Alias
-            ),
-            static custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(
-                custom.Alias
-            )
-        );
 
     private async Task<CustomCommandConfigurationSaveCommand> DisableUnavailableNativeAnnouncementsAsync(
         BlokeBotDbContext db,

@@ -11,23 +11,23 @@ internal sealed class CommunityProgressionCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Progress, ProgressAsync);
-        _ = commands.Map(
+        _ = commands.MapContextual(FixedChatCommandRoutes.Progress, ProgressAsync);
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.EquipTitle,
             (context, args, ct) => EquipAsync(context, args, CommunityRewardKind.Title, "title", ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.EquipBadge,
             (context, args, ct) => EquipAsync(context, args, CommunityRewardKind.Badge, "badge", ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.EquipAccent,
             (context, args, ct) =>
                 EquipAsync(context, args, CommunityRewardKind.CosmeticAccent, "accent", ct)
         );
     }
 
-    private async ValueTask ProgressAsync(
+    private async ValueTask<CommandHandlingOutcome> ProgressAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -36,18 +36,18 @@ internal sealed class CommunityProgressionCommandModule(
         var host = await FindEnabledHostAsync(context.Message.Channel, ct);
         if (host is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var viewerId = ViewerId(context.Message);
         if (viewerId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var board = await progression.GetPublicAsync(host.Login, ct);
         if (board is null)
         {
             await context.ReplyAsync("Community progression is hidden for this channel.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var current = board.Seasons.FirstOrDefault(value =>
             value.Status == CommunitySeasonStatus.Open
@@ -63,9 +63,10 @@ internal sealed class CommunityProgressionCommandModule(
                 : $"{current.Name}: {string.Join("; ", progress.Select(value => $"{value.DefinitionName} {value.Amount}/{value.Target}"))}. /community/{host.Login}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask EquipAsync(
+    private async ValueTask<CommandHandlingOutcome> EquipAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CommunityRewardKind kind,
@@ -74,15 +75,19 @@ internal sealed class CommunityProgressionCommandModule(
     )
     {
         var host = await FindEnabledHostAsync(context.Message.Channel, ct);
-        var viewerId = ViewerId(context.Message);
-        if (host is null || viewerId is null)
+        if (host is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
+        }
+        var viewerId = ViewerId(context.Message);
+        if (viewerId is null)
+        {
+            return new CommandHandlingOutcome.Handled();
         }
         if (args.Count != 1)
         {
             await context.ReplyAsync($"Usage: !equip{kindName} <reward-key>", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var result = await progression.EquipAsync(
             new(
@@ -107,6 +112,7 @@ internal sealed class CommunityProgressionCommandModule(
             },
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
     private async Task<HostIdentity?> FindEnabledHostAsync(string channel, CancellationToken ct)

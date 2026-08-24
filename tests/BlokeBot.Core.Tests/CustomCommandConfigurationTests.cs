@@ -281,7 +281,7 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task BuiltInOrDuplicateDraftAlias_Saving_RejectsCollision()
+    public async Task BuiltInAndDuplicateDraftAliases_Saving_AllowsShadowAndRejectsCustomCollision()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -300,14 +300,15 @@ public sealed class CustomCommandConfigurationTests
 
         var service = CreateService(dbFactory);
 
-        var builtInCollision = await SaveFailureAsync(
+        await SaveValidAsync(
             service,
             hostId,
-            ConfigurationWithCommands(("Built in", "points"))
+            ConfigurationWithCommands(("Built in", "points"), ("Fixed", "request"))
         );
-        builtInCollision
-            .ShouldBeOfType<CustomCommandConfigurationSaveFailure.BuiltInAliasCollision>()
-            .Alias.ShouldBe("points");
+        var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        loaded.Commands.Select(static command => command.Aliases).ShouldBe(["points", "request"]);
+        loaded.BuiltInAliases.ShouldContain("points");
+        loaded.BuiltInAliases.ShouldContain("request");
 
         var draftCollision = ValidationErrors(
             ConfigurationWithCommands(("First", "hello"), ("Second", "!HELLO"))

@@ -363,7 +363,7 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task BuiltInAliasCollision_Saving_ActivatesCommandsAndAssociatesTheMatchingAlias()
+    public async Task BuiltInAliasCollision_EditingAndSaving_ShowsWarningAndPersistsAlias()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -385,19 +385,22 @@ public sealed class CustomCommandSettingsUiTests
         var cut = context.Render<CustomCommandSettingsPage>();
 
         cut.Find($"#command-{seeded.CommandId}-aliases").Input("points");
+
+        var warning = cut.Find("[data-built-in-shadow-warning]");
+        warning.TextContent.ShouldContain("!points");
+        warning.GetAttribute("role").ShouldBe("status");
         cut.Find("button[aria-label='Save custom commands']").Click();
 
         cut.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("commands");
         var aliases = cut.Find($"#command-{seeded.CommandId}-aliases");
-        aliases.GetAttribute("aria-invalid").ShouldBe("true");
-        _ = aliases.GetAttribute("aria-describedby").ShouldNotBeNull();
-        ValidationMessages(cut).Length.ShouldBe(1);
-        toasts.Current.ShouldHaveSingleItem().Kind.ShouldBe(ToastKind.Error);
+        aliases.GetAttribute("aria-invalid").ShouldBe("false");
+        cut.FindAll("[data-validation-summary]").ShouldBeEmpty();
+        toasts.Current.ShouldHaveSingleItem().Kind.ShouldBe(ToastKind.Success);
         cut.Find("button[aria-label='Save custom commands']")
             .GetAttribute("data-save-state")
-            .ShouldBe("dirty");
+            .ShouldBe("clean");
         await using var savedDb = await dbFactory.CreateDbContextAsync();
-        (await savedDb.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("command");
+        (await savedDb.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("points");
     }
 
     [Test]

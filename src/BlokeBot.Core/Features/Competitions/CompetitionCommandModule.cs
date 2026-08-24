@@ -13,11 +13,11 @@ internal sealed class CompetitionCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Competitions, ViewAsync);
-        _ = commands.Map(FixedChatCommandRoutes.CompetitionJoin, JoinAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Competitions, ViewAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.CompetitionJoin, JoinAsync);
     }
 
-    private async ValueTask ViewAsync(
+    private async ValueTask<CommandHandlingOutcome> ViewAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -26,7 +26,7 @@ internal sealed class CompetitionCommandModule(
         var host = await EnabledHostAsync(context.Message.Channel, ct);
         if (host is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var board = await competitions.GetPublicAsync(host.Login, ct);
         var current = board?.Active.FirstOrDefault();
@@ -36,22 +36,26 @@ internal sealed class CompetitionCommandModule(
                 : $"{current.Name}: {current.Status.Label()} · {current.Format.Label()}. /competitions/{host.Login}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask JoinAsync(
+    private async ValueTask<CommandHandlingOutcome> JoinAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
     {
         var host = await EnabledHostAsync(context.Message.Channel, ct);
+        if (host is null)
+        {
+            return new CommandHandlingOutcome.Unhandled();
+        }
         if (
-            host is null
-            || !context.Message.Tags.TryGetValue("user-id", out var userId)
+            !context.Message.Tags.TryGetValue("user-id", out var userId)
             || string.IsNullOrWhiteSpace(userId)
         )
         {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var board = await competitions.GetPublicAsync(host.Login, ct);
         var competition = board?.Active.FirstOrDefault(x =>
@@ -61,7 +65,7 @@ internal sealed class CompetitionCommandModule(
         if (competition is null)
         {
             await context.ReplyAsync("Individual competition registration is closed.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var login = CommunityInput.NormalizeLogin(context.Message.Login);
         var displayName = context.Message.Tags.GetValueOrDefault("display-name", login);
@@ -93,6 +97,7 @@ internal sealed class CompetitionCommandModule(
                 },
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
     private async Task<HostReference?> EnabledHostAsync(string channel, CancellationToken ct)

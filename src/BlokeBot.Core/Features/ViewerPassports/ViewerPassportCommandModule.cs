@@ -8,35 +8,45 @@ internal sealed class ViewerPassportCommandModule(
 ) : IChatCommandModule
 {
     public void AddCommands(IChatCommandBuilder commands) =>
-        _ = commands.Map(FixedChatCommandRoutes.Passport, PassportAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Passport, PassportAsync);
 
-    private async ValueTask PassportAsync(
+    private async ValueTask<CommandHandlingOutcome> PassportAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken cancellationToken
     )
     {
-        if (
-            args.Count > 0
-            || !context.Message.Tags.TryGetValue("user-id", out var twitchUserId)
-            || string.IsNullOrWhiteSpace(twitchUserId)
-        )
-        {
-            return;
-        }
-        var outcome = await passports.GetVisibleByIdentityAsync(
-            context.Message.Channel,
-            new(
-                twitchUserId,
+        var hasViewerId =
+            context.Message.Tags.TryGetValue("user-id", out var twitchUserId)
+            && !string.IsNullOrWhiteSpace(twitchUserId);
+        var outcome = hasViewerId
+            ? await passports.GetVisibleByIdentityAsync(
+                context.Message.Channel,
+                new(
+                    twitchUserId!,
+                    context.Message.Login,
+                    context.Message.Tags.GetValueOrDefault("display-name", context.Message.Login)
+                ),
+                new(twitchUserId!, false),
+                cancellationToken
+            )
+            : await passports.GetVisibleAsync(
+                context.Message.Channel,
                 context.Message.Login,
-                context.Message.Tags.GetValueOrDefault("display-name", context.Message.Login)
-            ),
-            new(twitchUserId, false),
-            cancellationToken
-        );
+                new(context.Message.Login, false),
+                cancellationToken
+            );
+        if (outcome is ViewerPassportQueryOutcome.FeatureDisabled)
+        {
+            return new CommandHandlingOutcome.Unhandled();
+        }
+        if (args.Count > 0 || !hasViewerId)
+        {
+            return new CommandHandlingOutcome.Handled();
+        }
         if (outcome is not ViewerPassportQueryOutcome.Available { Passport: var passport })
         {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         if (passport.Visibility != ViewerPassportVisibility.Public)
         {
@@ -44,7 +54,7 @@ internal sealed class ViewerPassportCommandModule(
                 $"Open your viewer passport: {links.Resolve($"/passports/{Uri.EscapeDataString(passport.HostLogin)}/me")}",
                 cancellationToken
             );
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var attendance = passport.HideAttendance
@@ -60,5 +70,6 @@ internal sealed class ViewerPassportCommandModule(
                 ),
             cancellationToken
         );
+        return new CommandHandlingOutcome.Handled();
     }
 }

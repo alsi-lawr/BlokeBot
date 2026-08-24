@@ -11,56 +11,59 @@ public sealed class PlayQueueCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Queue, StatusAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Join, JoinAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Leave, LeaveAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Position, PositionAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Ready, ReadyAsync);
-        _ = commands.Map(
+        _ = commands.MapContextual(FixedChatCommandRoutes.Queue, StatusAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Join, JoinAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Leave, LeaveAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Position, PositionAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Ready, ReadyAsync);
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.QueueOpen,
             (context, args, ct) => SetOpenAsync(context, args, true, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.QueueClose,
             (context, args, ct) => SetOpenAsync(context, args, false, ct)
         );
     }
 
-    private async ValueTask StatusAsync(
+    private async ValueTask<CommandHandlingOutcome> StatusAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
     {
-        var resolved = await ResolveAsync(context, args, ct);
-        if (resolved is null)
+        var resolution = await ResolveAsync(context, args, ct);
+        if (ResolutionOutcome(resolution) is { } outcome)
         {
-            return;
+            return outcome;
         }
+        var resolved = ((QueueRouteResolution.Available)resolution).Queue;
 
         var page = await queues.GetPublicPageAsync(resolved.HostLogin, resolved.Queue.Slug, ct);
         if (page is null)
         {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         await context.ReplyAsync(
             $"{page.Queue.Name} is {(page.Queue.IsOpen ? "open" : "closed")}: {page.Waiting.Count} waiting, {page.CurrentParty.Count}/{page.Queue.Capacity} in the party. {page.Queue.PriorityDescription} /queues/{page.Queue.HostLogin}/{page.Queue.Slug}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask JoinAsync(
+    private async ValueTask<CommandHandlingOutcome> JoinAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
     {
-        var resolved = await ResolveAsync(context, args, ct);
-        if (resolved is null)
+        var resolution = await ResolveAsync(context, args, ct);
+        if (ResolutionOutcome(resolution) is { } outcome)
         {
-            return;
+            return outcome;
         }
+        var resolved = ((QueueRouteResolution.Available)resolution).Queue;
 
         var values = resolved
             .RemainingArguments.Select(argument =>
@@ -84,31 +87,33 @@ public sealed class PlayQueueCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private ValueTask LeaveAsync(
+    private ValueTask<CommandHandlingOutcome> LeaveAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     ) => RespondViewerMutationAsync(context, args, "You left the queue.", queues.LeaveAsync, ct);
 
-    private ValueTask ReadyAsync(
+    private ValueTask<CommandHandlingOutcome> ReadyAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     ) => RespondViewerMutationAsync(context, args, "You are marked ready.", queues.ReadyAsync, ct);
 
-    private async ValueTask PositionAsync(
+    private async ValueTask<CommandHandlingOutcome> PositionAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
     {
-        var resolved = await ResolveAsync(context, args, ct);
-        if (resolved is null)
+        var resolution = await ResolveAsync(context, args, ct);
+        if (ResolutionOutcome(resolution) is { } outcome)
         {
-            return;
+            return outcome;
         }
+        var resolved = ((QueueRouteResolution.Available)resolution).Queue;
 
         var result = await queues.GetPositionAsync(
             resolved.Queue.HostId,
@@ -127,25 +132,26 @@ public sealed class PlayQueueCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask SetOpenAsync(
+    private async ValueTask<CommandHandlingOutcome> SetOpenAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         bool open,
         CancellationToken ct
     )
     {
+        var resolution = await ResolveAsync(context, args, ct);
+        if (ResolutionOutcome(resolution) is { } outcome)
+        {
+            return outcome;
+        }
+        var resolved = ((QueueRouteResolution.Available)resolution).Queue;
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That queue command is moderator-only.", ct);
-            return;
-        }
-
-        var resolved = await ResolveAsync(context, args, ct);
-        if (resolved is null)
-        {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var result = await queues.SetOpenAsync(
@@ -161,9 +167,10 @@ public sealed class PlayQueueCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask RespondViewerMutationAsync(
+    private async ValueTask<CommandHandlingOutcome> RespondViewerMutationAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         string successMessage,
@@ -177,11 +184,12 @@ public sealed class PlayQueueCommandModule(
         CancellationToken ct
     )
     {
-        var resolved = await ResolveAsync(context, args, ct);
-        if (resolved is null)
+        var resolution = await ResolveAsync(context, args, ct);
+        if (ResolutionOutcome(resolution) is { } outcome)
         {
-            return;
+            return outcome;
         }
+        var resolved = ((QueueRouteResolution.Available)resolution).Queue;
 
         var result = await mutate(
             resolved.Queue.HostId,
@@ -193,9 +201,10 @@ public sealed class PlayQueueCommandModule(
             result.Match(_ => successMessage, rejected => rejected.Reason.Message),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async Task<ResolvedQueue?> ResolveAsync(
+    private async Task<QueueRouteResolution> ResolveAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -214,14 +223,14 @@ public sealed class PlayQueueCommandModule(
             .SingleOrDefaultAsync(ct);
         if (host is null)
         {
-            return null;
+            return new QueueRouteResolution.Unavailable();
         }
 
         var available = await queues.GetQueuesForHostAsync(host.Id, ct);
         if (available.Count == 0)
         {
             await context.ReplyAsync("No play-with-viewers queue is configured.", ct);
-            return null;
+            return new QueueRouteResolution.Handled();
         }
 
         PlayQueueSummary queue;
@@ -242,7 +251,7 @@ public sealed class PlayQueueCommandModule(
                     $"Choose a queue: {string.Join(", ", available.Select(value => value.Slug))}.",
                     ct
                 );
-                return null;
+                return new QueueRouteResolution.Handled();
             }
 
             queue = available.FirstOrDefault(value =>
@@ -251,14 +260,25 @@ public sealed class PlayQueueCommandModule(
             if (queue is null)
             {
                 await context.ReplyAsync("Queue not found.", ct);
-                return null;
+                return new QueueRouteResolution.Handled();
             }
 
             consumed = 1;
         }
 
-        return new ResolvedQueue(host.Login, queue, args.Skip(consumed).ToArray());
+        return new QueueRouteResolution.Available(
+            new ResolvedQueue(host.Login, queue, args.Skip(consumed).ToArray())
+        );
     }
+
+    private static CommandHandlingOutcome? ResolutionOutcome(QueueRouteResolution resolution) =>
+        resolution switch
+        {
+            QueueRouteResolution.Unavailable => new CommandHandlingOutcome.Unhandled(),
+            QueueRouteResolution.Handled => new CommandHandlingOutcome.Handled(),
+            QueueRouteResolution.Available => null,
+            _ => throw new ArgumentOutOfRangeException(nameof(resolution)),
+        };
 
     private static PlayQueueViewerIdentity Identity(ChatMessage message)
     {
@@ -272,4 +292,15 @@ public sealed class PlayQueueCommandModule(
         PlayQueueSummary Queue,
         IReadOnlyList<string> RemainingArguments
     );
+
+    private abstract record QueueRouteResolution
+    {
+        private QueueRouteResolution() { }
+
+        public sealed record Unavailable : QueueRouteResolution;
+
+        public sealed record Handled : QueueRouteResolution;
+
+        public sealed record Available(ResolvedQueue Queue) : QueueRouteResolution;
+    }
 }

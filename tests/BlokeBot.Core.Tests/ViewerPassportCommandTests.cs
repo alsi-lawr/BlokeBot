@@ -1,8 +1,13 @@
+using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Core.Hosting;
 using BlokeBot.Functional;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -11,6 +16,81 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class ViewerPassportCommandTests
 {
+    [Test]
+    public async Task CollidingCustomCommand_Dispatching_UsesPassportUnlessFeatureIsUnavailable()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                TwitchUserId = "streamer-id",
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures =
+                    HostFeatureFlags.ViewerPassports | HostFeatureFlags.CustomCommands,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+            await SeedCustomPassportCommandAsync(db, hostId);
+        }
+        var passports = new ViewerPassportService(
+            database,
+            new PointBalanceService(database),
+            new LiveStreamProvider(),
+            TimeProvider.System
+        );
+        _ = Success(
+            await passports.SaveAsync(
+                Save(hostId, ViewerPassportVisibility.Public, "PUBLIC-LINE"),
+                default
+            )
+        );
+        var services = new ServiceCollection();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton(passports);
+        _ = services.AddSingleton(PublicSiteLinks("https://localhost/oauth/callback"));
+        _ = services.AddSingleton(Options.Create(new BlokeBotOptions()));
+        _ = services.AddSingleton<ICustomCommandAutomationRuntime>(
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+        _ = services.AddSingleton<IMessageLibraryChatterSource>(
+            new UnavailableMessageLibraryChatterSource()
+        );
+        _ = services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
+        _ = services
+            .AddChatCommands()
+            .AddCommandModule<ViewerPassportCommandModule>()
+            .AddCommandModule<CustomCommandModule>();
+        await using var provider = services.BuildServiceProvider();
+        var dispatcher = provider.GetRequiredService<ChatCommandDispatcher>();
+        var responses = new List<string>();
+
+        await DispatchAsync(dispatcher, responses);
+        await dispatcher.DispatchResponsesAsync(
+            Message("!passport extra"),
+            RecordResponses(responses),
+            default
+        );
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures = HostFeatureFlags.CustomCommands;
+            _ = await db.SaveChangesAsync();
+        }
+        await dispatcher.DispatchResponsesAsync(
+            Message("!passport extra"),
+            RecordResponses(responses),
+            default
+        );
+
+        responses[0].ShouldContain("Viewer: 0 points");
+        responses.Skip(1).ShouldBe(["Custom passport"]);
+    }
+
     [Test]
     public async Task Summary_RespectsVisibilityAndFeatureGate()
     {
@@ -90,6 +170,47 @@ public sealed class ViewerPassportCommandTests
         ViewerPassportVisibility visibility,
         string line
     ) => new(hostId, new("viewer-id", "viewer", "Viewer"), line, visibility, true, null, null);
+
+    private static async Task SeedCustomPassportCommandAsync(BlokeBotDbContext db, int hostId)
+    {
+        var now = DateTime.UtcNow;
+        var entry = new CustomMessageLibraryEntry
+        {
+            HostId = hostId,
+            Name = "Custom passport",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            Variants = [new CustomMessageVariant { Text = "Custom passport" }],
+        };
+        _ = db.CustomMessageLibraryEntries.Add(entry);
+        _ = await db.SaveChangesAsync();
+        var command = new CustomCommand
+        {
+            HostId = hostId,
+            Name = "Custom passport",
+            Enabled = true,
+            AllowEveryone = true,
+            Action = new MessageCustomCommandAction
+            {
+                HostId = hostId,
+                ZeroArgumentMessageLibraryEntryId = entry.Id,
+                OneArgumentMessageLibraryEntryId = entry.Id,
+            },
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        };
+        _ = db.CustomCommands.Add(command);
+        _ = await db.SaveChangesAsync();
+        _ = db.CustomCommandAliases.Add(
+            new CustomCommandAlias
+            {
+                HostId = hostId,
+                CustomCommandId = command.Id,
+                Alias = "passport",
+            }
+        );
+        _ = await db.SaveChangesAsync();
+    }
 
     private static ViewerPassportView Success(ViewerPassportMutationOutcome outcome) =>
         outcome.ShouldBeOfType<ViewerPassportMutationOutcome.Succeeded>().Passport;
@@ -206,4 +327,24 @@ public sealed class ViewerPassportCommandTests
             },
             default
         );
+
+    private static ChatMessage Message(string text) =>
+        new(
+            "viewer",
+            "streamer",
+            text,
+            "raw",
+            new Dictionary<string, string>
+            {
+                ["id"] = Guid.NewGuid().ToString(),
+                ["user-id"] = "viewer-id",
+            }
+        );
+
+    private static CommandResponder RecordResponses(List<string> responses) =>
+        (response, _) =>
+        {
+            responses.Add(response.Message);
+            return ValueTask.CompletedTask;
+        };
 }

@@ -14,9 +14,9 @@ internal sealed class BlokeRaidCommandModule(
 ) : IChatCommandModule
 {
     public void AddCommands(IChatCommandBuilder commands) =>
-        commands.Map(FixedChatCommandRoutes.Raid, ExecuteAsync);
+        commands.MapContextual(FixedChatCommandRoutes.Raid, ExecuteAsync);
 
-    private async ValueTask ExecuteAsync(
+    private async ValueTask<CommandHandlingOutcome> ExecuteAsync(
         ChatCommandContext context,
         IReadOnlyList<string> arguments,
         CancellationToken cancellationToken
@@ -25,7 +25,7 @@ internal sealed class BlokeRaidCommandModule(
         var host = await FindEnabledHostAsync(context.Message.Channel, cancellationToken);
         if (host is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         var action = arguments.FirstOrDefault()?.ToLowerInvariant() ?? "status";
@@ -65,6 +65,7 @@ internal sealed class BlokeRaidCommandModule(
                 );
                 break;
         }
+        return new CommandHandlingOutcome.Handled();
     }
 
     private async Task ActAsync(

@@ -21,6 +21,17 @@
                                                @bind-Value="Command.Aliases"
                                                Placeholder="hello, hi" />
                                         <p class="mt-1 text-xs text-muted-foreground">Viewers type @Context.CommandInvocation(Command) in chat.</p>
+                                        @if (Context.BuiltInShadows(Command) is { Count: > 0 } shadows)
+                                        {
+                                            <ul class="mt-2 space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-medium text-amber-700"
+                                                role="status"
+                                                data-built-in-shadow-warning>
+                                                @foreach (var alias in shadows)
+                                                {
+                                                    <li>The built-in <code>!@alias</code> command handles this word first when it is available. This custom command handles it when the built-in is unavailable.</li>
+                                                }
+                                            </ul>
+                                        }
                                     </div>
                                     @if (Context.CommandPreviewLines(Command) is { Count: > 0 } previewLines)
                                     {

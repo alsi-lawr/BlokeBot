@@ -95,6 +95,95 @@ public sealed class CommandTests
         calls.ShouldBe(0);
     }
 
+    [Test]
+    public async Task ContextualBuiltInUnavailable_Dispatching_UsesCustomBeforePlugin()
+    {
+        List<string> calls = [];
+        var dispatcher = BuildDispatcher(builder =>
+            builder.AddCommands(commands =>
+            {
+                _ = commands.MapContextual(
+                    new FixedChatCommandRoute("shared"),
+                    (_, _, _) =>
+                    {
+                        calls.Add("built-in");
+                        return ValueTask.FromResult<CommandHandlingOutcome>(
+                            new CommandHandlingOutcome.Unhandled()
+                        );
+                    }
+                );
+                _ = commands.MapDynamic(
+                    (context, _, _) =>
+                    {
+                        if (context.CommandName != "shared")
+                        {
+                            return ValueTask.FromResult<CommandHandlingOutcome>(
+                                new CommandHandlingOutcome.Unhandled()
+                            );
+                        }
+
+                        calls.Add("custom");
+                        return ValueTask.FromResult<CommandHandlingOutcome>(
+                            new CommandHandlingOutcome.Handled()
+                        );
+                    }
+                );
+                _ = commands.MapDynamic(
+                    (_, _, _) =>
+                    {
+                        calls.Add("plugin");
+                        return ValueTask.FromResult<CommandHandlingOutcome>(
+                            new CommandHandlingOutcome.Handled()
+                        );
+                    }
+                );
+            })
+        );
+
+        await dispatcher.DispatchResponsesAsync(
+            Message("alice", "!shared"),
+            static (_, _) => ValueTask.CompletedTask,
+            CancellationToken.None
+        );
+
+        calls.ShouldBe(["built-in", "custom"]);
+    }
+
+    [Test]
+    public async Task ContextualBuiltInHandledNoEffect_Dispatching_DoesNotFallThrough()
+    {
+        var fallbackCalls = 0;
+        var dispatcher = BuildDispatcher(builder =>
+            builder.AddCommands(commands =>
+            {
+                _ = commands.MapContextual(
+                    new FixedChatCommandRoute("shared"),
+                    (_, _, _) =>
+                        ValueTask.FromResult<CommandHandlingOutcome>(
+                            new CommandHandlingOutcome.Handled()
+                        )
+                );
+                _ = commands.MapDynamic(
+                    (_, _, _) =>
+                    {
+                        fallbackCalls++;
+                        return ValueTask.FromResult<CommandHandlingOutcome>(
+                            new CommandHandlingOutcome.Handled()
+                        );
+                    }
+                );
+            })
+        );
+
+        await dispatcher.DispatchResponsesAsync(
+            Message("alice", "!shared invalid"),
+            static (_, _) => ValueTask.CompletedTask,
+            CancellationToken.None
+        );
+
+        fallbackCalls.ShouldBe(0);
+    }
+
     private static ChatCommandDispatcher BuildDispatcher(Action<IChatBotBuilder> configure)
     {
         var services = new ServiceCollection();

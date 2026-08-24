@@ -16,6 +16,9 @@ public sealed class CustomCommandConfiguration
 
     public List<CustomAnnouncementEditor> Announcements { get; set; } = [];
 
+    public IReadOnlySet<string> BuiltInAliases { get; set; } =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     public TwitchAnnouncementReadiness TwitchAnnouncementReadiness { get; set; } =
         new(TwitchAnnouncementAvailability.Unavailable, string.Empty);
 

@@ -14,8 +14,8 @@ public sealed class MomentCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Moment, CaptureAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Clip, CaptureAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Moment, CaptureAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Clip, CaptureAsync);
     }
 
     /// <summary>
@@ -30,7 +30,7 @@ public sealed class MomentCommandModule(
     internal static string JoinedReply(Guid publicId) =>
         $"Added your capture to moment {publicId:N}.";
 
-    private async ValueTask CaptureAsync(
+    private async ValueTask<CommandHandlingOutcome> CaptureAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -48,19 +48,19 @@ public sealed class MomentCommandModule(
             .SingleOrDefaultAsync(ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var streamResult = await streams.GetStreamLiveness(hostLogin).ExecuteAsync(ct);
         var stream = streamResult.Match(value => value, _ => throw new UnreachableException());
         if (stream is HostStreamLivenessOutcome.Offline)
         {
             await context.ReplyAsync("Moments can only be captured while the channel is live.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         if (stream is not HostStreamLivenessOutcome.Live live)
         {
             await context.ReplyAsync("Twitch stream identity is temporarily unavailable.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var text = string.Join(' ', args);
@@ -92,5 +92,6 @@ public sealed class MomentCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 }

@@ -19,6 +19,14 @@ public interface IChatCommandBuilder
     IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler);
 
     /// <summary>
+    /// Registers a reserved fixed command route that may be unavailable for the current context.
+    /// </summary>
+    IChatCommandBuilder MapContextual(
+        FixedChatCommandRoute route,
+        DynamicChatCommandHandler handler
+    );
+
+    /// <summary>
     /// Registers a dynamic command handler for routes resolved at dispatch time.
     /// </summary>
     /// <param name="handler">The handler to invoke for unmatched static routes.</param>

@@ -22,6 +22,49 @@ namespace BlokeBot.Core.Tests;
 public sealed class CustomCommandExecutionTests
 {
     [Test]
+    public async Task ContextualBuiltInRoute_DispatchingUnavailableOrHandled_ControlsCustomFallback()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        _ = await SeedCommandAsync(dbFactory, hostId, "shared", ["Custom reply"]);
+        CommandHandlingOutcome builtInOutcome = new CommandHandlingOutcome.Unhandled();
+        await using var services = BuildServices(
+            dbFactory,
+            configureBuiltIns: builder =>
+                builder.AddCommands(commands =>
+                    commands.MapContextual(
+                        new FixedChatCommandRoute("shared"),
+                        async (context, _, ct) =>
+                        {
+                            if (builtInOutcome is CommandHandlingOutcome.Handled)
+                            {
+                                await context.ReplyAsync("Built-in usage", ct);
+                            }
+
+                            return builtInOutcome;
+                        }
+                    )
+                )
+        );
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+        List<string> replies = [];
+
+        await dispatcher.DispatchResponsesAsync(
+            Message("viewer", "streamer", "!shared"),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+        builtInOutcome = new CommandHandlingOutcome.Handled();
+        await dispatcher.DispatchResponsesAsync(
+            Message("viewer", "streamer", "!shared invalid"),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(["Custom reply", "Built-in usage"]);
+    }
+
+    [Test]
     public async Task NormalizedHostAliasWithDisabledPeer_Dispatching_ExecutesOnlyEnabledHostCommand()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -1246,7 +1289,8 @@ public sealed class CustomCommandExecutionTests
         IPublicChatMessageSender? publicChat = null,
         bool realAutomations = false,
         IMessageLibraryRandomSource? random = null,
-        IMessageLibraryChatterSource? chatters = null
+        IMessageLibraryChatterSource? chatters = null,
+        Action<IChatBotBuilder>? configureBuiltIns = null
     )
     {
         var services = new ServiceCollection();
@@ -1305,7 +1349,9 @@ public sealed class CustomCommandExecutionTests
             );
             _ = services.AddBlokeBotAutomations();
         }
-        _ = services.AddChatCommands().AddCommandModule<CustomCommandModule>();
+        var commands = services.AddChatCommands();
+        configureBuiltIns?.Invoke(commands);
+        _ = commands.AddCommandModule<CustomCommandModule>();
         return services.BuildServiceProvider();
     }
 

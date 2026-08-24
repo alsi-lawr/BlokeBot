@@ -16,40 +16,40 @@ internal sealed class BountyCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Bounties, ListAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Bounty, ViewAsync);
-        _ = commands.Map(FixedChatCommandRoutes.BountyPledge, PledgeAsync);
-        _ = commands.Map(FixedChatCommandRoutes.BountyCreate, CreateAsync);
-        _ = commands.Map(
+        _ = commands.MapContextual(FixedChatCommandRoutes.Bounties, ListAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Bounty, ViewAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.BountyPledge, PledgeAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.BountyCreate, CreateAsync);
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.BountyOpen,
             (context, args, ct) =>
                 TransitionAsync(context, args, BountyTransitionAction.OpenFunding, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.BountyAccept,
             (context, args, ct) => TransitionAsync(context, args, BountyTransitionAction.Accept, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.BountyComplete,
             (context, args, ct) =>
                 TransitionAsync(context, args, BountyTransitionAction.Complete, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.BountyFail,
             (context, args, ct) => TransitionAsync(context, args, BountyTransitionAction.Fail, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.BountyCancel,
             (context, args, ct) => TransitionAsync(context, args, BountyTransitionAction.Cancel, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.BountyReject,
             (context, args, ct) => TransitionAsync(context, args, BountyTransitionAction.Reject, ct)
         );
-        _ = commands.Map(FixedChatCommandRoutes.BountyExtend, ExtendAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.BountyExtend, ExtendAsync);
     }
 
-    private async ValueTask ListAsync(
+    private async ValueTask<CommandHandlingOutcome> ListAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -57,7 +57,7 @@ internal sealed class BountyCommandModule(
     {
         if (await FindEnabledHostIdAsync(context.Message.Channel, ct) is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var board = await bounties.GetPublicBoardAsync(context.Message.Channel, ct);
         var active = board.Where(value => !IsTerminal(value.Status)).Take(5).ToArray();
@@ -67,9 +67,10 @@ internal sealed class BountyCommandModule(
                 : $"Bounties: {string.Join("; ", active.Select(Summary))}. /bounties/{CommunityInput.NormalizeLogin(context.Message.Channel)}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask ViewAsync(
+    private async ValueTask<CommandHandlingOutcome> ViewAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -77,12 +78,12 @@ internal sealed class BountyCommandModule(
     {
         if (await FindEnabledHostIdAsync(context.Message.Channel, ct) is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         if (args.Count != 1)
         {
             await context.ReplyAsync("Usage: !bounty <bounty-id>", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var board = await bounties.GetPublicBoardAsync(context.Message.Channel, ct);
@@ -93,9 +94,10 @@ internal sealed class BountyCommandModule(
                 : $"{Summary(bounty)}. Contributors: {ContributorSummary(bounty)}. /bounties/{bounty.HostLogin}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask PledgeAsync(
+    private async ValueTask<CommandHandlingOutcome> PledgeAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -104,12 +106,12 @@ internal sealed class BountyCommandModule(
         var hostId = await FindEnabledHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         if (args.Count != 2 || ParseAmount(args[1]) is not { IsZero: false } amount)
         {
             await context.ReplyAsync("Usage: !bountypledge <bounty-id> <points>", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var board = await bounties.GetPublicBoardAsync(context.Message.Channel, ct);
@@ -117,7 +119,7 @@ internal sealed class BountyCommandModule(
         if (bounty is null)
         {
             await context.ReplyAsync("Public bounty not found.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var result = await bounties.PledgeAsync(
@@ -140,9 +142,10 @@ internal sealed class BountyCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask CreateAsync(
+    private async ValueTask<CommandHandlingOutcome> CreateAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -151,12 +154,12 @@ internal sealed class BountyCommandModule(
         var hostId = await FindEnabledHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That bounty command is moderator-only.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         if (
             args.Count < 7
@@ -178,7 +181,7 @@ internal sealed class BountyCommandModule(
                 "Usage: !bountycreate <target> <hours> <public|private> <refund|spend> <equal|proportional> <bonus> <title> | description | private reason",
                 ct
             );
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var sections = string.Join(' ', args.Skip(6)).Split('|', StringSplitOptions.TrimEntries);
@@ -207,9 +210,10 @@ internal sealed class BountyCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask TransitionAsync(
+    private async ValueTask<CommandHandlingOutcome> TransitionAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         BountyTransitionAction action,
@@ -219,12 +223,12 @@ internal sealed class BountyCommandModule(
         var hostId = await FindEnabledHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That bounty command is moderator-only.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         if (args.Count < 1)
         {
@@ -232,7 +236,7 @@ internal sealed class BountyCommandModule(
                 $"Usage: !bounty{ActionWord(action)} <bounty-id> | private reason",
                 ct
             );
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var page = await bounties.GetModeratorBoardAsync(hostId.Value, ct);
@@ -240,7 +244,7 @@ internal sealed class BountyCommandModule(
         if (bounty is null)
         {
             await context.ReplyAsync("Bounty not found.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var reason = string.Join(' ', args.Skip(1)).TrimStart('|').Trim();
         var result = await bounties.TransitionAsync(
@@ -262,9 +266,10 @@ internal sealed class BountyCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask ExtendAsync(
+    private async ValueTask<CommandHandlingOutcome> ExtendAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -273,12 +278,12 @@ internal sealed class BountyCommandModule(
         var hostId = await FindEnabledHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That bounty command is moderator-only.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         if (
             args.Count < 2
@@ -295,7 +300,7 @@ internal sealed class BountyCommandModule(
                 "Usage: !bountyextend <bounty-id> <hours> | private reason",
                 ct
             );
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var page = await bounties.GetModeratorBoardAsync(hostId.Value, ct);
@@ -303,7 +308,7 @@ internal sealed class BountyCommandModule(
         if (bounty is null)
         {
             await context.ReplyAsync("Bounty not found.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var reason = string.Join(' ', args.Skip(2)).TrimStart('|').Trim();
         var result = await bounties.ExtendAsync(
@@ -326,6 +331,7 @@ internal sealed class BountyCommandModule(
             ),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
     private async Task<int?> FindEnabledHostIdAsync(string channel, CancellationToken ct)

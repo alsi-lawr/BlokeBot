@@ -14,37 +14,37 @@ public sealed class RequestBoardCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Request, SubmitAsync);
-        _ = commands.Map(FixedChatCommandRoutes.Requests, ListAsync);
-        _ = commands.Map(FixedChatCommandRoutes.RequestVote, VoteAsync);
-        _ = commands.Map(
+        _ = commands.MapContextual(FixedChatCommandRoutes.Request, SubmitAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Requests, ListAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.RequestVote, VoteAsync);
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.RequestApprove,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Approved, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.RequestReject,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Rejected, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.RequestQueue,
             (context, args, ct) => ModerateAsync(context, args, RequestSubmissionStatus.Queued, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.RequestAccept,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Accepted, ct)
         );
-        _ = commands.Map(
+        _ = commands.MapContextual(
             FixedChatCommandRoutes.RequestComplete,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Completed, ct)
         );
-        _ = commands.Map(FixedChatCommandRoutes.RequestMerge, MergeAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.RequestMerge, MergeAsync);
     }
 
-    private async ValueTask SubmitAsync(
+    private async ValueTask<CommandHandlingOutcome> SubmitAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -53,7 +53,7 @@ public sealed class RequestBoardCommandModule(
         var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         if (args.Count < 2)
@@ -62,7 +62,7 @@ public sealed class RequestBoardCommandModule(
                 "Usage: !request <board> <title> | field=value | category=value | tags=a,b",
                 ct
             );
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var sections = string.Join(' ', args.Skip(1)).Split('|', StringSplitOptions.TrimEntries);
@@ -116,10 +116,10 @@ public sealed class RequestBoardCommandModule(
             ),
             ct
         );
-        return;
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask ListAsync(
+    private async ValueTask<CommandHandlingOutcome> ListAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -128,7 +128,7 @@ public sealed class RequestBoardCommandModule(
         var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         var boardList = await boards.GetBoardsForHostAsync(hostId.Value, ct);
@@ -139,7 +139,7 @@ public sealed class RequestBoardCommandModule(
                     ? "No request boards are configured."
                     : $"Request boards: {string.Join(", ", boardList.Select(board => board.Slug))}.";
             await context.ReplyAsync(names, ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var board = boardList.SingleOrDefault(value =>
@@ -155,10 +155,10 @@ public sealed class RequestBoardCommandModule(
                 : $"{board.Title} is {(board.IsOpen ? "open" : "closed")}. Voting: {(board.VotingEnabled ? $"up to {board.VoteLimitPerUser} per viewer" : "off")}. Order: {board.OrderingDescription} /requests/{board.HostLogin}/{board.Slug}",
             ct
         );
-        return;
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask VoteAsync(
+    private async ValueTask<CommandHandlingOutcome> VoteAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -167,7 +167,7 @@ public sealed class RequestBoardCommandModule(
         var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         if (
             args.Count != 1
@@ -175,7 +175,7 @@ public sealed class RequestBoardCommandModule(
         )
         {
             await context.ReplyAsync("Usage: !requestvote <request-id>", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var outcome = await boards.VoteAsync(hostId.Value, id, context.Message.Login, ct);
@@ -189,10 +189,10 @@ public sealed class RequestBoardCommandModule(
             ),
             ct
         );
-        return;
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask ModerateAsync(
+    private async ValueTask<CommandHandlingOutcome> ModerateAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         RequestSubmissionStatus target,
@@ -202,13 +202,13 @@ public sealed class RequestBoardCommandModule(
         var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That request-board command is moderator-only.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         if (
@@ -220,14 +220,14 @@ public sealed class RequestBoardCommandModule(
                 $"Usage: !request{target.ToString().ToLowerInvariant()} <request-id>",
                 ct
             );
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var current = await boards.GetModeratorSubmissionAsync(hostId.Value, id, ct);
         if (current is null)
         {
             await context.ReplyAsync("Request not found.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var outcome = await boards.ModerateAsync(
@@ -251,10 +251,10 @@ public sealed class RequestBoardCommandModule(
             ),
             ct
         );
-        return;
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask MergeAsync(
+    private async ValueTask<CommandHandlingOutcome> MergeAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -263,13 +263,13 @@ public sealed class RequestBoardCommandModule(
         var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (hostId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That request-board command is moderator-only.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         if (
@@ -289,7 +289,7 @@ public sealed class RequestBoardCommandModule(
         )
         {
             await context.ReplyAsync("Usage: !requestmerge <source-id> <target-id>", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
 
         var outcome = await boards.MergeAsync(
@@ -307,7 +307,7 @@ public sealed class RequestBoardCommandModule(
             ),
             ct
         );
-        return;
+        return new CommandHandlingOutcome.Handled();
     }
 
     private async Task<int?> FindHostIdAsync(string channel, CancellationToken ct)

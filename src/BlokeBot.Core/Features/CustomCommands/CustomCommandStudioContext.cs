@@ -31,6 +31,7 @@ public sealed class CustomCommandStudioContext
     public required Func<bool> FineTuningOpen { get; init; }
     public required Action<bool> SetFineTuningOpen { get; init; }
     public required Func<CustomCommandEditor, string> BasicsSummary { get; init; }
+    public required Func<CustomCommandEditor, IReadOnlyList<string>> BuiltInShadows { get; init; }
     public required Func<CustomCommandEditor, string> CommandInvocation { get; init; }
     public required Func<CustomCommandEditor, string> CommandAccessSummary { get; init; }
     public required Func<CustomCommandActionKind, string> ActionKindLabel { get; init; }

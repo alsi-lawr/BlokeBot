@@ -10,9 +10,9 @@ internal sealed class CollectiveCommandModule(
 ) : IChatCommandModule
 {
     public void AddCommands(IChatCommandBuilder commands) =>
-        _ = commands.Map(FixedChatCommandRoutes.Collective, ViewAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Collective, ViewAsync);
 
-    private async ValueTask ViewAsync(
+    private async ValueTask<CommandHandlingOutcome> ViewAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -33,12 +33,12 @@ internal sealed class CollectiveCommandModule(
             .FirstOrDefaultAsync(ct);
         if (collectiveId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var projection = await collectives.LoadPublicAsync(login, new(collectiveId.Value), ct);
         if (projection is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var progress = projection.Goal is { } goal
             ? $" · {goal.Name}: {goal.Current}/{goal.Target} {goal.UnitName}"
@@ -47,5 +47,6 @@ internal sealed class CollectiveCommandModule(
             $"{projection.Name}: {projection.ParticipatingHosts.Count} participating hosts{progress}. /collectives/{login}/{projection.Id.Value:D}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 }

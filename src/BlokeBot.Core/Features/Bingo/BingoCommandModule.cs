@@ -13,12 +13,12 @@ internal sealed class BingoCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        _ = commands.Map(FixedChatCommandRoutes.Bingo, ViewAsync);
-        _ = commands.Map(FixedChatCommandRoutes.BingoJoin, JoinAsync);
-        _ = commands.Map(FixedChatCommandRoutes.BingoLeave, LeaveAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.Bingo, ViewAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.BingoJoin, JoinAsync);
+        _ = commands.MapContextual(FixedChatCommandRoutes.BingoLeave, LeaveAsync);
     }
 
-    private async ValueTask ViewAsync(
+    private async ValueTask<CommandHandlingOutcome> ViewAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -27,13 +27,13 @@ internal sealed class BingoCommandModule(
         var host = await FindEnabledHostAsync(context.Message.Channel, ct);
         if (host is null)
         {
-            return;
+            return new CommandHandlingOutcome.Unhandled();
         }
         var view = await bingo.GetPublicAsync(host.Login, ct);
         if (view?.LiveGame is not { } game)
         {
             await context.ReplyAsync("No Bingo cards are live right now.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var viewerId = context.Message.Tags.GetValueOrDefault("user-id", string.Empty);
         var card = game.Cards.SingleOrDefault(value =>
@@ -44,20 +44,25 @@ internal sealed class BingoCommandModule(
             $"Bingo is live: {game.TemplateName} ({game.Dimension.Value}×{game.Dimension.Value}).{assignment} /bingo/{host.Login}",
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask JoinAsync(
+    private async ValueTask<CommandHandlingOutcome> JoinAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
     {
         var host = await FindEnabledHostAsync(context.Message.Channel, ct);
+        if (host is null)
+        {
+            return new CommandHandlingOutcome.Unhandled();
+        }
         var viewer = Viewer(context.Message);
         var operationId = OperationId(context.Message);
-        if (host is null || viewer is null || operationId is null)
+        if (viewer is null || operationId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var current = (await bingo.GetModeratorGamesAsync(host.Id, ct))
             .Select(value => value.Game)
@@ -65,7 +70,7 @@ internal sealed class BingoCommandModule(
         if (current is null)
         {
             await context.ReplyAsync("Bingo joining is closed.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         BingoTeamId? teamId = null;
         if (current.Mode == BingoGameMode.Team)
@@ -80,7 +85,7 @@ internal sealed class BingoCommandModule(
                     $"Choose a Bingo team: {string.Join(", ", current.Teams.Select(value => value.Name))}.",
                     ct
                 );
-                return;
+                return new CommandHandlingOutcome.Handled();
             }
             teamId = team.Id;
         }
@@ -102,20 +107,25 @@ internal sealed class BingoCommandModule(
                 : ResultMessage(result),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
-    private async ValueTask LeaveAsync(
+    private async ValueTask<CommandHandlingOutcome> LeaveAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
     {
         var host = await FindEnabledHostAsync(context.Message.Channel, ct);
+        if (host is null)
+        {
+            return new CommandHandlingOutcome.Unhandled();
+        }
         var viewer = Viewer(context.Message);
         var operationId = OperationId(context.Message);
-        if (host is null || viewer is null || operationId is null)
+        if (viewer is null || operationId is null)
         {
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var current = (await bingo.GetModeratorGamesAsync(host.Id, ct))
             .Select(value => value.Game)
@@ -123,7 +133,7 @@ internal sealed class BingoCommandModule(
         if (current is null)
         {
             await context.ReplyAsync("Bingo joining is closed.", ct);
-            return;
+            return new CommandHandlingOutcome.Handled();
         }
         var result = await bingo.RemoveAsync(
             host.Id,
@@ -143,6 +153,7 @@ internal sealed class BingoCommandModule(
                 : ResultMessage(result),
             ct
         );
+        return new CommandHandlingOutcome.Handled();
     }
 
     private async Task<HostReference?> FindEnabledHostAsync(string channel, CancellationToken ct)
