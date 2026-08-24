@@ -21,6 +21,7 @@
     <Project Path="src/BlokeBot.Functional/BlokeBot.Functional.csproj" />
     <Project Path="src/BlokeBot.Persistence/BlokeBot.Persistence.csproj" />
     <Project Path="src/BlokeBot.Plugins.Contracts/BlokeBot.Plugins.Contracts.csproj" />
+    <Project Path="src/BlokeBot.Plugins.Features/BlokeBot.Plugins.Features.csproj" />
     <Project Path="src/BlokeBot.Plugins.Runtime/BlokeBot.Plugins.Runtime.csproj" />
     <Project Path="src/BlokeBot.Twitch.Auth/BlokeBot.Twitch.Auth.csproj" />
     <Project Path="src/BlokeBot.Twitch.Runtime/BlokeBot.Twitch.Runtime.csproj" />
@@ -35,6 +36,7 @@
     <Project Path="tests/BlokeBot.Functional.Tests/BlokeBot.Functional.Tests.csproj" />
     <Project Path="tests/BlokeBot.Plugins.Contracts.Testing/BlokeBot.Plugins.Contracts.Testing.csproj" />
     <Project Path="tests/BlokeBot.Plugins.Contracts.Tests/BlokeBot.Plugins.Contracts.Tests.csproj" />
+    <Project Path="tests/BlokeBot.Plugins.Features.Tests/BlokeBot.Plugins.Features.Tests.csproj" />
     <Project Path="tests/BlokeBot.Core.Tests/BlokeBot.Core.Tests.csproj" />
     <Project Path="tests/BlokeBot.Site.Tests/BlokeBot.Site.Tests.csproj" />
     <Project Path="tests/BlokeBot.Testing/BlokeBot.Testing.csproj" />

@@ -1,0 +1,171 @@
+@using BlokeBot.Plugins.Contracts
+
+<div class="@_fieldClass">
+    @switch (Editor.Descriptor.Schema)
+    {
+        case PluginSettingSchema.Boolean:
+            @if (Editor.Descriptor.Required)
+            {
+                <span id="@_labelId" class="label">@Editor.Descriptor.Name</span>
+                <div class="flex items-center gap-2">
+                    <button @ref="_input"
+                            class="studio-toggle"
+                            type="button"
+                            role="switch"
+                            aria-checked="@Editor.BooleanValue.ToString().ToLowerInvariant()"
+                            aria-labelledby="@_labelId"
+                            aria-describedby="@_describedBy"
+                            @onclick="Editor.ToggleBoolean"></button>
+                    <span class="studio-toggle-label text-sm font-semibold text-[var(--app-text-medium)]">@(Editor.BooleanValue ? "On" : "Off")</span>
+                </div>
+            }
+            else
+            {
+                <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+                <select @ref="_input"
+                        id="@Editor.InputId"
+                        class="input"
+                        value="@(Editor.HasValue ? Editor.BooleanValue.ToString().ToLowerInvariant() : string.Empty)"
+                        aria-describedby="@_describedBy"
+                        @onchange="SetOptionalBoolean">
+                    <option value="">Use default</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                </select>
+            }
+            break;
+        case PluginSettingSchema.Text text:
+            <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+            <input @ref="_input"
+                   id="@Editor.InputId"
+                   class="input"
+                   maxlength="@text.MaximumLength"
+                   value="@Editor.Value"
+                   aria-invalid="@_invalid"
+                   aria-describedby="@_describedBy"
+                   @oninput="SetValue" />
+            break;
+        case PluginSettingSchema.MultilineText multiline:
+            <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+            <textarea @ref="_input"
+                      id="@Editor.InputId"
+                      class="input min-h-24 resize-y"
+                      maxlength="@multiline.MaximumLength"
+                      value="@Editor.Value"
+                      aria-invalid="@_invalid"
+                      aria-describedby="@_describedBy"
+                      @oninput="SetValue"></textarea>
+            break;
+        case PluginSettingSchema.Integer integer:
+            <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+            <input @ref="_input"
+                   id="@Editor.InputId"
+                   class="input"
+                   type="number"
+                   inputmode="numeric"
+                   min="@integer.Minimum"
+                   max="@integer.Maximum"
+                   value="@Editor.Value"
+                   aria-invalid="@_invalid"
+                   aria-describedby="@_describedBy"
+                   @oninput="SetValue" />
+            break;
+        case PluginSettingSchema.Number number:
+            <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+            <input @ref="_input"
+                   id="@Editor.InputId"
+                   class="input"
+                   type="number"
+                   inputmode="decimal"
+                   min="@number.Minimum"
+                   max="@number.Maximum"
+                   step="@NumberStep(number.DecimalPlaces)"
+                   value="@Editor.Value"
+                   aria-invalid="@_invalid"
+                   aria-describedby="@_describedBy"
+                   @oninput="SetValue" />
+            break;
+        case PluginSettingSchema.Duration duration:
+            <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+            <div class="flex items-center gap-2">
+                <input @ref="_input"
+                       id="@Editor.InputId"
+                       class="input"
+                       type="number"
+                       inputmode="numeric"
+                       min="@duration.MinimumSeconds"
+                       max="@duration.MaximumSeconds"
+                       value="@Editor.Value"
+                       aria-invalid="@_invalid"
+                       aria-describedby="@_describedBy"
+                       @oninput="SetValue" />
+                <span class="text-sm text-muted-foreground">seconds</span>
+            </div>
+            break;
+        case PluginSettingSchema.Choice choice:
+            <label class="label" for="@Editor.InputId">@Editor.Descriptor.Name</label>
+            <select @ref="_input"
+                    id="@Editor.InputId"
+                    class="input"
+                    value="@Editor.Value"
+                    aria-invalid="@_invalid"
+                    aria-describedby="@_describedBy"
+                    @onchange="SetValue">
+                <option value="">Choose</option>
+                @foreach (var option in choice.Choices)
+                {
+                    <option value="@option.Id.Value">@option.Name</option>
+                }
+            </select>
+            break;
+        case PluginSettingSchema.Secret:
+            <span class="label">@Editor.Descriptor.Name</span>
+            @if (Editor.SecretMode == PluginSecretEditMode.Saved)
+            {
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-semibold text-[var(--app-text-medium)]">A secret is saved.</span>
+                    <button @ref="_input" class="btn-secondary" type="button" @onclick="Editor.ReplaceSecret">Replace</button>
+                    <button class="btn-secondary" type="button" @onclick="Editor.ClearSecret">Clear</button>
+                </div>
+                <p class="form-help">The saved value never appears here.</p>
+            }
+            else if (Editor.SecretMode == PluginSecretEditMode.Clearing)
+            {
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-semibold text-[var(--app-text-medium)]">The secret will be cleared.</span>
+                    <button @ref="_input" class="btn-secondary" type="button" @onclick="Editor.CancelSecretEdit">Undo</button>
+                </div>
+            }
+            else
+            {
+                <input @ref="_input"
+                       id="@Editor.InputId"
+                       class="input"
+                       type="password"
+                       autocomplete="new-password"
+                       spellcheck="false"
+                       value="@Editor.Value"
+                       aria-label="@Editor.Descriptor.Name"
+                       aria-invalid="@_invalid"
+                       aria-describedby="@_describedBy"
+                       @oninput="SetValue" />
+                <div class="flex flex-wrap gap-2">
+                    @if (Editor.SecretMode == PluginSecretEditMode.Replacing)
+                    {
+                        <button class="btn-secondary" type="button" @onclick="Editor.CancelSecretEdit">Cancel replacement</button>
+                    }
+                    @if (Editor.HadSavedSecret)
+                    {
+                        <button class="btn-secondary" type="button" @onclick="Editor.ClearSecret">Clear</button>
+                    }
+                </div>
+            }
+            break;
+    }
+
+    <p id="@_descriptionId" class="form-help">@Editor.Descriptor.Description</p>
+    @if (Editor.Error is { } error)
+    {
+        <p id="@Editor.ErrorId" class="text-sm font-semibold text-red-700" role="alert">@error</p>
+    }
+</div>

@@ -2,6 +2,8 @@ using System.Reflection;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence;
+using BlokeBot.Plugins.Contracts;
+using BlokeBot.Plugins.Features;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
@@ -12,7 +14,8 @@ public sealed class ConfigurationDocumentExporter(
     AutomationCatalogService automationCatalog,
     AutomationFlowService automationFlows,
     ILogger<ConfigurationDocumentExporter> logger,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    IPluginFeatureStore pluginFeatures
 )
 {
     public async Task<ConfigurationExportOutcome> ExportAsync(
@@ -36,6 +39,19 @@ public sealed class ConfigurationDocumentExporter(
         {
             return new ConfigurationExportOutcome.Unsupported(
                 "Channel tool enablement contains a flag that format 1 cannot represent."
+            );
+        }
+        if (
+            selection.Sections.Contains(ConfigurationSectionId.ChannelToolEnablement)
+            && PluginHostId.TryCreate(hostId, out var pluginHostId)
+            && await pluginFeatures.HasFormat1IncompatibleStateAsync(
+                pluginHostId,
+                cancellationToken
+            )
+        )
+        {
+            return new ConfigurationExportOutcome.Unsupported(
+                "Format 1 cannot export plugin feature settings or state."
             );
         }
         if (

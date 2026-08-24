@@ -10,6 +10,7 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Persistence.Plugins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -183,7 +184,8 @@ public sealed class ConfigurationTransferAutomationTests
             transfer.Catalog,
             transfer.FlowService,
             NullLogger<ConfigurationDocumentExporter>.Instance,
-            TimeProvider.System
+            TimeProvider.System,
+            new EfPluginFeatureStore(database, new())
         ).ExportAsync(
             hostId,
             new(
@@ -615,7 +617,8 @@ public sealed class ConfigurationTransferAutomationTests
                 transfer.Catalog,
                 transfer.FlowService,
                 exportLogger,
-                TimeProvider.System
+                TimeProvider.System,
+                new EfPluginFeatureStore(database, new())
             ).ExportAsync(
                 hostId,
                 new(
@@ -745,7 +748,8 @@ public sealed class ConfigurationTransferAutomationTests
                 transfer.Catalog,
                 transfer.FlowService,
                 exportLogger,
-                TimeProvider.System
+                TimeProvider.System,
+                new EfPluginFeatureStore(database, new())
             ).ExportAsync(
                 hostId,
                 new(
@@ -914,7 +918,8 @@ public sealed class ConfigurationTransferAutomationTests
             transfer.Catalog,
             transfer.FlowService,
             exportLogger,
-            TimeProvider.System
+            TimeProvider.System,
+            new EfPluginFeatureStore(database, new())
         ).ExportAsync(
             hostId,
             new(
@@ -2419,7 +2424,8 @@ public sealed class ConfigurationTransferAutomationTests
             transfer.Catalog,
             transfer.FlowService,
             NullLogger<ConfigurationDocumentExporter>.Instance,
-            TimeProvider.System
+            TimeProvider.System,
+            new EfPluginFeatureStore(database, new())
         ).ExportAsync(
             hostId,
             new(

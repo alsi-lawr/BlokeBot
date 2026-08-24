@@ -11,6 +11,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
+using BlokeBot.Plugins.Features;
 using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,10 @@ internal static class UiTestContextFactory
         _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
         _ = context.Services.AddSingleton(BlokeBotBuildIdentity.Current);
         _ = context.Services.AddSingleton<UiFaultTelemetry>();
+        var declarations = new PluginFeatureDeclarationRegistry();
+        var snapshots = new PluginFeatureSnapshotRegistry();
+        _ = context.Services.AddSingleton<IPluginFeatureDeclarationProvider>(declarations);
+        _ = context.Services.AddSingleton<IPluginFeatureSnapshotProvider>(snapshots);
         _ = context.Services.AddScoped<DashboardFragmentState>();
         _ = context.Services.AddSingleton<HostedChannelChangeNotifier>();
         _ = context.Services.AddSingleton<HostFeatureService>();

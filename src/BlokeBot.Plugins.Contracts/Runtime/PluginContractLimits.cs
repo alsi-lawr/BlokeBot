@@ -18,4 +18,16 @@ public static class PluginContractLimits
     public const int MaximumPluginValuePayloadBytes = 256 * 1024;
     public const int MaximumHostFailureSafeMessageCharacters = 1_000;
     public const int MaximumHostFailureSafeMessageBytes = 2 * 1024;
+    public const int MaximumTextSettingCharacters = 4_096;
+    public const int MaximumMultilineSettingCharacters = 16_384;
+    public const int MaximumSecretSettingCharacters = 4_096;
+    public const int MaximumSettingChoices = 64;
+    public const long MinimumIntegerSettingValue = -1_000_000_000_000;
+    public const long MaximumIntegerSettingValue = 1_000_000_000_000;
+    public const decimal MinimumNumberSettingValue = -1_000_000_000_000m;
+    public const decimal MaximumNumberSettingValue = 1_000_000_000_000m;
+    public const int MaximumNumberDecimalPlaces = 6;
+    public const long MaximumDurationSettingSeconds = 31_536_000;
+    public const int MaximumOrdinarySettingsJsonBytes = 64 * 1024;
+    public const int MaximumReadinessReasonCharacters = 256;
 }

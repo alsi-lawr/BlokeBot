@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Persistence.Plugins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -51,7 +52,8 @@ public sealed class ConfigurationTransferCustomCommandTests
                 automation.Catalog,
                 automation.Flows,
                 NullLogger<ConfigurationDocumentExporter>.Instance,
-                TimeProvider.System
+                TimeProvider.System,
+                new EfPluginFeatureStore(database, new())
             ).ExportAsync(
                 hostId,
                 new(

@@ -20,6 +20,7 @@ using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Core.Features.PlayWithViewers;
+using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Commands;
 using BlokeBot.Core.Features.Points.Giveaways;
@@ -131,6 +132,7 @@ public static partial class BlokeBotApplication
             .AddBlokeBotPlayWithViewers()
             .AddBlokeBotMoments()
             .AddBlokeBotOverlays()
+            .AddBlokeBotPluginFeatures()
             .AddBlokeBotConfigurationTransfer()
             .AddBlokeBotToasts()
             .AddBlokeBotTwitchOperations()

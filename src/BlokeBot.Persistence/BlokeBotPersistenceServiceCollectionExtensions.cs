@@ -1,4 +1,5 @@
 using BlokeBot.Persistence.Plugins;
+using BlokeBot.Plugins.Features;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,8 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
         );
         _ = services.AddSingleton<BlokeBotDatabaseInitializer>();
         _ = services.AddSingleton<IPluginLifecycleStore, EfPluginLifecycleStore>();
+        _ = services.AddSingleton<PluginSettingValuesCodec>();
+        _ = services.AddSingleton<IPluginFeatureStore, EfPluginFeatureStore>();
 
         return services;
     }

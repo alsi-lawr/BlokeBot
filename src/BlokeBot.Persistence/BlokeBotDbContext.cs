@@ -235,6 +235,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureCollectives(modelBuilder);
         ConfigureConfigurationTransfer(modelBuilder);
         ConfigurePluginLifecycles(modelBuilder);
+        ConfigurePluginFeatures(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>

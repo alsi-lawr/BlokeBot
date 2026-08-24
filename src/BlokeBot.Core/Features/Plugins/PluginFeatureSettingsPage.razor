@@ -1,0 +1,70 @@
+@page "/plugins/{PluginIdValue}/features/{FeatureIdValue}"
+@using BlokeBot.Plugins.Features
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+
+<PageTitle>BlokeBot | Plugin feature</PageTitle>
+
+<DashboardPage Kicker="@_pluginName"
+               Title="@_title"
+               Description="@_description"
+               LoadState="@_loadState"
+               SaveFeedback="@_saveFeedback"
+               Width="DashboardPageWidth.Readable">
+    <Actions>
+        <span class="@_statusClass">
+            <span class="status-pill__dot"></span>
+            <span class="status-pill__label">@_statusLabel</span>
+        </span>
+    </Actions>
+    <SaveAction>
+        <SaveChangesButton Disabled="@(_editor is null)" Saving="@_saving" OnSave="SaveAsync" />
+    </SaveAction>
+    <ChildContent>
+        @if (_editor is not null)
+        {
+            <div class="grid gap-4">
+                <TaskPanel Title="@_statusTitle" Description="@_statusDescription">
+                    <Actions>
+                        @switch (_state?.Readiness)
+                        {
+                            case PluginFeatureReadiness.Ready:
+                                <button class="btn-secondary" type="button" @onclick="DisableAsync">Disable</button>
+                                break;
+                            case PluginFeatureReadiness.EnabledDegraded:
+                                <button class="btn-secondary" type="button" @onclick="DisableAsync">Disable</button>
+                                <button class="btn-primary" type="button" @onclick="RetryAsync">Check again</button>
+                                break;
+                            default:
+                                <button class="btn-primary" type="button" @onclick="EnableAsync">Enable</button>
+                                break;
+                        }
+                    </Actions>
+                    <ChildContent>
+                        <span class="sr-only" role="status">@_statusLabel</span>
+                    </ChildContent>
+                </TaskPanel>
+                <TaskPanel Title="Channel settings"
+                           Description="@($"These values apply only to {Host?.DisplayName}.")">
+                    @if (_sharedSettingsNeedAttention)
+                    {
+                        <div class="card mb-4 p-4" role="alert">
+                            <p class="text-sm font-semibold">Check the shared plugin settings before enabling.</p>
+                            <AuthorizeView Policy="BotAdmin">
+                                <Authorized>
+                                    <a class="btn-secondary mt-3 inline-flex"
+                                       href="@($"plugins/{PluginIdValue}/settings")">Open shared settings</a>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <p class="form-help mt-2">Ask a bot admin to check them.</p>
+                                </NotAuthorized>
+                            </AuthorizeView>
+                        </div>
+                    }
+                    <PluginGeneratedSettingsForm Editor="_editor" />
+                </TaskPanel>
+            </div>
+        }
+    </ChildContent>
+</DashboardPage>

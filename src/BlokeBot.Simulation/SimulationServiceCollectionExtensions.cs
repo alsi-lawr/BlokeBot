@@ -3,6 +3,7 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
+using BlokeBot.Plugins.Features;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Simulation;
@@ -13,6 +14,12 @@ internal static class SimulationServiceCollectionExtensions
     {
         _ = services.Replace(
             ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider())
+        );
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<
+                IPluginFeatureLifecycleHealth,
+                SimulationPluginFeatureLifecycleHealth
+            >()
         );
         _ = services.Replace(
             ServiceDescriptor.Singleton<
@@ -68,6 +75,7 @@ internal static class SimulationServiceCollectionExtensions
             )
         );
         _ = services.AddSingleton<SimulationFixtureSeeder>();
+        _ = services.AddSingleton<SimulationPluginFeatureScenario>();
         _ = services.AddSingleton<SimulationReadiness>();
         _ = services.AddSingleton<SimulationStartupCoordinator>();
         return services;
@@ -97,6 +105,13 @@ internal static class SimulationServiceCollectionExtensions
             TimeSpan dueTime,
             TimeSpan period
         ) => TimeProvider.System.CreateTimer(callback, state, dueTime, period);
+    }
+
+    private sealed class SimulationPluginFeatureLifecycleHealth : IPluginFeatureLifecycleHealth
+    {
+        public bool IsCurrent(PluginFeatureDeclaration declaration) => true;
+
+        public bool IsHealthy(PluginFeatureDeclaration declaration) => false;
     }
 
     private sealed class SimulationPointTargetUserLookup : IPointTargetUserLookup

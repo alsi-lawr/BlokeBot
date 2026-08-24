@@ -2,6 +2,8 @@
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Hosts
 @using BlokeBot.Persistence.Models
+@using BlokeBot.Plugins.Contracts
+@using BlokeBot.Plugins.Features
 @inject EventBus<AppEventKind> _events
 @inject HostFeatureService _features
 @inject IJSRuntime _js
@@ -40,6 +42,14 @@
                     var showHostConfig = session.CanOpenHostConfig(_existingHostIds);
                     var showConfigurationTransfer =
                         selection is not null && session.CanUseBotFunctions(_existingHostIds);
+                    PluginHostId? pluginFeatureHost = null;
+                    if (
+                        showConfigurationTransfer
+                        && PluginHostId.TryCreate(selection!.Current.Id, out var selectedPluginHost)
+                    )
+                    {
+                        pluginFeatureHost = selectedPluginHost;
+                    }
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showBounties = FeatureIsVisible(
@@ -172,6 +182,7 @@
                                                   args => CloseGroupOnEscape(NavigationGroup.Automations, args)
                                               ))))"
                                       Routes="routes" />
+                <NavMenuPluginFeatures HostId="pluginFeatureHost" Routes="routes" />
                 @if (selection is not null)
                 {
                     <div class="nav-menu__active-channel nav-menu__metadata mt-auto rounded-xl p-3">

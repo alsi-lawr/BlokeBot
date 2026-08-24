@@ -1,0 +1,18 @@
+@if (Editor.Settings.Count == 0)
+{
+    <p class="text-sm text-muted-foreground">No settings are required.</p>
+}
+else
+{
+    <div class="studio-grid">
+        @foreach (var setting in Editor.Settings)
+        {
+            <PluginGeneratedSettingField Editor="setting" @key="setting.Descriptor.Id" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public PluginSettingsEditor Editor { get; set; } = default!;
+}

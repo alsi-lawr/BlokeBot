@@ -1,0 +1,67 @@
+@using BlokeBot.Core.Features.Plugins
+@using BlokeBot.Plugins.Features
+@inject IPluginFeatureDeclarationProvider DeclarationProvider
+@inject IPluginFeatureSnapshotProvider SnapshotProvider
+@implements IAsyncDisposable
+
+<AuthorizeView Policy="BotAdmin">
+    <Authorized>
+        @if (_plugins.Length > 0)
+        {
+            <div class="nav-menu__separator" aria-hidden="true"></div>
+            <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                Plugin settings
+            </div>
+        }
+        @foreach (var plugin in _plugins)
+        {
+            <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                 data-nav-destination="plugin-@plugin.Id.Value-settings">
+                <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                         ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
+                         href="@($"plugins/{plugin.Id.Value}/settings")"
+                         aria-label="@($"{plugin.Name} settings")"
+                         aria-describedby="@Routes.RouteHelpReference($"plugin-{plugin.Id.Value}-settings")"
+                         aria-current="@Routes.CurrentRoute($"plugins/{plugin.Id.Value}/settings", exact: true)"
+                         @onclick="Routes.NotifyNavigatedAsync">
+                    <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600" aria-hidden="true">⚙</span>
+                    <span class="nav-menu__label min-w-0">@plugin.Name settings</span>
+                </NavLink>
+                @Routes.RouteHelp($"plugin-{plugin.Id.Value}-settings", $"{plugin.Name} settings")
+            </div>
+        }
+    </Authorized>
+</AuthorizeView>
+
+@if (HostId is not null && _plugins.Any(static plugin => plugin.Features.Length > 0))
+{
+    <div class="nav-menu__separator" aria-hidden="true"></div>
+    <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+        Plugin tools
+    </div>
+    @foreach (var plugin in _plugins)
+    {
+        @foreach (var feature in plugin.Features)
+        {
+            var routeKey = $"plugin-{plugin.Id.Value}-{feature.Id.Value}";
+            var route = $"plugins/{plugin.Id.Value}/features/{feature.Id.Value}";
+            <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                 data-nav-destination="@routeKey">
+                <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                         ActiveClass="nav-menu__item-active"
+                         href="@route"
+                         aria-label="@feature.Name"
+                         aria-describedby="@Routes.RouteHelpReference(routeKey)"
+                         aria-current="@Routes.CurrentRoute(route, exact: true)"
+                         @onclick="Routes.NotifyNavigatedAsync">
+                    <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">◆</span>
+                    <span class="nav-menu__label min-w-0">
+                        <span class="block truncate">@feature.Name</span>
+                        <span class="block text-xs font-medium text-slate-500">@ReadinessLabel(feature.Readiness)</span>
+                    </span>
+                </NavLink>
+                @Routes.RouteHelp(routeKey, feature.Name)
+            </div>
+        }
+    }
+}

@@ -181,17 +181,7 @@ public static partial class PluginManifestValidator
         {
             ValidateName(setting.Name, "$.settings.name", errors);
             ValidateText(setting.Description, "$.settings.description", required: true, errors);
-            if (
-                setting.ValueKind == PluginSettingValueKind.Choice
-                    ? setting.Choices.Length < 2
-                        || setting.Choices.Distinct(StringComparer.Ordinal).Count()
-                            != setting.Choices.Length
-                        || setting.Choices.Any(choice =>
-                            string.IsNullOrWhiteSpace(choice)
-                            || choice.Length > PluginContractLimits.MaximumNameCharacters
-                        )
-                    : setting.Choices.Length != 0
-            )
+            if (!ValidSettingSchema(setting.Schema))
             {
                 errors.Add(new(PluginManifestErrorCode.InvalidSetting, "$.settings"));
             }
@@ -215,6 +205,45 @@ public static partial class PluginManifestValidator
             ValidateTwitch(feature.Twitch, errors);
         }
     }
+
+    private static bool ValidSettingSchema(PluginSettingSchema schema) =>
+        schema.Match(
+            _ => true,
+            text =>
+                text.MaximumLength is >= 1 and <= PluginContractLimits.MaximumTextSettingCharacters,
+            multiline =>
+                multiline.MaximumLength
+                    is >= 1
+                        and <= PluginContractLimits.MaximumMultilineSettingCharacters,
+            integer =>
+                integer.Minimum >= PluginContractLimits.MinimumIntegerSettingValue
+                && integer.Maximum <= PluginContractLimits.MaximumIntegerSettingValue
+                && integer.Minimum <= integer.Maximum,
+            number =>
+                number.Minimum >= PluginContractLimits.MinimumNumberSettingValue
+                && number.Maximum <= PluginContractLimits.MaximumNumberSettingValue
+                && number.Minimum <= number.Maximum
+                && number.DecimalPlaces
+                    is >= 0
+                        and <= PluginContractLimits.MaximumNumberDecimalPlaces,
+            duration =>
+                duration.MinimumSeconds >= 0
+                && duration.MaximumSeconds <= PluginContractLimits.MaximumDurationSettingSeconds
+                && duration.MinimumSeconds <= duration.MaximumSeconds,
+            choice => ValidChoices(choice.Choices),
+            secret =>
+                secret.MaximumLength
+                    is >= 1
+                        and <= PluginContractLimits.MaximumSecretSettingCharacters
+        );
+
+    private static bool ValidChoices(ImmutableArray<PluginSettingChoiceDescriptor> choices) =>
+        choices.Length is >= 2 and <= PluginContractLimits.MaximumSettingChoices
+        && choices.Select(static choice => choice.Id).Distinct().Count() == choices.Length
+        && choices.All(static choice =>
+            !string.IsNullOrWhiteSpace(choice.Name)
+            && choice.Name.Length <= PluginContractLimits.MaximumNameCharacters
+        );
 
     private static void ValidateTwitch(
         PluginTwitchRequirements twitch,

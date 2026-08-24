@@ -36,6 +36,8 @@ internal static class SimulationViewCatalog
             $"/competitions/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["custom-commands"] = "/custom-commands/settings#commands",
         ["configuration-transfer"] = "/configuration-transfer",
+        ["plugin-installation"] = "/plugins/community.link-queue/settings",
+        ["plugin-collection"] = "/plugins/community.link-queue/features/collection",
         ["automation-events"] = "/automations/events",
         ["automations"] = "/automations",
         ["overlays"] = "/overlays#sources",

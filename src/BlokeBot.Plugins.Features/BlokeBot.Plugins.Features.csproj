@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\BlokeBot.Plugins.Contracts\BlokeBot.Plugins.Contracts.csproj" />
+    <ProjectReference Include="..\BlokeBot.Plugins.Runtime\BlokeBot.Plugins.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

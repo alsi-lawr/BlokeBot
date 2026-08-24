@@ -1,0 +1,26 @@
+@page "/plugins/{PluginIdValue}/settings"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "BotAdmin")]
+@inherits AuthenticatedPageComponent
+
+<PageTitle>BlokeBot | Plugin settings</PageTitle>
+
+<DashboardPage Kicker="Plugin settings"
+               Title="@_title"
+               Description="Settings shared by every channel."
+               LoadState="@_loadState"
+               SaveFeedback="@_saveFeedback"
+               Width="DashboardPageWidth.Readable">
+    <SaveAction>
+        <SaveChangesButton Disabled="@(_editor is null)" Saving="@_saving" OnSave="SaveAsync" />
+    </SaveAction>
+    <ChildContent>
+        @if (_editor is not null)
+        {
+            <TaskPanel Title="Shared settings"
+                       Description="These values apply to all enabled features.">
+                <PluginGeneratedSettingsForm Editor="_editor" />
+            </TaskPanel>
+        }
+    </ChildContent>
+</DashboardPage>

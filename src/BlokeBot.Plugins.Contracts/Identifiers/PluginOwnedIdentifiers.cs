@@ -32,6 +32,22 @@ public sealed record PluginSettingId
         );
 }
 
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginSettingChoiceId>))]
+public sealed record PluginSettingChoiceId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginSettingChoiceId>
+{
+    private PluginSettingChoiceId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginSettingChoiceId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginSettingChoiceId(value),
+            out identifier
+        );
+}
+
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginFeatureId>))]
 public sealed record PluginFeatureId
     : PluginContractIdentifier,

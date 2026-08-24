@@ -3,7 +3,10 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 
 namespace BlokeBot.Simulation;
 
-internal sealed class SimulationStartupCoordinator(SimulationFixtureSeeder fixtures)
+internal sealed class SimulationStartupCoordinator(
+    SimulationFixtureSeeder fixtures,
+    SimulationPluginFeatureScenario pluginFeatures
+)
 {
     public async Task BootstrapAsync(WebApplication app, CancellationToken cancellationToken)
     {
@@ -32,6 +35,7 @@ internal sealed class SimulationStartupCoordinator(SimulationFixtureSeeder fixtu
             .Services.GetRequiredService<HostedChannelRuntimeControlService>()
             .Start(host.Id)
             .ExecuteAsync(cancellationToken);
+        await pluginFeatures.SeedAsync(host.Id, cancellationToken);
     }
 
     private static async Task FollowRedirectsAsync(

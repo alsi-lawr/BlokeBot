@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\BlokeBot.Plugins.Contracts.Testing\BlokeBot.Plugins.Contracts.Testing.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Plugins.Features\BlokeBot.Plugins.Features.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+</Project>

@@ -5,6 +5,8 @@ using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Persistence.Plugins;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -249,7 +251,8 @@ public sealed class ConfigurationTransferContractTests
             automation.Catalog,
             automation.Flows,
             NullLogger<ConfigurationDocumentExporter>.Instance,
-            TimeProvider.System
+            TimeProvider.System,
+            new EfPluginFeatureStore(database, new())
         );
 
         var both = await ExportOverlaysAsync(exporter, hostId, urls: true, media: true);
@@ -318,7 +321,8 @@ public sealed class ConfigurationTransferContractTests
                 automation.Catalog,
                 automation.Flows,
                 NullLogger<ConfigurationDocumentExporter>.Instance,
-                TimeProvider.System
+                TimeProvider.System,
+                new EfPluginFeatureStore(database, new())
             ).ExportAsync(
                 hostId,
                 new(
@@ -335,6 +339,102 @@ public sealed class ConfigurationTransferContractTests
         ChannelToolEnablementMapper
             .ToFlags(exported.Document.Sections.ChannelToolEnablement!)
             .ShouldBe(HostFeatureFlags.RaidCollaboration | HostFeatureFlags.CustomCommands);
+    }
+
+    [Test]
+    public async Task ChannelToolExport_WithPluginFeatureConfigurationOrState_ReturnsUnsupported()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "plugin-format-one",
+                DisplayName = "Plugin format one",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+            _ = db.PluginFeatureConfigurations.Add(
+                new()
+                {
+                    PluginId = "community-links",
+                    FeatureId = "collection",
+                    HostId = hostId,
+                    ValuesJson = "[]",
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var automation = ConfigurationTransferAutomationTestServices.Create(database);
+
+        var outcome = await new ConfigurationDocumentExporter(
+            database,
+            new(),
+            automation.Catalog,
+            automation.Flows,
+            NullLogger<ConfigurationDocumentExporter>.Instance,
+            TimeProvider.System,
+            new EfPluginFeatureStore(database, new())
+        ).ExportAsync(
+            hostId,
+            new(
+                new HashSet<ConfigurationSectionId>
+                {
+                    ConfigurationSectionId.ChannelToolEnablement,
+                },
+                new(false, false, false)
+            ),
+            CancellationToken.None
+        );
+
+        var unsupported = outcome.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
+        unsupported.Message.ShouldContain("plugin feature");
+
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            _ = db.PluginFeatureConfigurations.Remove(
+                await db.PluginFeatureConfigurations.SingleAsync()
+            );
+            _ = db.PluginFeatureStates.Add(
+                new()
+                {
+                    PluginId = "community-links",
+                    FeatureId = "collection",
+                    HostId = hostId,
+                    LifecycleOperationId = Guid.NewGuid(),
+                    WorkerGeneration = 1,
+                    FeatureGeneration = 1,
+                    Readiness = PluginFeatureReadinessKind.Disabled,
+                    Revision = 1,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        _ = (
+            await new ConfigurationDocumentExporter(
+                database,
+                new(),
+                automation.Catalog,
+                automation.Flows,
+                NullLogger<ConfigurationDocumentExporter>.Instance,
+                TimeProvider.System,
+                new EfPluginFeatureStore(database, new())
+            ).ExportAsync(
+                hostId,
+                new(
+                    new HashSet<ConfigurationSectionId>
+                    {
+                        ConfigurationSectionId.ChannelToolEnablement,
+                    },
+                    new(false, false, false)
+                ),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
     }
 
     [Test]

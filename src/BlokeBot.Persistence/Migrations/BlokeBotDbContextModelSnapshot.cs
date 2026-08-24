@@ -6120,6 +6120,176 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("play_queue_role_requirements", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginFeatureConfigurationRecord", b =>
+                {
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FeatureId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PluginId", "FeatureId", "HostId");
+
+                    b.HasIndex("HostId");
+
+                    b.ToTable("plugin_feature_configurations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_plugin_feature_configurations_Revision", "\"Revision\" >= 0");
+
+                            t.HasCheckConstraint("CK_plugin_feature_configurations_ValuesJson", "json_valid(\"ValuesJson\") AND json_type(\"ValuesJson\") = 'array' AND length(CAST(\"ValuesJson\" AS BLOB)) <= 65536");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginFeatureSecretRecord", b =>
+                {
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FeatureId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SettingId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("ProtectedValue")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("PluginId", "FeatureId", "HostId", "SettingId");
+
+                    b.ToTable("plugin_feature_secrets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_plugin_feature_secrets_ProtectedValue", "length(\"ProtectedValue\") > 0 AND length(\"ProtectedValue\") <= 32768");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginFeatureStateRecord", b =>
+                {
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FeatureId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("FeatureGeneration")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("LifecycleOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Readiness")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReasonCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReasonDetail")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecoveryAction")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("WorkerGeneration")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("PluginId", "FeatureId", "HostId");
+
+                    b.HasIndex("HostId");
+
+                    b.ToTable("plugin_feature_states", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_plugin_feature_states_Generations", "\"WorkerGeneration\" > 0 AND \"FeatureGeneration\" > 0");
+
+                            t.HasCheckConstraint("CK_plugin_feature_states_Readiness", "\"Readiness\" IN ('Disabled', 'EnabledDegraded', 'Ready')");
+
+                            t.HasCheckConstraint("CK_plugin_feature_states_Reason", "(\"Readiness\" = 'EnabledDegraded' AND \"ReasonCode\" IS NOT NULL AND \"RecoveryAction\" IS NOT NULL AND \"ReasonDetail\" IS NOT NULL) OR (\"Readiness\" <> 'EnabledDegraded' AND \"ReasonCode\" IS NULL AND \"RecoveryAction\" IS NULL AND \"ReasonDetail\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_plugin_feature_states_ReasonCode", "\"ReasonCode\" IS NULL OR \"ReasonCode\" IN ('MissingScopes', 'ReconciliationPending', 'ReconciliationFailed')");
+
+                            t.HasCheckConstraint("CK_plugin_feature_states_ReasonDetail", "\"ReasonDetail\" IS NULL OR length(trim(\"ReasonDetail\")) BETWEEN 1 AND 256");
+
+                            t.HasCheckConstraint("CK_plugin_feature_states_RecoveryAction", "\"RecoveryAction\" IS NULL OR \"RecoveryAction\" IN ('ReconnectTwitch', 'Retry')");
+
+                            t.HasCheckConstraint("CK_plugin_feature_states_Revision", "\"Revision\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginInstallationConfigurationRecord", b =>
+                {
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PluginId");
+
+                    b.ToTable("plugin_installation_configurations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_plugin_installation_configurations_Revision", "\"Revision\" >= 0");
+
+                            t.HasCheckConstraint("CK_plugin_installation_configurations_ValuesJson", "json_valid(\"ValuesJson\") AND json_type(\"ValuesJson\") = 'array' AND length(CAST(\"ValuesJson\" AS BLOB)) <= 65536");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginInstallationSecretRecord", b =>
+                {
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SettingId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("ProtectedValue")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("PluginId", "SettingId");
+
+                    b.ToTable("plugin_installation_secrets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_plugin_installation_secrets_ProtectedValue", "length(\"ProtectedValue\") > 0 AND length(\"ProtectedValue\") <= 32768");
+                        });
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.PluginLifecycleOutcomeRecord", b =>
                 {
                     b.Property<string>("PluginId")
@@ -9974,6 +10144,42 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Queue");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginFeatureConfigurationRecord", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginFeatureSecretRecord", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.PluginFeatureConfigurationRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PluginId", "FeatureId", "HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginFeatureStateRecord", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PluginInstallationSecretRecord", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.PluginInstallationConfigurationRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PluginId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.PointBalance", b =>

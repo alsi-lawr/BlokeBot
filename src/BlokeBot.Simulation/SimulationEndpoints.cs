@@ -66,6 +66,18 @@ internal static class SimulationEndpoints
             .AllowAnonymous();
 
         _ = app.MapPost(
+                "/simulation/plugin-features/{state}",
+                static async (
+                    string state,
+                    SimulationPluginFeatureScenario scenario,
+                    CancellationToken ct
+                ) =>
+                    await scenario.SetReadinessAsync(state, ct)
+                        ? Results.Ok()
+                        : Results.BadRequest()
+            )
+            .AllowAnonymous();
+        _ = app.MapPost(
                 "/simulation/configuration-activation/{mode}",
                 static (string mode, SimulationConfigurationActivationObserver observer) =>
                 {
