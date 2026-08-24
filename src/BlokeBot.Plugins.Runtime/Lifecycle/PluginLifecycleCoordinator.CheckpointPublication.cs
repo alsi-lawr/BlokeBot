@@ -87,21 +87,32 @@ public sealed partial class PluginLifecycleCoordinator
         )
         {
             var restoration = _snapshots.TryRestoreOriginal(publication);
-            if (restoration == PluginRuntimeRollbackOutcome.Restored)
+            if (restoration is PluginRuntimeRollbackOutcome.Restored)
             {
-                if (publication.Original?.Worker is not { Termination.IsCompleted: true })
+                if (publication.Original?.Worker is not { } worker)
+                {
+                    return new PluginCheckpointWriteOutcome.Rejected(Conflict(current));
+                }
+
+                if (!worker.Termination.IsCompleted)
                 {
                     return new PluginCheckpointWriteOutcome.Rejected(Conflict(current));
                 }
 
                 publication = _snapshots.StopAdmission(current!);
-                restoration = PluginRuntimeRollbackOutcome.WorkerTerminated;
+                restoration = new PluginRuntimeRollbackOutcome.TerminationObserved(
+                    await worker.Termination
+                );
             }
 
-            if (restoration == PluginRuntimeRollbackOutcome.WorkerTerminated)
+            if (restoration is PluginRuntimeRollbackOutcome.TerminationObserved terminated)
             {
                 return new PluginCheckpointWriteOutcome.Rejected(
-                    await FaultTerminatedRollbackAsync(current!, publication.Ownership)
+                    await HandleRollbackTerminationAsync(
+                        current!,
+                        terminated.Failure,
+                        publication.Ownership
+                    )
                 );
             }
         }
@@ -111,39 +122,57 @@ public sealed partial class PluginLifecycleCoordinator
         );
     }
 
-    private async ValueTask<PluginLifecycleCommandOutcome> FaultTerminatedRollbackAsync(
+    private async ValueTask<PluginLifecycleCommandOutcome> HandleRollbackTerminationAsync(
         PluginLifecycleState current,
+        PluginWorkerFailure failure,
         PluginRuntimeSlot? ownership
     )
     {
-        if (current is { Phase: PluginLifecyclePhase.Preparing, ActiveRuntime: not null })
+        var handled = await ApplyWorkerTerminationAsync(current, failure);
+        if (handled is PluginWorkerTerminationCheckpointOutcome.Completed completed)
         {
-            var restored = Applied(
-                PluginLifecycleStateMachine.PreparationFailed(
-                    current,
-                    PluginLifecycleFailureCode.WorkerExited,
-                    SafeDetail("The active plugin worker exited while lifecycle work was pending."),
-                    Now()
-                )
-            );
-            var written = await _store.WriteAsync(current, restored, CancellationToken.None);
-            if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
-            {
-                return await SettleAndPublishConflictAsync(current, ownership, conflict.Current);
-            }
-
-            current = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
+            return completed.Outcome;
         }
 
-        return current is { Phase: PluginLifecyclePhase.Active, ActiveRuntime: not null }
-            ? await FaultAsync(
-                current,
-                PluginLifecyclePhase.Active,
-                PluginLifecycleFailureCode.WorkerExited,
-                SafeDetail("The active plugin worker exited while lifecycle work was pending."),
+        if (handled is not PluginWorkerTerminationCheckpointOutcome.Replacement replacement)
+        {
+            return await SettleAndPublishConflictAsync(current, ownership, current);
+        }
+
+        await DelayUntilAsync(replacement.State.RestartNotBeforeUtc!.Value, CancellationToken.None);
+        var scheduled = await _store.LoadAsync(current.PluginId, CancellationToken.None);
+        if (
+            scheduled is not { Phase: PluginLifecyclePhase.Activating }
+            || scheduled.SelectedFence != replacement.State.SelectedFence
+        )
+        {
+            return Conflict(scheduled);
+        }
+
+        var resolved = await _packages.ResolveAsync(
+            scheduled.SelectedInstallation,
+            CancellationToken.None
+        );
+        if (resolved is not PluginLifecyclePackageResolution.Available available)
+        {
+            return await FaultAsync(
+                scheduled,
+                PluginLifecyclePhase.Activating,
+                PluginLifecycleFailureCode.RecoveryPackageUnavailable,
+                SafeDetail("The replacement plugin package is unavailable."),
                 CancellationToken.None
-            )
-            : await SettleAndPublishConflictAsync(current, ownership, current);
+            );
+        }
+
+        var restarted = await StartAndPublishAsync(
+            scheduled,
+            available.Package,
+            recovered: true,
+            CancellationToken.None
+        );
+        return restarted is PluginLifecycleCommandOutcome.Succeeded
+            ? Conflict(await _store.LoadAsync(current.PluginId, CancellationToken.None))
+            : restarted;
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> SettleAndPublishConflictAsync(

@@ -114,7 +114,7 @@ public sealed partial class PluginLifecycleCoordinator
 
         active = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
         _ = _snapshots.Publish(active, worker);
-        ObserveUnexpectedExit(active, package, worker);
+        ObserveWorkerTermination(active, package, worker);
         return Succeeded(active);
     }
 

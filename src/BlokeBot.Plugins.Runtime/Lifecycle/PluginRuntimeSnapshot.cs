@@ -112,11 +112,16 @@ internal sealed record PluginAdmissionStopPublication(
     PluginRuntimeSlot? Ownership
 );
 
-internal enum PluginRuntimeRollbackOutcome
+internal abstract record PluginRuntimeRollbackOutcome
 {
-    Restored,
-    WorkerTerminated,
-    PublicationChanged,
+    private PluginRuntimeRollbackOutcome() { }
+
+    internal sealed record Restored : PluginRuntimeRollbackOutcome;
+
+    internal sealed record TerminationObserved(PluginWorkerFailure Failure)
+        : PluginRuntimeRollbackOutcome;
+
+    internal sealed record PublicationChanged : PluginRuntimeRollbackOutcome;
 }
 
 internal sealed class PluginAdmissionTracker

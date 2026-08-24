@@ -42,6 +42,8 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 
     internal bool ConflictAfterNextWrite { get; set; }
 
+    internal List<PluginLifecycleState> WrittenStates { get; } = [];
+
     internal void PauseNextWrite()
     {
         WriteStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -194,6 +196,7 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
             }
 
             _states[expected.PluginId] = next;
+            WrittenStates.Add(next);
             outcome = new PluginLifecycleStoreWriteOutcome.Written(next);
             exception = ExceptionAfterNextWrite;
             ExceptionAfterNextWrite = null;

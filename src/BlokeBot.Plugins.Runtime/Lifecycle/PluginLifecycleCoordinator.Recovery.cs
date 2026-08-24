@@ -87,7 +87,7 @@ public sealed partial class PluginLifecycleCoordinator
                 Phase = PluginLifecyclePhase.Active,
             };
             _ = _snapshots.Publish(activeState, restored.Worker);
-            ObserveUnexpectedExit(activeState, previous.Package, restored.Worker);
+            ObserveWorkerTermination(activeState, previous.Package, restored.Worker);
         }
 
         await RecoverSelectedPreparationAsync(state, cancellationToken);
@@ -232,7 +232,7 @@ public sealed partial class PluginLifecycleCoordinator
 
         recovered = recoveredWrite.State;
         _ = _snapshots.Publish(recovered, restored.Worker);
-        ObserveUnexpectedExit(recovered, available.Package, restored.Worker);
+        ObserveWorkerTermination(recovered, available.Package, restored.Worker);
     }
 
     private async ValueTask RecoverDrainAsync(

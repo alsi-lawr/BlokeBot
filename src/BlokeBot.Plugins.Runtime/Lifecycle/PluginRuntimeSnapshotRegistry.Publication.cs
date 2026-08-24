@@ -68,12 +68,14 @@ public sealed partial class PluginRuntimeSnapshotRegistry
                 || !ReferenceEquals(current, publication.Stopped)
             )
             {
-                return PluginRuntimeRollbackOutcome.PublicationChanged;
+                return new PluginRuntimeRollbackOutcome.PublicationChanged();
             }
 
-            if (publication.Original?.Worker is { Termination.IsCompleted: true })
+            if (publication.Original?.Worker is { Termination.IsCompleted: true } worker)
             {
-                return PluginRuntimeRollbackOutcome.WorkerTerminated;
+                return new PluginRuntimeRollbackOutcome.TerminationObserved(
+                    worker.Termination.GetAwaiter().GetResult()
+                );
             }
 
             notification = PublishLocked(
@@ -84,7 +86,7 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         }
 
         Notify(notification);
-        return PluginRuntimeRollbackOutcome.Restored;
+        return new PluginRuntimeRollbackOutcome.Restored();
     }
 
     private (PluginRuntimeSlot? Previous, PluginRuntimeSlot Current) Replace(
