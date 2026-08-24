@@ -19,7 +19,7 @@ public sealed class CustomCommandAliasRegistry
         aliases.UnionWith(
             await db
                 .CommandAliases.AsNoTracking()
-                .Where(alias => alias.HostId == hostId)
+                .Where(alias => alias.HostId == hostId && alias.GuessRoundProfileId == null)
                 .Select(alias => alias.Alias)
                 .ToArrayAsync(ct)
         );
@@ -48,6 +48,29 @@ public sealed class CustomCommandAliasRegistry
             .FirstOrDefaultAsync(ct);
         return builtInCollision is not null
             ? new CustomCommandAliasConflict.BuiltIn(builtInCollision)
+            : await FindCustomConflictAsync(db, hostId, excludedCommandIds, aliases, ct);
+    }
+
+    public async Task<CustomCommandAliasConflict?> FindCustomSaveConflictAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        IReadOnlySet<int> excludedCommandIds,
+        IReadOnlyCollection<string> aliases,
+        CancellationToken ct
+    )
+    {
+        var aliasValues = aliases.ToArray();
+        var guessingCollision = await db
+            .CommandAliases.AsNoTracking()
+            .Where(alias =>
+                alias.HostId == hostId
+                && alias.GuessRoundProfileId != null
+                && aliasValues.Contains(alias.Alias)
+            )
+            .Select(alias => alias.Alias)
+            .FirstOrDefaultAsync(ct);
+        return guessingCollision is not null
+            ? new CustomCommandAliasConflict.BuiltIn(guessingCollision)
             : await FindCustomConflictAsync(db, hostId, excludedCommandIds, aliases, ct);
     }
 

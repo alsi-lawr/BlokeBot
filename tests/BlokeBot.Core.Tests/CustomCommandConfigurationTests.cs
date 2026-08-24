@@ -319,6 +319,64 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
+    public async Task SharedGuessingAlias_SavingCustomCommand_RejectsCollisionWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var first = new GuessRoundProfile
+            {
+                HostId = hostId,
+                Name = "First",
+                Slug = "first",
+                IsDefault = true,
+            };
+            var second = new GuessRoundProfile
+            {
+                HostId = hostId,
+                Name = "Second",
+                Slug = "second",
+            };
+            db.Profiles.AddRange(first, second);
+            _ = await db.SaveChangesAsync();
+            db.CommandAliases.AddRange(
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    GuessRoundProfileId = first.Id,
+                    Kind = AppCommandKind.Guess,
+                    Alias = "shared-guess",
+                },
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    GuessRoundProfileId = second.Id,
+                    Kind = AppCommandKind.Guess,
+                    Alias = "shared-guess",
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        var service = CreateService(dbFactory);
+        var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        var failure = await SaveFailureAsync(
+            service,
+            hostId,
+            ConfigurationWithCommands(("Custom", "shared-guess"))
+        );
+
+        loaded.BuiltInAliases.ShouldNotContain("shared-guess");
+        failure.ShouldBe(
+            new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision("shared-guess")
+        );
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.CommandAliases.CountAsync()).ShouldBe(2);
+        (await verify.CustomCommands.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task ActionAndScheduleTypeChanges_Saving_ReplacesVariantsAndAliases()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

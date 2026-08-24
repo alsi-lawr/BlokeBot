@@ -230,17 +230,24 @@ public abstract record CustomCommandConfigurationSaveFailure
     public abstract string Message { get; }
 
     public TResult Match<TResult>(
+        Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
         Func<CustomAliasCollision, TResult> customAliasCollision,
         Func<StaleEntity, TResult> staleEntity,
         Func<OverlayCueReference, TResult> overlayCueReference
     ) =>
         this switch
         {
+            BuiltInAliasCollision value => builtInAliasCollision(value),
             CustomAliasCollision value => customAliasCollision(value),
             StaleEntity value => staleEntity(value),
             OverlayCueReference value => overlayCueReference(value),
             _ => throw new UnreachableException("Unknown custom command save failure."),
         };
+
+    public sealed record BuiltInAliasCollision(string Alias) : CustomCommandConfigurationSaveFailure
+    {
+        public override string Message => $"!{Alias} is already used by another bot command.";
+    }
 
     public sealed record CustomAliasCollision(string Alias) : CustomCommandConfigurationSaveFailure
     {

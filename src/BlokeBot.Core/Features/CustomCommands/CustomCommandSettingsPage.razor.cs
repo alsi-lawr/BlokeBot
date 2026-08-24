@@ -980,6 +980,7 @@ public partial class CustomCommandSettingsPage
         CustomCommandConfigurationSaveFailure failure
     ) =>
         failure.Match<CustomCommandConfigurationValidationTarget?>(
+            builtInAliasCollision => CommandAliasesTarget(builtInAliasCollision.Alias),
             customAliasCollision => CommandAliasesTarget(customAliasCollision.Alias),
             _ => null,
             cueReference => CommandTarget(cueReference.CommandId, cueReference.Field)

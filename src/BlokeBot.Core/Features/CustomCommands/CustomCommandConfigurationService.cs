@@ -130,7 +130,7 @@ public sealed class CustomCommandConfigurationService(
         ).ToHashSet();
         foreach (var configured in command.Commands)
         {
-            var conflict = await aliasRegistry.FindCustomConflictAsync(
+            var conflict = await aliasRegistry.FindCustomSaveConflictAsync(
                 db,
                 hostId,
                 managedCommandIds,
@@ -142,9 +142,7 @@ public sealed class CustomCommandConfigurationService(
                 return Result<
                     CustomCommandConfigurationSaved,
                     CustomCommandConfigurationSaveFailure
-                >.Error(
-                    new CustomCommandConfigurationSaveFailure.CustomAliasCollision(conflict.Alias)
-                );
+                >.Error(AliasFailure(conflict));
             }
         }
 
@@ -170,6 +168,18 @@ public sealed class CustomCommandConfigurationService(
             CustomCommandConfigurationSaveFailure
         >.Success(new());
     }
+
+    private static CustomCommandConfigurationSaveFailure AliasFailure(
+        CustomCommandAliasConflict conflict
+    ) =>
+        conflict.Match<CustomCommandConfigurationSaveFailure>(
+            static builtIn => new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision(
+                builtIn.Alias
+            ),
+            static custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(
+                custom.Alias
+            )
+        );
 
     private async Task<CustomCommandConfigurationSaveCommand> DisableUnavailableNativeAnnouncementsAsync(
         BlokeBotDbContext db,
