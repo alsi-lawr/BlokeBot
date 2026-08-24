@@ -38,6 +38,10 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 
     internal Exception? ExceptionBeforeNextWrite { get; set; }
 
+    internal CancellationTokenSource? CancellationAfterNextWrite { get; set; }
+
+    internal bool ConflictAfterNextWrite { get; set; }
+
     internal void PauseNextWrite()
     {
         WriteStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -176,6 +180,8 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 
         PluginLifecycleStoreWriteOutcome outcome;
         Exception? exception;
+        CancellationTokenSource? cancellation;
+        bool conflict;
         lock (_sync)
         {
             if (
@@ -191,9 +197,17 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
             outcome = new PluginLifecycleStoreWriteOutcome.Written(next);
             exception = ExceptionAfterNextWrite;
             ExceptionAfterNextWrite = null;
+            cancellation = CancellationAfterNextWrite;
+            CancellationAfterNextWrite = null;
+            conflict = ConflictAfterNextWrite;
+            ConflictAfterNextWrite = false;
         }
 
-        return exception is null ? outcome : throw exception;
+        cancellation?.Cancel();
+        cancellationToken.ThrowIfCancellationRequested();
+        return exception is not null ? throw exception
+            : conflict ? new PluginLifecycleStoreWriteOutcome.Conflict(next)
+            : outcome;
     }
 
     internal void Seed(PluginLifecycleState state)
@@ -327,9 +341,12 @@ internal sealed class FakeLifecycleWorkerSession(
     private readonly TaskCompletionSource<PluginWorkerFailure> _termination = new(
         TaskCreationOptions.RunContinuationsAsynchronously
     );
+    private int _disposeCalls;
 
     internal TaskCompletionSource Disposed { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal int DisposeCalls => Volatile.Read(ref _disposeCalls);
 
     public PluginWorkerMode Mode { get; } = mode;
 
@@ -340,6 +357,7 @@ internal sealed class FakeLifecycleWorkerSession(
 
     public ValueTask DisposeAsync()
     {
+        _ = Interlocked.Increment(ref _disposeCalls);
         _ = Disposed.TrySetResult();
         return disposalException is null
             ? ValueTask.CompletedTask

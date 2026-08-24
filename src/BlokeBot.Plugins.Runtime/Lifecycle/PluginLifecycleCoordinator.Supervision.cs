@@ -85,29 +85,19 @@ public sealed partial class PluginLifecycleCoordinator
 
                 var next = ((PluginLifecycleTransitionOutcome.Applied)transition).State;
                 var publication = _snapshots.StopAdmission(next);
-                PluginLifecycleStoreWriteOutcome written;
-                try
+                var checkpoint = await WriteCheckpointAsync(
+                    current,
+                    next,
+                    publication,
+                    PluginCheckpointRollbackPolicy.SettleRuntime,
+                    CancellationToken.None
+                );
+                if (checkpoint is PluginCheckpointWriteOutcome.Rejected)
                 {
-                    written = await _store.WriteAsync(current, next, CancellationToken.None);
-                }
-                catch
-                {
-                    await ReconcileTerminatedCheckpointExceptionAsync(next, publication.Ownership);
-                    throw;
-                }
-
-                if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
-                {
-                    _ = await SettleAndPublishConflictAsync(
-                        next,
-                        publication.Ownership,
-                        conflict.Current
-                    );
                     return;
                 }
 
-                var restarted = (PluginLifecycleStoreWriteOutcome.Written)written;
-                var draining = restarted.State;
+                var draining = ((PluginCheckpointWriteOutcome.Committed)checkpoint).State;
                 var drain = await CancelDrainAndCheckpointAsync(
                     draining,
                     publication.Ownership,

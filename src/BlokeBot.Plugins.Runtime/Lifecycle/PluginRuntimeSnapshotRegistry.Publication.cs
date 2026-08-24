@@ -39,7 +39,7 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         }
 
         Notify(notification);
-        return new(state.PluginId, previous, runtimeFence is null ? null : stopped);
+        return new(state.PluginId, previous, stopped, runtimeFence is null ? null : stopped);
     }
 
     internal PluginRuntimeSlot? Remove(PluginId pluginId)
@@ -56,11 +56,26 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         return previous;
     }
 
-    internal void RestoreOriginal(PluginAdmissionStopPublication publication)
+    internal PluginRuntimeRollbackOutcome TryRestoreOriginal(
+        PluginAdmissionStopPublication publication
+    )
     {
         ChangeNotification notification;
         lock (_sync)
         {
+            if (
+                !_current.Slots.TryGetValue(publication.PluginId, out var current)
+                || !ReferenceEquals(current, publication.Stopped)
+            )
+            {
+                return PluginRuntimeRollbackOutcome.PublicationChanged;
+            }
+
+            if (publication.Original?.Worker is { Termination.IsCompleted: true })
+            {
+                return PluginRuntimeRollbackOutcome.WorkerTerminated;
+            }
+
             notification = PublishLocked(
                 publication.Original is null
                     ? _current.Slots.Remove(publication.PluginId)
@@ -69,6 +84,7 @@ public sealed partial class PluginRuntimeSnapshotRegistry
         }
 
         Notify(notification);
+        return PluginRuntimeRollbackOutcome.Restored;
     }
 
     private (PluginRuntimeSlot? Previous, PluginRuntimeSlot Current) Replace(

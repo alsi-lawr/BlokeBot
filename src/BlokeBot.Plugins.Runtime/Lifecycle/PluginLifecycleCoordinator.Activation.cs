@@ -18,32 +18,28 @@ public sealed partial class PluginLifecycleCoordinator
 
         var migrating = Applied(PluginLifecycleStateMachine.PreparationSucceeded(state, Now()));
         var publication = _snapshots.StopAdmission(migrating);
-        PluginLifecycleStoreWriteOutcome migrationFence;
-        try
+        var migrationFence = await WriteCheckpointAsync(
+            state,
+            migrating,
+            publication,
+            PluginCheckpointRollbackPolicy.RestoreLiveOriginal,
+            cancellationToken
+        );
+        if (migrationFence is PluginCheckpointWriteOutcome.Rejected rejected)
         {
-            migrationFence = await _store.WriteAsync(state, migrating, cancellationToken);
-        }
-        catch
-        {
-            await ReconcileCommandCheckpointExceptionAsync(state, migrating, publication);
-            throw;
-        }
-
-        if (migrationFence is PluginLifecycleStoreWriteOutcome.Conflict conflict)
-        {
-            return await ReconcileCommandCheckpointConflictAsync(
-                state,
-                migrating,
-                publication,
-                conflict.Current
-            );
+            return rejected.Outcome;
         }
 
-        state = ((PluginLifecycleStoreWriteOutcome.Written)migrationFence).State;
+        var committed = (PluginCheckpointWriteOutcome.Committed)migrationFence;
+        state = committed.State;
+        var continuationToken =
+            committed.Continuation == PluginCheckpointContinuation.LifecycleOwned
+                ? CancellationToken.None
+                : cancellationToken;
         var drain = await CancelDrainAndCheckpointAsync(
             state,
             publication.Ownership,
-            cancellationToken
+            continuationToken
         );
         return drain is PluginRuntimeDrainOutcome.Failed drainFailure
             ? drainFailure.Outcome
@@ -51,7 +47,7 @@ public sealed partial class PluginLifecycleCoordinator
                 ((PluginRuntimeDrainOutcome.Ready)drain).State,
                 package,
                 recovered: false,
-                cancellationToken
+                continuationToken
             );
     }
 

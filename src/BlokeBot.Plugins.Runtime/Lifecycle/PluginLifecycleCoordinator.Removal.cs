@@ -44,34 +44,30 @@ public sealed partial class PluginLifecycleCoordinator
 
         var started = Applied(transition);
         var publication = _snapshots.StopAdmission(started);
-        PluginLifecycleStoreWriteOutcome written;
-        try
+        var checkpoint = await WriteCheckpointAsync(
+            current,
+            started,
+            publication,
+            PluginCheckpointRollbackPolicy.RestoreLiveOriginal,
+            cancellationToken
+        );
+        if (checkpoint is PluginCheckpointWriteOutcome.Rejected checkpointRejected)
         {
-            written = await _store.WriteAsync(current, started, cancellationToken);
-        }
-        catch
-        {
-            await ReconcileCommandCheckpointExceptionAsync(current, started, publication);
-            throw;
-        }
-
-        if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
-        {
-            return await ReconcileCommandCheckpointConflictAsync(
-                current,
-                started,
-                publication,
-                conflict.Current
-            );
+            return checkpointRejected.Outcome;
         }
 
-        current = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
+        var committed = (PluginCheckpointWriteOutcome.Committed)checkpoint;
+        current = committed.State;
+        var continuationToken =
+            committed.Continuation == PluginCheckpointContinuation.LifecycleOwned
+                ? CancellationToken.None
+                : cancellationToken;
         if (current.Phase == PluginLifecyclePhase.Draining)
         {
             var drain = await CancelDrainAndCheckpointAsync(
                 current,
                 publication.Ownership,
-                cancellationToken
+                continuationToken
             );
             if (drain is PluginRuntimeDrainOutcome.Failed drainFailure)
             {
@@ -81,7 +77,7 @@ public sealed partial class PluginLifecycleCoordinator
             current = ((PluginRuntimeDrainOutcome.Ready)drain).State;
 
             var drained = Applied(PluginLifecycleStateMachine.DrainSucceeded(current, Now()));
-            written = await _store.WriteAsync(current, drained, cancellationToken);
+            var written = await _store.WriteAsync(current, drained, continuationToken);
             if (written is PluginLifecycleStoreWriteOutcome.Conflict drainConflict)
             {
                 return Conflict(drainConflict.Current);
@@ -92,8 +88,8 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         return current.Phase == PluginLifecyclePhase.Purging
-            ? await CompletePurgeAsync(current, cancellationToken)
-            : await CompleteRemovalAsync(current, cancellationToken);
+            ? await CompletePurgeAsync(current, continuationToken)
+            : await CompleteRemovalAsync(current, continuationToken);
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> CompleteRemovalAsync(

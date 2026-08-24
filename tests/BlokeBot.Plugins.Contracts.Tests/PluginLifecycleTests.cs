@@ -542,6 +542,176 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
+    public async Task UpdateCheckpointCancellation_DoesNotReadmitWorkerTerminatedWhileStopped()
+    {
+        var harness = new LifecycleHarness();
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var other = await harness.ActivateOtherAsync("other-plugin", "1.0.0", "v1");
+        var worker = harness.Workers.Admitted[0];
+        harness.Store.PauseNextWrite();
+        using var cancellation = new CancellationTokenSource();
+        var update = harness
+            .Coordinator.ActivateAsync(
+                Operation(),
+                harness.Package("2.0.0", "v2"),
+                cancellation.Token
+            )
+            .AsTask();
+        await harness.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        worker.Exit(PluginWorkerFailureCode.WorkerExited);
+        cancellation.Cancel();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(async () => await update);
+        await AssertTerminatedRollbackFaultedAsync(harness, active, worker, other);
+    }
+
+    [Test]
+    public async Task UpdateCheckpointWriteFailure_DoesNotReadmitWorkerTerminatedWhileStopped()
+    {
+        var harness = new LifecycleHarness();
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var other = await harness.ActivateOtherAsync("other-plugin", "1.0.0", "v1");
+        var worker = harness.Workers.Admitted[0];
+        harness.Store.ExceptionBeforeNextWrite = new InvalidOperationException(
+            "simulated pre-write failure"
+        );
+        harness.Store.PauseNextWrite();
+        var update = harness
+            .Coordinator.ActivateAsync(
+                Operation(),
+                harness.Package("2.0.0", "v2"),
+                CancellationToken.None
+            )
+            .AsTask();
+        await harness.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        worker.Exit(PluginWorkerFailureCode.WorkerExited);
+        harness.Store.ResumeWrite();
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(async () => await update);
+        await AssertTerminatedRollbackFaultedAsync(harness, active, worker, other);
+    }
+
+    [Test]
+    public async Task RemoveCheckpointConflict_DoesNotReadmitWorkerTerminatedWhileStopped()
+    {
+        var harness = new LifecycleHarness();
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var other = await harness.ActivateOtherAsync("other-plugin", "1.0.0", "v1");
+        var original = (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!;
+        var worker = harness.Workers.Admitted[0];
+        harness.Store.PauseNextWrite();
+        var removal = harness
+            .Coordinator.RemoveAsync(harness.PluginId, Operation(), CancellationToken.None)
+            .AsTask();
+        await harness.Store.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        worker.Exit(PluginWorkerFailureCode.WorkerExited);
+        harness.Store.Seed(
+            (
+                (PluginLifecycleTransitionOutcome.Applied)
+                    PluginLifecycleStateMachine.ActiveRecoverySucceeded(
+                        original,
+                        DateTimeOffset.UtcNow
+                    )
+            ).State
+        );
+        harness.Store.ResumeWrite();
+
+        _ = (
+            await removal.WaitAsync(TimeSpan.FromSeconds(2))
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>();
+        await AssertTerminatedRollbackFaultedAsync(harness, active, worker, other);
+    }
+
+    [Test]
+    public async Task CommittedUpdateCheckpoint_ContinuesAfterThrowAndCancellation()
+    {
+        var thrown = new LifecycleHarness();
+        var thrownActive = await thrown.ActivateAsync("1.0.0", "v1");
+        var thrownWorker = thrown.Workers.Admitted.Single();
+        thrown.Store.ExceptionAfterNextWrite = new InvalidOperationException(
+            "simulated commit-then-throw"
+        );
+
+        var thrownOutcome = await thrown.Coordinator.ActivateAsync(
+            Operation(),
+            thrown.Package("2.0.0", "v2"),
+            CancellationToken.None
+        );
+
+        var thrownView = thrownOutcome
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
+            .View;
+        thrownView.Installation.Release.DeclaredVersion.Value.ShouldBe("2.0.0");
+        thrownWorker.DisposeCalls.ShouldBe(1);
+        thrown.PendingWork.CancelledFences.ShouldBe([Fence(thrownActive)]);
+
+        var canceled = new LifecycleHarness();
+        var canceledActive = await canceled.ActivateAsync("1.0.0", "v1");
+        var canceledWorker = canceled.Workers.Admitted.Single();
+        using var cancellation = new CancellationTokenSource();
+        canceled.Store.CancellationAfterNextWrite = cancellation;
+
+        var canceledOutcome = await canceled.Coordinator.ActivateAsync(
+            Operation(),
+            canceled.Package("2.0.0", "v2"),
+            cancellation.Token
+        );
+
+        var canceledView = canceledOutcome
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
+            .View;
+        cancellation.IsCancellationRequested.ShouldBeTrue();
+        canceledView.Installation.Release.DeclaredVersion.Value.ShouldBe("2.0.0");
+        canceledWorker.DisposeCalls.ShouldBe(1);
+        canceled.PendingWork.CancelledFences.ShouldBe([Fence(canceledActive)]);
+    }
+
+    [Test]
+    public async Task CommittedRemoveCheckpoint_ContinuesAfterThrowAndCancellation()
+    {
+        var thrown = new LifecycleHarness();
+        var thrownActive = await thrown.ActivateAsync("1.0.0", "v1");
+        var thrownWorker = thrown.Workers.Admitted.Single();
+        thrown.Store.ExceptionAfterNextWrite = new InvalidOperationException(
+            "simulated commit-then-throw"
+        );
+
+        var thrownOutcome = await thrown.Coordinator.RemoveAsync(
+            thrown.PluginId,
+            Operation(),
+            CancellationToken.None
+        );
+
+        thrownOutcome
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
+            .View.Phase.ShouldBe(PluginLifecyclePhase.Removed);
+        thrownWorker.DisposeCalls.ShouldBe(1);
+        thrown.PendingWork.CancelledFences.ShouldBe([Fence(thrownActive)]);
+
+        var canceled = new LifecycleHarness();
+        var canceledActive = await canceled.ActivateAsync("1.0.0", "v1");
+        var canceledWorker = canceled.Workers.Admitted.Single();
+        using var cancellation = new CancellationTokenSource();
+        canceled.Store.CancellationAfterNextWrite = cancellation;
+
+        var canceledOutcome = await canceled.Coordinator.RemoveAsync(
+            canceled.PluginId,
+            Operation(),
+            cancellation.Token
+        );
+
+        cancellation.IsCancellationRequested.ShouldBeTrue();
+        canceledOutcome
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
+            .View.Phase.ShouldBe(PluginLifecyclePhase.Removed);
+        canceledWorker.DisposeCalls.ShouldBe(1);
+        canceled.PendingWork.CancelledFences.ShouldBe([Fence(canceledActive)]);
+    }
+
+    [Test]
     public async Task PersistedDrainingRecovery_CancelsTheDurablePriorRuntimeFence()
     {
         var harness = new LifecycleHarness();
@@ -882,6 +1052,38 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
+    public async Task CommittedReplacementCheckpoint_ContinuesAfterWriteUncertainty()
+    {
+        await AssertReplacementCompletesAsync(store =>
+            store.ExceptionAfterNextWrite = new InvalidOperationException(
+                "simulated commit-then-throw"
+            )
+        );
+        await AssertReplacementCompletesAsync(store =>
+            store.ExceptionAfterNextWrite = new OperationCanceledException(
+                "simulated commit-then-cancellation"
+            )
+        );
+        await AssertReplacementCompletesAsync(store => store.ConflictAfterNextWrite = true);
+    }
+
+    [Test]
+    public async Task CommittedTerminalFaultCheckpoint_ContinuesAfterWriteUncertainty()
+    {
+        await AssertTerminalFaultCompletesAsync(store =>
+            store.ExceptionAfterNextWrite = new InvalidOperationException(
+                "simulated commit-then-throw"
+            )
+        );
+        await AssertTerminalFaultCompletesAsync(store =>
+            store.ExceptionAfterNextWrite = new OperationCanceledException(
+                "simulated commit-then-cancellation"
+            )
+        );
+        await AssertTerminalFaultCompletesAsync(store => store.ConflictAfterNextWrite = true);
+    }
+
+    [Test]
     public async Task ColdReplacementRecovery_CancelsPersistedOldFenceBeforeStartingWorker()
     {
         var source = new LifecycleHarness();
@@ -1120,24 +1322,21 @@ public sealed class PluginLifecycleTests
         var active = ActiveState(package);
         var maximumGeneration = Generation(long.MaxValue);
         var fence = new PluginLifecycleFence(active.OperationId, maximumGeneration);
-        source.Store.Seed(
-            active with
-            {
-                SelectedGeneration = maximumGeneration,
-                ActiveRuntime = new(package.Installation, fence),
-            }
-        );
-        source.Packages.Add(package);
-        await source.Coordinator.RecoverAsync(CancellationToken.None);
-        source.Store.ExceptionAfterNextWrite = new InvalidOperationException(
-            "simulated crash after durable fault intent"
-        );
-
-        source.Workers.Admitted[0].Exit(PluginWorkerFailureCode.WorkerExited);
-        var intent = await source.Store.WaitForAsync(
-            source.PluginId,
-            state => state is { Phase: PluginLifecyclePhase.Faulted, ActiveRuntime: not null }
-        );
+        active = active with
+        {
+            SelectedGeneration = maximumGeneration,
+            ActiveRuntime = new(package.Installation, fence),
+        };
+        var intent = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.BeginFaultShutdown(
+                    active,
+                    PluginLifecycleFailureCode.GenerationExhausted,
+                    null,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        source.Store.Seed(intent);
         var pendingWork = new RecordingPendingWorkCanceller();
         var workers = new FakeLifecycleWorkers();
         var snapshots = new PluginRuntimeSnapshotRegistry();
@@ -1843,6 +2042,89 @@ public sealed class PluginLifecycleTests
             ? generation
             : throw new InvalidOperationException("Invalid test generation.");
 
+    private static async ValueTask AssertTerminatedRollbackFaultedAsync(
+        LifecycleHarness harness,
+        PluginLifecycleCommandOutcome.Succeeded active,
+        FakeLifecycleWorkerSession worker,
+        (PluginId PluginId, PluginLifecycleFence Fence) other
+    )
+    {
+        var faulted = (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!;
+        faulted.Phase.ShouldBe(PluginLifecyclePhase.Faulted);
+        faulted.ActiveRuntime.ShouldBeNull();
+        faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.WorkerExited);
+        var entry = harness.Snapshots.Current.Entries[harness.PluginId];
+        entry.Phase.ShouldBe(PluginLifecyclePhase.Faulted);
+        entry.Fence.ShouldBe(faulted.SelectedFence);
+        entry.WorkerMode.ShouldBeNull();
+        worker.DisposeCalls.ShouldBe(1);
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
+        harness.Workers.Admitted.Count.ShouldBe(2);
+        harness
+            .Workers.StartedInstallations.Count(installation =>
+                installation.PluginId == harness.PluginId
+            )
+            .ShouldBe(1);
+        harness
+            .Snapshots.Admit(harness.PluginId, Fence(active), PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.Faulted);
+        var otherAdmission = harness
+            .Snapshots.Admit(other.PluginId, other.Fence, PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Admitted>()
+            .Admission;
+        await otherAdmission.DisposeAsync();
+    }
+
+    private static async ValueTask AssertReplacementCompletesAsync(
+        Action<InMemoryLifecycleStore> arrangeUncertainty
+    )
+    {
+        var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var worker = harness.Workers.Admitted.Single();
+        arrangeUncertainty(harness.Store);
+
+        worker.Exit(PluginWorkerFailureCode.WorkerExited);
+
+        var restarted = await harness.Store.WaitForAsync(
+            harness.PluginId,
+            state =>
+                state.Phase == PluginLifecyclePhase.Active && state.SelectedFence != Fence(active)
+        );
+        restarted.AutomaticRestartConsumed.ShouldBeTrue();
+        worker.DisposeCalls.ShouldBe(1);
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
+        harness.Workers.Admitted.Count.ShouldBe(2);
+        harness.Snapshots.Current.Entries[harness.PluginId].Fence.ShouldBe(restarted.SelectedFence);
+    }
+
+    private static async ValueTask AssertTerminalFaultCompletesAsync(
+        Action<InMemoryLifecycleStore> arrangeUncertainty
+    )
+    {
+        var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var durable = (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!;
+        harness.Store.Seed(durable with { AutomaticRestartConsumed = true });
+        var worker = harness.Workers.Admitted.Single();
+        arrangeUncertainty(harness.Store);
+
+        worker.Exit(PluginWorkerFailureCode.WorkerExited);
+
+        var faulted = await harness.Store.WaitForAsync(
+            harness.PluginId,
+            state => state is { Phase: PluginLifecyclePhase.Faulted, ActiveRuntime: null }
+        );
+        faulted.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.WorkerExited);
+        worker.DisposeCalls.ShouldBe(1);
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
+        harness.Workers.Admitted.Count.ShouldBe(1);
+        harness
+            .Snapshots.Current.Entries[harness.PluginId]
+            .Phase.ShouldBe(PluginLifecyclePhase.Faulted);
+    }
+
     private static async ValueTask AssertOriginalRuntimeRestoredAsync(
         LifecycleHarness harness,
         PluginLifecycleCommandOutcome.Succeeded active,
@@ -1925,15 +2207,18 @@ public sealed class PluginLifecycleTests
     )
     {
         var active = (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!;
-        harness.Store.Seed(active with { AutomaticRestartConsumed = true });
-        harness.Store.ExceptionAfterNextWrite = new InvalidOperationException(
-            "simulated crash after durable fault intent"
-        );
-        harness.Workers.Admitted.Single().Exit(PluginWorkerFailureCode.WorkerExited);
-        return await harness.Store.WaitForAsync(
-            harness.PluginId,
-            state => state is { Phase: PluginLifecyclePhase.Faulted, ActiveRuntime: not null }
-        );
+        active = active with { AutomaticRestartConsumed = true };
+        var intent = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.BeginFaultShutdown(
+                    active,
+                    PluginLifecycleFailureCode.WorkerExited,
+                    null,
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        harness.Store.Seed(intent);
+        return intent;
     }
 
     private static void AssertFaultRejected(PluginLifecycleState state) =>

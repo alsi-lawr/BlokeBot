@@ -135,28 +135,27 @@ public sealed partial class PluginLifecycleCoordinator
             PluginLifecycleStateMachine.BeginFaultShutdown(state, code, detail, Now())
         );
         var publication = _snapshots.StopAdmission(intent);
-        PluginLifecycleStoreWriteOutcome written;
-        try
+        var checkpoint = await WriteCheckpointAsync(
+            state,
+            intent,
+            publication,
+            PluginCheckpointRollbackPolicy.SettleRuntime,
+            cancellationToken
+        );
+        if (checkpoint is PluginCheckpointWriteOutcome.Rejected rejected)
         {
-            written = await _store.WriteAsync(state, intent, cancellationToken);
-        }
-        catch
-        {
-            await ReconcileTerminatedCheckpointExceptionAsync(intent, publication.Ownership);
-            throw;
-        }
-
-        if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
-        {
-            return await SettleAndPublishConflictAsync(
-                intent,
-                publication.Ownership,
-                conflict.Current
-            );
+            return rejected.Outcome;
         }
 
-        intent = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
-        return await CompleteFaultShutdownAsync(intent, publication.Ownership, cancellationToken);
+        var committed = (PluginCheckpointWriteOutcome.Committed)checkpoint;
+        intent = committed.State;
+        return await CompleteFaultShutdownAsync(
+            intent,
+            publication.Ownership,
+            committed.Continuation == PluginCheckpointContinuation.LifecycleOwned
+                ? CancellationToken.None
+                : cancellationToken
+        );
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> CompleteFaultShutdownAsync(
