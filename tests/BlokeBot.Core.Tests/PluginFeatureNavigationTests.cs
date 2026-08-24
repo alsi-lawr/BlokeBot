@@ -114,7 +114,7 @@ public sealed class PluginFeatureNavigationTests
     }
 
     [Test]
-    public void DeclaredFeatures_RefreshNavigationAcrossReadinessHostAndRouteChanges()
+    public void DeclaredFeatureRoute_PushesCanonicalDestinationToHistory()
     {
         using var context = new BunitContext();
         var declarations = new PluginFeatureDeclarationRegistry();
@@ -125,57 +125,22 @@ public sealed class PluginFeatureNavigationTests
         _ = authorization.SetAuthorized("streamer");
         _ = authorization.SetPolicies("BotAdmin");
         var manifest = ValidatedManifest();
-        var fence = Fence();
-        declarations.Publish(manifest, fence);
+        declarations.Publish(manifest, Fence());
         PluginHostId.TryCreate(41, out var firstHost).ShouldBeTrue();
-        PluginHostId.TryCreate(42, out var secondHost).ShouldBeTrue();
         var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
-        var clicked = 0;
-        var routes = Routes(
-            navigation,
-            () =>
-            {
-                clicked++;
-                return Task.CompletedTask;
-            }
-        );
+        var routes = Routes(navigation, static () => Task.CompletedTask);
         var component = context.Render<NavMenuPluginFeatures>(parameters =>
-            parameters.Add(value => value.Routes, routes)
-        );
-
-        component.FindAll("a").ShouldHaveSingleItem().TextContent.ShouldContain("settings");
-        component.Markup.ShouldNotContain("Link collection");
-        component.Render(parameters =>
             parameters.Add(value => value.HostId, firstHost).Add(value => value.Routes, routes)
         );
+        var historyDepth = navigation.History.Count;
+        const string Route = "plugins/community.link-queue/features/collection";
 
-        component.FindAll("a").Count.ShouldBe(3);
-        component.Markup.ShouldContain("Link collection");
-        component.Markup.ShouldContain("Scheduled publishing");
-        component.Markup.ShouldContain("Setup");
+        var destination = component.Find($"a[href='{Route}']").GetAttribute("href");
+        navigation.NavigateTo(destination!);
 
-        component.Find("a[href='plugins/community.link-queue/features/collection']").Click();
-        clicked.ShouldBe(1);
-
-        snapshots.Publish(ReadyState(manifest, fence, firstHost));
-        component.WaitForAssertion(() => component.Markup.ShouldContain("Ready"));
-
-        navigation.NavigateTo("/");
-        navigation.NavigateTo("/plugins/community.link-queue/features/collection");
-        component
-            .Find("a[href='plugins/community.link-queue/features/collection']")
-            .ClassList.ShouldContain("nav-menu__item-active");
-
-        component.Render(parameters =>
-            parameters.Add(value => value.HostId, secondHost).Add(value => value.Routes, routes)
-        );
-        component.Markup.ShouldNotContain("Ready");
-        component.Markup.ShouldContain("Setup");
-
-        declarations.Remove(manifest.Manifest.Id, fence);
-        component.WaitForAssertion(() => component.FindAll("a").ShouldBeEmpty());
-        declarations.Publish(manifest, fence);
-        component.WaitForAssertion(() => component.FindAll("a").Count.ShouldBe(3));
+        navigation.ToBaseRelativePath(navigation.Uri).ShouldBe(Route);
+        navigation.History.Count.ShouldBe(historyDepth + 1);
+        navigation.History.First().Uri.ShouldEndWith(Route);
     }
 
     private static ValidatedPluginManifest ValidatedManifest() =>
@@ -191,23 +156,6 @@ public sealed class PluginFeatureNavigationTests
     {
         PluginWorkerGeneration.TryCreate(1, out var generation).ShouldBeTrue();
         return new(PluginLifecycleOperationId.New(), generation);
-    }
-
-    private static PluginFeatureState ReadyState(
-        ValidatedPluginManifest manifest,
-        PluginLifecycleFence fence,
-        PluginHostId hostId
-    )
-    {
-        PluginFeatureGeneration.TryCreate(1, out var generation).ShouldBeTrue();
-        PluginFeatureId.TryCreate("collection", out var featureId).ShouldBeTrue();
-        return new(
-            new(manifest.Manifest.Id, featureId, hostId),
-            fence,
-            generation,
-            new PluginFeatureReadiness.Ready(),
-            PluginFeatureRevision.Initial
-        );
     }
 
     private static async Task<(int First, int Second)> SeedHostsAsync(

@@ -74,7 +74,13 @@ public sealed partial class EfPluginFeatureStore(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.PluginFeatureConfigurations.AnyAsync(
+        return await db.PluginInstallationConfigurations.AnyAsync(cancellationToken)
+            || await db.PluginInstallationSecrets.AnyAsync(cancellationToken)
+            || await db.PluginFeatureConfigurations.AnyAsync(
+                value => value.HostId == hostId.Value,
+                cancellationToken
+            )
+            || await db.PluginFeatureSecrets.AnyAsync(
                 value => value.HostId == hostId.Value,
                 cancellationToken
             )

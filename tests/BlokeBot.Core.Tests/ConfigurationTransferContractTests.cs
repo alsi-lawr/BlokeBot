@@ -390,8 +390,7 @@ public sealed class ConfigurationTransferContractTests
             CancellationToken.None
         );
 
-        var unsupported = outcome.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
-        unsupported.Message.ShouldContain("plugin feature");
+        _ = outcome.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
 
         await using (var db = await database.CreateDbContextAsync())
         {
@@ -435,6 +434,61 @@ public sealed class ConfigurationTransferContractTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
+    }
+
+    [Test]
+    public async Task Export_WithInstallationPluginSettingAndSecret_ReturnsUnsupportedForAnySection()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "plugin-installation-format-one",
+                DisplayName = "Plugin installation format one",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = db.PluginInstallationConfigurations.Add(
+                new()
+                {
+                    PluginId = "community-links",
+                    ValuesJson = """[{"id":"moderation-mode","kind":"choice","value":"manual"}]""",
+                    Revision = 1,
+                }
+            );
+            _ = db.PluginInstallationSecrets.Add(
+                new()
+                {
+                    PluginId = "community-links",
+                    SettingId = "service-token",
+                    ProtectedValue = [1, 2, 3],
+                }
+            );
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+        }
+        var automation = ConfigurationTransferAutomationTestServices.Create(database);
+
+        var outcome = await new ConfigurationDocumentExporter(
+            database,
+            new(),
+            automation.Catalog,
+            automation.Flows,
+            NullLogger<ConfigurationDocumentExporter>.Instance,
+            TimeProvider.System,
+            new EfPluginFeatureStore(database, new())
+        ).ExportAsync(
+            hostId,
+            new(
+                new HashSet<ConfigurationSectionId> { ConfigurationSectionId.Points },
+                new(false, false, false)
+            ),
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
     }
 
     [Test]

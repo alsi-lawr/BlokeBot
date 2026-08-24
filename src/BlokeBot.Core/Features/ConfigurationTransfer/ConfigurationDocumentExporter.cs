@@ -42,8 +42,7 @@ public sealed class ConfigurationDocumentExporter(
             );
         }
         if (
-            selection.Sections.Contains(ConfigurationSectionId.ChannelToolEnablement)
-            && PluginHostId.TryCreate(hostId, out var pluginHostId)
+            PluginHostId.TryCreate(hostId, out var pluginHostId)
             && await pluginFeatures.HasFormat1IncompatibleStateAsync(
                 pluginHostId,
                 cancellationToken
@@ -51,7 +50,7 @@ public sealed class ConfigurationDocumentExporter(
         )
         {
             return new ConfigurationExportOutcome.Unsupported(
-                "Format 1 cannot export plugin feature settings or state."
+                "Format 1 cannot export plugin-owned settings, secrets, or feature state."
             );
         }
         if (

@@ -1,4 +1,5 @@
 using BlokeBot.Plugins.Contracts;
+using BlokeBot.Plugins.Runtime;
 using Shouldly;
 
 namespace BlokeBot.Plugins.Features.Tests;
@@ -289,6 +290,76 @@ public sealed class PluginFeatureManagerTests
     }
 
     [Test]
+    public async Task Enable_CancelledAfterCommit_RetainsOnePendingStateAndRecoversCurrentGenerationOnce()
+    {
+        await using var context = await PluginFeatureTestContext.CreateAsync();
+        _ = context.Publish();
+        var reconciler = new CancellationThenReadyReconciler();
+        var manager = context.Manager(
+            new HealthyLifecycle(),
+            new AvailableDependencies(),
+            reconciler
+        );
+        await SaveInstallationAsync(manager);
+        var key = PluginFeatureTestContext.Key("collection");
+        _ = (
+            await SaveFeatureAsync(manager, key, PluginFeatureTestContext.CollectionValues())
+        ).ShouldBeOfType<PluginConfigurationSaveOutcome.Saved>();
+        using var cancellation = new CancellationTokenSource();
+
+        var enable = manager.EnableAsync(key, cancellation.Token).AsTask();
+        PluginFeatureState pending;
+        PluginConfigurationState retained;
+        try
+        {
+            await reconciler.FirstAttemptStarted.WaitAsync(TimeSpan.FromSeconds(5));
+            pending = (
+                await context.Store.LoadFeatureStatesAsync(key.PluginId, CancellationToken.None)
+            ).ShouldHaveSingleItem();
+            retained = await context.Store.LoadConfigurationAsync(
+                new PluginConfigurationOwner.Feature(key),
+                CancellationToken.None
+            );
+        }
+        finally
+        {
+            cancellation.Cancel();
+            try
+            {
+                _ = await enable;
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => enable);
+        var degraded = pending.Readiness.ShouldBeOfType<PluginFeatureReadiness.EnabledDegraded>();
+        degraded.Reason.Code.ShouldBe(PluginReadinessReasonCode.ReconciliationPending);
+        pending.Enabled.ShouldBeTrue();
+        retained.Values.ShouldBe(PluginFeatureTestContext.CollectionValues());
+        var recovered = (
+            await manager.SynchronizeDeclarationAsync(key.PluginId, CancellationToken.None)
+        )
+            .Single()
+            .ShouldBeOfType<PluginFeatureEnableOutcome.Enabled>()
+            .State;
+
+        _ = recovered.Readiness.ShouldBeOfType<PluginFeatureReadiness.Ready>();
+        recovered.Generation.ShouldBe(pending.Generation);
+        var recovery = reconciler.Requests.Skip(1).ShouldHaveSingleItem();
+        recovery.Fence.ShouldBe(pending.Fence);
+        recovery.Generation.ShouldBe(pending.Generation);
+        (await context.Store.LoadFeatureStatesAsync(key.PluginId, CancellationToken.None))
+            .ShouldHaveSingleItem()
+            .ShouldBe(recovered);
+        (
+            await context.Store.LoadConfigurationAsync(
+                new PluginConfigurationOwner.Feature(key),
+                CancellationToken.None
+            )
+        ).Values.ShouldBe(PluginFeatureTestContext.CollectionValues());
+    }
+
+    [Test]
     public async Task Disable_CancelsCommittedGenerationAndIgnoresStaleReconciliation()
     {
         await using var context = await PluginFeatureTestContext.CreateAsync();
@@ -434,5 +505,40 @@ public sealed class PluginFeatureManagerTests
     {
         PluginSettingChoiceId.TryCreate(value, out var choice).ShouldBeTrue();
         return choice;
+    }
+
+    private sealed class CancellationThenReadyReconciler : IPluginFeatureReconciler
+    {
+        private readonly TaskCompletionSource _firstAttemptStarted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        internal Task FirstAttemptStarted => _firstAttemptStarted.Task;
+
+        internal List<PluginFeatureReconciliationRequest> Requests { get; } = [];
+
+        public async ValueTask<PluginFeatureReconciliationResult> ReconcileAsync(
+            PluginFeatureReconciliationRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            Requests.Add(request);
+            if (Requests.Count == 1)
+            {
+                _ = _firstAttemptStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("The cancelled attempt continued.");
+            }
+            return Requests.Count == 2
+                ? new PluginFeatureReconciliationResult.Ready()
+                : throw new InvalidOperationException("Unexpected reconciliation attempt.");
+        }
+
+        public ValueTask CancelAsync(
+            PluginFeatureKey key,
+            PluginLifecycleFence fence,
+            PluginFeatureGeneration generation,
+            CancellationToken cancellationToken
+        ) => ValueTask.CompletedTask;
     }
 }
