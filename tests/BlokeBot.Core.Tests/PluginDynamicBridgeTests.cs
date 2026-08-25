@@ -97,13 +97,7 @@ public sealed class PluginDynamicBridgeTests
         featureStates.Publish(state);
         var plugin = new RecordingDispatchInvoker();
         List<(GuessCommandKind Kind, AppCommandRouteState State)> guessingCalls = [];
-        var strategies = Enum.GetValues<GuessCommandKind>()
-            .Select(kind =>
-                (ICommandStrategy<GuessCommandKind, AppCommandRouteState>)
-                    new RecordingGuessingStrategy(kind, guessingCalls)
-            )
-            .ToArray();
-        var guessing = new CommandStrategyModule<GuessCommandKind, AppCommandRouteState>(
+        var guessing = new SingleGuessingStrategyModule(
             new GuessingCommandRouteResolver(
                 new AppCommandAliasResolver(database),
                 new HostFeatureService(
@@ -113,7 +107,7 @@ public sealed class PluginDynamicBridgeTests
                 ),
                 database
             ),
-            new(new(strategies))
+            new RecordingGuessingStrategy(GuessCommandKind.Guesses, guessingCalls)
         );
         var registry = new ChatCommandRegistry(
             [],
@@ -1182,6 +1176,46 @@ public sealed class PluginDynamicBridgeTests
         {
             calls.Add((context.Kind, context.State));
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class SingleGuessingStrategyModule(
+        ICommandRouteResolver<GuessCommandKind, AppCommandRouteState> resolver,
+        RecordingGuessingStrategy strategy
+    ) : IChatCommandModule
+    {
+        public void AddCommands(IChatCommandBuilder commands) => commands.MapDynamic(RouteAsync);
+
+        private async ValueTask<CommandHandlingOutcome> RouteAsync(
+            ChatCommandContext context,
+            IReadOnlyList<string> args,
+            CancellationToken cancellationToken
+        )
+        {
+            var resolution = await resolver.ResolveAsync(context, cancellationToken);
+            return await resolution.Match(
+                _ =>
+                    ValueTask.FromResult<CommandHandlingOutcome>(
+                        new CommandHandlingOutcome.Unhandled()
+                    ),
+                resolved => ExecuteAsync(resolved.Route)
+            );
+
+            async ValueTask<CommandHandlingOutcome> ExecuteAsync(
+                CommandRoute<GuessCommandKind, AppCommandRouteState> route
+            )
+            {
+                if (route.Kind != strategy.Kind)
+                {
+                    return new CommandHandlingOutcome.Unhandled();
+                }
+
+                await strategy.ExecuteAsync(
+                    new(route.Kind, route.State, context, args),
+                    cancellationToken
+                );
+                return new CommandHandlingOutcome.Handled();
+            }
         }
     }
 
