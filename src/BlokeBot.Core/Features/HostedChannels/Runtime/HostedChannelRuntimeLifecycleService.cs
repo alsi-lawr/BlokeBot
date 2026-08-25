@@ -1,36 +1,13 @@
 using BlokeBot.Core.Identity;
-using BlokeBot.Persistence;
-using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.HostedChannels.Runtime;
 
 public sealed class HostedChannelRuntimeLifecycleService(
-    IDbContextFactory<BlokeBotDbContext> dbFactory,
-    HostedChannelChangeNotifier changes
+    HostedChannelRuntimeTransitionService runtimeTransitions
 )
 {
-    public async Task RecoverInterruptedStopsAsync(CancellationToken ct)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var interrupted = await db
-            .Hosts.Where(host => host.BotRuntimeState == BotChannelRuntimeState.Stopping)
-            .ToArrayAsync(ct);
-        if (interrupted.Length == 0)
-        {
-            return;
-        }
-
-        var recoveredAtUtc = DateTime.UtcNow;
-        foreach (var host in interrupted)
-        {
-            host.BotRuntimeState = BotChannelRuntimeState.Stopped;
-            host.BotRuntimeStateChangedAtUtc = recoveredAtUtc;
-        }
-
-        _ = await db.SaveChangesAsync(ct);
-        _ = await changes.NotifyChangedAsync(ct);
-    }
+    public async Task RecoverInterruptedStopsAsync(CancellationToken ct) =>
+        _ = await runtimeTransitions.RecoverInterruptedStopsAsync(ct);
 
     public async Task MarkStartedAsync(string channel, CancellationToken ct)
     {
@@ -40,26 +17,7 @@ public sealed class HostedChannelRuntimeLifecycleService(
             return;
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Login == normalized.Value, ct);
-        if (host is null)
-        {
-            return;
-        }
-
-        var lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
-            host.BotRuntimeState,
-            host.BotRuntimeStateChangedAtUtc
-        );
-        if (lifecycle is not HostedChannelRuntimeLifecycle.Starting)
-        {
-            return;
-        }
-
-        host.BotRuntimeState = BotChannelRuntimeState.Started;
-        host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-        _ = await db.SaveChangesAsync(ct);
-        _ = await changes.NotifyChangedAsync(ct);
+        _ = await runtimeTransitions.ConfirmStartedAsync(normalized.Value, ct);
     }
 
     public async Task MarkStoppedAsync(string channel, CancellationToken ct)
@@ -70,25 +28,6 @@ public sealed class HostedChannelRuntimeLifecycleService(
             return;
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Login == normalized.Value, ct);
-        if (host is null)
-        {
-            return;
-        }
-
-        var lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
-            host.BotRuntimeState,
-            host.BotRuntimeStateChangedAtUtc
-        );
-        if (lifecycle is HostedChannelRuntimeLifecycle.Stopped)
-        {
-            return;
-        }
-
-        host.BotRuntimeState = BotChannelRuntimeState.Stopped;
-        host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-        _ = await db.SaveChangesAsync(ct);
-        _ = await changes.NotifyChangedAsync(ct);
+        _ = await runtimeTransitions.ConfirmStoppedAsync(normalized.Value, ct);
     }
 }

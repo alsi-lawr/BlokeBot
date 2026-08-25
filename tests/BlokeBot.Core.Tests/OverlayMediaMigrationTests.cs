@@ -71,15 +71,15 @@ public sealed class OverlayMediaMigrationTests
     {
         await using var db = await database.CreateDbContextAsync();
         await db.GetService<IMigrator>().MigrateAsync(_previousMigration);
-        var host = new BotHost
-        {
-            TwitchUserId = "migration-id",
-            Login = "migration",
-            DisplayName = "Migration",
-            CreatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
+        const int HostId = 1;
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO hosts
+                (Id, BotRuntimeState, CommandsAliasesConfigured, CreatedAtUtc, DisplayName, Login, TwitchUserId)
+            VALUES
+                ({HostId}, {BotChannelRuntimeState.Stopped}, {false}, {DateTime.UtcNow}, {"Migration"}, {"migration"}, {"migration-id"});
+            """
+        );
         var presentId = Guid.NewGuid();
         var missingId = Guid.NewGuid();
         var presentKey = new string('a', 32);
@@ -92,12 +92,12 @@ public sealed class OverlayMediaMigrationTests
             VALUES
                 ({presentId.ToString(
                 "D"
-            )}, {host.Id}, {"Present"}, {1}, {"video/mp4"}, {3L}, {presentKey}, {now}, {now}),
+                )}, {HostId}, {"Present"}, {1}, {"video/mp4"}, {3L}, {presentKey}, {now}, {now}),
                 ({missingId.ToString(
                 "D"
-            )}, {host.Id}, {"Missing"}, {1}, {"video/mp4"}, {3L}, {missingKey}, {now}, {now});
+            )}, {HostId}, {"Missing"}, {1}, {"video/mp4"}, {3L}, {missingKey}, {now}, {now});
             """
         );
-        return (host.Id, presentId, presentKey, missingId);
+        return (HostId, presentId, presentKey, missingId);
     }
 }

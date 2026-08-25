@@ -9,10 +9,10 @@ namespace BlokeBot.Core.Features.HostedChannels.Runtime;
 
 public sealed class HostedChannelRuntimeControlService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    HostedChannelChangeNotifier changes,
     ChannelBotAuthorizationService channelBotAuthorization,
     HostBotAccountAuthorizationService botAccounts,
-    IOptions<BlokeBotOptions> options
+    IOptions<BlokeBotOptions> options,
+    HostedChannelRuntimeTransitionService runtimeTransitions
 )
 {
     private TimeSpan _runtimeChangeCooldown =>
@@ -60,11 +60,10 @@ public sealed class HostedChannelRuntimeControlService(
                 return Success(cooldown);
             }
 
-            host.BotRuntimeState = BotChannelRuntimeState.Starting;
-            host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-            _ = await db.SaveChangesAsync(ct);
-            _ = await changes.NotifyChangedAsync(ct);
-            return Success(new HostedChannelRuntimeControlOutcome.Accepted());
+            var transition = await runtimeTransitions.RequestStartAsync(host.Id, ct);
+            return transition is HostedChannelRuntimeTransitionOutcome.HostNotFound
+                ? Success(new HostedChannelRuntimeControlOutcome.HostNotFound())
+                : Success(new HostedChannelRuntimeControlOutcome.Accepted());
         });
 
     public IO<HostedChannelRuntimeControlOutcome, Never> Stop(int hostId) =>
@@ -77,7 +76,7 @@ public sealed class HostedChannelRuntimeControlService(
                 return Success(new HostedChannelRuntimeControlOutcome.HostNotFound());
             }
 
-            var lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
+            _ = HostedChannelRuntimeLifecycle.FromPersistence(
                 host.BotRuntimeState,
                 host.BotRuntimeStateChangedAtUtc
             );
@@ -87,17 +86,10 @@ public sealed class HostedChannelRuntimeControlService(
                 return Success(cooldown);
             }
 
-            host.BotRuntimeState = lifecycle.Match(
-                static _ => BotChannelRuntimeState.Stopped,
-                static _ => BotChannelRuntimeState.Stopped,
-                static _ => BotChannelRuntimeState.Stopping,
-                static _ => BotChannelRuntimeState.Stopping
-            );
-            host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-
-            _ = await db.SaveChangesAsync(ct);
-            _ = await changes.NotifyChangedAsync(ct);
-            return Success(new HostedChannelRuntimeControlOutcome.Accepted());
+            var transition = await runtimeTransitions.RequestStopAsync(host.Id, ct);
+            return transition is HostedChannelRuntimeTransitionOutcome.HostNotFound
+                ? Success(new HostedChannelRuntimeControlOutcome.HostNotFound())
+                : Success(new HostedChannelRuntimeControlOutcome.Accepted());
         });
 
     private HostedChannelRuntimeControlOutcome.Cooldown? CooldownMessage(BotHost host)

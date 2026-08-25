@@ -661,6 +661,7 @@ public sealed class HostBotAccountAuthorizationTests
             httpClientFactory,
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
+        var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),
@@ -674,8 +675,9 @@ public sealed class HostBotAccountAuthorizationTests
                     oauth,
                     NullLogger<TokenStatusService>.Instance
                 ),
-            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            options
+            changes,
+            options,
+            new HostedChannelRuntimeTransitionService(dbFactory, changes)
         );
     }
 

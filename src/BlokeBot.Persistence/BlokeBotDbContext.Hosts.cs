@@ -13,6 +13,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.BotRuntimeState);
             _ = b.Property(static x => x.BotRuntimeStateChangedAtUtc);
+            _ = b.Property(static x => x.BotRuntimeGeneration).HasDefaultValue(0L);
             _ = b.Property(static x => x.ChannelBotAuthorizedAtUtc);
             _ = b.Property(static x => x.ChannelBotAuthorizedScopes).HasMaxLength(512);
             _ = b.Property(static x => x.EnabledFeatures)

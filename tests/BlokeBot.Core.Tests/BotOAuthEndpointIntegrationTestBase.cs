@@ -323,7 +323,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     HostBotAccountTokenProtectionTestSupport.CreateProtector(),
                     new UnavailableTokenStatusSource(),
                     changes,
-                    settings
+                    settings,
+                    new HostedChannelRuntimeTransitionService(dbFactory, changes)
                 )
             );
         }

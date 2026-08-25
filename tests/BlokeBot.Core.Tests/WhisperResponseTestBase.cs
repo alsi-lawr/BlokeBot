@@ -172,6 +172,7 @@ public abstract class WhisperResponseTestBase
                 http,
                 global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
             );
+            var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
             var hostBotAccounts = new HostBotAccountAuthorizationService(
                 dbFactory,
                 new HostBotAccountOAuthService(options, oauth, helixUsers),
@@ -179,8 +180,9 @@ public abstract class WhisperResponseTestBase
                 helixUsers,
                 HostBotAccountTokenProtectionTestSupport.CreateProtector(),
                 new UnavailableTokenStatusSource(),
-                new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                options
+                changes,
+                options,
+                new HostedChannelRuntimeTransitionService(dbFactory, changes)
             );
             var chat = new RecordingChatSender(
                 publicChatOutcome ?? new PublicChatSendOutcome.Accepted()

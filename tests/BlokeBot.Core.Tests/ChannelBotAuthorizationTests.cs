@@ -138,12 +138,13 @@ public sealed class ChannelBotAuthorizationTests
             authorizedScopes: "bits:read"
         );
         var authorization = ChannelAuthorizationService(dbFactory, "channel:bot");
+        var changes = ChangeNotifier();
         var runtime = new HostedChannelRuntimeControlService(
             dbFactory,
-            ChangeNotifier(),
             authorization,
             HostBotAccounts(dbFactory),
-            Options.Create(new BlokeBotOptions { BotStateChangeCooldownSeconds = 0 })
+            Options.Create(new BlokeBotOptions { BotStateChangeCooldownSeconds = 0 }),
+            new HostedChannelRuntimeTransitionService(dbFactory, changes)
         );
 
         var result = await runtime.Start(hostId).RunAsync(CancellationToken.None);
@@ -152,6 +153,49 @@ public sealed class ChannelBotAuthorizationTests
             result.ShouldBeOfType<HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired>();
         var host = await LoadHostAsync(dbFactory, hostId);
         host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
+    }
+
+    [Test]
+    public async Task AuthorizedChannel_StartAndStop_ExposeTransitionsUntilRuntimeConfirmsEffects()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "123",
+            "streamer",
+            authorizedScopes: "channel:bot"
+        );
+        var changes = ChangeNotifier();
+        var transitions = new HostedChannelRuntimeTransitionService(dbFactory, changes);
+        var runtime = new HostedChannelRuntimeControlService(
+            dbFactory,
+            ChannelAuthorizationService(dbFactory, "channel:bot"),
+            HostBotAccounts(dbFactory),
+            Options.Create(new BlokeBotOptions { BotStateChangeCooldownSeconds = 0 }),
+            transitions
+        );
+        var lifecycle = new HostedChannelRuntimeLifecycleService(transitions);
+
+        _ = (
+            await runtime.Start(hostId).RunAsync(CancellationToken.None)
+        ).ShouldBeOfType<HostedChannelRuntimeControlOutcome.Accepted>();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Starting
+        );
+        await lifecycle.MarkStartedAsync("streamer", CancellationToken.None);
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Started
+        );
+        _ = (
+            await runtime.Stop(hostId).RunAsync(CancellationToken.None)
+        ).ShouldBeOfType<HostedChannelRuntimeControlOutcome.Accepted>();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Stopping
+        );
+        await lifecycle.MarkStoppedAsync("streamer", CancellationToken.None);
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Stopped
+        );
     }
 
     private static ChannelBotAuthorizationGrant Grant(
@@ -201,6 +245,7 @@ public sealed class ChannelBotAuthorizationTests
             httpClientFactory,
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
+        var changes = ChangeNotifier();
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),
@@ -208,8 +253,9 @@ public sealed class ChannelBotAuthorizationTests
             helix,
             HostBotAccountTokenProtectionTestSupport.CreateProtector(),
             new UnavailableTokenStatusSource(),
-            ChangeNotifier(),
-            options
+            changes,
+            options,
+            new HostedChannelRuntimeTransitionService(dbFactory, changes)
         );
     }
 

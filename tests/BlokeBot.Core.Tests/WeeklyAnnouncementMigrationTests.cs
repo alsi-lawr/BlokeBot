@@ -56,13 +56,15 @@ public sealed class WeeklyAnnouncementMigrationTests
     )
     {
         var now = DateTime.UtcNow;
-        var host = new BotHost
-        {
-            Login = "migration-host",
-            DisplayName = "Migration host",
-            TimeZoneId = "America/New_York",
-            CreatedAtUtc = now,
-        };
+        const int HostId = 1;
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO hosts
+                (Id, BotRuntimeState, CommandsAliasesConfigured, CreatedAtUtc, DisplayName, Login, TimeZoneId)
+            VALUES
+                ({HostId}, {BotChannelRuntimeState.Stopped}, {false}, {now}, {"Migration host"}, {"migration-host"}, {"America/New_York"});
+            """
+        );
         var reply = new CustomMessageLibraryEntry
         {
             Name = "Migration reply",
@@ -89,15 +91,13 @@ public sealed class WeeklyAnnouncementMigrationTests
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
-        reply.HostId = host.Id;
+        reply.HostId = HostId;
         _ = db.CustomMessageLibraryEntries.Add(reply);
         _ = await db.SaveChangesAsync();
-        announcement.HostId = host.Id;
+        announcement.HostId = HostId;
         announcement.MessageLibraryEntryId = reply.Id;
-        announcement.Schedule.HostId = host.Id;
-        announcement.DeliveryPolicy.HostId = host.Id;
+        announcement.Schedule.HostId = HostId;
+        announcement.DeliveryPolicy.HostId = HostId;
         _ = db.CustomAnnouncements.Add(announcement);
         _ = await db.SaveChangesAsync();
     }

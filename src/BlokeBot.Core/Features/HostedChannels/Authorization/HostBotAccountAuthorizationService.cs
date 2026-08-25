@@ -17,7 +17,8 @@ public sealed class HostBotAccountAuthorizationService(
     IHostBotAccountTokenProtector tokenProtector,
     ITokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
-    BotSettings botSettings
+    BotSettings botSettings,
+    HostedChannelRuntimeTransitionService runtimeTransitions
 ) : IBotAccountProvider, IHostBotAccountTokenStatusProvider
 {
     private static readonly TimeSpan _refreshSkew = TimeSpan.FromMinutes(1);
@@ -274,20 +275,27 @@ public sealed class HostBotAccountAuthorizationService(
 
         settings.UpdatedAtUtc = DateTime.UtcNow;
 
-        if (restartRuntime)
-        {
-            host.BotRuntimeState = await CanStartWithSelectedBotAccountAsync(
+        var canRestart =
+            restartRuntime
+            && await CanStartWithSelectedBotAccountAsync(
                 db,
                 settings,
                 selection,
                 cancellationToken
-            )
-                ? BotChannelRuntimeState.Starting
-                : BotChannelRuntimeState.Stopped;
-            host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-        }
+            );
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
+        if (restartRuntime)
+        {
+            _ = await runtimeTransitions.RestartAfterAccountChangeAsync(
+                db,
+                host.Id,
+                canRestart,
+                cancellationToken
+            );
+        }
+        await transaction.CommitAsync(cancellationToken);
         _ = await changes.NotifyChangedAsync(cancellationToken);
     }
 
@@ -798,7 +806,7 @@ public sealed class HostBotAccountAuthorizationService(
         return true;
     }
 
-    private static async Task DisableUnusableCredentialsAsync(
+    private async Task DisableUnusableCredentialsAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         CancellationToken cancellationToken
@@ -809,13 +817,6 @@ public sealed class HostBotAccountAuthorizationService(
         settings.WhisperResponsesEnabled = false;
         ClearAuthorization(settings);
         settings.UpdatedAtUtc = now;
-
-        var host = await db.Hosts.SingleAsync(
-            value => value.Id == settings.HostId,
-            cancellationToken
-        );
-        host.BotRuntimeState = BotChannelRuntimeState.Stopped;
-        host.BotRuntimeStateChangedAtUtc = now;
 
         var alertExists = await db.DurableAlerts.AnyAsync(
             value =>
@@ -842,7 +843,14 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await runtimeTransitions.ForceStoppedForCredentialPolicyAsync(
+            db,
+            settings.HostId,
+            cancellationToken
+        );
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private async Task RefreshProfileMetadataAsync(

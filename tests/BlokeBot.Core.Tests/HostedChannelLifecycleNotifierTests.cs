@@ -42,9 +42,9 @@ public sealed class HostedChannelLifecycleNotifierTests
                 return ValueTask.CompletedTask;
             }
         );
+        var changes = new HostedChannelChangeNotifier(events);
         var lifecycle = new HostedChannelRuntimeLifecycleService(
-            dbFactory,
-            new HostedChannelChangeNotifier(events)
+            new HostedChannelRuntimeTransitionService(dbFactory, changes)
         );
 
         await lifecycle.RecoverInterruptedStopsAsync(CancellationToken.None);
@@ -79,10 +79,10 @@ public sealed class HostedChannelLifecycleNotifierTests
         http.Enqueue(PollResponse("external-poll", "TERMINATED", votes: 2));
         http.Enqueue(EmptyPollResponse());
         http.Enqueue(EmptyPollResponse());
+        var changes = new HostedChannelChangeNotifier(events);
         var notifier = new HostedChannelLifecycleNotifier(
             new HostedChannelRuntimeLifecycleService(
-                dbFactory,
-                new HostedChannelChangeNotifier(events)
+                new HostedChannelRuntimeTransitionService(dbFactory, changes)
             ),
             CreatePollService(dbFactory, http, events),
             new ClipMarkerService(
