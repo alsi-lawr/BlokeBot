@@ -1,17 +1,14 @@
-using System.Text.Json;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class ConfigurationActivationTests
+public sealed partial class ConfigurationActivationTests
 {
     [Test]
     public async Task InteractiveAndImportedChanges_RunTheSameOrderedAutomaticWork()
@@ -96,42 +93,6 @@ public sealed class ConfigurationActivationTests
     }
 
     [Test]
-    public async Task ConcurrentWorkers_ClaimOnePendingActivationExactlyOnce()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "destination", HostFeatureFlags.Polls);
-        var activationId = Guid.NewGuid();
-        await SeedActivationAsync(
-            database,
-            activationId,
-            hostId,
-            HostFeatureFlags.Polls,
-            HostFeatureFlags.None
-        );
-        var observer = new RecordingObserver(TimeSpan.FromMilliseconds(100));
-        var events = TestEventBus.Create<AppEventKind>();
-        using var alerts = new DurableAlertService(database, TimeProvider.System, events);
-        var queue = new ConfigurationActivationQueue();
-        var authority = Authority(observer, events, alerts);
-        var first = Worker(database, queue, authority);
-        var second = Worker(database, queue, authority);
-
-        await first.StartAsync(CancellationToken.None);
-        await second.StartAsync(CancellationToken.None);
-        queue.Wake();
-        await WaitForStatusAsync(database, activationId, ConfigurationActivationStatus.Complete);
-        await first.StopAsync(CancellationToken.None);
-        await second.StopAsync(CancellationToken.None);
-
-        observer.Changes.ShouldBe([
-            new(hostId, HostFeatureFlags.Polls, HostFeatureActivationState.Enabled),
-        ]);
-        await using var verify = await database.CreateDbContextAsync();
-        var row = await verify.ConfigurationActivations.SingleAsync();
-        row.AttemptCount.ShouldBe(1);
-    }
-
-    [Test]
     public async Task AutomaticWorkFailure_KeepsImportedStateAndRetriesWithAStableSafeReason()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -179,87 +140,6 @@ public sealed class ConfigurationActivationTests
         observer.Changes.Count.ShouldBe(2);
         var view = await service.LoadAsync(hostId, activationId, CancellationToken.None);
         view.ShouldNotBeNull().Issues.ShouldBeEmpty();
-    }
-
-    [Test]
-    public async Task WorkerCancellation_ReturnsActivationToPendingAndRestartCompletesIt()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "destination", HostFeatureFlags.Polls);
-        var activationId = Guid.NewGuid();
-        await SeedActivationAsync(
-            database,
-            activationId,
-            hostId,
-            HostFeatureFlags.Polls,
-            HostFeatureFlags.None
-        );
-        var blocking = new BlockingObserver();
-        var events = TestEventBus.Create<AppEventKind>();
-        using var alerts = new DurableAlertService(database, TimeProvider.System, events);
-        var queue = new ConfigurationActivationQueue();
-        var first = Worker(database, queue, Authority(blocking, events, alerts));
-        await first.StartAsync(CancellationToken.None);
-        queue.Wake();
-        await blocking.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        await first.StopAsync(CancellationToken.None);
-
-        await using (var canceled = await database.CreateDbContextAsync())
-        {
-            var row = await canceled.ConfigurationActivations.SingleAsync();
-            row.Status.ShouldBe(ConfigurationActivationStatus.Pending);
-            var issue = PersistedIssues(row).ShouldHaveSingleItem();
-            issue.Code.ShouldBe(HostFeatureActivationAuthority.CancellationCode);
-            issue.Reason.ShouldNotBeNullOrWhiteSpace();
-            (await canceled.Hosts.SingleAsync()).EnabledFeatures.ShouldBe(HostFeatureFlags.Polls);
-        }
-        var complete = new RecordingObserver();
-        var restarted = Worker(database, queue, Authority(complete, events, alerts));
-        await restarted.StartAsync(CancellationToken.None);
-        queue.Wake();
-        await WaitForStatusAsync(database, activationId, ConfigurationActivationStatus.Complete);
-        await restarted.StopAsync(CancellationToken.None);
-
-        complete.Changes.Count.ShouldBe(1);
-    }
-
-    [Test]
-    public async Task ExpiredProcessingLease_IsReclaimedOnceAfterRestart()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "destination", HostFeatureFlags.Polls);
-        var activationId = Guid.NewGuid();
-        await SeedActivationAsync(
-            database,
-            activationId,
-            hostId,
-            HostFeatureFlags.Polls,
-            HostFeatureFlags.None,
-            DateTime.UtcNow.AddMinutes(-6)
-        );
-        await using (var interrupted = await database.CreateDbContextAsync())
-        {
-            var row = await interrupted.ConfigurationActivations.SingleAsync();
-            row.Status = ConfigurationActivationStatus.Processing;
-            row.AttemptCount = 1;
-            row.Revision = 2;
-            _ = await interrupted.SaveChangesAsync();
-        }
-        var observer = new RecordingObserver();
-        var events = TestEventBus.Create<AppEventKind>();
-        using var alerts = new DurableAlertService(database, TimeProvider.System, events);
-        var queue = new ConfigurationActivationQueue();
-        var restarted = Worker(database, queue, Authority(observer, events, alerts));
-
-        await restarted.StartAsync(CancellationToken.None);
-        queue.Wake();
-        await WaitForStatusAsync(database, activationId, ConfigurationActivationStatus.Complete);
-        await restarted.StopAsync(CancellationToken.None);
-
-        observer.Changes.Count.ShouldBe(1);
-        await using var verify = await database.CreateDbContextAsync();
-        (await verify.ConfigurationActivations.SingleAsync()).AttemptCount.ShouldBe(2);
     }
 
     [Test]
@@ -399,181 +279,6 @@ public sealed class ConfigurationActivationTests
             .ShouldBe(["provider:one", "provider:two"]);
     }
 
-    [Test]
-    public async Task NewerOppositeChange_WaitsForProcessingChangeAndRunsAfterIt()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "destination", HostFeatureFlags.Bingo);
-        var enabledId = Guid.NewGuid();
-        await SeedActivationAsync(
-            database,
-            enabledId,
-            hostId,
-            HostFeatureFlags.Bingo,
-            HostFeatureFlags.None,
-            DateTime.UtcNow.AddMinutes(-1)
-        );
-        var observer = new GateObserver();
-        var events = TestEventBus.Create<AppEventKind>();
-        using var alerts = new DurableAlertService(database, TimeProvider.System, events);
-        var queue = new ConfigurationActivationQueue();
-        var authority = Authority(observer, events, alerts);
-        var first = Worker(database, queue, authority);
-        var second = Worker(database, queue, authority);
-        await first.StartAsync(CancellationToken.None);
-        await second.StartAsync(CancellationToken.None);
-        queue.Wake();
-        await observer.FirstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var disabledId = Guid.NewGuid();
-        await SeedActivationAsync(
-            database,
-            disabledId,
-            hostId,
-            HostFeatureFlags.None,
-            HostFeatureFlags.Bingo,
-            DateTime.UtcNow
-        );
-        queue.Wake();
-        await Task.Delay(100);
-        observer.Changes.Count.ShouldBe(1);
-        _ = observer.ReleaseFirst.TrySetResult();
-
-        await WaitForStatusAsync(database, enabledId, ConfigurationActivationStatus.Complete);
-        await WaitForStatusAsync(database, disabledId, ConfigurationActivationStatus.Complete);
-        await first.StopAsync(CancellationToken.None);
-        await second.StopAsync(CancellationToken.None);
-
-        observer.Changes.ShouldBe([
-            new(hostId, HostFeatureFlags.Bingo, HostFeatureActivationState.Enabled),
-            new(hostId, HostFeatureFlags.Bingo, HostFeatureActivationState.Disabled),
-        ]);
-    }
-
-    private static HostFeatureActivationAuthority Authority(
-        IHostFeatureActivationObserver observer,
-        EventBus<AppEventKind> events,
-        DurableAlertService alerts
-    ) => Authority([observer], events, alerts);
-
-    private static HostFeatureActivationAuthority Authority(
-        IReadOnlyList<IHostFeatureActivationObserver> observers,
-        EventBus<AppEventKind> events,
-        DurableAlertService alerts
-    ) =>
-        new(
-            observers,
-            new HostedChannelChangeNotifier(events),
-            alerts,
-            NullLogger<HostFeatureActivationAuthority>.Instance
-        );
-
-    private static ConfigurationActivationWorker Worker(
-        SqliteBlokeBotDbFactory database,
-        ConfigurationActivationQueue queue,
-        HostFeatureActivationAuthority authority
-    ) =>
-        new(
-            database,
-            queue,
-            authority,
-            TimeProvider.System,
-            NullLogger<ConfigurationActivationWorker>.Instance
-        );
-
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory database,
-        string login,
-        HostFeatureFlags enabled
-    )
-    {
-        await using var db = await database.CreateDbContextAsync();
-        var host = new BotHost
-        {
-            Login = login,
-            DisplayName = login,
-            EnabledFeatures = enabled,
-            CreatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
-        return host.Id;
-    }
-
-    private static async Task SeedActivationAsync(
-        SqliteBlokeBotDbFactory database,
-        Guid activationId,
-        int hostId,
-        HostFeatureFlags enabled,
-        HostFeatureFlags disabled,
-        DateTime? updatedAt = null
-    )
-    {
-        await using var db = await database.CreateDbContextAsync();
-        var now = updatedAt ?? DateTime.UtcNow;
-        var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
-        host.EnabledFeatures = (host.EnabledFeatures | enabled) & ~disabled;
-        _ = db.ConfigurationActivations.Add(
-            new()
-            {
-                Id = activationId,
-                HostId = hostId,
-                EnabledChanges = enabled,
-                DisabledChanges = disabled,
-                Status = ConfigurationActivationStatus.Pending,
-                Revision = 1,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now,
-            }
-        );
-        _ = await db.SaveChangesAsync();
-    }
-
-    private static async Task WaitForStatusAsync(
-        SqliteBlokeBotDbFactory database,
-        Guid activationId,
-        ConfigurationActivationStatus expected,
-        int minimumAttemptCount = 0
-    )
-    {
-        for (var attempt = 0; attempt < 200; attempt++)
-        {
-            await using var db = await database.CreateDbContextAsync();
-            var row = await db.ConfigurationActivations.SingleAsync(x => x.Id == activationId);
-            if (row.Status == expected && row.AttemptCount >= minimumAttemptCount)
-            {
-                return;
-            }
-            await Task.Delay(20);
-        }
-        throw new TimeoutException($"Activation {activationId} did not become {expected}.");
-    }
-
-    private static IReadOnlyList<ConfigurationActivationIssue> PersistedIssues(
-        ConfigurationActivation activation
-    ) =>
-        JsonSerializer.Deserialize<ConfigurationActivationIssue[]>(
-            activation.IssuesJson.ShouldNotBeNull()
-        ) ?? [];
-
-    private sealed class RecordingObserver(TimeSpan? delay = null) : IHostFeatureActivationObserver
-    {
-        public List<HostFeatureActivationChange> Changes { get; } = [];
-
-        public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
-            HostFeatureActivationChange change,
-            CancellationToken cancellationToken
-        )
-        {
-            Changes.Add(change);
-            if (delay is { } value)
-            {
-                await Task.Delay(value, cancellationToken);
-            }
-            return new HostFeatureAutomaticWorkResult.Complete();
-        }
-    }
-
     private sealed class MutableObserver : IHostFeatureActivationObserver
     {
         internal const string ManualCode = "provider-reconnection-required";
@@ -608,22 +313,6 @@ public sealed class ConfigurationActivationTests
         }
     }
 
-    private sealed class BlockingObserver : IHostFeatureActivationObserver
-    {
-        internal TaskCompletionSource Started { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
-            HostFeatureActivationChange change,
-            CancellationToken cancellationToken
-        )
-        {
-            _ = Started.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            return new HostFeatureAutomaticWorkResult.Complete();
-        }
-    }
-
     private sealed class FixedManualFollowUpObserver(string code, string stableKey)
         : IHostFeatureActivationObserver
     {
@@ -643,28 +332,5 @@ public sealed class ConfigurationActivationTests
                     )
                 )
             );
-    }
-
-    private sealed class GateObserver : IHostFeatureActivationObserver
-    {
-        internal TaskCompletionSource FirstStarted { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal TaskCompletionSource ReleaseFirst { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal List<HostFeatureActivationChange> Changes { get; } = [];
-
-        public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
-            HostFeatureActivationChange change,
-            CancellationToken cancellationToken
-        )
-        {
-            Changes.Add(change);
-            if (Changes.Count == 1)
-            {
-                _ = FirstStarted.TrySetResult();
-                await ReleaseFirst.Task.WaitAsync(cancellationToken);
-            }
-            return new HostFeatureAutomaticWorkResult.Complete();
-        }
     }
 }

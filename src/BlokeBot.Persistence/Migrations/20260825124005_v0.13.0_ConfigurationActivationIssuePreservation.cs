@@ -22,7 +22,12 @@ public sealed class v0130_ConfigurationActivationIssuePreservation : Migration
         migrationBuilder.Sql(
             """
             UPDATE configuration_activations
-            SET IssuesJson = '[{"Code":"automatic-work-failed","Reason":"A previous automatic activation failed. Retry automatic activation."}]'
+            SET IssuesJson = json_array(
+                json_object(
+                    'Code', FailureCode,
+                    'Reason', 'A previous automatic activation failed. Retry automatic activation.'
+                )
+            )
             WHERE FailureCode IS NOT NULL;
             """
         );

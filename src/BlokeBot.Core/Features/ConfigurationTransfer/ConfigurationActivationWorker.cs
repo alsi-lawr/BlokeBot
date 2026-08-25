@@ -1,7 +1,9 @@
+using System.Data;
 using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
@@ -30,63 +32,76 @@ internal sealed class ConfigurationActivationWorker(
 
     private async Task<ActivationClaim?> ClaimAsync(CancellationToken cancellationToken)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var staleBefore = now - _claimLease;
-        var candidate = await db
-            .ConfigurationActivations.AsNoTracking()
-            .Where(x =>
-                (
-                    x.Status == ConfigurationActivationStatus.Pending
-                    && !db.ConfigurationActivations.Any(other =>
-                        other.HostId == x.HostId
-                        && other.Id != x.Id
-                        && other.Status == ConfigurationActivationStatus.Processing
-                        && other.UpdatedAtUtc > staleBefore
-                    )
-                )
-                || (
-                    x.Status == ConfigurationActivationStatus.Processing
-                    && x.UpdatedAtUtc <= staleBefore
-                )
-            )
-            .OrderBy(x => x.UpdatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (candidate is null)
+        try
         {
-            return null;
-        }
-
-        var claimed = await db
-            .ConfigurationActivations.Where(x =>
-                x.Id == candidate.Id
-                && x.Revision == candidate.Revision
-                && (
-                    x.Status == ConfigurationActivationStatus.Pending
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable,
+                cancellationToken
+            );
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var staleBefore = now - _claimLease;
+            var candidate = await db
+                .ConfigurationActivations.AsNoTracking()
+                .Where(x =>
+                    (
+                        x.Status == ConfigurationActivationStatus.Pending
+                        && !db.ConfigurationActivations.Any(other =>
+                            other.HostId == x.HostId
+                            && other.Id != x.Id
+                            && other.Status == ConfigurationActivationStatus.Processing
+                        )
+                    )
                     || (
                         x.Status == ConfigurationActivationStatus.Processing
                         && x.UpdatedAtUtc <= staleBefore
                     )
                 )
-            )
-            .ExecuteUpdateAsync(
-                setters =>
-                    setters
-                        .SetProperty(x => x.Status, ConfigurationActivationStatus.Processing)
-                        .SetProperty(x => x.AttemptCount, x => x.AttemptCount + 1)
-                        .SetProperty(x => x.Revision, x => x.Revision + 1)
-                        .SetProperty(x => x.UpdatedAtUtc, now),
-                cancellationToken
-            );
-        return claimed == 0
-            ? null
-            : new(
-                candidate.Id,
-                candidate.HostId,
-                candidate.EnabledChanges,
-                candidate.DisabledChanges,
-                candidate.Revision + 1
-            );
+                .OrderBy(x => x.UpdatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (candidate is null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return null;
+            }
+
+            var claimed = await db
+                .ConfigurationActivations.Where(x =>
+                    x.Id == candidate.Id
+                    && x.Revision == candidate.Revision
+                    && (
+                        x.Status == ConfigurationActivationStatus.Pending
+                        || (
+                            x.Status == ConfigurationActivationStatus.Processing
+                            && x.UpdatedAtUtc <= staleBefore
+                        )
+                    )
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.Status, ConfigurationActivationStatus.Processing)
+                            .SetProperty(x => x.AttemptCount, x => x.AttemptCount + 1)
+                            .SetProperty(x => x.Revision, x => x.Revision + 1)
+                            .SetProperty(x => x.UpdatedAtUtc, now),
+                    cancellationToken
+                );
+            await transaction.CommitAsync(cancellationToken);
+            return claimed == 0
+                ? null
+                : new(
+                    candidate.Id,
+                    candidate.HostId,
+                    candidate.EnabledChanges,
+                    candidate.DisabledChanges,
+                    candidate.Revision + 1
+                );
+        }
+        catch (Exception exception) when (IsSqliteContention(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return null;
+        }
     }
 
     private async Task ProcessAsync(ActivationClaim claim, CancellationToken cancellationToken)
@@ -135,6 +150,15 @@ internal sealed class ConfigurationActivationWorker(
                     break;
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await SetOutcomeAsync(
+                claim,
+                ConfigurationActivationStatus.Pending,
+                [CancellationIssue()],
+                CancellationToken.None
+            );
+        }
         catch (Exception exception)
         {
             logger.LogError(
@@ -156,6 +180,20 @@ internal sealed class ConfigurationActivationWorker(
             );
         }
     }
+
+    private static HostFeatureActivationIssue CancellationIssue() =>
+        new(
+            HostFeatureActivationAuthority.CancellationCode,
+            "Automatic feature activation was interrupted and will be retried."
+        );
+
+    private static bool IsSqliteContention(Exception exception) =>
+        exception switch
+        {
+            SqliteException { SqliteErrorCode: 5 or 6 } => true,
+            DbUpdateException { InnerException: { } inner } => IsSqliteContention(inner),
+            _ => false,
+        };
 
     private async Task SetOutcomeAsync(
         ActivationClaim claim,
