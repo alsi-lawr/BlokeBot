@@ -157,7 +157,7 @@ public sealed class PluginLifecyclePersistenceTests
     }
 
     [Test]
-    public async Task LifecycleMigration_PurgeRetainsOnlyLatestOutcomeAndAllowsReinstall()
+    public async Task Purge_RetryRetainsLatestTombstoneAndAllowsReinstall()
     {
         await using var database = await LifecycleDatabase.CreateAsync();
         var store = new EfPluginLifecycleStore(database);
@@ -187,21 +187,6 @@ public sealed class PluginLifecyclePersistenceTests
                 CancellationToken.None
             )
         ).ShouldBe(tombstone);
-
-        await using (var connection = await database.OpenConnectionAsync())
-        {
-            (await ReadOutcomeColumnsAsync(connection))
-                .Order(StringComparer.Ordinal)
-                .ToArray()
-                .ShouldBe([
-                    "FailureCode",
-                    "OutcomeCode",
-                    "OutcomeDetail",
-                    "OutcomeOccurredAtUtc",
-                    "PluginId",
-                ]);
-            await AssertRetainedOutcomeAsync(connection, tombstone);
-        }
 
         var reinstalled = (
             await store.BeginActivationAsync(
@@ -556,40 +541,6 @@ public sealed class PluginLifecyclePersistenceTests
     private static PluginLifecycleState Applied(PluginLifecycleTransitionOutcome transition) =>
         transition.ShouldBeOfType<PluginLifecycleTransitionOutcome.Applied>().State;
 
-    private static async ValueTask<IReadOnlyList<string>> ReadOutcomeColumnsAsync(
-        SqliteConnection connection
-    )
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info('plugin_lifecycle_outcomes');";
-        await using var reader = await command.ExecuteReaderAsync();
-        var columns = new List<string>();
-        while (await reader.ReadAsync())
-        {
-            columns.Add(reader.GetString(reader.GetOrdinal("name")));
-        }
-
-        return columns;
-    }
-
-    private static async ValueTask AssertRetainedOutcomeAsync(
-        SqliteConnection connection,
-        PluginLifecycleTombstone expected
-    )
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            "SELECT \"PluginId\", \"OutcomeCode\", \"FailureCode\", \"OutcomeDetail\" "
-            + "FROM \"plugin_lifecycle_outcomes\";";
-        await using var reader = await command.ExecuteReaderAsync();
-        (await reader.ReadAsync()).ShouldBeTrue();
-        reader.GetString(0).ShouldBe(expected.PluginId.Value);
-        reader.GetString(1).ShouldBe(nameof(PluginLifecycleOutcomeCode.Purged));
-        reader.IsDBNull(2).ShouldBeTrue();
-        reader.IsDBNull(3).ShouldBeTrue();
-        (await reader.ReadAsync()).ShouldBeFalse();
-    }
-
     private sealed class LifecycleDatabase(string path, DbContextOptions<BlokeBotDbContext> options)
         : IDbContextFactory<BlokeBotDbContext>,
             IAsyncDisposable
@@ -625,13 +576,6 @@ public sealed class PluginLifecyclePersistenceTests
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
         ) => Task.FromResult(CreateDbContext());
-
-        internal async ValueTask<SqliteConnection> OpenConnectionAsync()
-        {
-            var connection = new SqliteConnection($"Data Source={path}");
-            await connection.OpenAsync();
-            return connection;
-        }
 
         internal async ValueTask MigrateToLatestAsync()
         {

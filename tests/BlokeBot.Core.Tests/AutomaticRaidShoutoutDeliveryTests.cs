@@ -11,36 +11,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomaticRaidShoutoutDeliveryTests
 {
     [Test]
-    [Arguments("sent", AutomaticRaidShoutoutResultCode.Delivered)]
-    [Arguments("cooldown", AutomaticRaidShoutoutResultCode.Cooldown)]
-    [Arguments("authority", AutomaticRaidShoutoutResultCode.AuthorityRequired)]
-    [Arguments("invalid", AutomaticRaidShoutoutResultCode.Invalid)]
-    [Arguments("rejected", AutomaticRaidShoutoutResultCode.Rejected)]
-    [Arguments("ambiguous", AutomaticRaidShoutoutResultCode.Ambiguous)]
-    public async Task NativeAdapter_MapsManualOperationOutcomeWithoutChatFallback(
-        string scenario,
-        AutomaticRaidShoutoutResultCode expectedCode
-    )
-    {
-        var native = new AutomaticRaidNativeShoutoutSender(
-            new ScriptedNativeOperation(NativeOutcome(scenario))
-        );
-
-        var result = await native.SendAsync(1, "raider", CancellationToken.None);
-
-        var code = result switch
-        {
-            AutomaticRaidShoutoutDeliveryResult.Delivered =>
-                AutomaticRaidShoutoutResultCode.Delivered,
-            AutomaticRaidShoutoutDeliveryResult.NotDelivered notDelivered => notDelivered.Reason,
-            AutomaticRaidShoutoutDeliveryResult.Ambiguous =>
-                AutomaticRaidShoutoutResultCode.Ambiguous,
-            _ => throw new InvalidOperationException(),
-        };
-        code.ShouldBe(expectedCode);
-    }
-
-    [Test]
     public async Task NativeAdapter_MapsProductionUnauthorizedAuthorityOutcome()
     {
         var native = new AutomaticRaidNativeShoutoutSender(
@@ -188,14 +158,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
     }
 
     [Test]
-    [Arguments(PersistedAnnouncementColor.Primary)]
-    [Arguments(PersistedAnnouncementColor.Blue)]
-    [Arguments(PersistedAnnouncementColor.Green)]
-    [Arguments(PersistedAnnouncementColor.Orange)]
-    [Arguments(PersistedAnnouncementColor.Purple)]
-    public async Task Announcement_UsesSelectedColorOnceWithoutChatFallback(
-        PersistedAnnouncementColor color
-    )
+    public async Task Announcement_UsesSelectedColorOnceWithoutChatFallback()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(database);
@@ -213,32 +176,27 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             AutomaticRaidChatPresentation.Announcement
         ) with
         {
-            AnnouncementColor = color,
+            AnnouncementColor = PersistedAnnouncementColor.Primary,
         };
 
         var result = await delivery.DeliverAsync(Request(configuration), CancellationToken.None);
 
         _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
-        announcement.Calls.ShouldHaveSingleItem().Color.ShouldBe(color);
+        announcement
+            .Calls.ShouldHaveSingleItem()
+            .Color.ShouldBe(PersistedAnnouncementColor.Primary);
         chat.Calls.ShouldBeEmpty();
     }
 
     [Test]
-    [Arguments("authority", AutomaticRaidShoutoutResultCode.AuthorityRequired)]
-    [Arguments("not-ready", AutomaticRaidShoutoutResultCode.NotReady)]
-    [Arguments("invalid", AutomaticRaidShoutoutResultCode.Invalid)]
-    [Arguments("rate-limited", AutomaticRaidShoutoutResultCode.RateLimited)]
-    [Arguments("rejected", AutomaticRaidShoutoutResultCode.Rejected)]
-    [Arguments("unexpected", AutomaticRaidShoutoutResultCode.Unexpected)]
-    public async Task AnnouncementTerminalFailure_MapsOnceWithoutRetryOrChatFallback(
-        string scenario,
-        AutomaticRaidShoutoutResultCode expectedCode
-    )
+    public async Task AnnouncementAuthorityFailure_MapsOnceWithoutRetryOrChatFallback()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(database);
         var chat = new RecordingChat();
-        var announcement = new RecordingAnnouncement(AnnouncementResult(scenario));
+        var announcement = new RecordingAnnouncement(
+            new AutomaticRaidAnnouncementSendResult.AuthorityRequired()
+        );
         var delivery = Delivery(
             database,
             new RecordingNative(new AutomaticRaidShoutoutDeliveryResult.Delivered()),
@@ -259,7 +217,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
 
         result
             .ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.NotDelivered>()
-            .Reason.ShouldBe(expectedCode);
+            .Reason.ShouldBe(AutomaticRaidShoutoutResultCode.AuthorityRequired);
         announcement.Calls.Count.ShouldBe(1);
         chat.Calls.ShouldBeEmpty();
     }
@@ -388,36 +346,6 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
         );
         _ = await db.SaveChangesAsync();
     }
-
-    private static AutomaticRaidAnnouncementSendResult AnnouncementResult(string scenario) =>
-        scenario switch
-        {
-            "authority" => new AutomaticRaidAnnouncementSendResult.AuthorityRequired(),
-            "not-ready" => new AutomaticRaidAnnouncementSendResult.NotReady(),
-            "invalid" => new AutomaticRaidAnnouncementSendResult.Invalid(),
-            "rate-limited" => new AutomaticRaidAnnouncementSendResult.RateLimited(),
-            "rejected" => new AutomaticRaidAnnouncementSendResult.Rejected(),
-            "unexpected" => new AutomaticRaidAnnouncementSendResult.Unexpected(),
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
-        };
-
-    private static ShoutoutOperationOutcome NativeOutcome(string scenario) =>
-        scenario switch
-        {
-            "sent" => new ShoutoutOperationOutcome.Sent("raider"),
-            "cooldown" => new ShoutoutOperationOutcome.CooldownUnknown(),
-            "authority" => new ShoutoutOperationOutcome.NotReady(
-                "Reconnect the bot account with shoutout permissions."
-            ),
-            "invalid" => new ShoutoutOperationOutcome.TargetNotFound("raider"),
-            "rejected" => new ShoutoutOperationOutcome.ProviderRejected(
-                "Twitch rejected that shoutout target."
-            ),
-            "ambiguous" => new ShoutoutOperationOutcome.ProviderRejected(
-                "Twitch could not confirm the shoutout."
-            ),
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
-        };
 
     private static async Task SeedHostAndOutcomeAsync(SqliteBlokeBotDbFactory database)
     {

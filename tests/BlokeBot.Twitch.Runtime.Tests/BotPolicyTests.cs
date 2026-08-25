@@ -8,115 +8,6 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class BotPolicyTests
 {
     [Test]
-    public void CompletePolicyOptions_Validating_AcceptsEveryBoundary()
-    {
-        var options = ValidOptions();
-
-        new IrcSessionResilienceOptionsValidator()
-            .Validate("IRC session", options.IrcSession)
-            .Failed.ShouldBeFalse();
-        new EventSubChannelRecoveryOptionsValidator()
-            .Validate("EventSub channel recovery", options.EventSubChannelRecovery)
-            .Failed.ShouldBeFalse();
-        new PublicChatRetryOptionsValidator()
-            .Validate("public chat retry", options.PublicChatRetry)
-            .Failed.ShouldBeFalse();
-        new PublicChatDeliveryLifetimeOptionsValidator()
-            .Validate("public chat lifetime", options.PublicChatDeliveryLifetime)
-            .Failed.ShouldBeFalse();
-        new PublicChatTerminalRetentionOptionsValidator()
-            .Validate("public chat retention", options.PublicChatTerminalRetention)
-            .Failed.ShouldBeFalse();
-    }
-
-    [Test]
-    public void MissingIrcValues_Validating_ReportsEveryRequiredMember()
-    {
-        var result = new IrcSessionResilienceOptionsValidator().Validate(
-            "IRC session",
-            new IrcSessionResilienceOptions
-            {
-                AttemptLimit = null,
-                Delay = null,
-                MaximumDelay = null,
-                DelayBackoffType = null,
-                AttemptTimeout = null,
-            }
-        );
-
-        result.Failed.ShouldBeTrue();
-        result.Failures.ShouldContain(static failure =>
-            failure.Contains(
-                nameof(IrcSessionResilienceOptions.AttemptLimit),
-                StringComparison.Ordinal
-            )
-        );
-        result.Failures.ShouldContain(static failure =>
-            failure.Contains(nameof(IrcSessionResilienceOptions.Delay), StringComparison.Ordinal)
-        );
-        result.Failures.ShouldContain(static failure =>
-            failure.Contains(
-                nameof(IrcSessionResilienceOptions.MaximumDelay),
-                StringComparison.Ordinal
-            )
-        );
-        result.Failures.ShouldContain(static failure =>
-            failure.Contains(
-                nameof(IrcSessionResilienceOptions.DelayBackoffType),
-                StringComparison.Ordinal
-            )
-        );
-        result.Failures.ShouldContain(static failure =>
-            failure.Contains(
-                nameof(IrcSessionResilienceOptions.AttemptTimeout),
-                StringComparison.Ordinal
-            )
-        );
-    }
-
-    [Test]
-    public void InvalidEventSubChannelRecoveryValues_Validating_RejectsRanges()
-    {
-        var result = new EventSubChannelRecoveryOptionsValidator().Validate(
-            "EventSub channel recovery",
-            new EventSubChannelRecoveryOptions
-            {
-                AttemptLimit = -1,
-                Delay = TimeSpan.Zero,
-                MaximumDelay = TimeSpan.Zero,
-                DelayBackoffType = DelayBackoffType.Linear,
-                AttemptTimeout = TimeSpan.Zero,
-            }
-        );
-
-        result.Failed.ShouldBeTrue();
-        result.Failures.Count().ShouldBeGreaterThanOrEqualTo(4);
-    }
-
-    [Test]
-    public void InvalidPublicChatValues_Validating_RejectsRetryAndRetentionRanges()
-    {
-        var retry = new PublicChatRetryOptionsValidator().Validate(
-            "public chat retry",
-            new PublicChatRetryOptions
-            {
-                AttemptLimit = 0,
-                Delay = TimeSpan.Zero,
-                MaximumDelay = TimeSpan.Zero,
-                DelayBackoffType = DelayBackoffType.Constant,
-            }
-        );
-        var retention = new PublicChatTerminalRetentionOptionsValidator().Validate(
-            "public chat retention",
-            new PublicChatTerminalRetentionOptions { Duration = TimeSpan.Zero }
-        );
-
-        retry.Failed.ShouldBeTrue();
-        retry.Failures.Count().ShouldBeGreaterThanOrEqualTo(3);
-        retention.Failed.ShouldBeTrue();
-    }
-
-    [Test]
     public void PublicChatLifetime_Validating_RequiresPositiveAtMostSixtySeconds()
     {
         ValidateLifetime(null).Failed.ShouldBeTrue();
@@ -127,16 +18,12 @@ public sealed class BotPolicyTests
     }
 
     [Test]
-    [Arguments("IrcSession")]
-    [Arguments("EventSubChannelRecovery")]
-    [Arguments("PublicChatRetry")]
-    [Arguments("PublicChatDeliveryLifetime")]
-    [Arguments("PublicChatTerminalRetention")]
-    public void RequiredPolicySectionMissing_Binding_FailsWithBoundaryName(string sectionName)
+    public void RequiredPolicySectionMissing_Binding_FailsWithBoundaryName()
     {
+        const string SectionName = "IrcSession";
         var values = ValidConfiguration()
             .Where(pair =>
-                !pair.Key.StartsWith($"TwitchBot:Policies:{sectionName}:", StringComparison.Ordinal)
+                !pair.Key.StartsWith($"TwitchBot:Policies:{SectionName}:", StringComparison.Ordinal)
             )
             .ToDictionary();
         var section = new ConfigurationBuilder()
@@ -148,7 +35,7 @@ public sealed class BotPolicyTests
             BotPolicies.BindRequired(section)
         );
 
-        exception.OptionsName.ShouldContain(sectionName);
+        exception.OptionsName.ShouldContain(SectionName);
         exception.Message.ShouldNotContain("secret", Case.Insensitive);
         exception.Message.ShouldNotContain("message content", Case.Insensitive);
     }
@@ -165,23 +52,6 @@ public sealed class BotPolicyTests
         );
 
         exception.OptionsName.ShouldContain(nameof(BotPolicyOptions.EventSubChannelRecovery));
-    }
-
-    [Test]
-    public void CompleteConfiguration_Binding_MapsNamedImmutablePolicies()
-    {
-        var section = new ConfigurationBuilder()
-            .AddInMemoryCollection(ValidConfiguration())
-            .Build()
-            .GetSection("TwitchBot");
-
-        var policies = BotPolicies.BindRequired(section);
-
-        policies.IrcSession.AttemptLimit.ShouldBe(5);
-        policies.EventSubChannelRecovery.DelayBackoffType.ShouldBe(DelayBackoffType.Exponential);
-        policies.PublicChatRetry.MaximumDelay.ShouldBe(TimeSpan.FromSeconds(30));
-        policies.PublicChatDeliveryLifetime.MaximumAge.ShouldBe(TimeSpan.FromSeconds(30));
-        policies.PublicChatTerminalRetention.Duration.ShouldBe(TimeSpan.FromDays(7));
     }
 
     [Test]

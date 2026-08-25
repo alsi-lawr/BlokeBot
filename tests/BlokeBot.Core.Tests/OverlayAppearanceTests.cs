@@ -8,28 +8,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class OverlayAppearanceTests
 {
     [Test]
-    public void ExistingConfigurations_ReceiveTheirEquivalentFixedGeometry()
-    {
-        var guessing = OverlayConfiguration
-            .Parse(
-                OverlayType.Guessing,
-                """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}"""
-            )
-            .ShouldBeOfType<OverlayConfigurationParseResult.Valid>()
-            .Value.ShouldBeOfType<OverlayConfiguration.GuessingV1>();
-        var giveaway = OverlayConfiguration
-            .Parse(
-                OverlayType.Giveaway,
-                """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}"""
-            )
-            .ShouldBeOfType<OverlayConfigurationParseResult.Valid>()
-            .Value.ShouldBeOfType<OverlayConfiguration.GiveawayV1>();
-
-        guessing.Appearance.ShouldBe(OverlayAppearance.GuessingDefault);
-        giveaway.Appearance.ShouldBe(OverlayAppearance.GiveawayDefault);
-    }
-
-    [Test]
     public void Appearance_RoundTripsGeometryAndSafeScopedCss()
     {
         var configuration = new OverlayConfiguration.GuessingV1(

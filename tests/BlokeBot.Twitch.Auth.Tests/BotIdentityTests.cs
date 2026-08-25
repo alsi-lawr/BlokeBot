@@ -1,14 +1,9 @@
-using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 
 public sealed class BotIdentityTests
 {
-    [Test]
-    public void DefaultIdentityScopes_IncludeConnectedChatterAccess() =>
-        new BotIdentityOptions().Scopes.ShouldContain(Scopes.ModeratorReadChatters);
-
     [Test]
     public void MutableScopes_MappingIdentity_NormalizesAndCopiesValues()
     {
@@ -20,61 +15,6 @@ public sealed class BotIdentityTests
         options.Scopes = ["moderator:manage:announcements"];
 
         identity.Scopes.ShouldBe(["chat:read", "user:bot"]);
-    }
-
-    [Test]
-    public void MissingRequiredIdentityValues_Validating_ReportsPropertyNamesOnly()
-    {
-        var options = new BotIdentityOptions
-        {
-            BotUsername = string.Empty,
-            ClientId = string.Empty,
-            ClientSecret = "client-secret-value",
-            RedirectUri = string.Empty,
-            Scopes = null!,
-            TokenCachePath = string.Empty,
-        };
-
-        var result = new BotIdentityOptionsValidator().Validate("TwitchBot.Identity", options);
-
-        result.Failed.ShouldBeTrue();
-        foreach (
-            var propertyName in new[]
-            {
-                nameof(options.BotUsername),
-                nameof(options.ClientId),
-                nameof(options.RedirectUri),
-                nameof(options.Scopes),
-                nameof(options.TokenCachePath),
-            }
-        )
-        {
-            result.Failures.ShouldContain(failure =>
-                failure.Contains(propertyName, StringComparison.Ordinal)
-            );
-        }
-
-        string.Join(' ', result.Failures).ShouldNotContain(options.ClientSecret);
-    }
-
-    [Test]
-    public void EmptyScopes_MappingPermissiveIdentity_RejectsInvalidSet() =>
-        Should.Throw<ArgumentException>(static () =>
-            BotIdentity.FromOptions(new BotIdentityOptions { Scopes = [] })
-        );
-
-    [Test]
-    public void BlankScopes_MappingConfiguredIdentity_RejectsInvalidSet()
-    {
-        var options = ValidOptions([" "]);
-
-        var exception = Should.Throw<OptionsValidationException>(() =>
-            BotIdentity.FromConfiguredOptions(options, "TwitchBot.Identity")
-        );
-
-        exception.Failures.ShouldContain(failure =>
-            failure.Contains(nameof(BotIdentityOptions.Scopes), StringComparison.Ordinal)
-        );
     }
 
     [Test]

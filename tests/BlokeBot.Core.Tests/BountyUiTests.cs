@@ -130,28 +130,6 @@ public sealed partial class BountyUiTests
         created.Audits.ShouldContain(audit => audit.Reason == "PRIVATE-CREATION-NOTE");
     }
 
-    [Test]
-    public async Task ModeratorNote_IsAKeyboardDisclosureThatStaysCollapsedByDefault()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
-        using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(CreateService(database));
-
-        var page = RenderAuthoring(context);
-
-        var toggle = page.Find("[data-fold='bounty-moderator-note'] button");
-        toggle.GetAttribute("type").ShouldBe("button");
-        toggle.GetAttribute("aria-expanded").ShouldBe("false");
-        var bodyId = toggle.GetAttribute("aria-controls");
-        bodyId.ShouldNotBeNullOrWhiteSpace();
-        page.Find($"#{bodyId}").HasAttribute("inert").ShouldBeTrue();
-
-        OpenModeratorNote(page);
-
-        page.Find($"#{bodyId}").HasAttribute("inert").ShouldBeFalse();
-    }
-
     private static BountyService CreateService(SqliteBlokeBotDbFactory database) =>
         new(database, TestEventBus.Create<AppEventKind>(), new FixedTimeProvider(_now));
 

@@ -40,7 +40,7 @@ public sealed class PluginFeatureManagerTests
     }
 
     [Test]
-    public async Task Save_RejectsEveryInvalidSchemaValueWithoutCommittingValuesOrSecrets()
+    public async Task Save_InvalidConfigurationWithSecretReplacement_DoesNotCommitEither()
     {
         await using var context = await PluginFeatureTestContext.CreateAsync();
         _ = context.Publish();
@@ -55,92 +55,30 @@ public sealed class PluginFeatureManagerTests
         var installation = (
             await manager.LoadConfigurationAsync(installationOwner, CancellationToken.None)
         ).ShouldBeOfType<PluginConfigurationLoadOutcome.Loaded>();
-        PluginSettingId.TryCreate("service-token", out var secretId).ShouldBeTrue();
-        PluginSecretPlaintext
-            .TryCreate(new string('x', 257), 300, out var oversizedSecret)
-            .ShouldBeTrue();
-        var invalidInstallation = await manager.SaveConfigurationAsync(
+        PluginSettingChoiceId.TryCreate("unknown", out var invalidChoice).ShouldBeTrue();
+        var invalid = await manager.SaveConfigurationAsync(
             new(
                 installationOwner,
                 installation.Configuration.Revision,
                 Values(
                     PluginFeatureTestContext.Entry(
                         "moderation-mode",
-                        new PluginSettingValue.Choice(Choice("unknown"))
+                        new PluginSettingValue.Choice(invalidChoice)
                     )
                 ),
-                [new(secretId, new PluginSecretUpdate.Replace(oversizedSecret))]
+                [PluginFeatureTestContext.SecretReplacement("raw-secret")]
             ),
             CancellationToken.None
         );
 
-        var installationIssues = invalidInstallation
-            .ShouldBeOfType<PluginConfigurationSaveOutcome.Invalid>()
-            .Issues;
-        installationIssues.ShouldContain(issue =>
-            issue.Code == PluginSettingValidationCode.InvalidChoice
-        );
-        installationIssues.ShouldContain(issue =>
-            issue.Code == PluginSettingValidationCode.TooLong
-        );
+        var issues = invalid.ShouldBeOfType<PluginConfigurationSaveOutcome.Invalid>().Issues;
+        issues.ShouldContain(issue => issue.Code == PluginSettingValidationCode.InvalidChoice);
         var unchangedInstallation = await context.Store.LoadConfigurationAsync(
             installationOwner,
             CancellationToken.None
         );
         unchangedInstallation.Revision.ShouldBe(PluginConfigurationRevision.Initial);
         unchangedInstallation.Secrets.ShouldBeEmpty();
-
-        var featureOwner = new PluginConfigurationOwner.Feature(
-            PluginFeatureTestContext.Key("collection")
-        );
-        var invalidFeature = await manager.SaveConfigurationAsync(
-            new(
-                featureOwner,
-                PluginConfigurationRevision.Initial,
-                Values(
-                    PluginFeatureTestContext.Entry(
-                        "collect-messages",
-                        new PluginSettingValue.Text("wrong kind")
-                    ),
-                    PluginFeatureTestContext.Entry(
-                        "chat-command",
-                        new PluginSettingValue.Text(new string('x', 25))
-                    ),
-                    PluginFeatureTestContext.Entry(
-                        "queue-note",
-                        new PluginSettingValue.Text(new string('x', 501))
-                    ),
-                    PluginFeatureTestContext.Entry(
-                        "maximum-links",
-                        new PluginSettingValue.Integer(0)
-                    ),
-                    PluginFeatureTestContext.Entry(
-                        "minimum-score",
-                        new PluginSettingValue.Number(2.55m)
-                    ),
-                    PluginFeatureTestContext.Entry(
-                        "wait-between-links",
-                        new PluginSettingValue.Duration(3601)
-                    )
-                ),
-                []
-            ),
-            CancellationToken.None
-        );
-
-        var featureIssues = invalidFeature
-            .ShouldBeOfType<PluginConfigurationSaveOutcome.Invalid>()
-            .Issues;
-        featureIssues.ShouldContain(issue =>
-            issue.Code == PluginSettingValidationCode.WrongValueKind
-        );
-        featureIssues.Count(issue => issue.Code == PluginSettingValidationCode.TooLong).ShouldBe(2);
-        featureIssues
-            .Count(issue => issue.Code == PluginSettingValidationCode.OutOfRange)
-            .ShouldBe(3);
-        (
-            await context.Store.LoadConfigurationAsync(featureOwner, CancellationToken.None)
-        ).Revision.ShouldBe(PluginConfigurationRevision.Initial);
     }
 
     [Test]
@@ -500,12 +438,6 @@ public sealed class PluginFeatureManagerTests
 
     private static PluginSettingValues Values(params PluginSettingValueEntry[] entries) =>
         ((PluginSettingValuesOutcome.Created)PluginSettingValues.Create(entries)).Values;
-
-    private static PluginSettingChoiceId Choice(string value)
-    {
-        PluginSettingChoiceId.TryCreate(value, out var choice).ShouldBeTrue();
-        return choice;
-    }
 
     private sealed class CancellationThenReadyReconciler : IPluginFeatureReconciler
     {

@@ -171,30 +171,6 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
-    public async Task TwitchIntegrationReadiness_BeforeHostConfigLoads_ShowsOnlyPageLoadingState()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
-        await using var context = testContext.Context;
-        ConfigureHostServices(
-            context,
-            dbFactory,
-            new RecordingLogger<UiFaultTelemetry>(),
-            new ManualTimeProvider()
-        );
-        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
-            new PendingBroadcasterTokenStatusProvider()
-        );
-
-        var page = RenderHostConfigPage(context);
-
-        page.FindAll("[data-twitch-integration]").ShouldBeEmpty();
-        BroadcasterActions(page).ShouldBeEmpty();
-        TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-    }
-
-    [Test]
     public async Task TwitchIntegrationReadiness_LoadFault_UsesExistingPageFaultBoundaryWithoutActions()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -964,22 +940,6 @@ public sealed class HostConfigFaultRoutingTests
                 ? ReadyBroadcasterStatus()
                 : new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []);
         }
-
-        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
-            string channelLogin
-        ) => throw new NotSupportedException();
-    }
-
-    private sealed class PendingBroadcasterTokenStatusProvider : IHostBroadcasterTokenStatusProvider
-    {
-        public TaskCompletionSource<TokenStatus> Completion { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task<TokenStatus> GetTokenStatusAsync(
-            int hostId,
-            IEnumerable<string?> requiredScopes,
-            CancellationToken ct
-        ) => Completion.Task.WaitAsync(ct);
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin

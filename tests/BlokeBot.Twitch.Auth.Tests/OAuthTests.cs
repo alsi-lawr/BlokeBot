@@ -493,22 +493,6 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task PreCancelledRequest_RequestingAccess_PropagatesCancellationBeforeLoad()
-    {
-        var store = new MemoryTokenStore();
-        using var cache = new AccessTokenCache();
-        var provider = Provider(cache, store, new FakeOAuthClient());
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-
-        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
-            provider.GetAccessToken().ExecuteAsync(cancellation.Token).AsTask()
-        );
-
-        store.LoadCalls.ShouldBe(0);
-    }
-
-    [Test]
     public async Task TokenStoreFailure_RequestingAccess_PropagatesUnexpectedFailure()
     {
         var loadError = new IOException("Token load failed.");

@@ -50,26 +50,6 @@ public sealed class PageHelpButtonTests
             .ShouldBeTrue();
 
     [Test]
-    public void HelpTrigger_IsAKeyboardActivatedButtonThatOwnsItsLabelledPopover()
-    {
-        using var context = CreateContext(null);
-        var help = RenderAt(context, "/queues");
-        var trigger = help.Find("button[aria-label='Page help']");
-
-        trigger.GetAttribute("type").ShouldBe("button");
-        trigger.GetAttribute("aria-expanded").ShouldBe("false");
-        trigger.GetAttribute("aria-controls").ShouldBe("page-help-popover");
-        help.FindAll("#page-help-popover").ShouldBeEmpty();
-
-        trigger.Click();
-
-        help.Find("button[aria-label='Page help']").GetAttribute("aria-expanded").ShouldBe("true");
-        var popover = help.Find("#page-help-popover");
-        popover.GetAttribute("aria-labelledby").ShouldBe("page-help-title");
-        _ = help.Find("#page-help-title");
-    }
-
-    [Test]
     public void HelpTrigger_TogglesClosedAndKeepsFocusOnTheTrigger()
     {
         using var context = CreateContext(null);

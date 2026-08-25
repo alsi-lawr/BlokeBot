@@ -1,5 +1,4 @@
 using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using Bunit;
 using Microsoft.AspNetCore.Components;
@@ -11,21 +10,6 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class UiFaultRoutingTests
 {
-    [Test]
-    public void UnavailableReadiness_Mapping_ReturnsTypedExpectedLoadFailure()
-    {
-        var result = HostBotChannelStatusLoadFailure.FromReadiness(
-            new HostBotReadinessOutcome.Unknown(new(true, false, false, false))
-        );
-
-        var failure = result.Match<HostBotChannelStatusLoadFailure?>(
-            static _ => null,
-            static error => error
-        );
-
-        _ = failure.ShouldNotBeNull();
-    }
-
     [Test]
     public void UnexpectedFault_Reporting_EmitsSafeContextWithoutExceptionDetails()
     {

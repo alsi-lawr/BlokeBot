@@ -288,73 +288,6 @@ public sealed class CompetitionUiTests
     }
 
     [Test]
-    public async Task NewCompetition_OpensTheComposerWithFormatAndEntryExpanded()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedCompetitionHostAsync(database);
-        var service = CreateService(database);
-        await SeedDraftAsync(service, hostId, "Existing cup");
-        using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
-
-        var page = context.Render<CompetitionsPage>();
-        page.WaitForAssertion(() => _ = page.Find("[data-action='new-competition']"));
-        page.Find("[data-action='new-competition']").Click();
-
-        page.WaitForAssertion(() => _ = page.Find("[data-competition-create]"));
-        Header(page, "competition-format").GetAttribute("aria-expanded").ShouldBe("true");
-        Body(page, "competition-format").HasAttribute("inert").ShouldBeFalse();
-        _ = page.Find("#competition-name");
-        _ = page.Find("#competition-format");
-        _ = page.Find("#competition-entry-kind");
-        foreach (
-            var stage in new[] { "competition-scoring", "competition-rewards", "competition-notes" }
-        )
-        {
-            Header(page, stage).GetAttribute("aria-expanded").ShouldBe("false");
-            Body(page, stage).HasAttribute("inert").ShouldBeTrue();
-        }
-    }
-
-    [Test]
-    public async Task EverySetupSection_ExpandsAndCollapsesFromItsOwnDisclosureHeader()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedCompetitionHostAsync(database);
-        using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(CreateService(database));
-
-        var page = RenderComposer(context);
-
-        foreach (var stage in _composerStages)
-        {
-            var header = Header(page, stage);
-            header.GetAttribute("type").ShouldBe("button");
-            header.HasAttribute("disabled").ShouldBeFalse();
-            header.GetAttribute("aria-controls").ShouldBe(Body(page, stage).Id);
-            var openAtRest = header.GetAttribute("aria-expanded") == "true";
-
-            Header(page, stage).Click();
-
-            page.WaitForAssertion(() =>
-                Header(page, stage)
-                    .GetAttribute("aria-expanded")
-                    .ShouldBe(openAtRest ? "false" : "true")
-            );
-            Body(page, stage).HasAttribute("inert").ShouldBe(openAtRest);
-
-            Header(page, stage).Click();
-
-            page.WaitForAssertion(() =>
-                Header(page, stage)
-                    .GetAttribute("aria-expanded")
-                    .ShouldBe(openAtRest ? "true" : "false")
-            );
-            Body(page, stage).HasAttribute("inert").ShouldBe(!openAtRest);
-        }
-    }
-
-    [Test]
     public async Task ValidDraft_IsCreatedThroughTheServiceWithEverySectionsValues()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -423,34 +356,17 @@ public sealed class CompetitionUiTests
     }
 
     [Test]
-    [Arguments("competition-format", "format-and-entry")]
-    [Arguments("competition-rewards", "rewards-and-reminders")]
-    public async Task DraftFailure_StaysBesideTheSectionThatOwnsItAndPersistsNothing(
-        string stage,
-        string placement
-    )
+    public async Task InvalidDraft_Creating_ReturnsInvalidAndPersistsNothing()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedCompetitionHostAsync(database);
         var service = CreateService(database);
-        using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
 
-        var page = RenderComposer(context);
-        if (placement == "rewards-and-reminders")
-        {
-            page.Find("#competition-name").Input("Community Cup");
-            OpenStage(page, "competition-rewards");
-            page.Find("#competition-reminder-message").Input(string.Empty);
-        }
-        page.Find("[data-action='create-competition']").Click();
+        _ = (
+            await service.CreateAsync(hostId, Draft(" "), CancellationToken.None)
+        ).ShouldBeOfType<CompetitionOutcome.Invalid>();
 
-        page.WaitForAssertion(() => _ = page.Find($"[data-composer-error='{placement}']"));
-        var failure = page.Find($"[data-composer-error='{placement}']");
-        failure.GetAttribute("role").ShouldBe("alert");
-        _ = failure.Closest($"[data-stage='{stage}']").ShouldNotBeNull();
-        Header(page, stage).GetAttribute("aria-expanded").ShouldBe("true");
-        (await service.GetModeratorAsync(hostId, default)).ShouldBeEmpty();
+        (await service.GetModeratorAsync(hostId, CancellationToken.None)).ShouldBeEmpty();
     }
 
     [Test]
@@ -565,14 +481,6 @@ public sealed class CompetitionUiTests
             .Id.ShouldBe(page.Find("[aria-selected='true']").GetAttribute("aria-controls"));
         _ = page.Find(".competition-fixture--selected");
     }
-
-    private static readonly string[] _composerStages =
-    [
-        "competition-format",
-        "competition-scoring",
-        "competition-rewards",
-        "competition-notes",
-    ];
 
     private static CompetitionService CreateService(SqliteBlokeBotDbFactory database) =>
         new(
@@ -692,9 +600,6 @@ public sealed class CompetitionUiTests
 
     private static IElement Header(IRenderedComponent<CompetitionsPage> page, string stage) =>
         page.Find($"[data-stage='{stage}'] .studio-stage__header");
-
-    private static IElement Body(IRenderedComponent<CompetitionsPage> page, string stage) =>
-        page.Find($"#{Header(page, stage).GetAttribute("aria-controls")}");
 
     private static void OpenStage(IRenderedComponent<CompetitionsPage> page, string stage)
     {

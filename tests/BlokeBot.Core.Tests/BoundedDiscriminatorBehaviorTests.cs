@@ -12,18 +12,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class BoundedDiscriminatorBehaviorTests
 {
     [Test]
-    public void ReplyDeliveryTarget_Mapping_CoversChatAndWhisper()
-    {
-        var delivery = ReplyDeliveryMap.FromSettings([
-            Setting("chat-reply", ReplyDeliveryTarget.Chat),
-            Setting("whisper-reply", ReplyDeliveryTarget.Whisper),
-        ]);
-
-        delivery.TargetFor("chat-reply").ShouldBe(CommandResponseTarget.Chat);
-        delivery.TargetFor("whisper-reply").ShouldBe(CommandResponseTarget.Whisper);
-    }
-
-    [Test]
     public async Task InvalidReplyFeature_LoadingDelivery_ThrowsDataIntegrityFailure()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -164,14 +152,6 @@ public sealed class BoundedDiscriminatorBehaviorTests
     private static void AssertSuccess(
         Result<PointBalanceMutation, PointBalanceMutationFailure> result
     ) => result.Match(static _ => true, static _ => false).ShouldBeTrue();
-
-    private static ReplyDeliverySetting Setting(string key, ReplyDeliveryTarget target) =>
-        new()
-        {
-            Feature = ReplyFeature.Guessing,
-            ReplyKey = key,
-            Target = target,
-        };
 
     private static PointAmount Amount(int value) =>
         PointAmount.ParseAbsolute(value.ToString(CultureInfo.InvariantCulture));

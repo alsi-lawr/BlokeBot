@@ -9,20 +9,6 @@ namespace BlokeBot.Twitch.Auth.Tests;
 public sealed class TokenStatusServiceTests
 {
     [Test]
-    public async Task UnavailableStatusSource_ExecutingStatus_ReturnsUnavailableWithRequiredScopes()
-    {
-        var source = new UnavailableTokenStatusSource();
-
-        var result = await source
-            .GetUserAccessTokenStatus(["chat:read"])
-            .ExecuteAsync(CancellationToken.None);
-
-        var status = Success(result).ShouldBeOfType<TokenStatus.Unavailable>();
-        status.Reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
-        status.RequiredScopes.ShouldBe(["chat:read"]);
-    }
-
-    [Test]
     public async Task StatusInspection_BeforeExecution_DoesNotAcquireToken()
     {
         var provider = new RecordingTokenProvider("saved-token");

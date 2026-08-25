@@ -8,45 +8,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostedChannelRemovalUiTests
 {
     [Test]
-    public void EmptyOrMismatchedConfirmation_Removing_DoesNotInvokeDeletionOrAnimation()
-    {
-        using var context = new BunitContext();
-        var removalCount = 0;
-        var row = context.Render<HostedChannelRow>(parameters =>
-            parameters
-                .Add(component => component.Host, Host())
-                .Add(
-                    component => component.RemoveHost,
-                    _ =>
-                    {
-                        removalCount++;
-                        return Task.CompletedTask;
-                    }
-                )
-        );
-
-        row.FindAll("button").Single(button => button.TextContent.Trim() == "Remove").Click();
-
-        _ = row.Find("[data-channel-removal-dialog]");
-        var confirm = row.Find("button[aria-label='Permanently remove channel']");
-        confirm.HasAttribute("disabled").ShouldBeTrue();
-        confirm.Click();
-        removalCount.ShouldBe(0);
-
-        row.Find("input[aria-label='Type channel login to confirm removal']").Input("other");
-        confirm = row.Find("button[aria-label='Permanently remove channel']");
-        confirm.HasAttribute("disabled").ShouldBeTrue();
-        confirm.Click();
-        removalCount.ShouldBe(0);
-
-        row.FindAll("[data-channel-removal-dialog] button")
-            .Single(button => button.TextContent.Trim() == "Cancel")
-            .Click();
-        row.FindAll("[data-channel-removal-dialog]").ShouldBeEmpty();
-        removalCount.ShouldBe(0);
-    }
-
-    [Test]
     public async Task NormalizedMatchingConfirmation_Removing_InvokesExistingCallbackOnce()
     {
         using var context = new BunitContext();

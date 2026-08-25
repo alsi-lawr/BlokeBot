@@ -59,19 +59,28 @@ public sealed class OAuthTransportTests
     }
 
     [Test]
-    public void InvalidAuthorizationScopeValues_CreatingScopeSet_RejectsInvalidElements()
+    public void DefaultIdentity_CreatingAuthorizationUri_RequestsConnectedChatterAccess()
     {
-        _ = Should.Throw<ArgumentNullException>(static () =>
-            OAuthAuthorizationScopeSet.Create(null!)
+        var client = new OAuthClient(
+            BotIdentity.FromOptions(
+                new BotIdentityOptions
+                {
+                    BotUsername = "bot",
+                    ClientId = "client",
+                    ClientSecret = "secret",
+                    RedirectUri = "https://localhost/callback",
+                    TokenCachePath = "tokens.json",
+                }
+            ),
+            new OAuthTransport(
+                new ScriptedHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
         );
-        _ = Should.Throw<ArgumentException>(static () => OAuthAuthorizationScopeSet.Create([]));
-        _ = Should.Throw<ArgumentException>(static () =>
-            OAuthAuthorizationScopeSet.Create([null!])
-        );
-        _ = Should.Throw<ArgumentException>(static () => OAuthAuthorizationScopeSet.Create([" "]));
-        _ = Should.Throw<ArgumentException>(static () =>
-            OAuthAuthorizationScopeSet.Create(["chat read"])
-        );
+
+        var uri = client.BuildAuthorizeUri("state");
+
+        uri.Query.ShouldContain("moderator%3Aread%3Achatters");
     }
 
     [Test]

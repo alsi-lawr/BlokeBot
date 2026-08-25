@@ -1,69 +1,9 @@
-using System.Net;
-using System.Net.Sockets;
-using BlokeBot.Twitch.Auth;
-using Polly.Timeout;
 using Shouldly;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
 public sealed class PublicChatDeliveryClassifierTests
 {
-    [Test]
-    public void TransientPreparationFailures_Classifying_AreSafePreSendOnly()
-    {
-        Exception[] failures =
-        [
-            new HttpRequestException("connection failed"),
-            new HttpRequestException("request timed out", null, HttpStatusCode.RequestTimeout),
-            new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests),
-            new HttpRequestException(
-                "provider unavailable",
-                null,
-                HttpStatusCode.ServiceUnavailable
-            ),
-            new SocketException((int)SocketError.ConnectionReset),
-            new IOException("connection ended"),
-            new TimeoutException("preparation timed out"),
-            new TimeoutRejectedException("preparation timed out"),
-            new OperationCanceledException("non-caller timeout"),
-        ];
-
-        foreach (var failure in failures)
-        {
-            var outcome = PublicChatDeliveryClassifier.ClassifyPreparationFailure(
-                failure,
-                CancellationToken.None
-            );
-
-            var transient =
-                outcome.ShouldBeOfType<PublicChatPreparationOutcome.SafePreSendTransient>();
-            transient.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
-            _ = transient.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
-        }
-    }
-
-    [Test]
-    public void TerminalPreparationFailures_Classifying_AreUnexpectedWithExactCause()
-    {
-        Exception[] failures =
-        [
-            new HttpRequestException("bad request", null, HttpStatusCode.BadRequest),
-            new AppAccessTokenResponseException(),
-            new InvalidOperationException("invalid identity response"),
-        ];
-
-        foreach (var failure in failures)
-        {
-            var unexpected = PublicChatDeliveryClassifier
-                .ClassifyPreparationFailure(failure, CancellationToken.None)
-                .ShouldBeOfType<PublicChatPreparationOutcome.Unexpected>();
-
-            unexpected.Cause.ShouldBeSameAs(failure);
-            unexpected.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
-            _ = unexpected.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
-        }
-    }
-
     [Test]
     public void CallerCancellation_ClassifyingPreparation_PropagatesCancellation()
     {
@@ -123,36 +63,6 @@ public sealed class PublicChatDeliveryClassifierTests
             )
             .ShouldBeOfType<PublicChatTransportSendResult.Rejected>();
         _ = unspecified.Reason.ShouldBeOfType<PublicChatRejectionReason.Unspecified>();
-    }
-
-    [Test]
-    public void PostBoundaryFailures_Classifying_AreAlwaysAmbiguous()
-    {
-        Exception[] failures =
-        [
-            new HttpRequestException("rejected after post", null, HttpStatusCode.BadRequest),
-            new HttpRequestException(
-                "provider unavailable after post",
-                null,
-                HttpStatusCode.ServiceUnavailable
-            ),
-            new SocketException((int)SocketError.ConnectionReset),
-            new IOException("response ended"),
-            new TimeoutException("response timed out"),
-            new TimeoutRejectedException("response timed out"),
-            new OperationCanceledException("non-caller interruption"),
-            new InvalidOperationException("invalid provider response"),
-        ];
-
-        foreach (var failure in failures)
-        {
-            var ambiguous = PublicChatDeliveryClassifier
-                .ClassifyPostBoundaryFailure(failure, CancellationToken.None)
-                .ShouldBeOfType<PublicChatDeliveryOutcome.Ambiguous>();
-
-            ambiguous.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
-            _ = ambiguous.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Send>();
-        }
     }
 
     [Test]

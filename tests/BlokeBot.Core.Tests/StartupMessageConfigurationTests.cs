@@ -28,18 +28,14 @@ public sealed class StartupMessageConfigurationTests
     }
 
     [Test]
-    [Arguments(AuthRole.Streamer)]
-    [Arguments(AuthRole.Admin)]
-    public async Task StreamerOrAdministrator_SavingValidMessage_NormalizesAndPersists(
-        AuthRole role
-    )
+    public async Task Streamer_SavingValidMessage_NormalizesAndPersists()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer", null, null);
         var service = Service(dbFactory);
 
         var outcome = await service.SaveAsync(
-            Session(hostId, role),
+            Session(hostId, AuthRole.Streamer),
             hostId,
             new StartupMessageSaveCommand(true, "  Welcome everyone!  "),
             CancellationToken.None

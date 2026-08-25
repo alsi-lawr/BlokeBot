@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Polly;
 using Shouldly;
 using static BlokeBot.Core.Tests.PublicChatIntegrationTestSupport;
 
@@ -223,11 +224,65 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
     public async Task SafePreparationFailure_PersistingClassification_SchedulesRetryFromPersistedFailure()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var retryPolicy = CreateRetryPolicy(
+            4,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(5),
+            DelayBackoffType.Exponential
+        );
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+
+        await RecordSafePreparationFailureAsync(
+            dbFactory,
+            retryPolicy,
+            clock,
+            "retained payload",
+            enqueue: true
+        );
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await RecordSafePreparationFailureAsync(
+            dbFactory,
+            retryPolicy,
+            clock,
+            "retained payload",
+            enqueue: false
+        );
+        clock.Advance(TimeSpan.FromSeconds(4));
+        await RecordSafePreparationFailureAsync(
+            dbFactory,
+            retryPolicy,
+            clock,
+            "retained payload",
+            enqueue: false
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+        row.Message.ShouldBe("retained payload");
+        row.AttemptCount.ShouldBe(0);
+        row.SafePreSendFailureCount.ShouldBe(3);
+        row.NextAttemptAtUtc.ShouldBe(clock.GetUtcNow().AddSeconds(5).UtcDateTime);
+        row.SendStartedAtUtc.ShouldBeNull();
+        row.CompletedAtUtc.ShouldBeNull();
+        row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Preparation);
+        row.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
+        row.HttpStatusCode.ShouldBe(503);
+        row.RejectionCode.ShouldBeNull();
+    }
+
+    private static async Task RecordSafePreparationFailureAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        PublicChatRetryPolicy retryPolicy,
+        ManualTestTimeProvider clock,
+        string message,
+        bool enqueue
+    )
+    {
         var outbox = new CompletionObservingPublicChatOutbox(
             new EfPublicChatOutbox(
                 dbFactory,
-                StandardRetryPolicy,
+                retryPolicy,
                 StandardLifetimePolicy,
                 StandardRetentionPolicy
             )
@@ -248,62 +303,16 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 throw new InvalidOperationException("A safe preparation failure cannot send.")
         );
         var queue = CreateQueue(outbox, transport, clock);
-        _ = await queue.EnqueueAsync(
-            Command("streamer", "retained payload"),
-            CancellationToken.None
-        );
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
-
+        if (enqueue)
+        {
+            _ = await queue.EnqueueAsync(Command("streamer", message), CancellationToken.None);
+        }
         _ = await outbox.ReadOutcomeAsync();
         await StopAsync(stopping, worker);
 
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-            row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
-            row.Message.ShouldBe("retained payload");
-            row.AttemptCount.ShouldBe(0);
-            row.SafePreSendFailureCount.ShouldBe(1);
-            row.NextAttemptAtUtc.ShouldBe(clock.GetUtcNow().AddSeconds(1).UtcDateTime);
-            row.SendStartedAtUtc.ShouldBeNull();
-            row.CompletedAtUtc.ShouldBeNull();
-            row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Preparation);
-            row.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
-            row.HttpStatusCode.ShouldBe(503);
-            row.RejectionCode.ShouldBeNull();
-        }
-
-        var beforeRetry = (
-            await new EfPublicChatOutbox(
-                dbFactory,
-                StandardRetryPolicy,
-                StandardLifetimePolicy,
-                StandardRetentionPolicy
-            ).TryClaimNextAsync(
-                clock.GetUtcNow(),
-                clock.GetUtcNow().AddMinutes(5),
-                TimeSpan.Zero,
-                TimeSpan.Zero,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
-        beforeRetry.AvailableAt.ShouldBe(clock.GetUtcNow().AddSeconds(1));
-
-        var retry = await new EfPublicChatOutbox(
-            dbFactory,
-            StandardRetryPolicy,
-            StandardLifetimePolicy,
-            StandardRetentionPolicy
-        ).TryClaimNextAsync(
-            beforeRetry.AvailableAt,
-            beforeRetry.AvailableAt.AddMinutes(5),
-            TimeSpan.Zero,
-            TimeSpan.Zero,
-            CancellationToken.None
-        );
-        retry
-            .ShouldBeOfType<PublicChatClaimOutcome.Claimed>()
-            .Message.Message.ShouldBe("retained payload");
+        transport.PrepareCount.ShouldBe(1);
+        transport.SendCount.ShouldBe(0);
     }
 }

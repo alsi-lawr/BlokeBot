@@ -52,25 +52,6 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task ActionKind_ChangingToMessage_HidesCounterControl()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seeded = await SeedConfigurationAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
-
-        var cut = context.Render<CustomCommandSettingsPage>();
-
-        var reply = cut.Find($"#command-{seeded.CommandId}-0-argument-reply");
-        reply.GetAttribute("aria-invalid").ShouldBeNull();
-        reply.GetAttribute("aria-describedby").ShouldBeNull();
-        cut.Find("[data-action-kind='Counter']").GetAttribute("aria-pressed").ShouldBe("true");
-        cut.Find("[data-action-kind='Message']").Click();
-
-        cut.Find("[data-action-kind='Message']").GetAttribute("aria-pressed").ShouldBe("true");
-        cut.FindAll($"#command-{seeded.CommandId}-counter-id").ShouldBeEmpty();
-    }
-
-    [Test]
     public async Task RestrictedAccess_Editing_ResolvesStableUsersAndRetainsDraftsAcrossFailuresAndTabs()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

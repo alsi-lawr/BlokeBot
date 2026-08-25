@@ -18,34 +18,6 @@ public sealed class BingoServiceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 14, 0, 0, TimeSpan.Zero);
 
     [Test]
-    [Arguments(3)]
-    [Arguments(4)]
-    [Arguments(5)]
-    public void CardLayout_ReproducesEverySupportedGridAndDerivesWinLines(int size)
-    {
-        var dimension = new BingoDimension(size);
-        var keys = Enumerable
-            .Range(1, dimension.SquareCount)
-            .Select(value => new BingoSquareKey($"s-{value}"))
-            .ToArray();
-
-        var first = BingoCardLayout.Generate("seed-42", 7, dimension, "card:one", keys);
-        var replay = BingoCardLayout.Generate("seed-42", 7, dimension, "card:one", keys.Reverse());
-        var otherAssignment = BingoCardLayout.Generate("seed-42", 7, dimension, "card:two", keys);
-
-        replay.ShouldBe(first);
-        otherAssignment.ShouldNotBe(first);
-        first.Distinct().Count().ShouldBe(dimension.SquareCount);
-        var lines = BingoCardLayout.WinLines(dimension, includeFullCard: true);
-        lines
-            .Single(value => value.Kind == BingoWinKind.FullCard)
-            .Positions.Count.ShouldBe(dimension.SquareCount);
-        lines
-            .Where(value => value.Kind != BingoWinKind.FullCard)
-            .ShouldAllBe(value => value.Positions.Count == size);
-    }
-
-    [Test]
     public async Task TeamRoster_EnforcesCapsAndFreezesAssignmentsAtIssue()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

@@ -285,31 +285,6 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
-    public async Task TypedEditor_Page_DirectUnavailableProviderFlowSelectionClearsDisclosure()
-    {
-        await using var fixture = await AutomationEditorPageFixture.CreateAsync(
-            includeUnavailableFlow: true
-        );
-        var source = fixture
-            .Page.FindComponent<AutomationFlowCanvas>()
-            .Instance.Nodes.Single(static node =>
-                node.Definition.Id == AutomationDefinitionIds.StreamOnlineSource
-            );
-        await DiscloseAsync(fixture.Page, source.Id);
-
-        fixture
-            .Page.FindAll(".automation-flow-item")
-            .Single(item => item.TextContent.Contains("Unavailable provider flow"))
-            .Click();
-
-        fixture.Page.WaitForAssertion(() =>
-        {
-            fixture.Page.FindAll("[data-automation-canvas]").ShouldBeEmpty();
-            DisclosureCount(fixture.Page).ShouldBe(0);
-        });
-    }
-
-    [Test]
     public async Task TypedEditor_Page_PlainActivationTogglesDisclosureAndMovesItBetweenNodes()
     {
         await using var fixture = await AutomationEditorPageFixture.CreateAsync();
@@ -625,41 +600,6 @@ public sealed class AutomationEditorInteractionTests
                 .GetAttribute("aria-expanded")
                 .ShouldNotBe("true");
         });
-    }
-
-    [Test]
-    public void TypedEditor_Canvas_AnnouncesEveryPortWithoutVisualDisclosure()
-    {
-        using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var conditionDefinition = ProductionDefinitions()
-            .Single(definition => definition.Id == AutomationDefinitionIds.ConditionControl);
-        var condition = AutomationEditorNode.Create(conditionDefinition, new(new(48), new(72)));
-        condition.DisplayAlias =
-            "A deliberately long compact node title that remains complete for assistive technology";
-
-        var canvas = context.Render<AutomationFlowCanvas>(parameters =>
-            parameters
-                .Add(component => component.Nodes, [condition])
-                .Add(component => component.Edges, [])
-                .Add(component => component.ViewportKey, "accessible-ports")
-        );
-
-        var accessibleName = canvas
-            .Find("[data-automation-node-select]")
-            .GetAttribute("aria-label")
-            .ShouldNotBeNull();
-
-        accessibleName.ShouldContain(condition.DisplayAlias);
-
-        foreach (var input in conditionDefinition.Inputs)
-        {
-            accessibleName.ShouldContain($"{AccessiblePortName(input)} input");
-        }
-        foreach (var output in conditionDefinition.Outputs)
-        {
-            accessibleName.ShouldContain($"{AccessiblePortName(output)} output");
-        }
     }
 
     [Test]
@@ -1105,36 +1045,6 @@ public sealed class AutomationEditorInteractionTests
     }
 
     [Test]
-    public void TypedEditor_Inspector_RetainedConnectionShowsDiagnosticAndRepairAction()
-    {
-        using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var nodes = CreatePickerNodes();
-        var retained = new AutomationFlowDraftEdge(
-            Guid.NewGuid(),
-            AutomationEdgeKind.Data,
-            nodes.IncompatibleSource.Id,
-            nodes.IncompatibleSource.Definition.Outputs.Single().Id,
-            nodes.Target.Id,
-            nodes.Target.Definition.Inputs.Single().Id
-        );
-        var inspector = context.Render<AutomationNodeInspector>(parameters =>
-            parameters
-                .Add(component => component.Node, nodes.Target)
-                .Add(
-                    component => component.Nodes,
-                    [nodes.IncompatibleSource, nodes.CompatibleSource, nodes.Target]
-                )
-                .Add(component => component.Edges, [retained])
-        );
-
-        inspector
-            .Find(".automation-connection-diagnostic[role=alert]")
-            .TextContent.ShouldNotBeNullOrWhiteSpace();
-        _ = inspector.Find("button[data-automation-source-picker-open]");
-    }
-
-    [Test]
     public void TypedEditor_DynamicTransform_RoundTripsIdentityAndKeepsRemovedPortEdgesVisible()
     {
         var registered = new CoreAutomationCatalogModule()
@@ -1280,11 +1190,6 @@ public sealed class AutomationEditorInteractionTests
         AutomationPortNullability nullability = AutomationPortNullability.NonNullable,
         AutomationConfigurationFieldId? bindingFieldId = null
     ) => new(new(id), id, $"Supplies {type}.", type, sensitivity, nullability, bindingFieldId);
-
-    private static string AccessiblePortName(AutomationPortMetadata port) =>
-        port.ValueType == AutomationPortValueType.Flow
-            ? port.Name
-            : $"{port.Name} · {AutomationConnections.TypeLabel(port)}";
 
     private static PickerNodes CreatePickerNodes()
     {

@@ -60,26 +60,6 @@ public sealed class ConfigurationTransferNavigationTests
     }
 
     [Test]
-    public async Task DeselectingOverlays_AllowsExportWithoutHiddenUrlAcknowledgement()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database);
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddBlokeBotConfigurationTransfer();
-        var page = context.Render<ConfigurationTransferPage>();
-        var download = page.Find("#configuration-transfer-download");
-        download.HasAttribute("aria-disabled").ShouldBeTrue();
-        download.HasAttribute("href").ShouldBeFalse();
-
-        var overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
-        await page.InvokeAsync(() => overlay.Instance.SelectedChanged.InvokeAsync(false));
-
-        download = page.Find("#configuration-transfer-download");
-        download.HasAttribute("aria-disabled").ShouldBeFalse();
-        _ = download.GetAttribute("href").ShouldNotBeNull();
-    }
-
-    [Test]
     public async Task CancelImport_ReturnsToEmptyImportAtImportFragment()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

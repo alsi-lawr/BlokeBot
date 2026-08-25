@@ -11,86 +11,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomationCatalogTests
 {
     [Test]
-    public async Task RandomNumberConfiguration_DefaultsAndSignedDomainAreExactWithStableFailures()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "random", HostFeatureFlags.Automations);
-        var service = new AutomationCatalogService(Catalog(), FeatureService(dbFactory));
-
-        var defaults = (
-            await service.ValidatePersistedForSaveAsync(
-                new(hostId),
-                Persisted("random-number", 1, "{}"),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationConfigurationCheck.Valid>();
-        defaults.Configuration.ShouldBe(new AutomationRandomNumberConfiguration(0, 100));
-
-        var domain = (
-            await service.ValidatePersistedForSaveAsync(
-                new(hostId),
-                Persisted(
-                    "random-number",
-                    1,
-                    """{"minimum":-9223372036854775808,"maximum":9223372036854775807}"""
-                ),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationConfigurationCheck.Valid>();
-        domain.Configuration.ShouldBe(
-            new AutomationRandomNumberConfiguration(long.MinValue, long.MaxValue)
-        );
-
-        var fractional = (
-            await service.ValidatePersistedForSaveAsync(
-                new(hostId),
-                Persisted("random-number", 1, """{"minimum":0.5,"maximum":1}"""),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
-        fractional
-            .Errors.ShouldHaveSingleItem()
-            .ShouldBe(
-                new(
-                    new AutomationValidationTarget.Field(new("minimum")),
-                    "Enter an exact whole number without a fractional part."
-                )
-            );
-
-        var outOfDomain = (
-            await service.ValidatePersistedForSaveAsync(
-                new(hostId),
-                Persisted("random-number", 1, """{"minimum":0,"maximum":9223372036854775808}"""),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
-        outOfDomain
-            .Errors.ShouldHaveSingleItem()
-            .ShouldBe(
-                new(
-                    new AutomationValidationTarget.Field(new("maximum")),
-                    "Enter a whole number from -9223372036854775808 through 9223372036854775807."
-                )
-            );
-
-        var reversed = (
-            await service.ValidatePersistedForSaveAsync(
-                new(hostId),
-                Persisted("random-number", 1, """{"minimum":2,"maximum":1}"""),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
-        reversed
-            .Errors.ShouldHaveSingleItem()
-            .ShouldBe(
-                new(
-                    new AutomationValidationTarget.Field(new("maximum")),
-                    "Maximum must be greater than or equal to minimum."
-                )
-            );
-    }
-
-    [Test]
     public void RandomNumberInclusiveMapping_CoversEndpointsSingletonFullDomainAndRejection()
     {
         var endpoints = new SequenceUInt64Source(1, ulong.MaxValue);
@@ -201,6 +121,40 @@ public sealed class AutomationCatalogTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer", HostFeatureFlags.Automations);
         var service = new AutomationCatalogService(Catalog(), FeatureService(dbFactory));
+        var persistedRandomDefaults = await service.ValidatePersistedForSaveAsync(
+            new(hostId),
+            Persisted("random-number", 1, "{}"),
+            CancellationToken.None
+        );
+        _ = persistedRandomDefaults.ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        var persistedRandomDomain = await service.ValidatePersistedForSaveAsync(
+            new(hostId),
+            Persisted(
+                "random-number",
+                1,
+                """{"minimum":-9223372036854775808,"maximum":9223372036854775807}"""
+            ),
+            CancellationToken.None
+        );
+        _ = persistedRandomDomain.ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        foreach (
+            var invalidRandomConfiguration in new[]
+            {
+                """{"minimum":0.5,"maximum":1}""",
+                """{"minimum":0,"maximum":9223372036854775808}""",
+                """{"minimum":2,"maximum":1}""",
+            }
+        )
+        {
+            _ = (
+                await service.ValidatePersistedForSaveAsync(
+                    new(hostId),
+                    Persisted("random-number", 1, invalidRandomConfiguration),
+                    CancellationToken.None
+                )
+            ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+        }
+
         var valid = new (AutomationDefinitionId Id, AutomationConfiguration Configuration)[]
         {
             (

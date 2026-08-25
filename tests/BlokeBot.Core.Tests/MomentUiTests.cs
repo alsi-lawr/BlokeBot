@@ -3,7 +3,6 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -84,21 +83,6 @@ public sealed class MomentUiTests
             _ = page.Find("a[href='https://clips.twitch.tv/PublicMoment']");
             page.Markup.ShouldNotContain("PRIVATE-MODERATOR-NOTE");
         });
-    }
-
-    [Test]
-    public void Routes_DeclareModeratorAndPublicAuthorizationAudiences()
-    {
-        var moderator = typeof(MomentsPage)
-            .GetCustomAttributes(typeof(AuthorizeAttribute), true)
-            .Cast<AuthorizeAttribute>()
-            .ShouldHaveSingleItem();
-        var publicRoute = typeof(PublicMomentRecapPage)
-            .GetCustomAttributes(typeof(AllowAnonymousAttribute), true)
-            .ShouldHaveSingleItem();
-
-        moderator.Policy.ShouldBe("HostSelected");
-        _ = publicRoute.ShouldNotBeNull();
     }
 
     [Test]

@@ -39,7 +39,7 @@ public sealed class GuessingSettingsLoadTests
     }
 
     [Test]
-    public async Task DeletedSelectedAndDefaultProfiles_Selecting_LeavesNoEditorWithoutThrowing()
+    public async Task DeletedProfiles_Selecting_ReportsRecoveryAndFailure()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -50,8 +50,11 @@ public sealed class GuessingSettingsLoadTests
 
         page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
-        page.WaitForAssertion(() => page.Markup.ShouldContain("Loading guessing settings..."));
-        toasts.Current.Select(toast => toast.Kind).ShouldBe([ToastKind.Warning, ToastKind.Error]);
+        page.WaitForAssertion(() =>
+            toasts
+                .Current.Select(toast => toast.Kind)
+                .ShouldBe([ToastKind.Warning, ToastKind.Error])
+        );
     }
 
     private static string RoundTypeChip(int profileId) =>

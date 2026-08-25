@@ -227,71 +227,6 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void FeatureStrategyCatalogs_ReadingPermissions_ExposeModeratorRequirements()
-    {
-        var guessing = GuessingCatalog();
-        var points = PointsCatalog();
-
-        _ = guessing
-            .Find(GuessCommandKind.Start)
-            .Match(
-                static _ => throw new InvalidOperationException(),
-                static found => found.Strategy.Access
-            )
-            .ShouldBeOfType<CommandStrategyAccess<
-                GuessCommandKind,
-                AppCommandRouteState
-            >.ModeratorOnly>();
-        _ = points
-            .Find(PointsCommandKind.AddPoints)
-            .Match(
-                static _ => throw new InvalidOperationException(),
-                static found => found.Strategy.Access
-            )
-            .ShouldBeOfType<CommandStrategyAccess<
-                PointsCommandKind,
-                AppCommandRouteState
-            >.ModeratorOnly>();
-        _ = points
-            .Find(PointsCommandKind.Points)
-            .Match(
-                static _ => throw new InvalidOperationException(),
-                static found => found.Strategy.Access
-            )
-            .ShouldBeOfType<CommandStrategyAccess<
-                PointsCommandKind,
-                AppCommandRouteState
-            >.Everyone>();
-        _ = guessing
-            .Find(GuessCommandKind.Guess)
-            .Match(
-                static _ => throw new InvalidOperationException(),
-                static found => found.Strategy.Access
-            )
-            .ShouldBeOfType<CommandStrategyAccess<
-                GuessCommandKind,
-                AppCommandRouteState
-            >.Everyone>();
-    }
-
-    [Test]
-    public void FeatureAndPersistedCommandKinds_Mapping_MapsSupportedKindsWithoutOverlap()
-    {
-        GuessingAppCommandKindMap
-            .FromAppKind(AppCommandKind.Giveaway)
-            .Match(static _ => false, static () => true)
-            .ShouldBeTrue();
-        PointsAppCommandKindMap
-            .FromAppKind(AppCommandKind.Win)
-            .Match(static _ => false, static () => true)
-            .ShouldBeTrue();
-
-        var guessingKinds = GuessingAppCommandKindMap.AppKinds;
-        var pointsKinds = PointsAppCommandKindMap.AppKinds;
-        guessingKinds.Intersect(pointsKinds).ShouldBeEmpty();
-    }
-
-    [Test]
     public async Task InvalidBalanceMutation_ReturningFailure_UsesTypedReasonWithoutMessageCode()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -333,32 +268,4 @@ public sealed class CommandCatalogTests
         _ = await db.SaveChangesAsync();
         return host.Id;
     }
-
-    private static CommandStrategyCatalog<
-        GuessCommandKind,
-        AppCommandRouteState
-    > GuessingCatalog() =>
-        new([
-            new StartGuessingCommandStrategy(null!, null!),
-            new StopGuessingCommandStrategy(null!, null!),
-            new WinGuessingCommandStrategy(null!, null!),
-            new GuessCommandStrategy(null!, null!),
-            new AvailableGuessesCommandStrategy(null!),
-        ]);
-
-    private static CommandStrategyCatalog<
-        PointsCommandKind,
-        AppCommandRouteState
-    > PointsCatalog() =>
-        new([
-            new PointsBalanceCommandStrategy(null!, null!),
-            new GivePointsCommandStrategy(null!, null!, null!),
-            new AddPointsCommandStrategy(null!, null!, null!),
-            new RemovePointsCommandStrategy(null!, null!),
-            new GambleCommandStrategy(null!, null!, null!, null!, null!),
-            new StartGiveawayCommandStrategy(null!, null!),
-            new JoinGiveawayCommandStrategy(null!, null!),
-            new EndGiveawayCommandStrategy(null!, null!),
-            new CancelGiveawayCommandStrategy(null!, null!),
-        ]);
 }

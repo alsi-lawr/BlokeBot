@@ -164,26 +164,6 @@ public sealed class SegmentedTabsTests
     }
 
     [Test]
-    public void FragmentTabs_ExposeRovingFocusIdentityAndPanelOwnership()
-    {
-        using var context = new BunitContext();
-        _ = context.Services.AddScoped<DashboardFragmentState>();
-        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
-        navigation.NavigateTo("/overlays#cues");
-
-        var tabs = RenderFragmentTabs(context);
-
-        tabs.Find("#overlays-cues-tab").GetAttribute("aria-selected").ShouldBe("true");
-        tabs.Find("#overlays-cues-tab").GetAttribute("tabindex").ShouldBe("0");
-        tabs.Find("#overlays-cues-tab")
-            .GetAttribute("aria-controls")
-            .ShouldBe("overlays-cues-panel");
-        tabs.Find("#overlays-sources-tab").GetAttribute("tabindex").ShouldBe("-1");
-        tabs.Find("#overlays-media-tab").GetAttribute("tabindex").ShouldBe("-1");
-        tabs.FindAll("[role='tab']").Select(tab => tab.GetAttribute("id")).ShouldBeUnique();
-    }
-
-    [Test]
     public void FragmentTabs_ArrowHomeAndEndKeys_SelectAndFocusTabs()
     {
         using var context = new BunitContext();

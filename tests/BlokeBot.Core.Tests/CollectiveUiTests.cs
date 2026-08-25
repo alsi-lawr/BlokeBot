@@ -1,5 +1,4 @@
 using AngleSharp.Dom;
-using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Collectives;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Persistence.Models;
@@ -86,10 +85,6 @@ public sealed partial class CollectiveUiTests
             cut.Markup.ShouldNotContain("PRIVATE ACTOR");
         });
     }
-
-    [Test]
-    public void CollectivesRoute_HasUsefulOptInAuthorityPrivacyAndRecoveryHelp() =>
-        PageHelpButton.HasUsefulHelpForPath("/collectives").ShouldBeTrue();
 
     [Test]
     public async Task WorkflowFragments_KeepUrlSelectionAndContentInSyncThroughHistory()

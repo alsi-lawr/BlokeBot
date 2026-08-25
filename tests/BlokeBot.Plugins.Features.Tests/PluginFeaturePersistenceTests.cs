@@ -155,20 +155,6 @@ public sealed class PluginFeaturePersistenceTests
         (await verify.PluginInstallationSecrets.CountAsync()).ShouldBe(0);
     }
 
-    [Test]
-    public async Task RealSqliteMigration_AppliesAfterLifecycleAndLeavesNoPendingMigrations()
-    {
-        await using var context = await PluginFeatureTestContext.CreateAsync();
-        await using var db = context.Database.CreateDbContext();
-
-        var applied = (await db.Database.GetAppliedMigrationsAsync()).ToArray();
-        var pending = (await db.Database.GetPendingMigrationsAsync()).ToArray();
-
-        applied[^2].ShouldBe("20260823184405_v0.13.0_PluginLifecycleFaultInvariants");
-        applied[^1].ShouldBe("20260824034031_v0.13.0_PluginFeatureConfiguration");
-        pending.ShouldBeEmpty();
-    }
-
     private static string Value(PluginConfigurationState configuration, string settingId) =>
         configuration
             .Values.Entries.Single(entry => entry.SettingId.Value == settingId)

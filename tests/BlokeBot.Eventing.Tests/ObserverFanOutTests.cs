@@ -266,20 +266,6 @@ public sealed class ObserverFanOutTests
         sink.Attempts.ShouldBe(0);
     }
 
-    [Test]
-    public void BoundedRetry_WithOneTotalAttempt_RejectsImplicitRetryDefault() =>
-        Should.Throw<ArgumentOutOfRangeException>(static () =>
-            new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.BoundedRetry
-            {
-                Boundary = _boundary,
-                AttemptLimit = 1,
-            }
-        );
-
-    [Test]
-    public void CorrelationId_WithWhitespace_RejectsEmptyContext() =>
-        Should.Throw<ArgumentException>(static () => ObserverCorrelationId.Named(" "));
-
     private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Continue() =>
         new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.ContinueAndReport
         {

@@ -15,7 +15,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class PlayQueueCommandAndUiTests
 {
     [Test]
-    public async Task ModeratorLobbyFailure_StatesThatPrivateMessageWasNotPostedPublicly()
+    public async Task PrivateLobbyFailure_DoesNotWritePublicChatOutbox()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var host = await SeedHostAsync(database);
@@ -47,7 +47,8 @@ public sealed class PlayQueueCommandAndUiTests
         _ = await service.SelectPartyAsync(host, "squad", false, CancellationToken.None);
         await using var context = UiTestContextFactory.Create(database, host);
         _ = context.Services.AddSingleton(service);
-        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(new FailingPrivateLobbyDelivery());
+        var privateDelivery = new FailingPrivateLobbyDelivery();
+        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(privateDelivery);
 
         var page = context.Render<PlayQueuesPage>();
 
@@ -56,9 +57,9 @@ public sealed class PlayQueueCommandAndUiTests
         page.WaitForElement("#queue-lobby-code").Input("join-code");
         FindButton(page, "Whisper party").Click();
 
-        page.WaitForAssertion(() =>
-            page.Find("[role='alert']").TextContent.ShouldContain("not posted publicly")
-        );
+        await privateDelivery.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
     }
 
     [Test]
@@ -397,13 +398,18 @@ public sealed class PlayQueueCommandAndUiTests
 
     private sealed class FailingPrivateLobbyDelivery : IPrivateLobbyDelivery
     {
+        public TaskCompletionSource Delivered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Task<IReadOnlyList<PrivateLobbyDeliveryOutcome>> DeliverAsync(
             string hostLogin,
             string lobbyCode,
             IReadOnlyList<PrivateLobbyRecipient> recipients,
             CancellationToken ct
-        ) =>
-            Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>(
+        )
+        {
+            _ = Delivered.TrySetResult();
+            return Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>(
                 recipients
                     .Select(static recipient => new PrivateLobbyDeliveryOutcome(
                         recipient.Login,
@@ -412,5 +418,6 @@ public sealed class PlayQueueCommandAndUiTests
                     ))
                     .ToArray()
             );
+        }
     }
 }

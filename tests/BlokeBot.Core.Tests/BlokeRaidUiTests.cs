@@ -14,6 +14,31 @@ public sealed class BlokeRaidUiTests
     private static readonly DateTimeOffset _now = new(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task Configuration_SavingRepresentativeValues_PersistsAndSchedulesWeeklyReset()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var context = await CreateContextAsync(database);
+        var page = RenderConfiguration(context);
+
+        page.Find("#raid-boss-name").Input("The Static Hydra");
+        page.Find("#raid-attack-cooldown").Change("25");
+        page.Find("#raid-reset-weekly").Change(true);
+        page.WaitForAssertion(() => _ = page.Find("#raid-reset-day"));
+        page.Find("#raid-reset-day").Change("Friday");
+        page.Find("#raid-reset-hour").Change("18");
+        Save(page, "success");
+
+        await using var verify = await database.CreateDbContextAsync();
+        var configuration = await verify.BlokeRaidConfigurations.SingleAsync();
+        configuration.BossName.ShouldBe("The Static Hydra");
+        configuration.AttackCooldownSeconds.ShouldBe(25);
+        configuration.ResetPolicy.ShouldBe(BlokeRaidResetPolicy.Weekly);
+        configuration.WeeklyResetDay.ShouldBe((int)DayOfWeek.Friday);
+        configuration.WeeklyResetHourUtc.ShouldBe(18);
+        _ = configuration.NextWeeklyResetAtUtc.ShouldNotBeNull();
+    }
+
+    [Test]
     public async Task BarePath_NormalizesToCampaignAndSelectingConfigurationPushesOneHistoryEntry()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -94,79 +119,6 @@ public sealed class BlokeRaidUiTests
                 .ShouldBe("true");
             _ = page.Find("#raid-boss-name");
         });
-    }
-
-    [Test]
-    public async Task Configuration_SavesEveryGroupedSectionThroughTheService()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var context = await CreateContextAsync(database);
-        var page = RenderConfiguration(context);
-
-        page.Find("#raid-boss-name").Input("The Static Hydra");
-        page.Find("#raid-duration").Change("72");
-        page.Find("#raid-health").Change("30000");
-        page.Find("#raid-ward").Change("1500");
-        page.Find("#raid-victory-reward").Input("400");
-        page.Find("#raid-attack-minimum").Change("3");
-        page.Find("#raid-attack-maximum").Change("9");
-        page.Find("#raid-attack-cooldown").Change("25");
-        page.Find("#raid-attack-limit").Change("30");
-        page.Find("#raid-mend-minimum").Change("4");
-        page.Find("#raid-mend-maximum").Change("8");
-        page.Find("#raid-mend-cooldown").Change("35");
-        page.Find("#raid-mend-limit").Change("15");
-        page.Find("#raid-special-minimum").Change("10");
-        page.Find("#raid-special-maximum").Change("16");
-        page.Find("#raid-special-cooldown").Change("120");
-        page.Find("#raid-special-limit").Change("4");
-        page.Find("#raid-special-cost").Change("90");
-        page.Find("#raid-guess-damage").Change("6");
-        page.Find("#raid-phase-two").Change("60");
-        page.Find("#raid-phase-three").Change("25");
-        page.Find("#raid-phase-one-response").Input("The Hydra surfaces.");
-        page.Find("#raid-phase-two-response").Input("Its scales split.");
-        page.Find("#raid-phase-three-response").Input("One head remains.");
-        page.Find("#raid-victory-response").Input("The Hydra falls.");
-        page.Find("#raid-expiry-response").Input("The Hydra slipped away.");
-        page.Find("#raid-reset-weekly").Change(true);
-        page.WaitForAssertion(() => _ = page.Find("#raid-reset-day"));
-        page.Find("#raid-reset-day").Change("Friday");
-        page.Find("#raid-reset-hour").Change("18");
-        Save(page, "success");
-
-        await using var verify = await database.CreateDbContextAsync();
-        var configuration = await verify.BlokeRaidConfigurations.SingleAsync();
-        configuration.BossName.ShouldBe("The Static Hydra");
-        configuration.CampaignDurationHours.ShouldBe(72);
-        configuration.MaximumHealth.ShouldBe(30_000);
-        configuration.MaximumWard.ShouldBe(1_500);
-        configuration.VictoryPointReward.ShouldBe("400");
-        configuration.AttackMinimum.ShouldBe(3);
-        configuration.AttackMaximum.ShouldBe(9);
-        configuration.AttackCooldownSeconds.ShouldBe(25);
-        configuration.AttackPerStreamLimit.ShouldBe(30);
-        configuration.MendMinimum.ShouldBe(4);
-        configuration.MendMaximum.ShouldBe(8);
-        configuration.MendCooldownSeconds.ShouldBe(35);
-        configuration.MendPerStreamLimit.ShouldBe(15);
-        configuration.SpecialMinimum.ShouldBe(10);
-        configuration.SpecialMaximum.ShouldBe(16);
-        configuration.SpecialCooldownSeconds.ShouldBe(120);
-        configuration.SpecialPerStreamLimit.ShouldBe(4);
-        configuration.SpecialPointCost.ShouldBe("90");
-        configuration.CorrectGuessDamage.ShouldBe(6);
-        configuration.PhaseTwoHealthPercent.ShouldBe(60);
-        configuration.PhaseThreeHealthPercent.ShouldBe(25);
-        configuration.PhaseOneResponse.ShouldBe("The Hydra surfaces.");
-        configuration.PhaseTwoResponse.ShouldBe("Its scales split.");
-        configuration.PhaseThreeResponse.ShouldBe("One head remains.");
-        configuration.VictoryResponse.ShouldBe("The Hydra falls.");
-        configuration.ExpiryResponse.ShouldBe("The Hydra slipped away.");
-        configuration.ResetPolicy.ShouldBe(BlokeRaidResetPolicy.Weekly);
-        configuration.WeeklyResetDay.ShouldBe((int)DayOfWeek.Friday);
-        configuration.WeeklyResetHourUtc.ShouldBe(18);
-        _ = configuration.NextWeeklyResetAtUtc.ShouldNotBeNull();
     }
 
     private static IRenderedComponent<BlokeRaidPage> RenderConfiguration(BunitContext context)

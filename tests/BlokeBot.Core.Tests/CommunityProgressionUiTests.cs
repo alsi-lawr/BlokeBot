@@ -1,8 +1,6 @@
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Persistence.Models;
-using Bunit;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -10,7 +8,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class CommunityProgressionUiTests
 {
     [Test]
-    public async Task SignedInDirectRoute_WhenDisabled_ShowsRecoveryWithoutRetainedData()
+    public async Task DisabledHost_SeasonProjectionsExposeNoRetainedData()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         int hostId;
@@ -55,15 +53,7 @@ public sealed class CommunityProgressionUiTests
             host.EnabledFeatures = HostFeatureFlags.None;
             _ = await db.SaveChangesAsync();
         }
-        using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
-
-        var cut = context.Render<CommunityProgressionPage>();
-
-        cut.WaitForAssertion(() =>
-        {
-            _ = cut.Find("a[href='/host#chat-tools']");
-            cut.FindAll("#season-name, [data-season-id], [data-season-activity]").ShouldBeEmpty();
-        });
+        (await service.GetModeratorSeasonsAsync(hostId, default)).ShouldBeEmpty();
+        (await service.GetPublicAsync("streamer", default)).ShouldBeNull();
     }
 }

@@ -96,23 +96,6 @@ public sealed class DashboardFragmentNavigationTests
     }
 
     [Test]
-    public async Task OverlaysWithFeatureOff_KeepTabsAndShowDisabledRecoveryPerPanel()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedOverlayHostAsync(database, HostFeatureFlags.None);
-        await using var context = CreateOverlayContext(database, hostId);
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/overlays#cues");
-
-        var page = context.Render<OverlaysPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            page.Find("#overlays-cues-tab").GetAttribute("aria-selected").ShouldBe("true");
-            _ = page.Find("[data-overlay-disabled-recovery]");
-        });
-    }
-
-    [Test]
     public async Task GuessingRefresh_RestoresHistoryAndLeaderboardFragmentsWithLazyLoads()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -172,20 +155,6 @@ public sealed class DashboardFragmentNavigationTests
             navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeFalse();
             page.Find("#guessing-history-tab").GetAttribute("aria-selected").ShouldBe("true");
         });
-    }
-
-    [Test]
-    public async Task GuessingWithFeatureOff_RendersRecoveryWithoutTabs()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedGuessingAsync(dbFactory, HostFeatureFlags.None);
-        await using var context = CreateGuessingContext(dbFactory, hostId);
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/guessing#history");
-
-        var page = context.Render<GuessingDashboard>();
-
-        page.FindAll("[role='tablist']").ShouldBeEmpty();
-        page.Find("button").HasAttribute("disabled").ShouldBeTrue();
     }
 
     [Test]

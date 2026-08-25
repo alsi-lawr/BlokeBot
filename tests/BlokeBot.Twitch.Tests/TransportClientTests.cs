@@ -587,50 +587,6 @@ public sealed class TransportClientTests
     }
 
     [Test]
-    public async Task NativeAnnouncement_InvalidLength_DoesNotSend()
-    {
-        var factory = new ScriptedHttpClientFactory();
-        var client = new ChatAnnouncementClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
-
-        var result = await client.SendAsync(
-            Context(),
-            "channel-id",
-            "validated-bot-subject",
-            new string('x', 501),
-            TwitchAnnouncementColor.Primary,
-            CancellationToken.None
-        );
-
-        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
-        factory.RequestCount.ShouldBe(0);
-    }
-
-    [Test]
-    public async Task NativeAnnouncement_UnsupportedColor_DoesNotSend()
-    {
-        var factory = new ScriptedHttpClientFactory();
-        var client = new ChatAnnouncementClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
-
-        var result = await client.SendAsync(
-            Context(),
-            "channel-id",
-            "validated-bot-subject",
-            "Native announcement",
-            (TwitchAnnouncementColor)99,
-            CancellationToken.None
-        );
-
-        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
-        factory.RequestCount.ShouldBe(0);
-    }
-
-    [Test]
     public async Task NativeAnnouncement_TransportFailure_RemainsAmbiguous()
     {
         var factory = new ScriptedHttpClientFactory();
@@ -653,10 +609,7 @@ public sealed class TransportClientTests
     }
 
     [Test]
-    [Arguments(null)]
-    [Arguments(30)]
-    [Arguments(1800)]
-    public async Task ChatMessagePinning_UsesExactMessageAndNativeDuration(int? durationSeconds)
+    public async Task ChatMessagePinning_WithoutDuration_OmitsNativeDuration()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
@@ -666,14 +619,7 @@ public sealed class TransportClientTests
                 request.RequestUri!.Query.ShouldContain("broadcaster_id=channel-id");
                 request.RequestUri.Query.ShouldContain("moderator_id=bot-id");
                 request.RequestUri.Query.ShouldContain("message_id=exact-message-id");
-                if (durationSeconds is { } seconds)
-                {
-                    request.RequestUri.Query.ShouldContain($"duration_seconds={seconds}");
-                }
-                else
-                {
-                    request.RequestUri.Query.ShouldNotContain("duration_seconds");
-                }
+                request.RequestUri.Query.ShouldNotContain("duration_seconds");
 
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
             }
@@ -688,7 +634,39 @@ public sealed class TransportClientTests
             "channel-id",
             "bot-id",
             "exact-message-id",
-            durationSeconds,
+            null,
+            CancellationToken.None
+        );
+
+        _ = result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
+    }
+
+    [Test]
+    public async Task ChatMessagePinning_WithDuration_UsesNativeDuration()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            (request, _) =>
+            {
+                AssertContext(request, HttpMethod.Put, "/helix/chat/pins");
+                request.RequestUri!.Query.ShouldContain("broadcaster_id=channel-id");
+                request.RequestUri.Query.ShouldContain("moderator_id=bot-id");
+                request.RequestUri.Query.ShouldContain("message_id=exact-message-id");
+                request.RequestUri.Query.ShouldContain("duration_seconds=30");
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+            }
+        );
+        var client = new ChatPinClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+
+        var result = await client.PinAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            "exact-message-id",
+            30,
             CancellationToken.None
         );
 

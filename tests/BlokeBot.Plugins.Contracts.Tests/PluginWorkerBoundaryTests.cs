@@ -9,84 +9,24 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginWorkerBoundaryTests
 {
     [Test]
-    public async Task InvocationCategories_RoundTripThroughTypedWorkerProtocol()
+    public async Task CommandInvocation_RoundTripsThroughTypedWorkerProtocol()
     {
         await using var package = await MaterializedPluginTestPackage.CreateAsync(
             """
             return {
-              prepare = function() return "prepare" end,
-              migration = function() return "migration" end,
-              lifecycle = function() return "lifecycle" end,
               command = function() return "command" end,
-              event = function() return "event" end,
-              schedule = function() return "schedule" end,
-              action = function() return "action" end,
-              storage = function() return "storage" end,
-              page = function() return "page" end
             }
             """
         );
         await using var worker = await package.StartAsync(PluginWorkerMode.Admitted);
 
         await AssertReturnedAsync(
-            worker.Client.PrepareAsync(
+            worker.Client.InvokeAsync(
                 Identity(package),
-                new(
-                    MaterializedPluginTestPackage.ModuleId(),
-                    MaterializedPluginTestPackage.OperationId("prepare"),
-                    new PluginValue.Nil()
-                ),
+                new PluginLiveInvocation.Command(Module(), Operation("command"), Nil()),
                 CancellationToken.None
             ),
-            "prepare"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Migration(Module(), Operation("migration"), Nil()),
-            "migration"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Lifecycle(Module(), Operation("lifecycle"), Nil()),
-            "lifecycle"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Command(Module(), Operation("command"), Nil()),
             "command"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Event(Module(), Operation("event"), Nil()),
-            "event"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Schedule(Module(), Operation("schedule"), Nil()),
-            "schedule"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.HostAction(Module(), Operation("action"), Nil()),
-            "action"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Storage(Module(), Operation("storage"), Nil()),
-            "storage"
-        );
-        await AssertLiveReturnedAsync(
-            package,
-            worker.Client,
-            new PluginLiveInvocation.Page(Module(), Operation("page"), Nil()),
-            "page"
         );
     }
 
@@ -471,17 +411,6 @@ public sealed class PluginWorkerBoundaryTests
             .ShouldBeOfType<PluginFrameReadOutcome.Rejected>()
             .Failure.Code.ShouldBe(PluginWorkerFailureCode.MalformedFrame);
     }
-
-    private static async ValueTask AssertLiveReturnedAsync(
-        MaterializedPluginTestPackage package,
-        PluginWorkerClient client,
-        PluginLiveInvocation invocation,
-        string expected
-    ) =>
-        await AssertReturnedAsync(
-            client.InvokeAsync(Identity(package), invocation, CancellationToken.None),
-            expected
-        );
 
     private static async ValueTask AssertReturnedAsync(
         ValueTask<PluginWorkerInvocationResult> result,

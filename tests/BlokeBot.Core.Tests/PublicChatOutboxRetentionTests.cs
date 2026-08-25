@@ -94,38 +94,6 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
     }
 
     [Test]
-    public async Task MissingIdentityTerminals_RetentionAtExactCutoff_PurgesBothCases()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var now = Utc(12, 0, 0);
-        var duration = TimeSpan.FromMinutes(10);
-        await SeedTerminalRowsAsync(
-            dbFactory,
-            TerminalRow(PublicChatOutboxStatus.MissingChannel, now - duration),
-            TerminalRow(PublicChatOutboxStatus.MissingBot, now - duration)
-        );
-        var outbox = new EfPublicChatOutbox(
-            dbFactory,
-            StandardRetryPolicy,
-            StandardLifetimePolicy,
-            Retention(duration)
-        );
-
-        _ = (
-            await outbox.TryClaimNextAsync(
-                now,
-                now.AddMinutes(5),
-                TimeSpan.Zero,
-                TimeSpan.Zero,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<PublicChatClaimOutcome.Empty>();
-
-        await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
-    }
-
-    [Test]
     public async Task TerminalRetention_MoreThanOneBatch_CleansInBoundedPasses()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

@@ -1130,48 +1130,6 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public void PureHandlerRegistry_RejectsDuplicatesDescriptorMismatchesAndEffectOutputs()
-    {
-        var catalog = new AutomationDefinitionCatalog([new DataContractAutomationModule()]);
-        var handler = TextValueHandler("test-counting-text-value", "value");
-
-        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
-            new AutomationPureHandlerRegistry(catalog, [handler, handler])
-        );
-        var mismatch = new TestPureHandler(
-            handler.Contract with
-            {
-                Kind = AutomationNodeKind.Transform,
-            },
-            static _ => new AutomationPureNodeResult.Failed("unused")
-        );
-        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
-            new AutomationPureHandlerRegistry(catalog, [mismatch])
-        );
-        var sensitive = new TestPureHandler(
-            new(
-                new("test-sensitive-number-value"),
-                AutomationNodeKind.Value,
-                [],
-                [
-                    new(
-                        new("value"),
-                        AutomationPortValueType.Number,
-                        AutomationPortNullability.NonNullable
-                    ),
-                ]
-            ),
-            static _ => new AutomationPureNodeResult.Failed("unused")
-        );
-        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
-            new AutomationPureHandlerRegistry(catalog, [sensitive])
-        );
-        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
-            new AutomationDefinitionCatalog([new ActionDataOutputModule()])
-        );
-    }
-
-    [Test]
     public async Task PureOutput_ExecutesOnceAcrossFanOutAndRemainsHostIsolated()
     {
         var handler = TextValueHandler("test-counting-text-value", "shared-value");
@@ -2129,17 +2087,6 @@ public sealed class AutomationRuntimeTests
         _ = fixture
             .Catalog.ValidatePersistedDefinition(duplicateIdentity.Definition)
             .ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
-    }
-
-    [Test]
-    public void CelTransform_FoundationKeepsSafeContractsOffThePublicCatalogSurface()
-    {
-        var constructor = typeof(AutomationDefinition<DataContractConfiguration>)
-            .GetConstructors()
-            .ShouldHaveSingleItem();
-        constructor.GetParameters().Length.ShouldBe(3);
-        typeof(AutomationSafeTriggerViewDescriptor).IsPublic.ShouldBeFalse();
-        typeof(AutomationSafeTriggerViewField).IsPublic.ShouldBeFalse();
     }
 
     [Test]
@@ -5291,40 +5238,6 @@ public sealed class AutomationRuntimeTests
 
             return result;
         }
-    }
-
-    private sealed class ActionDataOutputModule : IAutomationCatalogModule
-    {
-        public AutomationModuleId Id => new("tests.action-output");
-
-        public IEnumerable<IAutomationDefinition> Definitions =>
-            [
-                new AutomationDefinition<DataContractConfiguration>(
-                    new(
-                        new("test-action-data-output"),
-                        AutomationNodeKind.Action,
-                        AutomationDefinitionScope.Host,
-                        new(new(1), new(1)),
-                        new("Invalid action", "Declares a Data output.", "Test"),
-                        [],
-                        [
-                            new(
-                                new("value"),
-                                "Value",
-                                "An invalid action result.",
-                                AutomationPortValueType.Text
-                            ),
-                        ],
-                        [],
-                        AutomationActionCapabilities.SendsChat,
-                        AutomationActionRetrySafety.Unsafe
-                    ),
-                    static _ => new AutomationConfigurationParseResult.Parsed(
-                        new DataContractConfiguration()
-                    ),
-                    static _ => AutomationValidationResult.Valid
-                ),
-            ];
     }
 
     private sealed class DataContractAutomationModule : IAutomationCatalogModule

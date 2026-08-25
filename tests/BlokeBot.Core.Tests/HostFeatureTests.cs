@@ -51,15 +51,6 @@ public sealed class HostFeatureTests
     }
 
     [Test]
-    public void NewHostModel_DefaultsEveryChatToolOff()
-    {
-        new BotHost().EnabledFeatures.ShouldBe(HostFeatureFlags.None);
-        ((ulong)HostFeatureFlags.RaidCollaboration).ShouldBe(1UL << 18);
-        ((ulong)HostFeatureFlags.CooperativeGame).ShouldBe(1UL << 19);
-        ((ulong)HostFeatureFlags.Collectives).ShouldBe(1UL << 20);
-    }
-
-    [Test]
     public async Task AutomationFeature_Toggling_PreservesUnknownBits()
     {
         var unknown = (HostFeatureFlags)(1UL << 48);

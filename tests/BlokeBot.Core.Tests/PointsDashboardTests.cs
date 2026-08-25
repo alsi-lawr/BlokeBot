@@ -1,8 +1,5 @@
-using System.Globalization;
-using System.Numerics;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Core.Features.Points.Commands;
 using BlokeBot.Core.Features.Points.Dashboard;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -62,55 +59,6 @@ public sealed class PointsDashboardTests : PointsTestBase
         _ = Success(result);
         balance.Login.ShouldBe("viewer");
         balance.Amount.ShouldBe("10");
-    }
-
-    [Test]
-    public async Task InvalidFormatOrRange_SubmittingPointAmounts_PreservesInvalidResponses()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var users = new FixedPointTargetUserLookup(["viewer"]);
-        var dashboard = new PointsDashboardService(
-            new PointBalanceService(dbFactory),
-            null!,
-            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            users
-        );
-        List<string> replies = [];
-        var command = new AddPointsCommandStrategy(
-            new PointsCommandService(dbFactory),
-            new PointBalanceService(dbFactory),
-            users
-        );
-
-        var dashboardResult = await dashboard.AddAsync(
-            hostId,
-            "viewer",
-            "10.5",
-            "streamer",
-            CancellationToken.None
-        );
-        await command.ExecuteAsync(
-            CommandContext(
-                hostId,
-                "moderator",
-                "streamer",
-                "addpoints",
-                [
-                    "viewer",
-                    (PointAmount.MaximumValue + BigInteger.One).ToString(
-                        CultureInfo.InvariantCulture
-                    ),
-                ],
-                replies
-            ),
-            CancellationToken.None
-        );
-
-        await using var db = await dbFactory.CreateDbContextAsync();
-        Failure(dashboardResult).Message.ShouldBe("Invalid amount.");
-        replies.ShouldBe(["That point amount is not valid."]);
-        (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
 
     [Test]

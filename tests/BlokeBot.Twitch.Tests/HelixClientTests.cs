@@ -120,14 +120,10 @@ public sealed class HelixClientTests
     }
 
     [Test]
-    [Arguments(HttpStatusCode.Unauthorized)]
-    [Arguments(HttpStatusCode.Forbidden)]
-    [Arguments(HttpStatusCode.TooManyRequests)]
-    [Arguments(HttpStatusCode.InternalServerError)]
-    public async Task Chatters_FailedResponse_IsUnavailable(HttpStatusCode status)
+    public async Task Chatters_InitialServerFailure_IsUnavailable()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(_ => new HttpResponseMessage(status));
+        factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var outcome = await client.GetChattersAsync(

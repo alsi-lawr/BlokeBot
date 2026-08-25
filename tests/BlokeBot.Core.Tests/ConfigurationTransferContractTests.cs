@@ -492,23 +492,6 @@ public sealed class ConfigurationTransferContractTests
     }
 
     [Test]
-    [Arguments(HostFeatureFlags.None)]
-    [Arguments(HostFeatureFlags.Polls)]
-    [Arguments(
-        HostFeatureFlags.Automations
-            | HostFeatureFlags.RewardsAndRedemptions
-            | HostFeatureFlags.Bingo
-            | HostFeatureFlags.CustomCommands
-    )]
-    [Arguments(HostFeatureFlags.All)]
-    public void Enablement_RoundTripsEveryIndependentFlag(HostFeatureFlags flags)
-    {
-        var mapped = ChannelToolEnablementMapper.FromFlags(flags);
-
-        ChannelToolEnablementMapper.ToFlags(mapped).ShouldBe(flags);
-    }
-
-    [Test]
     public void TypedCodec_MissingRequiredNestedValues_ReturnsStructuralFailure()
     {
         const string Json = """

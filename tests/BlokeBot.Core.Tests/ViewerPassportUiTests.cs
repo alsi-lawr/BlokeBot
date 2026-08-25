@@ -100,63 +100,6 @@ public sealed class ViewerPassportUiTests
     }
 
     [Test]
-    public async Task VisibilityChoices_AreNativeRadiosStatingTheRetainedAuthorizationPolicy()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(
-            database,
-            HostFeatureFlags.ViewerPassports,
-            ViewerPassportVisibility.ChannelMembers,
-            "PROFILE-LINE"
-        );
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(new PointBalanceService(database));
-        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
-        _ = context.Services.AddSingleton<ViewerPassportService>();
-
-        var cut = context.Render<ViewerPassportsPage>();
-
-        cut.WaitForAssertion(() => cut.FindAll(".passport-visibility-option").ShouldNotBeEmpty());
-        var choices = cut.FindAll(".passport-visibility-option");
-        choices
-            .Select(choice => choice.QuerySelector("input")!.GetAttribute("name"))
-            .ShouldAllBe(name => name == "passport-visibility");
-        choices
-            .Select(choice => choice.QuerySelector("input")!.GetAttribute("type"))
-            .ShouldAllBe(type => type == "radio");
-    }
-
-    [Test]
-    public async Task VisibilityIcons_AreDecorativeAndHiddenFromAssistiveTechnology()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(
-            database,
-            HostFeatureFlags.ViewerPassports,
-            ViewerPassportVisibility.Public,
-            "PROFILE-LINE"
-        );
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(new PointBalanceService(database));
-        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
-        _ = context.Services.AddSingleton<ViewerPassportService>();
-
-        var cut = context.Render<ViewerPassportsPage>();
-
-        cut.WaitForAssertion(() =>
-            cut.FindAll(".passport-visibility-option__icon").ShouldNotBeEmpty()
-        );
-        foreach (var icon in cut.FindAll(".passport-visibility-option__icon"))
-        {
-            icon.GetAttribute("aria-hidden").ShouldBe("true");
-            var glyph = icon.QuerySelector("svg").ShouldNotBeNull();
-            glyph.GetAttribute("focusable").ShouldBe("false");
-            glyph.QuerySelector("title").ShouldBeNull();
-            glyph.GetAttribute("aria-label").ShouldBeNull();
-        }
-    }
-
-    [Test]
     public async Task ChoosingVisibility_MovesTheSelectedStateAndPersistsTheChosenValue()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

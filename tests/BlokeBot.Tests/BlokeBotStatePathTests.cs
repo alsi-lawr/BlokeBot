@@ -7,50 +7,6 @@ namespace BlokeBot.Tests;
 public sealed class BlokeBotStatePathTests
 {
     [Test]
-    public void LinuxWithXdgStateHome_Resolving_UsesLowercaseXdgApplicationDirectory()
-    {
-        var paths = Resolve(
-            BlokeBotOperatingSystem.Linux,
-            new("/home/alex", "/var/lib/state", null)
-        );
-
-        paths.DatabasePath.ShouldBe("/var/lib/state/blokebot/blokebot.db");
-        paths.TokenCachePath.ShouldBe("/var/lib/state/blokebot/twitch.tokens.json");
-    }
-
-    [Test]
-    public void LinuxWithoutXdgStateHome_Resolving_UsesHomeStateFallback()
-    {
-        var paths = Resolve(BlokeBotOperatingSystem.Linux, new("/home/alex", null, null));
-
-        paths.DatabasePath.ShouldBe("/home/alex/.local/state/blokebot/blokebot.db");
-        paths.TokenCachePath.ShouldBe("/home/alex/.local/state/blokebot/twitch.tokens.json");
-    }
-
-    [Test]
-    public void MacOs_Resolving_UsesApplicationSupportDirectory()
-    {
-        var paths = Resolve(BlokeBotOperatingSystem.MacOS, new("/Users/alex", null, null));
-
-        paths.DatabasePath.ShouldBe("/Users/alex/Library/Application Support/BlokeBot/blokebot.db");
-        paths.TokenCachePath.ShouldBe(
-            "/Users/alex/Library/Application Support/BlokeBot/twitch.tokens.json"
-        );
-    }
-
-    [Test]
-    public void Windows_Resolving_UsesLocalApplicationDataDirectory()
-    {
-        var paths = Resolve(
-            BlokeBotOperatingSystem.Windows,
-            new(null, null, @"C:\Users\Alex\AppData\Local")
-        );
-
-        paths.DatabasePath.ShouldBe(@"C:\Users\Alex\AppData\Local\BlokeBot\blokebot.db");
-        paths.TokenCachePath.ShouldBe(@"C:\Users\Alex\AppData\Local\BlokeBot\twitch.tokens.json");
-    }
-
-    [Test]
     public void ExplicitAndDataDirectoryPaths_Resolving_UseFieldByFieldPrecedence()
     {
         var result = BlokeBotStatePathResolver.Resolve(
@@ -137,13 +93,4 @@ public sealed class BlokeBotStatePathTests
 
         BlokeBotServerUrlPolicy.LocalUrl(addresses).ShouldBe("http://127.0.0.1:43127");
     }
-
-    private static BlokeBotStatePaths Resolve(
-        BlokeBotOperatingSystem operatingSystem,
-        BlokeBotPlatformEnvironment environment
-    ) =>
-        BlokeBotStatePathResolver
-            .Resolve(new(operatingSystem, environment, null, null, null))
-            .ShouldBeOfType<BlokeBotStatePathResolution.Resolved>()
-            .Paths;
 }

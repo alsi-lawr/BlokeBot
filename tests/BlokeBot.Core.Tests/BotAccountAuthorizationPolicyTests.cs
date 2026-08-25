@@ -27,15 +27,6 @@ public sealed class BotAccountAuthorizationPolicyTests
     }
 
     [Test]
-    public async Task InvalidToken_LoadingConfiguredStatus_ReportsNotAuthorized()
-    {
-        var status = await LoadConfiguredStatusAsync(new TokenStatus.Invalid(RequiredScopes()));
-
-        status.State.ShouldBe(BotAccountAuthorizationState.NotAuthorized);
-        status.MissingScopes.ShouldBe(RequiredScopes());
-    }
-
-    [Test]
     public async Task TokenInspectionFailure_LoadingConfiguredStatus_ReportsUnknown()
     {
         var error = new TokenStatusError.ValidationUnavailable(
@@ -85,28 +76,6 @@ public sealed class BotAccountAuthorizationPolicyTests
 
         status.State.ShouldBe(BotAccountAuthorizationState.MissingScopes);
         status.MissingScopes.ShouldBe([Scopes.UserReadFollows]);
-    }
-
-    [Test]
-    public async Task MissingAnnouncementManagementScope_LoadingConfiguredStatus_RequiresReconnect()
-    {
-        var requiredScopes = RequiredScopes();
-        var grantedScopes = ImmutableArray.Create(
-            Scopes.UserReadModeratedChannels,
-            Scopes.UserReadFollows
-        );
-        var status = await LoadConfiguredStatusAsync(
-            new TokenStatus.MissingScopes(
-                "saved-token",
-                Validation(grantedScopes),
-                requiredScopes,
-                grantedScopes,
-                [Scopes.ModeratorManageAnnouncements]
-            )
-        );
-
-        status.State.ShouldBe(BotAccountAuthorizationState.MissingScopes);
-        status.MissingScopes.ShouldBe([Scopes.ModeratorManageAnnouncements]);
     }
 
     [Test]

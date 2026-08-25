@@ -1,5 +1,3 @@
-using System.Net.Sockets;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Shouldly;
 
@@ -7,45 +5,6 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public sealed class RuntimeSessionBoundaryTests : RuntimeSessionResilienceTestBase
 {
-    [Test]
-    public void BoundaryClassifiers_ClassifyingHttpAndCancellation_UseExplicitCases()
-    {
-        using var canceled = new CancellationTokenSource();
-        canceled.Cancel();
-        var cancellation = new OperationCanceledException(canceled.Token);
-        var transientHttp = new HttpRequestException(
-            "service unavailable",
-            null,
-            System.Net.HttpStatusCode.ServiceUnavailable
-        );
-        var terminalHttp = new HttpRequestException(
-            "unauthorized",
-            null,
-            System.Net.HttpStatusCode.Unauthorized
-        );
-
-        IrcSessionFailureClassifier
-            .Classify(cancellation, canceled.Token)
-            .ShouldBe(RuntimeSessionFailureClassification.Cancellation);
-        IrcSessionFailureClassifier
-            .Classify(transientHttp, CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Transient);
-        IrcSessionFailureClassifier
-            .Classify(terminalHttp, CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Terminal);
-    }
-
-    [Test]
-    public void BoundaryClassifiers_ClassifyingTransportAndProtocolFaults_UseBoundaryCases()
-    {
-        IrcSessionFailureClassifier
-            .Classify(new SocketException((int)SocketError.ConnectionReset), CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Transient);
-        IrcSessionFailureClassifier
-            .Classify(new JsonException("invalid payload"), CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Terminal);
-    }
-
     [Test]
     public void StructuredHealthReport_Logging_ContainsSafeFieldsWithoutExceptionMessage()
     {

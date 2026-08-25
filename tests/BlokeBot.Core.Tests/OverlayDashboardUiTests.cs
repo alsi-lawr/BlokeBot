@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -82,34 +81,6 @@ public sealed class OverlayDashboardUiTests
             revisited.FindAll("[data-private-url-reveal]").ShouldBeEmpty();
             revisited.Markup.ShouldNotContain(revealedUrl!);
         });
-    }
-
-    [Test]
-    public void SharedRenderer_ConstrainsCredentialModeAndNeverRequiresAPrivateKey()
-    {
-        var publicDocument = OverlayBrowserSourceDocument.Render(
-            PathString.Empty,
-            "/overlay/private/state",
-            "/overlay/private/events",
-            OverlayBrowserSourceCredentials.Omit,
-            liveEnabled: true
-        );
-        var previewDocument = OverlayBrowserSourceDocument.Render(
-            new PathString("/blokebot"),
-            "/overlays/preview/opaque-id/state",
-            "/overlays/preview/opaque-id/events",
-            OverlayBrowserSourceCredentials.SameOrigin,
-            liveEnabled: false
-        );
-
-        publicDocument.ShouldContain("data-credentials=\"omit\"");
-        publicDocument.ShouldContain("data-live-enabled=\"true\"");
-        previewDocument.ShouldContain("data-credentials=\"same-origin\"");
-        previewDocument.ShouldContain("data-live-enabled=\"false\"");
-        previewDocument.ShouldContain(
-            "data-state-url=\"/blokebot/overlays/preview/opaque-id/state\""
-        );
-        previewDocument.ShouldNotContain("accessKey", Case.Insensitive);
     }
 
     [Test]

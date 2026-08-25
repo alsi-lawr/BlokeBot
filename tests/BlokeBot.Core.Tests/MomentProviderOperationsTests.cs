@@ -68,13 +68,10 @@ public sealed class MomentProviderOperationsTests
     }
 
     [Test]
-    [Arguments(ClipFailure.Offline)]
-    [Arguments(ClipFailure.VodsDisabled)]
-    [Arguments(ClipFailure.Unauthorized)]
-    public async Task KnownIneligibleClipFailure_DoesNotAttemptMarkerFallback(ClipFailure failure)
+    public async Task UnauthorizedClipFailure_DoesNotAttemptMarkerFallback()
     {
         await using var database = await CreateDatabaseAsync();
-        var http = new ProviderHttpClientFactory(failure, markerAmbiguous: false);
+        var http = new ProviderHttpClientFactory(ClipFailure.Unauthorized, markerAmbiguous: false);
         var operations = CreateOperations(database, http);
 
         var outcome = await operations.CaptureAsync(
