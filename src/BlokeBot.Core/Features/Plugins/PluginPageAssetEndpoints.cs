@@ -5,7 +5,7 @@ namespace BlokeBot.Core.Features.Plugins;
 
 internal static class PluginPageAssetEndpoints
 {
-    internal const string DocumentCsp =
+    internal const string PageCsp =
         "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https:; font-src 'self'; connect-src https:; frame-src https:; object-src 'none'; base-uri 'none'; form-action https:; frame-ancestors 'self'";
 
     internal static void MapPluginPageAssetEndpoints(this WebApplication app) =>
@@ -71,10 +71,7 @@ internal static class PluginPageAssetEndpoints
         response.Headers.XContentTypeOptions = "nosniff";
         response.Headers["Referrer-Policy"] = "no-referrer";
         response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
-        if (asset.IsDocument)
-        {
-            response.Headers.ContentSecurityPolicy = DocumentCsp;
-        }
+        response.Headers.ContentSecurityPolicy = PageCsp;
         return Results.Bytes(asset.Content, asset.MediaType);
     }
 }

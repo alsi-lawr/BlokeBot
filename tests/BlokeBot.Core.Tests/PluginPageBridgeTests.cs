@@ -4,6 +4,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Text.Json.Nodes;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Hosts;
@@ -207,11 +208,29 @@ public sealed class PluginPageBridgeTests
         document
             .Headers.GetValues("Content-Security-Policy")
             .ShouldHaveSingleItem()
-            .ShouldBe(PluginPageAssetEndpoints.DocumentCsp);
+            .ShouldBe(PluginPageAssetEndpoints.PageCsp);
         document
             .Headers.GetValues("X-Content-Type-Options")
             .ShouldHaveSingleItem()
             .ShouldBe("nosniff");
+
+        using var secondaryDocumentRequest = Request(Route(1, "web/secondary.html"), 1);
+        using var secondaryDocument = await host.Client.SendAsync(secondaryDocumentRequest);
+        secondaryDocument.StatusCode.ShouldBe(HttpStatusCode.OK);
+        secondaryDocument.Content.Headers.ContentType!.MediaType.ShouldBe("text/html");
+        secondaryDocument
+            .Headers.GetValues("Content-Security-Policy")
+            .ShouldHaveSingleItem()
+            .ShouldBe(PluginPageAssetEndpoints.PageCsp);
+
+        using var scriptRequest = Request(Route(1, "web/app.js"), 1);
+        using var script = await host.Client.SendAsync(scriptRequest);
+        script.StatusCode.ShouldBe(HttpStatusCode.OK);
+        script.Content.Headers.ContentType!.MediaType.ShouldBe("application/javascript");
+        script
+            .Headers.GetValues("Content-Security-Policy")
+            .ShouldHaveSingleItem()
+            .ShouldBe(PluginPageAssetEndpoints.PageCsp);
 
         using var undeclaredRequest = Request(Route(1, "secret.txt"), 1);
         using var undeclared = await host.Client.SendAsync(undeclaredRequest);
@@ -331,13 +350,17 @@ public sealed class PluginPageBridgeTests
                 Path.Combine(packageRoot, "web/index.html"),
                 "<!doctype html><main>Queue</main>"
             );
+            await File.WriteAllTextAsync(
+                Path.Combine(packageRoot, "web/secondary.html"),
+                "<!doctype html><main>Secondary</main>"
+            );
             await File.WriteAllTextAsync(Path.Combine(packageRoot, "web/app.js"), "export {};");
             await File.WriteAllBytesAsync(
                 Path.Combine(packageRoot, "media/icon.webp"),
                 [0x52, 0x49]
             );
             await File.WriteAllTextAsync(Path.Combine(packageRoot, "secret.txt"), "not declared");
-            var setup = PageSetup.Create();
+            var setup = PageSetup.Create(ManifestWithSecondaryDocument());
             var builder = WebApplication.CreateBuilder();
             _ = builder.Services.AddSingleton(setup.Catalogue);
             _ = builder.Services.AddSingleton<IPluginPackageAssetResolver>(
@@ -370,6 +393,35 @@ public sealed class PluginPageBridgeTests
             return new(app, new HttpClient { BaseAddress = new(address) }, packageRoot);
         }
 
+        private static byte[] ManifestWithSecondaryDocument()
+        {
+            var manifest = JsonNode
+                .Parse(PluginContractFixtures.CompleteManifestJson())!
+                .AsObject();
+            manifest["assets"]!
+                .AsArray()
+                .Add(
+                    new JsonObject
+                    {
+                        ["id"] = "secondary-document",
+                        ["path"] = "web/secondary.html",
+                        ["kind"] = "browser",
+                        ["mediaType"] = "text/html",
+                        ["purpose"] = "Provides an additional navigable queue document.",
+                        ["runtimeIdentifiers"] = new JsonArray(
+                            "linux-x64",
+                            "linux-arm64",
+                            "osx-arm64",
+                            "win-x64",
+                            "win-arm64"
+                        ),
+                        ["maximumBytes"] = 65_536,
+                    }
+                );
+            manifest["embeddedPages"]![0]!["assets"]!.AsArray().Add("secondary-document");
+            return Encoding.UTF8.GetBytes(manifest.ToJsonString());
+        }
+
         public async ValueTask DisposeAsync()
         {
             Client.Dispose();
@@ -380,12 +432,12 @@ public sealed class PluginPageBridgeTests
 
     private sealed record PageSetup(ValidatedPluginManifest Manifest, PluginPageCatalog Catalogue)
     {
-        internal static PageSetup Create()
+        internal static PageSetup Create(byte[]? manifestJson = null)
         {
             var manifest = (
                 (PluginManifestValidationOutcome.Accepted)
                     PluginManifestJson.Validate(
-                        PluginContractFixtures.CompleteManifestJson(),
+                        manifestJson ?? PluginContractFixtures.CompleteManifestJson(),
                         PluginContractFixtures.CompatibleHost()
                     )
             ).Manifest;

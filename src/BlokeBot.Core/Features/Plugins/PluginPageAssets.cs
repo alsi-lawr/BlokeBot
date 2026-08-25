@@ -4,11 +4,7 @@ using BlokeBot.Plugins.Runtime;
 
 namespace BlokeBot.Core.Features.Plugins;
 
-internal sealed record PluginPageAsset(
-    ReadOnlyMemory<byte> Content,
-    string MediaType,
-    bool IsDocument
-);
+internal sealed record PluginPageAsset(ReadOnlyMemory<byte> Content, string MediaType);
 
 internal abstract record PluginPageAssetResolution
 {
@@ -139,13 +135,7 @@ internal sealed class PluginPageAssetService(
                 != PluginPageSessionBinding.From(endpoint)
         )
             ? new PluginPageAssetResolution.NotFound()
-            : new PluginPageAssetResolution.Available(
-                new(
-                    output.ToArray(),
-                    asset.MediaType,
-                    asset.Id == embedded.Descriptor.DocumentAsset
-                )
-            );
+            : new PluginPageAssetResolution.Available(new(output.ToArray(), asset.MediaType));
     }
 
     private static bool SameAsset(PluginAssetDescriptor expected, PluginAssetDescriptor actual) =>
