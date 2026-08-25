@@ -76,8 +76,31 @@ public static class PluginStandardHostModules
             Operation("cancel", Channel(), [PluginValueKind.String], PluginValueKind.Nil)
         );
 
+    public static PluginHostModuleDescriptor Storage { get; } =
+        Module(
+            "storage",
+            Operation(
+                "execute",
+                StorageContexts(),
+                [PluginValueKind.String, PluginValueKind.Map],
+                PluginValueKind.Number
+            ),
+            Operation(
+                "query",
+                StorageContexts(),
+                [PluginValueKind.String, PluginValueKind.Map],
+                PluginValueKind.Array
+            )
+        );
+
+    public static PluginHostModuleDescriptor Http { get; } =
+        Module(
+            "http",
+            Operation("send", LiveContexts(), [PluginValueKind.Map], PluginValueKind.Map)
+        );
+
     public static ImmutableArray<PluginHostModuleDescriptor> All { get; } =
-    [Diagnostics, Responses, Chat, Overlay, Points, Twitch, Schedules];
+    [Diagnostics, Responses, Chat, Overlay, Points, Twitch, Schedules, Storage, Http];
 
     private static PluginHostModuleDescriptor Module(
         string id,
@@ -106,6 +129,23 @@ public static class PluginStandardHostModules
 
     private static ImmutableArray<PluginInvocationContextKind> Channel() =>
         [PluginInvocationContextKind.Channel];
+
+    private static ImmutableArray<PluginInvocationContextKind> StorageContexts() =>
+        [
+            PluginInvocationContextKind.Installation,
+            PluginInvocationContextKind.Channel,
+            PluginInvocationContextKind.Automation,
+            PluginInvocationContextKind.Migration,
+            PluginInvocationContextKind.Page,
+        ];
+
+    private static ImmutableArray<PluginInvocationContextKind> LiveContexts() =>
+        [
+            PluginInvocationContextKind.Installation,
+            PluginInvocationContextKind.Channel,
+            PluginInvocationContextKind.Automation,
+            PluginInvocationContextKind.Page,
+        ];
 
     private static ImmutableArray<PluginInvocationContextKind> AllContexts() =>
         [

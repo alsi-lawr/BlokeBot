@@ -58,7 +58,7 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var migration = await RunMigrationOwnersAsync(state, cancellationToken);
+        var migration = await RunMigrationOwnersAsync(state, package, cancellationToken);
         if (migration is PluginLifecycleOwnerOutcome.Failed failed)
         {
             return await FaultAsync(
@@ -147,6 +147,7 @@ public sealed partial class PluginLifecycleCoordinator
 
     private async ValueTask<PluginLifecycleOwnerOutcome> RunMigrationOwnersAsync(
         PluginLifecycleState state,
+        PluginLifecyclePackage package,
         CancellationToken cancellationToken
     )
     {
@@ -155,7 +156,7 @@ public sealed partial class PluginLifecycleCoordinator
             try
             {
                 var outcome = await owner.MigrateAsync(
-                    new(state.SelectedInstallation, state.SelectedFence),
+                    new(state.SelectedInstallation, state.SelectedFence, package),
                     cancellationToken
                 );
                 if (outcome is PluginLifecycleOwnerOutcome.Failed)

@@ -83,6 +83,8 @@ public sealed class PluginFeatureAdmissionService(
     IPluginRuntimeSnapshotProvider runtime
 )
 {
+    internal IPluginRuntimeSnapshotProvider Runtime => runtime;
+
     public PluginFeatureAdmissionOutcome Admit(
         PluginFeatureKey key,
         PluginFeatureFence expected,

@@ -30,4 +30,18 @@ public static class PluginContractLimits
     public const long MaximumDurationSettingSeconds = 31_536_000;
     public const int MaximumOrdinarySettingsJsonBytes = 64 * 1024;
     public const int MaximumReadinessReasonCharacters = 256;
+    public const int MaximumSqlCharacters = 32 * 1024;
+    public const int MaximumSqlParameters = 64;
+    public const int MaximumSqlRows = 256;
+    public const int MaximumSqlColumns = 64;
+    public const int MaximumHttpUrlCharacters = 2_048;
+    public const int MaximumHttpHeaders = 32;
+    public const int MaximumHttpHeaderBytes = 16 * 1024;
+    public const int MaximumHttpRequestBodyBytes = 256 * 1024;
+    public const int MaximumHttpResponseBodyBytes = 48 * 1024;
+    public const int MaximumHttpRedirects = 3;
+    public const int MaximumHttpDurationMilliseconds = 10_000;
+    public const int MaximumConcurrentHttpRequestsPerPlugin = 4;
+    public const int MaximumWebRequestBodyBytes = 48 * 1024;
+    public const int MaximumWebRequestHeaderBytes = 16 * 1024;
 }

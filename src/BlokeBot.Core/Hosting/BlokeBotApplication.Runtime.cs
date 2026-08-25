@@ -5,6 +5,7 @@ using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Persistence;
 
@@ -45,6 +46,7 @@ public static partial class BlokeBotApplication
         _ = app.UseAuthorization();
 
         app.MapOverlayBrowserSourceEndpoints();
+        app.MapPluginWebEndpoints();
         _ = app.MapMethods(
             "/favicon.ico",
             ["GET", "HEAD"],

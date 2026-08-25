@@ -54,7 +54,17 @@ public abstract record PluginLifecycleOwnerOutcome
 public sealed record PluginMigrationContext(
     PluginInstallationIdentity Installation,
     PluginLifecycleFence Fence
-);
+)
+{
+    public PluginLifecyclePackage? Package { get; init; }
+
+    internal PluginMigrationContext(
+        PluginInstallationIdentity installation,
+        PluginLifecycleFence fence,
+        PluginLifecyclePackage package
+    )
+        : this(installation, fence) => Package = package;
+}
 
 public interface IPluginMigrationDataOwner
 {

@@ -20,6 +20,10 @@ public sealed class PluginDispatchManifestProtocolTests
         PluginHostOperationId.TryCreate("handle", out var operation).ShouldBeTrue();
         PluginEventHandlerId.TryCreate("stream-online", out var eventHandler).ShouldBeTrue();
         PluginScheduleHandlerId.TryCreate("refresh", out var scheduleHandler).ShouldBeTrue();
+        PluginWebhookId.TryCreate("public-hook", out var publicHook).ShouldBeTrue();
+        PluginWebhookId.TryCreate("signed-hook", out var signedHook).ShouldBeTrue();
+        PluginActionId.TryCreate("approve", out var action).ShouldBeTrue();
+        PluginHostOperationId.TryCreate("authenticate", out var authenticate).ShouldBeTrue();
         var validated = (
             (PluginManifestValidationOutcome.Accepted)
                 PluginManifestValidator.Validate(
@@ -62,6 +66,33 @@ public sealed class PluginDispatchManifestProtocolTests
                                             operation,
                                             PluginCallbackRequirements.Independent
                                         ),
+                                    ],
+                                    [
+                                        new(
+                                            publicHook,
+                                            module,
+                                            operation,
+                                            PluginCallbackRequirements.Independent,
+                                            new PluginWebhookAuthentication.Public()
+                                        ),
+                                        new(
+                                            signedHook,
+                                            module,
+                                            operation,
+                                            PluginCallbackRequirements.Independent,
+                                            new PluginWebhookAuthentication.Callback(
+                                                module,
+                                                authenticate
+                                            )
+                                        ),
+                                    ],
+                                    [
+                                        new(
+                                            action,
+                                            module,
+                                            operation,
+                                            PluginCallbackRequirements.Independent
+                                        ),
                                     ]
                                 ),
                             }
@@ -71,12 +102,16 @@ public sealed class PluginDispatchManifestProtocolTests
                 )
         ).Manifest;
 
+        var json = PluginManifestJson.Serialize(validated);
+        var jsonText = System.Text.Encoding.UTF8.GetString(json);
+        jsonText.ShouldContain("\"webhooks\"");
+        jsonText.ShouldContain("\"actions\"");
+        jsonText.ShouldNotContain("webhookDeclarations");
+        jsonText.ShouldNotContain("actionDeclarations");
+
         var roundTripped = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginManifestJson.Serialize(validated),
-                    PluginContractFixtures.CompatibleHost()
-                )
+                PluginManifestJson.Validate(json, PluginContractFixtures.CompatibleHost())
         )
             .Manifest.Manifest.Features.Single(item => item.Id == feature.Id)
             .DispatchDeclarations;
@@ -86,6 +121,62 @@ public sealed class PluginDispatchManifestProtocolTests
             .Events.ShouldHaveSingleItem()
             .Source.ShouldBeOfType<PluginEventSource.Twitch>();
         roundTripped.Schedules.ShouldHaveSingleItem().Id.ShouldBe(scheduleHandler);
+        roundTripped.Webhooks.Length.ShouldBe(2);
+        _ = roundTripped
+            .Webhooks.Single(hook => hook.Id == publicHook)
+            .Authentication.ShouldBeOfType<PluginWebhookAuthentication.Public>();
+        _ = roundTripped
+            .Webhooks.Single(hook => hook.Id == signedHook)
+            .Authentication.ShouldBeOfType<PluginWebhookAuthentication.Callback>();
+        roundTripped.Actions.ShouldHaveSingleItem().Id.ShouldBe(action);
+    }
+
+    [Test]
+    public void WebhookAuthentication_MustDeliberatelyDeclarePublicOrCallback()
+    {
+        var accepted = (
+            (PluginManifestValidationOutcome.Accepted)
+                PluginManifestJson.Validate(
+                    PluginContractFixtures.CompleteManifestJson(),
+                    PluginContractFixtures.CompatibleHost()
+                )
+        ).Manifest;
+        var feature = accepted.Manifest.Features.Single(item => item.Id.Value == "collection");
+        var module = accepted.Manifest.LuaModules[0].Id;
+        PluginHostOperationId.TryCreate("handle", out var operation).ShouldBeTrue();
+        PluginWebhookId.TryCreate("incoming", out var webhook).ShouldBeTrue();
+
+        var outcome = PluginManifestValidator.Validate(
+            accepted.Manifest with
+            {
+                Features = accepted.Manifest.Features.Replace(
+                    feature,
+                    feature with
+                    {
+                        Dispatch = new(
+                            [],
+                            [],
+                            [],
+                            [
+                                new(
+                                    webhook,
+                                    module,
+                                    operation,
+                                    PluginCallbackRequirements.Independent,
+                                    null!
+                                ),
+                            ]
+                        ),
+                    }
+                ),
+            },
+            PluginContractFixtures.CompatibleHost()
+        );
+
+        Errors(outcome)
+            .ShouldContain(error =>
+                error.Code == PluginManifestErrorCode.InvalidDispatchDeclaration
+            );
     }
 
     [Test]

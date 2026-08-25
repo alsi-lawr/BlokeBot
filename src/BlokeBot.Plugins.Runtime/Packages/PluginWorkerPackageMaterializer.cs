@@ -6,7 +6,10 @@ namespace BlokeBot.Plugins.Runtime;
 public sealed record PreparedPluginWorkerPackage(
     PluginWorkerPackageDescriptor Descriptor,
     string PackageRoot
-);
+)
+{
+    public ValidatedPluginManifest? Manifest { get; init; }
+}
 
 public enum PluginPackageMaterializationFailureCode
 {
@@ -110,7 +113,12 @@ public static class PluginWorkerPackageMaterializer
                 .LuaModules.Select(module => new PluginWorkerLuaModule(module.Id, module.Path))
                 .ToImmutableArray()
         );
-        return new PluginPackageMaterializationOutcome.Prepared(new(descriptor, fullDestination));
+        return new PluginPackageMaterializationOutcome.Prepared(
+            new(descriptor, fullDestination)
+            {
+                Manifest = ((PluginPackageValidationOutcome.Accepted)validation).Manifest,
+            }
+        );
     }
 
     private static string ResolveContainedPath(string root, string canonicalPath)

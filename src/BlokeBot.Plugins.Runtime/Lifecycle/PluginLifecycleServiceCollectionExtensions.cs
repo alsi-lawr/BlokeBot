@@ -12,6 +12,7 @@ public static class PluginLifecycleServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(PluginLifecycleOptions.Default);
         services.TryAddSingleton<PluginWorkerCoordinator>();
+        services.TryAddSingleton<IPluginLifecycleMigrationRunner, PluginLifecycleMigrationRunner>();
         services.TryAddSingleton<PluginRuntimeSnapshotRegistry>();
         services.TryAddSingleton<IPluginRuntimeSnapshotProvider>(provider =>
             provider.GetRequiredService<PluginRuntimeSnapshotRegistry>()

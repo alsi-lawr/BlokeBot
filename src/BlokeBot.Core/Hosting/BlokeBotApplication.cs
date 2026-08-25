@@ -29,6 +29,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Eventing;
+using BlokeBot.Plugins.Features;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;
@@ -79,6 +80,11 @@ public static partial class BlokeBotApplication
             );
         }
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        var databasePath = builder.Configuration["BlokeBot:DatabasePath"];
+        var pluginStateRoot = !string.IsNullOrWhiteSpace(databasePath)
+            ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, "plugins")
+            : Path.Combine(builder.Environment.ContentRootPath, ".state", "plugins");
+        builder.Services.TryAddSingleton(new PluginPrivateDataOptions(pluginStateRoot));
 
         var twitchEndpoints =
             builder

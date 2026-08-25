@@ -4,7 +4,7 @@ using BlokeBot.Plugins.Runtime;
 
 namespace BlokeBot.Core.Features.Plugins;
 
-public sealed class PluginHostModuleCatalog(
+public sealed partial class PluginHostModuleCatalog(
     IEnumerable<IPluginHostModule> modules,
     PluginFeatureAdmissionService admissions,
     ILogger<PluginHostModuleCatalog> logger
@@ -42,6 +42,11 @@ public sealed class PluginHostModuleCatalog(
         CancellationToken cancellationToken
     )
     {
+        if (identity.Context is PluginInvocationContext.Migration)
+        {
+            return await DispatchMigrationAsync(identity, call, cancellationToken);
+        }
+
         if (
             identity.Activation is not { } activation
             || !PluginLifecycleOperationId.TryCreate(

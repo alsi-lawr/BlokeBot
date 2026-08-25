@@ -49,9 +49,33 @@ public interface IPluginDispatchInvoker
         PluginValue input,
         CancellationToken cancellationToken
     );
+
+    ValueTask<PluginWebDispatchOutcome> InvokeWebhookAsync(
+        PluginDispatchEndpoint.Webhook endpoint,
+        PluginInvocationContext.Channel context,
+        PluginValue input,
+        CancellationToken cancellationToken
+    ) =>
+        ValueTask.FromResult<PluginWebDispatchOutcome>(
+            new PluginWebDispatchOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.FeatureUnavailable
+            )
+        );
+
+    ValueTask<PluginWebDispatchOutcome> InvokeActionAsync(
+        PluginDispatchEndpoint.Action endpoint,
+        PluginInvocationContext.Channel context,
+        PluginValue input,
+        CancellationToken cancellationToken
+    ) =>
+        ValueTask.FromResult<PluginWebDispatchOutcome>(
+            new PluginWebDispatchOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.FeatureUnavailable
+            )
+        );
 }
 
-public sealed class PluginDispatchInvoker(
+public sealed partial class PluginDispatchInvoker(
     PluginFeatureAdmissionService admissions,
     IPluginRuntimeInvoker runtime,
     PluginDispatchWorkRegistry work,

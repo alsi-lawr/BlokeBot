@@ -14,12 +14,18 @@ public static partial class PluginManifestValidator
             dispatch.Commands.Length <= PluginContractLimits.MaximumDeclarationsPerSurface
             && dispatch.Events.Length <= PluginContractLimits.MaximumDeclarationsPerSurface
             && dispatch.Schedules.Length <= PluginContractLimits.MaximumDeclarationsPerSurface
+            && dispatch.Webhooks.Length <= PluginContractLimits.MaximumDeclarationsPerSurface
+            && dispatch.Actions.Length <= PluginContractLimits.MaximumDeclarationsPerSurface
             && dispatch.Commands.Select(static command => command.Route).Distinct().Count()
                 == dispatch.Commands.Length
             && dispatch.Events.Select(static handler => handler.Id).Distinct().Count()
                 == dispatch.Events.Length
             && dispatch.Schedules.Select(static handler => handler.Id).Distinct().Count()
                 == dispatch.Schedules.Length
+            && dispatch.Webhooks.Select(static hook => hook.Id).Distinct().Count()
+                == dispatch.Webhooks.Length
+            && dispatch.Actions.Select(static action => action.Id).Distinct().Count()
+                == dispatch.Actions.Length
             && dispatch.Commands.All(command =>
                 ValidCommandRoute(command.Route)
                 && modules.Contains(command.Module)
@@ -38,6 +44,19 @@ public static partial class PluginManifestValidator
                 && modules.Contains(handler.Module)
                 && handler.Operation is not null
                 && handler.Requirements is not null
+            )
+            && dispatch.Webhooks.All(hook =>
+                hook.Id is not null
+                && modules.Contains(hook.Module)
+                && hook.Operation is not null
+                && hook.Requirements is not null
+                && ValidWebhookAuthentication(hook.Authentication, modules)
+            )
+            && dispatch.Actions.All(action =>
+                action.Id is not null
+                && modules.Contains(action.Module)
+                && action.Operation is not null
+                && action.Requirements is not null
             )
             && RawEventSubDeclarationsAreComplete(feature, dispatch);
         if (!valid)
@@ -97,4 +116,16 @@ public static partial class PluginManifestValidator
 
     private static bool ValidEventSubVersion(string version) =>
         version is { Length: >= 1 and <= 16 } && version.All(char.IsAsciiDigit);
+
+    private static bool ValidWebhookAuthentication(
+        PluginWebhookAuthentication? authentication,
+        IReadOnlySet<PluginLuaModuleId> modules
+    ) =>
+        authentication switch
+        {
+            PluginWebhookAuthentication.Public => true,
+            PluginWebhookAuthentication.Callback callback => modules.Contains(callback.Module)
+                && callback.Operation is not null,
+            _ => false,
+        };
 }

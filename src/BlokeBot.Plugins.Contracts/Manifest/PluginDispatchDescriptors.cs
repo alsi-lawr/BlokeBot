@@ -3,13 +3,45 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
-public sealed record PluginDispatchDeclarations(
-    ImmutableArray<PluginCommandDescriptor> Commands,
-    ImmutableArray<PluginEventHandlerDescriptor> Events,
-    ImmutableArray<PluginScheduleHandlerDescriptor> Schedules
-)
+public sealed record PluginDispatchDeclarations
 {
-    public static PluginDispatchDeclarations Empty { get; } = new([], [], []);
+    public PluginDispatchDeclarations(
+        ImmutableArray<PluginCommandDescriptor> commands,
+        ImmutableArray<PluginEventHandlerDescriptor> events,
+        ImmutableArray<PluginScheduleHandlerDescriptor> schedules,
+        ImmutableArray<PluginWebhookDescriptor> webhooks = default,
+        ImmutableArray<PluginActionDescriptor> actions = default
+    )
+    {
+        Commands = commands;
+        Events = events;
+        Schedules = schedules;
+        Webhooks = webhooks.IsDefault ? [] : webhooks;
+        Actions = actions.IsDefault ? [] : actions;
+    }
+
+    public ImmutableArray<PluginCommandDescriptor> Commands { get; init; }
+
+    public ImmutableArray<PluginEventHandlerDescriptor> Events { get; init; }
+
+    public ImmutableArray<PluginScheduleHandlerDescriptor> Schedules { get; init; }
+
+    public ImmutableArray<PluginWebhookDescriptor> Webhooks { get; init; }
+
+    public ImmutableArray<PluginActionDescriptor> Actions { get; init; }
+
+    public void Deconstruct(
+        out ImmutableArray<PluginCommandDescriptor> commands,
+        out ImmutableArray<PluginEventHandlerDescriptor> events,
+        out ImmutableArray<PluginScheduleHandlerDescriptor> schedules
+    )
+    {
+        commands = Commands;
+        events = Events;
+        schedules = Schedules;
+    }
+
+    public static PluginDispatchDeclarations Empty { get; } = new([], [], [], [], []);
 }
 
 public sealed record PluginCallbackRequirements(bool TwitchReady)
@@ -129,6 +161,34 @@ public sealed record PluginEventHandlerDescriptor(
 
 public sealed record PluginScheduleHandlerDescriptor(
     PluginScheduleHandlerId Id,
+    PluginLuaModuleId Module,
+    PluginHostOperationId Operation,
+    PluginCallbackRequirements Requirements
+);
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(PluginWebhookAuthentication.Public), "public")]
+[JsonDerivedType(typeof(PluginWebhookAuthentication.Callback), "callback")]
+public abstract record PluginWebhookAuthentication
+{
+    private PluginWebhookAuthentication() { }
+
+    public sealed record Public : PluginWebhookAuthentication;
+
+    public sealed record Callback(PluginLuaModuleId Module, PluginHostOperationId Operation)
+        : PluginWebhookAuthentication;
+}
+
+public sealed record PluginWebhookDescriptor(
+    PluginWebhookId Id,
+    PluginLuaModuleId Module,
+    PluginHostOperationId Operation,
+    PluginCallbackRequirements Requirements,
+    PluginWebhookAuthentication Authentication
+);
+
+public sealed record PluginActionDescriptor(
+    PluginActionId Id,
     PluginLuaModuleId Module,
     PluginHostOperationId Operation,
     PluginCallbackRequirements Requirements

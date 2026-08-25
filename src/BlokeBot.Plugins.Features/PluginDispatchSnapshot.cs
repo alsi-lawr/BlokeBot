@@ -6,6 +6,20 @@ namespace BlokeBot.Plugins.Features;
 
 public sealed record PluginCommandRouteKey(PluginHostId HostId, string Route);
 
+public sealed record PluginWebhookRouteKey(
+    PluginId PluginId,
+    PluginFeatureId FeatureId,
+    PluginHostId HostId,
+    PluginWebhookId WebhookId
+);
+
+public sealed record PluginActionRouteKey(
+    PluginId PluginId,
+    PluginFeatureId FeatureId,
+    PluginHostId HostId,
+    PluginActionId ActionId
+);
+
 public abstract record PluginDispatchEndpoint
 {
     private protected PluginDispatchEndpoint(
@@ -86,6 +100,42 @@ public abstract record PluginDispatchEndpoint
 
         public PluginScheduleHandlerDescriptor Descriptor { get; }
     }
+
+    public sealed record Webhook : PluginDispatchEndpoint
+    {
+        internal Webhook(
+            PluginFeatureDeclaration declaration,
+            PluginFeatureState state,
+            PluginWebhookDescriptor descriptor
+        )
+            : base(
+                declaration,
+                state,
+                descriptor.Module,
+                descriptor.Operation,
+                descriptor.Requirements
+            ) => Descriptor = descriptor;
+
+        public PluginWebhookDescriptor Descriptor { get; }
+    }
+
+    public sealed record Action : PluginDispatchEndpoint
+    {
+        internal Action(
+            PluginFeatureDeclaration declaration,
+            PluginFeatureState state,
+            PluginActionDescriptor descriptor
+        )
+            : base(
+                declaration,
+                state,
+                descriptor.Module,
+                descriptor.Operation,
+                descriptor.Requirements
+            ) => Descriptor = descriptor;
+
+        public PluginActionDescriptor Descriptor { get; }
+    }
 }
 
 public sealed class PluginDispatchSnapshot
@@ -93,12 +143,16 @@ public sealed class PluginDispatchSnapshot
     internal PluginDispatchSnapshot(
         ImmutableDictionary<PluginCommandRouteKey, PluginDispatchEndpoint.Command> commands,
         ImmutableArray<PluginDispatchEndpoint.Event> events,
-        ImmutableArray<PluginDispatchEndpoint.Schedule> schedules
+        ImmutableArray<PluginDispatchEndpoint.Schedule> schedules,
+        ImmutableDictionary<PluginWebhookRouteKey, PluginDispatchEndpoint.Webhook> webhooks,
+        ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.Action> actions
     )
     {
         Commands = commands;
         Events = events;
         Schedules = schedules;
+        Webhooks = webhooks;
+        Actions = actions;
     }
 
     public IReadOnlyDictionary<
@@ -110,11 +164,20 @@ public sealed class PluginDispatchSnapshot
 
     public ImmutableArray<PluginDispatchEndpoint.Schedule> Schedules { get; }
 
+    public IReadOnlyDictionary<
+        PluginWebhookRouteKey,
+        PluginDispatchEndpoint.Webhook
+    > Webhooks { get; }
+
+    public IReadOnlyDictionary<PluginActionRouteKey, PluginDispatchEndpoint.Action> Actions { get; }
+
     public static PluginDispatchSnapshot Empty { get; } =
         new(
             ImmutableDictionary<PluginCommandRouteKey, PluginDispatchEndpoint.Command>.Empty,
             [],
-            []
+            [],
+            ImmutableDictionary<PluginWebhookRouteKey, PluginDispatchEndpoint.Webhook>.Empty,
+            ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.Action>.Empty
         );
 }
 

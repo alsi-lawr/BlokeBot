@@ -126,6 +126,14 @@ public sealed class PluginDispatchSnapshotRegistry
         >();
         var events = ImmutableArray.CreateBuilder<PluginDispatchEndpoint.Event>();
         var schedules = ImmutableArray.CreateBuilder<PluginDispatchEndpoint.Schedule>();
+        var webhooks = ImmutableDictionary.CreateBuilder<
+            PluginWebhookRouteKey,
+            PluginDispatchEndpoint.Webhook
+        >();
+        var actions = ImmutableDictionary.CreateBuilder<
+            PluginActionRouteKey,
+            PluginDispatchEndpoint.Action
+        >();
         var eligible = _features
             .States.Values.Where(static state => state.Enabled)
             .Select(EndpointSource)
@@ -142,6 +150,28 @@ public sealed class PluginDispatchSnapshotRegistry
             foreach (var descriptor in source.Feature.DispatchDeclarations.Schedules)
             {
                 schedules.Add(new(source.Declaration, source.State, descriptor));
+            }
+            foreach (var descriptor in source.Feature.DispatchDeclarations.Webhooks)
+            {
+                webhooks[
+                    new(
+                        source.State.Key.PluginId,
+                        source.State.Key.FeatureId,
+                        source.State.Key.HostId,
+                        descriptor.Id
+                    )
+                ] = new(source.Declaration, source.State, descriptor);
+            }
+            foreach (var descriptor in source.Feature.DispatchDeclarations.Actions)
+            {
+                actions[
+                    new(
+                        source.State.Key.PluginId,
+                        source.State.Key.FeatureId,
+                        source.State.Key.HostId,
+                        descriptor.Id
+                    )
+                ] = new(source.Declaration, source.State, descriptor);
             }
         }
 
@@ -175,7 +205,13 @@ public sealed class PluginDispatchSnapshotRegistry
 
         Volatile.Write(
             ref _current,
-            new(commands.ToImmutable(), events.ToImmutable(), schedules.ToImmutable())
+            new(
+                commands.ToImmutable(),
+                events.ToImmutable(),
+                schedules.ToImmutable(),
+                webhooks.ToImmutable(),
+                actions.ToImmutable()
+            )
         );
 
         EndpointSource? EndpointSource(PluginFeatureState state) =>

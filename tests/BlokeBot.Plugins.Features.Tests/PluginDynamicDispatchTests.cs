@@ -31,6 +31,8 @@ public sealed class PluginDynamicDispatchTests
         dispatch
             .Current.Schedules.Select(endpoint => endpoint.State.Key)
             .ShouldBe([first.Key, second.Key], ignoreOrder: true);
+        dispatch.Current.Webhooks.Count.ShouldBe(2);
+        dispatch.Current.Actions.Count.ShouldBe(2);
 
         features.Publish(
             first with
@@ -44,12 +46,16 @@ public sealed class PluginDynamicDispatchTests
         dispatch.Current.Commands.Keys.ShouldBe([new(second.Key.HostId, "plugin-route")]);
         dispatch.Current.Events.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
         dispatch.Current.Schedules.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
+        dispatch.Current.Webhooks.Values.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
+        dispatch.Current.Actions.Values.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
 
         declarations.Remove(manifest.Manifest.Id, fence);
 
         dispatch.Current.Commands.ShouldBeEmpty();
         dispatch.Current.Events.ShouldBeEmpty();
         dispatch.Current.Schedules.ShouldBeEmpty();
+        dispatch.Current.Webhooks.ShouldBeEmpty();
+        dispatch.Current.Actions.ShouldBeEmpty();
     }
 
     [Test]
@@ -233,6 +239,101 @@ public sealed class PluginDynamicDispatchTests
             .ShouldBeOfType<PluginDispatchWorkAdmission.Stopping>();
     }
 
+    [Test]
+    public async Task WebhookAuthenticationAndHandler_ShareOneCurrentAdmissionAndWorkLease()
+    {
+        var worker = new WebWorker(authentication: true);
+        var setup = Setup(new PluginFeatureReadiness.Ready(), worker);
+        var endpoint = setup.Dispatch.Current.Webhooks.Values.ShouldHaveSingleItem();
+        var context = Context(endpoint) with
+        {
+            Web = new(PluginWebInvocationKind.Webhook, endpoint.Descriptor.Id.Value, "POST"),
+        };
+
+        var outcome = await setup.Invoker.InvokeWebhookAsync(
+            endpoint,
+            context,
+            new PluginValue.Map([]),
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<PluginWebDispatchOutcome.Returned>();
+        worker.Invocations.Count.ShouldBe(2);
+        foreach (var invocation in worker.Invocations)
+        {
+            _ = invocation.ShouldBeOfType<PluginLiveInvocation.HostAction>();
+        }
+        worker
+            .Identities.Select(static identity => identity.Activation)
+            .Distinct()
+            .Count()
+            .ShouldBe(1);
+        worker.Identities.ShouldAllBe(identity => identity.Context == context);
+    }
+
+    [Test]
+    public async Task WebhookAuthentication_DenialAndGenerationChangeNeverRunTheHandler()
+    {
+        var deniedWorker = new WebWorker(authentication: false);
+        var denied = Setup(new PluginFeatureReadiness.Ready(), deniedWorker);
+        var deniedEndpoint = denied.Dispatch.Current.Webhooks.Values.ShouldHaveSingleItem();
+        var deniedOutcome = await denied.Invoker.InvokeWebhookAsync(
+            deniedEndpoint,
+            Context(deniedEndpoint),
+            new PluginValue.Map([]),
+            CancellationToken.None
+        );
+        _ = deniedOutcome.ShouldBeOfType<PluginWebDispatchOutcome.AuthenticationRejected>();
+        deniedWorker.Invocations.Count.ShouldBe(1);
+
+        var staleWorker = new WebWorker(authentication: true);
+        var stale = Setup(new PluginFeatureReadiness.Ready(), staleWorker);
+        var staleEndpoint = stale.Dispatch.Current.Webhooks.Values.ShouldHaveSingleItem();
+        staleWorker.AfterAuthentication = () =>
+            stale.Features.Publish(
+                staleEndpoint.State with
+                {
+                    Generation = Generation(2),
+                    Readiness = new PluginFeatureReadiness.Disabled(),
+                    Revision = Revision(2),
+                }
+            );
+        var staleOutcome = await stale.Invoker.InvokeWebhookAsync(
+            staleEndpoint,
+            Context(staleEndpoint),
+            new PluginValue.Map([]),
+            CancellationToken.None
+        );
+        _ = staleOutcome.ShouldBeOfType<PluginWebDispatchOutcome.Stale>();
+        staleWorker.Invocations.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task DeliberatelyPublicWebhook_SkipsAuthenticationButKeepsGenerationFencing()
+    {
+        var worker = new WebWorker(authentication: true);
+        var setup = Setup(new PluginFeatureReadiness.Ready(), worker);
+        var endpoint = setup.Dispatch.Current.Webhooks.Values.ShouldHaveSingleItem();
+        endpoint = new(
+            endpoint.Declaration,
+            endpoint.State,
+            endpoint.Descriptor with
+            {
+                Authentication = new PluginWebhookAuthentication.Public(),
+            }
+        );
+
+        var outcome = await setup.Invoker.InvokeWebhookAsync(
+            endpoint,
+            Context(endpoint),
+            new PluginValue.Map([]),
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<PluginWebDispatchOutcome.Returned>();
+        worker.Invocations.Count.ShouldBe(1);
+    }
+
     private static DynamicDispatchSetup Setup(
         PluginFeatureReadiness readiness,
         RecordingWorker? worker = null
@@ -273,6 +374,9 @@ public sealed class PluginDynamicDispatchTests
         PluginHostOperationId.TryCreate("handle", out var operation).ShouldBeTrue();
         PluginEventHandlerId.TryCreate("stream-online", out var eventId).ShouldBeTrue();
         PluginScheduleHandlerId.TryCreate("refresh", out var scheduleId).ShouldBeTrue();
+        PluginWebhookId.TryCreate("incoming", out var webhookId).ShouldBeTrue();
+        PluginActionId.TryCreate("refresh", out var actionId).ShouldBeTrue();
+        PluginHostOperationId.TryCreate("authenticate", out var authentication).ShouldBeTrue();
         var modified = accepted.Manifest with
         {
             Features = accepted.Manifest.Features.Replace(
@@ -301,7 +405,24 @@ public sealed class PluginDynamicDispatchTests
                                 PluginCallbackRequirements.Twitch
                             ),
                         ],
-                        [new(scheduleId, module, operation, PluginCallbackRequirements.Independent)]
+                        [
+                            new(
+                                scheduleId,
+                                module,
+                                operation,
+                                PluginCallbackRequirements.Independent
+                            ),
+                        ],
+                        [
+                            new(
+                                webhookId,
+                                module,
+                                operation,
+                                PluginCallbackRequirements.Independent,
+                                new PluginWebhookAuthentication.Callback(module, authentication)
+                            ),
+                        ],
+                        [new(actionId, module, operation, PluginCallbackRequirements.Independent)]
                     ),
                 }
             ),
@@ -503,6 +624,47 @@ public sealed class PluginDynamicDispatchTests
                     []
                 );
             }
+        }
+    }
+
+    private sealed class WebWorker(bool authentication) : RecordingWorker
+    {
+        internal Action? AfterAuthentication { get; set; }
+
+        public override ValueTask<PluginWorkerInvocationResult> InvokeAsync(
+            PluginWorkerInvocationIdentity identity,
+            PluginLiveInvocation invocation,
+            CancellationToken cancellationToken
+        )
+        {
+            Identities.Add(identity);
+            Invocations.Add(invocation);
+            if (Invocations.Count == 1)
+            {
+                AfterAuthentication?.Invoke();
+                return ValueTask.FromResult(
+                    new PluginWorkerInvocationResult(
+                        new PluginWorkerInvocationOutcome.Returned(
+                            new PluginValue.Boolean(authentication)
+                        ),
+                        PluginWorkerInvocationMetrics.Empty,
+                        []
+                    )
+                );
+            }
+
+            return ValueTask.FromResult(
+                new PluginWorkerInvocationResult(
+                    new PluginWorkerInvocationOutcome.Returned(
+                        new PluginValue.Map([
+                            new("status", new PluginValue.Number(200)),
+                            new("body", new PluginValue.String("ok")),
+                        ])
+                    ),
+                    PluginWorkerInvocationMetrics.Empty,
+                    []
+                )
+            );
         }
     }
 }

@@ -34,7 +34,7 @@ public static partial class PluginManifestValidator
                 migration.FromVersion.CompareTo(migration.ToVersion) >= 0
                 || migration.ToVersion.CompareTo(manifest.Release.DeclaredVersion) > 0
                 || !moduleIds.Contains(migration.Module)
-                || !ValidEntryPoint(migration.EntryPoint)
+                || !PluginHostOperationId.TryCreate(migration.EntryPoint, out _)
                 || !transitions.Add(new(migration.FromVersion, migration.ToVersion))
             )
             {

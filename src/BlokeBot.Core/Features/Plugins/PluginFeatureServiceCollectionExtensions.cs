@@ -20,6 +20,23 @@ public static class PluginFeatureServiceCollectionExtensions
             provider.GetRequiredService<PluginDispatchSnapshotRegistry>()
         );
         services.TryAddSingleton<PluginDispatchWorkRegistry>();
+        services.TryAddSingleton<PluginPrivateDataStore>();
+        services.TryAddSingleton<PluginPrivateDataLifecycleOwner>();
+        services.TryAddSingleton<PluginOutboundHttpClient>();
+        _ = services
+            .AddHttpClient(
+                PluginOutboundHttpClient.ClientName,
+                static client => client.Timeout = Timeout.InfiniteTimeSpan
+            )
+            .ConfigurePrimaryHttpMessageHandler(static () =>
+                new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    MaxConnectionsPerServer =
+                        PluginContractLimits.MaximumConcurrentHttpRequestsPerPlugin,
+                }
+            );
         services.TryAddSingleton<IPluginScheduleStore, PluginScheduleFileStore>();
         services.TryAddSingleton<PluginFeatureWorkCoordinator>();
         services.TryAddSingleton<IPluginFeatureWorkCoordinator>(provider =>
@@ -74,6 +91,12 @@ public static class PluginFeatureServiceCollectionExtensions
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IPluginHostModule, PluginSchedulesHostModule>()
         );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IPluginHostModule, PluginStorageHostModule>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IPluginHostModule, PluginHttpHostModule>()
+        );
         services.TryAddSingleton<PluginHostModuleCatalog>();
         services.TryAddSingleton<IPluginCoreDependencyChecker>(provider =>
             provider.GetRequiredService<PluginHostModuleCatalog>()
@@ -110,6 +133,12 @@ public static class PluginFeatureServiceCollectionExtensions
         );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IPluginPurgeDataOwner, PluginFeaturePurgeOwner>()
+        );
+        _ = services.AddSingleton<IPluginMigrationDataOwner>(provider =>
+            provider.GetRequiredService<PluginPrivateDataLifecycleOwner>()
+        );
+        _ = services.AddSingleton<IPluginPurgeDataOwner>(provider =>
+            provider.GetRequiredService<PluginPrivateDataLifecycleOwner>()
         );
         _ = services.Replace(
             ServiceDescriptor.Singleton<

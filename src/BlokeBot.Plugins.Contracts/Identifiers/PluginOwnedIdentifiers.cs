@@ -96,6 +96,38 @@ public sealed record PluginScheduleHandlerId
         );
 }
 
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginWebhookId>))]
+public sealed record PluginWebhookId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginWebhookId>
+{
+    private PluginWebhookId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginWebhookId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginWebhookId(value),
+            out identifier
+        );
+}
+
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginActionId>))]
+public sealed record PluginActionId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginActionId>
+{
+    private PluginActionId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginActionId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginActionId(value),
+            out identifier
+        );
+}
+
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginMigrationId>))]
 public sealed record PluginMigrationId
     : PluginContractIdentifier,

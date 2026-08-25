@@ -45,11 +45,31 @@ public abstract record PluginInvocationContext
         PluginStreamContext? Stream = null,
         PluginCommandInvocation? Command = null,
         PluginEventInvocation? Event = null,
-        PluginScheduleInvocation? Schedule = null
+        PluginScheduleInvocation? Schedule = null,
+        PluginWebInvocation? Web = null
     ) : PluginInvocationContext
     {
         [JsonIgnore]
         public override PluginInvocationContextKind Kind => PluginInvocationContextKind.Channel;
+
+        public void Deconstruct(
+            out PluginInstallationIdentity plugin,
+            out PluginHostId host,
+            out PluginActorContext? actor,
+            out PluginStreamContext? stream,
+            out PluginCommandInvocation? command,
+            out PluginEventInvocation? @event,
+            out PluginScheduleInvocation? schedule
+        )
+        {
+            plugin = Plugin;
+            host = Host;
+            actor = Actor;
+            stream = Stream;
+            command = Command;
+            @event = Event;
+            schedule = Schedule;
+        }
     }
 
     public sealed record Automation(
@@ -111,6 +131,18 @@ public sealed record PluginScheduleInvocation(
     PluginScheduleHandlerId HandlerId,
     Guid ScheduleId,
     DateTimeOffset DueAtUtc
+);
+
+public enum PluginWebInvocationKind
+{
+    Webhook,
+    Action,
+}
+
+public sealed record PluginWebInvocation(
+    PluginWebInvocationKind Kind,
+    string RouteId,
+    string Method
 );
 
 internal sealed class PluginHostIdJsonConverter : JsonConverter<PluginHostId>
