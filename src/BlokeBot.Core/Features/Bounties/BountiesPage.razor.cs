@@ -271,8 +271,10 @@ public partial class BountiesPage
 
     private static string AuditLine(BountyModerationAuditView audit)
     {
+        var actor =
+            audit.Action == BountyAuditAction.PauseAdjusted ? "BlokeBot" : $"@{audit.ActorLogin}";
         var line =
-            $"{BountyPresentation.AbsoluteUtc(audit.OccurredAtUtc)} · {BountyPresentation.AuditActionLabel(audit.Action)} by @{audit.ActorLogin}";
+            $"{BountyPresentation.AbsoluteUtc(audit.OccurredAtUtc)} · {BountyPresentation.AuditActionLabel(audit.Action)} by {actor}";
         return string.IsNullOrWhiteSpace(audit.Reason) ? line : $"{line} · {audit.Reason}";
     }
 

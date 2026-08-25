@@ -166,7 +166,8 @@ internal static class BountyPresentation
             BountyAuditAction.Cancelled => "Cancelled",
             BountyAuditAction.Rejected => "Rejected",
             BountyAuditAction.Extended => "Extended",
-            _ => "Expired",
+            BountyAuditAction.PauseAdjusted => "Pause adjusted",
+            BountyAuditAction.Expired => "Expired",
         };
 
     public static string ShortId(Guid id) => id.ToString("N")[..8];

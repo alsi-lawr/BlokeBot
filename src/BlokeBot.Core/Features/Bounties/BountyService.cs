@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Core.Features.Bounties;
 
-internal sealed class BountyService(
+internal sealed partial class BountyService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
@@ -23,6 +23,7 @@ internal sealed class BountyService(
 )
 {
     private const int _eventSchemaVersion = 1;
+    private const int _immediateTransactionAdmissionTimeoutSeconds = 1;
     private const int _maximumEventPayloadLength = 1024;
     private const int _persistenceRetryCount = 20;
     private readonly IBountyCompletionObserver[] _completionObservers =
@@ -1543,8 +1544,19 @@ internal sealed class BountyService(
         IDbContextTransaction contextTransaction
     ) : IAsyncDisposable
     {
-        public static async Task<ImmediateTransaction> StartAsync(
+        public static Task<ImmediateTransaction> StartAsync(
             BlokeBotDbContext db,
+            CancellationToken ct
+        ) => StartAsync(db, ImmediateTransactionAdmission.Default, ct);
+
+        public static Task<ImmediateTransaction> StartWithBoundedAdmissionAsync(
+            BlokeBotDbContext db,
+            CancellationToken ct
+        ) => StartAsync(db, ImmediateTransactionAdmission.Bounded, ct);
+
+        private static async Task<ImmediateTransaction> StartAsync(
+            BlokeBotDbContext db,
+            ImmediateTransactionAdmission admission,
             CancellationToken ct
         )
         {
@@ -1552,7 +1564,21 @@ internal sealed class BountyService(
             var connection =
                 db.Database.GetDbConnection() as SqliteConnection
                 ?? throw new InvalidOperationException("Bounty persistence requires SQLite.");
-            var providerTransaction = connection.BeginTransaction(deferred: false);
+            ct.ThrowIfCancellationRequested();
+            var defaultTimeout = connection.DefaultTimeout;
+            SqliteTransaction providerTransaction;
+            try
+            {
+                if (admission == ImmediateTransactionAdmission.Bounded)
+                {
+                    connection.DefaultTimeout = _immediateTransactionAdmissionTimeoutSeconds;
+                }
+                providerTransaction = connection.BeginTransaction(deferred: false);
+            }
+            finally
+            {
+                connection.DefaultTimeout = defaultTimeout;
+            }
             try
             {
                 var contextTransaction =
@@ -1575,6 +1601,12 @@ internal sealed class BountyService(
         {
             await contextTransaction.DisposeAsync();
             await providerTransaction.DisposeAsync();
+        }
+
+        private enum ImmediateTransactionAdmission
+        {
+            Default,
+            Bounded,
         }
     }
 }

@@ -89,6 +89,9 @@ public enum BountyAuditAction
     [PersistedToken("Extended")]
     Extended,
 
+    [PersistedToken("PauseAdjusted")]
+    PauseAdjusted,
+
     [PersistedToken("Expired")]
     Expired,
 }

@@ -7,7 +7,7 @@ namespace BlokeBot.Core.Features.Bounties;
 
 internal sealed class BountyPauseObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    TimeProvider timeProvider
+    BountyService bountyService
 ) : IHostFeatureActivationObserver
 {
     public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
@@ -20,7 +20,11 @@ internal sealed class BountyPauseObserver(
             return new HostFeatureAutomaticWorkResult.Complete();
         }
 
-        await ReconcileAsync(change.HostId, cancellationToken);
+        await bountyService.ReconcilePauseAsync(
+            change.HostId,
+            BountyPauseRecoveryCause.FeatureChanged(change.Feature, change.State),
+            cancellationToken
+        );
         return new HostFeatureAutomaticWorkResult.Complete();
     }
 
@@ -37,56 +41,7 @@ internal sealed class BountyPauseObserver(
             .ToListAsync(ct);
         foreach (var hostId in hostIds)
         {
-            await ReconcileAsync(hostId, ct);
+            await bountyService.ReconcilePauseAsync(hostId, BountyPauseRecoveryCause.Restart(), ct);
         }
-    }
-
-    private async Task ReconcileAsync(int hostId, CancellationToken ct)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(value => value.Id == hostId, ct);
-        if (host is null)
-        {
-            return;
-        }
-
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var required = HostFeatureFlags.Bounties | HostFeatureFlags.Points;
-        var effective = (host.EnabledFeatures & required) == required;
-        if (!effective)
-        {
-            host.BountiesPausedAtUtc ??= now;
-            _ = await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            return;
-        }
-
-        if (host.BountiesPausedAtUtc is not { } pausedAt)
-        {
-            return;
-        }
-
-        var pausedFor = now - pausedAt;
-        if (pausedFor > TimeSpan.Zero)
-        {
-            var active = await db
-                .Bounties.Where(value =>
-                    value.HostId == hostId
-                    && (
-                        value.Status == BountyStatus.Funding
-                        || value.Status == BountyStatus.Accepted
-                    )
-                )
-                .ToListAsync(ct);
-            foreach (var bounty in active)
-            {
-                bounty.ExpiresAtUtc = bounty.ExpiresAtUtc.Add(pausedFor);
-            }
-        }
-
-        host.BountiesPausedAtUtc = null;
-        _ = await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
     }
 }

@@ -348,7 +348,7 @@ public sealed class BountyExpirySchedulerTests
         new(
             dbFactory,
             service,
-            new BountyPauseObserver(dbFactory, clock),
+            new BountyPauseObserver(dbFactory, service),
             new BountyExpirySchedulerPolicy
             {
                 PollInterval = pollInterval ?? TimeSpan.FromMinutes(1),
@@ -448,7 +448,7 @@ public sealed class BountyExpirySchedulerTests
     )
     {
         var events = TestEventBus.Create<AppEventKind>();
-        var observer = new BountyPauseObserver(database, clock);
+        var observer = new BountyPauseObserver(database, CreateService(database, clock));
         var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(events),
