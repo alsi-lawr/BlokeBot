@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Features.Alerts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,8 @@ internal sealed partial class EfPublicChatOutbox(
     PublicChatRetryPolicy retryPolicy,
     PublicChatDeliveryLifetimePolicy lifetimePolicy,
     PublicChatTerminalRetentionPolicy retentionPolicy,
-    DurableAlertService? alerts = null
+    DurableAlertService? alerts = null,
+    AutomaticRaidShoutoutOutcomeAuthority? automaticRaidOutcomes = null
 ) : IPublicChatOutbox
 {
     private static readonly TimeSpan _claimAvailabilityPoll = TimeSpan.FromMilliseconds(250);
@@ -23,6 +25,8 @@ internal sealed partial class EfPublicChatOutbox(
         lifetimePolicy ?? throw new ArgumentNullException(nameof(lifetimePolicy));
     private readonly PublicChatTerminalRetentionPolicy _terminalRetentionPolicy =
         retentionPolicy ?? throw new ArgumentNullException(nameof(retentionPolicy));
+    private readonly AutomaticRaidShoutoutOutcomeAuthority _automaticRaidOutcomes =
+        automaticRaidOutcomes ?? new AutomaticRaidShoutoutOutcomeAuthority();
 
     public async ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,

@@ -51,37 +51,29 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     )
     {
-        var candidates = await db
-            .AutomaticRaidShoutoutOutcomes.Where(outcome =>
-                outcome.Status == AutomaticRaidShoutoutOutcomeStatus.Processing
-                || outcome.Status == AutomaticRaidShoutoutOutcomeStatus.Delivered
-            )
-            .ToArrayAsync(cancellationToken);
-        var outcome = candidates.SingleOrDefault(candidate =>
-            PublicChatMessageDeduplication
-                .CorrelatedKey(
-                    new PublicChatDeliveryCorrelation(candidate.HostId, candidate.ProviderMessageId)
-                )
-                .Value == deduplicationKey
+        AutomaticRaidOutcomeTransition transition =
+            resultCode is AutomaticRaidShoutoutResultCode.Ambiguous
+                ? new AutomaticRaidOutcomeTransition.Ambiguous()
+                : new AutomaticRaidOutcomeTransition.TerminalFailure(resultCode);
+        var recorded = await _automaticRaidOutcomes.ApplyCorrelatedAsync(
+            db,
+            deduplicationKey,
+            transition,
+            completedAt,
+            cancellationToken
         );
-        if (outcome is null)
+        if (recorded is not AutomaticRaidOutcomeTransitionResult.Applied applied)
         {
             return null;
         }
 
-        outcome.Status =
-            resultCode is AutomaticRaidShoutoutResultCode.Ambiguous
-                ? AutomaticRaidShoutoutOutcomeStatus.Ambiguous
-                : AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
-        outcome.ResultCode = resultCode;
-        outcome.CompletedAtUtc = completedAt.UtcDateTime;
         _ = await db
             .PublicChatPinOperations.Where(operation =>
                 operation.OutboxMessageId == outboxMessageId
                 && operation.Status == PublicChatPinOperationStatus.AwaitingDelivery
-                && operation.HostId == outcome.HostId
+                && operation.HostId == applied.Identity.HostId
                 && operation.Feature == AutomaticRaidDeliveryCorrelation.Feature
-                && operation.OwnerId == outcome.Id
+                && operation.OwnerId == applied.Identity.OutcomeId
             )
             .ExecuteUpdateAsync(
                 update =>
@@ -110,9 +102,9 @@ internal sealed partial class EfPublicChatOutbox
             db,
             new DurableAlertReport(
                 new DurableAlertIdentity(
-                    outcome.HostId,
+                    applied.Identity.HostId,
                     AutomaticRaidDeliveryCorrelation.AlertSource,
-                    outcome.ProviderMessageId
+                    applied.Identity.ProviderMessageId
                 ),
                 DurableAlertSeverity.Warning,
                 "Automatic raid shoutout was not delivered",
@@ -124,7 +116,7 @@ internal sealed partial class EfPublicChatOutbox
         );
     }
 
-    private static async ValueTask PublishCommittedAlertAsync(
+    private async ValueTask PublishCommittedAlertAsync(
         DurableAlertService.ReportOperation? reportOperation,
         DurableAlertPendingChange? change
     )
@@ -132,18 +124,22 @@ internal sealed partial class EfPublicChatOutbox
         if (change is not null)
         {
             await reportOperation!.PublishCommittedAsync(change);
+            await _automaticRaidOutcomes.PublishCommittedAsync(changed: true);
         }
     }
 
-    private static async ValueTask PublishCommittedAlertsAsync(
+    private async ValueTask PublishCommittedAlertsAsync(
         DurableAlertService.ReportOperation? reportOperation,
         IEnumerable<DurableAlertPendingChange> changes
     )
     {
+        var changed = false;
         foreach (var change in changes)
         {
             await reportOperation!.PublishCommittedAsync(change);
+            changed = true;
         }
+        await _automaticRaidOutcomes.PublishCommittedAsync(changed);
     }
 
     private async ValueTask<DurableAlertService.ReportOperation?> BeginAlertReportOperationAsync(

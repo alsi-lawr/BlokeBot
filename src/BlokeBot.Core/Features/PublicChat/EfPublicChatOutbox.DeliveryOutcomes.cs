@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Features.Alerts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -134,10 +135,19 @@ internal sealed partial class EfPublicChatOutbox
                     cancellationToken
                 );
 
+            var automaticRaidChange = await _automaticRaidOutcomes.ApplyCorrelatedAsync(
+                db,
+                message.DeduplicationKey.Value,
+                new AutomaticRaidOutcomeTransition.TransportDelivered(),
+                completedAt,
+                cancellationToken
+            );
+
             _ = db.PublicChatOutboxMessages.Remove(deleted);
             _ = await db.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
+            await _automaticRaidOutcomes.PublishCommittedAsync(automaticRaidChange);
             return new PublicChatClaimUpdate.Applied();
         }
         catch (Exception exception) when (IsSqliteContention(exception))

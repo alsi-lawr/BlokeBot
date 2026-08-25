@@ -138,6 +138,8 @@ public abstract record AutomaticRaidShoutoutDeliveryResult
 {
     private AutomaticRaidShoutoutDeliveryResult() { }
 
+    public sealed record Queued : AutomaticRaidShoutoutDeliveryResult;
+
     public sealed record Delivered : AutomaticRaidShoutoutDeliveryResult;
 
     public sealed record NotDelivered(AutomaticRaidShoutoutResultCode Reason)

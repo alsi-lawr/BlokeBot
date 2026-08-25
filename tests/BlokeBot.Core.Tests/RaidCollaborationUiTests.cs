@@ -227,6 +227,7 @@ public sealed partial class RaidCollaborationUiTests
                 new AutomaticRaidShoutoutRunner(
                     database,
                     new UnusedAutomaticDelivery(),
+                    new AutomaticRaidShoutoutOutcomeAuthority(),
                     TimeProvider.System
                 ),
                 [],

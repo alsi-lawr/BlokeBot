@@ -5,12 +5,26 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 
-public sealed class AutomaticRaidShoutoutRunner(
-    IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IAutomaticRaidShoutoutDelivery delivery,
-    TimeProvider clock
-)
+public sealed class AutomaticRaidShoutoutRunner
 {
+    private readonly IDbContextFactory<BlokeBotDbContext> _dbFactory;
+    private readonly IAutomaticRaidShoutoutDelivery _delivery;
+    private readonly AutomaticRaidShoutoutOutcomeAuthority _outcomes;
+    private readonly TimeProvider _clock;
+
+    internal AutomaticRaidShoutoutRunner(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        IAutomaticRaidShoutoutDelivery delivery,
+        AutomaticRaidShoutoutOutcomeAuthority outcomes,
+        TimeProvider clock
+    )
+    {
+        _dbFactory = dbFactory;
+        _delivery = delivery;
+        _outcomes = outcomes;
+        _clock = clock;
+    }
+
     internal static readonly TimeSpan FreshnessWindow = TimeSpan.FromMinutes(2);
     internal static readonly TimeSpan ClaimContentionRetryDelay = TimeSpan.FromMilliseconds(25);
     internal const int ClaimContentionCommandTimeoutSeconds = 1;
@@ -24,7 +38,7 @@ public sealed class AutomaticRaidShoutoutRunner(
         CancellationToken cancellationToken
     )
     {
-        var now = clock.GetUtcNow();
+        var now = _clock.GetUtcNow();
         if (
             !configuration.Enabled
             || !HasUsableIdentity(incomingRaid)
@@ -42,7 +56,7 @@ public sealed class AutomaticRaidShoutoutRunner(
             return null;
         }
 
-        var result = await delivery.DeliverAsync(
+        var result = await _delivery.DeliverAsync(
             new AutomaticRaidShoutoutDeliveryRequest(
                 host.Id,
                 host.Login,
@@ -70,7 +84,7 @@ public sealed class AutomaticRaidShoutoutRunner(
         {
             try
             {
-                await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+                await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
                 ((SqliteConnection)db.Database.GetDbConnection()).DefaultTimeout =
                     ClaimContentionCommandTimeoutSeconds;
                 db.Database.SetCommandTimeout(ClaimContentionCommandTimeoutSeconds);
@@ -130,41 +144,39 @@ public sealed class AutomaticRaidShoutoutRunner(
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var outcome = await db.AutomaticRaidShoutoutOutcomes.SingleAsync(
-            value => value.Id == outcomeId && value.HostId == hostId,
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var providerMessageId = await db
+            .AutomaticRaidShoutoutOutcomes.Where(value =>
+                value.Id == outcomeId && value.HostId == hostId
+            )
+            .Select(value => value.ProviderMessageId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (providerMessageId is null)
+        {
+            return null;
+        }
+
+        AutomaticRaidOutcomeTransition transition = result switch
+        {
+            AutomaticRaidShoutoutDeliveryResult.Queued =>
+                new AutomaticRaidOutcomeTransition.QueueAccepted(),
+            AutomaticRaidShoutoutDeliveryResult.Delivered =>
+                new AutomaticRaidOutcomeTransition.TransportDelivered(),
+            AutomaticRaidShoutoutDeliveryResult.Ambiguous =>
+                new AutomaticRaidOutcomeTransition.Ambiguous(),
+            AutomaticRaidShoutoutDeliveryResult.NotDelivered notDelivered =>
+                new AutomaticRaidOutcomeTransition.TerminalFailure(notDelivered.Reason),
+            _ => throw new InvalidOperationException(
+                "Unsupported automatic shoutout delivery result."
+            ),
+        };
+        var stored = await _outcomes.ApplyAsync(
+            db,
+            new AutomaticRaidOutcomeIdentity(hostId, outcomeId, providerMessageId),
+            transition,
+            _clock.GetUtcNow(),
             cancellationToken
         );
-        if (outcome.Status is not AutomaticRaidShoutoutOutcomeStatus.Processing)
-        {
-            return outcome.ResultCode;
-        }
-        var now = clock.GetUtcNow().UtcDateTime;
-        switch (result)
-        {
-            case AutomaticRaidShoutoutDeliveryResult.Delivered:
-                outcome.Status = AutomaticRaidShoutoutOutcomeStatus.Delivered;
-                outcome.ResultCode = AutomaticRaidShoutoutResultCode.Delivered;
-                break;
-            case AutomaticRaidShoutoutDeliveryResult.Ambiguous:
-                outcome.Status = AutomaticRaidShoutoutOutcomeStatus.Ambiguous;
-                outcome.ResultCode = AutomaticRaidShoutoutResultCode.Ambiguous;
-                break;
-            case AutomaticRaidShoutoutDeliveryResult.NotDelivered notDelivered:
-                outcome.Status = AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
-                outcome.ResultCode = notDelivered.Reason
-                    is AutomaticRaidShoutoutResultCode.Delivered
-                        or AutomaticRaidShoutoutResultCode.Ambiguous
-                    ? AutomaticRaidShoutoutResultCode.Unexpected
-                    : notDelivered.Reason;
-                break;
-            default:
-                throw new InvalidOperationException(
-                    "Unsupported automatic shoutout delivery result."
-                );
-        }
-        outcome.CompletedAtUtc = now;
-        _ = await db.SaveChangesAsync(cancellationToken);
 
         _ = await db
             .AutomaticRaidShoutoutOutcomes.Where(value =>
@@ -178,7 +190,13 @@ public sealed class AutomaticRaidShoutoutRunner(
             .ThenByDescending(value => value.Id)
             .Skip(TerminalOutcomeRetention)
             .ExecuteDeleteAsync(cancellationToken);
-        return outcome.ResultCode;
+        return stored switch
+        {
+            AutomaticRaidOutcomeTransitionResult.Applied applied => applied.State.ResultCode,
+            AutomaticRaidOutcomeTransitionResult.Unchanged unchanged => unchanged.State.ResultCode,
+            AutomaticRaidOutcomeTransitionResult.NotFound => null,
+            _ => null,
+        };
     }
 
     private static bool HasUsableIdentity(EventSubIncomingRaidEvent incomingRaid) =>

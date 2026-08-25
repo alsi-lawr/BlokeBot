@@ -17,6 +17,7 @@ public partial class AutomaticShoutoutOutcomeList
     private static string OutcomeTitle(AutomaticRaidShoutoutOutcomeView outcome) =>
         outcome.ResultCode switch
         {
+            AutomaticRaidShoutoutResultCode.Queued => "Queued",
             AutomaticRaidShoutoutResultCode.Delivered => "Delivered",
             AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong =>
                 "Message exceeded the rendered limit",
@@ -30,14 +31,17 @@ public partial class AutomaticShoutoutOutcomeList
             AutomaticRaidShoutoutResultCode.Unexpected => "Shoutout failed",
             AutomaticRaidShoutoutResultCode.Ambiguous => "Check Twitch for the result",
             _ when outcome.Status == AutomaticRaidShoutoutOutcomeStatus.Processing =>
-                "Sending shoutout",
+                "Preparing shoutout",
             _ => "Shoutout was not sent",
         };
 
     private static string OutcomeDescription(AutomaticRaidShoutoutOutcomeView outcome) =>
         outcome.ResultCode switch
         {
-            AutomaticRaidShoutoutResultCode.Delivered => "BlokeBot sent the shoutout you selected.",
+            AutomaticRaidShoutoutResultCode.Queued =>
+                "BlokeBot queued this chat shoutout. It will show as delivered after Twitch confirms the send.",
+            AutomaticRaidShoutoutResultCode.Delivered =>
+                "Twitch confirmed that BlokeBot sent this shoutout.",
             AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong =>
                 "Live Twitch values pushed the chat message over 500 characters. Nothing was sent.",
             AutomaticRaidShoutoutResultCode.NotReady =>

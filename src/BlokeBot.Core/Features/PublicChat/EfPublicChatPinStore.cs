@@ -9,9 +9,13 @@ namespace BlokeBot.Core.Features.PublicChat;
 internal sealed class EfPublicChatPinStore(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider timeProvider,
-    DurableAlertService alerts
+    DurableAlertService alerts,
+    AutomaticRaidShoutoutOutcomeAuthority? automaticRaidOutcomes = null
 ) : IPublicChatPinStore
 {
+    private readonly AutomaticRaidShoutoutOutcomeAuthority _automaticRaidOutcomes =
+        automaticRaidOutcomes ?? new AutomaticRaidShoutoutOutcomeAuthority();
+
     public async ValueTask<PublicChatPinWorkItem?> TryClaimAsync(
         CancellationToken cancellationToken
     )
@@ -82,6 +86,7 @@ internal sealed class EfPublicChatPinStore(
         }
 
         DurableAlertPendingChange? alertChange = null;
+        var automaticRaidChanged = false;
         operation.CompletedAtUtc = UtcNow();
         switch (outcome)
         {
@@ -107,14 +112,19 @@ internal sealed class EfPublicChatPinStore(
             case PublicChatPinExecutionOutcome.Terminal terminal:
                 operation.Status = PublicChatPinOperationStatus.Terminal;
                 operation.Outcome = terminal.Reason;
-                await RecordAutomaticRaidPartialFailureAsync(db, item, cancellationToken);
-                alertChange = await StageAlertAsync(
-                    reportOperation!,
-                    db,
-                    item,
-                    terminal.Reason,
-                    cancellationToken
-                );
+                var shouldReport = await ShouldReportTerminalAsync(db, item, cancellationToken);
+                automaticRaidChanged =
+                    item.Feature == AutomaticRaidDeliveryCorrelation.Feature && shouldReport;
+                if (shouldReport)
+                {
+                    alertChange = await StageAlertAsync(
+                        reportOperation!,
+                        db,
+                        item,
+                        terminal.Reason,
+                        cancellationToken
+                    );
+                }
                 break;
             default:
                 throw new InvalidOperationException("Unknown public chat pin outcome.");
@@ -126,6 +136,7 @@ internal sealed class EfPublicChatPinStore(
         {
             await reportOperation!.PublishCommittedAsync(alertChange);
         }
+        await _automaticRaidOutcomes.PublishCommittedAsync(automaticRaidChanged);
     }
 
     private async Task RecordActivePinAsync(
@@ -243,7 +254,7 @@ internal sealed class EfPublicChatPinStore(
         );
     }
 
-    private async Task RecordAutomaticRaidPartialFailureAsync(
+    private async Task<bool> ShouldReportTerminalAsync(
         BlokeBotDbContext db,
         PublicChatPinWorkItem item,
         CancellationToken cancellationToken
@@ -251,24 +262,17 @@ internal sealed class EfPublicChatPinStore(
     {
         if (item.Feature != AutomaticRaidDeliveryCorrelation.Feature)
         {
-            return;
+            return true;
         }
 
-        var outcome = await db.AutomaticRaidShoutoutOutcomes.SingleOrDefaultAsync(
-            value =>
-                value.Id == item.OwnerId
-                && value.HostId == item.HostId
-                && value.ProviderMessageId == item.ReplyKey,
+        var recorded = await _automaticRaidOutcomes.ApplyAsync(
+            db,
+            new AutomaticRaidOutcomeIdentity(item.HostId, item.OwnerId, item.ReplyKey),
+            new AutomaticRaidOutcomeTransition.PinFailed(),
+            timeProvider.GetUtcNow(),
             cancellationToken
         );
-        if (outcome is null)
-        {
-            return;
-        }
-
-        outcome.Status = AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
-        outcome.ResultCode = AutomaticRaidShoutoutResultCode.PartialFailure;
-        outcome.CompletedAtUtc = UtcNow();
+        return recorded is AutomaticRaidOutcomeTransitionResult.Applied;
     }
 
     private static PublicChatPinWorkItem ToWorkItem(

@@ -163,7 +163,7 @@
                                         <div class="surface-muted rounded-lg p-3"><strong class="text-xl">@arrival.ViewerCount</strong><p class="text-xs text-muted-foreground">aggregate viewers</p></div>
                                         <div class="surface-muted rounded-lg p-3"><strong>@@@arrival.Login</strong><p class="text-xs text-muted-foreground">@(arrival.Category ?? "Category unavailable")</p></div>
                                     </div>
-                                    <p class="mt-3 text-xs text-muted-foreground">Welcome: @arrival.WelcomeOutcome · native shoutout: @arrival.ShoutoutOutcome · @arrival.OccurredAt.ToLocalTime().ToString("g")</p>
+                                    <p class="mt-3 text-xs text-muted-foreground">Welcome: @arrival.WelcomeOutcome · shoutout: @arrival.ShoutoutOutcome · @arrival.OccurredAt.ToLocalTime().ToString("g")</p>
                                 }
                                 else
                                 {
@@ -188,7 +188,7 @@
                         </div>
                     </div>
 
-                    <TaskPanel Title="Relationship history" Description="Recent incoming and outgoing raids, deduplicated, with welcome and native shoutout context.">
+                    <TaskPanel Title="Relationship history" Description="Recent incoming and outgoing raids, deduplicated, with welcome and shoutout context.">
                         @if (dashboard.History.Count == 0)
                         {
                             <p class="text-sm text-muted-foreground">No raid history has been recorded yet.</p>

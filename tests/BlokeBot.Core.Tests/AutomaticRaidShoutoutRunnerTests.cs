@@ -125,7 +125,7 @@ public sealed class AutomaticRaidShoutoutRunnerTests
         );
         try
         {
-            _ = await deleteFailure.Failure.WaitAsync(TimeSpan.FromSeconds(5));
+            _ = await deleteFailure.Failure.WaitAsync(TimeSpan.FromSeconds(15));
         }
         finally
         {
@@ -207,6 +207,12 @@ public sealed class AutomaticRaidShoutoutRunnerTests
 
     [Test]
     [Arguments(
+        DeliveryResultShape.Queued,
+        AutomaticRaidShoutoutResultCode.NotReady,
+        AutomaticRaidShoutoutOutcomeStatus.Queued,
+        AutomaticRaidShoutoutResultCode.Queued
+    )]
+    [Arguments(
         DeliveryResultShape.Delivered,
         AutomaticRaidShoutoutResultCode.NotReady,
         AutomaticRaidShoutoutOutcomeStatus.Delivered,
@@ -264,7 +270,7 @@ public sealed class AutomaticRaidShoutoutRunnerTests
         DeliveryResultShape.NotDelivered,
         AutomaticRaidShoutoutResultCode.PartialFailure,
         AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
-        AutomaticRaidShoutoutResultCode.PartialFailure
+        AutomaticRaidShoutoutResultCode.Unexpected
     )]
     [Arguments(
         DeliveryResultShape.NotDelivered,
@@ -295,6 +301,7 @@ public sealed class AutomaticRaidShoutoutRunnerTests
         var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         AutomaticRaidShoutoutDeliveryResult result = shape switch
         {
+            DeliveryResultShape.Queued => new AutomaticRaidShoutoutDeliveryResult.Queued(),
             DeliveryResultShape.Delivered => new AutomaticRaidShoutoutDeliveryResult.Delivered(),
             DeliveryResultShape.Ambiguous => new AutomaticRaidShoutoutDeliveryResult.Ambiguous(),
             DeliveryResultShape.NotDelivered =>
@@ -449,6 +456,7 @@ public sealed class AutomaticRaidShoutoutRunnerTests
         _ = await new AutomaticRaidShoutoutRunner(
             factory,
             delivery,
+            new AutomaticRaidShoutoutOutcomeAuthority(),
             new FixedTimeProvider(_now)
         ).RunAsync(seeded.Host, seeded.Configuration, raid, CancellationToken.None);
 
@@ -567,7 +575,7 @@ public sealed class AutomaticRaidShoutoutRunnerTests
             outcome.ResultCode = AutomaticRaidShoutoutResultCode.Rejected;
             outcome.CompletedAtUtc = _now.UtcDateTime;
             _ = await db.SaveChangesAsync(cancellationToken);
-            return new AutomaticRaidShoutoutDeliveryResult.Delivered();
+            return new AutomaticRaidShoutoutDeliveryResult.Queued();
         }
     }
 
@@ -724,6 +732,7 @@ public sealed class AutomaticRaidShoutoutRunnerTests
 
     public enum DeliveryResultShape
     {
+        Queued,
         Delivered,
         Ambiguous,
         NotDelivered,

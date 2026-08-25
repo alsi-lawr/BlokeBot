@@ -12,6 +12,69 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxIntegrationTestBase
 {
     [Test]
+    public async Task CorrelatedTransportSend_ConfirmsDeliveredWithReceiptAndHistoryProjection()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedTwoHostsAndOutcomesAsync(database);
+        var now = Utc(12, 0, 0);
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            _ = seed.RaidCollaborationHistory.Add(
+                new RaidCollaborationHistoryEntry
+                {
+                    HostId = 1,
+                    ProviderMessageId = "same-provider-message",
+                    Direction = RaidDirection.Incoming,
+                    OtherTwitchUserId = "raider-id",
+                    OtherLogin = "raider",
+                    OtherDisplayName = "Raider",
+                    ViewerCount = 10,
+                    OccurredAtUtc = now.UtcDateTime,
+                    WelcomeOutcome = RaidWelcomeOutcome.NotConfigured,
+                    ShoutoutOutcome = RaidShoutoutOutcome.Queued,
+                    RecordedAtUtc = now.UtcDateTime,
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+        var outbox = Outbox(database);
+        await EnqueueCorrelatedAsync(
+            outbox,
+            now,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum()
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+        _ = (
+            await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        var deliveredAt = now.AddSeconds(1);
+
+        _ = (
+            await outbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                new PublicChatDeliveryOutcome.Sent("twitch-message"),
+                deliveredAt,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await using var verify = await database.CreateDbContextAsync();
+        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(value =>
+            value.HostId == 1
+        );
+        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
+        outcome.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Delivered);
+        outcome.CompletedAtUtc.ShouldBe(deliveredAt.UtcDateTime);
+        (await verify.RaidCollaborationHistory.SingleAsync()).ShoutoutOutcome.ShouldBe(
+            RaidShoutoutOutcome.Sent
+        );
+        (await verify.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
+        var receipt = await verify.PublicChatSendReceipts.SingleAsync();
+        receipt.TwitchMessageId.ShouldBe("twitch-message");
+        receipt.DeliveredAtUtc.ShouldBe(deliveredAt.UtcDateTime);
+    }
+
+    [Test]
     public async Task TerminalDelivery_AlertSaveFails_RollsBackOutcomeAndPublishesNothing()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync(
@@ -70,7 +133,8 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(value =>
             value.HostId == 1
         );
-        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
+        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Queued);
+        outcome.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Queued);
         (await verify.DurableAlerts.CountAsync()).ShouldBe(0);
         notificationCount.ShouldBe(0);
     }
@@ -244,8 +308,8 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static outcome =>
             outcome.HostId == 2
         );
-        second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
-        second.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Delivered);
+        second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Queued);
+        second.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Queued);
         var alert = await verify.DurableAlerts.SingleAsync();
         alert.HostId.ShouldBe(1);
         alert.SourceKey.ShouldBe("same-provider-message");
@@ -363,6 +427,49 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         );
     }
 
+    [Test]
+    public async Task CorrelatedPostSendCancellation_RecordsAmbiguousWithoutRetry()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedTwoHostsAndOutcomesAsync(database);
+        var now = Utc(12, 0, 0);
+        var outbox = Outbox(database);
+        await EnqueueCorrelatedAsync(
+            outbox,
+            now,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum()
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+        _ = (
+            await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        _ = (
+            await outbox.RecordPostBoundaryInterruptionAsync(
+                claimed,
+                new PublicChatFailureDiagnostic.Send
+                {
+                    FailureType = new PublicChatFailureType(
+                        typeof(OperationCanceledException).FullName!
+                    ),
+                    HttpStatus = new PublicChatHttpStatus.Unavailable(),
+                },
+                now.AddSeconds(1),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await using var verify = await database.CreateDbContextAsync();
+        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(value =>
+            value.HostId == 1
+        );
+        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Ambiguous);
+        outcome.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Ambiguous);
+        (await verify.PublicChatOutboxMessages.SingleAsync()).Status.ShouldBe(
+            PublicChatOutboxStatus.Ambiguous
+        );
+    }
+
     private static EfPublicChatOutbox Outbox(SqliteBlokeBotDbFactory database) =>
         new(
             database,
@@ -400,8 +507,8 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static outcome =>
             outcome.HostId == 2
         );
-        second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
-        second.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Delivered);
+        second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Queued);
+        second.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Queued);
         var message = await verify.PublicChatOutboxMessages.SingleAsync();
         message.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendExhausted);
         message.HttpStatusCode.ShouldBe(429);
@@ -479,7 +586,9 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                 TwitchUserId = "first-id",
             }
         );
-        _ = db.AutomaticRaidShoutoutOutcomes.Add(Outcome(1, "raid-message"));
+        _ = db.AutomaticRaidShoutoutOutcomes.Add(
+            Outcome(1, "raid-message", AutomaticRaidShoutoutOutcomeStatus.Delivered)
+        );
         _ = db.PublicChatPinOperations.Add(
             new PublicChatPinOperation
             {
@@ -501,7 +610,11 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         _ = await db.SaveChangesAsync();
     }
 
-    private static AutomaticRaidShoutoutOutcome Outcome(int hostId, string providerMessageId) =>
+    private static AutomaticRaidShoutoutOutcome Outcome(
+        int hostId,
+        string providerMessageId,
+        AutomaticRaidShoutoutOutcomeStatus status = AutomaticRaidShoutoutOutcomeStatus.Queued
+    ) =>
         new()
         {
             Id = hostId,
@@ -511,10 +624,14 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             SourceLogin = "raider",
             SourceDisplayName = "Raider",
             ViewerCount = 10,
-            Status = AutomaticRaidShoutoutOutcomeStatus.Delivered,
-            ResultCode = AutomaticRaidShoutoutResultCode.Delivered,
+            Status = status,
+            ResultCode =
+                status == AutomaticRaidShoutoutOutcomeStatus.Delivered
+                    ? AutomaticRaidShoutoutResultCode.Delivered
+                    : AutomaticRaidShoutoutResultCode.Queued,
             MessageTimestampUtc = DateTime.UtcNow,
             ClaimedAtUtc = DateTime.UtcNow,
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc =
+                status == AutomaticRaidShoutoutOutcomeStatus.Delivered ? DateTime.UtcNow : null,
         };
 }

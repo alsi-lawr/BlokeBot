@@ -108,7 +108,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
 
         var result = await delivery.DeliverAsync(Request(configuration), CancellationToken.None);
 
-        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
+        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Queued>();
         var call = chat.Calls.ShouldHaveSingleItem();
         call.Message.ShouldBe("@raider|unknown game|untitled");
         call.Correlation.ShouldBe(new PublicChatDeliveryCorrelation(1, "raid-message"));
@@ -176,7 +176,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
 
         var result = await delivery.DeliverAsync(Request(configuration), CancellationToken.None);
 
-        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
+        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Queued>();
         var call = chat.Calls.ShouldHaveSingleItem();
         var pin = call.PinIntent.ShouldNotBeNull();
         pin.HostId.ShouldBe(1);

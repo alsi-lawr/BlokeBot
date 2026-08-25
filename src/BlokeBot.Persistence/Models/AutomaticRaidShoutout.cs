@@ -70,6 +70,9 @@ public enum AutomaticRaidShoutoutOutcomeStatus
     [PersistedToken("Processing")]
     Processing,
 
+    [PersistedToken("Queued")]
+    Queued,
+
     [PersistedToken("Delivered")]
     Delivered,
 
@@ -82,6 +85,9 @@ public enum AutomaticRaidShoutoutOutcomeStatus
 
 public enum AutomaticRaidShoutoutResultCode
 {
+    [PersistedToken("Queued")]
+    Queued,
+
     [PersistedToken("Delivered")]
     Delivered,
 

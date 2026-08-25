@@ -42,7 +42,13 @@ public static class TwitchOperationsServiceCollectionExtensions
             AutomaticRaidAnnouncementSender
         >();
         services.TryAddSingleton<IAutomaticRaidShoutoutDelivery, AutomaticRaidShoutoutDelivery>();
-        _ = services.AddSingleton<AutomaticRaidShoutoutRunner>();
+        services.TryAddSingleton<AutomaticRaidShoutoutOutcomeAuthority>();
+        _ = services.AddSingleton(static provider => new AutomaticRaidShoutoutRunner(
+            provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
+            provider.GetRequiredService<IAutomaticRaidShoutoutDelivery>(),
+            provider.GetRequiredService<AutomaticRaidShoutoutOutcomeAuthority>(),
+            TimeProvider.System
+        ));
         _ = services.AddSingleton<RaidCollaborationService>();
         services.TryAddSingleton<IRaidCollaborationProvider, TwitchRaidCollaborationProvider>();
         services.TryAddSingleton<IRaidWelcomeSender, RaidWelcomeSender>();

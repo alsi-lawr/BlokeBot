@@ -292,7 +292,11 @@ internal sealed class AutomaticRaidShoutoutDelivery(
         {
             result = NotDelivered(AutomaticRaidShoutoutResultCode.Unexpected);
         }
-        if (result is not AutomaticRaidShoutoutDeliveryResult.Delivered)
+        if (
+            result
+            is AutomaticRaidShoutoutDeliveryResult.NotDelivered
+                or AutomaticRaidShoutoutDeliveryResult.Ambiguous
+        )
         {
             await AlertAsync(request, result, cancellationToken);
         }
@@ -397,7 +401,7 @@ internal sealed class AutomaticRaidShoutoutDelivery(
                 cancellationToken
             );
         return outcome.Match<AutomaticRaidShoutoutDeliveryResult>(
-            _ => new AutomaticRaidShoutoutDeliveryResult.Delivered(),
+            _ => new AutomaticRaidShoutoutDeliveryResult.Queued(),
             _ => NotDelivered(AutomaticRaidShoutoutResultCode.Rejected)
         );
     }

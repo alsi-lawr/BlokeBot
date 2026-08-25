@@ -1050,15 +1050,7 @@ public sealed class RaidCollaborationService(
 
     private static RaidShoutoutOutcome MapShoutoutOutcome(
         AutomaticRaidShoutoutResultCode? resultCode
-    ) =>
-        resultCode switch
-        {
-            null => RaidShoutoutOutcome.NotConfigured,
-            AutomaticRaidShoutoutResultCode.Delivered => RaidShoutoutOutcome.Sent,
-            AutomaticRaidShoutoutResultCode.Cooldown => RaidShoutoutOutcome.Cooldown,
-            AutomaticRaidShoutoutResultCode.Invalid => RaidShoutoutOutcome.NotEligible,
-            _ => RaidShoutoutOutcome.Rejected,
-        };
+    ) => AutomaticRaidShoutoutOutcomeAuthority.ToRaidShoutoutOutcome(resultCode);
 
     private static string ExclusionReason(RaidChannelSnapshotOutcome outcome) =>
         outcome switch

@@ -79,6 +79,9 @@ public enum RaidShoutoutOutcome
     [PersistedToken("Deduplicated")]
     Deduplicated,
 
+    [PersistedToken("Queued")]
+    Queued,
+
     [PersistedToken("Sent")]
     Sent,
 

@@ -463,7 +463,12 @@ public sealed class RaidCollaborationServiceTests
                 provider,
                 welcome,
                 shoutouts,
-                new AutomaticRaidShoutoutRunner(database, automatic, new FixedTimeProvider(_now)),
+                new AutomaticRaidShoutoutRunner(
+                    database,
+                    automatic,
+                    new AutomaticRaidShoutoutOutcomeAuthority(),
+                    new FixedTimeProvider(_now)
+                ),
                 [domainEvents],
                 TestEventBus.Create<AppEventKind>(),
                 new FixedTimeProvider(_now)
