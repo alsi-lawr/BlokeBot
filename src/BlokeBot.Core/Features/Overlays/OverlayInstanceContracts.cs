@@ -40,6 +40,7 @@ public sealed record OverlayInstanceView(
     string Name,
     OverlayType Type,
     bool IsEnabled,
+    bool RequiresAccessKeyRegeneration,
     OverlayConfiguration Configuration,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,

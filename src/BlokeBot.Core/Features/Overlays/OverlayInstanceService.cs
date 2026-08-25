@@ -1,5 +1,6 @@
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -8,10 +9,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Overlays;
 
-public sealed class OverlayInstanceService(
+public sealed partial class OverlayInstanceService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IModeratorAuthorityService moderatorAuthority,
     IOverlayAccessKeyGenerator accessKeys,
+    DurableAlertService alerts,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
     ILogger<OverlayInstanceService> logger
@@ -278,132 +280,6 @@ public sealed class OverlayInstanceService(
         ChangeOverlayInstanceAvailabilityCommand command,
         CancellationToken ct
     ) => SetEnabledAsync(session, command, false, ct);
-
-    public async Task<OverlayInstanceResult<OverlayInstanceKeyRotation>> RotateKeyAsync(
-        AuthenticatedSession session,
-        RotateOverlayInstanceKeyCommand command,
-        CancellationToken ct
-    ) =>
-        !ValidOverlayIdAndRevision(command.OverlayId, command.ExpectedRevision)
-            ? Rejected<OverlayInstanceKeyRotation>(
-                new OverlayInstanceRejection.Invalid(
-                    "An overlay ID and positive expected revision are required."
-                )
-            )
-            : await MutateExistingAsync<OverlayInstanceKeyRotation>(
-                session,
-                command.OverlayId,
-                command.ExpectedRevision,
-                "key-rotated",
-                async (db, actor, overlay) =>
-                {
-                    var accessKey = GenerateAccessKey();
-                    var digest = OverlayAccessKeyDigest.Compute(accessKey);
-                    var now = Now();
-                    await using var transaction = await db.Database.BeginTransactionAsync(ct);
-                    var updated = await db
-                        .OverlayInstances.Where(value =>
-                            value.HostId == actor.HostId
-                            && value.PublicId == command.OverlayId
-                            && value.Revision == command.ExpectedRevision.Value
-                        )
-                        .ExecuteUpdateAsync(
-                            setters =>
-                                setters
-                                    .SetProperty(value => value.AccessKeyDigest, digest)
-                                    .SetProperty(
-                                        value => value.KeyVersion,
-                                        value => value.KeyVersion + 1
-                                    )
-                                    .SetProperty(value => value.UpdatedAtUtc, now)
-                                    .SetProperty(
-                                        value => value.Revision,
-                                        value => value.Revision + 1
-                                    ),
-                            ct
-                        );
-                    if (updated != 1)
-                    {
-                        return Rejected<OverlayInstanceKeyRotation>(
-                            new OverlayInstanceRejection.Conflict()
-                        );
-                    }
-
-                    overlay.AccessKeyDigest = digest;
-                    overlay.KeyVersion++;
-                    overlay.UpdatedAtUtc = now;
-                    overlay.Revision++;
-                    _ = db.OverlayInstanceEvents.Add(
-                        DomainEvent(actor, overlay, OverlayInstanceEventKind.KeyRotated, now)
-                    );
-                    _ = await db.SaveChangesAsync(ct);
-                    await transaction.CommitAsync(ct);
-                    await NotifyAsync(
-                        actor,
-                        overlay.PublicId,
-                        OverlayInstanceEventKind.KeyRotated,
-                        overlay.Revision,
-                        ct
-                    );
-                    return Succeeded(
-                        new OverlayInstanceKeyRotation(
-                            ToView(overlay),
-                            new OverlayPrivateAccess(accessKey)
-                        )
-                    );
-                },
-                ct
-            );
-
-    public async Task<OverlayInstanceResult<Guid>> DeleteAsync(
-        AuthenticatedSession session,
-        DeleteOverlayInstanceCommand command,
-        CancellationToken ct
-    ) =>
-        !ValidOverlayIdAndRevision(command.OverlayId, command.ExpectedRevision)
-            ? Rejected<Guid>(
-                new OverlayInstanceRejection.Invalid(
-                    "An overlay ID and positive expected revision are required."
-                )
-            )
-            : await MutateExistingAsync<Guid>(
-                session,
-                command.OverlayId,
-                command.ExpectedRevision,
-                "deleted",
-                async (db, actor, overlay) =>
-                {
-                    var now = Now();
-                    await using var transaction = await db.Database.BeginTransactionAsync(ct);
-                    var deleted = await db
-                        .OverlayInstances.Where(value =>
-                            value.HostId == actor.HostId
-                            && value.PublicId == command.OverlayId
-                            && value.Revision == command.ExpectedRevision.Value
-                        )
-                        .ExecuteDeleteAsync(ct);
-                    if (deleted != 1)
-                    {
-                        return Rejected<Guid>(new OverlayInstanceRejection.Conflict());
-                    }
-
-                    overlay.Revision++;
-                    _ = db.OverlayInstanceEvents.Add(
-                        DomainEvent(actor, overlay, OverlayInstanceEventKind.Deleted, now)
-                    );
-                    _ = await db.SaveChangesAsync(ct);
-                    await transaction.CommitAsync(ct);
-                    await NotifyAsync(
-                        actor,
-                        overlay.PublicId,
-                        OverlayInstanceEventKind.Deleted,
-                        overlay.Revision,
-                        ct
-                    );
-                    return Succeeded(command.OverlayId);
-                },
-                ct
-            );
 
     private async Task<OverlayInstanceResult<OverlayInstanceView>> SetEnabledAsync(
         AuthenticatedSession session,
@@ -704,6 +580,7 @@ public sealed class OverlayInstanceService(
             overlay.Name,
             overlay.Type,
             overlay.IsEnabled,
+            overlay.RequiresAccessKeyRegeneration,
             OverlayConfiguration.FromPersistence(overlay.Type, overlay.ConfigurationJson),
             new DateTimeOffset(DateTime.SpecifyKind(overlay.CreatedAtUtc, DateTimeKind.Utc)),
             new DateTimeOffset(DateTime.SpecifyKind(overlay.UpdatedAtUtc, DateTimeKind.Utc)),

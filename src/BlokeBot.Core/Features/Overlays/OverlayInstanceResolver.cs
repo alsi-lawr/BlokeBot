@@ -19,7 +19,11 @@ public sealed class OverlayInstanceResolver(IDbContextFactory<BlokeBotDbContext>
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var resolved = await db
             .OverlayInstances.AsNoTracking()
-            .Where(value => value.IsEnabled && value.AccessKeyDigest == digest)
+            .Where(value =>
+                value.IsEnabled
+                && !value.RequiresAccessKeyRegeneration
+                && value.AccessKeyDigest == digest
+            )
             .Join(
                 db.Hosts.AsNoTracking(),
                 overlay => overlay.HostId,

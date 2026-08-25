@@ -40,6 +40,51 @@ public sealed class OverlayDashboardUiTests
     }
 
     [Test]
+    public async Task ImportedSource_ShowsItsBlockedStatusAndRevealsTheGeneratedUrlOnlyAfterAction()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedAsync(database, requiresRegeneration: true);
+        await using var context = UiTestContextFactory.Create(database, seed.HostId);
+        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthority()
+        );
+        _ = context
+            .Services.AddBlokeBotPlayWithViewers()
+            .AddBlokeBotBounties()
+            .AddBlokeBotCommunityProgression()
+            .AddBlokeBotOverlays();
+        _ = context.JSInterop.Setup<bool>("confirm", _ => true).SetResult(true);
+
+        var page = context.Render<OverlaysPage>();
+
+        _ = page.WaitForElement("[data-overlay-access-regeneration-required]");
+        page.FindAll("[data-private-url-reveal]").ShouldBeEmpty();
+        page.Markup.ShouldNotContain(seed.PrivateAccessKey);
+
+        await page.InvokeAsync(() =>
+            page.FindAll("button")
+                .Single(button => button.TextContent.Trim() == "Generate private URL")
+                .Click()
+        );
+
+        string? revealedUrl = null;
+        page.WaitForAssertion(() =>
+        {
+            page.FindAll("[data-overlay-access-regeneration-required]").ShouldBeEmpty();
+            revealedUrl = page.Find("[data-private-url-reveal] input").GetAttribute("value");
+            revealedUrl.ShouldStartWith("http://localhost/overlay/");
+            revealedUrl.ShouldNotContain(seed.PrivateAccessKey);
+        });
+
+        var revisited = context.Render<OverlaysPage>();
+        revisited.WaitForAssertion(() =>
+        {
+            revisited.FindAll("[data-private-url-reveal]").ShouldBeEmpty();
+            revisited.Markup.ShouldNotContain(revealedUrl!);
+        });
+    }
+
+    [Test]
     public void SharedRenderer_ConstrainsCredentialModeAndNeverRequiresAPrivateKey()
     {
         var publicDocument = OverlayBrowserSourceDocument.Render(
@@ -232,7 +277,10 @@ public sealed class OverlayDashboardUiTests
         page.FindAll($"[aria-label='{groupLabel}'] button")
             .Single(button => button.TextContent.Trim() == buttonLabel);
 
-    private static async Task<OverlaySeed> SeedAsync(SqliteBlokeBotDbFactory database)
+    private static async Task<OverlaySeed> SeedAsync(
+        SqliteBlokeBotDbFactory database,
+        bool requiresRegeneration = false
+    )
     {
         const string PrivateAccessKey = "component-test-overlay-key-0000000000000000";
         await using var db = await database.CreateDbContextAsync();
@@ -255,6 +303,7 @@ public sealed class OverlayDashboardUiTests
             IsEnabled = true,
             ConfigurationJson = """{"schemaVersion":1}""",
             AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
+            RequiresAccessKeyRegeneration = requiresRegeneration,
             KeyVersion = 1,
             Revision = 1,
             CreatedAtUtc = DateTime.UtcNow,

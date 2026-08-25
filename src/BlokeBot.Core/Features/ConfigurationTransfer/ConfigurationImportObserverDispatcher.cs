@@ -2,10 +2,18 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal interface IConfigurationImportObserverDispatcher
 {
-    Task<IReadOnlyList<ConfigurationPostCommitFailure>> DispatchAsync(
+    Task<ConfigurationPostCommitReport> DispatchAsync(
         int hostId,
         IReadOnlySet<ConfigurationSectionId> changedSections
     );
+}
+
+internal sealed record ConfigurationPostCommitReport(
+    IReadOnlyList<ConfigurationPostCommitFailure> Failures,
+    IReadOnlyList<ConfigurationImportManualFollowUp> ManualFollowUps
+)
+{
+    internal static ConfigurationPostCommitReport Empty { get; } = new([], []);
 }
 
 internal sealed class ConfigurationImportObserverDispatcher(
@@ -13,17 +21,19 @@ internal sealed class ConfigurationImportObserverDispatcher(
     ILogger<ConfigurationImportObserverDispatcher> logger
 ) : IConfigurationImportObserverDispatcher
 {
-    public async Task<IReadOnlyList<ConfigurationPostCommitFailure>> DispatchAsync(
+    public async Task<ConfigurationPostCommitReport> DispatchAsync(
         int hostId,
         IReadOnlySet<ConfigurationSectionId> changedSections
     )
     {
         var failures = new List<ConfigurationPostCommitFailure>();
+        var manualFollowUps = new List<ConfigurationImportManualFollowUp>();
         foreach (var observer in observers.Where(value => changedSections.Contains(value.Section)))
         {
             try
             {
-                await observer.ImportedAsync(hostId, CancellationToken.None);
+                var observation = await observer.ImportedAsync(hostId, CancellationToken.None);
+                manualFollowUps.AddRange(observation.ManualFollowUps);
             }
             catch (Exception exception)
             {
@@ -36,7 +46,7 @@ internal sealed class ConfigurationImportObserverDispatcher(
                 failures.Add(new(observer.Section, "reconciliation-failed"));
             }
         }
-        return failures;
+        return new(failures, manualFollowUps);
     }
 }
 
@@ -45,8 +55,8 @@ internal sealed class UnavailableConfigurationImportObserverDispatcher
 {
     internal static UnavailableConfigurationImportObserverDispatcher Instance { get; } = new();
 
-    public Task<IReadOnlyList<ConfigurationPostCommitFailure>> DispatchAsync(
+    public Task<ConfigurationPostCommitReport> DispatchAsync(
         int hostId,
         IReadOnlySet<ConfigurationSectionId> changedSections
-    ) => Task.FromResult<IReadOnlyList<ConfigurationPostCommitFailure>>([]);
+    ) => Task.FromResult(ConfigurationPostCommitReport.Empty);
 }

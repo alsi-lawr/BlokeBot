@@ -238,7 +238,7 @@ public sealed partial class ConfigurationTransferCoordinator
                 _activationQueue.Wake();
             }
 
-            var postCommitFailures = await _importObservers.DispatchAsync(
+            var postCommit = await _importObservers.DispatchAsync(
                 host.Id,
                 changedSections.ToHashSet()
             );
@@ -246,7 +246,8 @@ public sealed partial class ConfigurationTransferCoordinator
             return new ConfigurationImportApplyOutcome.Applied(
                 new(operationId, activation?.Id, changedSections)
                 {
-                    PostCommitFailures = postCommitFailures,
+                    PostCommitFailures = postCommit.Failures,
+                    ManualFollowUps = postCommit.ManualFollowUps,
                 }
             );
         }

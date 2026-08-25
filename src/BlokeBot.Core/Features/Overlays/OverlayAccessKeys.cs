@@ -27,6 +27,9 @@ internal static class OverlayAccessKeyDigest
     internal static byte[] Compute(string accessKey) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(accessKey));
 
+    internal static byte[] CreateUnavailablePlaceholder(Guid overlayId) =>
+        SHA256.HashData(overlayId.ToByteArray());
+
     internal static bool HasCanonicalShape(string accessKey) =>
         accessKey.Length == 43
         && accessKey.All(static character =>

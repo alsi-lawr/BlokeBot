@@ -248,7 +248,9 @@ public partial class OverlaySourcesPanel
         ];
 
     private string RailSub(OverlayInstanceView overlay) =>
-        $"{TypeLabel(overlay.Type)} · {(overlay.IsEnabled ? "" : "disabled · ")}{(
+        overlay.RequiresAccessKeyRegeneration
+            ? $"{TypeLabel(overlay.Type)} · URL regeneration required"
+            : $"{TypeLabel(overlay.Type)} · {(overlay.IsEnabled ? "" : "disabled · ")}{(
             OtherConnectionCount(overlay) > 0 ? "connected" : "not connected"
         )}";
 
@@ -340,6 +342,11 @@ public partial class OverlaySourcesPanel
         if (_selected is null)
         {
             return string.Empty;
+        }
+
+        if (_selected.RequiresAccessKeyRegeneration)
+        {
+            return "URL regeneration required";
         }
 
         var connections = OtherConnectionCount(_selected) switch
@@ -820,16 +827,23 @@ public partial class OverlaySourcesPanel
 
     private async Task RotateUrlAsync()
     {
+        var requiresRegeneration = _selected?.RequiresAccessKeyRegeneration == true;
         if (
             _selected is null
             || !await ConfirmAsync(
-                "Rotate this overlay's private URL? Every existing OBS source using the old URL will stop working."
+                requiresRegeneration
+                    ? "Generate a private URL for this imported source? The URL appears once and must replace this source's URL in OBS."
+                    : "Rotate this overlay's private URL? Every existing OBS source using the old URL will stop working."
             )
         )
         {
             if (_selected is not null)
             {
-                SetSuccess("URL rotation cancelled. The existing Browser Source URL still works.");
+                SetSuccess(
+                    requiresRegeneration
+                        ? "URL generation cancelled. This imported Browser Source still needs a private URL."
+                        : "URL rotation cancelled. The existing Browser Source URL still works."
+                );
             }
             return;
         }
@@ -855,7 +869,9 @@ public partial class OverlaySourcesPanel
                     _revealedBrowserSourceUrl = revealedUrl;
                     _openStages.Open(OverlaySourceStage.Delivery);
                     SetSuccess(
-                        "Private URL rotated. Copy the replacement now and update every OBS source."
+                        requiresRegeneration
+                            ? "Private URL generated. Copy it now and replace this source's URL in OBS."
+                            : "Private URL rotated. Copy the replacement now and update every OBS source."
                     );
                 },
                 rejected =>

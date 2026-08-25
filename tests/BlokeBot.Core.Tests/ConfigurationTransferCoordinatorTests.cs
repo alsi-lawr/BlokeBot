@@ -503,7 +503,10 @@ public sealed class ConfigurationTransferCoordinatorTests
 
         public bool SawCommittedAudit { get; private set; }
 
-        public async ValueTask ImportedAsync(int hostId, CancellationToken cancellationToken)
+        public async ValueTask<ConfigurationImportObservation> ImportedAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        )
         {
             Calls++;
             await using var db = await database.CreateDbContextAsync(cancellationToken);
@@ -511,6 +514,7 @@ public sealed class ConfigurationTransferCoordinatorTests
                 value => value.HostId == hostId,
                 cancellationToken
             );
+            return ConfigurationImportObservation.Complete;
         }
     }
 

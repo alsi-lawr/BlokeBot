@@ -148,6 +148,25 @@
                                        Title="@($"{SectionTitle(failure.Section)} reconciliation needs attention")"
                                        Description="The configuration is saved. Runtime reconciliation failed separately and can be retried without reapplying the import." />
                         }
+                        @foreach (var followUp in applied.ManualFollowUps)
+                        {
+                            <section class="activation-row"
+                                     data-status="manual-follow-up"
+                                     data-import-manual-follow-up="@followUp.Code">
+                                <div class="activation-row__line">
+                                    <strong>@followUp.Title</strong>
+                                    <span class="@ActivationPillClass(ConfigurationActivationStatus.ManualFollowUp)">
+                                        <span class="status-pill__dot" aria-hidden="true"></span>
+                                        @ActivationLabel(ConfigurationActivationStatus.ManualFollowUp)
+                                    </span>
+                                </div>
+                                <p class="field-error" role="status">@followUp.Reason</p>
+                                <div class="activation-row__actions">
+                                    <a class="btn-primary" href="@followUp.LinkPath">Open Overlays</a>
+                                    <a class="btn-secondary" href="/alerts">Open alerts</a>
+                                </div>
+                            </section>
+                        }
                         <div class="operation-row">
                             <span class="operation-row__label">Operation ID</span>
                             <code>@applied.OperationId</code>

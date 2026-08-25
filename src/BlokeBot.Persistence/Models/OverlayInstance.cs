@@ -129,6 +129,8 @@ public sealed class OverlayInstance
 
     public byte[] AccessKeyDigest { get; set; } = [];
 
+    public bool RequiresAccessKeyRegeneration { get; set; }
+
     public int KeyVersion { get; set; }
 
     public long Revision { get; set; }

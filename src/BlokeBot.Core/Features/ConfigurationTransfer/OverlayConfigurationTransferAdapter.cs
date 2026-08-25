@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal sealed partial class OverlayConfigurationTransferAdapter(
-    IOverlayAccessKeyGenerator accessKeys,
     OverlayRemoteUrlPolicy urlPolicy,
     IOptions<BlokeBotOptions> options,
     TimeProvider timeProvider

@@ -91,6 +91,33 @@ public sealed partial class DurableAlertService(
             );
         });
 
+    internal IO<DurableAlertResolution, Never> Resolve(
+        int hostId,
+        string source,
+        string sourceKey,
+        string actorLogin
+    ) =>
+        IO<DurableAlertResolution, Never>.Create(async ct =>
+        {
+            var identity = new DurableAlertIdentity(
+                hostId,
+                NormalizeRequired(source, nameof(source)),
+                NormalizeRequired(sourceKey, nameof(sourceKey))
+            );
+            var actor = NormalizeRequired(actorLogin, nameof(actorLogin));
+            await using var operation = await BeginReportOperationAsync(ct);
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            var change = await operation.StageResolutionAsync(db, identity, actor, UtcNow(), ct);
+            await transaction.CommitAsync(ct);
+            await operation.PublishCommittedAsync(change);
+            return Result<DurableAlertResolution, Never>.Success(
+                change.WasResolved
+                    ? new DurableAlertResolution.Resolved()
+                    : new DurableAlertResolution.NotActive()
+            );
+        });
+
     public async Task<int> CountActiveAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -154,6 +181,15 @@ public abstract record DurableAlertAcknowledgement
     public sealed record AlreadyAcknowledged : DurableAlertAcknowledgement;
 
     public sealed record Acknowledged : DurableAlertAcknowledgement;
+}
+
+internal abstract record DurableAlertResolution
+{
+    private DurableAlertResolution() { }
+
+    public sealed record NotActive : DurableAlertResolution;
+
+    public sealed record Resolved : DurableAlertResolution;
 }
 
 public sealed record DurableAlertState(

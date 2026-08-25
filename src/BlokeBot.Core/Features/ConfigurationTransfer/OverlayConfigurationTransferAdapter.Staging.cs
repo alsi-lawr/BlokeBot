@@ -94,7 +94,6 @@ internal sealed partial class OverlayConfigurationTransferAdapter
             }
             else
             {
-                var accessKey = accessKeys.Generate();
                 instance = new OverlayInstance
                 {
                     PublicId = id,
@@ -103,7 +102,8 @@ internal sealed partial class OverlayConfigurationTransferAdapter
                     Type = imported.Type,
                     IsEnabled = imported.Enabled,
                     ConfigurationJson = mapped.ToPersistenceJson(),
-                    AccessKeyDigest = OverlayAccessKeyDigest.Compute(accessKey),
+                    AccessKeyDigest = OverlayAccessKeyDigest.CreateUnavailablePlaceholder(id),
+                    RequiresAccessKeyRegeneration = true,
                     KeyVersion = 1,
                     Revision = 1,
                     CreatedAtUtc = Now(),

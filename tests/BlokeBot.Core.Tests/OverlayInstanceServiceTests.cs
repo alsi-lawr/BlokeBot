@@ -1,6 +1,7 @@
 using System.Text.Json;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence.Models;
@@ -661,6 +662,7 @@ public sealed class OverlayInstanceServiceTests
             int otherHostId,
             FakeModeratorAuthority authority,
             RecordingLogger logger,
+            DurableAlertService alerts,
             OverlayInstanceService service
         )
         {
@@ -669,6 +671,7 @@ public sealed class OverlayInstanceServiceTests
             OtherHostId = otherHostId;
             Authority = authority;
             Logger = logger;
+            Alerts = alerts;
             Service = service;
             Resolver = new OverlayInstanceResolver(database);
         }
@@ -678,6 +681,7 @@ public sealed class OverlayInstanceServiceTests
         internal int OtherHostId { get; }
         internal FakeModeratorAuthority Authority { get; }
         internal RecordingLogger Logger { get; }
+        internal DurableAlertService Alerts { get; }
         internal OverlayInstanceService Service { get; }
         internal OverlayInstanceResolver Resolver { get; }
 
@@ -711,18 +715,25 @@ public sealed class OverlayInstanceServiceTests
             var clock = new FixedTimeProvider(
                 new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero)
             );
+            var events = TestEventBus.Create<AppEventKind>();
+            var alerts = new DurableAlertService(database, clock, events);
             var service = new OverlayInstanceService(
                 database,
                 authority,
                 new CryptographicOverlayAccessKeyGenerator(),
-                TestEventBus.Create<AppEventKind>(),
+                alerts,
+                events,
                 clock,
                 logger
             );
-            return new Fixture(database, hostId, otherHostId, authority, logger, service);
+            return new Fixture(database, hostId, otherHostId, authority, logger, alerts, service);
         }
 
-        public ValueTask DisposeAsync() => Database.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            Alerts.Dispose();
+            await Database.DisposeAsync();
+        }
 
         private static BotHost Host(string login) =>
             new()

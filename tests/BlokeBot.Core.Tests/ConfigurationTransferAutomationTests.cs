@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
@@ -2446,7 +2447,6 @@ public sealed class ConfigurationTransferAutomationTests
         var automations = transfer.Adapter;
         var overlayOptions = Options.Create(new BlokeBotOptions());
         var overlays = new OverlayConfigurationTransferAdapter(
-            new CryptographicOverlayAccessKeyGenerator(),
             null!,
             overlayOptions,
             TimeProvider.System
@@ -2527,7 +2527,12 @@ public sealed class ConfigurationTransferAutomationTests
         return (
             new ConfigurationImportObserverDispatcher(
                 [
-                    new OverlayConfigurationImportObserver(events, maintenance),
+                    new OverlayConfigurationImportObserver(
+                        database,
+                        new DurableAlertService(database, TimeProvider.System, events),
+                        events,
+                        maintenance
+                    ),
                     new AutomationConfigurationImportObserver(trigger),
                 ],
                 NullLogger<ConfigurationImportObserverDispatcher>.Instance

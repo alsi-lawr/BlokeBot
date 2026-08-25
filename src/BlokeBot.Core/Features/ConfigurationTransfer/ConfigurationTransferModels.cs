@@ -128,4 +128,6 @@ public sealed record ConfigurationImportApplied(
 )
 {
     public IReadOnlyList<ConfigurationPostCommitFailure> PostCommitFailures { get; init; } = [];
+
+    public IReadOnlyList<ConfigurationImportManualFollowUp> ManualFollowUps { get; init; } = [];
 }

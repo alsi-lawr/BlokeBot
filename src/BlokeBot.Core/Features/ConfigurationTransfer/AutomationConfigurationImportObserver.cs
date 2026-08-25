@@ -6,9 +6,13 @@ internal sealed class AutomationConfigurationImportObserver(
 {
     public ConfigurationSectionId Section => ConfigurationSectionId.Automations;
 
-    public async ValueTask ImportedAsync(int hostId, CancellationToken cancellationToken)
+    public async ValueTask<ConfigurationImportObservation> ImportedAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    )
     {
         _ = hostId;
         await eventSub.ReconcileAsync(cancellationToken);
+        return ConfigurationImportObservation.Complete;
     }
 }

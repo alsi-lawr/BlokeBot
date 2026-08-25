@@ -107,6 +107,37 @@ public sealed partial class DurableAlertService
         await PublishCommittedAsync();
     }
 
+    private async Task<DurableAlertPendingResolution> StageResolutionAsync(
+        BlokeBotDbContext db,
+        DurableAlertIdentity identity,
+        string actorLogin,
+        DateTime resolvedAtUtc,
+        CancellationToken cancellationToken
+    )
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(identity);
+
+        var resolved = await ActiveIssue(db, identity)
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(alert => alert.AcknowledgedAtUtc, resolvedAtUtc)
+                        .SetProperty(alert => alert.AcknowledgedByLogin, actorLogin),
+                cancellationToken
+            );
+        return new DurableAlertPendingResolution(resolved == 1);
+    }
+
+    private async ValueTask PublishCommittedAsync(DurableAlertPendingResolution change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        if (change.ClaimPublication())
+        {
+            await PublishCommittedAsync();
+        }
+    }
+
     private async ValueTask PublishCommittedAsync() =>
         _ = await events.PublishAsync(AppEventKind.AlertsChanged, CancellationToken.None);
 
@@ -177,7 +208,20 @@ public sealed partial class DurableAlertService
             CancellationToken cancellationToken
         ) => GetAuthority().StageReportAsync(db, report, cancellationToken);
 
+        internal Task<DurableAlertPendingResolution> StageResolutionAsync(
+            BlokeBotDbContext db,
+            DurableAlertIdentity identity,
+            string actorLogin,
+            DateTime resolvedAtUtc,
+            CancellationToken cancellationToken
+        ) =>
+            GetAuthority()
+                .StageResolutionAsync(db, identity, actorLogin, resolvedAtUtc, cancellationToken);
+
         internal ValueTask PublishCommittedAsync(DurableAlertPendingChange change) =>
+            GetAuthority().PublishCommittedAsync(change);
+
+        internal ValueTask PublishCommittedAsync(DurableAlertPendingResolution change) =>
             GetAuthority().PublishCommittedAsync(change);
 
         internal ValueTask PublishCommittedAsync() => GetAuthority().PublishCommittedAsync();
@@ -222,4 +266,18 @@ internal sealed class DurableAlertPendingChange(DurableAlert alert, bool wasCrea
             );
         }
     }
+}
+
+internal sealed class DurableAlertPendingResolution(bool wasResolved)
+{
+    private int _publicationClaimed;
+
+    internal bool WasResolved { get; } = wasResolved;
+
+    internal bool ClaimPublication() =>
+        Interlocked.Exchange(ref _publicationClaimed, 1) == 0
+            ? WasResolved
+            : throw new InvalidOperationException(
+                "The committed alert resolution was already published."
+            );
 }
