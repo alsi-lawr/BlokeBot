@@ -7,6 +7,7 @@ namespace BlokeBot.Core.Features.HostedChannels.Authorization;
 internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     BotSettings settings,
     IAccessTokenCache tokenCache,
+    ITokenStore tokenStore,
     HelixClient helix,
     ITokenStatusSource tokenStatus,
     HostedChannelChangeNotifier changes
@@ -52,14 +53,8 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
 
     public async Task ClearAsync(CancellationToken ct)
     {
-        var tokenCachePath = settings.Identity.TokenCachePath;
-        if (!string.IsNullOrWhiteSpace(tokenCachePath) && File.Exists(tokenCachePath))
-        {
-            File.Delete(tokenCachePath);
-        }
-
-        await tokenCache.ClearAsync(ct);
-        _ = await changes.NotifyChangedAsync(ct);
+        await tokenCache.ClearAsync(tokenStore, settings.Identity.TokenCachePath, ct);
+        _ = await changes.NotifyChangedAsync(CancellationToken.None);
     }
 
     private async Task<BotAccountAuthorizationStatus> GetAuthorizedStatusAsync(

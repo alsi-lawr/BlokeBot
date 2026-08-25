@@ -4,15 +4,15 @@ namespace BlokeBot.Twitch.Auth;
 
 internal sealed class InMemoryOAuthStateStore : IOAuthStateStore
 {
-    private readonly HashSet<string> _states = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CredentialEpoch> _states = new(StringComparer.Ordinal);
     private readonly object _gate = new();
 
-    public string Issue()
+    public string Issue(CredentialEpoch credentialEpoch)
     {
         var state = Guid.NewGuid().ToString("N");
         lock (_gate)
         {
-            _ = _states.Add(state);
+            _states.Add(state, credentialEpoch);
         }
 
         return state;
@@ -27,8 +27,10 @@ internal sealed class InMemoryOAuthStateStore : IOAuthStateStore
 
         lock (_gate)
         {
-            return _states.Remove(state)
-                ? Result<OAuthStateConsumed, OAuthStateRejected>.Success(new OAuthStateConsumed())
+            return _states.Remove(state, out var credentialEpoch)
+                ? Result<OAuthStateConsumed, OAuthStateRejected>.Success(
+                    new OAuthStateConsumed(credentialEpoch)
+                )
                 : Result<OAuthStateConsumed, OAuthStateRejected>.Error(new OAuthStateRejected());
         }
     }

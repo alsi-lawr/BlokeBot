@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using System.Text;
+using System.Threading.Channels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Eventing;
@@ -126,7 +127,7 @@ public sealed class BotAccountAuthorizationPolicyTests
     }
 
     [Test]
-    public async Task ConfiguredPolicy_ClearingAuthorization_DeletesTokenAndClearsRequiredCache()
+    public async Task ConfiguredPolicy_ClearingAuthorization_ReportsOnlyAfterDurableAndMemoryClear()
     {
         var tokenCachePath = Path.Combine(
             Path.GetTempPath(),
@@ -136,6 +137,7 @@ public sealed class BotAccountAuthorizationPolicyTests
         try
         {
             var cache = new RecordingAccessTokenCache();
+            var tokenStore = new BlockingTokenStore(new JsonTokenStore());
             var events = TestEventBus.Create<AppEventKind>();
             var eventCount = 0;
             using var subscription = events.Subscribe(
@@ -151,6 +153,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                 new ConfiguredBotAccountAuthorizationPolicy(
                     Settings(tokenCachePath),
                     cache,
+                    tokenStore,
                     new HelixClient(
                         new RejectingHttpClientFactory(),
                         global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
@@ -160,16 +163,63 @@ public sealed class BotAccountAuthorizationPolicyTests
                 )
             );
 
-            await service.ClearAsync(CancellationToken.None);
+            var clearing = service.ClearAsync(CancellationToken.None);
+            _ = await tokenStore.DeleteStarted.Reader.ReadAsync(CancellationToken.None);
+
+            clearing.IsCompleted.ShouldBeFalse();
+            File.Exists(tokenCachePath).ShouldBeTrue();
+            cache.IsCleared.ShouldBeFalse();
+            eventCount.ShouldBe(0);
+            await tokenStore.ContinueDelete.Writer.WriteAsync(true, CancellationToken.None);
+            await clearing;
 
             File.Exists(tokenCachePath).ShouldBeFalse();
-            cache.ClearCount.ShouldBe(1);
+            cache.IsCleared.ShouldBeTrue();
             eventCount.ShouldBe(1);
         }
         finally
         {
             File.Delete(tokenCachePath);
         }
+    }
+
+    [Test]
+    public async Task ConfiguredPolicy_DurableDeleteFailure_DoesNotReportAuthorizationChange()
+    {
+        var failure = new IOException("delete failed");
+        var cache = new RecordingAccessTokenCache();
+        var events = TestEventBus.Create<AppEventKind>();
+        var eventCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            ObserverIdentity.Named("Test.BotAccountAuthorizationPolicy.Failure"),
+            (_, _) =>
+            {
+                eventCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var service = new BotAccountAuthorizationService(
+            new ConfiguredBotAccountAuthorizationPolicy(
+                Settings("tokens.json"),
+                cache,
+                new FailingTokenStore(failure),
+                new HelixClient(
+                    new RejectingHttpClientFactory(),
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                ),
+                new UnavailableTokenStatusSource(),
+                new HostedChannelChangeNotifier(events)
+            )
+        );
+
+        var thrown = await Should.ThrowAsync<IOException>(() =>
+            service.ClearAsync(CancellationToken.None)
+        );
+
+        thrown.ShouldBeSameAs(failure);
+        cache.IsCleared.ShouldBeFalse();
+        eventCount.ShouldBe(0);
     }
 
     [Test]
@@ -230,6 +280,7 @@ public sealed class BotAccountAuthorizationPolicyTests
             new ConfiguredBotAccountAuthorizationPolicy(
                 Settings("tokens.json"),
                 new RecordingAccessTokenCache(),
+                new JsonTokenStore(),
                 new HelixClient(
                     new CurrentUserHttpClientFactory(),
                     global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
@@ -254,16 +305,63 @@ public sealed class BotAccountAuthorizationPolicyTests
     {
         public int ClearCount { get; private set; }
 
+        public bool IsCleared { get; private set; }
+
+        CredentialEpoch IAccessTokenCache.Epoch => default;
+
         Task<TResult> IAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
             Func<IAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
             CancellationToken cancellationToken
         ) => throw new InvalidOperationException("Read-through should not run while clearing.");
 
-        public Task ClearAsync(CancellationToken cancellationToken)
+        public async Task ClearAsync(
+            ITokenStore tokenStore,
+            string path,
+            CancellationToken cancellationToken
+        )
         {
             ClearCount++;
-            return Task.CompletedTask;
+            await tokenStore.DeleteAsync(path, cancellationToken);
+            IsCleared = true;
         }
+    }
+
+    private sealed class BlockingTokenStore(ITokenStore inner) : ITokenStore
+    {
+        public Channel<bool> DeleteStarted { get; } = Channel.CreateUnbounded<bool>();
+
+        public Channel<bool> ContinueDelete { get; } = Channel.CreateUnbounded<bool>();
+
+        public Task<Option<TokenSet>> LoadAsync(string path, CancellationToken cancellationToken) =>
+            inner.LoadAsync(path, cancellationToken);
+
+        public Task SaveAsync(
+            string path,
+            TokenSet tokenSet,
+            CancellationToken cancellationToken
+        ) => inner.SaveAsync(path, tokenSet, cancellationToken);
+
+        public async Task DeleteAsync(string path, CancellationToken cancellationToken)
+        {
+            await DeleteStarted.Writer.WriteAsync(true, cancellationToken);
+            _ = await ContinueDelete.Reader.ReadAsync(cancellationToken);
+            await inner.DeleteAsync(path, cancellationToken);
+        }
+    }
+
+    private sealed class FailingTokenStore(Exception failure) : ITokenStore
+    {
+        public Task<Option<TokenSet>> LoadAsync(string path, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Loading is not expected.");
+
+        public Task SaveAsync(
+            string path,
+            TokenSet tokenSet,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Saving is not expected.");
+
+        public Task DeleteAsync(string path, CancellationToken cancellationToken) =>
+            Task.FromException(failure);
     }
 
     private sealed class StaticTokenStatusSource(Result<TokenStatus, TokenStatusError> result)

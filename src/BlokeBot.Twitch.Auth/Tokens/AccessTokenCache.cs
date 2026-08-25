@@ -9,7 +9,12 @@ internal sealed class AccessTokenCache
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private Option<TokenSet> _current = Option<TokenSet>.None;
+    private long _epoch;
     private bool _loaded;
+
+    CredentialEpoch IAccessTokenCache.Epoch => new(Interlocked.Read(ref _epoch));
+
+    CredentialEpoch IAccessTokenCacheTransaction.Epoch => new(_epoch);
 
     bool IAccessTokenCacheTransaction.IsLoaded => _loaded;
 
@@ -33,13 +38,22 @@ internal sealed class AccessTokenCache
         }
     }
 
-    public async Task ClearAsync(CancellationToken cancellationToken)
+    public async Task ClearAsync(
+        ITokenStore tokenStore,
+        string path,
+        CancellationToken cancellationToken
+    )
     {
+        ArgumentNullException.ThrowIfNull(tokenStore);
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            var nextEpoch = checked(_epoch + 1);
+            await tokenStore.DeleteAsync(path, CancellationToken.None);
             _current = Option<TokenSet>.None;
             _loaded = false;
+            _ = Interlocked.Exchange(ref _epoch, nextEpoch);
         }
         finally
         {

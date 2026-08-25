@@ -2,7 +2,7 @@ using BlokeBot.Functional;
 
 namespace BlokeBot.Twitch.Auth;
 
-public readonly record struct OAuthStateConsumed;
+public readonly record struct OAuthStateConsumed(CredentialEpoch CredentialEpoch);
 
 public readonly record struct OAuthStateRejected;
 
@@ -14,8 +14,9 @@ public interface IOAuthStateStore
     /// <summary>
     /// Issues a state value.
     /// </summary>
+    /// <param name="credentialEpoch">The credential epoch at issuance.</param>
     /// <returns>The issued state value.</returns>
-    string Issue();
+    string Issue(CredentialEpoch credentialEpoch);
 
     /// <summary>
     /// Consumes a state value.

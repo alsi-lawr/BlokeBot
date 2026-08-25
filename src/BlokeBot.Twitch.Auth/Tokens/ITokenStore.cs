@@ -23,4 +23,12 @@ public interface ITokenStore
     /// <param name="cancellationToken">A token that cancels saving.</param>
     /// <returns>A task that completes when the token set is saved.</returns>
     Task SaveAsync(string path, TokenSet tokenSet, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes a stored token set.
+    /// </summary>
+    /// <param name="path">The storage path.</param>
+    /// <param name="cancellationToken">A token that cancels deletion.</param>
+    /// <returns>A task that completes when the token set is absent.</returns>
+    Task DeleteAsync(string path, CancellationToken cancellationToken);
 }

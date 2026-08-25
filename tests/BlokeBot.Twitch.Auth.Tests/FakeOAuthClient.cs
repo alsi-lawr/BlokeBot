@@ -1,3 +1,5 @@
+using System.Threading.Channels;
+
 namespace BlokeBot.Twitch.Auth.Tests;
 
 internal sealed class FakeOAuthClient : IOAuthClient
@@ -14,6 +16,14 @@ internal sealed class FakeOAuthClient : IOAuthClient
 
     public Exception? ValidateException { get; set; }
 
+    public Channel<bool>? ExchangeStarted { get; init; }
+
+    public Channel<bool>? ContinueExchange { get; init; }
+
+    public Channel<bool>? RefreshStarted { get; init; }
+
+    public Channel<bool>? ContinueRefresh { get; init; }
+
     public int ExchangeCalls { get; private set; }
 
     public int RefreshCalls { get; private set; }
@@ -21,18 +31,39 @@ internal sealed class FakeOAuthClient : IOAuthClient
     public Uri BuildAuthorizeUri(string state) =>
         new($"https://id.twitch.tv/oauth2/authorize?state={state}");
 
-    public Task<TokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
+    public async Task<TokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
     {
         ExchangeCalls++;
-        return Task.FromResult(ExchangeResult);
+        if (ExchangeStarted is not null)
+        {
+            await ExchangeStarted.Writer.WriteAsync(true, cancellationToken);
+        }
+
+        if (ContinueExchange is not null)
+        {
+            _ = await ContinueExchange.Reader.ReadAsync(cancellationToken);
+        }
+
+        return ExchangeResult;
     }
 
-    public Task<TokenSet> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
+    public async Task<TokenSet> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken
+    )
     {
         RefreshCalls++;
-        return RefreshException is not null
-            ? Task.FromException<TokenSet>(RefreshException)
-            : Task.FromResult(RefreshResult);
+        if (RefreshStarted is not null)
+        {
+            await RefreshStarted.Writer.WriteAsync(true, cancellationToken);
+        }
+
+        if (ContinueRefresh is not null)
+        {
+            _ = await ContinueRefresh.Reader.ReadAsync(cancellationToken);
+        }
+
+        return RefreshException is not null ? throw RefreshException : RefreshResult;
     }
 
     public Task<TokenValidationOutcome> ValidateAsync(

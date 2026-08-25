@@ -64,4 +64,12 @@ public sealed class JsonTokenStore : ITokenStore
             }
         }
     }
+
+    /// <inheritdoc />
+    public Task DeleteAsync(string path, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        File.Delete(path);
+        return Task.CompletedTask;
+    }
 }

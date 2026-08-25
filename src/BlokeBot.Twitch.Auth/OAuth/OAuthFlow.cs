@@ -12,14 +12,14 @@ internal sealed class OAuthFlow(
 {
     public Uri CreateAuthorizationUri()
     {
-        var state = states.Issue();
+        var state = IssueState();
         return oauth.BuildAuthorizeUri(state);
     }
 
     public Uri CreateAuthorizationUri(IEnumerable<string?> additionalScopes)
     {
         ArgumentNullException.ThrowIfNull(additionalScopes);
-        var state = states.Issue();
+        var state = IssueState();
         return oauth.BuildAuthorizeUri(state, additionalScopes);
     }
 
@@ -30,33 +30,47 @@ internal sealed class OAuthFlow(
     )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
-
         return states
             .Consume(state)
             .Match(
-                _ => CompleteConsumedAuthorizationAsync(code, cancellationToken),
-                static _ =>
-                    Task.FromResult<OAuthFlowCompletionOutcome>(
-                        new OAuthFlowCompletionOutcome.InvalidState()
-                    )
+                consumed =>
+                    cache.Epoch == consumed.CredentialEpoch
+                        ? CompleteConsumedAuthorizationAsync(
+                            code,
+                            consumed.CredentialEpoch,
+                            cancellationToken
+                        )
+                        : InvalidState(),
+                static _ => InvalidState()
             );
     }
 
     private async Task<OAuthFlowCompletionOutcome> CompleteConsumedAuthorizationAsync(
         string code,
+        CredentialEpoch credentialEpoch,
         CancellationToken cancellationToken
     )
     {
         var tokenSet = await oauth.ExchangeCodeAsync(code, cancellationToken);
-        _ = await cache.ExecuteSynchronizedAsync(
+        return await cache.ExecuteSynchronizedAsync(
             async (transaction, token) =>
             {
+                if (transaction.Epoch != credentialEpoch)
+                {
+                    return new OAuthFlowCompletionOutcome.InvalidState();
+                }
+
                 await tokens.SaveAsync(identity.TokenCachePath, tokenSet, token);
                 transaction.SetLoaded(Option<TokenSet>.Some(tokenSet));
-                return true;
+                return (OAuthFlowCompletionOutcome)
+                    new OAuthFlowCompletionOutcome.Completed(tokenSet);
             },
             cancellationToken
         );
-        return new OAuthFlowCompletionOutcome.Completed(tokenSet);
     }
+
+    private string IssueState() => states.Issue(cache.Epoch);
+
+    private static Task<OAuthFlowCompletionOutcome> InvalidState() =>
+        Task.FromResult<OAuthFlowCompletionOutcome>(new OAuthFlowCompletionOutcome.InvalidState());
 }
