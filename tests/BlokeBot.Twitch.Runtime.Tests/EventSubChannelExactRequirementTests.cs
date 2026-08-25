@@ -15,7 +15,7 @@ public sealed class EventSubChannelExactRequirementTests : EventSubChannelRecove
         operations.EnqueueExactCreateFailure("channel", failure);
         await using var harness = CreateHarness(operations, attemptLimit: 1);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         _ = harness
@@ -46,12 +46,12 @@ public sealed class EventSubChannelExactRequirementTests : EventSubChannelRecove
 
         await using (var initial = CreateHarness(operations, attemptLimit: 1))
         {
-            initial.Session.Start(["channel"], CancellationToken.None);
+            Start(initial, ["channel"], CancellationToken.None);
             await initial.Session.DrainAsync();
 
             await initial.Session.RepairRevokedSubscriptionAndDrainAsync(
                 operations.ExactSubscriptionIds("channel").ShouldHaveSingleItem(),
-                _ => ValueTask.FromResult<IReadOnlyList<string>>(["channel"]),
+                _ => ValueTask.FromResult(TargetsFor(initial.Session, ["channel"])),
                 CancellationToken.None
             );
 
@@ -68,7 +68,7 @@ public sealed class EventSubChannelExactRequirementTests : EventSubChannelRecove
 
         await using (var reconnect = CreateHarness(operations, attemptLimit: 1))
         {
-            reconnect.Session.Start(["channel"], CancellationToken.None);
+            Start(reconnect, ["channel"], CancellationToken.None);
             await reconnect.Session.DrainAsync();
 
             _ = reconnect
@@ -94,7 +94,7 @@ public sealed class EventSubChannelExactRequirementTests : EventSubChannelRecove
         );
         operations.SetExactRequirements("channel", _channelBan);
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         var exactId = operations.ExactSubscriptionIds("channel").ShouldHaveSingleItem();
 

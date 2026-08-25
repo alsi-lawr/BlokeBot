@@ -6,16 +6,41 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class EventSubChannelReconciliationTests : EventSubChannelRecoveryTestBase
 {
     [Test]
+    public async Task ReplacedRuntimeSession_StartsAndLaterStopsOnlyNewIdentity()
+    {
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+        Start(harness, ["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        var first = operations.ChannelStartedTargets.ShouldHaveSingleItem();
+        var second = ReplaceTarget(harness.Session, "channel");
+
+        await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
+        operations.CompleteStopTargets.ShouldBeEmpty();
+        ReferenceEquals(operations.ChannelStartedTargets[1].SessionIdentity, second.SessionIdentity)
+            .ShouldBeTrue();
+        ReferenceEquals(first.SessionIdentity, second.SessionIdentity).ShouldBeFalse();
+
+        await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
+
+        ReferenceEquals(
+                operations.CompleteStopTargets.ShouldHaveSingleItem().SessionIdentity,
+                second.SessionIdentity
+            )
+            .ShouldBeTrue();
+    }
+
+    [Test]
     public async Task PeriodicInventoryHealth_RecreatesTrackedChannelWithNoEnabledOwnedId()
     {
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         await harness.Session.RepairMissingSubscriptionsAndDrainAsync(
             _ => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal)),
-            _ => ValueTask.FromResult<IReadOnlyList<string>>(["channel"]),
+            _ => ValueTask.FromResult(TargetsFor(harness.Session, ["channel"])),
             CancellationToken.None
         );
 
@@ -32,7 +57,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
     {
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["missing", "healthy"], CancellationToken.None);
+        Start(harness, ["missing", "healthy"], CancellationToken.None);
         await harness.Session.DrainAsync();
         harness.Diagnostics.Clear();
 
@@ -41,7 +66,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
                 Task.FromResult<IReadOnlySet<string>>(
                     new HashSet<string>(StringComparer.Ordinal) { "subscription-healthy" }
                 ),
-            _ => ValueTask.FromResult<IReadOnlyList<string>>(["missing", "healthy"]),
+            _ => ValueTask.FromResult(TargetsFor(harness.Session, ["missing", "healthy"])),
             CancellationToken.None
         );
 
@@ -61,7 +86,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         var releaseReplacement = Channel.CreateUnbounded<bool>();
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         operations.EnqueueAccount(
             "channel",
@@ -75,7 +100,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
 
         var replacement = harness.Session.RepairRevokedSubscriptionAndDrainAsync(
             "subscription-channel",
-            _ => ValueTask.FromResult<IReadOnlyList<string>>(["channel"]),
+            _ => ValueTask.FromResult(TargetsFor(harness.Session, ["channel"])),
             CancellationToken.None
         );
         _ = await enteredReplacement.Reader.ReadAsync();
@@ -93,7 +118,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             ignored =>
             {
                 _ = Interlocked.Increment(ref desiredChannelLoads);
-                return ValueTask.FromResult<IReadOnlyList<string>>(["channel"]);
+                return ValueTask.FromResult(TargetsFor(harness.Session, ["channel"]));
             },
             CancellationToken.None
         );
@@ -119,12 +144,12 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
     {
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["revoked", "healthy"], CancellationToken.None);
+        Start(harness, ["revoked", "healthy"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         await harness.Session.RepairRevokedSubscriptionAndDrainAsync(
             "subscription-revoked",
-            _ => ValueTask.FromResult<IReadOnlyList<string>>(["revoked", "healthy"]),
+            _ => ValueTask.FromResult(TargetsFor(harness.Session, ["revoked", "healthy"])),
             CancellationToken.None
         );
 
@@ -140,7 +165,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         var failure = new IOException("remote delete failed once");
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         operations.EnqueueDeleteFailure("channel", failure);
         harness.Diagnostics.Clear();
@@ -192,7 +217,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         var failure = new TimeoutException("remote delete timed out once");
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         operations.EnqueueDeleteFailure("channel", failure);
         harness.Diagnostics.Clear();
@@ -235,7 +260,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         var failure = new IOException("remote delete secret");
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         for (var attempt = 0; attempt < 3; attempt++)
         {
@@ -281,7 +306,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         var failure = new InvalidOperationException("terminal delete secret");
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["bad", "good"], CancellationToken.None);
+        Start(harness, ["bad", "good"], CancellationToken.None);
         await harness.Session.DrainAsync();
         operations.EnqueueDeleteFailure("bad", failure);
         harness.Diagnostics.Clear();
@@ -326,7 +351,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
     {
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
@@ -344,7 +369,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
     {
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         operations.EnqueueCompleteStopFailure(
             "channel",
@@ -365,7 +390,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         using var cancellation = new CancellationTokenSource();
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["channel"], cancellation.Token);
+        Start(harness, ["channel"], cancellation.Token);
         await harness.Session.DrainAsync();
         operations.EnqueueBeforeDelete("channel", cancellation.Cancel);
         operations.EnqueueDeleteFailure(
@@ -403,7 +428,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             sharedRuntimeStatus,
             sharedPendingDeletions
         );
-        old.Session.Start(["channel"], CancellationToken.None);
+        Start(old, ["channel"], CancellationToken.None);
         await old.Session.DrainAsync();
         oldOperations.EnqueueDeleteFailure(
             "channel",
@@ -422,7 +447,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             sharedRuntimeStatus,
             sharedPendingDeletions
         );
-        replacement.Session.Start([], CancellationToken.None);
+        Start(replacement, [], CancellationToken.None);
         await replacement.Session.DrainAsync();
 
         replacementOperations.DeleteCount("channel").ShouldBe(1);
@@ -450,7 +475,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             sharedStatus,
             sharedRuntimeStatus
         );
-        old.Session.Start(["old"], CancellationToken.None);
+        Start(old, ["old"], CancellationToken.None);
         await old.Session.DrainAsync();
         oldOperations.EnqueueAccount(
             "old",
@@ -475,7 +500,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             sharedStatus,
             sharedRuntimeStatus
         );
-        replacement.Session.Start(["replacement"], CancellationToken.None);
+        Start(replacement, ["replacement"], CancellationToken.None);
         await replacement.Session.DrainAsync();
 
         await old.Session.DisposeAsync();

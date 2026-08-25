@@ -60,9 +60,9 @@ public sealed class EventSubRuntimeResilienceTests : EventSubChannelRecoveryTest
 
     private sealed class EmptyChannelProvider : IBotChannelProvider
     {
-        public ValueTask<IReadOnlyList<string>> GetChannelsAsync(
+        public ValueTask<IReadOnlyList<BotChannelTarget>> GetChannelsAsync(
             CancellationToken cancellationToken
-        ) => ValueTask.FromResult<IReadOnlyList<string>>([]);
+        ) => ValueTask.FromResult<IReadOnlyList<BotChannelTarget>>([]);
     }
 
     private sealed class FailingListTransport : IEventSubSubscriptionTransport

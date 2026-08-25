@@ -6,9 +6,11 @@ namespace BlokeBot.Twitch.Runtime;
 public interface IBotChannelProvider
 {
     /// <summary>
-    /// Gets the channel logins that should be connected, without leading hash characters.
+    /// Gets the channel runtime sessions that should be connected.
     /// </summary>
     /// <param name="cancellationToken">A token that cancels the channel lookup.</param>
-    /// <returns>The channel logins to connect.</returns>
-    ValueTask<IReadOnlyList<string>> GetChannelsAsync(CancellationToken cancellationToken);
+    /// <returns>The channel runtime sessions to connect.</returns>
+    ValueTask<IReadOnlyList<BotChannelTarget>> GetChannelsAsync(
+        CancellationToken cancellationToken
+    );
 }

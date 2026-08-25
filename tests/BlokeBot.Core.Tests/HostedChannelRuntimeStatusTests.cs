@@ -16,9 +16,11 @@ public sealed class HostedChannelRuntimeStatusTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
+        var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
         var service = new HostedChannelRuntimeStatusService(
             dbFactory,
-            ChannelAuthorizationService(dbFactory, "channel:bot")
+            ChannelAuthorizationService(dbFactory, "channel:bot"),
+            new HostedChannelRuntimeTransitionService(dbFactory, changes)
         );
 
         var summary = (

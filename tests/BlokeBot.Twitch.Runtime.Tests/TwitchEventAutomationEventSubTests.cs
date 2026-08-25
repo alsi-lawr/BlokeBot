@@ -590,7 +590,7 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
         operations.EnqueueBroadcasterAccountResult("channel", "channel");
         await using var harness = CreateHarness(operations, attemptLimit: 1);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         operations

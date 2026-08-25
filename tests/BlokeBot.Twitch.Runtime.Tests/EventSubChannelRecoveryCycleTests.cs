@@ -17,7 +17,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
         operations.EnqueueAccountFailure("channel", exhaustedFailure);
         await using var harness = CreateHarness(operations, attemptLimit: 2);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var exhaustedReports = harness.Diagnostics.Reports;
@@ -124,7 +124,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
         var harness = CreateHarness(operations, attemptLimit: 2);
         harness.Diagnostics.EnqueueFailure(reporterFailure);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         var taskFailure = await Should.ThrowAsync<EventSubChannelStatusPublicationException>(
             harness.Session.DrainAsync
         );
@@ -149,7 +149,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
         var releaseRecovery = Channel.CreateUnbounded<bool>();
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Session.Start(["bad", "good"], CancellationToken.None);
+        Start(harness, ["bad", "good"], CancellationToken.None);
         await harness.Session.DrainAsync();
         harness.Diagnostics.Clear();
 

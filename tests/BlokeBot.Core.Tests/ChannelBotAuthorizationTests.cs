@@ -182,7 +182,12 @@ public sealed class ChannelBotAuthorizationTests
         (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
             BotChannelRuntimeState.Starting
         );
-        await lifecycle.MarkStartedAsync("streamer", CancellationToken.None);
+        var session = await transitions.GetOrCreateSessionTargetAsync(
+            hostId,
+            "streamer",
+            CancellationToken.None
+        );
+        _ = await lifecycle.MarkStartedAsync(session, CancellationToken.None);
         (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
             BotChannelRuntimeState.Started
         );
@@ -192,7 +197,7 @@ public sealed class ChannelBotAuthorizationTests
         (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
             BotChannelRuntimeState.Stopping
         );
-        await lifecycle.MarkStoppedAsync("streamer", CancellationToken.None);
+        _ = await lifecycle.MarkStoppedAsync(session, CancellationToken.None);
         (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
             BotChannelRuntimeState.Stopped
         );

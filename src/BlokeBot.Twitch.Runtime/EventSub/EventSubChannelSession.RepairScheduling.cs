@@ -6,7 +6,7 @@ internal sealed partial class EventSubChannelSession
     // slot: a snapshot taken before queueing goes stale behind in-flight work and tears down
     // subscriptions that work just created.
     internal async Task TriggerReconciliationAndDrainAsync(
-        Func<CancellationToken, ValueTask<IReadOnlyList<string>>> loadDesiredChannels,
+        Func<CancellationToken, ValueTask<IReadOnlyList<BotChannelTarget>>> loadDesiredChannels,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
     ) =>
@@ -22,7 +22,7 @@ internal sealed partial class EventSubChannelSession
 
     internal async Task RepairMissingSubscriptionsAndDrainAsync(
         Func<CancellationToken, Task<IReadOnlySet<string>>> listEnabledRemoteSubscriptionIds,
-        Func<CancellationToken, ValueTask<IReadOnlyList<string>>> loadDesiredChannels,
+        Func<CancellationToken, ValueTask<IReadOnlyList<BotChannelTarget>>> loadDesiredChannels,
         CancellationToken cancellationToken
     ) =>
         await ScheduleAndDrainAsync(
@@ -37,7 +37,7 @@ internal sealed partial class EventSubChannelSession
 
     internal async Task RepairRevokedSubscriptionAndDrainAsync(
         string subscriptionId,
-        Func<CancellationToken, ValueTask<IReadOnlyList<string>>> loadDesiredChannels,
+        Func<CancellationToken, ValueTask<IReadOnlyList<BotChannelTarget>>> loadDesiredChannels,
         CancellationToken cancellationToken
     ) =>
         await ScheduleAndDrainAsync(
@@ -111,7 +111,7 @@ internal sealed partial class EventSubChannelSession
 
     private async Task RepairMissingSubscriptionsAsync(
         IReadOnlySet<string> enabledRemoteSubscriptionIds,
-        IReadOnlyList<string> desiredChannels,
+        IReadOnlyList<BotChannelTarget> desiredChannels,
         CancellationToken cancellationToken
     )
     {

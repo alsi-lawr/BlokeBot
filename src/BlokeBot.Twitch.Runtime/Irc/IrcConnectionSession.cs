@@ -46,10 +46,10 @@ internal sealed class IrcConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        var channelLogins = BotChannelList.Normalize(
+        var channelTargets = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
-        if (channelLogins.Length == 0)
+        if (channelTargets.Length == 0)
         {
             status.MarkDisconnected();
             _log.LogWarning(
@@ -94,25 +94,27 @@ internal sealed class IrcConnectionSession(
                 );
                 await writer.WriteLineAsync($"PASS oauth:{token}");
                 await writer.WriteLineAsync($"NICK {_opts.Identity.BotUsername}");
-                var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var startedChannels = new List<string>();
-                foreach (var channel in channelLogins)
+                var joinedChannels = new Dictionary<string, BotChannelSessionIdentity>(
+                    StringComparer.OrdinalIgnoreCase
+                );
+                var startedChannels = new List<BotChannelTarget>();
+                foreach (var target in channelTargets)
                 {
-                    await JoinChannelAsync(writer, channel, cancellationToken);
-                    _ = joinedChannels.Add(channel);
-                    startedChannels.Add(channel);
+                    await JoinChannelAsync(writer, target.Channel, cancellationToken);
+                    joinedChannels[target.Channel] = target.SessionIdentity;
+                    startedChannels.Add(target);
                 }
                 await AwaitAuthenticationAsync(reader, writer, cancellationToken);
-                status.MarkConnected(joinedChannels);
-                foreach (var channel in startedChannels)
+                status.MarkConnected(joinedChannels.Keys);
+                foreach (var target in startedChannels)
                 {
-                    await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
+                    await lifecycleNotifier.ChannelStartedAsync(target, cancellationToken);
                 }
 
                 _log.LogInformation(
                     "Twitch IRC authentication sent for {BotUsername}; joining {ChannelCount} channels.",
                     _opts.Identity.BotUsername,
-                    channelLogins.Length
+                    channelTargets.Length
                 );
 
                 return new RuntimeSessionEstablishment.Established
@@ -175,36 +177,46 @@ internal sealed class IrcConnectionSession(
 
     internal async Task SyncJoinedChannelsAsync(
         StreamWriter writer,
-        HashSet<string> joinedChannels,
+        Dictionary<string, BotChannelSessionIdentity> joinedChannels,
         CancellationToken cancellationToken
     )
     {
-        var desiredChannels = BotChannelList.Normalize(
+        var desiredTargets = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
-        var startedChannels = new List<string>();
-        var stoppedChannels = new List<string>();
+        var desiredChannels = desiredTargets.ToDictionary(
+            static target => target.Channel,
+            static target => target.SessionIdentity,
+            StringComparer.OrdinalIgnoreCase
+        );
+        var startedChannels = new List<BotChannelTarget>();
+        var stoppedChannels = new List<BotChannelTarget>();
 
         foreach (
-            var channel in joinedChannels
-                .Except(desiredChannels, StringComparer.OrdinalIgnoreCase)
+            var joined in joinedChannels
+                .Where(joined =>
+                    !desiredChannels.TryGetValue(joined.Key, out var desiredSession)
+                    || !ReferenceEquals(joined.Value, desiredSession)
+                )
                 .ToArray()
         )
         {
-            await writer.WriteLineAsync($"PART #{channel}");
-            _ = joinedChannels.Remove(channel);
-            stoppedChannels.Add(channel);
-            _log.LogInformation("Parted Twitch IRC channel #{Channel}.", channel);
+            await writer.WriteLineAsync($"PART #{joined.Key}");
+            _ = joinedChannels.Remove(joined.Key);
+            stoppedChannels.Add(new BotChannelTarget(joined.Key, joined.Value));
+            _log.LogInformation("Parted Twitch IRC channel #{Channel}.", joined.Key);
         }
 
         foreach (
-            var channel in desiredChannels.Except(joinedChannels, StringComparer.OrdinalIgnoreCase)
+            var target in desiredTargets.Where(target =>
+                !joinedChannels.ContainsKey(target.Channel)
+            )
         )
         {
-            await JoinChannelAsync(writer, channel, cancellationToken);
-            _ = joinedChannels.Add(channel);
-            startedChannels.Add(channel);
-            _log.LogInformation("Joined Twitch IRC channel #{Channel}.", channel);
+            await JoinChannelAsync(writer, target.Channel, cancellationToken);
+            joinedChannels[target.Channel] = target.SessionIdentity;
+            startedChannels.Add(target);
+            _log.LogInformation("Joined Twitch IRC channel #{Channel}.", target.Channel);
         }
 
         if (joinedChannels.Count == 0)
@@ -213,16 +225,16 @@ internal sealed class IrcConnectionSession(
         }
         else
         {
-            status.MarkConnected(joinedChannels);
+            status.MarkConnected(joinedChannels.Keys);
         }
-        foreach (var channel in stoppedChannels)
+        foreach (var target in stoppedChannels)
         {
-            await lifecycleNotifier.ChannelStoppedAsync(channel, cancellationToken);
+            await lifecycleNotifier.ChannelStoppedAsync(target, cancellationToken);
         }
 
-        foreach (var channel in startedChannels)
+        foreach (var target in startedChannels)
         {
-            await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
+            await lifecycleNotifier.ChannelStartedAsync(target, cancellationToken);
         }
     }
 
@@ -363,7 +375,7 @@ internal sealed class IrcConnectionSession(
         TcpClient tcp,
         StreamReader reader,
         StreamWriter writer,
-        HashSet<string> joinedChannels
+        Dictionary<string, BotChannelSessionIdentity> joinedChannels
     ) : IRuntimeEstablishedSession
     {
         public async Task<RuntimeReconnectRequest> ListenAsync(CancellationToken cancellationToken)

@@ -837,10 +837,14 @@ public sealed class ChatIdentityResolverTests
 
     private sealed class UnusedLifecycleNotifier : IBotChannelLifecycleNotifier
     {
-        public Task ChannelStartedAsync(string channel, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Channel startup was not expected.");
+        public Task ChannelStartedAsync(
+            BotChannelTarget target,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Channel startup was not expected.");
 
-        public Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Channel stop was not expected.");
+        public Task ChannelStoppedAsync(
+            BotChannelTarget target,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Channel stop was not expected.");
     }
 }

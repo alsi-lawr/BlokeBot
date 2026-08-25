@@ -5,7 +5,7 @@ namespace BlokeBot.Core.BotRuntime;
 internal sealed class HostedChannelProvider(HostedChannelRuntimeStatusService hostedChannels)
     : IBotChannelProvider
 {
-    public async ValueTask<IReadOnlyList<string>> GetChannelsAsync(
+    public async ValueTask<IReadOnlyList<BotChannelTarget>> GetChannelsAsync(
         CancellationToken cancellationToken
-    ) => await hostedChannels.LoadConnectableChannelLoginsAsync(cancellationToken);
+    ) => await hostedChannels.LoadConnectableChannelTargetsAsync(cancellationToken);
 }

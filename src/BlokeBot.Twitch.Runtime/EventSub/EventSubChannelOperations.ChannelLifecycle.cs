@@ -24,8 +24,8 @@ internal sealed partial class EventSubChannelOperations
         );
     }
 
-    public ValueTask NotifyChannelStartedAsync(string channel, CancellationToken ct) =>
-        new(lifecycle.ChannelStartedAsync(channel, ct));
+    public ValueTask NotifyChannelStartedAsync(BotChannelTarget target, CancellationToken ct) =>
+        new(lifecycle.ChannelStartedAsync(target, ct));
 
     public async ValueTask<EventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
         ActiveEventSubSubscription subscription,
@@ -62,6 +62,6 @@ internal sealed partial class EventSubChannelOperations
         }
     }
 
-    public ValueTask CompleteStopAsync(string channel, CancellationToken ct) =>
-        new(lifecycle.ChannelStoppedAsync(channel, ct));
+    public ValueTask CompleteStopAsync(BotChannelTarget target, CancellationToken ct) =>
+        new(lifecycle.ChannelStoppedAsync(target, ct));
 }

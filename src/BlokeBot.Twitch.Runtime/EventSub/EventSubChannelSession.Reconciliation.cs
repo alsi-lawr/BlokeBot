@@ -5,7 +5,7 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed partial class EventSubChannelSession
 {
     private async Task RunReconciliationAsync(
-        IReadOnlyList<string> desiredChannels,
+        IReadOnlyList<BotChannelTarget> desiredChannels,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
     )
@@ -21,13 +21,20 @@ internal sealed partial class EventSubChannelSession
             .ToArray();
 
         var desired = BotChannelList.Normalize(desiredChannels);
-        var removed = trackedChannels.Except(desired, StringComparer.OrdinalIgnoreCase).ToArray();
+        var desiredChannelLogins = desired.Select(static target => target.Channel).ToArray();
+        var removed = trackedChannels
+            .Except(desiredChannelLogins, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         await Task.WhenAll(
             desired
-                .Select(channel =>
+                .Select(target =>
                     RunTriggeredAsync(
-                        channel,
-                        EventSubChannelReconciliationTarget.Present,
+                        target.Channel,
+                        TryGetRuntimeTarget(target.Channel, out var current)
+                        && !ReferenceEquals(current.SessionIdentity, target.SessionIdentity)
+                            ? EventSubChannelReconciliationTarget.Replacing
+                            : EventSubChannelReconciliationTarget.Present,
+                        target,
                         trigger,
                         cancellationToken
                     )
@@ -37,6 +44,7 @@ internal sealed partial class EventSubChannelSession
                         RunTriggeredAsync(
                             channel,
                             EventSubChannelReconciliationTarget.Absent,
+                            GetRuntimeTarget(channel),
                             trigger,
                             cancellationToken
                         )
@@ -48,6 +56,7 @@ internal sealed partial class EventSubChannelSession
     private async Task RunTriggeredAsync(
         string channel,
         EventSubChannelReconciliationTarget target,
+        BotChannelTarget runtimeTarget,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
     )
@@ -73,6 +82,7 @@ internal sealed partial class EventSubChannelSession
             await RunRecoveryCycleAsync(
                 channel,
                 target,
+                runtimeTarget,
                 trigger,
                 GetFailureContext(channel),
                 cancellationToken
@@ -80,12 +90,13 @@ internal sealed partial class EventSubChannelSession
             return;
         }
 
-        await RunImmediateAsync(channel, target, trigger, cancellationToken);
+        await RunImmediateAsync(channel, target, runtimeTarget, trigger, cancellationToken);
     }
 
     private async Task RunImmediateAsync(
         string channel,
         EventSubChannelReconciliationTarget target,
+        BotChannelTarget runtimeTarget,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
     )
@@ -95,7 +106,7 @@ internal sealed partial class EventSubChannelSession
         try
         {
             outcome = await recovery.ExecuteAttemptAsync(
-                token => ReconcileAsync(channel, target, context, token),
+                token => ReconcileAsync(channel, target, runtimeTarget, context, token),
                 cancellationToken
             );
         }
@@ -127,7 +138,14 @@ internal sealed partial class EventSubChannelSession
 
             if (isRecoverable)
             {
-                await RunRecoveryCycleAsync(channel, target, trigger, failure, cancellationToken);
+                await RunRecoveryCycleAsync(
+                    channel,
+                    target,
+                    runtimeTarget,
+                    trigger,
+                    failure,
+                    cancellationToken
+                );
             }
 
             return;
@@ -168,7 +186,14 @@ internal sealed partial class EventSubChannelSession
             );
             if (isRecoverable)
             {
-                await RunRecoveryCycleAsync(channel, target, trigger, failure, cancellationToken);
+                await RunRecoveryCycleAsync(
+                    channel,
+                    target,
+                    runtimeTarget,
+                    trigger,
+                    failure,
+                    cancellationToken
+                );
             }
         }
     }
@@ -206,6 +231,7 @@ internal sealed partial class EventSubChannelSession
     private async Task RunRecoveryCycleAsync(
         string channel,
         EventSubChannelReconciliationTarget target,
+        BotChannelTarget runtimeTarget,
         EventSubChannelRecoveryTrigger trigger,
         EventSubChannelFailureContext initialFailure,
         CancellationToken cancellationToken
@@ -228,7 +254,13 @@ internal sealed partial class EventSubChannelSession
                     PublishRecovering(channel, trigger, attempt, latestFailure);
                     try
                     {
-                        var outcome = await ReconcileAsync(channel, target, context, attemptToken);
+                        var outcome = await ReconcileAsync(
+                            channel,
+                            target,
+                            runtimeTarget,
+                            context,
+                            attemptToken
+                        );
                         if (
                             outcome
                             is EventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved
@@ -286,5 +318,47 @@ internal sealed partial class EventSubChannelSession
         }
 
         PublishReconciliationOutcome(channel, target, trigger, attempt, outcome);
+    }
+
+    private bool TryGetRuntimeTarget(string channel, out BotChannelTarget target)
+    {
+        lock (_gate)
+        {
+            if (_runtimeTargets.TryGetValue(channel, out target!))
+            {
+                return true;
+            }
+        }
+
+        return pendingDeletions.TryGetRuntimeTarget(channel, out target!);
+    }
+
+    private BotChannelTarget GetRuntimeTarget(string channel) =>
+        TryGetRuntimeTarget(channel, out var target)
+            ? target
+            : throw new UnreachableException(
+                "A tracked EventSub channel has no runtime session identity."
+            );
+
+    private void TrackRuntimeTarget(BotChannelTarget target)
+    {
+        lock (_gate)
+        {
+            _runtimeTargets[target.Channel] = target;
+        }
+    }
+
+    private void ForgetRuntimeTarget(BotChannelTarget target)
+    {
+        lock (_gate)
+        {
+            if (
+                _runtimeTargets.TryGetValue(target.Channel, out var current)
+                && ReferenceEquals(current.SessionIdentity, target.SessionIdentity)
+            )
+            {
+                _ = _runtimeTargets.Remove(target.Channel);
+            }
+        }
     }
 }

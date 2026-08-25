@@ -30,6 +30,8 @@ internal sealed record EventSubPendingDeletion
 {
     internal required ActiveEventSubSubscription Subscription { get; init; }
 
+    internal required BotChannelTarget RuntimeTarget { get; init; }
+
     internal required EventSubPendingDeletionState State { get; init; }
 }
 
@@ -39,7 +41,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
     private readonly Dictionary<string, EventSubPendingDeletion> _pending = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private readonly HashSet<string> _pendingLifecycleReconciliations = new(
+    private readonly Dictionary<string, BotChannelTarget> _pendingLifecycleReconciliations = new(
         StringComparer.OrdinalIgnoreCase
     );
 
@@ -69,7 +71,10 @@ internal sealed class EventSubSubscriptionReconciliationStore
             lock (_gate)
             {
                 return _pending
-                    .Keys.Union(_pendingLifecycleReconciliations, StringComparer.OrdinalIgnoreCase)
+                    .Keys.Union(
+                        _pendingLifecycleReconciliations.Keys,
+                        StringComparer.OrdinalIgnoreCase
+                    )
                     .Order(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
             }
@@ -95,7 +100,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
         }
     }
 
-    internal void Begin(ActiveEventSubSubscription subscription)
+    internal void Begin(ActiveEventSubSubscription subscription, BotChannelTarget runtimeTarget)
     {
         lock (_gate)
         {
@@ -105,7 +110,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
                 return;
             }
 
-            if (_pendingLifecycleReconciliations.Contains(subscription.Channel))
+            if (_pendingLifecycleReconciliations.ContainsKey(subscription.Channel))
             {
                 throw new UnreachableException(
                     "An EventSub deletion cannot begin before the prior deletion lifecycle is reconciled."
@@ -115,6 +120,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
             _pending[subscription.Channel] = new EventSubPendingDeletion
             {
                 Subscription = subscription,
+                RuntimeTarget = runtimeTarget,
                 State = new EventSubPendingDeletionState.Scheduled(),
             };
         }
@@ -155,6 +161,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
             _pending[subscription.Channel] = new EventSubPendingDeletion
             {
                 Subscription = subscription,
+                RuntimeTarget = existing.RuntimeTarget,
                 State = new EventSubPendingDeletionState.Unresolved { Failure = failure },
             };
         }
@@ -173,7 +180,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
 
             EnsureSameSubscription(existing.Subscription, subscription);
             _ = _pending.Remove(subscription.Channel);
-            _ = _pendingLifecycleReconciliations.Add(subscription.Channel);
+            _pendingLifecycleReconciliations[subscription.Channel] = existing.RuntimeTarget;
         }
     }
 
@@ -181,7 +188,21 @@ internal sealed class EventSubSubscriptionReconciliationStore
     {
         lock (_gate)
         {
-            return _pendingLifecycleReconciliations.Contains(channel);
+            return _pendingLifecycleReconciliations.ContainsKey(channel);
+        }
+    }
+
+    internal bool TryGetRuntimeTarget(string channel, out BotChannelTarget target)
+    {
+        lock (_gate)
+        {
+            if (_pending.TryGetValue(channel, out var deletion))
+            {
+                target = deletion.RuntimeTarget;
+                return true;
+            }
+
+            return _pendingLifecycleReconciliations.TryGetValue(channel, out target!);
         }
     }
 

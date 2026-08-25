@@ -20,8 +20,6 @@ public sealed class BotHost
 
     public DateTime? BotRuntimeStateChangedAtUtc { get; set; }
 
-    public long BotRuntimeGeneration { get; set; }
-
     public HostFeatureFlags EnabledFeatures { get; set; } = HostFeatureFlags.None;
 
     public DateTime? BountiesPausedAtUtc { get; set; }

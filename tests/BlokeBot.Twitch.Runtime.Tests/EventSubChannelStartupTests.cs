@@ -13,7 +13,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         var operations = new ScriptedChannelOperations();
         await using (var initial = CreateHarness(operations, attemptLimit: 1))
         {
-            initial.Session.Start(["channel"], CancellationToken.None);
+            Start(initial, ["channel"], CancellationToken.None);
             await initial.Session.DrainAsync();
             await ReconcileAsync(
                 initial.Session,
@@ -25,7 +25,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         operations.StartupDeliveryCount("channel").ShouldBe(1);
         await using (var reconnect = CreateHarness(operations, attemptLimit: 1))
         {
-            reconnect.Session.Start(["channel"], CancellationToken.None);
+            Start(reconnect, ["channel"], CancellationToken.None);
             await reconnect.Session.DrainAsync();
         }
 
@@ -53,7 +53,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
 
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["bad", "good"], CancellationToken.None);
+        Start(harness, ["bad", "good"], CancellationToken.None);
         var initialization = harness.Session.DrainAsync();
 
         initialization.IsCompleted.ShouldBeFalse();
@@ -114,7 +114,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 2);
 
-        harness.Session.Start(["good", "slow"], CancellationToken.None);
+        Start(harness, ["good", "slow"], CancellationToken.None);
         var startup = harness.Session.DrainAsync();
         _ = await enteredAttempt.Reader.ReadAsync();
         harness.Clock.Advance(TimeSpan.FromMinutes(1));
@@ -148,7 +148,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         operations.EnqueueCreateFailure("channel", failure);
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var degraded = harness
@@ -187,7 +187,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var degraded = harness
@@ -223,7 +223,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var degraded = harness
@@ -259,7 +259,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var degraded = harness
@@ -295,7 +295,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         await ReconcileAsync(harness.Session, ["channel"], EventSubChannelRecoveryTrigger.Explicit);
 
@@ -330,7 +330,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         operations.EnqueueChannelStartedFailure("channel", failure);
         await using var harness = CreateHarness(operations, attemptLimit: 2);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         operations.StartupDeliveryCount("channel").ShouldBe(1);
@@ -354,7 +354,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         operations.EnqueueAccountFailure("channel", failure);
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var reports = harness.Diagnostics.Reports;
@@ -417,7 +417,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 2);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var deleted = operations.DeleteAttempts("channel").ShouldHaveSingleItem();
@@ -445,7 +445,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         );
         await using var harness = CreateHarness(operations, attemptLimit: 1);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
 

@@ -24,24 +24,26 @@ internal sealed partial class EventSubChannelSession
     private ValueTask<EventSubChannelReconciliationOutcome> ReconcileAsync(
         string channel,
         EventSubChannelReconciliationTarget target,
+        BotChannelTarget runtimeTarget,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     ) =>
         target switch
         {
             EventSubChannelReconciliationTarget.Present => EnsurePresentAsync(
-                channel,
+                runtimeTarget,
                 context,
                 cancellationToken
             ),
             EventSubChannelReconciliationTarget.Absent => EnsureAbsentAsync(
                 channel,
+                runtimeTarget,
                 EventSubChannelDeletionLifecycle.StopRuntime,
                 context,
                 cancellationToken
             ),
             EventSubChannelReconciliationTarget.Replacing => ReplaceAsync(
-                channel,
+                runtimeTarget,
                 context,
                 cancellationToken
             ),
@@ -49,13 +51,14 @@ internal sealed partial class EventSubChannelSession
         };
 
     private async ValueTask<EventSubChannelReconciliationOutcome> ReplaceAsync(
-        string channel,
+        BotChannelTarget runtimeTarget,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
     {
         var removal = await EnsureAbsentAsync(
-            channel,
+            runtimeTarget.Channel,
+            GetRuntimeTarget(runtimeTarget.Channel),
             EventSubChannelDeletionLifecycle.PreserveRuntime,
             context,
             cancellationToken
@@ -63,7 +66,7 @@ internal sealed partial class EventSubChannelSession
         return removal switch
         {
             EventSubChannelReconciliationOutcome.Completed => await EnsurePresentAsync(
-                channel,
+                runtimeTarget,
                 context,
                 cancellationToken
             ),
@@ -75,11 +78,12 @@ internal sealed partial class EventSubChannelSession
     }
 
     private async ValueTask<EventSubChannelReconciliationOutcome> EnsurePresentAsync(
-        string channel,
+        BotChannelTarget runtimeTarget,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
     {
+        var channel = runtimeTarget.Channel;
         var pendingDeletion = await ReconcilePendingDeletionAsync(
             channel,
             context,
@@ -103,6 +107,7 @@ internal sealed partial class EventSubChannelSession
             context,
             cancellationToken
         );
+        TrackRuntimeTarget(runtimeTarget);
         ActiveEventSubSubscription? current;
         lock (_gate)
         {
@@ -135,6 +140,7 @@ internal sealed partial class EventSubChannelSession
                 {
                     var deletion = await ReconcileSubscriptionDeletionAsync(
                         active,
+                        runtimeTarget,
                         context,
                         cancellationToken
                     );
@@ -189,6 +195,7 @@ internal sealed partial class EventSubChannelSession
                             }
                             var cleanup = await ReconcileSubscriptionDeletionAsync(
                                 partial.Subscription,
+                                runtimeTarget,
                                 context,
                                 cancellationToken
                             );
@@ -272,7 +279,7 @@ internal sealed partial class EventSubChannelSession
                         await RunPhaseAsync(
                             context,
                             EventSubChannelPhase.SubscriptionSetup,
-                            token => operations.NotifyChannelStartedAsync(channel, token),
+                            token => operations.NotifyChannelStartedAsync(runtimeTarget, token),
                             cancellationToken
                         );
                         active = active with { Readiness = EventSubSubscriptionReadiness.Ready };
@@ -471,6 +478,7 @@ internal sealed partial class EventSubChannelSession
 
     private async ValueTask<EventSubChannelReconciliationOutcome> EnsureAbsentAsync(
         string channel,
+        BotChannelTarget runtimeTarget,
         EventSubChannelDeletionLifecycle lifecycle,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
@@ -504,6 +512,7 @@ internal sealed partial class EventSubChannelSession
         {
             var deletion = await ReconcileSubscriptionDeletionAsync(
                 active,
+                runtimeTarget,
                 context,
                 cancellationToken
             );
@@ -531,6 +540,7 @@ internal sealed partial class EventSubChannelSession
         {
             _ = _authorizedChannels.Remove(channel);
         }
+        ForgetRuntimeTarget(runtimeTarget);
 
         context.Phase = EventSubChannelPhase.Reconciliation;
         return new EventSubChannelReconciliationOutcome.Completed();
@@ -545,17 +555,19 @@ internal sealed partial class EventSubChannelSession
             ? new EventSubChannelReconciliationOutcome.Completed()
             : await ReconcileSubscriptionDeletionAsync(
                 pending.Subscription,
+                pending.RuntimeTarget,
                 context,
                 cancellationToken
             );
 
     private async ValueTask<EventSubChannelReconciliationOutcome> ReconcileSubscriptionDeletionAsync(
         ActiveEventSubSubscription subscription,
+        BotChannelTarget runtimeTarget,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
     {
-        pendingDeletions.Begin(subscription);
+        pendingDeletions.Begin(subscription, runtimeTarget);
         foreach (var kind in _operationSubscriptionKinds)
         {
             var operationDeletion = await EnsureOperationSubscriptionAbsentAsync(
@@ -896,10 +908,16 @@ internal sealed partial class EventSubChannelSession
             case EventSubChannelDeletionLifecycle.PreserveRuntime:
                 break;
             case EventSubChannelDeletionLifecycle.StopRuntime:
+                if (!pendingDeletions.TryGetRuntimeTarget(channel, out var runtimeTarget))
+                {
+                    throw new UnreachableException(
+                        "A pending EventSub lifecycle stop has no runtime session identity."
+                    );
+                }
                 await RunPhaseAsync(
                     context,
                     EventSubChannelPhase.Reconciliation,
-                    token => operations.CompleteStopAsync(channel, token),
+                    token => operations.CompleteStopAsync(runtimeTarget, token),
                     cancellationToken
                 );
                 break;

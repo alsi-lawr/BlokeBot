@@ -40,12 +40,15 @@ internal interface IEventSubChannelOperations
         CancellationToken cancellationToken
     );
 
-    ValueTask NotifyChannelStartedAsync(string channel, CancellationToken cancellationToken);
+    ValueTask NotifyChannelStartedAsync(
+        BotChannelTarget target,
+        CancellationToken cancellationToken
+    );
 
     ValueTask<EventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
         ActiveEventSubSubscription subscription,
         CancellationToken cancellationToken
     );
 
-    ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken);
+    ValueTask CompleteStopAsync(BotChannelTarget target, CancellationToken cancellationToken);
 }

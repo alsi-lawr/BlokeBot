@@ -22,6 +22,9 @@ internal sealed partial class EventSubChannelSession(
     private readonly Dictionary<string, EventSubChannelFailureContext> _failures = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private readonly Dictionary<string, BotChannelTarget> _runtimeTargets = new(
+        StringComparer.OrdinalIgnoreCase
+    );
     private readonly HashSet<string> _authorizedChannels = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _sessionStop = new();
     private CancellationTokenSource? _lifetime;
@@ -46,11 +49,18 @@ internal sealed partial class EventSubChannelSession(
         }
     }
 
-    internal void Start(IReadOnlyList<string> desiredChannels, CancellationToken cancellationToken)
+    internal void Start(
+        IReadOnlyList<BotChannelTarget> desiredChannels,
+        CancellationToken cancellationToken
+    )
     {
         var desired = BotChannelList.Normalize(desiredChannels);
-        var desiredSet = desired.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var desiredByChannel = desired.ToDictionary(
+            static target => target.Channel,
+            StringComparer.OrdinalIgnoreCase
+        );
         var initial = desired
+            .Select(static target => target.Channel)
             .Union(pendingDeletions.ReconciliationChannels, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         lock (_gate)
@@ -80,9 +90,11 @@ internal sealed partial class EventSubChannelSession(
                     initial.Select(channel =>
                         RunImmediateAsync(
                             channel,
-                            desiredSet.Contains(channel)
+                            desiredByChannel.ContainsKey(channel)
                                 ? EventSubChannelReconciliationTarget.Present
                                 : EventSubChannelReconciliationTarget.Absent,
+                            desiredByChannel.GetValueOrDefault(channel)
+                                ?? GetRuntimeTarget(channel),
                             EventSubChannelRecoveryTrigger.Startup,
                             token
                         )
@@ -105,19 +117,23 @@ internal sealed partial class EventSubChannelSession(
 
     private async Task RepairSubscriptionsAsync(
         IReadOnlyList<string> channels,
-        IReadOnlyList<string> desiredChannels,
+        IReadOnlyList<BotChannelTarget> desiredChannels,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
     )
     {
-        var desired = desiredChannels.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var desired = desiredChannels.ToDictionary(
+            static target => target.Channel,
+            StringComparer.OrdinalIgnoreCase
+        );
         await Task.WhenAll(
             channels.Select(channel =>
                 RunImmediateAsync(
                     channel,
-                    desired.Contains(channel)
+                    desired.ContainsKey(channel)
                         ? EventSubChannelReconciliationTarget.Replacing
                         : EventSubChannelReconciliationTarget.Absent,
+                    desired.GetValueOrDefault(channel) ?? GetRuntimeTarget(channel),
                     trigger,
                     cancellationToken
                 )

@@ -14,9 +14,17 @@ internal sealed class HostedChannelLifecycleNotifier(
     PredictionService? predictions = null
 ) : IBotChannelLifecycleNotifier
 {
-    public async Task ChannelStartedAsync(string channel, CancellationToken cancellationToken)
+    public async Task ChannelStartedAsync(
+        BotChannelTarget target,
+        CancellationToken cancellationToken
+    )
     {
-        await lifecycle.MarkStartedAsync(channel, cancellationToken);
+        if (!await lifecycle.MarkStartedAsync(target, cancellationToken))
+        {
+            return;
+        }
+
+        var channel = target.Channel;
         await polls.ReconcileChannelAsync(channel, cancellationToken);
         await clipsMarkers.ReconcileChannelAsync(channel, cancellationToken);
         if (channelPoints is not null)
@@ -29,6 +37,8 @@ internal sealed class HostedChannelLifecycleNotifier(
         }
     }
 
-    public async Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken) =>
-        await lifecycle.MarkStoppedAsync(channel, cancellationToken);
+    public async Task ChannelStoppedAsync(
+        BotChannelTarget target,
+        CancellationToken cancellationToken
+    ) => await lifecycle.MarkStoppedAsync(target, cancellationToken);
 }

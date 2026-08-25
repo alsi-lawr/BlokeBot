@@ -9,25 +9,25 @@ public sealed class HostedChannelRuntimeLifecycleService(
     public async Task RecoverInterruptedStopsAsync(CancellationToken ct) =>
         _ = await runtimeTransitions.RecoverInterruptedStopsAsync(ct);
 
-    public async Task MarkStartedAsync(string channel, CancellationToken ct)
+    public async Task<bool> MarkStartedAsync(BotChannelTarget target, CancellationToken ct)
     {
-        var normalized = LoginName.Parse(channel);
-        if (normalized.IsEmpty)
-        {
-            return;
-        }
-
-        _ = await runtimeTransitions.ConfirmStartedAsync(normalized.Value, ct);
+        var normalized = LoginName.Parse(target.Channel);
+        return !normalized.IsEmpty
+            && await runtimeTransitions.ConfirmStartedAsync(
+                normalized.Value,
+                target.SessionIdentity,
+                ct
+            );
     }
 
-    public async Task MarkStoppedAsync(string channel, CancellationToken ct)
+    public async Task<bool> MarkStoppedAsync(BotChannelTarget target, CancellationToken ct)
     {
-        var normalized = LoginName.Parse(channel);
-        if (normalized.IsEmpty)
-        {
-            return;
-        }
-
-        _ = await runtimeTransitions.ConfirmStoppedAsync(normalized.Value, ct);
+        var normalized = LoginName.Parse(target.Channel);
+        return !normalized.IsEmpty
+            && await runtimeTransitions.ConfirmStoppedAsync(
+                normalized.Value,
+                target.SessionIdentity,
+                ct
+            );
     }
 }

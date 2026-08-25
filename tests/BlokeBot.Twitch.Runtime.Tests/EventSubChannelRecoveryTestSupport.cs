@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Polly;
 using Shouldly;
 
@@ -5,6 +6,9 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public abstract partial class EventSubChannelRecoveryTestBase
 {
+    private static readonly ConditionalWeakTable<EventSubChannelSession, TargetSet> _targets =
+        new();
+
     private protected static readonly DateTimeOffset Now = new(
         2026,
         7,
@@ -65,6 +69,12 @@ public abstract partial class EventSubChannelRecoveryTestBase
         );
     }
 
+    private protected static void Start(
+        RecoveryHarness harness,
+        IReadOnlyList<string> channels,
+        CancellationToken cancellationToken
+    ) => harness.Session.Start(TargetsFor(harness.Session, channels), cancellationToken);
+
     private protected static Task ReconcileAsync(
         EventSubChannelSession session,
         IReadOnlyList<string> desiredChannels,
@@ -72,10 +82,20 @@ public abstract partial class EventSubChannelRecoveryTestBase
         CancellationToken cancellationToken = default
     ) =>
         session.TriggerReconciliationAndDrainAsync(
-            _ => ValueTask.FromResult(desiredChannels),
+            _ => ValueTask.FromResult(TargetsFor(session, desiredChannels)),
             trigger,
             cancellationToken
         );
+
+    private protected static IReadOnlyList<BotChannelTarget> TargetsFor(
+        EventSubChannelSession session,
+        IEnumerable<string> channels
+    ) => _targets.GetOrCreateValue(session).For(channels);
+
+    private protected static BotChannelTarget ReplaceTarget(
+        EventSubChannelSession session,
+        string channel
+    ) => _targets.GetOrCreateValue(session).Replace(channel);
 
     private protected static void AssertHealthy(
         EventSubChannelStatus.Healthy status,
@@ -152,6 +172,34 @@ public abstract partial class EventSubChannelRecoveryTestBase
                     nextAction
                 )
             );
+    }
+
+    private sealed class TargetSet
+    {
+        private readonly Dictionary<string, BotChannelSessionIdentity> _sessions = new(
+            StringComparer.OrdinalIgnoreCase
+        );
+
+        internal IReadOnlyList<BotChannelTarget> For(IEnumerable<string> channels) =>
+            channels
+                .Select(channel =>
+                {
+                    if (!_sessions.TryGetValue(channel, out var identity))
+                    {
+                        identity = BotChannelSessionIdentity.Create();
+                        _sessions[channel] = identity;
+                    }
+
+                    return new BotChannelTarget(channel, identity);
+                })
+                .ToArray();
+
+        internal BotChannelTarget Replace(string channel)
+        {
+            var identity = BotChannelSessionIdentity.Create();
+            _sessions[channel] = identity;
+            return new BotChannelTarget(channel, identity);
+        }
     }
 
     private protected sealed class RecoveryHarness(

@@ -7,6 +7,56 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class IrcConnectionSessionTests
 {
     [Test]
+    public async Task ReplacedChannelSession_PartsOldIdentityAndStartsNewIdentity()
+    {
+        var channels = new StaticChannelProvider(["Channel"]);
+        var lifecycle = new RecordingLifecycleNotifier();
+        var session = new IrcConnectionSession(
+            BotSettings.FromOptions(new BotOptions()),
+            channels,
+            null!,
+            null!,
+            lifecycle,
+            new StaticStartupMessageProvider(new StartupChatMessage.Disabled()),
+            new RejectingChatSender(),
+            null!,
+            new BotRuntimeStatusStore(),
+            [],
+            null!,
+            new RecordingLogger<IrcConnectionSession>()
+        );
+        var joinedChannels = new Dictionary<string, BotChannelSessionIdentity>(
+            StringComparer.OrdinalIgnoreCase
+        );
+        await using var stream = new MemoryStream();
+        await using var writer = new StreamWriter(
+            stream,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            bufferSize: 1024,
+            leaveOpen: true
+        )
+        {
+            NewLine = "\r\n",
+            AutoFlush = true,
+        };
+
+        await session.SyncJoinedChannelsAsync(writer, joinedChannels, CancellationToken.None);
+        var first = lifecycle.StartedTargets.ShouldHaveSingleItem();
+        var second = channels.Replace("channel");
+
+        await session.SyncJoinedChannelsAsync(writer, joinedChannels, CancellationToken.None);
+
+        ReferenceEquals(first.SessionIdentity, second.SessionIdentity).ShouldBeFalse();
+        ReferenceEquals(
+                lifecycle.StoppedTargets.ShouldHaveSingleItem().SessionIdentity,
+                first.SessionIdentity
+            )
+            .ShouldBeTrue();
+        ReferenceEquals(lifecycle.StartedTargets[1].SessionIdentity, second.SessionIdentity)
+            .ShouldBeTrue();
+    }
+
+    [Test]
     public async Task StartupMessageDisabled_FreshSessionsJoinWithoutChatAttempt()
     {
         var channels = new StaticChannelProvider(["Channel"]);
@@ -26,7 +76,9 @@ public sealed class IrcConnectionSessionTests
             null!,
             new RecordingLogger<IrcConnectionSession>()
         );
-        var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var joinedChannels = new Dictionary<string, BotChannelSessionIdentity>(
+            StringComparer.OrdinalIgnoreCase
+        );
         await using var stream = new MemoryStream();
         await using var writer = new StreamWriter(
             stream,
@@ -41,12 +93,14 @@ public sealed class IrcConnectionSessionTests
 
         await session.SyncJoinedChannelsAsync(writer, joinedChannels, CancellationToken.None);
 
-        var reconnectChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reconnectChannels = new Dictionary<string, BotChannelSessionIdentity>(
+            StringComparer.OrdinalIgnoreCase
+        );
         await session.SyncJoinedChannelsAsync(writer, reconnectChannels, CancellationToken.None);
 
         chat.Messages.ShouldBeEmpty();
-        joinedChannels.ShouldBe(["channel"]);
-        reconnectChannels.ShouldBe(["channel"]);
+        joinedChannels.Keys.ShouldBe(["channel"]);
+        reconnectChannels.Keys.ShouldBe(["channel"]);
         lifecycle.StartedChannels.ShouldBe(["channel", "channel"]);
     }
 
@@ -73,7 +127,9 @@ public sealed class IrcConnectionSessionTests
             null!,
             logger
         );
-        var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var joinedChannels = new Dictionary<string, BotChannelSessionIdentity>(
+            StringComparer.OrdinalIgnoreCase
+        );
         await using var stream = new MemoryStream();
 
         await using (
@@ -95,7 +151,7 @@ public sealed class IrcConnectionSessionTests
         stream.Position = 0;
         using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
         (await reader.ReadToEndAsync()).ShouldBe("JOIN #channel\r\n");
-        joinedChannels.ShouldBe(["channel"]);
+        joinedChannels.Keys.ShouldBe(["channel"]);
         lifecycle.StartedChannels.ShouldBe(["channel"]);
         lifecycle.StoppedChannels.ShouldBeEmpty();
         status.Current.ShouldBeOfType<BotRuntimeStatus.Connected>().Channels.ShouldBe(["channel"]);
@@ -142,7 +198,9 @@ public sealed class IrcConnectionSessionTests
             NewLine = "\r\n",
             AutoFlush = true,
         };
-        var initialSessionChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var initialSessionChannels = new Dictionary<string, BotChannelSessionIdentity>(
+            StringComparer.OrdinalIgnoreCase
+        );
 
         await session.SyncJoinedChannelsAsync(
             writer,
@@ -158,7 +216,9 @@ public sealed class IrcConnectionSessionTests
         chat.Messages.ShouldBe([new SentMessage("channel", "Hello")]);
         lifecycle.StartedChannels.ShouldBe(["channel"]);
 
-        var reconnectSessionChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reconnectSessionChannels = new Dictionary<string, BotChannelSessionIdentity>(
+            StringComparer.OrdinalIgnoreCase
+        );
         await session.SyncJoinedChannelsAsync(
             writer,
             reconnectSessionChannels,
@@ -174,12 +234,27 @@ public sealed class IrcConnectionSessionTests
 
     private sealed class StaticChannelProvider(IReadOnlyList<string> channels) : IBotChannelProvider
     {
-        public ValueTask<IReadOnlyList<string>> GetChannelsAsync(
+        private IReadOnlyList<BotChannelTarget> _targets =
+        [
+            .. channels.Select(channel => new BotChannelTarget(
+                channel,
+                BotChannelSessionIdentity.Create()
+            )),
+        ];
+
+        internal BotChannelTarget Replace(string channel)
+        {
+            var target = new BotChannelTarget(channel, BotChannelSessionIdentity.Create());
+            _targets = [target];
+            return target;
+        }
+
+        public ValueTask<IReadOnlyList<BotChannelTarget>> GetChannelsAsync(
             CancellationToken cancellationToken
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(channels);
+            return ValueTask.FromResult(_targets);
         }
     }
 
@@ -198,21 +273,37 @@ public sealed class IrcConnectionSessionTests
 
     private sealed class RecordingLifecycleNotifier : IBotChannelLifecycleNotifier
     {
-        internal List<string> StartedChannels { get; } = [];
+        private readonly List<BotChannelTarget> _started = [];
 
-        internal List<string> StoppedChannels { get; } = [];
+        private readonly List<BotChannelTarget> _stopped = [];
 
-        public Task ChannelStartedAsync(string channel, CancellationToken cancellationToken)
+        internal IReadOnlyList<string> StartedChannels =>
+            _started.Select(static target => target.Channel).ToArray();
+
+        internal IReadOnlyList<string> StoppedChannels =>
+            _stopped.Select(static target => target.Channel).ToArray();
+
+        internal IReadOnlyList<BotChannelTarget> StartedTargets => _started;
+
+        internal IReadOnlyList<BotChannelTarget> StoppedTargets => _stopped;
+
+        public Task ChannelStartedAsync(
+            BotChannelTarget target,
+            CancellationToken cancellationToken
+        )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            StartedChannels.Add(channel);
+            _started.Add(target);
             return Task.CompletedTask;
         }
 
-        public Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken)
+        public Task ChannelStoppedAsync(
+            BotChannelTarget target,
+            CancellationToken cancellationToken
+        )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            StoppedChannels.Add(channel);
+            _stopped.Add(target);
             return Task.CompletedTask;
         }
     }

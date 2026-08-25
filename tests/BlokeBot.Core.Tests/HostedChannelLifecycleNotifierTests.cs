@@ -80,10 +80,9 @@ public sealed class HostedChannelLifecycleNotifierTests
         http.Enqueue(EmptyPollResponse());
         http.Enqueue(EmptyPollResponse());
         var changes = new HostedChannelChangeNotifier(events);
+        var transitions = new HostedChannelRuntimeTransitionService(dbFactory, changes);
         var notifier = new HostedChannelLifecycleNotifier(
-            new HostedChannelRuntimeLifecycleService(
-                new HostedChannelRuntimeTransitionService(dbFactory, changes)
-            ),
+            new HostedChannelRuntimeLifecycleService(transitions),
             CreatePollService(dbFactory, http, events),
             new ClipMarkerService(
                 dbFactory,
@@ -103,9 +102,14 @@ public sealed class HostedChannelLifecycleNotifierTests
                 new NativeTwitchFeatureGate(dbFactory)
             )
         );
+        var session = await transitions.GetOrCreateSessionTargetAsync(
+            1,
+            "Streamer",
+            CancellationToken.None
+        );
 
-        await notifier.ChannelStartedAsync("Streamer", CancellationToken.None);
-        await notifier.ChannelStartedAsync("streamer", CancellationToken.None);
+        await notifier.ChannelStartedAsync(session, CancellationToken.None);
+        await notifier.ChannelStartedAsync(session, CancellationToken.None);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             _ = db.TwitchPolls.Add(
@@ -139,8 +143,8 @@ public sealed class HostedChannelLifecycleNotifierTests
             _ = await db.SaveChangesAsync();
         }
 
-        await notifier.ChannelStartedAsync("streamer", CancellationToken.None);
-        await notifier.ChannelStartedAsync("streamer", CancellationToken.None);
+        await notifier.ChannelStartedAsync(session, CancellationToken.None);
+        await notifier.ChannelStartedAsync(session, CancellationToken.None);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
         (await verify.Hosts.Select(host => host.BotRuntimeState).SingleAsync()).ShouldBe(

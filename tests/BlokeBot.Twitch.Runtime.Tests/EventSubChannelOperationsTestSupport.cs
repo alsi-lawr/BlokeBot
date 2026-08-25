@@ -55,12 +55,14 @@ public abstract partial class EventSubChannelRecoveryTestBase
         private readonly Dictionary<string, int> _channelStartedCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly List<BotChannelTarget> _channelStartedTargets = [];
         private readonly Dictionary<string, Queue<Exception>> _channelStartedFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
         private readonly Dictionary<string, int> _completeStopCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly List<BotChannelTarget> _completeStopTargets = [];
         private readonly Dictionary<
             string,
             HashSet<EventSubOperationSubscriptionKind>
@@ -159,11 +161,15 @@ public abstract partial class EventSubChannelRecoveryTestBase
         internal int ChannelStartedCount(string channel) =>
             _channelStartedCounts.GetValueOrDefault(channel);
 
+        internal IReadOnlyList<BotChannelTarget> ChannelStartedTargets => _channelStartedTargets;
+
         internal void EnqueueChannelStartedFailure(string channel, Exception exception) =>
             GetQueue(_channelStartedFailures, channel).Enqueue(exception);
 
         internal int CompleteStopCount(string channel) =>
             _completeStopCounts.GetValueOrDefault(channel);
+
+        internal IReadOnlyList<BotChannelTarget> CompleteStopTargets => _completeStopTargets;
 
         internal void EnqueueCompleteStopFailure(string channel, Exception exception) =>
             GetQueue(_completeStopFailures, channel).Enqueue(exception);
@@ -347,11 +353,13 @@ public abstract partial class EventSubChannelRecoveryTestBase
             );
 
         public ValueTask NotifyChannelStartedAsync(
-            string channel,
+            BotChannelTarget target,
             CancellationToken cancellationToken
         )
         {
+            var channel = target.Channel;
             _channelStartedCounts[channel] = ChannelStartedCount(channel) + 1;
+            _channelStartedTargets.Add(target);
             return
                 _channelStartedFailures.TryGetValue(channel, out var failures) && failures.Count > 0
                 ? ValueTask.FromException(failures.Dequeue())
@@ -409,9 +417,14 @@ public abstract partial class EventSubChannelRecoveryTestBase
             };
         }
 
-        public ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken)
+        public ValueTask CompleteStopAsync(
+            BotChannelTarget target,
+            CancellationToken cancellationToken
+        )
         {
+            var channel = target.Channel;
             _completeStopCounts[channel] = CompleteStopCount(channel) + 1;
+            _completeStopTargets.Add(target);
             return
                 _completeStopFailures.TryGetValue(channel, out var failures) && failures.Count > 0
                 ? ValueTask.FromException(failures.Dequeue())

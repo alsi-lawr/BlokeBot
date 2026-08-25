@@ -15,39 +15,86 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostedChannelRuntimeTransitionTests
 {
     [Test]
-    public async Task StartCompletion_OperatorStopWinsWhenCompletionAlreadyObservedGeneration()
+    public async Task StaleChannelStarted_OlderSessionCannotConfirmNewStart()
     {
-        var pause = new PauseTransitionInterceptor();
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync(pause);
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
         var harness = Harness(dbFactory);
         _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
-        pause.Arm();
-
-        var lateStart = harness.Lifecycle.MarkStartedAsync("streamer", CancellationToken.None);
-        await pause.WaitUntilPausedAsync();
+        var firstSession = await harness.TargetAsync(hostId);
         _ = await harness.Transitions.RequestStopAsync(hostId, CancellationToken.None);
-        pause.Release();
-        await lateStart;
+        (
+            await harness.Lifecycle.MarkStoppedAsync(firstSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        var secondSession = await harness.TargetAsync(hostId);
 
-        var host = await LoadHostAsync(dbFactory, hostId);
-        host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopping);
-        host.BotRuntimeGeneration.ShouldBe(2);
-        harness.Notifications().ShouldBe(2);
+        ReferenceEquals(firstSession.SessionIdentity, secondSession.SessionIdentity)
+            .ShouldBeFalse();
+        (
+            await harness.Lifecycle.MarkStartedAsync(firstSession, CancellationToken.None)
+        ).ShouldBeFalse();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Starting
+        );
+
+        (
+            await harness.Lifecycle.MarkStartedAsync(secondSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Started
+        );
     }
 
     [Test]
-    public async Task StartCompletion_CredentialPolicyStopWinsWhenCompletionAlreadyObservedGeneration()
+    public async Task StaleChannelStopped_OlderSessionCannotStopNewSessionAndLaterRestartSucceeds()
     {
-        var pause = new PauseTransitionInterceptor();
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync(pause);
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
         var harness = Harness(dbFactory);
         _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
-        pause.Arm();
+        var firstSession = await harness.TargetAsync(hostId);
+        (
+            await harness.Lifecycle.MarkStartedAsync(firstSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        _ = await harness.Transitions.RequestStopAsync(hostId, CancellationToken.None);
+        _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        var secondSession = await harness.TargetAsync(hostId);
 
-        var lateStart = harness.Lifecycle.MarkStartedAsync("streamer", CancellationToken.None);
-        await pause.WaitUntilPausedAsync();
+        (
+            await harness.Lifecycle.MarkStoppedAsync(firstSession, CancellationToken.None)
+        ).ShouldBeFalse();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Starting
+        );
+        (
+            await harness.Lifecycle.MarkStartedAsync(secondSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        _ = await harness.Transitions.RequestStopAsync(hostId, CancellationToken.None);
+        (
+            await harness.Lifecycle.MarkStoppedAsync(secondSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        var thirdSession = await harness.TargetAsync(hostId);
+
+        ReferenceEquals(secondSession.SessionIdentity, thirdSession.SessionIdentity)
+            .ShouldBeFalse();
+        (
+            await harness.Lifecycle.MarkStartedAsync(thirdSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Started
+        );
+    }
+
+    [Test]
+    public async Task CredentialPolicyStop_InvalidatesCurrentSessionCallback()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        var harness = Harness(dbFactory);
+        _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        var session = await harness.TargetAsync(hostId);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             _ = await harness.Transitions.ForceStoppedForCredentialPolicyAsync(
@@ -55,58 +102,83 @@ public sealed class HostedChannelRuntimeTransitionTests
                 hostId,
                 CancellationToken.None
             );
-            _ = await harness.Changes.NotifyChangedAsync(CancellationToken.None);
         }
-        pause.Release();
-        await lateStart;
 
-        var host = await LoadHostAsync(dbFactory, hostId);
-        host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
-        host.BotRuntimeGeneration.ShouldBe(2);
-        harness.Notifications().ShouldBe(2);
+        (await harness.Lifecycle.MarkStartedAsync(session, CancellationToken.None)).ShouldBeFalse();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Stopped
+        );
     }
 
     [Test]
-    public async Task RepeatedCommandsAndConfirmations_DoNotCreateNewOperationsOrPublications()
+    public async Task ProcessRestart_InvalidatesPriorIdentityAndLeasesFreshStartedSession()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, BotChannelRuntimeState.Started);
+        var beforeRestart = Harness(dbFactory);
+        var priorSession = await beforeRestart.TargetAsync(hostId);
+        var afterRestart = Harness(dbFactory);
+        var currentSession = await afterRestart.TargetAsync(hostId);
+
+        ReferenceEquals(priorSession.SessionIdentity, currentSession.SessionIdentity)
+            .ShouldBeFalse();
+        (
+            await afterRestart.Lifecycle.MarkStartedAsync(priorSession, CancellationToken.None)
+        ).ShouldBeFalse();
+        (
+            await afterRestart.Lifecycle.MarkStartedAsync(currentSession, CancellationToken.None)
+        ).ShouldBeTrue();
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Started
+        );
+    }
+
+    [Test]
+    public async Task RepeatedCommandsAndCurrentConfirmations_DoNotCreateNewSessionsOrPublications()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
         var harness = Harness(dbFactory);
 
         _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        var session = await harness.TargetAsync(hostId);
         _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
-        await harness.Lifecycle.MarkStartedAsync("streamer", CancellationToken.None);
-        await harness.Lifecycle.MarkStartedAsync("streamer", CancellationToken.None);
+        var repeatedSession = await harness.TargetAsync(hostId);
+        ReferenceEquals(session.SessionIdentity, repeatedSession.SessionIdentity).ShouldBeTrue();
+        (await harness.Lifecycle.MarkStartedAsync(session, CancellationToken.None)).ShouldBeTrue();
+        (await harness.Lifecycle.MarkStartedAsync(session, CancellationToken.None)).ShouldBeTrue();
         _ = await harness.Transitions.RequestStopAsync(hostId, CancellationToken.None);
         _ = await harness.Transitions.RequestStopAsync(hostId, CancellationToken.None);
-        await harness.Lifecycle.MarkStoppedAsync("streamer", CancellationToken.None);
-        await harness.Lifecycle.MarkStoppedAsync("streamer", CancellationToken.None);
+        (await harness.Lifecycle.MarkStoppedAsync(session, CancellationToken.None)).ShouldBeTrue();
+        (await harness.Lifecycle.MarkStoppedAsync(session, CancellationToken.None)).ShouldBeFalse();
 
-        var host = await LoadHostAsync(dbFactory, hostId);
-        host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
-        host.BotRuntimeGeneration.ShouldBe(2);
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Stopped
+        );
         harness.Notifications().ShouldBe(4);
     }
 
     [Test]
-    public async Task InterruptedStopRecovery_NewerStartWinsAfterRecoveryCapturedGeneration()
+    public async Task InterruptedStopRecovery_CompletesBeforeConcurrentNewStart()
     {
-        var pause = new PauseTransitionInterceptor();
+        var pause = new PauseHostUpdateInterceptor();
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync(pause);
-        var hostId = await SeedHostAsync(dbFactory, BotChannelRuntimeState.Stopping, generation: 7);
+        var hostId = await SeedHostAsync(dbFactory, BotChannelRuntimeState.Stopping);
         var harness = Harness(dbFactory);
         pause.Arm();
 
         var recovery = harness.Lifecycle.RecoverInterruptedStopsAsync(CancellationToken.None);
         await pause.WaitUntilPausedAsync();
-        _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        var start = harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
+        start.IsCompleted.ShouldBeFalse();
         pause.Release();
         await recovery;
+        _ = await start;
 
-        var host = await LoadHostAsync(dbFactory, hostId);
-        host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Starting);
-        host.BotRuntimeGeneration.ShouldBe(8);
-        harness.Notifications().ShouldBe(1);
+        (await LoadHostAsync(dbFactory, hostId)).BotRuntimeState.ShouldBe(
+            BotChannelRuntimeState.Starting
+        );
+        harness.Notifications().ShouldBe(2);
     }
 
     [Test]
@@ -117,7 +189,11 @@ public sealed class HostedChannelRuntimeTransitionTests
         var harness = Harness(dbFactory);
         _ = await harness.Transitions.RequestStartAsync(hostId, CancellationToken.None);
         var authorization = ChannelAuthorization(dbFactory, harness.Changes);
-        var status = new HostedChannelRuntimeStatusService(dbFactory, authorization);
+        var status = new HostedChannelRuntimeStatusService(
+            dbFactory,
+            authorization,
+            harness.Transitions
+        );
         var directory = new HostedChannelDirectoryService(dbFactory);
 
         var selectedHost = (
@@ -178,8 +254,7 @@ public sealed class HostedChannelRuntimeTransitionTests
 
     private static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,
-        BotChannelRuntimeState state = BotChannelRuntimeState.Stopped,
-        long generation = 0
+        BotChannelRuntimeState state = BotChannelRuntimeState.Stopped
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -191,7 +266,6 @@ public sealed class HostedChannelRuntimeTransitionTests
             ChannelBotAuthorizedAtUtc = DateTime.UtcNow,
             ChannelBotAuthorizedScopes = "channel:bot",
             BotRuntimeState = state,
-            BotRuntimeGeneration = generation,
             BotRuntimeStateChangedAtUtc =
                 state is BotChannelRuntimeState.Stopped ? null : DateTime.UtcNow,
             CreatedAtUtc = DateTime.UtcNow,
@@ -212,14 +286,18 @@ public sealed class HostedChannelRuntimeTransitionTests
         HostedChannelRuntimeLifecycleService Lifecycle,
         HostedChannelChangeNotifier Changes,
         Func<int> Notifications
-    );
+    )
+    {
+        internal Task<BotChannelTarget> TargetAsync(int hostId) =>
+            Transitions.GetOrCreateSessionTargetAsync(hostId, "streamer", CancellationToken.None);
+    }
 
     private sealed class EmptyHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
     }
 
-    private sealed class PauseTransitionInterceptor : DbCommandInterceptor
+    private sealed class PauseHostUpdateInterceptor : DbCommandInterceptor
     {
         private readonly TaskCompletionSource _paused = new(
             TaskCreationOptions.RunContinuationsAsynchronously
@@ -246,7 +324,7 @@ public sealed class HostedChannelRuntimeTransitionTests
         {
             if (
                 Volatile.Read(ref _armed) == 1
-                && IsGenerationFencedHostUpdate(command)
+                && command.CommandText.Contains("UPDATE \"hosts\"", StringComparison.Ordinal)
                 && Interlocked.CompareExchange(ref _intercepted, 1, 0) == 0
             )
             {
@@ -256,9 +334,5 @@ public sealed class HostedChannelRuntimeTransitionTests
 
             return result;
         }
-
-        private static bool IsGenerationFencedHostUpdate(DbCommand command) =>
-            command.CommandText.Contains("UPDATE \"hosts\"", StringComparison.Ordinal)
-            && command.CommandText.Contains("BotRuntimeGeneration", StringComparison.Ordinal);
     }
 }

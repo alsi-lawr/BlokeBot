@@ -28,7 +28,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         );
         await using var harness = CreateHarness(operations, attemptLimit: 1);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         operations
@@ -81,7 +81,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         QueueBroadcasterAccounts(operations);
         await using var harness = CreateHarness(operations, attemptLimit: 1);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         operations
@@ -111,7 +111,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         );
         await using var harness = CreateHarness(operations, attemptLimit: 1);
 
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         var created = operations.OperationKinds("channel");
@@ -155,7 +155,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         var operations = new ScriptedChannelOperations();
         operations.SetNativeTwitchEnabled("channel", true);
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
         operations.CreateCount("channel").ShouldBe(3);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
@@ -211,7 +211,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         operations.SetNativeTwitchEnabled("channel", true);
         QueueBroadcasterAccounts(operations);
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         operations.CreateCount("channel").ShouldBe(6);
@@ -258,7 +258,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         operations.SetNativeTwitchEnabled("channel", true);
         QueueBroadcasterAccounts(operations);
         await using var harness = CreateHarness(operations, attemptLimit: 1);
-        harness.Session.Start(["channel"], CancellationToken.None);
+        Start(harness, ["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
         await ReconcileAsync(harness.Session, [], EventSubChannelRecoveryTrigger.Explicit);
@@ -282,14 +282,14 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         QueueBroadcasterAccounts(operations);
         await using (var initial = CreateHarness(operations, attemptLimit: 1))
         {
-            initial.Session.Start(["channel"], CancellationToken.None);
+            Start(initial, ["channel"], CancellationToken.None);
             await initial.Session.DrainAsync();
         }
 
         QueueBroadcasterAccounts(operations);
         await using (var replacement = CreateHarness(operations, attemptLimit: 1))
         {
-            replacement.Session.Start(["channel"], CancellationToken.None);
+            Start(replacement, ["channel"], CancellationToken.None);
             await replacement.Session.DrainAsync();
         }
 

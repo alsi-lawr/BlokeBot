@@ -9,10 +9,13 @@ namespace BlokeBot.Core.Features.HostedChannels.Runtime;
 
 public sealed class HostedChannelRuntimeStatusService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    ChannelBotAuthorizationService channelBotAuthorization
+    ChannelBotAuthorizationService channelBotAuthorization,
+    HostedChannelRuntimeTransitionService runtimeTransitions
 )
 {
-    public async Task<IReadOnlyList<string>> LoadConnectableChannelLoginsAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<BotChannelTarget>> LoadConnectableChannelTargetsAsync(
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hosts = await db
@@ -21,6 +24,7 @@ public sealed class HostedChannelRuntimeStatusService(
             .OrderBy(host => host.Login)
             .Select(host => new
             {
+                host.Id,
                 host.Login,
                 host.ChannelBotAuthorizedAtUtc,
                 host.ChannelBotAuthorizedScopes,
@@ -29,7 +33,7 @@ public sealed class HostedChannelRuntimeStatusService(
             })
             .ToArrayAsync(ct);
 
-        return hosts
+        var connectable = hosts
             .Select(host => new
             {
                 Host = host,
@@ -47,8 +51,12 @@ public sealed class HostedChannelRuntimeStatusService(
                     host.Host.ChannelBotAuthorizedScopes
                 )
             )
-            .Select(host => host.Host.Login)
             .ToArray();
+        return await Task.WhenAll(
+            connectable.Select(host =>
+                runtimeTransitions.GetOrCreateSessionTargetAsync(host.Host.Id, host.Host.Login, ct)
+            )
+        );
     }
 
     public IO<Option<HostedChannelRuntimeSummary>, Never> LoadHostRuntimeSummary(int hostId) =>

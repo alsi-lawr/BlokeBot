@@ -1715,11 +1715,6 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<DateTime?>("BlokeRaidPausedAtUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<long>("BotRuntimeGeneration")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(0L);
-
                     b.Property<int>("BotRuntimeState")
                         .HasColumnType("INTEGER");
 
