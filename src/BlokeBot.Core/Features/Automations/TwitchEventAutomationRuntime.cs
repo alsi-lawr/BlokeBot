@@ -373,21 +373,13 @@ public sealed class TwitchEventAutomationRuntime(
                 return;
             }
 
-            // The feature-switch gate runs before any receipt or run row is written. Every source
-            // requires Automations; native-operation deliveries additionally require their single
-            // backing Native Twitch feature switch, such as Rewards & redemptions, Shoutouts,
-            // Polls, or Predictions.
-            if (!host.EnabledFeatures.Contains(requiredFeatures))
-            {
-                return;
-            }
-
             var receivedAtUtc = clock.GetUtcNow();
             if (
                 !await TryClaimReceiptAsync(
                     host.Id,
                     definitionId,
                     messageId,
+                    requiredFeatures,
                     receivedAtUtc,
                     cancellation
                 )
@@ -422,12 +414,35 @@ public sealed class TwitchEventAutomationRuntime(
         int hostId,
         AutomationDefinitionId definitionId,
         string messageId,
+        HostFeatureFlags requiredFeatures,
         DateTimeOffset receivedAtUtc,
         CancellationToken cancellation
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellation);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
+        // The write lock orders receipt admission against the durable host feature transition.
+        var hostExists = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE hosts SET EnabledFeatures = EnabledFeatures WHERE Id = {hostId};",
+            cancellation
+        );
+        if (hostExists == 0)
+        {
+            await transaction.RollbackAsync(cancellation);
+            return false;
+        }
+
+        var enabledFeatures = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == hostId)
+            .Select(static host => host.EnabledFeatures)
+            .SingleAsync(cancellation);
+        if (!enabledFeatures.Contains(requiredFeatures))
+        {
+            await transaction.RollbackAsync(cancellation);
+            return false;
+        }
+
         var now = receivedAtUtc.UtcDateTime;
         // A receipt at or past its expiry has no deduplication authority; remove dead rows before
         // claiming so a post-window redelivery is admitted as a new occurrence.

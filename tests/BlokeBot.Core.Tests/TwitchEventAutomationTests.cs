@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Data.Common;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels;
@@ -9,6 +10,7 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -160,6 +162,82 @@ public sealed class TwitchEventAutomationTests
     }
 
     [Test]
+    public async Task ReceiptClaimWinsBeforeDisable_DedupesWithoutStartingARejectedRun()
+    {
+        var interleaving = new ReceiptTransactionInterleaving(ReceiptTransactionPause.AfterCommit);
+        await using var fixture = await EventFixture.CreateAsync(
+            databaseInterceptors: [interleaving]
+        );
+        var source = Node("stream-online", "{}");
+        var action = Node("send-chat", """{"message":"Live!"}""");
+        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        await fixture.FlowRuntime.InitializeAsync(CancellationToken.None);
+        interleaving.Arm();
+
+        var delivery = fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("receipt-first"),
+            CancellationToken.None
+        );
+        await interleaving.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        await fixture.EnableAutomationsAsync(false);
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        (await fixture.RunCountAsync()).ShouldBe(0);
+        interleaving.Release();
+        await delivery.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await fixture.RunCountAsync()).ShouldBe(0);
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await fixture.EnableAutomationsAsync(true);
+        (await fixture.RunCountAsync()).ShouldBe(0);
+        await fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("receipt-first"),
+            CancellationToken.None
+        );
+
+        (await fixture.RunCountAsync()).ShouldBe(0);
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task DisableWinsBeforeReceipt_WritesNothingUntilAnExplicitRedelivery()
+    {
+        var interleaving = new ReceiptTransactionInterleaving(ReceiptTransactionPause.BeforeStart);
+        await using var fixture = await EventFixture.CreateAsync(
+            databaseInterceptors: [interleaving]
+        );
+        var source = Node("stream-online", "{}");
+        var action = Node("send-chat", """{"message":"Live!"}""");
+        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        await fixture.FlowRuntime.InitializeAsync(CancellationToken.None);
+        interleaving.Arm();
+
+        var delivery = fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("disable-first"),
+            CancellationToken.None
+        );
+        await interleaving.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        await fixture.EnableAutomationsAsync(false);
+        interleaving.Release();
+        await delivery.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await fixture.RunCountAsync()).ShouldBe(0);
+        (await fixture.ReceiptCountAsync()).ShouldBe(0);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await fixture.EnableAutomationsAsync(true);
+        (await fixture.RunCountAsync()).ShouldBe(0);
+        await fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("disable-first"),
+            CancellationToken.None
+        );
+
+        (await fixture.RunCountAsync()).ShouldBe(1);
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        fixture.Chat.Messages.ShouldBe(["Live!"]);
+    }
+
+    [Test]
     public async Task AdmittedReceipt_DrainsAcrossDisableAndNeverReplaysAfterEnable()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -179,18 +257,21 @@ public sealed class TwitchEventAutomationTests
             CancellationToken.None
         );
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        (await fixture.RunCountAsync()).ShouldBe(1);
         await fixture.EnableAutomationsAsync(false);
         _ = release.TrySetResult();
         await delivery.WaitAsync(TimeSpan.FromSeconds(5));
 
-        (await fixture.RunCountAsync()).ShouldBe(1);
-        (await fixture.ReceiptCountAsync()).ShouldBe(1);
-        chat.Messages.ShouldBe(["Live!"]);
-        await fixture.Runtime.StreamOnlineAsync(
-            fixture.StreamOnline("admitted-1"),
-            CancellationToken.None
-        );
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (await db.AutomationFlowRuns.SingleAsync()).Status.ShouldBe(
+                AutomationFlowRunStatus.Completed
+            );
+        }
+        fixture.Chat.Messages.ShouldBe(["Live!"]);
         await fixture.EnableAutomationsAsync(true);
+        (await fixture.RunCountAsync()).ShouldBe(1);
         await fixture.Runtime.StreamOnlineAsync(
             fixture.StreamOnline("admitted-1"),
             CancellationToken.None
@@ -198,7 +279,7 @@ public sealed class TwitchEventAutomationTests
 
         (await fixture.RunCountAsync()).ShouldBe(1);
         (await fixture.ReceiptCountAsync()).ShouldBe(1);
-        chat.Messages.ShouldBe(["Live!"]);
+        fixture.Chat.Messages.ShouldBe(["Live!"]);
     }
 
     [Test]
@@ -547,6 +628,7 @@ public sealed class TwitchEventAutomationTests
             SqliteBlokeBotDbFactory database,
             MutableTimeProvider clock,
             RecordingChatSender chat,
+            HostFeatureService features,
             AutomationCatalogService catalog,
             AutomationExpressionService expressions,
             AutomationRuntimeService flowRuntime,
@@ -557,6 +639,7 @@ public sealed class TwitchEventAutomationTests
             Database = database;
             Clock = clock;
             Chat = chat;
+            Features = features;
             Catalog = catalog;
             Expressions = expressions;
             FlowRuntime = flowRuntime;
@@ -567,6 +650,7 @@ public sealed class TwitchEventAutomationTests
         internal SqliteBlokeBotDbFactory Database { get; }
         internal MutableTimeProvider Clock { get; }
         internal RecordingChatSender Chat { get; }
+        internal HostFeatureService Features { get; }
         internal AutomationCatalogService Catalog { get; }
         internal AutomationExpressionService Expressions { get; }
         internal AutomationRuntimeService FlowRuntime { get; }
@@ -582,16 +666,18 @@ public sealed class TwitchEventAutomationTests
         internal static async Task<EventFixture> CreateAsync(
             HostFeatureFlags hostFeatures =
                 HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands,
+            IInterceptor[]? databaseInterceptors = null,
             RecordingChatSender? chat = null
         )
         {
-            var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var database = await SqliteBlokeBotDbFactory.CreateAsync(databaseInterceptors ?? []);
             var clock = new MutableTimeProvider(_start);
             chat ??= new RecordingChatSender();
             var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                []
+                [],
+                clock
             );
             var catalog = new AutomationCatalogService(
                 new([new CoreAutomationCatalogModule(), new TwitchEventAutomationCatalogModule()]),
@@ -618,6 +704,7 @@ public sealed class TwitchEventAutomationTests
                 database,
                 clock,
                 chat,
+                features,
                 catalog,
                 expressions,
                 flowRuntime,
@@ -644,15 +731,18 @@ public sealed class TwitchEventAutomationTests
             return host.Id;
         }
 
-        internal async Task EnableAutomationsAsync(bool enabled)
-        {
-            await using var db = await Database.CreateDbContextAsync();
-            var host = await db.Hosts.SingleAsync(value => value.Id == HostId);
-            host.EnabledFeatures = enabled
-                ? host.EnabledFeatures | HostFeatureFlags.Automations
-                : host.EnabledFeatures & ~HostFeatureFlags.Automations;
-            _ = await db.SaveChangesAsync();
-        }
+        internal async Task EnableAutomationsAsync(bool enabled) =>
+            _ = enabled
+                ? await Features.EnableAsync(
+                    HostId,
+                    HostFeatureFlags.Automations,
+                    CancellationToken.None
+                )
+                : await Features.DisableAsync(
+                    HostId,
+                    HostFeatureFlags.Automations,
+                    CancellationToken.None
+                );
 
         internal async Task<AutomationFlowId> SaveAsync(
             ImmutableArray<AutomationFlowDraftNode> nodes,
@@ -776,6 +866,73 @@ public sealed class TwitchEventAutomationTests
 
             return new PublicChatSendOutcome.Accepted();
         }
+    }
+
+    private sealed class ReceiptTransactionInterleaving(ReceiptTransactionPause pause)
+        : DbTransactionInterceptor
+    {
+        private readonly TaskCompletionSource _entered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _release = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _armed;
+        private int _intercepted;
+
+        internal Task Entered => _entered.Task;
+
+        internal void Arm() => Volatile.Write(ref _armed, 1);
+
+        internal void Release() => _release.TrySetResult();
+
+        public override async ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection,
+            TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (TryEnter(ReceiptTransactionPause.BeforeStart))
+            {
+                await _release.Task.WaitAsync(cancellationToken);
+            }
+
+            return result;
+        }
+
+        public override async Task TransactionCommittedAsync(
+            DbTransaction transaction,
+            TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (TryEnter(ReceiptTransactionPause.AfterCommit))
+            {
+                await _release.Task.WaitAsync(cancellationToken);
+            }
+        }
+
+        private bool TryEnter(ReceiptTransactionPause expected)
+        {
+            if (
+                pause != expected
+                || Volatile.Read(ref _armed) == 0
+                || Interlocked.CompareExchange(ref _intercepted, 1, 0) != 0
+            )
+            {
+                return false;
+            }
+
+            _ = _entered.TrySetResult();
+            return true;
+        }
+    }
+
+    private enum ReceiptTransactionPause
+    {
+        BeforeStart,
+        AfterCommit,
     }
 
     private sealed class NoOverlayCues : IOverlayCueAdmissionService
