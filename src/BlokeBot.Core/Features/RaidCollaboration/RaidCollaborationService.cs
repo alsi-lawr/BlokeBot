@@ -474,6 +474,7 @@ public sealed class RaidCollaborationService(
             await RunWelcomeSequenceAsync(db, host, row, incomingRaid, cancellationToken);
         }
         _ = await db.SaveChangesAsync(cancellationToken);
+        await db.Entry(row).ReloadAsync(cancellationToken);
         await PublishDomainEventAsync(
             row,
             direction == RaidDirection.Incoming
@@ -593,13 +594,11 @@ public sealed class RaidCollaborationService(
             row.ShoutoutOutcome = RaidShoutoutOutcome.Suppressed;
             return;
         }
-        row.ShoutoutOutcome = MapShoutoutOutcome(
-            await automaticShoutouts.RunAsync(
-                host,
-                configuration.AutomaticShoutout,
-                incomingRaid,
-                cancellationToken
-            )
+        _ = await automaticShoutouts.RunAsync(
+            host,
+            configuration.AutomaticShoutout,
+            incomingRaid,
+            cancellationToken
         );
     }
 
@@ -1047,10 +1046,6 @@ public sealed class RaidCollaborationService(
                 row.ViewerCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 StringComparison.Ordinal
             );
-
-    private static RaidShoutoutOutcome MapShoutoutOutcome(
-        AutomaticRaidShoutoutResultCode? resultCode
-    ) => AutomaticRaidShoutoutOutcomeAuthority.ToRaidShoutoutOutcome(resultCode);
 
     private static string ExclusionReason(RaidChannelSnapshotOutcome outcome) =>
         outcome switch

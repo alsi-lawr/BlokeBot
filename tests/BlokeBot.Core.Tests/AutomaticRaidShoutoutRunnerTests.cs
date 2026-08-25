@@ -456,7 +456,6 @@ public sealed class AutomaticRaidShoutoutRunnerTests
         _ = await new AutomaticRaidShoutoutRunner(
             factory,
             delivery,
-            new AutomaticRaidShoutoutOutcomeAuthority(),
             new FixedTimeProvider(_now)
         ).RunAsync(seeded.Host, seeded.Configuration, raid, CancellationToken.None);
 

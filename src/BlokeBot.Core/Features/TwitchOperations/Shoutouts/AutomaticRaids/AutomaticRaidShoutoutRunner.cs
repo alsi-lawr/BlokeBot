@@ -12,6 +12,13 @@ public sealed class AutomaticRaidShoutoutRunner
     private readonly AutomaticRaidShoutoutOutcomeAuthority _outcomes;
     private readonly TimeProvider _clock;
 
+    public AutomaticRaidShoutoutRunner(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        IAutomaticRaidShoutoutDelivery delivery,
+        TimeProvider clock
+    )
+        : this(dbFactory, delivery, new AutomaticRaidShoutoutOutcomeAuthority(), clock) { }
+
     internal AutomaticRaidShoutoutRunner(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
         IAutomaticRaidShoutoutDelivery delivery,
