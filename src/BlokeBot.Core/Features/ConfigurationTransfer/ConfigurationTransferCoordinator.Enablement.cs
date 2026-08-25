@@ -41,12 +41,7 @@ public sealed partial class ConfigurationTransferCoordinator
         var enabled = updated & ~previous;
         var disabled = previous & ~updated;
         var pending = await db.ConfigurationActivations.SingleOrDefaultAsync(
-            x =>
-                x.HostId == host.Id
-                && (
-                    x.Status == ConfigurationActivationStatus.Pending
-                    || x.Status == ConfigurationActivationStatus.Processing
-                ),
+            x => x.HostId == host.Id && (x.Status == ConfigurationActivationStatus.Pending),
             cancellationToken
         );
         if (pending is null)
@@ -67,7 +62,7 @@ public sealed partial class ConfigurationTransferCoordinator
         pending.Status = ConfigurationActivationStatus.Pending;
         pending.Revision++;
         pending.UpdatedAtUtc = now;
-        pending.FailureCode = null;
+        pending.IssuesJson = null;
         pending.CompletedAtUtc = null;
         return pending;
     }

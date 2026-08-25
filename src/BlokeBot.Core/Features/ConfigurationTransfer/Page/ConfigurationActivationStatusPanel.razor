@@ -1,0 +1,36 @@
+@using BlokeBot.Persistence.Models
+
+<div class="activation-row" data-status="@Activation.Status.ToString().ToLowerInvariant()">
+    <div class="activation-row__line">
+        <strong>Feature activation @ConfigurationTransferPresentation.ActivationLabel(Activation.Status)</strong>
+        <span class="@ConfigurationTransferPresentation.ActivationPillClass(Activation.Status)">
+            <span class="status-pill__dot" aria-hidden="true"></span>
+            @ConfigurationTransferPresentation.ActivationLabel(Activation.Status)
+        </span>
+    </div>
+    <small>@ConfigurationTransferPresentation.ActivationDescription(Activation.Status)</small>
+    @foreach (var issue in Activation.Issues)
+    {
+        <p class="field-error" role="status">@issue.Reason</p>
+    }
+    @if (Activation.Status is ConfigurationActivationStatus.Failed or ConfigurationActivationStatus.ManualFollowUp)
+    {
+        <div class="activation-row__actions">
+            <button class="btn-secondary" type="button" @onclick="Retry">
+                Retry activation
+            </button>
+            @if (Activation.Status == ConfigurationActivationStatus.ManualFollowUp)
+            {
+                <a class="btn-secondary" href="/alerts">Open alerts</a>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ConfigurationActivationView Activation { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public EventCallback Retry { get; set; }
+}

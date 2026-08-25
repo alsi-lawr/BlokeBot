@@ -1,7 +1,6 @@
 using System.Text.Json;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.CommunityProgression;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence;
@@ -848,15 +847,14 @@ public sealed class BingoServiceTests
             await runtime.RequiresAsync("alpha", AutomationEventSubRequirement.Cheers, default)
         ).ShouldBeFalse();
         var trigger = new RecordingReconciliationTrigger();
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            [],
             [new BingoFeatureObserver(service, trigger)],
             new ManualTimeProvider(_now)
         );
 
-        await features.DisableAsync(hostId, HostFeatureFlags.Bingo, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.Bingo, default);
         trigger.Calls.ShouldBe(1);
         (
             await runtime.RequiresAsync(
@@ -865,7 +863,7 @@ public sealed class BingoServiceTests
                 default
             )
         ).ShouldBeFalse();
-        await features.EnableAsync(hostId, HostFeatureFlags.Bingo, default);
+        _ = await features.EnableAsync(hostId, HostFeatureFlags.Bingo, default);
         trigger.Calls.ShouldBe(2);
     }
 

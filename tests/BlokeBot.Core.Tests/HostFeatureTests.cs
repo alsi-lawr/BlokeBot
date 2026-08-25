@@ -29,7 +29,7 @@ public sealed class HostFeatureTests
                 return ValueTask.CompletedTask;
             }
         );
-        var service = new HostFeatureService(
+        var service = TestHostFeatureServices.Create(
             dbFactory,
             new HostedChannelChangeNotifier(events),
             []
@@ -37,14 +37,14 @@ public sealed class HostFeatureTests
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
 
-        await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
+        _ = await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
         var afterVisibleFeatureDisabled = await LoadFeaturesAsync(service, hostId);
         afterVisibleFeatureDisabled.ShouldBe(HostFeatureFlags.All & ~HostFeatureFlags.Guessing);
         afterVisibleFeatureDisabled!.Value.Contains(HostFeatureFlags.Automations).ShouldBeTrue();
         publishCount.ShouldBe(1);
 
-        await service.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
+        _ = await service.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         publishCount.ShouldBe(2);
@@ -65,16 +65,20 @@ public sealed class HostFeatureTests
         var unknown = (HostFeatureFlags)(1UL << 48);
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer", unknown);
-        var service = new HostFeatureService(
+        var service = TestHostFeatureServices.Create(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             []
         );
 
-        await service.EnableAsync(hostId, HostFeatureFlags.Automations, CancellationToken.None);
+        _ = await service.EnableAsync(hostId, HostFeatureFlags.Automations, CancellationToken.None);
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown | HostFeatureFlags.Automations);
 
-        await service.DisableAsync(hostId, HostFeatureFlags.Automations, CancellationToken.None);
+        _ = await service.DisableAsync(
+            hostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
 
         _ = await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
@@ -93,20 +97,20 @@ public sealed class HostFeatureTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var observer = new RecordingNativeTwitchFeatureChangeObserver();
-        var service = new HostFeatureService(
+        var service = TestHostFeatureServices.Create(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             [observer]
         );
 
-        await service.DisableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
-        await service.DisableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
-        await service.EnableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
+        _ = await service.DisableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
+        _ = await service.DisableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
+        _ = await service.EnableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         observer.Changes.ShouldBe([
-            (hostId, HostFeatureFlags.Polls, NativeTwitchFeatureState.Disabled),
-            (hostId, HostFeatureFlags.Polls, NativeTwitchFeatureState.Enabled),
+            (hostId, HostFeatureFlags.Polls, HostFeatureActivationState.Disabled),
+            (hostId, HostFeatureFlags.Polls, HostFeatureActivationState.Enabled),
         ]);
     }
 
@@ -117,7 +121,7 @@ public sealed class HostFeatureTests
         var hostId = await SeedHostAsync(dbFactory, "streamer", HostFeatureFlags.Points);
         await SeedAliasAsync(dbFactory, hostId, AppCommandKind.Start, "startguessing");
         await SeedAliasAsync(dbFactory, hostId, AppCommandKind.Points, "points");
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             []
@@ -148,8 +152,8 @@ public sealed class HostFeatureTests
         pointsRoute.Kind.ShouldBe(PointsCommandKind.Points);
         pointsRoute.State.ShouldBe(new AppCommandRouteState.Host(hostId));
 
-        await features.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
-        await features.DisableAsync(hostId, HostFeatureFlags.Points, CancellationToken.None);
+        _ = await features.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.Points, CancellationToken.None);
 
         var enabledGuessing = await guessing.ResolveAsync(
             CommandContext("streamer", "startguessing"),
@@ -202,7 +206,7 @@ public sealed class HostFeatureTests
             );
             _ = await db.SaveChangesAsync();
         }
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             []
@@ -287,7 +291,7 @@ public sealed class HostFeatureTests
             );
             _ = await db.SaveChangesAsync();
         }
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             []
@@ -363,24 +367,23 @@ public sealed class HostFeatureTests
         return features.Match<HostFeatureFlags?>(static value => value, static () => null);
     }
 
-    private sealed class RecordingNativeTwitchFeatureChangeObserver
-        : INativeTwitchFeatureChangeObserver
+    private sealed class RecordingNativeTwitchFeatureChangeObserver : IHostFeatureActivationObserver
     {
         internal List<(
             int HostId,
             HostFeatureFlags Feature,
-            NativeTwitchFeatureState State
+            HostFeatureActivationState State
         )> Changes { get; } = [];
 
-        public Task NativeTwitchFeatureChangedAsync(
-            int hostId,
-            HostFeatureFlags feature,
-            NativeTwitchFeatureState state,
+        public ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+            HostFeatureActivationChange change,
             CancellationToken cancellationToken
         )
         {
-            Changes.Add((hostId, feature, state));
-            return Task.CompletedTask;
+            Changes.Add((change.HostId, change.Feature, change.State));
+            return ValueTask.FromResult<HostFeatureAutomaticWorkResult>(
+                new HostFeatureAutomaticWorkResult.Complete()
+            );
         }
     }
 }

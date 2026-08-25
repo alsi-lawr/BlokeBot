@@ -208,11 +208,11 @@ internal sealed class SimulationCommandCatalogScenario(
         {
             if (enabledFeatures.Contains(feature))
             {
-                await hostFeatures.EnableAsync(hostId, feature, ct);
+                _ = await hostFeatures.EnableAsync(hostId, feature, ct);
             }
             else
             {
-                await hostFeatures.DisableAsync(hostId, feature, ct);
+                _ = await hostFeatures.DisableAsync(hostId, feature, ct);
             }
         }
         _ = await events.PublishAsync(AppEventKind.CommandsChanged, ct);

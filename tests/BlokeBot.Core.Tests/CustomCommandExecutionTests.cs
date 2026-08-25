@@ -4,7 +4,6 @@ using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosting;
@@ -1188,7 +1187,7 @@ public sealed class CustomCommandExecutionTests
         await interleaving.Entered.WaitAsync(TimeSpan.FromSeconds(5));
         try
         {
-            await services
+            _ = await services
                 .GetRequiredService<HostFeatureService>()
                 .DisableAsync(hostId, parent, CancellationToken.None);
         }
@@ -1336,10 +1335,7 @@ public sealed class CustomCommandExecutionTests
         _ = services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         if (realAutomations)
         {
-            _ = services.AddSingleton(
-                new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
-            );
-            _ = services.AddSingleton<HostFeatureService>();
+            _ = TestHostFeatureServices.Register(services);
             _ = services.AddSingleton(
                 publicChat
                     ?? throw new ArgumentNullException(

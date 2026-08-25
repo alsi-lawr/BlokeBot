@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using BlokeBot.Core.Features.Bounties;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence;
@@ -450,14 +449,13 @@ public sealed class BountyExpirySchedulerTests
     {
         var events = TestEventBus.Create<AppEventKind>();
         var observer = new BountyPauseObserver(database, clock);
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(events),
-            [],
             [observer],
             clock
         );
-        await features.DisableAsync(hostId, HostFeatureFlags.Bounties, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.Bounties, default);
     }
 
     private static async Task SeedBalanceAsync(

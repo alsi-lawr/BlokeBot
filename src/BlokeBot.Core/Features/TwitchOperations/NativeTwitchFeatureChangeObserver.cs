@@ -13,39 +13,43 @@ internal sealed class NativeTwitchFeatureChangeObserver(
     ClipMarkerService clipsMarkers,
     ChannelPointsService channelPoints,
     PredictionService predictions
-) : INativeTwitchFeatureChangeObserver
+) : IHostFeatureActivationObserver
 {
-    public async Task NativeTwitchFeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        NativeTwitchFeatureState state,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (feature is not HostFeatureFlags.ClipsAndMarkers)
+        if (!HostFeatureFlags.NativeTwitchFeatures.Contains(change.Feature))
+        {
+            return new HostFeatureAutomaticWorkResult.Complete();
+        }
+        if (change.Feature is not HostFeatureFlags.ClipsAndMarkers)
         {
             await eventSub.ReconcileAsync(cancellationToken);
         }
 
-        if (state is NativeTwitchFeatureState.Disabled)
+        if (change.State is HostFeatureActivationState.Disabled)
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
 
-        switch (feature)
+        switch (change.Feature)
         {
             case HostFeatureFlags.Polls:
-                await polls.ReconcileAsync(hostId, cancellationToken);
+                await polls.ReconcileAsync(change.HostId, cancellationToken);
                 break;
             case HostFeatureFlags.ClipsAndMarkers:
-                await clipsMarkers.ReconcileAsync(hostId, cancellationToken);
+                await clipsMarkers.ReconcileAsync(change.HostId, cancellationToken);
                 break;
             case HostFeatureFlags.RewardsAndRedemptions:
-                await channelPoints.ReconcileAsync(hostId, cancellationToken);
+                await channelPoints.ReconcileAsync(change.HostId, cancellationToken);
                 break;
             case HostFeatureFlags.Predictions:
-                await predictions.ReconcileAsync(hostId, cancellationToken);
+                await predictions.ReconcileAsync(change.HostId, cancellationToken);
                 break;
         }
+
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
 }

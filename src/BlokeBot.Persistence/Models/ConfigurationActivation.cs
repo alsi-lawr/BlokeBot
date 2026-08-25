@@ -13,6 +13,9 @@ public enum ConfigurationActivationStatus
 
     [PersistedToken("Failed")]
     Failed,
+
+    [PersistedToken("ManualFollowUp")]
+    ManualFollowUp,
 }
 
 public sealed class ConfigurationActivation
@@ -37,5 +40,5 @@ public sealed class ConfigurationActivation
 
     public DateTime? CompletedAtUtc { get; set; }
 
-    public string? FailureCode { get; set; }
+    public string? IssuesJson { get; set; }
 }

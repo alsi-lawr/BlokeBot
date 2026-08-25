@@ -8,8 +8,6 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
-using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
@@ -869,8 +867,7 @@ public sealed class OverlayBrowserSourceTests
             _ = builder.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
             _ = builder.Services.AddSingleton<TimeProvider>(time);
             _ = builder.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
-            _ = builder.Services.AddSingleton<HostedChannelChangeNotifier>();
-            _ = builder.Services.AddSingleton<HostFeatureService>();
+            _ = TestHostFeatureServices.Register(builder.Services);
             _ = builder.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );

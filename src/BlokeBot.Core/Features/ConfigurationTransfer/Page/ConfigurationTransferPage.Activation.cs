@@ -40,6 +40,7 @@ public partial class ConfigurationTransferPage : IAsyncDisposable
                     current.Status
                     is ConfigurationActivationStatus.Complete
                         or ConfigurationActivationStatus.Failed
+                        or ConfigurationActivationStatus.ManualFollowUp
                 )
                 {
                     return;

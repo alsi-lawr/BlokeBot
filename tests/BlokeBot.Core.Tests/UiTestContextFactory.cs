@@ -4,8 +4,6 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.CustomCommands;
-using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.MomentAttachments;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosting;
@@ -51,8 +49,7 @@ internal static class UiTestContextFactory
         _ = context.Services.AddSingleton<IPluginFeatureDeclarationProvider>(declarations);
         _ = context.Services.AddSingleton<IPluginFeatureSnapshotProvider>(snapshots);
         _ = context.Services.AddScoped<DashboardFragmentState>();
-        _ = context.Services.AddSingleton<HostedChannelChangeNotifier>();
-        _ = context.Services.AddSingleton<HostFeatureService>();
+        _ = TestHostFeatureServices.Register(context.Services);
         AddMomentAttachmentServices(context, dbFactory);
         _ = context.Services.AddBlokeBotAlerts();
         _ = context.Services.AddSingleton<IMessageLibraryChatterSource>(

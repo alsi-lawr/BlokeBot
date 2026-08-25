@@ -295,29 +295,29 @@ internal sealed class CommunityProgressionScheduleWorker(
 internal sealed class CommunityProgressionFeatureObserver(
     CommunityProgressionService progression,
     IEventSubChannelReconciliationTrigger? eventSub = null
-) : IHostFeatureChangeObserver
+) : IHostFeatureActivationObserver
 {
-    public async ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (feature != HostFeatureFlags.CommunityProgression)
+        if (change.Feature != HostFeatureFlags.CommunityProgression)
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
         if (eventSub is not null)
         {
             await eventSub.ReconcileAsync(cancellationToken);
         }
-        if (enabled)
+        if (change.State is HostFeatureActivationState.Enabled)
         {
             await progression.RollOverCurrentPeriodsAsync(
                 CommunityRolloverKind.Restart,
                 cancellationToken
             );
         }
+
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
 }

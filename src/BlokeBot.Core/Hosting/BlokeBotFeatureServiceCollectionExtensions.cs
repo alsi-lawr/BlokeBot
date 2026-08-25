@@ -82,7 +82,10 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
             services.GetRequiredService<CompetitionReminderWorker>()
         );
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IHostFeatureChangeObserver, CompetitionFeatureObserver>()
+            ServiceDescriptor.Singleton<
+                IHostFeatureActivationObserver,
+                CompetitionFeatureObserver
+            >()
         );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
@@ -99,7 +102,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
             serviceProvider.GetRequiredService<BingoRuntime>()
         );
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IHostFeatureChangeObserver, BingoFeatureObserver>()
+            ServiceDescriptor.Singleton<IHostFeatureActivationObserver, BingoFeatureObserver>()
         );
         _ = services.AddSingleton<IBountyCompletionObserver>(static serviceProvider =>
             serviceProvider.GetRequiredService<BingoRuntime>()
@@ -140,7 +143,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
-                IHostFeatureChangeObserver,
+                IHostFeatureActivationObserver,
                 CommunityProgressionFeatureObserver
             >()
         );
@@ -161,13 +164,9 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
     {
         _ = services.AddSingleton<BountyService>();
         _ = services.AddSingleton<BountyPauseObserver>();
-        _ = services.AddSingleton<IHostFeatureChangeObserver>(static services =>
+        _ = services.AddSingleton<IHostFeatureActivationObserver>(static services =>
             services.GetRequiredService<BountyPauseObserver>()
         );
-        _ =
-            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.IConfigurationActivationObserver>(
-                static services => services.GetRequiredService<BountyPauseObserver>()
-            );
         _ = services.AddSingleton(
             new BountyExpirySchedulerPolicy
             {

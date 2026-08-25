@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.Guessing.Commands;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
@@ -100,7 +99,7 @@ public sealed class PluginDynamicBridgeTests
         var guessing = new SingleGuessingStrategyModule(
             new GuessingCommandRouteResolver(
                 new AppCommandAliasResolver(database),
-                new HostFeatureService(
+                TestHostFeatureServices.Create(
                     database,
                     new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                     []
@@ -204,7 +203,7 @@ public sealed class PluginDynamicBridgeTests
             pluginHostId,
             new("moderator", "Moderator", "user-1", false, true, false)
         );
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             []

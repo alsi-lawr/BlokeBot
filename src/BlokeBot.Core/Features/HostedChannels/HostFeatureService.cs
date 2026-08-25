@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -7,38 +6,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.HostedChannels;
 
-public interface IHostFeatureChangeObserver
+public abstract record HostFeatureUpdateResult
 {
-    ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
-        CancellationToken cancellationToken
-    );
+    private HostFeatureUpdateResult() { }
+
+    public sealed record Saved(HostFeatureActivationResult Activation) : HostFeatureUpdateResult;
+
+    public sealed record Unchanged : HostFeatureUpdateResult;
+
+    public sealed record HostNotFound : HostFeatureUpdateResult;
 }
 
 public sealed class HostFeatureService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    HostedChannelChangeNotifier changes,
-    IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
-    IEnumerable<IHostFeatureChangeObserver> featureObservers,
+    HostFeatureActivationAuthority activation,
     TimeProvider timeProvider
 )
 {
     public HostFeatureService(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
-        HostedChannelChangeNotifier changes,
-        IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers
+        HostFeatureActivationAuthority activation
     )
-        : this(dbFactory, changes, nativeTwitchObservers, [], TimeProvider.System) { }
-
-    public HostFeatureService(
-        IDbContextFactory<BlokeBotDbContext> dbFactory,
-        HostedChannelChangeNotifier changes,
-        IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
-        IEnumerable<IHostFeatureChangeObserver> featureObservers
-    )
-        : this(dbFactory, changes, nativeTwitchObservers, featureObservers, TimeProvider.System) { }
+        : this(dbFactory, activation, TimeProvider.System) { }
 
     public async Task<IReadOnlyDictionary<int, HostFeatureFlags>> LoadHostedFeaturesAsync(
         CancellationToken ct
@@ -82,13 +71,19 @@ public sealed class HostFeatureService(
         );
     }
 
-    public Task EnableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct) =>
-        UpdateAsync(hostId, feature, static (current, selected) => current | selected, ct);
+    public Task<HostFeatureUpdateResult> EnableAsync(
+        int hostId,
+        HostFeatureFlags feature,
+        CancellationToken ct
+    ) => UpdateAsync(hostId, feature, static (current, selected) => current | selected, ct);
 
-    public Task DisableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct) =>
-        UpdateAsync(hostId, feature, static (current, selected) => current & ~selected, ct);
+    public Task<HostFeatureUpdateResult> DisableAsync(
+        int hostId,
+        HostFeatureFlags feature,
+        CancellationToken ct
+    ) => UpdateAsync(hostId, feature, static (current, selected) => current & ~selected, ct);
 
-    private async Task UpdateAsync(
+    private async Task<HostFeatureUpdateResult> UpdateAsync(
         int hostId,
         HostFeatureFlags feature,
         Func<HostFeatureFlags, HostFeatureFlags, HostFeatureFlags> update,
@@ -104,34 +99,23 @@ public sealed class HostFeatureService(
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
         {
-            return;
+            return new HostFeatureUpdateResult.HostNotFound();
         }
 
         var updated = update(host.EnabledFeatures, feature);
         if (updated == host.EnabledFeatures)
         {
-            return;
+            return new HostFeatureUpdateResult.Unchanged();
         }
 
+        var previous = host.EnabledFeatures;
         var now = timeProvider.GetUtcNow().UtcDateTime;
         await HostFeatureTransitionStager.StageAsync(db, host, updated, now, ct);
         _ = await db.SaveChangesAsync(ct);
-        foreach (var observer in featureObservers)
-        {
-            await observer.FeatureChangedAsync(hostId, feature, updated.Contains(feature), ct);
-        }
-        _ = await changes.NotifyChangedAsync(ct);
-        if (!HostFeatureFlags.NativeTwitchFeatures.Contains(feature))
-        {
-            return;
-        }
-
-        var state = updated.Contains(feature)
-            ? NativeTwitchFeatureState.Enabled
-            : NativeTwitchFeatureState.Disabled;
-        foreach (var observer in nativeTwitchObservers)
-        {
-            await observer.NativeTwitchFeatureChangedAsync(hostId, feature, state, ct);
-        }
+        var enabled = updated & ~previous;
+        var disabled = previous & ~updated;
+        return new HostFeatureUpdateResult.Saved(
+            await activation.ApplyAsync(hostId, enabled, disabled, ct)
+        );
     }
 }

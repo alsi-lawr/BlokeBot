@@ -106,12 +106,12 @@ internal static class SimulationEndpoints
                         .SingleAsync(ct);
                     if (string.Equals(state, "enabled", StringComparison.Ordinal))
                     {
-                        await features.EnableAsync(hostId, HostFeatureFlags.Collectives, ct);
+                        _ = await features.EnableAsync(hostId, HostFeatureFlags.Collectives, ct);
                         return Results.Ok();
                     }
                     if (string.Equals(state, "disabled", StringComparison.Ordinal))
                     {
-                        await features.DisableAsync(hostId, HostFeatureFlags.Collectives, ct);
+                        _ = await features.DisableAsync(hostId, HostFeatureFlags.Collectives, ct);
                         return Results.Ok();
                     }
                     return Results.BadRequest();

@@ -125,16 +125,15 @@ public sealed class CollectiveServiceTests
                 default
             )
         ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            [],
             [],
             clock
         );
 
         clock.Advance(TimeSpan.FromMinutes(1));
-        await features.DisableAsync(alpha, HostFeatureFlags.Collectives, default);
+        _ = await features.DisableAsync(alpha, HostFeatureFlags.Collectives, default);
         await UpdateBountyAsync(database, source, 7, clock.GetUtcNow().UtcDateTime);
         await service.BountyChangedAsync(alpha, default);
         _ = (
@@ -148,7 +147,7 @@ public sealed class CollectiveServiceTests
         ).ShouldBeOfType<CollectiveDashboardOutcome.FeatureDisabled>();
 
         clock.Advance(TimeSpan.FromMinutes(1));
-        await features.EnableAsync(alpha, HostFeatureFlags.Collectives, default);
+        _ = await features.EnableAsync(alpha, HostFeatureFlags.Collectives, default);
         await service.BountyChangedAsync(alpha, default);
         var retained = (await service.LoadAsync(Authority(alpha, "alpha"), collectiveId, default))
             .ShouldBeOfType<CollectiveDashboardOutcome.Loaded>()
@@ -482,15 +481,15 @@ public sealed class CollectiveServiceTests
                 break;
             case ProviderIntervalMutation.DisableTarget:
                 clock.Advance(TimeSpan.FromMinutes(1));
-                await FeatureService(database, clock)
+                _ = await FeatureService(database, clock)
                     .DisableAsync(beta, HostFeatureFlags.RaidCollaboration, default);
                 break;
             case ProviderIntervalMutation.DisableAndReenableTarget:
                 clock.Advance(TimeSpan.FromMinutes(1));
                 var features = FeatureService(database, clock);
-                await features.DisableAsync(beta, HostFeatureFlags.Collectives, default);
+                _ = await features.DisableAsync(beta, HostFeatureFlags.Collectives, default);
                 clock.Advance(TimeSpan.FromMinutes(1));
-                await features.EnableAsync(beta, HostFeatureFlags.Collectives, default);
+                _ = await features.EnableAsync(beta, HostFeatureFlags.Collectives, default);
                 break;
             case ProviderIntervalMutation.RevokeTarget:
                 _ = (
@@ -550,10 +549,9 @@ public sealed class CollectiveServiceTests
         SqliteBlokeBotDbFactory database,
         TimeProvider clock
     ) =>
-        new(
+        TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            [],
             [],
             clock
         );

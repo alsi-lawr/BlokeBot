@@ -8,35 +8,33 @@ namespace BlokeBot.Core.Features.Automations;
 internal sealed class AutomationFeatureDisableObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider clock
-) : IHostFeatureChangeObserver
+) : IHostFeatureActivationObserver
 {
-    public async ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (enabled)
+        if (change.State is HostFeatureActivationState.Enabled)
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var host = await db.Hosts.SingleOrDefaultAsync(
-            value => value.Id == hostId,
+            value => value.Id == change.HostId,
             cancellationToken
         );
         if (host is null)
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
 
         var candidates = await db
             .AutomationFlowRuns.AsNoTracking()
             .Where(value =>
-                value.HostId == hostId
+                value.HostId == change.HostId
                 && (
                     value.Status == AutomationFlowRunStatus.Running
                     || value.Status == AutomationFlowRunStatus.Waiting
@@ -46,7 +44,8 @@ internal sealed class AutomationFeatureDisableObserver(
             .ToArrayAsync(cancellationToken);
         var runs = candidates
             .Where(run =>
-                feature == HostFeatureFlags.Automations || run.RequiredFeatures.Contains(feature)
+                change.Feature == HostFeatureFlags.Automations
+                || run.RequiredFeatures.Contains(change.Feature)
             )
             .ToArray();
         var now = clock.GetUtcNow().UtcDateTime;
@@ -98,5 +97,6 @@ internal sealed class AutomationFeatureDisableObserver(
 
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
 }

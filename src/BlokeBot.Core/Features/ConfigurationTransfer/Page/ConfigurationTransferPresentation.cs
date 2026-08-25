@@ -84,6 +84,7 @@ internal static class ConfigurationTransferPresentation
                 "pending",
             ConfigurationActivationStatus.Complete => "complete",
             ConfigurationActivationStatus.Failed => "failed",
+            ConfigurationActivationStatus.ManualFollowUp => "needs a manual step",
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
 
@@ -91,11 +92,13 @@ internal static class ConfigurationTransferPresentation
         status switch
         {
             ConfigurationActivationStatus.Pending or ConfigurationActivationStatus.Processing =>
-                "The import is complete. Selected lifecycle changes will run separately.",
+                "The configuration is saved. Automatic feature activation is still running.",
             ConfigurationActivationStatus.Complete =>
-                "Selected lifecycle changes are ready. Suppressed work was not replayed.",
+                "Selected features are operational. Suppressed work was not replayed.",
             ConfigurationActivationStatus.Failed =>
-                "The import remains saved. Retry only the separate activation step.",
+                "The configuration remains saved. Retry only automatic feature activation.",
+            ConfigurationActivationStatus.ManualFollowUp =>
+                "The configuration remains saved. Complete the required step shown in Alerts, then retry automatic feature activation.",
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
 
@@ -106,6 +109,7 @@ internal static class ConfigurationTransferPresentation
                 "status-pill status-pill--amber",
             ConfigurationActivationStatus.Complete => "status-pill status-pill--green",
             ConfigurationActivationStatus.Failed => "status-pill status-pill--red",
+            ConfigurationActivationStatus.ManualFollowUp => "status-pill status-pill--amber",
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
 

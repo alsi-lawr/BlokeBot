@@ -195,7 +195,7 @@ internal sealed class OverlayEventFeedService(
     TimeProvider timeProvider,
     IServiceProvider services,
     ILogger<OverlayEventFeedService> logger
-) : IOverlayEventPresenter, IHostFeatureChangeObserver, IHostedService, IAsyncDisposable
+) : IOverlayEventPresenter, IHostFeatureActivationObserver, IHostedService, IAsyncDisposable
 {
     private static readonly TimeSpan _tombstoneRetention = TimeSpan.FromHours(24);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -334,31 +334,31 @@ internal sealed class OverlayEventFeedService(
         }
     }
 
-    public async ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (enabled)
+        if (change.State is HostFeatureActivationState.Enabled)
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
         if (
-            feature
+            change.Feature
             is HostFeatureFlags.Points
                 or HostFeatureFlags.Guessing
                 or HostFeatureFlags.CommunityProgression
         )
         {
-            await SuppressSourceAsync(hostId, feature, cancellationToken);
-            return;
+            await SuppressSourceAsync(change.HostId, change.Feature, cancellationToken);
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
-        if (feature is HostFeatureFlags.Overlays)
+        if (change.Feature is HostFeatureFlags.Overlays)
         {
-            await SuppressAllAsync(hostId, cancellationToken);
+            await SuppressAllAsync(change.HostId, cancellationToken);
         }
+
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
 
     private async Task SuppressAllAsync(int hostId, CancellationToken cancellationToken)

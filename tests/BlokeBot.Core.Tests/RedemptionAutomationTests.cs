@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
@@ -835,10 +834,9 @@ public sealed class RedemptionAutomationTests
             var clock = new MutableTimeProvider(_start);
             var chat = new RejectableChatSender();
             var redemptions = new RecordingRedemptionOperations();
-            var features = new HostFeatureService(
+            var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [],
                 [new AutomationFeatureDisableObserver(database, clock)]
             );
             var catalog = new AutomationCatalogService(

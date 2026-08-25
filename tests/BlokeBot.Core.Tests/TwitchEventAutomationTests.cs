@@ -408,17 +408,13 @@ public sealed class TwitchEventAutomationTests
         trigger.Reconciliations.ShouldBe(2);
 
         var observer = new AutomationEventSubReconciliationObserver(trigger);
-        await observer.FeatureChangedAsync(
-            fixture.HostId,
-            HostFeatureFlags.Automations,
-            enabled: false,
+        _ = await observer.ApplyAsync(
+            new(fixture.HostId, HostFeatureFlags.Automations, HostFeatureActivationState.Disabled),
             CancellationToken.None
         );
         trigger.Reconciliations.ShouldBe(3);
-        await observer.FeatureChangedAsync(
-            fixture.HostId,
-            HostFeatureFlags.Points,
-            enabled: false,
+        _ = await observer.ApplyAsync(
+            new(fixture.HostId, HostFeatureFlags.Points, HostFeatureActivationState.Disabled),
             CancellationToken.None
         );
         trigger.Reconciliations.ShouldBe(3);
@@ -549,10 +545,9 @@ public sealed class TwitchEventAutomationTests
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
             var clock = new MutableTimeProvider(_start);
             var chat = new RecordingChatSender();
-            var features = new HostFeatureService(
+            var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [],
                 [new AutomationFeatureDisableObserver(database, clock)]
             );
             var catalog = new AutomationCatalogService(

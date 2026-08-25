@@ -1,3 +1,5 @@
+using System.Text.Json;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 internal sealed class ConfigurationActivationWorker(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     ConfigurationActivationQueue queue,
-    ConfigurationActivationDispatcher dispatcher,
+    HostFeatureActivationAuthority activation,
     TimeProvider timeProvider,
     ILogger<ConfigurationActivationWorker> logger
 ) : BackgroundService
@@ -34,7 +36,15 @@ internal sealed class ConfigurationActivationWorker(
         var candidate = await db
             .ConfigurationActivations.AsNoTracking()
             .Where(x =>
-                x.Status == ConfigurationActivationStatus.Pending
+                (
+                    x.Status == ConfigurationActivationStatus.Pending
+                    && !db.ConfigurationActivations.Any(other =>
+                        other.HostId == x.HostId
+                        && other.Id != x.Id
+                        && other.Status == ConfigurationActivationStatus.Processing
+                        && other.UpdatedAtUtc > staleBefore
+                    )
+                )
                 || (
                     x.Status == ConfigurationActivationStatus.Processing
                     && x.UpdatedAtUtc <= staleBefore
@@ -83,22 +93,47 @@ internal sealed class ConfigurationActivationWorker(
     {
         try
         {
-            await dispatcher.ActivateAsync(
+            var result = await activation.ApplyAsync(
                 claim.HostId,
                 claim.Enabled,
                 claim.Disabled,
                 cancellationToken
             );
-            await SetOutcomeAsync(
-                claim,
-                ConfigurationActivationStatus.Complete,
-                null,
-                cancellationToken
-            );
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
+            switch (result)
+            {
+                case HostFeatureActivationResult.Complete:
+                    await SetOutcomeAsync(
+                        claim,
+                        ConfigurationActivationStatus.Complete,
+                        null,
+                        cancellationToken
+                    );
+                    break;
+                case HostFeatureActivationResult.Failed failed:
+                    await SetOutcomeAsync(
+                        claim,
+                        ConfigurationActivationStatus.Failed,
+                        [failed.Issue],
+                        cancellationToken
+                    );
+                    break;
+                case HostFeatureActivationResult.ManualFollowUp manual:
+                    await SetOutcomeAsync(
+                        claim,
+                        ConfigurationActivationStatus.ManualFollowUp,
+                        manual.Issues,
+                        cancellationToken
+                    );
+                    break;
+                case HostFeatureActivationResult.Canceled canceled:
+                    await SetOutcomeAsync(
+                        claim,
+                        ConfigurationActivationStatus.Pending,
+                        [canceled.Issue],
+                        CancellationToken.None
+                    );
+                    break;
+            }
         }
         catch (Exception exception)
         {
@@ -111,8 +146,13 @@ internal sealed class ConfigurationActivationWorker(
             await SetOutcomeAsync(
                 claim,
                 ConfigurationActivationStatus.Failed,
-                exception.GetType().Name,
-                cancellationToken
+                [
+                    new(
+                        HostFeatureActivationAuthority.AutomaticWorkFailureCode,
+                        "The saved feature setting could not be activated automatically. Retry automatic activation."
+                    ),
+                ],
+                CancellationToken.None
             );
         }
     }
@@ -120,7 +160,7 @@ internal sealed class ConfigurationActivationWorker(
     private async Task SetOutcomeAsync(
         ActivationClaim claim,
         ConfigurationActivationStatus status,
-        string? failureCode,
+        IReadOnlyList<HostFeatureActivationIssue>? issues,
         CancellationToken cancellationToken
     )
     {
@@ -132,7 +172,10 @@ internal sealed class ConfigurationActivationWorker(
                 setters =>
                     setters
                         .SetProperty(x => x.Status, status)
-                        .SetProperty(x => x.FailureCode, failureCode)
+                        .SetProperty(
+                            x => x.IssuesJson,
+                            issues == null ? null : JsonSerializer.Serialize(issues)
+                        )
                         .SetProperty(x => x.UpdatedAtUtc, now)
                         .SetProperty(
                             x => x.CompletedAtUtc,

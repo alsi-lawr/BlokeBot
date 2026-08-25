@@ -197,17 +197,12 @@ public partial class HostConfigPage
         var startupMessageText = _startupMessageText;
         try
         {
-            if (enabled)
-            {
-                await _features.EnableAsync(hostId, feature, CancellationToken.None);
-            }
-            else
-            {
-                await _features.DisableAsync(hostId, feature, CancellationToken.None);
-            }
+            var result = enabled
+                ? await _features.EnableAsync(hostId, feature, CancellationToken.None)
+                : await _features.DisableAsync(hostId, feature, CancellationToken.None);
 
             await LoadCoreAsync();
-            ToastFeatureChange(feature, enabled);
+            ToastFeatureChange(feature, enabled, result);
         }
         finally
         {
@@ -219,12 +214,57 @@ public partial class HostConfigPage
         }
     }
 
-    private void ToastFeatureChange(HostFeatureFlags feature, bool enabled)
+    private void ToastFeatureChange(
+        HostFeatureFlags feature,
+        bool enabled,
+        HostFeatureUpdateResult result
+    )
     {
         var featureName = FeatureName(feature);
         var channelName = _state is { Login.Length: > 0 } ? $"#{_state.Login}" : "this channel";
         var stateText = enabled ? "enabled" : "disabled";
         var impactText = FeatureImpact(feature, enabled);
+
+        if (result is HostFeatureUpdateResult.Saved { Activation: { } activation })
+        {
+            switch (activation)
+            {
+                case HostFeatureActivationResult.Failed failed:
+                    _ = _toasts.Publish(
+                        ToastRequest<ErrorToastStrategy>.WithTitle(
+                            failed.Issue.Reason,
+                            $"{featureName} activation failed"
+                        )
+                    );
+                    return;
+                case HostFeatureActivationResult.Canceled canceled:
+                    _ = _toasts.Publish(
+                        ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                            canceled.Issue.Reason,
+                            $"{featureName} activation interrupted"
+                        )
+                    );
+                    return;
+                case HostFeatureActivationResult.ManualFollowUp manual:
+                    _ = _toasts.Publish(
+                        ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                            string.Join(" ", manual.Issues.Select(issue => issue.Reason)),
+                            $"{featureName} needs a manual step"
+                        )
+                    );
+                    return;
+            }
+        }
+        if (result is HostFeatureUpdateResult.HostNotFound)
+        {
+            _ = _toasts.Publish(
+                ToastRequest<ErrorToastStrategy>.WithTitle(
+                    "The selected channel no longer exists.",
+                    $"{featureName} not saved"
+                )
+            );
+            return;
+        }
 
         var message = $"{featureName} is now {stateText} for {channelName}. {impactText}";
         var title = $"{featureName} {stateText}";

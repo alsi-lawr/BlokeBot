@@ -48,7 +48,7 @@ public sealed partial class BlokeBotDbContext
                     static x => PersistedEnumTokens<ConfigurationActivationStatus>.Parse(x)
                 )
                 .HasMaxLength(16);
-            _ = b.Property(static x => x.FailureCode).HasMaxLength(64);
+            _ = b.Property(static x => x.IssuesJson).HasMaxLength(4096);
             _ = b.HasIndex(static x => new { x.HostId, x.Status });
             _ = b.HasOne<BotHost>()
                 .WithMany()

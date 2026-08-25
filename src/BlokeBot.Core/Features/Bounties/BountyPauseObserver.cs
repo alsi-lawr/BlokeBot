@@ -8,33 +8,21 @@ namespace BlokeBot.Core.Features.Bounties;
 internal sealed class BountyPauseObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider timeProvider
-)
-    : IHostFeatureChangeObserver,
-        BlokeBot.Core.Features.ConfigurationTransfer.IConfigurationActivationObserver
+) : IHostFeatureActivationObserver
 {
-    public async ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (feature is not (HostFeatureFlags.Bounties or HostFeatureFlags.Points))
+        if (change.Feature is not (HostFeatureFlags.Bounties or HostFeatureFlags.Points))
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
 
-        await ReconcileAsync(hostId, cancellationToken);
+        await ReconcileAsync(change.HostId, cancellationToken);
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
-
-    public ValueTask FeatureEnabledAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        CancellationToken cancellationToken
-    ) =>
-        feature is HostFeatureFlags.Bounties or HostFeatureFlags.Points
-            ? new(ReconcileAsync(hostId, cancellationToken))
-            : ValueTask.CompletedTask;
 
     internal async Task RecoverAsync(CancellationToken ct)
     {

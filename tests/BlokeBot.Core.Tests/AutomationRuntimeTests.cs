@@ -1329,12 +1329,12 @@ public sealed class AutomationRuntimeTests
         );
         handler.Calls.ShouldBe(1);
 
-        await fixture.Features.DisableAsync(
+        _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
         );
-        await fixture.Features.EnableAsync(
+        _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -4049,14 +4049,14 @@ public sealed class AutomationRuntimeTests
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var runId = await SingleRunIdAsync(fixture);
 
-        await fixture.Features.DisableAsync(
+        _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
         );
         release.SetResult();
         _ = await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
-        await fixture.Features.EnableAsync(
+        _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -4389,7 +4389,7 @@ public sealed class AutomationRuntimeTests
         );
         var runId = dispatched.RunIds.ShouldHaveSingleItem();
 
-        await fixture.Features.DisableAsync(
+        _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -4404,7 +4404,7 @@ public sealed class AutomationRuntimeTests
         ).ShouldBeOfType<AutomationRunQueryOutcome.FeatureDisabled>();
 
         fixture.Clock.Advance(TimeSpan.FromMinutes(1));
-        await fixture.Features.EnableAsync(
+        _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -4439,7 +4439,7 @@ public sealed class AutomationRuntimeTests
         );
         var runId = dispatched.RunIds.ShouldHaveSingleItem();
 
-        await fixture.Features.DisableAsync(
+        _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.CustomCommands,
             CancellationToken.None
@@ -4454,7 +4454,7 @@ public sealed class AutomationRuntimeTests
             await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
         retained.Runs.ShouldHaveSingleItem().State.ShouldBe(AutomationFlowRunState.Invalidated);
-        await fixture.Features.EnableAsync(
+        _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.CustomCommands,
             CancellationToken.None
@@ -4712,7 +4712,7 @@ public sealed class AutomationRuntimeTests
             run.HostId == fixture.HostId && run.Status == AutomationFlowRunStatus.Completed
         );
 
-        await fixture.Features.DisableAsync(
+        _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.CustomCommands,
             CancellationToken.None
@@ -5669,10 +5669,9 @@ public sealed class AutomationRuntimeTests
             );
             chat ??= new RecordingChatSender(chatAdmissions);
             var observer = new AutomationFeatureDisableObserver(database, clock);
-            var features = new HostFeatureService(
+            var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [],
                 [observer]
             );
             var expressions = new AutomationExpressionService();

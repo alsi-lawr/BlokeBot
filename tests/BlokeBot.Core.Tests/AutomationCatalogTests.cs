@@ -158,7 +158,7 @@ public sealed class AutomationCatalogTests
         enabled.Availability.ShouldBe(AutomationCatalogAvailability.Enabled);
         enabled.Definitions.Length.ShouldBe(7);
 
-        await features.EnableAsync(
+        _ = await features.EnableAsync(
             disabledHost,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -166,7 +166,7 @@ public sealed class AutomationCatalogTests
         var firstEnable = await service.DiscoverAsync(new(disabledHost), CancellationToken.None);
         firstEnable.Definitions.ShouldBe(enabled.Definitions);
 
-        await features.DisableAsync(
+        _ = await features.DisableAsync(
             disabledHost,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -174,7 +174,7 @@ public sealed class AutomationCatalogTests
         (
             await service.DiscoverAsync(new(disabledHost), CancellationToken.None)
         ).Definitions.ShouldBeEmpty();
-        await features.EnableAsync(
+        _ = await features.EnableAsync(
             disabledHost,
             HostFeatureFlags.Automations,
             CancellationToken.None
@@ -425,7 +425,11 @@ public sealed class AutomationCatalogTests
         new([new CoreAutomationCatalogModule()]);
 
     private static HostFeatureService FeatureService(SqliteBlokeBotDbFactory dbFactory) =>
-        new(dbFactory, new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()), []);
+        TestHostFeatureServices.Create(
+            dbFactory,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            []
+        );
 
     private static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,

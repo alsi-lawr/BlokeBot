@@ -76,7 +76,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<IOverlayEventPresenter>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
         );
-        _ = services.AddSingleton<IHostFeatureChangeObserver>(static serviceProvider =>
+        _ = services.AddSingleton<IHostFeatureActivationObserver>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
         );
         _ = services.AddHostedService(static serviceProvider =>

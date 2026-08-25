@@ -78,7 +78,7 @@ public static class TwitchOperationsServiceCollectionExtensions
             provider.GetRequiredService<PredictionService>()
         );
         _ = services.AddSingleton<
-            INativeTwitchFeatureChangeObserver,
+            IHostFeatureActivationObserver,
             NativeTwitchFeatureChangeObserver
         >();
         _ = services.AddSingleton<IPollEventObserver>(static provider =>

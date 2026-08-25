@@ -73,7 +73,6 @@ public static class ConfigurationTransferServiceCollectionExtensions
                 : new SemaphoreSlim(1, 1)
         ));
         _ = services.AddSingleton<ConfigurationActivationQueue>();
-        _ = services.AddSingleton<ConfigurationActivationDispatcher>();
         _ = services.AddSingleton<ConfigurationActivationService>();
         _ = services.AddHostedService<ConfigurationActivationWorker>();
         return services;

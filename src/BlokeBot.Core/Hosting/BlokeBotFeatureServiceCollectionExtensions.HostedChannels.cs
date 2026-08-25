@@ -80,6 +80,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
                 );
         }
         _ = services.AddSingleton<HostedChannelChangeNotifier>();
+        _ = services.AddSingleton<HostFeatureActivationAuthority>();
         _ = services.AddSingleton<HostedChannelRuntimeTransitionService>();
         _ = services.AddSingleton<HostedChannelRuntimeControlService>();
         _ = services.AddSingleton<HostedChannelRuntimeLifecycleService>();

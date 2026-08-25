@@ -37,13 +37,17 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
         );
         var features = FeatureService(database, clock);
 
-        await features.DisableAsync(
+        _ = await features.DisableAsync(
             hostId,
             HostFeatureFlags.CustomCommands,
             CancellationToken.None
         );
         clock.SetUtcNow(_enabledAt);
-        await features.EnableAsync(hostId, HostFeatureFlags.CustomCommands, CancellationToken.None);
+        _ = await features.EnableAsync(
+            hostId,
+            HostFeatureFlags.CustomCommands,
+            CancellationToken.None
+        );
 
         await using var verify = await database.CreateDbContextAsync();
         var announcement = await verify.CustomAnnouncements.SingleAsync();
@@ -79,7 +83,7 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
             ["Weekly"],
             _disabledAt.AddDays(-7).UtcDateTime
         );
-        await FeatureService(database, clock)
+        _ = await FeatureService(database, clock)
             .DisableAsync(hostId, HostFeatureFlags.CustomCommands, CancellationToken.None);
         clock.SetUtcNow(_enabledAt);
 
@@ -139,7 +143,7 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
             ["Interval"],
             _disabledAt.AddHours(-1).UtcDateTime
         );
-        await FeatureService(database, clock)
+        _ = await FeatureService(database, clock)
             .DisableAsync(hostId, HostFeatureFlags.CustomCommands, CancellationToken.None);
         clock.SetUtcNow(_enabledAt);
 
@@ -165,7 +169,13 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
     private static HostFeatureService FeatureService(
         SqliteBlokeBotDbFactory database,
         TimeProvider clock
-    ) => new(database, new(TestEventBus.Create<AppEventKind>()), [], [], clock);
+    ) =>
+        TestHostFeatureServices.Create(
+            database,
+            new(TestEventBus.Create<AppEventKind>()),
+            [],
+            clock
+        );
 
     private static ConfigurationTransferCoordinator Coordinator(
         SqliteBlokeBotDbFactory database,

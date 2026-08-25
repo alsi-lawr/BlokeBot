@@ -1,6 +1,5 @@
 using System.Globalization;
 using BlokeBot.Core.Features.CommunityProgression;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
@@ -685,14 +684,13 @@ public sealed class CommunityProgressionServiceTests
         hiddenManagement.Standings.Single().TwitchUserId.ShouldBe(viewer.TwitchUserId);
 
         var featureEvents = TestEventBus.Create<AppEventKind>();
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(featureEvents),
             [],
-            [],
             clock
         );
-        await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
         clock.Advance(TimeSpan.FromMinutes(2));
         var suppressed = new CommunitySourceEvent.ChatMessage(
             "suppressed",
@@ -713,7 +711,7 @@ public sealed class CommunityProgressionServiceTests
             ).ShouldBeFalse();
         }
 
-        await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        _ = await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
         Success(await service.ProcessEventAsync(hostId, suppressed, default))
             .WasIdempotent.ShouldBeTrue();
         var retained = (await service.GetModeratorSeasonsAsync(hostId, default)).Single();
@@ -809,20 +807,19 @@ public sealed class CommunityProgressionServiceTests
             CreateService(database, clock),
             trigger
         );
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            [],
             [observer],
             clock
         );
 
-        await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
 
         trigger.Reconciled.ShouldBeTrue();
         trigger.Reset();
 
-        await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        _ = await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
 
         trigger.Reconciled.ShouldBeTrue();
     }
@@ -883,14 +880,13 @@ public sealed class CommunityProgressionServiceTests
                     .ToString(CultureInfo.InvariantCulture),
             }
         );
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             [],
-            [],
             clock
         );
-        await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
 
         await runtime.MessageReceivedAsync(delayedMessage, default);
         await bountyObserver.BountyCompletedAsync(
@@ -903,7 +899,7 @@ public sealed class CommunityProgressionServiceTests
 
         responses.ShouldBeEmpty();
         clock.Advance(TimeSpan.FromMinutes(2));
-        await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        _ = await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
         await runtime.MessageReceivedAsync(delayedMessage, default);
         await bountyObserver.BountyCompletedAsync(
             hostId,

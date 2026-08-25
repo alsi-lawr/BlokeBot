@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
+using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -85,22 +86,40 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             )
         );
 
-        await observer.NativeTwitchFeatureChangedAsync(
+        var notifications = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            ObserverIdentity.Named("Test.NativeActivation.ManualFollowUp"),
+            (_, _) =>
+            {
+                notifications++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var activation = new HostFeatureActivationAuthority(
+            [new ManualFollowUpObserver(), observer],
+            new(events),
+            alerts,
+            NullLogger<HostFeatureActivationAuthority>.Instance
+        );
+
+        var manual = await activation.ApplyAsync(
             1,
             HostFeatureFlags.Polls,
-            NativeTwitchFeatureState.Enabled,
+            HostFeatureFlags.None,
             CancellationToken.None
         );
-        await observer.NativeTwitchFeatureChangedAsync(
-            1,
-            HostFeatureFlags.RewardsAndRedemptions,
-            NativeTwitchFeatureState.Enabled,
+        _ = manual.ShouldBeOfType<HostFeatureActivationResult.ManualFollowUp>();
+        notifications.ShouldBe(1);
+        (await alerts.LoadStateAsync(1, CancellationToken.None))
+            .Active.ShouldHaveSingleItem()
+            .SourceKey.ShouldBe("native-provider:primary");
+        _ = await observer.ApplyAsync(
+            new(1, HostFeatureFlags.RewardsAndRedemptions, HostFeatureActivationState.Enabled),
             CancellationToken.None
         );
-        await observer.NativeTwitchFeatureChangedAsync(
-            1,
-            HostFeatureFlags.Predictions,
-            NativeTwitchFeatureState.Enabled,
+        _ = await observer.ApplyAsync(
+            new(1, HostFeatureFlags.Predictions, HostFeatureActivationState.Enabled),
             CancellationToken.None
         );
 
@@ -144,6 +163,26 @@ public sealed class NativeTwitchFeatureChangeObserverTests
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount("channel", "token")
+                    )
+                )
+            );
+    }
+
+    private sealed class ManualFollowUpObserver : IHostFeatureActivationObserver
+    {
+        public ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+            HostFeatureActivationChange change,
+            CancellationToken cancellationToken
+        ) =>
+            ValueTask.FromResult<HostFeatureAutomaticWorkResult>(
+                new HostFeatureAutomaticWorkResult.ManualFollowUp(
+                    new(
+                        "native-provider-connection-required",
+                        "Reconnect the native provider.",
+                        "native-provider:primary",
+                        "Native provider connection required",
+                        "Reconnect the provider before retrying activation.",
+                        "/host"
                     )
                 )
             );

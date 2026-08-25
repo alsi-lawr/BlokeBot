@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
@@ -390,8 +389,7 @@ public sealed class EventFeedOverlayTests
         _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(fixture.Database);
         _ = services.AddSingleton<TimeProvider>(fixture.Clock);
         _ = services.AddSingleton(TestEventBus.Create<AppEventKind>());
-        _ = services.AddSingleton<HostedChannelChangeNotifier>();
-        _ = services.AddSingleton<HostFeatureService>();
+        _ = TestHostFeatureServices.Register(services);
         _ = services.AddBlokeBotOverlays();
         await using var provider = services.BuildServiceProvider();
         var presenter = provider.GetRequiredService<IOverlayEventPresenter>();
@@ -405,7 +403,7 @@ public sealed class EventFeedOverlayTests
             HostFeatureFlags.CommunityProgression,
             communityConnection
         );
-        await features.EnableAsync(
+        _ = await features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.CommunityProgression,
             CancellationToken.None
@@ -417,7 +415,7 @@ public sealed class EventFeedOverlayTests
             HostFeatureFlags.Overlays,
             overlaysConnection
         );
-        await features.EnableAsync(
+        _ = await features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Overlays,
             CancellationToken.None
@@ -467,7 +465,7 @@ public sealed class EventFeedOverlayTests
             OverlayLiveCoordinator.OverlayLiveConnection connection
         )
         {
-            await features.DisableAsync(hostId, feature, CancellationToken.None);
+            _ = await features.DisableAsync(hostId, feature, CancellationToken.None);
             var clear = (
                 await ReadLiveAsync(connection)
             ).ShouldBeOfType<OverlayLiveTransportMessage.EventFeedEvent>();
@@ -502,22 +500,17 @@ public sealed class EventFeedOverlayTests
         _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(fixture.Database);
         _ = services.AddSingleton<TimeProvider>(fixture.Clock);
         _ = services.AddSingleton(TestEventBus.Create<AppEventKind>());
-        _ = services.AddSingleton<HostedChannelChangeNotifier>();
-        _ = services.AddSingleton<HostFeatureService>();
+        _ = TestHostFeatureServices.Register(services);
         _ = services.AddBlokeBotOverlays();
         await using var provider = services.BuildServiceProvider();
         var feed = provider.GetRequiredService<OverlayEventFeedService>();
-        provider
-            .GetServices<IHostFeatureChangeObserver>()
-            .ShouldHaveSingleItem()
-            .ShouldBeSameAs(feed);
         var presenter = provider.GetRequiredService<IOverlayEventPresenter>();
         var features = provider.GetRequiredService<HostFeatureService>();
         await presenter.PresentAsync(Point("point-active", "one"), CancellationToken.None);
         await presenter.PresentAsync(Point("point-queued", "two"), CancellationToken.None);
         await presenter.PresentAsync(Guess("guess-first"), CancellationToken.None);
 
-        await features.DisableAsync(
+        _ = await features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Points,
             CancellationToken.None
@@ -535,12 +528,16 @@ public sealed class EventFeedOverlayTests
             rows.Single(x => x.SourceKey == "guess-first")
                 .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Active);
         }
-        await features.EnableAsync(fixture.HostId, HostFeatureFlags.Points, CancellationToken.None);
+        _ = await features.EnableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Points,
+            CancellationToken.None
+        );
         var guessingActive = await feed.ReadAsync(fixture.Instance, CancellationToken.None);
         guessingActive!.Active!.Kind.ShouldBe("guessingWinner");
         await presenter.PresentAsync(Guess("guess-second"), CancellationToken.None);
 
-        await features.DisableAsync(
+        _ = await features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Guessing,
             CancellationToken.None
@@ -556,7 +553,7 @@ public sealed class EventFeedOverlayTests
             guessing.Count.ShouldBe(2);
             guessing.ShouldAllBe(x => x.Lifecycle == OverlayEventFeedLifecycle.Suppressed);
         }
-        await features.EnableAsync(
+        _ = await features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Guessing,
             CancellationToken.None

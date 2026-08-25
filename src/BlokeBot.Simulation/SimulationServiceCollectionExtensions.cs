@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.RaidCollaboration;
@@ -44,11 +45,9 @@ internal static class SimulationServiceCollectionExtensions
         );
         _ = services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
         _ = services.AddSingleton<SimulationConfigurationActivationObserver>();
-        _ =
-            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.IConfigurationActivationObserver>(
-                static provider =>
-                    provider.GetRequiredService<SimulationConfigurationActivationObserver>()
-            );
+        _ = services.AddSingleton<IHostFeatureActivationObserver>(static provider =>
+            provider.GetRequiredService<SimulationConfigurationActivationObserver>()
+        );
         _ = services.Replace(
             ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()

@@ -4,18 +4,21 @@ using BlokeBot.Persistence.Models;
 namespace BlokeBot.Core.Features.Competitions;
 
 public sealed class CompetitionFeatureObserver(CompetitionService competitions)
-    : IHostFeatureChangeObserver
+    : IHostFeatureActivationObserver
 {
-    public async ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (feature == HostFeatureFlags.Competitions && !enabled)
+        if (
+            change.Feature == HostFeatureFlags.Competitions
+            && change.State is HostFeatureActivationState.Disabled
+        )
         {
-            _ = await competitions.SuppressDueRemindersAsync(hostId, cancellationToken);
+            _ = await competitions.SuppressDueRemindersAsync(change.HostId, cancellationToken);
         }
+
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
 }

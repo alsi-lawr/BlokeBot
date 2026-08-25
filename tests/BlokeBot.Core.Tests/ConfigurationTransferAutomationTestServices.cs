@@ -1,5 +1,4 @@
 using BlokeBot.Core.Features.Automations;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 
@@ -14,7 +13,7 @@ internal sealed record ConfigurationTransferAutomationTestServices(
         SqliteBlokeBotDbFactory database
     )
     {
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             []

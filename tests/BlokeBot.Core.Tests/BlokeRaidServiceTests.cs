@@ -1,5 +1,4 @@
 using BlokeBot.Core.Features.BlokeRaid;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
@@ -200,14 +199,13 @@ public sealed class BlokeRaidServiceTests
         var started = Success(
             await service.StartAsync(hostId, Campaign("start"), default)
         ).Campaign;
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             [],
-            [],
             clock
         );
-        await features.DisableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
         await using (var before = await database.CreateDbContextAsync())
         {
             var campaign = await before.BlokeRaidCampaigns.SingleAsync();
@@ -242,7 +240,7 @@ public sealed class BlokeRaidServiceTests
         (await service.LoadEventsAsync(hostId, 0, 100, default)).ShouldBeEmpty();
         (await CountsAsync(database)).ShouldBe(countsBefore);
 
-        await features.EnableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
+        _ = await features.EnableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
         var resumed = await service.LoadModeratorAsync(hostId, default);
         var resumedValue = resumed.ShouldNotBeNull();
         var resumedCampaign = resumedValue.ActiveCampaign.ShouldNotBeNull();
@@ -450,14 +448,13 @@ public sealed class BlokeRaidServiceTests
             await service.StartAsync(hostId, Campaign("start"), default)
         ).Campaign;
         await SeedCompletedGuessAsync(database, hostId);
-        var features = new HostFeatureService(
+        var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             [],
-            [],
             clock
         );
-        await features.DisableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
+        _ = await features.DisableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
         var countsBefore = await CountsAsync(database);
         var runtime = new BlokeRaidRuntime(
             database,

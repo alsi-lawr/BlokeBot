@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -17,16 +18,22 @@ public sealed class ConfigurationActivationService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db
+        var activation = await db
             .ConfigurationActivations.AsNoTracking()
             .Where(x => x.HostId == hostId && x.Id == activationId)
-            .Select(x => new ConfigurationActivationView(
-                x.Id,
-                x.Status,
-                x.AttemptCount,
-                x.FailureCode
-            ))
             .SingleOrDefaultAsync(cancellationToken);
+        return activation is null
+            ? null
+            : new(
+                activation.Id,
+                activation.Status,
+                activation.AttemptCount,
+                activation.IssuesJson is null
+                    ? []
+                    : JsonSerializer.Deserialize<ConfigurationActivationIssue[]>(
+                        activation.IssuesJson
+                    ) ?? []
+            );
     }
 
     public async Task<bool> RetryAsync(
@@ -40,13 +47,16 @@ public sealed class ConfigurationActivationService(
             .ConfigurationActivations.Where(x =>
                 x.HostId == hostId
                 && x.Id == activationId
-                && x.Status == ConfigurationActivationStatus.Failed
+                && (
+                    x.Status == ConfigurationActivationStatus.Failed
+                    || x.Status == ConfigurationActivationStatus.ManualFollowUp
+                )
             )
             .ExecuteUpdateAsync(
                 setters =>
                     setters
                         .SetProperty(x => x.Status, ConfigurationActivationStatus.Pending)
-                        .SetProperty(x => x.FailureCode, (string?)null)
+                        .SetProperty(x => x.IssuesJson, (string?)null)
                         .SetProperty(x => x.Revision, x => x.Revision + 1)
                         .SetProperty(x => x.UpdatedAtUtc, timeProvider.GetUtcNow().UtcDateTime),
                 cancellationToken
@@ -64,5 +74,7 @@ public sealed record ConfigurationActivationView(
     Guid Id,
     ConfigurationActivationStatus Status,
     int AttemptCount,
-    string? FailureCode
+    IReadOnlyList<ConfigurationActivationIssue> Issues
 );
+
+public sealed record ConfigurationActivationIssue(string Code, string Reason);

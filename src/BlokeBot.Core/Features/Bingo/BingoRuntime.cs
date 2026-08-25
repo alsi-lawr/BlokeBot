@@ -295,26 +295,26 @@ internal sealed class BingoRuntime(
 internal sealed class BingoFeatureObserver(
     BingoService bingo,
     IEventSubChannelReconciliationTrigger? eventSub = null
-) : IHostFeatureChangeObserver
+) : IHostFeatureActivationObserver
 {
-    public async ValueTask FeatureChangedAsync(
-        int hostId,
-        HostFeatureFlags feature,
-        bool enabled,
+    public async ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
         CancellationToken cancellationToken
     )
     {
-        if (feature != HostFeatureFlags.Bingo)
+        if (change.Feature != HostFeatureFlags.Bingo)
         {
-            return;
+            return new HostFeatureAutomaticWorkResult.Complete();
         }
         if (eventSub is not null)
         {
             await eventSub.ReconcileAsync(cancellationToken);
         }
-        if (enabled)
+        if (change.State is HostFeatureActivationState.Enabled)
         {
-            await bingo.ReconcilePendingRewardsAsync(hostId, cancellationToken);
+            await bingo.ReconcilePendingRewardsAsync(change.HostId, cancellationToken);
         }
+
+        return new HostFeatureAutomaticWorkResult.Complete();
     }
 }

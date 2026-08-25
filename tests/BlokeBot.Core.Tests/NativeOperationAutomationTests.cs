@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
@@ -1010,10 +1009,9 @@ public sealed class NativeOperationAutomationTests
             var clipsMarkers = new RecordingClipMarkerOperations();
             var polls = new RecordingPollOperations();
             var predictions = new RecordingPredictionOperations();
-            var features = new HostFeatureService(
+            var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [],
                 [new AutomationFeatureDisableObserver(database, clock)]
             );
             var catalog = new AutomationCatalogService(

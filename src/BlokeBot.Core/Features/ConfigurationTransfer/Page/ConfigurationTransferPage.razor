@@ -154,26 +154,8 @@
                         </div>
                         @if (_activation is { } activation)
                         {
-                            <div class="activation-row" data-status="@activation.Status.ToString().ToLowerInvariant()">
-                                <div class="activation-row__line">
-                                    <strong>Feature activation @ActivationLabel(activation.Status)</strong>
-                                    <span class="@ActivationPillClass(activation.Status)">
-                                        <span class="status-pill__dot" aria-hidden="true"></span>
-                                        @activation.Status
-                                    </span>
-                                </div>
-                                <small>@ActivationDescription(activation.Status)</small>
-                                @if (activation.Status == ConfigurationActivationStatus.Failed)
-                                {
-                                    <div class="activation-row__actions">
-                                        <button class="btn-secondary"
-                                                type="button"
-                                                @onclick="RetryActivationAsync">
-                                            Retry activation
-                                        </button>
-                                    </div>
-                                }
-                            </div>
+                            <ConfigurationActivationStatusPanel Activation="activation"
+                                                                Retry="RetryActivationAsync" />
                         }
                         <div class="section-links">
                             @foreach (var section in applied.ChangedSections)
