@@ -8,6 +8,7 @@ namespace BlokeBot.Core.Features.PublicChat;
 internal sealed partial class EfPublicChatOutbox
 {
     private async Task ExpireUnsentBatchAsync(
+        DurableAlertService.ReportOperation? reportOperation,
         BlokeBotDbContext db,
         DateTime nowUtc,
         ICollection<DurableAlertPendingChange> alertChanges,
@@ -71,6 +72,7 @@ internal sealed partial class EfPublicChatOutbox
             }
             if (
                 await RecordAutomaticRaidTerminalAsync(
+                    reportOperation,
                     db,
                     row.DeduplicationKey,
                     row.Id,
@@ -138,6 +140,7 @@ internal sealed partial class EfPublicChatOutbox
     }
 
     private async Task RecoverExpiredAsync(
+        DurableAlertService.ReportOperation? reportOperation,
         BlokeBotDbContext db,
         DateTime nowUtc,
         ICollection<DurableAlertPendingChange> alertChanges,
@@ -195,6 +198,7 @@ internal sealed partial class EfPublicChatOutbox
             }
             if (
                 await RecordAutomaticRaidTerminalAsync(
+                    reportOperation,
                     db,
                     row.DeduplicationKey,
                     row.Id,
@@ -242,6 +246,7 @@ internal sealed partial class EfPublicChatOutbox
     }
 
     private async Task ExhaustConfiguredSafePreSendRetriesAsync(
+        DurableAlertService.ReportOperation? reportOperation,
         BlokeBotDbContext db,
         DateTime nowUtc,
         ICollection<DurableAlertPendingChange> alertChanges,
@@ -286,6 +291,7 @@ internal sealed partial class EfPublicChatOutbox
             }
             if (
                 await RecordAutomaticRaidTerminalAsync(
+                    reportOperation,
                     db,
                     row.DeduplicationKey,
                     row.Id,

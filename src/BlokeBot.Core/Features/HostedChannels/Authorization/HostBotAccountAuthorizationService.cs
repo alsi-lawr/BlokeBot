@@ -675,25 +675,14 @@ public sealed class HostBotAccountAuthorizationService(
 
             if (!ProtectedPayloadEquals(originalProtectedPayload, persistedProtectedPayload))
             {
-                var latest = tokenProtector.Unprotect(settings.HostId, persistedProtectedPayload);
-                return await latest.Match<Task<HostBotAccountTokenRefreshOutcome>>(
-                    payload =>
-                        Task.FromResult<HostBotAccountTokenRefreshOutcome>(
-                            new HostBotAccountTokenRefreshOutcome.Refreshed(payload)
-                        ),
-                    async failure =>
-                    {
-                        var alertChange = await DisableUnusableCredentialsAsync(
-                            db,
-                            settings,
-                            cancellationToken
-                        );
-                        _ = mutationGate.Release();
-                        mutationGateHeld = false;
-                        await _alertAuthority.PublishCommittedAsync(alertChange);
-                        _ = await changes.NotifyChangedAsync(cancellationToken);
-                        return new HostBotAccountTokenRefreshOutcome.ProtectionUnavailable(failure);
-                    }
+                var replacedProtectedPayload = persistedProtectedPayload.ToArray();
+                _ = mutationGate.Release();
+                mutationGateHeld = false;
+                return await ResolveReplacedProtectedPayloadAsync(
+                    db,
+                    settings,
+                    replacedProtectedPayload,
+                    cancellationToken
                 );
             }
 
@@ -759,6 +748,46 @@ public sealed class HostBotAccountAuthorizationService(
         }
     }
 
+    private async Task<HostBotAccountTokenRefreshOutcome> ResolveReplacedProtectedPayloadAsync(
+        BlokeBotDbContext db,
+        HostBotAccountSettings settings,
+        byte[] protectedPayload,
+        CancellationToken cancellationToken
+    )
+    {
+        var latest = tokenProtector.Unprotect(settings.HostId, protectedPayload);
+        return await latest.Match<Task<HostBotAccountTokenRefreshOutcome>>(
+            payload =>
+                Task.FromResult<HostBotAccountTokenRefreshOutcome>(
+                    new HostBotAccountTokenRefreshOutcome.Refreshed(payload)
+                ),
+            async failure =>
+            {
+                if (
+                    await DisableUnusableCredentialsIfCurrentAsync(
+                        db,
+                        settings,
+                        protectedPayload,
+                        cancellationToken
+                    )
+                )
+                {
+                    return new HostBotAccountTokenRefreshOutcome.ProtectionUnavailable(failure);
+                }
+
+                var replacement = settings.ProtectedTokenPayload?.ToArray();
+                return replacement is null
+                    ? new HostBotAccountTokenRefreshOutcome.Rejected()
+                    : await ResolveReplacedProtectedPayloadAsync(
+                        db,
+                        settings,
+                        replacement,
+                        cancellationToken
+                    );
+            }
+        );
+    }
+
     private SemaphoreSlim CredentialMutationGate(int hostId) =>
         _credentialMutationGates.GetOrAdd(hostId, static _ => new SemaphoreSlim(1, 1));
 
@@ -785,6 +814,9 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken cancellationToken
     )
     {
+        await using var reportOperation = await _alertAuthority.BeginReportOperationAsync(
+            cancellationToken
+        );
         var mutationGate = CredentialMutationGate(settings.HostId);
         var disabled = false;
         DurableAlertPendingChange? alertChange = null;
@@ -800,7 +832,12 @@ public sealed class HostBotAccountAuthorizationService(
                 return false;
             }
 
-            alertChange = await DisableUnusableCredentialsAsync(db, settings, cancellationToken);
+            alertChange = await DisableUnusableCredentialsAsync(
+                reportOperation,
+                db,
+                settings,
+                cancellationToken
+            );
             disabled = true;
         }
         finally
@@ -809,12 +846,13 @@ public sealed class HostBotAccountAuthorizationService(
         }
 
         Debug.Assert(disabled, "The unusable custom-bot credentials must be disabled.");
-        await _alertAuthority.PublishCommittedAsync(alertChange!);
+        await reportOperation.PublishCommittedAsync(alertChange!);
         _ = await changes.NotifyChangedAsync(cancellationToken);
         return true;
     }
 
     private async Task<DurableAlertPendingChange> DisableUnusableCredentialsAsync(
+        DurableAlertService.ReportOperation reportOperation,
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         CancellationToken cancellationToken
@@ -826,7 +864,7 @@ public sealed class HostBotAccountAuthorizationService(
         ClearAuthorization(settings);
         settings.UpdatedAtUtc = now;
 
-        var alertChange = await _alertAuthority.StageReportAsync(
+        var alertChange = await reportOperation.StageAsync(
             db,
             new DurableAlertReport(
                 new DurableAlertIdentity(

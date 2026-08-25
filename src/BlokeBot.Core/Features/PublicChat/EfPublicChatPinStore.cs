@@ -66,6 +66,10 @@ internal sealed class EfPublicChatPinStore(
         CancellationToken cancellationToken
     )
     {
+        await using var reportOperation =
+            outcome is PublicChatPinExecutionOutcome.Terminal
+                ? await alerts.BeginReportOperationAsync(cancellationToken)
+                : null;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var operation = await db.PublicChatPinOperations.SingleOrDefaultAsync(
@@ -104,7 +108,13 @@ internal sealed class EfPublicChatPinStore(
                 operation.Status = PublicChatPinOperationStatus.Terminal;
                 operation.Outcome = terminal.Reason;
                 await RecordAutomaticRaidPartialFailureAsync(db, item, cancellationToken);
-                alertChange = await StageAlertAsync(db, item, terminal.Reason, cancellationToken);
+                alertChange = await StageAlertAsync(
+                    reportOperation!,
+                    db,
+                    item,
+                    terminal.Reason,
+                    cancellationToken
+                );
                 break;
             default:
                 throw new InvalidOperationException("Unknown public chat pin outcome.");
@@ -114,7 +124,7 @@ internal sealed class EfPublicChatPinStore(
         await transaction.CommitAsync(cancellationToken);
         if (alertChange is not null)
         {
-            await alerts.PublishCommittedAsync(alertChange);
+            await reportOperation!.PublishCommittedAsync(alertChange);
         }
     }
 
@@ -202,6 +212,7 @@ internal sealed class EfPublicChatPinStore(
             .ExecuteDeleteAsync(cancellationToken);
 
     private Task<DurableAlertPendingChange> StageAlertAsync(
+        DurableAlertService.ReportOperation reportOperation,
         BlokeBotDbContext db,
         PublicChatPinWorkItem item,
         string reason,
@@ -213,7 +224,7 @@ internal sealed class EfPublicChatPinStore(
             ? AutomaticRaidDeliveryCorrelation.AlertSource
             : "public-chat-pin";
         var sourceKey = automaticRaid ? item.ReplyKey : $"{item.Id}:{reason}";
-        return alerts.StageReportAsync(
+        return reportOperation.StageAsync(
             db,
             new DurableAlertReport(
                 new DurableAlertIdentity(item.HostId, source, sourceKey),

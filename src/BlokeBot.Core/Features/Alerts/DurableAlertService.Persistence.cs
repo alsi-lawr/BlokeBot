@@ -6,7 +6,15 @@ namespace BlokeBot.Core.Features.Alerts;
 
 public sealed partial class DurableAlertService
 {
-    internal async Task<DurableAlertPendingChange> StageReportAsync(
+    internal async ValueTask<ReportOperation> BeginReportOperationAsync(
+        CancellationToken cancellationToken
+    )
+    {
+        await _reportGate.WaitAsync(cancellationToken);
+        return new ReportOperation(this);
+    }
+
+    private async Task<DurableAlertPendingChange> StageReportAsync(
         BlokeBotDbContext db,
         DurableAlertReport report,
         CancellationToken cancellationToken
@@ -92,7 +100,7 @@ public sealed partial class DurableAlertService
         return new DurableAlertPendingChange(created, wasCreated: true);
     }
 
-    internal async ValueTask PublishCommittedAsync(DurableAlertPendingChange change)
+    private async ValueTask PublishCommittedAsync(DurableAlertPendingChange change)
     {
         ArgumentNullException.ThrowIfNull(change);
         change.ClaimPublication();
@@ -101,6 +109,8 @@ public sealed partial class DurableAlertService
 
     private async ValueTask PublishCommittedAsync() =>
         _ = await events.PublishAsync(AppEventKind.AlertsChanged, CancellationToken.None);
+
+    private void EndReportOperation() => _ = _reportGate.Release();
 
     private static IQueryable<DurableAlert> ActiveIssue(
         BlokeBotDbContext db,
@@ -156,6 +166,32 @@ public sealed partial class DurableAlertService
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("Value is required.", parameterName)
             : value.Trim();
+
+    internal sealed class ReportOperation(DurableAlertService authority) : IAsyncDisposable
+    {
+        private DurableAlertService? _authority = authority;
+
+        internal Task<DurableAlertPendingChange> StageAsync(
+            BlokeBotDbContext db,
+            DurableAlertReport report,
+            CancellationToken cancellationToken
+        ) => GetAuthority().StageReportAsync(db, report, cancellationToken);
+
+        internal ValueTask PublishCommittedAsync(DurableAlertPendingChange change) =>
+            GetAuthority().PublishCommittedAsync(change);
+
+        internal ValueTask PublishCommittedAsync() => GetAuthority().PublishCommittedAsync();
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Exchange(ref _authority, null)?.EndReportOperation();
+            return ValueTask.CompletedTask;
+        }
+
+        private DurableAlertService GetAuthority() =>
+            Volatile.Read(ref _authority)
+            ?? throw new ObjectDisposedException(nameof(ReportOperation));
+    }
 }
 
 internal sealed record DurableAlertIdentity(int HostId, string Source, string SourceKey);

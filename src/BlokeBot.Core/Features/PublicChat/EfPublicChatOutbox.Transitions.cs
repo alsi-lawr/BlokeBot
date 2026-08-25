@@ -16,6 +16,7 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     )
     {
+        await using var reportOperation = await BeginAlertReportOperationAsync(cancellationToken);
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -30,6 +31,7 @@ internal sealed partial class EfPublicChatOutbox
             }
 
             var alertChange = await RecordAutomaticRaidTerminalAsync(
+                reportOperation,
                 db,
                 message,
                 automaticRaidResult,
@@ -38,7 +40,7 @@ internal sealed partial class EfPublicChatOutbox
             );
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await PublishCommittedAlertAsync(alertChange);
+            await PublishCommittedAlertAsync(reportOperation, alertChange);
             return changed;
         }
         catch (Exception exception) when (IsSqliteContention(exception))

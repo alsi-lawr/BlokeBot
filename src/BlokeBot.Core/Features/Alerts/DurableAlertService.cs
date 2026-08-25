@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -11,9 +10,9 @@ public sealed partial class DurableAlertService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider timeProvider,
     EventBus<AppEventKind> events
-)
+) : IDisposable
 {
-    private readonly ConcurrentDictionary<DurableAlertIdentity, SemaphoreSlim> _reportGates = new();
+    private readonly SemaphoreSlim _reportGate = new(1, 1);
 
     public IO<DurableAlertCreateOutcome, Never> Create(
         int hostId,
@@ -36,27 +35,19 @@ public sealed partial class DurableAlertService(
                 linkPath,
                 UtcNow()
             );
-            var gate = _reportGates.GetOrAdd(report.Identity, static _ => new SemaphoreSlim(1, 1));
-            await gate.WaitAsync(ct);
-            try
-            {
-                report = report with { OccurredAtUtc = UtcNow() };
-                await using var db = await dbFactory.CreateDbContextAsync(ct);
-                await using var transaction = await db.Database.BeginTransactionAsync(ct);
-                var change = await StageReportAsync(db, report, ct);
-                _ = await db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-                await PublishCommittedAsync(change);
-                return Result<DurableAlertCreateOutcome, Never>.Success(
-                    change.WasCreated
-                        ? new DurableAlertCreateOutcome.Created(change.Alert)
-                        : new DurableAlertCreateOutcome.Existing(change.Alert)
-                );
-            }
-            finally
-            {
-                _ = gate.Release();
-            }
+            await using var operation = await BeginReportOperationAsync(ct);
+            report = report with { OccurredAtUtc = UtcNow() };
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            var change = await operation.StageAsync(db, report, ct);
+            _ = await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await operation.PublishCommittedAsync(change);
+            return Result<DurableAlertCreateOutcome, Never>.Success(
+                change.WasCreated
+                    ? new DurableAlertCreateOutcome.Created(change.Alert)
+                    : new DurableAlertCreateOutcome.Existing(change.Alert)
+            );
         });
 
     public IO<DurableAlertAcknowledgement, Never> Acknowledge(
@@ -67,6 +58,7 @@ public sealed partial class DurableAlertService(
         IO<DurableAlertAcknowledgement, Never>.Create(async ct =>
         {
             var actor = NormalizeRequired(actorLogin, nameof(actorLogin));
+            await using var operation = await BeginReportOperationAsync(ct);
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var acknowledgedAtUtc = UtcNow();
             var changed = await db
@@ -82,7 +74,7 @@ public sealed partial class DurableAlertService(
                 );
             if (changed == 1)
             {
-                await PublishCommittedAsync();
+                await operation.PublishCommittedAsync();
                 return Result<DurableAlertAcknowledgement, Never>.Success(
                     new DurableAlertAcknowledgement.Acknowledged()
                 );
@@ -138,6 +130,8 @@ public sealed partial class DurableAlertService(
     }
 
     private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
+
+    public void Dispose() => _reportGate.Dispose();
 }
 
 public abstract record DurableAlertCreateOutcome

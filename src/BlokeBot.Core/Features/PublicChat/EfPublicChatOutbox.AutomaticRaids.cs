@@ -24,6 +24,7 @@ internal sealed partial class EfPublicChatOutbox
             : AutomaticRaidShoutoutResultCode.Unexpected;
 
     private Task<DurableAlertPendingChange?> RecordAutomaticRaidTerminalAsync(
+        DurableAlertService.ReportOperation? reportOperation,
         BlokeBotDbContext db,
         PublicChatClaimedMessage message,
         AutomaticRaidShoutoutResultCode resultCode,
@@ -31,6 +32,7 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     ) =>
         RecordAutomaticRaidTerminalAsync(
+            reportOperation,
             db,
             message.DeduplicationKey.Value,
             message.Id,
@@ -40,6 +42,7 @@ internal sealed partial class EfPublicChatOutbox
         );
 
     private async Task<DurableAlertPendingChange?> RecordAutomaticRaidTerminalAsync(
+        DurableAlertService.ReportOperation? reportOperation,
         BlokeBotDbContext db,
         string deduplicationKey,
         long outboxMessageId,
@@ -93,12 +96,17 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
 
-        var alertService =
+        _ =
             alerts
             ?? throw new InvalidOperationException(
                 "Automatic raid terminal outcomes require the durable alert authority."
             );
-        return await alertService.StageReportAsync(
+        return await (
+            reportOperation
+            ?? throw new InvalidOperationException(
+                "Automatic raid terminal outcomes require an active alert report operation."
+            )
+        ).StageAsync(
             db,
             new DurableAlertReport(
                 new DurableAlertIdentity(
@@ -116,21 +124,29 @@ internal sealed partial class EfPublicChatOutbox
         );
     }
 
-    private async ValueTask PublishCommittedAlertAsync(DurableAlertPendingChange? change)
+    private static async ValueTask PublishCommittedAlertAsync(
+        DurableAlertService.ReportOperation? reportOperation,
+        DurableAlertPendingChange? change
+    )
     {
         if (change is not null)
         {
-            await alerts!.PublishCommittedAsync(change);
+            await reportOperation!.PublishCommittedAsync(change);
         }
     }
 
-    private async ValueTask PublishCommittedAlertsAsync(
+    private static async ValueTask PublishCommittedAlertsAsync(
+        DurableAlertService.ReportOperation? reportOperation,
         IEnumerable<DurableAlertPendingChange> changes
     )
     {
         foreach (var change in changes)
         {
-            await alerts!.PublishCommittedAsync(change);
+            await reportOperation!.PublishCommittedAsync(change);
         }
     }
+
+    private async ValueTask<DurableAlertService.ReportOperation?> BeginAlertReportOperationAsync(
+        CancellationToken cancellationToken
+    ) => alerts is null ? null : await alerts.BeginReportOperationAsync(cancellationToken);
 }

@@ -150,6 +150,96 @@ public sealed class DurableAlertRecurrenceTests
     }
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task AcknowledgementAndRecurrence_Interleave_InGateOrder(bool acknowledgementFirst)
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        var events = TestEventBus.Create<AppEventKind>();
+        using var alerts = new DurableAlertService(database, TimeProvider.System, events);
+        var initial = await Report(
+                alerts,
+                hostId,
+                DurableAlertSeverity.Warning,
+                "Initial",
+                "Initial detail",
+                null
+            )
+            .RunAsync(CancellationToken.None);
+        var publicationPaused = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var releasePublication = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named(
+                $"Test.DurableAlertRecurrence.AcknowledgeRace.{acknowledgementFirst}"
+            ),
+            async (_, cancellationToken) =>
+            {
+                TrySignal(publicationPaused);
+                await releasePublication.Task.WaitAsync(cancellationToken);
+            }
+        );
+
+        Task first = acknowledgementFirst
+            ? alerts
+                .Acknowledge(hostId, initial.Alert.Id, "streamer")
+                .RunAsync(CancellationToken.None)
+                .AsTask()
+            : Report(
+                    alerts,
+                    hostId,
+                    DurableAlertSeverity.Critical,
+                    "Recurred",
+                    "Latest detail",
+                    "/latest"
+                )
+                .RunAsync(CancellationToken.None)
+                .AsTask();
+        await publicationPaused.Task;
+        Task second = acknowledgementFirst
+            ? Report(
+                    alerts,
+                    hostId,
+                    DurableAlertSeverity.Critical,
+                    "Recurred",
+                    "Latest detail",
+                    "/latest"
+                )
+                .RunAsync(CancellationToken.None)
+                .AsTask()
+            : alerts
+                .Acknowledge(hostId, initial.Alert.Id, "streamer")
+                .RunAsync(CancellationToken.None)
+                .AsTask();
+        var secondWaitedForPublication = !second.IsCompleted;
+        _ = releasePublication.TrySetResult();
+
+        await Task.WhenAll(first, second);
+        secondWaitedForPublication.ShouldBeTrue();
+        var state = await alerts.LoadStateAsync(hostId, CancellationToken.None);
+        if (acknowledgementFirst)
+        {
+            var active = state.Active.ShouldHaveSingleItem();
+            active.Title.ShouldBe("Recurred");
+            active.OccurrenceCount.ShouldBe(1);
+            state.History.ShouldHaveSingleItem().Id.ShouldBe(initial.Alert.Id);
+        }
+        else
+        {
+            state.Active.ShouldBeEmpty();
+            var history = state.History.ShouldHaveSingleItem();
+            history.Id.ShouldBe(initial.Alert.Id);
+            history.Title.ShouldBe("Recurred");
+            history.OccurrenceCount.ShouldBe(2);
+        }
+    }
+
+    [Test]
     public async Task CancelledReport_Retrying_PersistsOnlyTheCommittedAttempt()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -198,7 +288,7 @@ public sealed class DurableAlertRecurrenceTests
     }
 
     [Test]
-    public async Task StagedRecurrence_CallerRollsBack_PreservesAlertAndPublishesNothing()
+    public async Task CancelledStagedRecurrence_RollsBackAndReleasesGateForRetry()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database);
@@ -224,30 +314,26 @@ public sealed class DurableAlertRecurrenceTests
             }
         );
         var occurredAt = new DateTime(2026, 8, 25, 9, 0, 0, DateTimeKind.Utc);
-        await using (var db = await database.CreateDbContextAsync())
-        {
-            await using var transaction = await db.Database.BeginTransactionAsync();
-            _ = await alerts.StageReportAsync(
-                db,
-                new DurableAlertReport(
-                    new DurableAlertIdentity(hostId, "test-source", "same-issue"),
-                    DurableAlertSeverity.Warning,
-                    "Rolled back",
-                    "This change must not escape the transaction.",
-                    null,
-                    occurredAt
-                ),
-                CancellationToken.None
-            );
-            _ = await db.SaveChangesAsync();
-            await transaction.RollbackAsync();
-        }
+        using var cancelled = new CancellationTokenSource();
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
+            StageThenCancelAsync(alerts, database, hostId, occurredAt, cancelled)
+        );
+
+        _ = await Report(
+                alerts,
+                hostId,
+                DurableAlertSeverity.Critical,
+                "Retried",
+                "The retry committed after rollback.",
+                "/retry"
+            )
+            .RunAsync(CancellationToken.None);
 
         var stored = await LoadSingleAsync(database);
-        stored.OccurrenceCount.ShouldBe(1);
-        stored.Title.ShouldBe("Original");
-        stored.Message.ShouldBe("Original detail");
-        notificationCount.ShouldBe(0);
+        stored.OccurrenceCount.ShouldBe(2);
+        stored.Title.ShouldBe("Retried");
+        stored.Message.ShouldBe("The retry committed after rollback.");
+        notificationCount.ShouldBe(1);
     }
 
     private static IO<DurableAlertCreateOutcome, Never> Report(
@@ -258,6 +344,37 @@ public sealed class DurableAlertRecurrenceTests
         string message,
         string? linkPath
     ) => alerts.Create(hostId, severity, "test-source", "same-issue", title, message, linkPath);
+
+    private static void TrySignal(TaskCompletionSource completion) => completion.TrySetResult();
+
+    private static async Task StageThenCancelAsync(
+        DurableAlertService alerts,
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        DateTime occurredAt,
+        CancellationTokenSource cancellation
+    )
+    {
+        await using var reportOperation = await alerts.BeginReportOperationAsync(
+            CancellationToken.None
+        );
+        await using var db = await database.CreateDbContextAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        _ = await reportOperation.StageAsync(
+            db,
+            new DurableAlertReport(
+                new DurableAlertIdentity(hostId, "test-source", "same-issue"),
+                DurableAlertSeverity.Warning,
+                "Rolled back",
+                "This change must not escape the transaction.",
+                null,
+                occurredAt
+            ),
+            CancellationToken.None
+        );
+        await cancellation.CancelAsync();
+        cancellation.Token.ThrowIfCancellationRequested();
+    }
 
     private static async Task<DurableAlert> LoadSingleAsync(SqliteBlokeBotDbFactory database)
     {

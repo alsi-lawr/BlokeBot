@@ -40,6 +40,7 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     )
     {
+        await using var reportOperation = await BeginAlertReportOperationAsync(cancellationToken);
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -55,6 +56,7 @@ internal sealed partial class EfPublicChatOutbox
             if (expired == 1)
             {
                 var alertChange = await RecordAutomaticRaidTerminalAsync(
+                    reportOperation,
                     db,
                     message,
                     AutomaticRaidShoutoutResultCode.NotReady,
@@ -63,7 +65,7 @@ internal sealed partial class EfPublicChatOutbox
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                await PublishCommittedAlertAsync(alertChange);
+                await PublishCommittedAlertAsync(reportOperation, alertChange);
                 return new PublicChatClaimUpdate.Expired();
             }
 
@@ -120,6 +122,7 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     )
     {
+        await using var reportOperation = await BeginAlertReportOperationAsync(cancellationToken);
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -132,6 +135,7 @@ internal sealed partial class EfPublicChatOutbox
             )
             {
                 var alertChange = await RecordAutomaticRaidTerminalAsync(
+                    reportOperation,
                     db,
                     message,
                     AutomaticRaidShoutoutResultCode.NotReady,
@@ -140,7 +144,7 @@ internal sealed partial class EfPublicChatOutbox
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                await PublishCommittedAlertAsync(alertChange);
+                await PublishCommittedAlertAsync(reportOperation, alertChange);
                 return new PublicChatClaimUpdate.Expired();
             }
 
@@ -239,22 +243,37 @@ internal sealed partial class EfPublicChatOutbox
     {
         var nowUtc = now.UtcDateTime;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var alertChanges = new List<DurableAlertPendingChange>();
-        await using var maintenanceTransaction = await db.Database.BeginTransactionAsync(
-            cancellationToken
-        );
-        await ExpireUnsentBatchAsync(db, nowUtc, alertChanges, cancellationToken);
-        await RecoverExpiredAsync(db, nowUtc, alertChanges, cancellationToken);
-        await ExhaustConfiguredSafePreSendRetriesAsync(db, nowUtc, alertChanges, cancellationToken);
-        await PurgeTerminalBatchAsync(db, nowUtc, cancellationToken);
-        await PurgeSendReceiptBatchAsync(
-            db,
-            nowUtc,
-            Max(sendInterval, duplicateCooldown),
-            cancellationToken
-        );
-        await maintenanceTransaction.CommitAsync(cancellationToken);
-        await PublishCommittedAlertsAsync(alertChanges);
+        await using (var reportOperation = await BeginAlertReportOperationAsync(cancellationToken))
+        {
+            var alertChanges = new List<DurableAlertPendingChange>();
+            await using var maintenanceTransaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            await ExpireUnsentBatchAsync(
+                reportOperation,
+                db,
+                nowUtc,
+                alertChanges,
+                cancellationToken
+            );
+            await RecoverExpiredAsync(reportOperation, db, nowUtc, alertChanges, cancellationToken);
+            await ExhaustConfiguredSafePreSendRetriesAsync(
+                reportOperation,
+                db,
+                nowUtc,
+                alertChanges,
+                cancellationToken
+            );
+            await PurgeTerminalBatchAsync(db, nowUtc, cancellationToken);
+            await PurgeSendReceiptBatchAsync(
+                db,
+                nowUtc,
+                Max(sendInterval, duplicateCooldown),
+                cancellationToken
+            );
+            await maintenanceTransaction.CommitAsync(cancellationToken);
+            await PublishCommittedAlertsAsync(reportOperation, alertChanges);
+        }
         var nextTerminalPurgeAt = await NextTerminalPurgeAtAsync(db, now, cancellationToken);
         var nextSendReceiptPurgeAt = await NextSendReceiptPurgeAtAsync(
             db,
