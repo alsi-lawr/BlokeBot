@@ -160,6 +160,48 @@ public sealed class TwitchEventAutomationTests
     }
 
     [Test]
+    public async Task AdmittedReceipt_DrainsAcrossDisableAndNeverReplaysAfterEnable()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chat = new RecordingChatSender(async cancellationToken =>
+        {
+            _ = entered.TrySetResult();
+            await release.Task.WaitAsync(cancellationToken);
+        });
+        await using var fixture = await EventFixture.CreateAsync(chat: chat);
+        var source = Node("stream-online", "{}");
+        var action = Node("send-chat", """{"message":"Live!"}""");
+        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+
+        var delivery = fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("admitted-1"),
+            CancellationToken.None
+        );
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await fixture.EnableAutomationsAsync(false);
+        _ = release.TrySetResult();
+        await delivery.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await fixture.RunCountAsync()).ShouldBe(1);
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        chat.Messages.ShouldBe(["Live!"]);
+        await fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("admitted-1"),
+            CancellationToken.None
+        );
+        await fixture.EnableAutomationsAsync(true);
+        await fixture.Runtime.StreamOnlineAsync(
+            fixture.StreamOnline("admitted-1"),
+            CancellationToken.None
+        );
+
+        (await fixture.RunCountAsync()).ShouldBe(1);
+        (await fixture.ReceiptCountAsync()).ShouldBe(1);
+        chat.Messages.ShouldBe(["Live!"]);
+    }
+
+    [Test]
     public async Task Deliveries_ResolveExactlyOneHostAndReceiptsAreHostIsolated()
     {
         await using var fixture = await EventFixture.CreateAsync();
@@ -539,16 +581,17 @@ public sealed class TwitchEventAutomationTests
 
         internal static async Task<EventFixture> CreateAsync(
             HostFeatureFlags hostFeatures =
-                HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands
+                HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands,
+            RecordingChatSender? chat = null
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
             var clock = new MutableTimeProvider(_start);
-            var chat = new RecordingChatSender();
+            chat ??= new RecordingChatSender();
             var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [new AutomationFeatureDisableObserver(database, clock)]
+                []
             );
             var catalog = new AutomationCatalogService(
                 new([new CoreAutomationCatalogModule(), new TwitchEventAutomationCatalogModule()]),
@@ -713,11 +756,12 @@ public sealed class TwitchEventAutomationTests
         public async ValueTask DisposeAsync() => await Database.DisposeAsync();
     }
 
-    private sealed class RecordingChatSender : IPublicChatMessageSender
+    private sealed class RecordingChatSender(Func<CancellationToken, ValueTask>? beforeSend = null)
+        : IPublicChatMessageSender
     {
         internal ConcurrentQueue<string> Messages { get; } = [];
 
-        public ValueTask<PublicChatSendOutcome> SendAsync(
+        public async ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,
             string message,
             PublicChatDeliveryDeadline deadline,
@@ -725,9 +769,12 @@ public sealed class TwitchEventAutomationTests
         )
         {
             Messages.Enqueue(message);
-            return ValueTask.FromResult<PublicChatSendOutcome>(
-                new PublicChatSendOutcome.Accepted()
-            );
+            if (beforeSend is not null)
+            {
+                await beforeSend(cancellationToken);
+            }
+
+            return new PublicChatSendOutcome.Accepted();
         }
     }
 

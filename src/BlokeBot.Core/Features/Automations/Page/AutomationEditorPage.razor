@@ -54,6 +54,23 @@
                    Description="Saved flows and run history remain. Turn on Automations to edit, validate, test, or enable a flow.">
             <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
         </PageState>
+        @if (!_recentRuns.IsEmpty)
+        {
+            <AutomationRunDrawer Visible="true"
+                                 FocusMode="false"
+                                 HasRecentRuns="true"
+                                 CanRunSample="false"
+                                 Kind="history"
+                                 IconClass="@_runIconClass"
+                                 Icon="@_runIcon"
+                                 Title="@_runTitle"
+                                 Description="@_runDescription"
+                                 ShowDetails="ShowRunDetails" />
+            @if (_feedback is not null)
+            {
+                <div class="automation-feedback" role="status">@_feedback</div>
+            }
+        }
     }
     else
     {

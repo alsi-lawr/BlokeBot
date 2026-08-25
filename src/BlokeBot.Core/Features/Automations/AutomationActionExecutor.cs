@@ -232,7 +232,6 @@ public sealed class AutomationActionExecutor(
         CancellationToken cancellationToken
     )
     {
-        // Both the Automations and Rewards & redemptions switches must be on before any effect.
         if (
             !await IsEnabledAsync(hostId, HostFeatureFlags.RewardsAndRedemptions, cancellationToken)
         )
@@ -785,9 +784,7 @@ public sealed class AutomationActionExecutor(
     {
         var enabled = await features.Load(hostId.Value).RunAsync(cancellationToken);
         return enabled.Match(
-            flags =>
-                flags.Contains(HostFeatureFlags.Automations)
-                && (secondary == HostFeatureFlags.None || flags.Contains(secondary)),
+            flags => secondary == HostFeatureFlags.None || flags.Contains(secondary),
             static () => false
         );
     }

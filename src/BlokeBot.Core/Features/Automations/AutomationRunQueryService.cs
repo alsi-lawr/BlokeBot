@@ -19,19 +19,7 @@ public sealed class AutomationRunQueryService(
     )
     {
         var loaded = await features.Load(hostId.Value).RunAsync(cancellationToken);
-        var availability = loaded.Match(
-            enabled =>
-                enabled.Contains(HostFeatureFlags.Automations)
-                    ? AutomationCatalogAvailability.Enabled
-                    : AutomationCatalogAvailability.Disabled,
-            static () => AutomationCatalogAvailability.HostNotFound
-        );
-        if (availability == AutomationCatalogAvailability.Disabled)
-        {
-            return new AutomationRunQueryOutcome.FeatureDisabled();
-        }
-
-        if (availability == AutomationCatalogAvailability.HostNotFound)
+        if (!loaded.Match(static _ => true, static () => false))
         {
             return new AutomationRunQueryOutcome.HostNotFound();
         }

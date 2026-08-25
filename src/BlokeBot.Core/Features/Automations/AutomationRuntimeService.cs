@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public sealed class AutomationRuntimeService(
+public sealed partial class AutomationRuntimeService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationCatalogService catalog,
     AutomationFlowService flowService,
@@ -322,7 +322,7 @@ public sealed class AutomationRuntimeService(
         CancellationToken cancellationToken
     )
     {
-        var gate = await GateAsync(hostId, cancellationToken);
+        var gate = await AdmissionGateAsync(hostId, cancellationToken);
         if (
             gate is not AutomationRuntimeGate.Enabled enabled
             || !enabled.Features.Contains(HostFeatureFlags.CustomCommands)
@@ -382,7 +382,7 @@ public sealed class AutomationRuntimeService(
         CancellationToken cancellationToken
     )
     {
-        var gate = await GateAsync(hostId, cancellationToken);
+        var gate = await AdmissionGateAsync(hostId, cancellationToken);
         if (gate is not AutomationRuntimeGate.Enabled)
         {
             return new HashSet<string>(StringComparer.Ordinal);
@@ -502,29 +502,19 @@ public sealed class AutomationRuntimeService(
                 return new(terminal);
             }
 
-            var gate = await GateAsync(new(run.HostId), cancellationToken);
-            if (gate is not AutomationRuntimeGate.Enabled enabled)
+            var executionGate = await EnforceExecutionGateAsync(
+                db,
+                run,
+                leaseId,
+                cancellationToken
+            );
+            if (executionGate == AutomationExecutionGate.OwnershipLost)
             {
-                return new(
-                    gate is AutomationRuntimeGate.HostNotFound
-                        ? AutomationResumeStatus.NotFound
-                        : AutomationResumeStatus.FeatureDisabled
-                );
-            }
-
-            if (run.AutomationGeneration != enabled.Generation)
-            {
-                if (await InvalidateOwnedAsync(db, run, leaseId, cancellationToken))
-                {
-                    return new(AutomationResumeStatus.Invalidated);
-                }
-
                 continue;
             }
-
-            if (!enabled.Features.Contains(run.RequiredFeatures))
+            if (executionGate != AutomationExecutionGate.Open)
             {
-                return new(AutomationResumeStatus.FeatureDisabled);
+                return ExecutionBlocked(executionGate);
             }
 
             var now = clock.GetUtcNow().UtcDateTime;
@@ -583,18 +573,14 @@ public sealed class AutomationRuntimeService(
                 .SingleAsync(value => value.Id == runId.Value, cancellationToken);
             pending = run.NodeRuns.Single(value => value.Id == pending.Id);
 
-            var afterClaim = await GateAsync(new(run.HostId), cancellationToken);
-            if (
-                afterClaim is not AutomationRuntimeGate.Enabled current
-                || current.Generation != run.AutomationGeneration
-                || !current.Features.Contains(run.RequiredFeatures)
-            )
+            executionGate = await EnforceExecutionGateAsync(db, run, leaseId, cancellationToken);
+            if (executionGate == AutomationExecutionGate.OwnershipLost)
             {
-                return new(
-                    afterClaim is AutomationRuntimeGate.Enabled
-                        ? AutomationResumeStatus.Invalidated
-                        : AutomationResumeStatus.FeatureDisabled
-                );
+                continue;
+            }
+            if (executionGate != AutomationExecutionGate.Open)
+            {
+                return ExecutionBlocked(executionGate);
             }
 
             if (
@@ -674,18 +660,19 @@ public sealed class AutomationRuntimeService(
             );
             if (inputs is not AutomationInputResolution.Available resolvedInputs)
             {
-                var failedGate = await GateAsync(new(run.HostId), cancellationToken);
-                if (
-                    failedGate is not AutomationRuntimeGate.Enabled failedEnabled
-                    || failedEnabled.Generation != run.AutomationGeneration
-                    || !failedEnabled.Features.Contains(run.RequiredFeatures)
-                )
+                executionGate = await EnforceExecutionGateAsync(
+                    db,
+                    run,
+                    leaseId,
+                    cancellationToken
+                );
+                if (executionGate == AutomationExecutionGate.OwnershipLost)
                 {
-                    return new(
-                        failedGate is AutomationRuntimeGate.Enabled
-                            ? AutomationResumeStatus.Invalidated
-                            : AutomationResumeStatus.FeatureDisabled
-                    );
+                    continue;
+                }
+                if (executionGate != AutomationExecutionGate.Open)
+                {
+                    return ExecutionBlocked(executionGate);
                 }
 
                 if (await StopsFlowAsync(scope, "input-resolution-failed", cancellationToken))
@@ -704,18 +691,14 @@ public sealed class AutomationRuntimeService(
                 resolvedInputs.FieldValues,
                 cancellationToken
             );
-            var finalGate = await GateAsync(new(run.HostId), cancellationToken);
-            if (
-                finalGate is not AutomationRuntimeGate.Enabled finalEnabled
-                || finalEnabled.Generation != run.AutomationGeneration
-                || !finalEnabled.Features.Contains(run.RequiredFeatures)
-            )
+            executionGate = await EnforceExecutionGateAsync(db, run, leaseId, cancellationToken);
+            if (executionGate == AutomationExecutionGate.OwnershipLost)
             {
-                return new(
-                    finalGate is AutomationRuntimeGate.Enabled
-                        ? AutomationResumeStatus.Invalidated
-                        : AutomationResumeStatus.FeatureDisabled
-                );
+                continue;
+            }
+            if (executionGate != AutomationExecutionGate.Open)
+            {
+                return ExecutionBlocked(executionGate);
             }
 
             if (result is AutomationNodeExecution.Failed failure)
@@ -793,13 +776,25 @@ public sealed class AutomationRuntimeService(
                 continue;
             }
 
+            if (!hosts.TryGetValue(run.HostId, out var host))
+            {
+                Invalidate(run, now, "host-unavailable");
+                continue;
+            }
+
+            if (host.AutomationGeneration != run.AutomationGeneration)
+            {
+                Invalidate(run, now, "automation-stale");
+                continue;
+            }
+
             if (
-                !hosts.TryGetValue(run.HostId, out var host)
-                || host.AutomationGeneration != run.AutomationGeneration
-                || !host.EnabledFeatures.Contains(run.RequiredFeatures)
+                !host.EnabledFeatures.Contains(
+                    AutomationRequiredFeatures.BackingFeatures(run.RequiredFeatures)
+                )
             )
             {
-                Invalidate(run, now);
+                Invalidate(run, now, "required-feature-disabled");
                 continue;
             }
 
@@ -841,7 +836,7 @@ public sealed class AutomationRuntimeService(
                     : AutomationNodeRunStatus.Failed;
             node.OutcomeCode =
                 terminalStatus == AutomationFlowRunStatus.Invalidated
-                    ? "automation-disabled"
+                    ? "run-invalidated"
                     : "execution-interrupted";
             node.CompletedAtUtc = now;
         }
@@ -1121,6 +1116,7 @@ public sealed class AutomationRuntimeService(
         BlokeBotDbContext db,
         AutomationFlowRun run,
         Guid leaseId,
+        string outcomeCode,
         CancellationToken cancellationToken
     )
     {
@@ -1131,7 +1127,7 @@ public sealed class AutomationRuntimeService(
             return false;
         }
 
-        Invalidate(run, clock.GetUtcNow().UtcDateTime);
+        Invalidate(run, clock.GetUtcNow().UtcDateTime, outcomeCode);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -1248,7 +1244,7 @@ public sealed class AutomationRuntimeService(
         };
     }
 
-    private static void Invalidate(AutomationFlowRun run, DateTime now)
+    private static void Invalidate(AutomationFlowRun run, DateTime now, string outcomeCode)
     {
         run.Status = AutomationFlowRunStatus.Invalidated;
         run.CompletedAtUtc = now;
@@ -1259,7 +1255,7 @@ public sealed class AutomationRuntimeService(
         )
         {
             node.Status = AutomationNodeRunStatus.Invalidated;
-            node.OutcomeCode = "automation-disabled";
+            node.OutcomeCode = outcomeCode;
             node.CompletedAtUtc = now;
         }
     }
@@ -1351,27 +1347,6 @@ public sealed class AutomationRuntimeService(
             System.Text.Json.JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone()
         );
 
-    private async Task<AutomationRuntimeGate> GateAsync(
-        AutomationHostId hostId,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var host = await db
-            .Hosts.AsNoTracking()
-            .Where(value => value.Id == hostId.Value)
-            .Select(static value => new { value.EnabledFeatures, value.AutomationGeneration })
-            .SingleOrDefaultAsync(cancellationToken);
-        return host switch
-        {
-            null => new AutomationRuntimeGate.HostNotFound(),
-            { EnabledFeatures: var features }
-                when !features.Contains(HostFeatureFlags.Automations) =>
-                new AutomationRuntimeGate.Disabled(),
-            _ => new AutomationRuntimeGate.Enabled(host.AutomationGeneration, host.EnabledFeatures),
-        };
-    }
-
     private static AutomationResumeStatus? Terminal(AutomationFlowRunStatus status) =>
         status switch
         {
@@ -1380,18 +1355,6 @@ public sealed class AutomationRuntimeService(
             AutomationFlowRunStatus.Invalidated => AutomationResumeStatus.Invalidated,
             _ => null,
         };
-
-    private abstract record AutomationRuntimeGate
-    {
-        private AutomationRuntimeGate() { }
-
-        internal sealed record Enabled(int Generation, HostFeatureFlags Features)
-            : AutomationRuntimeGate;
-
-        internal sealed record Disabled : AutomationRuntimeGate;
-
-        internal sealed record HostNotFound : AutomationRuntimeGate;
-    }
 
     private abstract record AutomationRunClaim
     {

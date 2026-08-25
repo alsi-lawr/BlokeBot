@@ -4,6 +4,9 @@ namespace BlokeBot.Core.Features.Automations;
 
 internal static class AutomationRequiredFeatures
 {
+    internal static HostFeatureFlags BackingFeatures(HostFeatureFlags required) =>
+        required & ~HostFeatureFlags.Automations;
+
     internal static HostFeatureFlags ForDefinitions(IEnumerable<string> definitionIds) =>
         definitionIds.Aggregate(
             HostFeatureFlags.Automations,

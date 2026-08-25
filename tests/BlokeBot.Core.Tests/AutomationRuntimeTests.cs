@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
@@ -9,6 +10,7 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -1298,7 +1300,7 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task DisableAfterCheckpoint_InvalidatesWithoutReplayOrReevaluation()
+    public async Task DisableAfterCheckpoint_DrainsWithoutReevaluatingCheckpointOrReplayingOnEnable()
     {
         var handler = TextValueHandler("test-counting-text-value", "must-not-replay");
         await using var fixture = await RuntimeFixture.CreateAsync(handlers: [handler]);
@@ -1334,20 +1336,29 @@ public sealed class AutomationRuntimeTests
             HostFeatureFlags.Automations,
             CancellationToken.None
         );
-        _ = await fixture.Features.EnableAsync(
-            fixture.HostId,
-            HostFeatureFlags.Automations,
-            CancellationToken.None
-        );
         fixture.Clock.Advance(TimeSpan.FromSeconds(1));
 
         (
             await fixture
                 .NewRuntime()
                 .ResumeAsync(dispatched.RunIds.ShouldHaveSingleItem(), CancellationToken.None)
-        ).Status.ShouldBe(AutomationResumeStatus.Invalidated);
+        ).Status.ShouldBe(AutomationResumeStatus.Completed);
         handler.Calls.ShouldBe(1);
-        fixture.Chat.Messages.ShouldBeEmpty();
+        fixture.Chat.Messages.ShouldBe(["must-not-replay"]);
+
+        _ = await fixture.Features.EnableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
+        (
+            await fixture.Runtime.ResumeAsync(
+                dispatched.RunIds.ShouldHaveSingleItem(),
+                CancellationToken.None
+            )
+        ).Status.ShouldBe(AutomationResumeStatus.Completed);
+        handler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBe(["must-not-replay"]);
     }
 
     [Test]
@@ -1378,6 +1389,11 @@ public sealed class AutomationRuntimeTests
         );
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var runId = await SingleRunIdAsync(fixture);
+        _ = await fixture.Features.DisableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
         cancellation.Cancel();
         _ = await Should.ThrowAsync<OperationCanceledException>(() => dispatch);
 
@@ -1386,6 +1402,10 @@ public sealed class AutomationRuntimeTests
         ).Status.ShouldBe(AutomationResumeStatus.Failed);
         handler.Calls.ShouldBe(1);
         chat.Messages.ShouldBe(["single-attempt"]);
+        (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem()
+            .State.ShouldBe(AutomationFlowRunState.Failed);
         await using var db = await fixture.Database.CreateDbContextAsync();
         var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
             node.NodeId == value.Id.Value
@@ -3954,6 +3974,49 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    public async Task DispatchPausedAtAdmissionBoundary_RejectsAfterDurableDisable()
+    {
+        var interleaving = new AutomationDispatchTransactionInterleaving();
+        await using var fixture = await RuntimeFixture.CreateAsync(
+            databaseInterceptors: [interleaving]
+        );
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var action = Node("send-chat", """{"message":"must not run"}""");
+        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        await fixture.Runtime.InitializeAsync(CancellationToken.None);
+        interleaving.Arm();
+
+        var dispatch = fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        await interleaving.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        _ = await fixture.Features.DisableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
+        interleaving.Release();
+
+        (await dispatch.WaitAsync(TimeSpan.FromSeconds(5))).Status.ShouldBe(
+            AutomationDispatchStatus.FeatureDisabled
+        );
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        }
+
+        _ = await fixture.Features.EnableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
+        await using var verify = await fixture.Database.CreateDbContextAsync();
+        (await verify.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task ConcurrentResumeAndWorker_MultipleBranchesExecuteSeriallyAndOnlyOnce()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -4017,12 +4080,14 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task DisableDuringAction_InvalidationRemainsTerminalAndEnqueuesNoContinuation()
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task DisableDuringAction_DrainsToTheActionsActualTerminalOutcome(bool succeeds)
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var chat = new RecordingChatSender(
-            null,
+            [succeeds],
             async (call, _, cancellationToken) =>
             {
                 if (call != 1)
@@ -4037,10 +4102,10 @@ public sealed class AutomationRuntimeTests
         await using var fixture = await RuntimeFixture.CreateAsync(chat: chat);
         var source = Node("custom-command", """{"custom-command-id":7}""");
         var action = Node("send-chat", """{"message":"in flight"}""");
-        var never = Node("send-chat", """{"message":"must not replay"}""");
+        var continuation = Node("send-chat", """{"message":"continued"}""");
         _ = await fixture.SaveAsync(
-            [source, action, never],
-            [Edge(source, "flow", action), Edge(action, "complete", never)]
+            [source, action, continuation],
+            [Edge(source, "flow", action), Edge(action, "complete", continuation)]
         );
         var dispatch = fixture.Runtime.DispatchAsync(
             new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
@@ -4049,13 +4114,39 @@ public sealed class AutomationRuntimeTests
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var runId = await SingleRunIdAsync(fixture);
 
-        _ = await fixture.Features.DisableAsync(
+        var disabled = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
         );
+        _ = disabled.ShouldBeOfType<HostFeatureUpdateResult.Saved>();
+        _ = (
+            await fixture.Features.DisableAsync(
+                fixture.HostId,
+                HostFeatureFlags.Automations,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<HostFeatureUpdateResult.Unchanged>();
+        (
+            await fixture.Runtime.DispatchAsync(
+                new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+                CancellationToken.None
+            )
+        ).Status.ShouldBe(AutomationDispatchStatus.FeatureDisabled);
         release.SetResult();
-        _ = await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
+        var outcome = await dispatch.WaitAsync(TimeSpan.FromSeconds(5));
+
+        outcome.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        var history = (
+            await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
+        history
+            .Runs.ShouldHaveSingleItem()
+            .State.ShouldBe(
+                succeeds ? AutomationFlowRunState.Completed : AutomationFlowRunState.Failed
+            );
+        chat.Messages.ShouldBe(succeeds ? ["in flight", "continued"] : ["in flight"]);
+
         _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
@@ -4064,16 +4155,20 @@ public sealed class AutomationRuntimeTests
 
         (
             await fixture.NewRuntime().ResumeAsync(new(runId), CancellationToken.None)
-        ).Status.ShouldBe(AutomationResumeStatus.Invalidated);
-        chat.Messages.ShouldBe(["in flight"]);
+        ).Status.ShouldBe(
+            succeeds ? AutomationResumeStatus.Completed : AutomationResumeStatus.Failed
+        );
+        chat.Messages.ShouldBe(succeeds ? ["in flight", "continued"] : ["in flight"]);
         await using var db = await fixture.Database.CreateDbContextAsync();
         var run = await db.AutomationFlowRuns.Include(static value => value.NodeRuns).SingleAsync();
-        run.Status.ShouldBe(AutomationFlowRunStatus.Invalidated);
+        run.Status.ShouldBe(
+            succeeds ? AutomationFlowRunStatus.Completed : AutomationFlowRunStatus.Failed
+        );
         run.NodeRuns.ShouldNotContain(static node =>
             node.Status == AutomationNodeRunStatus.Pending
             || node.Status == AutomationNodeRunStatus.Running
         );
-        run.NodeRuns.ShouldNotContain(node => node.NodeId == never.Id.Value);
+        run.NodeRuns.Any(node => node.NodeId == continuation.Id.Value).ShouldBe(succeeds);
     }
 
     [Test]
@@ -4373,7 +4468,7 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task Disable_InvalidatesPendingWorkAndReenableNeverReplaysIt()
+    public async Task Disable_DrainsWaitingWorkAndReenableNeverReplaysIt()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("custom-command", """{"custom-command-id":7}""");
@@ -4389,6 +4484,15 @@ public sealed class AutomationRuntimeTests
         );
         var runId = dispatched.RunIds.ShouldHaveSingleItem();
 
+        int generation;
+        await using (var generationDb = await fixture.Database.CreateDbContextAsync())
+        {
+            generation = await generationDb
+                .Hosts.Where(host => host.Id == fixture.HostId)
+                .Select(static host => host.AutomationGeneration)
+                .SingleAsync();
+        }
+
         _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
@@ -4399,24 +4503,43 @@ public sealed class AutomationRuntimeTests
             CancellationToken.None
         );
         blocked.Status.ShouldBe(AutomationDispatchStatus.FeatureDisabled);
-        _ = (
+        var disabledHistory = (
             await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
-        ).ShouldBeOfType<AutomationRunQueryOutcome.FeatureDisabled>();
+        ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
+        disabledHistory.Runs.ShouldHaveSingleItem().State.ShouldBe(AutomationFlowRunState.Waiting);
+        await using (var disabledDb = await fixture.Database.CreateDbContextAsync())
+        {
+            (
+                await disabledDb
+                    .Hosts.Where(host => host.Id == fixture.HostId)
+                    .Select(static host => host.AutomationGeneration)
+                    .SingleAsync()
+            ).ShouldBe(generation);
+        }
 
         fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Completed);
+        fixture.Chat.Messages.ShouldBe(["must not replay"]);
+        var drained = (
+            await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
+        drained.Runs.ShouldHaveSingleItem().State.ShouldBe(AutomationFlowRunState.Completed);
+
         _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
         );
-        var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
-
-        resumed.Status.ShouldBe(AutomationResumeStatus.Invalidated);
-        fixture.Chat.Messages.ShouldBeEmpty();
+        (await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None)).Status.ShouldBe(
+            AutomationResumeStatus.Completed
+        );
+        fixture.Chat.Messages.ShouldBe(["must not replay"]);
         var query = (
             await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
-        query.Runs.ShouldHaveSingleItem().State.ShouldBe(AutomationFlowRunState.Invalidated);
+        query.Runs.ShouldHaveSingleItem().State.ShouldBe(AutomationFlowRunState.Completed);
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.AutomationFlows.SingleAsync()).Id.ShouldBe(flowId.Value);
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(1);
@@ -4448,12 +4571,16 @@ public sealed class AutomationRuntimeTests
             new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
             CancellationToken.None
         );
+        var invalidated = await fixture.Runtime.ResumeAsync(runId, CancellationToken.None);
 
         blocked.Status.ShouldBe(AutomationDispatchStatus.FeatureDisabled);
+        invalidated.Status.ShouldBe(AutomationResumeStatus.Invalidated);
         var retained = (
             await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
-        retained.Runs.ShouldHaveSingleItem().State.ShouldBe(AutomationFlowRunState.Invalidated);
+        var summary = retained.Runs.ShouldHaveSingleItem();
+        summary.State.ShouldBe(AutomationFlowRunState.Invalidated);
+        summary.Nodes.ShouldContain(static node => node.OutcomeCode == "required-feature-disabled");
         _ = await fixture.Features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.CustomCommands,
@@ -4465,6 +4592,46 @@ public sealed class AutomationRuntimeTests
         fixture.Chat.Messages.ShouldBeEmpty();
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task PersistedGenerationMismatch_InvalidatesGenuinelyStaleWork()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"must not run"}""");
+        _ = await fixture.SaveAsync(
+            [source, delay, action],
+            [Edge(source, "flow", delay), Edge(delay, "complete", action)]
+        );
+        var runId = (
+            await fixture.Runtime.DispatchAsync(
+                new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+                CancellationToken.None
+            )
+        ).RunIds.ShouldHaveSingleItem();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            _ = await db
+                .Hosts.Where(host => host.Id == fixture.HostId)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(
+                        static host => host.AutomationGeneration,
+                        static host => host.AutomationGeneration + 1
+                    )
+                );
+        }
+
+        (await fixture.Runtime.ResumeAsync(runId, CancellationToken.None)).Status.ShouldBe(
+            AutomationResumeStatus.Invalidated
+        );
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        summary.State.ShouldBe(AutomationFlowRunState.Invalidated);
+        summary.Nodes.ShouldContain(static node => node.OutcomeCode == "automation-stale");
+        fixture.Chat.Messages.ShouldBeEmpty();
     }
 
     [Test]
@@ -5660,19 +5827,19 @@ public sealed class AutomationRuntimeTests
             IEnumerable<IAutomationPureNodeHandler>? handlers = null,
             Func<AutomationCelTransformHandler, IAutomationPureNodeHandler>? transformDecorator =
                 null,
-            IAutomationIntegerEntropy? integerEntropy = null
+            IAutomationIntegerEntropy? integerEntropy = null,
+            IInterceptor[]? databaseInterceptors = null
         )
         {
-            var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var database = await SqliteBlokeBotDbFactory.CreateAsync(databaseInterceptors ?? []);
             var clock = new MutableTimeProvider(
                 new DateTimeOffset(2026, 8, 3, 12, 0, 0, TimeSpan.Zero)
             );
             chat ??= new RecordingChatSender(chatAdmissions);
-            var observer = new AutomationFeatureDisableObserver(database, clock);
             var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [observer]
+                []
             );
             var expressions = new AutomationExpressionService();
             var transformHandler = new AutomationCelTransformHandler(new("test-cel-transform"));
@@ -5817,6 +5984,44 @@ public sealed class AutomationRuntimeTests
             return _admissions.TryDequeue(out var accepted) && !accepted
                 ? new PublicChatSendOutcome.Rejected()
                 : new PublicChatSendOutcome.Accepted();
+        }
+    }
+
+    private sealed class AutomationDispatchTransactionInterleaving : DbTransactionInterceptor
+    {
+        private readonly TaskCompletionSource _entered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _release = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _armed;
+        private int _intercepted;
+
+        internal Task Entered => _entered.Task;
+
+        internal void Arm() => Volatile.Write(ref _armed, 1);
+
+        internal void Release() => _release.TrySetResult();
+
+        public override async ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection,
+            TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                Volatile.Read(ref _armed) == 0
+                || Interlocked.CompareExchange(ref _intercepted, 1, 0) != 0
+            )
+            {
+                return result;
+            }
+
+            _ = _entered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return result;
         }
     }
 

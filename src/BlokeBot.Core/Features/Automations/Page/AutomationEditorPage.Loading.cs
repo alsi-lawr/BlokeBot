@@ -51,6 +51,9 @@ public partial class AutomationEditorPage
         var catalog = await _catalogService.DiscoverAsync(hostId, CancellationToken.None);
         _featureEnabled = catalog.Availability == AutomationCatalogAvailability.Enabled;
         _definitions = catalog.Definitions;
+        var runQuery = await _runsService.ListAsync(hostId, CancellationToken.None);
+        var hostRuns = runQuery is AutomationRunQueryOutcome.Available runs ? runs.Runs : [];
+        _recentRuns = hostRuns;
         if (!_featureEnabled)
         {
             _flowSnapshots = [];
@@ -86,10 +89,7 @@ public partial class AutomationEditorPage
             _editor = null;
         }
 
-        var runQuery = await _runsService.ListAsync(hostId, CancellationToken.None);
-        _recentRuns = runQuery is AutomationRunQueryOutcome.Available runs
-            ? runs.Runs.Where(run => run.FlowId == _editor?.Id).ToImmutableArray()
-            : [];
+        _recentRuns = hostRuns.Where(run => run.FlowId == _editor?.Id).ToImmutableArray();
     }
 
     private async Task LoadReferenceChoicesAsync()

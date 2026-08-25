@@ -1012,7 +1012,7 @@ public sealed class NativeOperationAutomationTests
             var features = TestHostFeatureServices.Create(
                 database,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                [new AutomationFeatureDisableObserver(database, clock)]
+                []
             );
             var catalog = new AutomationCatalogService(
                 new([

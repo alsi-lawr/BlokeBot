@@ -79,10 +79,6 @@ internal static class HostFeatureTransitionStager
         {
             host.ViewerPassportContinuityGeneration++;
         }
-        if (Disabled(previous, updated, HostFeatureFlags.Automations))
-        {
-            host.AutomationGeneration++;
-        }
         if (Enabled(previous, updated, HostFeatureFlags.CustomCommands))
         {
             var announcements = await db

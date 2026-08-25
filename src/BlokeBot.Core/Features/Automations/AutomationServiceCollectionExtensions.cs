@@ -53,12 +53,6 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
                 IHostFeatureActivationObserver,
-                AutomationFeatureDisableObserver
-            >()
-        );
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<
-                IHostFeatureActivationObserver,
                 AutomationEventSubReconciliationObserver
             >()
         );

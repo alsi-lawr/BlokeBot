@@ -31,20 +31,23 @@ public sealed partial class AutomationFlowService
         CancellationToken cancellationToken
     )
     {
-        var snapshot = await catalog.DiscoverAsync(draft.HostId, cancellationToken);
-        if (
-            admission != AutomationGraphAdmission.ConfigurationTransfer
-            && snapshot.Availability != AutomationCatalogAvailability.Enabled
-        )
+        if (admission != AutomationGraphAdmission.Frozen)
         {
-            return new(snapshot.Availability, []);
-        }
-        if (
-            admission == AutomationGraphAdmission.ConfigurationTransfer
-            && snapshot.Availability == AutomationCatalogAvailability.HostNotFound
-        )
-        {
-            return new(snapshot.Availability, []);
+            var snapshot = await catalog.DiscoverAsync(draft.HostId, cancellationToken);
+            if (
+                admission == AutomationGraphAdmission.Saved
+                && snapshot.Availability != AutomationCatalogAvailability.Enabled
+            )
+            {
+                return new(snapshot.Availability, []);
+            }
+            if (
+                admission == AutomationGraphAdmission.ConfigurationTransfer
+                && snapshot.Availability == AutomationCatalogAvailability.HostNotFound
+            )
+            {
+                return new(snapshot.Availability, []);
+            }
         }
 
         var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
@@ -238,14 +241,14 @@ public sealed partial class AutomationFlowService
             );
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var enabledFeatures = await db
-            .Hosts.AsNoTracking()
-            .Where(value => value.Id == draft.HostId.Value)
-            .Select(static value => value.EnabledFeatures)
-            .SingleAsync(cancellationToken);
-        if (admission != AutomationGraphAdmission.ConfigurationTransfer)
+        if (admission == AutomationGraphAdmission.Saved)
         {
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var enabledFeatures = await db
+                .Hosts.AsNoTracking()
+                .Where(value => value.Id == draft.HostId.Value)
+                .Select(static value => value.EnabledFeatures)
+                .SingleAsync(cancellationToken);
             errors.AddRange(
                 CapabilityUnavailableErrors(
                     draft.Nodes.Select(static node => (node.Id, node.Definition.TypeId)),

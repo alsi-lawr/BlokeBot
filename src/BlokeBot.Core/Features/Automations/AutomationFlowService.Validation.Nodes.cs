@@ -46,14 +46,15 @@ public sealed partial class AutomationFlowService
         CancellationToken cancellationToken
     )
     {
-        var check =
-            admission == AutomationGraphAdmission.ConfigurationTransfer
-                ? catalog.ValidatePersistedDefinition(node.Definition)
-                : await catalog.ValidatePersistedForSaveAsync(
-                    hostId,
-                    node.Definition,
-                    cancellationToken
-                );
+        var check = admission
+            is AutomationGraphAdmission.Frozen
+                or AutomationGraphAdmission.ConfigurationTransfer
+            ? catalog.ValidatePersistedDefinition(node.Definition)
+            : await catalog.ValidatePersistedForSaveAsync(
+                hostId,
+                node.Definition,
+                cancellationToken
+            );
         if (check is AutomationConfigurationCheck.Invalid invalid)
         {
             foreach (var error in invalid.Errors)

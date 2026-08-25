@@ -107,7 +107,7 @@ public sealed class AutomationCatalogService
     ) =>
         requestedHostId != context.HostId
             ? new AutomationConfigurationCheck.HostMismatch(requestedHostId, context.HostId)
-            : await ValidateAsync(
+            : await ValidateAdmittedAsync(
                 requestedHostId,
                 definitionId,
                 schemaVersion,
@@ -123,7 +123,20 @@ public sealed class AutomationCatalogService
     ) =>
         requestedHostId != context.HostId
             ? new AutomationConfigurationCheck.HostMismatch(requestedHostId, context.HostId)
-            : await ValidatePersistedAsync(requestedHostId, persisted, cancellationToken);
+            : await ValidateAdmittedPersistedAsync(requestedHostId, persisted, cancellationToken);
+
+    private async Task<AutomationConfigurationCheck> ValidateAdmittedPersistedAsync(
+        AutomationHostId hostId,
+        PersistedAutomationNodeDefinition persisted,
+        CancellationToken cancellationToken
+    )
+    {
+        var definitionId = new AutomationDefinitionId(persisted.TypeId);
+        var schemaVersion = new AutomationSchemaVersion(persisted.SchemaVersion);
+        return await HostExistsAsync(hostId, cancellationToken)
+            ? ValidateEnabledPersisted(definitionId, schemaVersion, persisted.Configuration)
+            : new AutomationConfigurationCheck.HostNotFound();
+    }
 
     private async Task<AutomationConfigurationCheck> ValidatePersistedAsync(
         AutomationHostId hostId,
@@ -171,6 +184,26 @@ public sealed class AutomationCatalogService
             ),
             _ => throw new UnreachableException(),
         };
+    }
+
+    private async Task<AutomationConfigurationCheck> ValidateAdmittedAsync(
+        AutomationHostId hostId,
+        AutomationDefinitionId definitionId,
+        AutomationSchemaVersion schemaVersion,
+        AutomationConfiguration configuration,
+        CancellationToken cancellationToken
+    ) =>
+        await HostExistsAsync(hostId, cancellationToken)
+            ? ValidateEnabled(definitionId, schemaVersion, configuration)
+            : new AutomationConfigurationCheck.HostNotFound();
+
+    private async Task<bool> HostExistsAsync(
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await _features.Load(hostId.Value).RunAsync(cancellationToken);
+        return result.Match(static _ => true, static () => false);
     }
 
     private AutomationConfigurationCheck ValidateEnabledPersisted(
