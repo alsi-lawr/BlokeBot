@@ -47,6 +47,7 @@ public static partial class BlokeBotApplication
 
         app.MapOverlayBrowserSourceEndpoints();
         app.MapPluginWebEndpoints();
+        app.MapPluginPageAssetEndpoints();
         _ = app.MapMethods(
             "/favicon.ico",
             ["GET", "HEAD"],

@@ -73,6 +73,30 @@ public interface IPluginDispatchInvoker
                 PluginDispatchInvocationRejectionCode.FeatureUnavailable
             )
         );
+
+    ValueTask<PluginDispatchInvocationOutcome> InvokePageAsync(
+        PluginPageEndpoint endpoint,
+        PluginInvocationContext.Page context,
+        PluginValue input,
+        CancellationToken cancellationToken
+    ) =>
+        ValueTask.FromResult<PluginDispatchInvocationOutcome>(
+            new PluginDispatchInvocationOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.FeatureUnavailable
+            )
+        );
+
+    ValueTask<PluginDispatchInvocationOutcome> InvokePageActionAsync(
+        PluginDispatchEndpoint.Action endpoint,
+        PluginInvocationContext.Page context,
+        PluginValue input,
+        CancellationToken cancellationToken
+    ) =>
+        ValueTask.FromResult<PluginDispatchInvocationOutcome>(
+            new PluginDispatchInvocationOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.FeatureUnavailable
+            )
+        );
 }
 
 public sealed partial class PluginDispatchInvoker(
@@ -123,14 +147,14 @@ public sealed partial class PluginDispatchInvoker(
 
     private async ValueTask<PluginDispatchInvocationOutcome> InvokeAsync(
         PluginDispatchEndpoint endpoint,
-        PluginInvocationContext.Channel context,
+        PluginInvocationContext context,
         PluginLiveInvocation invocation,
         CancellationToken cancellationToken
     )
     {
         if (
-            context.Plugin != endpoint.Declaration.Installation
-            || context.Host != endpoint.State.Key.HostId
+            ContextPlugin(context) != endpoint.Declaration.Installation
+            || ContextHost(context) != endpoint.State.Key.HostId
         )
         {
             return new PluginDispatchInvocationOutcome.Rejected(
@@ -190,35 +214,57 @@ public sealed partial class PluginDispatchInvoker(
 
     private PluginWorkerInvocationIdentity Identity(
         PluginDispatchEndpoint endpoint,
-        PluginInvocationContext.Channel context
+        PluginInvocationContext context
+    ) => Identity(endpoint.Declaration, endpoint.State, context);
+
+    private PluginWorkerInvocationIdentity Identity(
+        PluginFeatureDeclaration declaration,
+        PluginFeatureState state,
+        PluginInvocationContext context
     )
     {
         _ = PluginWorkerInvocationId.TryCreate(Guid.NewGuid(), out var invocationId);
         _ = PluginCoroutineId.TryCreate(Guid.NewGuid(), out var coroutineId);
         _ = PluginWorkerCancellationId.TryCreate(Guid.NewGuid(), out var cancellationId);
         _ = PluginActivationOperationId.TryCreate(
-            endpoint.State.Fence.OperationId.Value,
+            state.Fence.OperationId.Value,
             out var operationId
         );
         _ = PluginFeatureActivationGeneration.TryCreate(
-            endpoint.State.Generation.Value,
+            state.Generation.Value,
             out var featureGeneration
         );
         return new(
-            endpoint.Declaration.Installation,
-            endpoint.State.Key.FeatureId,
-            endpoint.State.Key.HostId,
+            declaration.Installation,
+            state.Key.FeatureId,
+            state.Key.HostId,
             context,
             invocationId,
             coroutineId,
-            endpoint.State.Fence.Generation,
+            state.Fence.Generation,
             PluginWorkerDeadline.From(
                 timeProvider
                     .GetUtcNow()
                     .AddMilliseconds(PluginWorkerLimits.MaximumInvocationDurationMilliseconds)
             ),
             cancellationId,
-            new(operationId, endpoint.State.Fence.Generation, featureGeneration)
+            new(operationId, state.Fence.Generation, featureGeneration)
         );
     }
+
+    private static PluginInstallationIdentity? ContextPlugin(PluginInvocationContext context) =>
+        context switch
+        {
+            PluginInvocationContext.Channel channel => channel.Plugin,
+            PluginInvocationContext.Page page => page.Plugin,
+            _ => null,
+        };
+
+    private static PluginHostId? ContextHost(PluginInvocationContext context) =>
+        context switch
+        {
+            PluginInvocationContext.Channel channel => channel.Host,
+            PluginInvocationContext.Page page => page.Host,
+            _ => null,
+        };
 }

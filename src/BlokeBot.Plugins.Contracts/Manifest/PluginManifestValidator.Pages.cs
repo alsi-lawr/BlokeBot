@@ -24,7 +24,7 @@ public static partial class PluginManifestValidator
             if (
                 !featureIds.Contains(page.FeatureId)
                 || !moduleIds.Contains(page.Module)
-                || !ValidEntryPoint(page.RenderEntryPoint)
+                || !PluginHostOperationId.TryCreate(page.RenderEntryPoint, out _)
                 || !ValidRoute(page.Route)
                 || !routes.Add(page.Route)
             )

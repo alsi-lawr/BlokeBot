@@ -62,6 +62,25 @@
                 </NavLink>
                 @Routes.RouteHelp(routeKey, feature.Name)
             </div>
+            @foreach (var page in feature.Pages)
+            {
+                var pageRouteKey = $"plugin-{plugin.Id.Value}-{feature.Id.Value}-page-{page.Route}";
+                var pageRoute = $"plugins/{plugin.Id.Value}/features/{feature.Id.Value}/pages/{page.Route}";
+                <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1 pl-3"
+                     data-nav-destination="@pageRouteKey">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                             ActiveClass="nav-menu__item-active"
+                             href="@pageRoute"
+                             aria-label="@(page.Title)"
+                             aria-describedby="@Routes.RouteHelpReference(pageRouteKey)"
+                             aria-current="@Routes.CurrentRoute(pageRoute, exact: true)"
+                             @onclick="Routes.NotifyNavigatedAsync">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">↗</span>
+                        <span class="nav-menu__label min-w-0 truncate">@(page.Title)</span>
+                    </NavLink>
+                    @Routes.RouteHelp(pageRouteKey, page.Title)
+                </div>
+            }
         }
     }
 }

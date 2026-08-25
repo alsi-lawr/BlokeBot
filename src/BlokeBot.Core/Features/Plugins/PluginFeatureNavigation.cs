@@ -7,8 +7,11 @@ namespace BlokeBot.Core.Features.Plugins;
 internal sealed record PluginFeatureNavigationItem(
     PluginFeatureId Id,
     string Name,
-    PluginFeatureReadiness Readiness
+    PluginFeatureReadiness Readiness,
+    ImmutableArray<PluginPageNavigationItem> Pages
 );
+
+internal sealed record PluginPageNavigationItem(string Route, string Title);
 
 internal sealed record PluginNavigationItem(
     PluginId Id,
@@ -47,7 +50,28 @@ internal static class PluginFeatureNavigation
                             return new PluginFeatureNavigationItem(
                                 feature.Id,
                                 feature.Name,
-                                readiness
+                                readiness,
+                                declaration
+                                    .Manifest.GeneratedPages.Where(page =>
+                                        page.FeatureId == feature.Id
+                                    )
+                                    .Select(static page => new PluginPageNavigationItem(
+                                        page.Route,
+                                        page.Title
+                                    ))
+                                    .Concat(
+                                        declaration
+                                            .Manifest.EmbeddedPages.Where(page =>
+                                                page.FeatureId == feature.Id
+                                            )
+                                            .Select(static page => new PluginPageNavigationItem(
+                                                page.Route,
+                                                page.Title
+                                            ))
+                                    )
+                                    .OrderBy(static page => page.Title)
+                                    .ThenBy(static page => page.Route)
+                                    .ToImmutableArray()
                             );
                         })
                         .ToImmutableArray()

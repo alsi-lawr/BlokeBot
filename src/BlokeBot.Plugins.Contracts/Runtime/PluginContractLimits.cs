@@ -44,4 +44,12 @@ public static class PluginContractLimits
     public const int MaximumConcurrentHttpRequestsPerPlugin = 4;
     public const int MaximumWebRequestBodyBytes = 48 * 1024;
     public const int MaximumWebRequestHeaderBytes = 16 * 1024;
+    public const int MaximumPageSections = 24;
+    public const int MaximumPageFields = 32;
+    public const int MaximumPageTableColumns = 12;
+    public const int MaximumPageTableRows = 100;
+    public const int MaximumPageListItems = 100;
+    public const int MaximumPageMessageBytes = 48 * 1024;
+    public const int MaximumPageSessions = 512;
+    public const int MaximumPageMessagesPerSession = 128;
 }

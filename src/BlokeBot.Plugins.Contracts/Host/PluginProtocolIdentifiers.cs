@@ -119,3 +119,19 @@ public sealed record PluginPageSessionId
             out identifier
         );
 }
+
+[JsonConverter(typeof(PluginProtocolIdentifierJsonConverter<PluginPageMessageId>))]
+public sealed record PluginPageMessageId
+    : PluginProtocolIdentifier,
+        IPluginProtocolIdentifier<PluginPageMessageId>
+{
+    private PluginPageMessageId(Guid value)
+        : base(value) { }
+
+    public static bool TryCreate(Guid candidate, out PluginPageMessageId identifier) =>
+        PluginProtocolIdentifierFactory.TryCreate(
+            candidate,
+            static value => new PluginPageMessageId(value),
+            out identifier
+        );
+}

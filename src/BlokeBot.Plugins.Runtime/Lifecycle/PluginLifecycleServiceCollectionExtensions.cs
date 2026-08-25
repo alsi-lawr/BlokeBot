@@ -31,6 +31,10 @@ public static class PluginLifecycleServiceCollectionExtensions
             IPluginLifecyclePackageResolver,
             UnavailablePluginLifecyclePackageResolver
         >();
+        services.TryAddSingleton<
+            IPluginPackageAssetResolver,
+            LifecyclePluginPackageAssetResolver
+        >();
         services.TryAddSingleton<IPluginPendingWorkCanceller, EmptyPluginPendingWorkCanceller>();
         services.TryAddSingleton<IPluginLifecycleWorkerManager, PluginLifecycleWorkerManager>();
         services.TryAddSingleton(provider => new PluginLifecycleCoordinator(

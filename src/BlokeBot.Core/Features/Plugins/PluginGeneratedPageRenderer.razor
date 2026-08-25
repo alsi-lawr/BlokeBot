@@ -1,0 +1,178 @@
+@using BlokeBot.Plugins.Contracts
+@using BlokeBot.Plugins.Features
+@using System.Collections.Immutable
+
+@if (!string.IsNullOrWhiteSpace(Document.Introduction))
+{
+    <p class="text-sm text-muted-foreground">@Document.Introduction</p>
+}
+<div class="grid gap-4">
+    @foreach (var section in Document.Sections)
+    {
+        @switch (section)
+        {
+            case PluginPageSection.Text text:
+                <TaskPanel Title="@text.Title">
+                    <p class="whitespace-pre-wrap text-sm text-[var(--app-text-medium)]">@text.Body</p>
+                </TaskPanel>
+                break;
+            case PluginPageSection.Status status:
+                <TaskPanel Title="@status.Title" Description="@(status.Description ?? string.Empty)">
+                    <span class="@StatusClass(status.Tone)">
+                        <span class="status-pill__dot"></span>
+                        <span class="status-pill__label">@StatusLabel(status.Tone)</span>
+                    </span>
+                </TaskPanel>
+                break;
+            case PluginPageSection.Form form:
+                <form @onsubmit="() => SubmitAsync(form)" @onsubmit:preventDefault="true">
+                <TaskPanel Title="@form.Title" Description="@(form.Description ?? string.Empty)">
+                    <ChildContent>
+                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            @foreach (var field in form.Fields)
+                            {
+                                var inputId = $"plugin-page-{form.Action.Value}-{field.Id}";
+                                <div class="studio-field" @key="field.Id">
+                                    @if (field.Kind is PluginPageFieldKind.Boolean)
+                                    {
+                                        <label class="flex items-center gap-3 text-sm font-semibold" for="@inputId">
+                                            <input id="@inputId" type="checkbox" required="@field.Required" checked="@BooleanValue(form, field)" @onchange="eventArgs => SetBoolean(form, field, eventArgs)" />
+                                            <span>@field.Label</span>
+                                        </label>
+                                    }
+                                    else
+                                    {
+                                        <label class="label" for="@inputId">@field.Label</label>
+                                        @if (field.Kind is PluginPageFieldKind.Multiline)
+                                        {
+                                            <textarea id="@inputId" class="input min-h-24 resize-y" required="@field.Required" value="@Value(form, field)" @oninput="eventArgs => SetValue(form, field, eventArgs)"></textarea>
+                                        }
+                                        else if (field.Kind is PluginPageFieldKind.Choice)
+                                        {
+                                            <select id="@inputId" class="input" required="@field.Required" value="@Value(form, field)" @onchange="eventArgs => SetValue(form, field, eventArgs)">
+                                                <option value="">Choose</option>
+                                                @foreach (var choice in field.Choices)
+                                                {
+                                                    <option value="@choice.Value">@choice.Label</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input id="@inputId" class="input" type="@(field.Kind is PluginPageFieldKind.Number ? "number" : "text")" required="@field.Required" value="@Value(form, field)" @oninput="eventArgs => SetValue(form, field, eventArgs)" />
+                                        }
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(field.Help))
+                                    {
+                                        <p class="form-help">@field.Help</p>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </ChildContent>
+                    <Footer>
+                        <button class="btn-primary" type="submit" disabled="@_submitting">@form.SubmitLabel</button>
+                    </Footer>
+                </TaskPanel>
+                </form>
+                break;
+            case PluginPageSection.Table table:
+                <TaskPanel Title="@table.Title" Description="@(table.Description ?? string.Empty)">
+                    <DataTableRegion Label="@table.Title">
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                @foreach (var column in table.Columns)
+                                {
+                                    <th class="p-2">@column.Label</th>
+                                }
+                            </tr></thead>
+                            <tbody>
+                                @foreach (var row in table.Rows)
+                                {
+                                    <tr class="border-t">
+                                        @foreach (var column in table.Columns)
+                                        {
+                                            <td class="p-2">@(row.Cells.TryGetValue(column.Id, out var value) ? value : string.Empty)</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </DataTableRegion>
+                </TaskPanel>
+                break;
+            case PluginPageSection.List list:
+                <TaskPanel Title="@list.Title" Description="@(list.Description ?? string.Empty)">
+                    <div class="grid gap-3">
+                        @foreach (var item in list.Items)
+                        {
+                            <article class="card flex flex-wrap items-start justify-between gap-3 p-4">
+                                <div><h3 class="font-semibold text-[var(--app-text-strong)]">@item.Title</h3>@if (!string.IsNullOrWhiteSpace(item.Description)) { <p class="mt-1 text-sm text-muted-foreground">@item.Description</p> }</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Status)) { <span class="status-pill status-pill--slate"><span class="status-pill__label">@item.Status</span></span> }
+                            </article>
+                        }
+                    </div>
+                </TaskPanel>
+                break;
+        }
+    }
+</div>
+
+@code {
+    private readonly Dictionary<(PluginActionId Action, string Field), object?> _values = [];
+    private bool _submitting;
+
+    [Parameter, EditorRequired]
+    public PluginPageDocument Document { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public EventCallback<PluginPageFormSubmission> OnSubmit { get; set; }
+
+    private string Value(PluginPageSection.Form form, PluginPageField field) =>
+        _values.TryGetValue((form.Action, field.Id), out var value) ? value?.ToString() ?? string.Empty : string.Empty;
+
+    private bool BooleanValue(PluginPageSection.Form form, PluginPageField field) =>
+        _values.TryGetValue((form.Action, field.Id), out var value) && value is true;
+
+    private void SetValue(PluginPageSection.Form form, PluginPageField field, ChangeEventArgs eventArgs) =>
+        _values[(form.Action, field.Id)] = eventArgs.Value?.ToString() ?? string.Empty;
+
+    private void SetBoolean(PluginPageSection.Form form, PluginPageField field, ChangeEventArgs eventArgs) =>
+        _values[(form.Action, field.Id)] = eventArgs.Value is true;
+
+    private async Task SubmitAsync(PluginPageSection.Form form)
+    {
+        _submitting = true;
+        try
+        {
+            var properties = form.Fields.Select(field => new PluginValueProperty(field.Id, ToPluginValue(form, field))).ToImmutableArray();
+            await OnSubmit.InvokeAsync(new(form.Action, new PluginValue.Map(properties)));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private PluginValue ToPluginValue(PluginPageSection.Form form, PluginPageField field)
+    {
+        _ = _values.TryGetValue((form.Action, field.Id), out var value);
+        return field.Kind switch
+        {
+            PluginPageFieldKind.Boolean => new PluginValue.Boolean(value is true),
+            PluginPageFieldKind.Number when double.TryParse(value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number) => new PluginValue.Number(number),
+            _ => new PluginValue.String(value?.ToString() ?? string.Empty),
+        };
+    }
+
+    private static string StatusClass(PluginPageStatusTone tone) => tone switch
+    {
+        PluginPageStatusTone.Success => "status-pill status-pill--green",
+        PluginPageStatusTone.Warning => "status-pill status-pill--amber",
+        PluginPageStatusTone.Danger => "status-pill status-pill--red",
+        PluginPageStatusTone.Info => "status-pill status-pill--blue",
+        _ => "status-pill status-pill--slate",
+    };
+
+    private static string StatusLabel(PluginPageStatusTone tone) => tone.ToString();
+}

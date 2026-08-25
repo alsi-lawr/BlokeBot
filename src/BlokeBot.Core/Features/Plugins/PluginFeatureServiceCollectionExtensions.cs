@@ -110,6 +110,13 @@ public static class PluginFeatureServiceCollectionExtensions
         >();
         services.TryAddSingleton<PluginFeatureManager>();
         services.TryAddSingleton<PluginFeatureAdmissionService>();
+        services.TryAddSingleton<PluginPageCatalog>();
+        services.TryAddSingleton<PluginPageSessionRegistry>();
+        services.TryAddSingleton<
+            IPluginPackageAssetResolver,
+            UnavailablePluginPackageAssetResolver
+        >();
+        services.TryAddSingleton<PluginPageAssetService>();
         services.TryAddSingleton<IPluginDispatchInvoker, PluginDispatchInvoker>();
         services.TryAddSingleton<PluginTwitchEventBridge>();
         services.TryAddSingleton<IPluginTwitchEventObserver>(provider =>

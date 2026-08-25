@@ -1,0 +1,54 @@
+@page "/plugins/{PluginIdValue}/features/{FeatureIdValue}/pages/{RouteValue}"
+@using BlokeBot.Plugins.Features
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@implements IAsyncDisposable
+
+<PageTitle>BlokeBot | @_title</PageTitle>
+
+<DashboardPage Kicker="@_pluginName"
+               Title="@_title"
+               Description="@_description"
+               LoadState="@_loadState"
+               SaveFeedback="@_feedback"
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        <span class="@_statusClass">
+            <span class="status-pill__dot"></span>
+            <span class="status-pill__label">@_statusLabel</span>
+        </span>
+    </Actions>
+    <ChildContent>
+        @if (_document is not null)
+        {
+            <PluginGeneratedPageRenderer Document="_document" OnSubmit="SubmitGeneratedActionAsync" />
+        }
+        else if (_embeddedUrl is not null)
+        {
+            <TaskPanel Title="Plugin content" Description="This page is kept inside a contained frame. Plugin pages are trusted extensions, not a security sandbox.">
+                <iframe @ref="_iframe"
+                        class="min-h-[34rem] w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)]"
+                        title="@_title"
+                        src="@_embeddedUrl"
+                        sandbox="allow-scripts allow-forms allow-same-origin"
+                        referrerpolicy="no-referrer"></iframe>
+            </TaskPanel>
+        }
+        else if (_stateTitle is not null)
+        {
+            <PageState Kind="PageStateKind.Unavailable" Title="@_stateTitle" Description="@_stateDescription">
+                <Actions>
+                    @if (_stateActionRoute is not null)
+                    {
+                        <a class="btn-primary" href="@_stateActionRoute">@_stateActionLabel</a>
+                    }
+                    else
+                    {
+                        <button class="btn-primary" type="button" @onclick="OnParametersSetAsync">Try again</button>
+                    }
+                </Actions>
+            </PageState>
+        }
+    </ChildContent>
+</DashboardPage>
