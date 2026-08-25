@@ -284,18 +284,17 @@ public sealed class HostBotAccountAuthorizationService(
                 cancellationToken
             );
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        _ = await db.SaveChangesAsync(cancellationToken);
-        if (restartRuntime)
-        {
-            _ = await runtimeTransitions.RestartAfterAccountChangeAsync(
-                db,
-                host.Id,
-                canRestart,
-                cancellationToken
-            );
-        }
-        await transaction.CommitAsync(cancellationToken);
+        var runtimeChange = restartRuntime
+            ? canRestart
+                ? HostedChannelAccountSelectionRuntimeChange.Restart
+                : HostedChannelAccountSelectionRuntimeChange.Stop
+            : HostedChannelAccountSelectionRuntimeChange.None;
+        await runtimeTransitions.CommitAccountSelectionAsync(
+            db,
+            host.Id,
+            runtimeChange,
+            cancellationToken
+        );
         _ = await changes.NotifyChangedAsync(cancellationToken);
     }
 
@@ -843,14 +842,11 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        _ = await db.SaveChangesAsync(cancellationToken);
-        _ = await runtimeTransitions.ForceStoppedForCredentialPolicyAsync(
+        await runtimeTransitions.CommitCredentialPolicyStopAsync(
             db,
             settings.HostId,
             cancellationToken
         );
-        await transaction.CommitAsync(cancellationToken);
     }
 
     private async Task RefreshProfileMetadataAsync(

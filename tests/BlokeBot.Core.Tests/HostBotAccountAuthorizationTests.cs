@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
@@ -7,6 +8,7 @@ using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -622,12 +624,58 @@ public sealed class HostBotAccountAuthorizationTests
         settings.OverrideEnabled.ShouldBeTrue();
     }
 
+    [Test]
+    public async Task AccountSelectionCommitCanceled_RollsBackAccountRuntimeAndSessionIdentity()
+    {
+        var commitCancellation = new CommitCancellationInterceptor();
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync(commitCancellation);
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
+        var transitions = new HostedChannelRuntimeTransitionService(dbFactory, changes);
+        var lifecycle = new HostedChannelRuntimeLifecycleService(transitions);
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            runtimeTransitions: transitions
+        );
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+        await AuthorizeCustomBotAsync(service, hostId);
+        await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
+        var priorTarget = await transitions.GetOrCreateSessionTargetAsync(
+            hostId,
+            "streamer",
+            CancellationToken.None
+        );
+        commitCancellation.CancelNextCommit();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
+            service.UseMainBotAsync(hostId, CancellationToken.None)
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = await db.Hosts.AsNoTracking().SingleAsync(x => x.Id == hostId);
+        var settings = await db
+            .HostBotAccountSettings.AsNoTracking()
+            .SingleAsync(x => x.HostId == hostId);
+        var currentTarget = await transitions.GetOrCreateSessionTargetAsync(
+            hostId,
+            "streamer",
+            CancellationToken.None
+        );
+        commitCancellation.CommitAttempts.ShouldBe(1);
+        settings.OverrideEnabled.ShouldBeTrue();
+        host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Started);
+        ReferenceEquals(priorTarget.SessionIdentity, currentTarget.SessionIdentity).ShouldBeTrue();
+        (await lifecycle.MarkStartedAsync(priorTarget, CancellationToken.None)).ShouldBeTrue();
+    }
+
     private static HostBotAccountAuthorizationService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         IAccessTokenProvider? tokenProvider,
         HostBotAccountHttpClientFactory? httpClientFactory = null,
         bool includeFollowRead = false,
-        bool includeAnnouncementManagement = false
+        bool includeAnnouncementManagement = false,
+        HostedChannelRuntimeTransitionService? runtimeTransitions = null
     )
     {
         httpClientFactory ??= new HostBotAccountHttpClientFactory();
@@ -677,7 +725,7 @@ public sealed class HostBotAccountAuthorizationTests
                 ),
             changes,
             options,
-            new HostedChannelRuntimeTransitionService(dbFactory, changes)
+            runtimeTransitions ?? new HostedChannelRuntimeTransitionService(dbFactory, changes)
         );
     }
 
@@ -802,6 +850,34 @@ public sealed class HostBotAccountAuthorizationTests
                     Result<string, AccessTokenUnavailableReason>.Success(accessToken)
                 )
             );
+    }
+
+    private sealed class CommitCancellationInterceptor : DbTransactionInterceptor
+    {
+        private bool _cancelNextCommit;
+
+        internal int CommitAttempts { get; private set; }
+
+        internal void CancelNextCommit() => _cancelNextCommit = true;
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction,
+            TransactionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (!_cancelNextCommit)
+            {
+                return ValueTask.FromResult(result);
+            }
+
+            _cancelNextCommit = false;
+            CommitAttempts++;
+            return ValueTask.FromException<InterceptionResult>(
+                new OperationCanceledException("commit cancellation")
+            );
+        }
     }
 
     private sealed class HostBotAccountHttpClientFactory(HttpStatusCode? tokenStatusCode = null)

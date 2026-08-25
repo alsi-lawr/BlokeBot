@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ public sealed class HostedChannelRuntimeTransitionService(
 ) : IDisposable
 {
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
-    private readonly Dictionary<int, BotChannelSessionIdentity> _activeSessions = [];
+    private readonly HostedChannelRuntimeSessions _activeSessions = new();
 
     internal Task<HostedChannelRuntimeTransitionOutcome> RequestStartAsync(
         int hostId,
@@ -18,9 +19,7 @@ public sealed class HostedChannelRuntimeTransitionService(
     ) =>
         BeginOperationAndNotifyAsync(
             hostId,
-            host =>
-                host.BotRuntimeState != BotChannelRuntimeState.Starting
-                && host.BotRuntimeState != BotChannelRuntimeState.Started,
+            HostedChannelRuntimePersistence.CanStart,
             BotChannelRuntimeState.Starting,
             replaceSession: true,
             cancellationToken
@@ -32,44 +31,34 @@ public sealed class HostedChannelRuntimeTransitionService(
     ) =>
         BeginOperationAndNotifyAsync(
             hostId,
-            host =>
-                host.BotRuntimeState != BotChannelRuntimeState.Stopping
-                && host.BotRuntimeState != BotChannelRuntimeState.Stopped,
+            HostedChannelRuntimePersistence.CanStop,
             BotChannelRuntimeState.Stopping,
             replaceSession: false,
             cancellationToken
         );
 
-    internal Task<HostedChannelRuntimeTransitionOutcome> RestartAfterAccountChangeAsync(
+    internal Task CommitAccountSelectionAsync(
         BlokeBotDbContext db,
         int hostId,
-        bool canStart,
+        HostedChannelAccountSelectionRuntimeChange runtimeChange,
         CancellationToken cancellationToken
     ) =>
-        BeginOperationAsync(
+        CommitPendingAccountChangesAsync(
             db,
             hostId,
-            host =>
-                host.BotRuntimeState == BotChannelRuntimeState.Starting
-                || host.BotRuntimeState == BotChannelRuntimeState.Started,
-            canStart ? BotChannelRuntimeState.Starting : BotChannelRuntimeState.Stopped,
-            replaceSession: canStart,
-            clearSession: !canStart,
+            HostedChannelRuntimePersistence.PendingChangeFor(runtimeChange),
             cancellationToken
         );
 
-    internal Task<HostedChannelRuntimeTransitionOutcome> ForceStoppedForCredentialPolicyAsync(
+    internal Task CommitCredentialPolicyStopAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken cancellationToken
     ) =>
-        BeginOperationAsync(
+        CommitPendingAccountChangesAsync(
             db,
             hostId,
-            host => host.BotRuntimeState != BotChannelRuntimeState.Stopped,
-            BotChannelRuntimeState.Stopped,
-            replaceSession: false,
-            clearSession: true,
+            PendingAccountRuntimeChange.ForceStop,
             cancellationToken
         );
 
@@ -82,13 +71,7 @@ public sealed class HostedChannelRuntimeTransitionService(
         await _transitionGate.WaitAsync(cancellationToken);
         try
         {
-            if (!_activeSessions.TryGetValue(hostId, out var identity))
-            {
-                identity = BotChannelSessionIdentity.Create();
-                _activeSessions[hostId] = identity;
-            }
-
-            return new BotChannelTarget(channelLogin, identity);
+            return new BotChannelTarget(channelLogin, _activeSessions.GetOrCreate(hostId));
         }
         finally
         {
@@ -104,7 +87,7 @@ public sealed class HostedChannelRuntimeTransitionService(
         ConfirmAsync(
             normalizedChannelLogin,
             sessionIdentity,
-            BotChannelRuntimeState.Starting,
+            [BotChannelRuntimeState.Starting],
             BotChannelRuntimeState.Started,
             clearSession: false,
             cancellationToken
@@ -131,27 +114,12 @@ public sealed class HostedChannelRuntimeTransitionService(
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var interruptedHostIds = await db
-                .Hosts.AsNoTracking()
-                .Where(host => host.BotRuntimeState == BotChannelRuntimeState.Stopping)
-                .Select(host => host.Id)
-                .ToArrayAsync(cancellationToken);
-            recovered = await db
-                .Hosts.Where(host => host.BotRuntimeState == BotChannelRuntimeState.Stopping)
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(
-                                host => host.BotRuntimeState,
-                                BotChannelRuntimeState.Stopped
-                            )
-                            .SetProperty(host => host.BotRuntimeStateChangedAtUtc, DateTime.UtcNow),
-                    cancellationToken
-                );
-            foreach (var hostId in interruptedHostIds)
-            {
-                _ = _activeSessions.Remove(hostId);
-            }
+            var recovery = await HostedChannelRuntimePersistence.RecoverInterruptedStopsAsync(
+                db,
+                cancellationToken
+            );
+            recovered = recovery.Count;
+            _activeSessions.Clear(recovery.HostIds);
         }
         finally
         {
@@ -168,7 +136,7 @@ public sealed class HostedChannelRuntimeTransitionService(
 
     private async Task<HostedChannelRuntimeTransitionOutcome> BeginOperationAndNotifyAsync(
         int hostId,
-        System.Linq.Expressions.Expression<Func<BotHost, bool>> canTransition,
+        Expression<Func<BotHost, bool>> canTransition,
         BotChannelRuntimeState target,
         bool replaceSession,
         CancellationToken cancellationToken
@@ -192,10 +160,50 @@ public sealed class HostedChannelRuntimeTransitionService(
         return outcome;
     }
 
+    private async Task CommitPendingAccountChangesAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        PendingAccountRuntimeChange runtimeChange,
+        CancellationToken cancellationToken
+    )
+    {
+        await _transitionGate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            _ = await db.SaveChangesAsync(cancellationToken);
+            var runtimeChanged = await HostedChannelRuntimePersistence.TryTransitionAsync(
+                db,
+                hostId,
+                runtimeChange,
+                cancellationToken
+            );
+            await transaction.CommitAsync(cancellationToken);
+
+            if (runtimeChanged)
+            {
+                if (runtimeChange is PendingAccountRuntimeChange.Restart)
+                {
+                    _activeSessions.Replace(hostId);
+                }
+                else
+                {
+                    _activeSessions.Clear(hostId);
+                }
+            }
+        }
+        finally
+        {
+            _ = _transitionGate.Release();
+        }
+    }
+
     private async Task<HostedChannelRuntimeTransitionOutcome> BeginOperationAsync(
         BlokeBotDbContext db,
         int hostId,
-        System.Linq.Expressions.Expression<Func<BotHost, bool>> canTransition,
+        Expression<Func<BotHost, bool>> canTransition,
         BotChannelRuntimeState target,
         bool replaceSession,
         bool clearSession,
@@ -205,56 +213,32 @@ public sealed class HostedChannelRuntimeTransitionService(
         await _transitionGate.WaitAsync(cancellationToken);
         try
         {
-            var changed = await db
-                .Hosts.Where(host => host.Id == hostId)
-                .Where(canTransition)
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(host => host.BotRuntimeState, target)
-                            .SetProperty(host => host.BotRuntimeStateChangedAtUtc, DateTime.UtcNow),
-                    cancellationToken
-                );
-            if (changed > 0)
+            var outcome = await HostedChannelRuntimePersistence.TransitionAsync(
+                db,
+                hostId,
+                canTransition,
+                target,
+                cancellationToken
+            );
+            if (outcome is HostedChannelRuntimeTransitionOutcome.Transitioned)
             {
                 if (replaceSession)
                 {
-                    _activeSessions[hostId] = BotChannelSessionIdentity.Create();
+                    _activeSessions.Replace(hostId);
                 }
                 else if (clearSession)
                 {
-                    _ = _activeSessions.Remove(hostId);
+                    _activeSessions.Clear(hostId);
                 }
-
-                return HostedChannelRuntimeTransitionOutcome.Transitioned;
             }
 
-            return await db.Hosts.AnyAsync(host => host.Id == hostId, cancellationToken)
-                ? HostedChannelRuntimeTransitionOutcome.Unchanged
-                : HostedChannelRuntimeTransitionOutcome.HostNotFound;
+            return outcome;
         }
         finally
         {
             _ = _transitionGate.Release();
         }
     }
-
-    private async Task<bool> ConfirmAsync(
-        string normalizedChannelLogin,
-        BotChannelSessionIdentity sessionIdentity,
-        BotChannelRuntimeState expected,
-        BotChannelRuntimeState target,
-        bool clearSession,
-        CancellationToken cancellationToken
-    ) =>
-        await ConfirmAsync(
-            normalizedChannelLogin,
-            sessionIdentity,
-            [expected],
-            target,
-            clearSession,
-            cancellationToken
-        );
 
     private async Task<bool> ConfirmAsync(
         string normalizedChannelLogin,
@@ -270,15 +254,14 @@ public sealed class HostedChannelRuntimeTransitionService(
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var host = await db
-                .Hosts.AsNoTracking()
-                .Where(host => host.Login == normalizedChannelLogin)
-                .Select(host => new RuntimeCallbackHost(host.Id, host.BotRuntimeState))
-                .SingleOrDefaultAsync(cancellationToken);
+            var host = await HostedChannelRuntimePersistence.LoadCallbackHostAsync(
+                db,
+                normalizedChannelLogin,
+                cancellationToken
+            );
             if (
                 host is null
-                || !_activeSessions.TryGetValue(host.Id, out var activeSession)
-                || !ReferenceEquals(activeSession, sessionIdentity)
+                || !_activeSessions.IsCurrent(host.Id, sessionIdentity)
                 || (host.State != target && !expected.Contains(host.State))
             )
             {
@@ -287,26 +270,18 @@ public sealed class HostedChannelRuntimeTransitionService(
 
             if (host.State != target)
             {
-                changed =
-                    await db
-                        .Hosts.Where(candidate =>
-                            candidate.Id == host.Id && expected.Contains(candidate.BotRuntimeState)
-                        )
-                        .ExecuteUpdateAsync(
-                            setters =>
-                                setters
-                                    .SetProperty(candidate => candidate.BotRuntimeState, target)
-                                    .SetProperty(
-                                        candidate => candidate.BotRuntimeStateChangedAtUtc,
-                                        DateTime.UtcNow
-                                    ),
-                            cancellationToken
-                        ) > 0;
+                changed = await HostedChannelRuntimePersistence.TryConfirmAsync(
+                    db,
+                    host.Id,
+                    expected,
+                    target,
+                    cancellationToken
+                );
             }
 
             if (clearSession)
             {
-                _ = _activeSessions.Remove(host.Id);
+                _activeSessions.Clear(host.Id);
             }
         }
         finally
@@ -322,14 +297,5 @@ public sealed class HostedChannelRuntimeTransitionService(
         return true;
     }
 
-    private sealed record RuntimeCallbackHost(int Id, BotChannelRuntimeState State);
-
     public void Dispose() => _transitionGate.Dispose();
-}
-
-internal enum HostedChannelRuntimeTransitionOutcome
-{
-    HostNotFound,
-    Unchanged,
-    Transitioned,
 }

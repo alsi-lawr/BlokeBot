@@ -97,7 +97,7 @@ public sealed class HostedChannelRuntimeTransitionTests
         var session = await harness.TargetAsync(hostId);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            _ = await harness.Transitions.ForceStoppedForCredentialPolicyAsync(
+            await harness.Transitions.CommitCredentialPolicyStopAsync(
                 db,
                 hostId,
                 CancellationToken.None
