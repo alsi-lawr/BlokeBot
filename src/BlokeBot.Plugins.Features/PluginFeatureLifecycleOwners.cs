@@ -21,7 +21,8 @@ public sealed class PluginFeaturePurgeOwner(
 
 public sealed class PluginFeaturePendingWorkCanceller(
     IPluginFeatureStore store,
-    IPluginFeatureReconciler reconciler
+    IPluginFeatureReconciler reconciler,
+    IPluginFeatureWorkCoordinator? work = null
 ) : IPluginPendingWorkCanceller
 {
     public async ValueTask<PluginLifecycleOwnerOutcome> CancelAsync(
@@ -30,6 +31,10 @@ public sealed class PluginFeaturePendingWorkCanceller(
         CancellationToken cancellationToken
     )
     {
+        if (work is not null)
+        {
+            await work.CancelAndDrainPluginAsync(pluginId, cancellationToken);
+        }
         var states = await store.LoadFeatureStatesAsync(pluginId, cancellationToken);
         foreach (var state in states.Where(state => state.Enabled && state.Fence == fence))
         {

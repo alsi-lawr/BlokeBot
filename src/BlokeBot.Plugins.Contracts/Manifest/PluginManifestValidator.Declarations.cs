@@ -203,6 +203,7 @@ public static partial class PluginManifestValidator
             }
 
             ValidateTwitch(feature.Twitch, errors);
+            ValidateDispatchDeclarations(manifest, feature, errors);
         }
     }
 

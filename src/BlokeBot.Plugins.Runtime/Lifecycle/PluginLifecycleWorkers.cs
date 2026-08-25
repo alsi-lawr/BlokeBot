@@ -20,6 +20,24 @@ internal interface IPluginLifecycleWorkerSession : IAsyncDisposable
     PluginWorkerMode Mode { get; }
 
     Task<PluginWorkerFailure> Termination { get; }
+
+    ValueTask<PluginWorkerInvocationResult> InvokeAsync(
+        PluginWorkerInvocationIdentity identity,
+        PluginLiveInvocation invocation,
+        CancellationToken cancellationToken
+    ) =>
+        ValueTask.FromResult(
+            new PluginWorkerInvocationResult(
+                new PluginWorkerInvocationOutcome.Failed(
+                    new(
+                        PluginWorkerFailureCode.WorkerTerminated,
+                        "Plugin worker invocation is unavailable."
+                    )
+                ),
+                PluginWorkerInvocationMetrics.Empty,
+                []
+            )
+        );
 }
 
 internal interface IPluginLifecycleWorkerManager
@@ -120,6 +138,12 @@ internal sealed class PluginLifecycleWorkerManager(PluginWorkerCoordinator coord
         public PluginWorkerMode Mode => lease.Mode;
 
         public Task<PluginWorkerFailure> Termination => lease.Client.Termination;
+
+        public ValueTask<PluginWorkerInvocationResult> InvokeAsync(
+            PluginWorkerInvocationIdentity identity,
+            PluginLiveInvocation invocation,
+            CancellationToken cancellationToken
+        ) => lease.Client.InvokeAsync(identity, invocation, cancellationToken);
 
         public ValueTask DisposeAsync() => lease.DisposeAsync();
     }

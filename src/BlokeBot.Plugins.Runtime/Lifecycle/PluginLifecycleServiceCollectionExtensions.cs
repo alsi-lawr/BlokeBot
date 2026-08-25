@@ -16,6 +16,9 @@ public static class PluginLifecycleServiceCollectionExtensions
         services.TryAddSingleton<IPluginRuntimeSnapshotProvider>(provider =>
             provider.GetRequiredService<PluginRuntimeSnapshotRegistry>()
         );
+        services.TryAddSingleton<IPluginRuntimeInvoker>(provider =>
+            provider.GetRequiredService<PluginRuntimeSnapshotRegistry>()
+        );
         services.TryAddSingleton<IPluginLifecycleChangeNotifier>(provider =>
             provider.GetRequiredService<PluginRuntimeSnapshotRegistry>()
         );

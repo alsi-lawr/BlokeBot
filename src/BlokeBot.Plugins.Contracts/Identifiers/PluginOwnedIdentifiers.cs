@@ -64,6 +64,38 @@ public sealed record PluginFeatureId
         );
 }
 
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginEventHandlerId>))]
+public sealed record PluginEventHandlerId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginEventHandlerId>
+{
+    private PluginEventHandlerId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginEventHandlerId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginEventHandlerId(value),
+            out identifier
+        );
+}
+
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginScheduleHandlerId>))]
+public sealed record PluginScheduleHandlerId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginScheduleHandlerId>
+{
+    private PluginScheduleHandlerId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginScheduleHandlerId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginScheduleHandlerId(value),
+            out identifier
+        );
+}
+
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginMigrationId>))]
 public sealed record PluginMigrationId
     : PluginContractIdentifier,

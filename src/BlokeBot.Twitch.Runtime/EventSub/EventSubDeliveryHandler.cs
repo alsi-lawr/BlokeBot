@@ -13,7 +13,7 @@ internal interface IEventSubDeliveryHandler
     );
 }
 
-internal sealed class EventSubDeliveryHandler(
+internal sealed partial class EventSubDeliveryHandler(
     ChatCommandDispatcher dispatcher,
     ICommandResponseSender responses,
     INativeTwitchFeatureStateProvider nativeTwitch,
@@ -28,7 +28,9 @@ internal sealed class EventSubDeliveryHandler(
     IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null,
     IEnumerable<IPredictionEventObserver>? predictionObservers = null,
     IEnumerable<IIncomingRaidEventObserver>? incomingRaidObservers = null,
-    IEnumerable<ITwitchEventAutomationObserver>? automationObservers = null
+    IEnumerable<ITwitchEventAutomationObserver>? automationObservers = null,
+    IEnumerable<IPluginTwitchEventObserver>? pluginObservers = null,
+    IEnumerable<IEventSubRawObserver>? rawObservers = null
 ) : IEventSubDeliveryHandler
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -54,6 +56,8 @@ internal sealed class EventSubDeliveryHandler(
     [
         .. automationObservers ?? [],
     ];
+    private readonly IPluginTwitchEventObserver[] _pluginObservers = [.. pluginObservers ?? []];
+    private readonly EventSubRawDelivery _rawDelivery = new(rawObservers);
 
     internal async Task DispatchChatMessageAsync(
         EventSubChatMessageEvent chatEvent,
@@ -79,33 +83,6 @@ internal sealed class EventSubDeliveryHandler(
         await dispatcher.DispatchResponsesAsync(
             message,
             async (response, ct) => await responses.SendAsync(message, response, ct),
-            cancellationToken
-        );
-    }
-
-    private async Task DispatchShoutoutAsync(
-        EventSubShoutoutEvent shoutout,
-        CancellationToken cancellationToken
-    )
-    {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                shoutout.BroadcasterUserLogin,
-                NativeTwitchFeature.RaidCollaboration,
-                cancellationToken
-            )
-        )
-        {
-            return;
-        }
-
-        foreach (var observer in _shoutoutObservers)
-        {
-            await observer.ShoutoutReceivedAsync(shoutout, cancellationToken);
-        }
-
-        await NotifyAutomationObserversAsync(
-            (observer, token) => observer.ShoutoutOccurredAsync(shoutout, token),
             cancellationToken
         );
     }
@@ -191,17 +168,9 @@ internal sealed class EventSubDeliveryHandler(
                     cancellationToken
                 );
                 break;
-        }
-    }
-
-    private async Task NotifyAutomationObserversAsync(
-        Func<ITwitchEventAutomationObserver, CancellationToken, Task> notify,
-        CancellationToken cancellationToken
-    )
-    {
-        foreach (var observer in _automationObservers)
-        {
-            await notify(observer, cancellationToken);
+            case EventSubNotification.Unknown:
+                await _rawDelivery.DispatchAsync(envelope, cancellationToken);
+                break;
         }
     }
 
@@ -247,128 +216,5 @@ internal sealed class EventSubDeliveryHandler(
         }
 
         return new ReadOnlyDictionary<string, string>(tags);
-    }
-
-    private async Task DispatchPollAsync(
-        EventSubPollEvent poll,
-        CancellationToken cancellationToken
-    )
-    {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                poll.BroadcasterUserLogin,
-                NativeTwitchFeature.Polls,
-                cancellationToken
-            )
-        )
-        {
-            return;
-        }
-
-        foreach (var observer in _pollObservers)
-        {
-            await observer.PollReceivedAsync(poll, cancellationToken);
-        }
-
-        await NotifyAutomationObserversAsync(
-            (observer, token) => observer.PollChangedAsync(poll, token),
-            cancellationToken
-        );
-    }
-
-    internal async Task DispatchIncomingRaidAsync(
-        EventSubIncomingRaidEvent incomingRaid,
-        CancellationToken cancellationToken
-    )
-    {
-        // Automation observers gate on their own feature switch, not on Raid & collaboration.
-        if (incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Incoming)
-        {
-            await NotifyAutomationObserversAsync(
-                (observer, token) => observer.IncomingRaidReceivedAsync(incomingRaid, token),
-                cancellationToken
-            );
-        }
-        var targetEnabled =
-            incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Incoming
-            && await nativeTwitch.IsEnabledAsync(
-                incomingRaid.ToBroadcasterUserLogin,
-                NativeTwitchFeature.RaidCollaboration,
-                cancellationToken
-            );
-        var sourceEnabled =
-            incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Outgoing
-            && await nativeTwitch.IsEnabledAsync(
-                incomingRaid.FromBroadcasterUserLogin,
-                NativeTwitchFeature.RaidCollaboration,
-                cancellationToken
-            );
-        if (!targetEnabled && !sourceEnabled)
-        {
-            return;
-        }
-
-        foreach (var observer in _incomingRaidObservers)
-        {
-            await observer.IncomingRaidReceivedAsync(incomingRaid, cancellationToken);
-        }
-    }
-
-    internal async Task DispatchPredictionAsync(
-        EventSubPredictionEvent prediction,
-        CancellationToken cancellationToken
-    )
-    {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                prediction.BroadcasterUserLogin,
-                NativeTwitchFeature.Predictions,
-                cancellationToken
-            )
-        )
-        {
-            return;
-        }
-
-        foreach (var observer in _predictionObservers)
-        {
-            await observer.PredictionReceivedAsync(prediction, cancellationToken);
-        }
-
-        await NotifyAutomationObserversAsync(
-            (observer, token) => observer.PredictionChangedAsync(prediction, token),
-            cancellationToken
-        );
-    }
-
-    internal async Task DispatchRewardRedemptionAsync(
-        EventSubRewardRedemptionEvent redemption,
-        CancellationToken cancellationToken
-    )
-    {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                redemption.BroadcasterUserLogin,
-                NativeTwitchFeature.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
-        {
-            return;
-        }
-
-        foreach (var observer in _channelPointsObservers)
-        {
-            await observer.RedemptionReceivedAsync(redemption, cancellationToken);
-        }
-
-        // The Rewards & redemptions parent gate above also bounds automation dispatch; automation
-        // observers run after the Channel Points observers so the redemption row exists before any
-        // flow acts on it, and they additionally enforce the Automations switch and the durable
-        // delivery receipt themselves.
-        await NotifyAutomationObserversAsync(
-            (observer, token) => observer.RewardRedemptionReceivedAsync(redemption, token),
-            cancellationToken
-        );
     }
 }

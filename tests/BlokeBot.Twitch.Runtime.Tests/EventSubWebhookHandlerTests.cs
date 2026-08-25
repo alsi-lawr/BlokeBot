@@ -49,6 +49,36 @@ public sealed class EventSubWebhookHandlerTests
     }
 
     [Test]
+    public async Task SignedRawNotification_WithMismatchedUnsignedIdentity_IsRejectedBeforeDispatch()
+    {
+        var delivery = new RecordingDelivery();
+        var handler = CreateHandler(delivery);
+        await handler.StartAsync(CancellationToken.None);
+        var body = Body("notification", subscriptionType: "channel.ban");
+
+        var typeMismatch = await HandleAsync(
+            handler,
+            "raw-type-mismatch",
+            "notification",
+            body,
+            subscriptionType: "channel.chat.message"
+        );
+        var versionMismatch = await HandleAsync(
+            handler,
+            "raw-version-mismatch",
+            "notification",
+            body,
+            subscriptionType: "channel.ban",
+            subscriptionVersion: "2"
+        );
+        await handler.StopAsync(CancellationToken.None);
+
+        typeMismatch.StatusCode.ShouldBe(400);
+        versionMismatch.StatusCode.ShouldBe(400);
+        delivery.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task ValidSignedRevocation_RepairsTheRevokedSubscription()
     {
         var reconciliation = new RecordingReconciliation();
@@ -267,7 +297,9 @@ public sealed class EventSubWebhookHandlerTests
         string messageId,
         string messageType,
         byte[] body,
-        DateTimeOffset? timestamp = null
+        DateTimeOffset? timestamp = null,
+        string subscriptionType = "channel.chat.message",
+        string subscriptionVersion = "1"
     )
     {
         var value = (timestamp ?? _now).ToString("O");
@@ -276,8 +308,8 @@ public sealed class EventSubWebhookHandlerTests
             messageType,
             value,
             Sign(messageId, value, body),
-            "channel.chat.message",
-            "1",
+            subscriptionType,
+            subscriptionVersion,
             body,
             CancellationToken.None
         );
@@ -286,7 +318,9 @@ public sealed class EventSubWebhookHandlerTests
     private static byte[] Body(
         string messageType,
         string? challenge = null,
-        string eventText = "hello"
+        string eventText = "hello",
+        string subscriptionType = "channel.chat.message",
+        string subscriptionVersion = "1"
     ) =>
         JsonSerializer.SerializeToUtf8Bytes(
             new
@@ -296,8 +330,8 @@ public sealed class EventSubWebhookHandlerTests
                 {
                     id = "subscription-1",
                     status = "enabled",
-                    type = "channel.chat.message",
-                    version = "1",
+                    type = subscriptionType,
+                    version = subscriptionVersion,
                     condition = new { broadcaster_user_id = "channel-id", user_id = "bot-id" },
                     transport = new
                     {

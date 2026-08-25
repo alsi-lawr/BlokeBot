@@ -9,6 +9,12 @@ public interface IPluginHostCallDispatcher
         PluginHostCall call,
         CancellationToken cancellationToken
     );
+
+    ValueTask<PluginHostCallOutcome> DispatchAsync(
+        PluginWorkerInvocationIdentity identity,
+        PluginHostCall call,
+        CancellationToken cancellationToken
+    ) => DispatchAsync(call, cancellationToken);
 }
 
 public sealed record PluginWorkerStartOptions(

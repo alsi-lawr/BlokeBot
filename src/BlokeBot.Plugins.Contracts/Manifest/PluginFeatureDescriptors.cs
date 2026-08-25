@@ -165,8 +165,13 @@ public sealed record PluginFeatureDescriptor(
     string Description,
     ImmutableArray<PluginSettingId> Settings,
     PluginTwitchRequirements Twitch,
-    ImmutableArray<PluginAutomationTemplateId> AutomationTemplates
-);
+    ImmutableArray<PluginAutomationTemplateId> AutomationTemplates,
+    PluginDispatchDeclarations? Dispatch = null
+)
+{
+    public PluginDispatchDeclarations DispatchDeclarations =>
+        Dispatch ?? PluginDispatchDeclarations.Empty;
+}
 
 public sealed record PluginTwitchRequirements(
     ImmutableArray<string> Scopes,

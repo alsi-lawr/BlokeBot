@@ -72,23 +72,16 @@ internal sealed class EventSubWebhookHandler(
             return ValueTask.FromResult(new EventSubWebhookResult(403));
         }
 
-        EventSubEnvelope? envelope;
-        try
-        {
-            envelope = JsonSerializer.Deserialize<EventSubEnvelope>(body.Span);
-        }
-        catch (JsonException)
-        {
-            return ValueTask.FromResult(new EventSubWebhookResult(400));
-        }
-
         if (
-            envelope is null
-            || string.IsNullOrWhiteSpace(messageId)
+            string.IsNullOrWhiteSpace(messageId)
             || string.IsNullOrWhiteSpace(messageType)
-            || string.IsNullOrWhiteSpace(subscriptionType)
-            || string.IsNullOrWhiteSpace(subscriptionVersion)
-            || envelope.Subscription is not { ValueKind: JsonValueKind.Object }
+            || !EventSubSignedSubscriptionIdentity.TryParse(
+                body.Span,
+                subscriptionType,
+                subscriptionVersion,
+                out var envelope,
+                out var subscriptionIdentity
+            )
         )
         {
             return ValueTask.FromResult(new EventSubWebhookResult(400));
@@ -108,14 +101,10 @@ internal sealed class EventSubWebhookHandler(
             MessageId = messageId,
             MessageType = messageType,
             MessageTimestamp = DateTimeOffset.TryParse(timestamp, out var parsed) ? parsed : null,
-            SubscriptionType = subscriptionType,
-            SubscriptionVersion = subscriptionVersion,
+            SubscriptionType = subscriptionIdentity.Type,
+            SubscriptionVersion = subscriptionIdentity.Version,
         };
-        var subscriptionId =
-            envelope.Subscription.Value.TryGetProperty("id", out var id)
-            && id.ValueKind is JsonValueKind.String
-                ? id.GetString() ?? string.Empty
-                : string.Empty;
+        var subscriptionId = subscriptionIdentity.Id;
 
         if (messageType.Equals("webhook_callback_verification", StringComparison.Ordinal))
         {

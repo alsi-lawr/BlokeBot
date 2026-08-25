@@ -11,7 +11,8 @@ public sealed record PluginWorkerInvocationIdentity(
     PluginCoroutineId CoroutineId,
     PluginWorkerGeneration Generation,
     PluginWorkerDeadline Deadline,
-    PluginWorkerCancellationId CancellationId
+    PluginWorkerCancellationId CancellationId,
+    PluginActivationFence? Activation = null
 );
 
 public sealed record PluginPreparationInvocation(

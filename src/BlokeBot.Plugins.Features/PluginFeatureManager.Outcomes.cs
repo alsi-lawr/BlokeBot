@@ -42,6 +42,7 @@ public enum PluginFeatureEnableRejectionCode
     MissingCoreDependency,
     LifecycleNotHealthy,
     GenerationExhausted,
+    CommandRouteCollision,
     Conflict,
 }
 

@@ -109,7 +109,7 @@ public sealed partial class PluginWorkerClient
         PluginHostCallOutcome outcome;
         try
         {
-            outcome = await _hostCalls.DispatchAsync(requested.Call, hostToken);
+            outcome = await _hostCalls.DispatchAsync(pending.Identity, requested.Call, hostToken);
         }
         catch (OperationCanceledException) when (hostToken.IsCancellationRequested)
         {

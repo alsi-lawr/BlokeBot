@@ -37,10 +37,14 @@ public interface IPluginFeatureSnapshotProvider
 
 public sealed class PluginFeatureSnapshotRegistry : IPluginFeatureSnapshotProvider
 {
+    private readonly IPluginDispatchSnapshotSink? _dispatch;
     private readonly object _sync = new();
     private PluginFeatureSnapshot _current = PluginFeatureSnapshot.Empty;
     private TaskCompletionSource<PluginFeatureChangeVersion> _change = NewChangeCompletion();
     private long _version;
+
+    public PluginFeatureSnapshotRegistry(IPluginDispatchSnapshotSink? dispatch = null) =>
+        _dispatch = dispatch;
 
     public PluginFeatureSnapshot Current => Volatile.Read(ref _current);
 
@@ -136,7 +140,9 @@ public sealed class PluginFeatureSnapshotRegistry : IPluginFeatureSnapshotProvid
 
     private void PublishLocked(ImmutableDictionary<PluginFeatureKey, PluginFeatureState> states)
     {
-        Volatile.Write(ref _current, new(states));
+        var snapshot = new PluginFeatureSnapshot(states);
+        Volatile.Write(ref _current, snapshot);
+        _dispatch?.PublishFeatures(snapshot);
         var change = _change;
         var version = new PluginFeatureChangeVersion(++_version);
         _change = NewChangeCompletion();

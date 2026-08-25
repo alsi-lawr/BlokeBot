@@ -18,6 +18,7 @@ public enum PluginManifestErrorCode
     InvalidSetting,
     InvalidFeature,
     InvalidTwitchDeclaration,
+    InvalidDispatchDeclaration,
     InvalidHostModule,
     InvalidMigration,
     InvalidAutomationDefinition,

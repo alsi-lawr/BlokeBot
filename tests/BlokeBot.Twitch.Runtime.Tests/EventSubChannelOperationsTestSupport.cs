@@ -65,6 +65,18 @@ public abstract partial class EventSubChannelRecoveryTestBase
             string,
             HashSet<EventSubOperationSubscriptionKind>
         > _nativeTwitchFeatures = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<
+            string,
+            IReadOnlyList<EventSubExactSubscription>
+        > _exactRequirements = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<
+            string,
+            List<(EventSubExactSubscription Requirement, string SubscriptionId)>
+        > _exactCreations = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<
+            string,
+            Queue<Func<CancellationToken, ValueTask<EventSubSubscriptionSetupOutcome>>>
+        > _exactCreateScripts = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Queue<Exception>> _completeStopFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
@@ -190,6 +202,25 @@ public abstract partial class EventSubChannelRecoveryTestBase
             }
         }
 
+        internal void SetExactRequirements(
+            string channel,
+            params EventSubExactSubscription[] requirements
+        ) => _exactRequirements[channel] = requirements;
+
+        internal IReadOnlyList<EventSubExactSubscription> ExactCreations(string channel) =>
+            _exactCreations.TryGetValue(channel, out var creations)
+                ? creations.Select(static creation => creation.Requirement).ToArray()
+                : [];
+
+        internal IReadOnlyList<string> ExactSubscriptionIds(string channel) =>
+            _exactCreations.TryGetValue(channel, out var creations)
+                ? creations.Select(static creation => creation.SubscriptionId).ToArray()
+                : [];
+
+        internal void EnqueueExactCreateFailure(string channel, Exception exception) =>
+            GetQueue(_exactCreateScripts, channel)
+                .Enqueue(_ => ValueTask.FromException<EventSubSubscriptionSetupOutcome>(exception));
+
         public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
             string channel,
             EventSubAuthorizationContext authorization
@@ -264,6 +295,45 @@ public abstract partial class EventSubChannelRecoveryTestBase
                     ? outcomes.Dequeue()
                     : new EventSubStartupDeliveryOutcome.Completed();
             return ValueTask.FromResult(outcome);
+        }
+
+        public ValueTask<IReadOnlyList<EventSubExactSubscription>> GetExactRequirementsAsync(
+            string channel,
+            CancellationToken cancellationToken
+        ) =>
+            ValueTask.FromResult(
+                _exactRequirements.GetValueOrDefault(channel)
+                    ?? (IReadOnlyList<EventSubExactSubscription>)[]
+            );
+
+        public ValueTask<EventSubSubscriptionSetupOutcome> CreateExactSubscriptionAsync(
+            string channel,
+            BotAccount account,
+            EventSubExactSubscription subscription,
+            CancellationToken cancellationToken
+        )
+        {
+            if (!_exactCreations.TryGetValue(channel, out var creations))
+            {
+                creations = [];
+                _exactCreations[channel] = creations;
+            }
+            var subscriptionId = $"exact-{channel}-{creations.Count + 1}";
+            creations.Add((subscription, subscriptionId));
+            return _exactCreateScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
+                ? scripts.Dequeue()(cancellationToken)
+                : ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
+                    new EventSubSubscriptionSetupOutcome.Created(
+                        new ActiveEventSubSubscription
+                        {
+                            Channel = channel,
+                            SubscriptionId = subscriptionId,
+                            BotLogin = account.Login,
+                            Authorization = EventSubAuthorizationContext.ConfiguredBotAuthority,
+                            Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
+                        }
+                    )
+                );
         }
 
         public ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(

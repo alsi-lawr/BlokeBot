@@ -54,10 +54,14 @@ public sealed class PluginFeatureDeclarationRegistry
     : IPluginFeatureDeclarationProvider,
         IPluginFeatureDeclarationPublisher
 {
+    private readonly IPluginDispatchSnapshotSink? _dispatch;
     private readonly object _sync = new();
     private PluginFeatureDeclarationSnapshot _current = PluginFeatureDeclarationSnapshot.Empty;
     private TaskCompletionSource<PluginDeclarationChangeVersion> _change = NewChangeCompletion();
     private long _version;
+
+    public PluginFeatureDeclarationRegistry(IPluginDispatchSnapshotSink? dispatch = null) =>
+        _dispatch = dispatch;
 
     public PluginFeatureDeclarationSnapshot Current => Volatile.Read(ref _current);
 
@@ -104,6 +108,7 @@ public sealed class PluginFeatureDeclarationRegistry
                         .SetItem(manifest.Manifest.Id, declaration)
                 )
             );
+            _dispatch?.PublishDeclaration(declaration);
             NotifyLocked();
         }
     }
@@ -124,6 +129,7 @@ public sealed class PluginFeatureDeclarationRegistry
                 ref _current,
                 new(_current.Declarations.ToImmutableDictionary().Remove(pluginId))
             );
+            _dispatch?.RemoveDeclaration(pluginId, fence);
             NotifyLocked();
         }
     }

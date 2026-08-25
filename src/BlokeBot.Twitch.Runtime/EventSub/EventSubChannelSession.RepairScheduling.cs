@@ -153,9 +153,9 @@ internal sealed partial class EventSubChannelSession
         }
 
         foreach (
-            var operation in _operationSubscriptionKinds.Select(kind =>
-                GetOperationState(subscription, kind)
-            )
+            var operation in _operationSubscriptionKinds
+                .Select(kind => GetOperationState(subscription, kind))
+                .Concat(subscription.ExactSubscriptions.Values)
         )
         {
             var active = operation switch

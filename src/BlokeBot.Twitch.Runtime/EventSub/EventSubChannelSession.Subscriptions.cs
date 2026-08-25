@@ -227,6 +227,23 @@ internal sealed partial class EventSubChannelSession
                     _subscriptions[channel] = active;
                 }
 
+                var exactSubscriptions = await ReconcileExactSubscriptionsAsync(
+                    channel,
+                    active,
+                    context,
+                    cancellationToken
+                );
+                if (exactSubscriptions.Outcome is { } exactSubscriptionFailure)
+                {
+                    return exactSubscriptionFailure;
+                }
+
+                active = exactSubscriptions.Subscription;
+                lock (_gate)
+                {
+                    _subscriptions[channel] = active;
+                }
+
                 switch (active.Readiness)
                 {
                     case EventSubSubscriptionReadiness.PendingStartupDelivery:
@@ -553,6 +570,17 @@ internal sealed partial class EventSubChannelSession
             {
                 return operationFailure;
             }
+        }
+
+        var exactDeletion = await DeleteExactSubscriptionsAsync(
+            subscription,
+            context,
+            cancellationToken
+        );
+        subscription = exactDeletion.Subscription;
+        if (exactDeletion.Outcome is { } exactFailure)
+        {
+            return exactFailure;
         }
 
         var outcome = await RunPhaseAsync(

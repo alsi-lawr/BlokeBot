@@ -38,8 +38,15 @@ public abstract record PluginInvocationContext
             PluginInvocationContextKind.Installation;
     }
 
-    public sealed record Channel(PluginInstallationIdentity Plugin, PluginHostId Host)
-        : PluginInvocationContext
+    public sealed record Channel(
+        PluginInstallationIdentity Plugin,
+        PluginHostId Host,
+        PluginActorContext? Actor = null,
+        PluginStreamContext? Stream = null,
+        PluginCommandInvocation? Command = null,
+        PluginEventInvocation? Event = null,
+        PluginScheduleInvocation? Schedule = null
+    ) : PluginInvocationContext
     {
         [JsonIgnore]
         public override PluginInvocationContextKind Kind => PluginInvocationContextKind.Channel;
@@ -79,6 +86,32 @@ public abstract record PluginInvocationContext
         public override PluginInvocationContextKind Kind => PluginInvocationContextKind.Page;
     }
 }
+
+public sealed record PluginActorContext(
+    string Login,
+    string DisplayName,
+    string? TwitchUserId,
+    bool IsBroadcaster,
+    bool IsModerator,
+    bool IsSubscriber
+);
+
+public sealed record PluginStreamContext(string? StreamId, bool IsLive);
+
+public sealed record PluginCommandInvocation(string Route, IReadOnlyList<string> Arguments);
+
+public sealed record PluginEventInvocation(
+    PluginEventHandlerId HandlerId,
+    string Source,
+    string EventId,
+    DateTimeOffset OccurredAtUtc
+);
+
+public sealed record PluginScheduleInvocation(
+    PluginScheduleHandlerId HandlerId,
+    Guid ScheduleId,
+    DateTimeOffset DueAtUtc
+);
 
 internal sealed class PluginHostIdJsonConverter : JsonConverter<PluginHostId>
 {

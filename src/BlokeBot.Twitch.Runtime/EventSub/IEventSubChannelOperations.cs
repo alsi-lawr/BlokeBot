@@ -17,6 +17,18 @@ internal interface IEventSubChannelOperations
         EventSubOperationSubscriptionKind? operationKind = null
     );
 
+    ValueTask<IReadOnlyList<EventSubExactSubscription>> GetExactRequirementsAsync(
+        string channel,
+        CancellationToken cancellationToken
+    );
+
+    ValueTask<EventSubSubscriptionSetupOutcome> CreateExactSubscriptionAsync(
+        string channel,
+        BotAccount account,
+        EventSubExactSubscription subscription,
+        CancellationToken cancellationToken
+    );
+
     ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
         string channel,
         EventSubOperationSubscriptionKind kind,

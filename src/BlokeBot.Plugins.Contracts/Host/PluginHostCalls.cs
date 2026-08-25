@@ -68,4 +68,10 @@ public interface IPluginHostModule
         PluginHostCall call,
         CancellationToken cancellationToken
     );
+
+    ValueTask<PluginHostCallOutcome> InvokeAsync(
+        PluginWorkerInvocationIdentity identity,
+        PluginHostCall call,
+        CancellationToken cancellationToken
+    ) => InvokeAsync(call, cancellationToken);
 }

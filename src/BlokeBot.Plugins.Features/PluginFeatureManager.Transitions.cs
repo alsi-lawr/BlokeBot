@@ -127,6 +127,15 @@ public sealed partial class PluginFeatureManager
         {
             return Completed(Rejected(PluginFeatureEnableRejectionCode.MissingCoreDependency));
         }
+        var reservationOutcome = commandActivation?.Reserve(key, feature);
+        if (reservationOutcome is PluginCommandActivationReservationOutcome.Rejected)
+        {
+            return Completed(Rejected(PluginFeatureEnableRejectionCode.CommandRouteCollision));
+        }
+        await using var commandReservation = reservationOutcome
+            is PluginCommandActivationReservationOutcome.Reserved reserved
+            ? reserved.Reservation
+            : null;
         if (!PluginFeatureGeneration.TryNext(current?.Generation, out var generation))
         {
             return Completed(Rejected(PluginFeatureEnableRejectionCode.GenerationExhausted));
@@ -185,8 +194,13 @@ public sealed partial class PluginFeatureManager
         {
             return (new PluginFeatureDisableOutcome.AlreadyDisabled(current), null);
         }
+        if (work is not null)
+        {
+            await work.CancelAndDrainAsync(current, cancellationToken);
+        }
         if (!PluginFeatureGeneration.TryNext(current.Generation, out var generation))
         {
+            work?.Resume(current);
             return (new PluginFeatureDisableOutcome.GenerationExhausted(), null);
         }
 
@@ -199,6 +213,7 @@ public sealed partial class PluginFeatureManager
         var written = await store.WriteFeatureStateAsync(current, next, cancellationToken);
         if (written is PluginFeatureStateStoreWriteOutcome.Conflict conflict)
         {
+            work?.Resume(current);
             return (new PluginFeatureDisableOutcome.Conflict(conflict.Current), null);
         }
 

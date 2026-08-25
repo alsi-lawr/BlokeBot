@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal abstract record EventSubNotification
+internal abstract partial record EventSubNotification
 {
     private EventSubNotification() { }
 

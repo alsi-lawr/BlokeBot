@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace BlokeBot.Twitch.Runtime;
 
 internal enum EventSubChannelReconciliationTarget
@@ -92,6 +94,12 @@ internal sealed record ActiveEventSubSubscription
 
     internal EventSubOperationSubscriptionState AutomationChatNotificationSubscriptions { get; init; } =
         new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal ImmutableDictionary<
+        EventSubExactSubscription,
+        EventSubOperationSubscriptionState
+    > ExactSubscriptions { get; init; } =
+        ImmutableDictionary<EventSubExactSubscription, EventSubOperationSubscriptionState>.Empty;
 }
 
 internal enum EventSubOperationSubscriptionKind

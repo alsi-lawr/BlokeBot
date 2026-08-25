@@ -166,7 +166,8 @@ public static partial class BlokeBotApplication
                 .AddCommandModule<RequestBoardCommandModule>()
                 .AddCommandModule<PlayQueueCommandModule>()
                 .AddCommandModule<MomentCommandModule>()
-                .AddCommandModule<CustomCommandModule>();
+                .AddCommandModule<CustomCommandModule>()
+                .AddCommandModule<PluginCommandModule>();
         }
         else
         {

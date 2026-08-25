@@ -57,6 +57,8 @@ public interface ITwitchEventAutomationObserver
     Task PredictionChangedAsync(EventSubPredictionEvent prediction, CancellationToken cancellation);
 }
 
+public interface IPluginTwitchEventObserver : ITwitchEventAutomationObserver;
+
 /// <summary>
 /// Answers whether a channel currently needs an automation EventSub subscription group. The
 /// automation feature owner implements this so subscription lifecycle follows host connections and

@@ -35,6 +35,22 @@ public sealed record PluginWorkerCancellationId
         );
 }
 
+[JsonConverter(typeof(PluginProtocolIdentifierJsonConverter<PluginActivationOperationId>))]
+public sealed record PluginActivationOperationId
+    : PluginProtocolIdentifier,
+        IPluginProtocolIdentifier<PluginActivationOperationId>
+{
+    private PluginActivationOperationId(Guid value)
+        : base(value) { }
+
+    public static bool TryCreate(Guid candidate, out PluginActivationOperationId identifier) =>
+        PluginProtocolIdentifierFactory.TryCreate(
+            candidate,
+            static value => new PluginActivationOperationId(value),
+            out identifier
+        );
+}
+
 [JsonConverter(typeof(PluginWorkerGenerationJsonConverter))]
 public sealed record PluginWorkerGeneration
 {
@@ -49,6 +65,27 @@ public sealed record PluginWorkerGeneration
         return valid;
     }
 }
+
+[JsonConverter(typeof(PluginFeatureActivationGenerationJsonConverter))]
+public sealed record PluginFeatureActivationGeneration
+{
+    private PluginFeatureActivationGeneration(ulong value) => Value = value;
+
+    public ulong Value { get; }
+
+    public static bool TryCreate(ulong candidate, out PluginFeatureActivationGeneration generation)
+    {
+        var valid = candidate is > 0 and <= long.MaxValue;
+        generation = valid ? new(candidate) : null!;
+        return valid;
+    }
+}
+
+public sealed record PluginActivationFence(
+    PluginActivationOperationId OperationId,
+    PluginWorkerGeneration WorkerGeneration,
+    PluginFeatureActivationGeneration FeatureGeneration
+);
 
 [JsonConverter(typeof(PluginWorkerDeadlineJsonConverter))]
 public sealed record PluginWorkerDeadline
@@ -90,6 +127,27 @@ internal sealed class PluginWorkerGenerationJsonConverter : JsonConverter<Plugin
     public override void Write(
         Utf8JsonWriter writer,
         PluginWorkerGeneration value,
+        JsonSerializerOptions options
+    ) => writer.WriteNumberValue(value.Value);
+}
+
+internal sealed class PluginFeatureActivationGenerationJsonConverter
+    : JsonConverter<PluginFeatureActivationGeneration>
+{
+    public override PluginFeatureActivationGeneration Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options
+    ) =>
+        reader.TokenType == JsonTokenType.Number
+        && reader.TryGetUInt64(out var candidate)
+        && PluginFeatureActivationGeneration.TryCreate(candidate, out var generation)
+            ? generation
+            : throw new JsonException("Invalid plugin feature activation generation.");
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        PluginFeatureActivationGeneration value,
         JsonSerializerOptions options
     ) => writer.WriteNumberValue(value.Value);
 }
