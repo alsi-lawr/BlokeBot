@@ -22,5 +22,6 @@ public sealed class PluginPrivateDataOptions
             DataSource = DatabasePath(pluginId),
             Mode = SqliteOpenMode.ReadWriteCreate,
             Pooling = false,
+            ForeignKeys = true,
         }.ToString();
 }

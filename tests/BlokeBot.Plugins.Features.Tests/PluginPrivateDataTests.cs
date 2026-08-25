@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Contracts.Testing;
 using BlokeBot.Plugins.Runtime;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -89,6 +90,135 @@ public sealed class PluginPrivateDataTests
             )
         ).ShouldBeOfType<PluginSqliteOutcome.Rows>();
         Value(retained).ShouldBe("first");
+    }
+
+    [Test]
+    public async Task PrivateConnection_RejectsDatabaseAndFileEscapeBeforeAnyStatementRuns()
+    {
+        await using var root = new TemporaryPrivateDataRoot();
+        var store = root.Store();
+        var first = Identity("community.first", hostId: 11);
+        var second = Identity("community.second", hostId: 22);
+        var none = new PluginValue.Map([]);
+        _ = await store.ExecuteAsync(
+            second,
+            "CREATE TABLE entries (value TEXT NOT NULL);",
+            none,
+            CancellationToken.None
+        );
+        _ = await store.ExecuteAsync(
+            second,
+            "INSERT INTO entries (value) VALUES ('safe');",
+            none,
+            CancellationToken.None
+        );
+
+        var attach = await store.ExecuteAsync(
+            first,
+            "ATTACH DATABASE $path AS victim; UPDATE victim.entries SET value = 'changed';",
+            Parameters(("path", new PluginValue.String(root.DatabasePath(second.Plugin.PluginId)))),
+            CancellationToken.None
+        );
+        attach
+            .ShouldBeOfType<PluginSqliteOutcome.Rejected>()
+            .Code.ShouldBe(PluginSqliteRejectionCode.InvalidStatement);
+
+        var export = Path.Combine(root.RootPath, "escaped.db");
+        var vacuum = await store.ExecuteAsync(
+            first,
+            "VACUUM INTO $path;",
+            Parameters(("path", new PluginValue.String(export))),
+            CancellationToken.None
+        );
+        vacuum
+            .ShouldBeOfType<PluginSqliteOutcome.Rejected>()
+            .Code.ShouldBe(PluginSqliteRejectionCode.InvalidStatement);
+        File.Exists(export).ShouldBeFalse();
+
+        var mixed = await store.ExecuteAsync(
+            first,
+            "CREATE TABLE escaped (value TEXT); ATTACH DATABASE $path AS victim;",
+            Parameters(("path", new PluginValue.String(root.DatabasePath(second.Plugin.PluginId)))),
+            CancellationToken.None
+        );
+        mixed
+            .ShouldBeOfType<PluginSqliteOutcome.Rejected>()
+            .Code.ShouldBe(PluginSqliteRejectionCode.InvalidStatement);
+        var safeMultiple = await store.ExecuteAsync(
+            first,
+            "CREATE TABLE first (value TEXT); CREATE TABLE second (value TEXT);",
+            none,
+            CancellationToken.None
+        );
+        safeMultiple
+            .ShouldBeOfType<PluginSqliteOutcome.Rejected>()
+            .Code.ShouldBe(PluginSqliteRejectionCode.InvalidStatement);
+
+        var victim = (
+            await store.QueryAsync(
+                second,
+                "SELECT value FROM entries;",
+                none,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginSqliteOutcome.Rows>();
+        Value(victim).ShouldBe("safe");
+        var escapedTables = (
+            await store.QueryAsync(
+                first,
+                "SELECT name FROM sqlite_schema WHERE type = 'table' AND name IN ('escaped', 'first', 'second');",
+                none,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginSqliteOutcome.Rows>();
+        escapedTables.Values.ShouldBeEmpty();
+
+        _ = (
+            await store.ExecuteAsync(
+                first,
+                "CREATE TABLE own_data (host_id INTEGER NOT NULL, value TEXT NOT NULL);",
+                none,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginSqliteOutcome.Changed>();
+        _ = (
+            await store.ExecuteAsync(
+                first,
+                "INSERT INTO own_data (host_id, value) VALUES ($host, $value);",
+                Parameters(
+                    ("host", new PluginValue.Number(first.Host.Value)),
+                    ("value", new PluginValue.String("normal"))
+                ),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginSqliteOutcome.Changed>();
+        var own = (
+            await store.QueryAsync(
+                first,
+                "SELECT value FROM own_data WHERE host_id = $host;",
+                Parameters(("host", new PluginValue.Number(first.Host.Value))),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginSqliteOutcome.Rows>();
+        Value(own).ShouldBe("normal");
+
+        var database = root.DatabasePath(first.Plugin.PluginId);
+        await using (var direct = new SqliteConnection($"Data Source={database}"))
+        {
+            await direct.OpenAsync();
+            await using var create = direct.CreateCommand();
+            create.CommandText = "CREATE VIRTUAL TABLE external_search USING fts5(value);";
+            _ = await create.ExecuteNonQueryAsync();
+        }
+        var virtualTable = await store.QueryAsync(
+            first,
+            "SELECT value FROM external_search;",
+            none,
+            CancellationToken.None
+        );
+        virtualTable
+            .ShouldBeOfType<PluginSqliteOutcome.Rejected>()
+            .Code.ShouldBe(PluginSqliteRejectionCode.InvalidStatement);
     }
 
     [Test]
@@ -411,18 +541,19 @@ public sealed class PluginPrivateDataTests
 
     private sealed class TemporaryPrivateDataRoot : IAsyncDisposable
     {
-        private readonly string _path = Path.Combine(
-            Path.GetTempPath(),
-            $"blokebot-private-data-{Guid.NewGuid():N}"
-        );
+        internal string RootPath { get; } =
+            Path.Combine(Path.GetTempPath(), $"blokebot-private-data-{Guid.NewGuid():N}");
 
-        internal PluginPrivateDataStore Store() => new(new(_path));
+        internal string DatabasePath(PluginId pluginId) =>
+            Path.Combine(RootPath, pluginId.Value, "private.db");
+
+        internal PluginPrivateDataStore Store() => new(new(RootPath));
 
         public ValueTask DisposeAsync()
         {
-            if (Directory.Exists(_path))
+            if (Directory.Exists(RootPath))
             {
-                Directory.Delete(_path, recursive: true);
+                Directory.Delete(RootPath, recursive: true);
             }
             return ValueTask.CompletedTask;
         }

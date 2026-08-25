@@ -154,6 +154,14 @@ public sealed partial class PluginPrivateDataStore(PluginPrivateDataOptions opti
         CancellationToken cancellationToken
     )
     {
+        if (
+            PluginPrivateDataConnectionGuard.ValidateStatement(connection, sql)
+            == PluginPrivateStatementValidation.Restricted
+        )
+        {
+            return Rejected(PluginSqliteRejectionCode.InvalidStatement);
+        }
+
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.CommandTimeout = 5;
@@ -175,9 +183,13 @@ public sealed partial class PluginPrivateDataStore(PluginPrivateDataOptions opti
         {
             throw;
         }
-        catch (SqliteException)
+        catch (SqliteException exception)
         {
-            return Rejected(PluginSqliteRejectionCode.StatementFailed);
+            return Rejected(
+                exception.SqliteErrorCode == SQLitePCL.raw.SQLITE_AUTH
+                    ? PluginSqliteRejectionCode.InvalidStatement
+                    : PluginSqliteRejectionCode.StatementFailed
+            );
         }
     }
 
@@ -190,6 +202,7 @@ public sealed partial class PluginPrivateDataStore(PluginPrivateDataOptions opti
         _ = Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var connection = new SqliteConnection(options.ConnectionString(pluginId));
         await connection.OpenAsync(cancellationToken);
+        PluginPrivateDataConnectionGuard.Apply(connection);
         return connection;
     }
 
