@@ -1,5 +1,5 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +9,7 @@ namespace BlokeBot.Core.Features.PublicChat;
 internal sealed class EfPublicChatPinStore(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider timeProvider,
-    EventBus<AppEventKind> events
+    DurableAlertService alerts
 ) : IPublicChatPinStore
 {
     public async ValueTask<PublicChatPinWorkItem?> TryClaimAsync(
@@ -77,6 +77,7 @@ internal sealed class EfPublicChatPinStore(
             return;
         }
 
+        DurableAlertPendingChange? alertChange = null;
         operation.CompletedAtUtc = UtcNow();
         switch (outcome)
         {
@@ -103,7 +104,7 @@ internal sealed class EfPublicChatPinStore(
                 operation.Status = PublicChatPinOperationStatus.Terminal;
                 operation.Outcome = terminal.Reason;
                 await RecordAutomaticRaidPartialFailureAsync(db, item, cancellationToken);
-                await AddAlertAsync(db, item, terminal.Reason, cancellationToken);
+                alertChange = await StageAlertAsync(db, item, terminal.Reason, cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException("Unknown public chat pin outcome.");
@@ -111,9 +112,9 @@ internal sealed class EfPublicChatPinStore(
 
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        if (outcome is PublicChatPinExecutionOutcome.Terminal)
+        if (alertChange is not null)
         {
-            _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+            await alerts.PublishCommittedAsync(alertChange);
         }
     }
 
@@ -200,7 +201,7 @@ internal sealed class EfPublicChatPinStore(
             )
             .ExecuteDeleteAsync(cancellationToken);
 
-    private async Task AddAlertAsync(
+    private Task<DurableAlertPendingChange> StageAlertAsync(
         BlokeBotDbContext db,
         PublicChatPinWorkItem item,
         string reason,
@@ -212,38 +213,22 @@ internal sealed class EfPublicChatPinStore(
             ? AutomaticRaidDeliveryCorrelation.AlertSource
             : "public-chat-pin";
         var sourceKey = automaticRaid ? item.ReplyKey : $"{item.Id}:{reason}";
-        if (
-            await db.DurableAlerts.AnyAsync(
-                alert =>
-                    alert.HostId == item.HostId
-                    && alert.Source == source
-                    && alert.SourceKey == sourceKey
-                    && alert.AcknowledgedAtUtc == null,
-                cancellationToken
-            )
-        )
-        {
-            return;
-        }
-
-        _ = db.DurableAlerts.Add(
-            new DurableAlert
-            {
-                HostId = item.HostId,
-                Severity = DurableAlertSeverity.Warning,
-                Source = source,
-                SourceKey = sourceKey,
-                Title = automaticRaid switch
+        return alerts.StageReportAsync(
+            db,
+            new DurableAlertReport(
+                new DurableAlertIdentity(item.HostId, source, sourceKey),
+                DurableAlertSeverity.Warning,
+                automaticRaid switch
                 {
                     true => "Automatic raid shoutout pin failed",
                     false when item.IsUnpin => "Chat pin reset failed",
                     _ => "Chat reply pin failed",
                 },
-                Message =
-                    $"Twitch could not complete the chat pin operation ({reason}). Check the bot moderator role and reconnect its account if the required scope is missing.",
-                LinkPath = "/channel/setup",
-                CreatedAtUtc = UtcNow(),
-            }
+                $"Twitch could not complete the chat pin operation ({reason}). Check the bot moderator role and reconnect its account if the required scope is missing.",
+                "/channel/setup",
+                UtcNow()
+            ),
+            cancellationToken
         );
     }
 

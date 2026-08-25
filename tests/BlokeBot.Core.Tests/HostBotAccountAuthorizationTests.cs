@@ -1,9 +1,11 @@
 using System.Data.Common;
 using System.Net;
 using System.Text;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Identity;
+using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -263,11 +265,38 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task UnprotectFailure_LoadingCustomBot_DisablesCredentialsAndRaisesAlert()
+    public async Task UnprotectFailure_LoadingCustomBot_DisablesCredentialsAndRefreshesBadgeAfterCommit()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        var events = TestEventBus.Create<AppEventKind>();
+        var alertNotifications = 0;
+        var committedStateObserved = false;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.CustomBotCredentialAlert.BadgeRefresh"),
+            async (_, cancellationToken) =>
+            {
+                await using var observed = await dbFactory.CreateDbContextAsync(cancellationToken);
+                var observedSettings = await observed.HostBotAccountSettings.SingleAsync(
+                    cancellationToken
+                );
+                var observedHost = await observed.Hosts.SingleAsync(cancellationToken);
+                alertNotifications++;
+                committedStateObserved =
+                    !observedSettings.OverrideEnabled
+                    && observedHost.BotRuntimeState == BotChannelRuntimeState.Stopped
+                    && await observed.DurableAlerts.CountAsync(
+                        alert => alert.AcknowledgedAtUtc == null,
+                        cancellationToken
+                    ) == 1;
+            }
+        );
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            events: events
+        );
         await service.UseCustomBotAsync(hostId, CancellationToken.None);
         await AuthorizeCustomBotAsync(service, hostId);
         await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
@@ -294,6 +323,8 @@ public sealed class HostBotAccountAuthorizationTests
         host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
         alert.Source.ShouldBe(CustomBotCredentialAlert.Source);
         alert.SourceKey.ShouldBe(CustomBotCredentialAlert.SourceKey);
+        alertNotifications.ShouldBe(1);
+        committedStateObserved.ShouldBeTrue();
     }
 
     [Test]
@@ -675,7 +706,8 @@ public sealed class HostBotAccountAuthorizationTests
         HostBotAccountHttpClientFactory? httpClientFactory = null,
         bool includeFollowRead = false,
         bool includeAnnouncementManagement = false,
-        HostedChannelRuntimeTransitionService? runtimeTransitions = null
+        HostedChannelRuntimeTransitionService? runtimeTransitions = null,
+        EventBus<AppEventKind>? events = null
     )
     {
         httpClientFactory ??= new HostBotAccountHttpClientFactory();
@@ -709,7 +741,8 @@ public sealed class HostBotAccountAuthorizationTests
             httpClientFactory,
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
-        var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
+        events ??= TestEventBus.Create<AppEventKind>();
+        var changes = new HostedChannelChangeNotifier(events);
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),
@@ -725,7 +758,8 @@ public sealed class HostBotAccountAuthorizationTests
                 ),
             changes,
             options,
-            runtimeTransitions ?? new HostedChannelRuntimeTransitionService(dbFactory, changes)
+            runtimeTransitions ?? new HostedChannelRuntimeTransitionService(dbFactory, changes),
+            new DurableAlertService(dbFactory, TimeProvider.System, events)
         );
     }
 

@@ -45,6 +45,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.Property(static x => x.Message).HasMaxLength(1000);
             _ = b.Property(static x => x.LinkPath).HasMaxLength(256);
             _ = b.Property(static x => x.AcknowledgedByLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.OccurrenceCount).HasDefaultValue(1);
             _ = b.HasIndex(static x => new { x.HostId, x.AcknowledgedAtUtc });
             _ = b.HasIndex(static x => new
                 {

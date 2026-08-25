@@ -1,5 +1,7 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -9,6 +11,70 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxIntegrationTestBase
 {
+    [Test]
+    public async Task TerminalDelivery_AlertSaveFails_RollsBackOutcomeAndPublishesNothing()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(
+            new FailDurableAlertSaveInterceptor()
+        );
+        await SeedTwoHostsAndOutcomesAsync(database);
+        var now = Utc(12, 0, 0);
+        var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.AutomaticRaidDelivery.AlertRollback"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var outbox = new EfPublicChatOutbox(
+            database,
+            StandardRetryPolicy,
+            StandardLifetimePolicy,
+            StandardRetentionPolicy,
+            Alerts(database, events)
+        );
+        await EnqueueCorrelatedAsync(
+            outbox,
+            now,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum()
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+        _ = (
+            await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
+            outbox
+                .RecordDeliveryOutcomeAsync(
+                    claimed,
+                    new PublicChatDeliveryOutcome.Rejection
+                    {
+                        Reason = new PublicChatRejectionReason.ProviderCode(
+                            new PublicChatProviderRejectionCode("msg_rejected")
+                        ),
+                    },
+                    now.AddSeconds(1),
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.PublicChatOutboxMessages.SingleAsync()).Status.ShouldBe(
+            PublicChatOutboxStatus.Sending
+        );
+        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(value =>
+            value.HostId == 1
+        );
+        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
+        (await verify.DurableAlerts.CountAsync()).ShouldBe(0);
+        notificationCount.ShouldBe(0);
+    }
+
     [Test]
     public async Task CorrelatedRateLimit_DirectRetryExhaustionRecordsRateLimitedAndOneAlert()
     {
@@ -25,7 +91,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             ),
             StandardLifetimePolicy,
             StandardRetentionPolicy,
-            TestEventBus.Create<AppEventKind>()
+            Alerts(database)
         );
         await EnqueueCorrelatedAsync(
             outbox,
@@ -62,7 +128,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             ),
             StandardLifetimePolicy,
             StandardRetentionPolicy,
-            TestEventBus.Create<AppEventKind>()
+            Alerts(database)
         );
         await EnqueueCorrelatedAsync(
             schedulingOutbox,
@@ -89,7 +155,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             ),
             StandardLifetimePolicy,
             StandardRetentionPolicy,
-            TestEventBus.Create<AppEventKind>()
+            Alerts(database)
         );
 
         _ = (
@@ -112,12 +178,22 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         await SeedTwoHostsAndOutcomesAsync(database);
         var now = Utc(12, 0, 0);
         var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.AutomaticRaidDelivery.AlertCommit"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
         var outbox = new EfPublicChatOutbox(
             database,
             StandardRetryPolicy,
             StandardLifetimePolicy,
             StandardRetentionPolicy,
-            events
+            Alerts(database, events)
         );
         var correlation = new PublicChatDeliveryCorrelation(1, "same-provider-message");
         var accepted = await outbox.EnqueueAsync(
@@ -173,6 +249,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         var alert = await verify.DurableAlerts.SingleAsync();
         alert.HostId.ShouldBe(1);
         alert.SourceKey.ShouldBe("same-provider-message");
+        notificationCount.ShouldBe(1);
     }
 
     [Test]
@@ -180,10 +257,21 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedAutomaticPinAsync(database);
+        var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.AutomaticRaidPin.AlertCommit"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
         var store = new EfPublicChatPinStore(
             database,
             new ManualTestTimeProvider(new DateTimeOffset(2026, 7, 29, 12, 0, 0, TimeSpan.Zero)),
-            TestEventBus.Create<AppEventKind>()
+            Alerts(database, events)
         );
         var item = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
 
@@ -207,6 +295,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         operation.Outcome.ShouldBe("permission-denied");
         (await verify.DurableAlerts.CountAsync()).ShouldBe(1);
         (await verify.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
+        notificationCount.ShouldBe(1);
     }
 
     [Test]
@@ -280,8 +369,13 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             StandardRetryPolicy,
             StandardLifetimePolicy,
             StandardRetentionPolicy,
-            TestEventBus.Create<AppEventKind>()
+            Alerts(database)
         );
+
+    private static DurableAlertService Alerts(
+        SqliteBlokeBotDbFactory database,
+        EventBus<AppEventKind>? events = null
+    ) => new(database, TimeProvider.System, events ?? TestEventBus.Create<AppEventKind>());
 
     private static PublicChatDeliveryOutcome RateLimitedPreparationOutcome() =>
         PublicChatDeliveryClassifier.MapPreparationFailure(

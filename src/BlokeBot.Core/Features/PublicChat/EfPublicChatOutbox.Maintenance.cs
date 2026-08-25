@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -6,9 +7,10 @@ namespace BlokeBot.Core.Features.PublicChat;
 
 internal sealed partial class EfPublicChatOutbox
 {
-    private static async Task ExpireUnsentBatchAsync(
+    private async Task ExpireUnsentBatchAsync(
         BlokeBotDbContext db,
         DateTime nowUtc,
+        ICollection<DurableAlertPendingChange> alertChanges,
         CancellationToken cancellationToken
     )
     {
@@ -67,14 +69,20 @@ internal sealed partial class EfPublicChatOutbox
             {
                 continue;
             }
-            _ = await RecordAutomaticRaidTerminalAsync(
-                db,
-                row.DeduplicationKey,
-                row.Id,
-                AutomaticRaidShoutoutResultCode.NotReady,
-                ToDateTimeOffset(nowUtc),
-                cancellationToken
-            );
+            if (
+                await RecordAutomaticRaidTerminalAsync(
+                    db,
+                    row.DeduplicationKey,
+                    row.Id,
+                    AutomaticRaidShoutoutResultCode.NotReady,
+                    ToDateTimeOffset(nowUtc),
+                    cancellationToken
+                ) is
+                { } alertChange
+            )
+            {
+                alertChanges.Add(alertChange);
+            }
         }
         _ = await db.SaveChangesAsync(cancellationToken);
     }
@@ -129,9 +137,10 @@ internal sealed partial class EfPublicChatOutbox
         return expiresAtUtc is { } value ? ToDateTimeOffset(value) : null;
     }
 
-    private static async Task RecoverExpiredAsync(
+    private async Task RecoverExpiredAsync(
         BlokeBotDbContext db,
         DateTime nowUtc,
+        ICollection<DurableAlertPendingChange> alertChanges,
         CancellationToken cancellationToken
     )
     {
@@ -184,14 +193,20 @@ internal sealed partial class EfPublicChatOutbox
             {
                 continue;
             }
-            _ = await RecordAutomaticRaidTerminalAsync(
-                db,
-                row.DeduplicationKey,
-                row.Id,
-                AutomaticRaidShoutoutResultCode.Ambiguous,
-                ToDateTimeOffset(nowUtc),
-                cancellationToken
-            );
+            if (
+                await RecordAutomaticRaidTerminalAsync(
+                    db,
+                    row.DeduplicationKey,
+                    row.Id,
+                    AutomaticRaidShoutoutResultCode.Ambiguous,
+                    ToDateTimeOffset(nowUtc),
+                    cancellationToken
+                ) is
+                { } alertChange
+            )
+            {
+                alertChanges.Add(alertChange);
+            }
         }
         _ = await db
             .PublicChatOutboxMessages.Where(row =>
@@ -229,6 +244,7 @@ internal sealed partial class EfPublicChatOutbox
     private async Task ExhaustConfiguredSafePreSendRetriesAsync(
         BlokeBotDbContext db,
         DateTime nowUtc,
+        ICollection<DurableAlertPendingChange> alertChanges,
         CancellationToken cancellationToken
     )
     {
@@ -268,14 +284,20 @@ internal sealed partial class EfPublicChatOutbox
             {
                 continue;
             }
-            _ = await RecordAutomaticRaidTerminalAsync(
-                db,
-                row.DeduplicationKey,
-                row.Id,
-                SafePreSendExhaustionResult(row.HttpStatusCode),
-                ToDateTimeOffset(nowUtc),
-                cancellationToken
-            );
+            if (
+                await RecordAutomaticRaidTerminalAsync(
+                    db,
+                    row.DeduplicationKey,
+                    row.Id,
+                    SafePreSendExhaustionResult(row.HttpStatusCode),
+                    ToDateTimeOffset(nowUtc),
+                    cancellationToken
+                ) is
+                { } alertChange
+            )
+            {
+                alertChanges.Add(alertChange);
+            }
         }
         _ = await db.SaveChangesAsync(cancellationToken);
     }

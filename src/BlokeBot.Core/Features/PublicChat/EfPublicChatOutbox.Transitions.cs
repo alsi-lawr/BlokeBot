@@ -29,7 +29,7 @@ internal sealed partial class EfPublicChatOutbox
                 return changed;
             }
 
-            var alertCreated = await RecordAutomaticRaidTerminalAsync(
+            var alertChange = await RecordAutomaticRaidTerminalAsync(
                 db,
                 message,
                 automaticRaidResult,
@@ -38,10 +38,7 @@ internal sealed partial class EfPublicChatOutbox
             );
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            if (alertCreated && events is not null)
-            {
-                _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
-            }
+            await PublishCommittedAlertAsync(alertChange);
             return changed;
         }
         catch (Exception exception) when (IsSqliteContention(exception))

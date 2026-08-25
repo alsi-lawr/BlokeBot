@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -6,12 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Alerts;
 
-public sealed class DurableAlertService(
+public sealed partial class DurableAlertService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider timeProvider,
     EventBus<AppEventKind> events
 )
 {
+    private readonly ConcurrentDictionary<DurableAlertIdentity, SemaphoreSlim> _reportGates = new();
+
     public IO<DurableAlertCreateOutcome, Never> Create(
         int hostId,
         DurableAlertSeverity severity,
@@ -23,42 +26,37 @@ public sealed class DurableAlertService(
     ) =>
         IO<DurableAlertCreateOutcome, Never>.Create(async ct =>
         {
-            var normalizedSource = NormalizeRequired(source, nameof(source));
-            var normalizedSourceKey = NormalizeRequired(sourceKey, nameof(sourceKey));
-
-            await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var existing = await db.DurableAlerts.SingleOrDefaultAsync(
-                x =>
-                    x.HostId == hostId
-                    && x.Source == normalizedSource
-                    && x.SourceKey == normalizedSourceKey
-                    && x.AcknowledgedAtUtc == null,
-                ct
+            var report = Report(
+                hostId,
+                severity,
+                source,
+                sourceKey,
+                title,
+                message,
+                linkPath,
+                UtcNow()
             );
-            if (existing is not null)
+            var gate = _reportGates.GetOrAdd(report.Identity, static _ => new SemaphoreSlim(1, 1));
+            await gate.WaitAsync(ct);
+            try
             {
+                report = report with { OccurredAtUtc = UtcNow() };
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+                var change = await StageReportAsync(db, report, ct);
+                _ = await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                await PublishCommittedAsync(change);
                 return Result<DurableAlertCreateOutcome, Never>.Success(
-                    new DurableAlertCreateOutcome.Existing(existing)
+                    change.WasCreated
+                        ? new DurableAlertCreateOutcome.Created(change.Alert)
+                        : new DurableAlertCreateOutcome.Existing(change.Alert)
                 );
             }
-
-            var alert = new DurableAlert
+            finally
             {
-                HostId = hostId,
-                Severity = severity,
-                Source = normalizedSource,
-                SourceKey = normalizedSourceKey,
-                Title = NormalizeRequired(title, nameof(title)),
-                Message = NormalizeRequired(message, nameof(message)),
-                LinkPath = string.IsNullOrWhiteSpace(linkPath) ? null : linkPath.Trim(),
-                CreatedAtUtc = UtcNow(),
-            };
-            _ = db.DurableAlerts.Add(alert);
-            _ = await db.SaveChangesAsync(ct);
-            _ = await events.PublishAsync(AppEventKind.AlertsChanged, ct);
-            return Result<DurableAlertCreateOutcome, Never>.Success(
-                new DurableAlertCreateOutcome.Created(alert)
-            );
+                _ = gate.Release();
+            }
         });
 
     public IO<DurableAlertAcknowledgement, Never> Acknowledge(
@@ -70,30 +68,34 @@ public sealed class DurableAlertService(
         {
             var actor = NormalizeRequired(actorLogin, nameof(actorLogin));
             await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var alert = await db.DurableAlerts.SingleOrDefaultAsync(
-                x => x.HostId == hostId && x.Id == alertId,
+            var acknowledgedAtUtc = UtcNow();
+            var changed = await db
+                .DurableAlerts.Where(alert =>
+                    alert.HostId == hostId && alert.Id == alertId && alert.AcknowledgedAtUtc == null
+                )
+                .ExecuteUpdateAsync(
+                    update =>
+                        update
+                            .SetProperty(alert => alert.AcknowledgedAtUtc, acknowledgedAtUtc)
+                            .SetProperty(alert => alert.AcknowledgedByLogin, actor),
+                    ct
+                );
+            if (changed == 1)
+            {
+                await PublishCommittedAsync();
+                return Result<DurableAlertAcknowledgement, Never>.Success(
+                    new DurableAlertAcknowledgement.Acknowledged()
+                );
+            }
+
+            var exists = await db.DurableAlerts.AnyAsync(
+                alert => alert.HostId == hostId && alert.Id == alertId,
                 ct
             );
-            if (alert is null)
-            {
-                return Result<DurableAlertAcknowledgement, Never>.Success(
-                    new DurableAlertAcknowledgement.NotFound()
-                );
-            }
-
-            if (alert.AcknowledgedAtUtc is not null)
-            {
-                return Result<DurableAlertAcknowledgement, Never>.Success(
-                    new DurableAlertAcknowledgement.AlreadyAcknowledged()
-                );
-            }
-
-            alert.AcknowledgedAtUtc = UtcNow();
-            alert.AcknowledgedByLogin = actor;
-            _ = await db.SaveChangesAsync(ct);
-            _ = await events.PublishAsync(AppEventKind.AlertsChanged, ct);
             return Result<DurableAlertAcknowledgement, Never>.Success(
-                new DurableAlertAcknowledgement.Acknowledged()
+                exists
+                    ? new DurableAlertAcknowledgement.AlreadyAcknowledged()
+                    : new DurableAlertAcknowledgement.NotFound()
             );
         });
 
@@ -101,7 +103,7 @@ public sealed class DurableAlertService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db.DurableAlerts.CountAsync(
-            x => x.HostId == hostId && x.AcknowledgedAtUtc == null,
+            alert => alert.HostId == hostId && alert.AcknowledgedAtUtc == null,
             ct
         );
     }
@@ -111,34 +113,31 @@ public sealed class DurableAlertService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var alerts = await db
             .DurableAlerts.AsNoTracking()
-            .Where(x => x.HostId == hostId)
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .Select(x => new DurableAlertItem(
-                x.Id,
-                x.Severity,
-                x.Source,
-                x.SourceKey,
-                x.Title,
-                x.Message,
-                x.LinkPath,
-                x.CreatedAtUtc,
-                x.AcknowledgedAtUtc,
-                x.AcknowledgedByLogin
+            .Where(alert => alert.HostId == hostId)
+            .OrderByDescending(alert => alert.LastOccurredAtUtc)
+            .Select(alert => new DurableAlertItem(
+                alert.Id,
+                alert.Severity,
+                alert.Source,
+                alert.SourceKey,
+                alert.Title,
+                alert.Message,
+                alert.LinkPath,
+                alert.CreatedAtUtc,
+                alert.OccurrenceCount,
+                alert.LastOccurredAtUtc,
+                alert.AcknowledgedAtUtc,
+                alert.AcknowledgedByLogin
             ))
             .ToArrayAsync(ct);
 
         return new DurableAlertState(
-            alerts.Where(x => x.IsActive).ToArray(),
-            alerts.Where(x => !x.IsActive).ToArray()
+            alerts.Where(static alert => alert.IsActive).ToArray(),
+            alerts.Where(static alert => !alert.IsActive).ToArray()
         );
     }
 
     private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
-
-    private static string NormalizeRequired(string value, string parameterName) =>
-        string.IsNullOrWhiteSpace(value)
-            ? throw new ArgumentException("Value is required.", parameterName)
-            : value.Trim();
 }
 
 public abstract record DurableAlertCreateOutcome
@@ -180,6 +179,8 @@ public sealed record DurableAlertItem(
     string Message,
     string? LinkPath,
     DateTime CreatedAtUtc,
+    int OccurrenceCount,
+    DateTime LastOccurredAtUtc,
     DateTime? AcknowledgedAtUtc,
     string? AcknowledgedByLogin
 )

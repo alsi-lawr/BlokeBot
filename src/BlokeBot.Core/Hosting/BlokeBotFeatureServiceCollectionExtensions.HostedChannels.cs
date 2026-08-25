@@ -1,4 +1,5 @@
 using BlokeBot.Core.BotRuntime;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.Page;
@@ -35,6 +36,8 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.TryAddSingleton<DurableAlertService>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         _ = services.AddSingleton<ChannelBotAuthorizationService>();
         _ = services.AddSingleton<HostBotAccountOAuthService>();
         _ = services.AddSingleton<HostBotOAuthStateStore>();

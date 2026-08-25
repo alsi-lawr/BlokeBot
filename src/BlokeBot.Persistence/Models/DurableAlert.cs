@@ -20,6 +20,10 @@ public sealed class DurableAlert
 
     public DateTime CreatedAtUtc { get; set; }
 
+    public int OccurrenceCount { get; set; } = 1;
+
+    public DateTime LastOccurredAtUtc { get; set; }
+
     public DateTime? AcknowledgedAtUtc { get; set; }
 
     public string? AcknowledgedByLogin { get; set; }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -18,7 +19,8 @@ public sealed class HostBotAccountAuthorizationService(
     ITokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
     BotSettings botSettings,
-    HostedChannelRuntimeTransitionService runtimeTransitions
+    HostedChannelRuntimeTransitionService runtimeTransitions,
+    DurableAlertService? alerts = null
 ) : IBotAccountProvider, IHostBotAccountTokenStatusProvider
 {
     private static readonly TimeSpan _refreshSkew = TimeSpan.FromMinutes(1);
@@ -681,9 +683,14 @@ public sealed class HostBotAccountAuthorizationService(
                         ),
                     async failure =>
                     {
-                        await DisableUnusableCredentialsAsync(db, settings, cancellationToken);
+                        var alertChange = await DisableUnusableCredentialsAsync(
+                            db,
+                            settings,
+                            cancellationToken
+                        );
                         _ = mutationGate.Release();
                         mutationGateHeld = false;
+                        await _alertAuthority.PublishCommittedAsync(alertChange);
                         _ = await changes.NotifyChangedAsync(cancellationToken);
                         return new HostBotAccountTokenRefreshOutcome.ProtectionUnavailable(failure);
                     }
@@ -780,6 +787,7 @@ public sealed class HostBotAccountAuthorizationService(
     {
         var mutationGate = CredentialMutationGate(settings.HostId);
         var disabled = false;
+        DurableAlertPendingChange? alertChange = null;
         await mutationGate.WaitAsync(cancellationToken);
         try
         {
@@ -792,7 +800,7 @@ public sealed class HostBotAccountAuthorizationService(
                 return false;
             }
 
-            await DisableUnusableCredentialsAsync(db, settings, cancellationToken);
+            alertChange = await DisableUnusableCredentialsAsync(db, settings, cancellationToken);
             disabled = true;
         }
         finally
@@ -801,11 +809,12 @@ public sealed class HostBotAccountAuthorizationService(
         }
 
         Debug.Assert(disabled, "The unusable custom-bot credentials must be disabled.");
+        await _alertAuthority.PublishCommittedAsync(alertChange!);
         _ = await changes.NotifyChangedAsync(cancellationToken);
         return true;
     }
 
-    private async Task DisableUnusableCredentialsAsync(
+    private async Task<DurableAlertPendingChange> DisableUnusableCredentialsAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         CancellationToken cancellationToken
@@ -817,37 +826,36 @@ public sealed class HostBotAccountAuthorizationService(
         ClearAuthorization(settings);
         settings.UpdatedAtUtc = now;
 
-        var alertExists = await db.DurableAlerts.AnyAsync(
-            value =>
-                value.HostId == settings.HostId
-                && value.Source == CustomBotCredentialAlert.Source
-                && value.SourceKey == CustomBotCredentialAlert.SourceKey
-                && value.AcknowledgedAtUtc == null,
+        var alertChange = await _alertAuthority.StageReportAsync(
+            db,
+            new DurableAlertReport(
+                new DurableAlertIdentity(
+                    settings.HostId,
+                    CustomBotCredentialAlert.Source,
+                    CustomBotCredentialAlert.SourceKey
+                ),
+                DurableAlertSeverity.Warning,
+                CustomBotCredentialAlert.Title,
+                CustomBotCredentialAlert.Message,
+                CustomBotCredentialAlert.LinkPath,
+                now
+            ),
             cancellationToken
         );
-        if (!alertExists)
-        {
-            _ = db.DurableAlerts.Add(
-                new DurableAlert
-                {
-                    HostId = settings.HostId,
-                    Severity = DurableAlertSeverity.Warning,
-                    Source = CustomBotCredentialAlert.Source,
-                    SourceKey = CustomBotCredentialAlert.SourceKey,
-                    Title = CustomBotCredentialAlert.Title,
-                    Message = CustomBotCredentialAlert.Message,
-                    LinkPath = CustomBotCredentialAlert.LinkPath,
-                    CreatedAtUtc = now,
-                }
-            );
-        }
 
         await runtimeTransitions.CommitCredentialPolicyStopAsync(
             db,
             settings.HostId,
             cancellationToken
         );
+        return alertChange;
     }
+
+    private DurableAlertService _alertAuthority =>
+        alerts
+        ?? throw new InvalidOperationException(
+            "Credential policy stops require the durable alert authority."
+        );
 
     private async Task RefreshProfileMetadataAsync(
         BlokeBotDbContext db,

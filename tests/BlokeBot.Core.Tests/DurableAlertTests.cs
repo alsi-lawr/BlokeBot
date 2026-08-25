@@ -90,7 +90,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task RepeatedPublicChatQueueIncident_Observing_PersistsAndNotifiesOnce()
+    public async Task RepeatedPublicChatQueueIncident_Observing_RefreshesOneAlertAndNotifiesEachCommit()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -128,8 +128,9 @@ public sealed class DurableAlertTests
         stored.Severity.ShouldBe(DurableAlertSeverity.Warning);
         stored.Source.ShouldBe("twitch-outbound-queue");
         stored.SourceKey.ShouldStartWith("streamer:");
+        stored.OccurrenceCount.ShouldBe(2);
         stored.AcknowledgedAtUtc.ShouldBeNull();
-        notificationCount.ShouldBe(1);
+        notificationCount.ShouldBe(2);
     }
 
     [Test]

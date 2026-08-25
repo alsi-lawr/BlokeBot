@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using BlokeBot.Eventing;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +11,7 @@ internal sealed partial class EfPublicChatOutbox(
     PublicChatRetryPolicy retryPolicy,
     PublicChatDeliveryLifetimePolicy lifetimePolicy,
     PublicChatTerminalRetentionPolicy retentionPolicy,
-    EventBus<AppEventKind>? events = null
+    DurableAlertService? alerts = null
 ) : IPublicChatOutbox
 {
     private static readonly TimeSpan _claimAvailabilityPoll = TimeSpan.FromMilliseconds(250);

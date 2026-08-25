@@ -2714,6 +2714,8 @@ internal sealed class SimulationFixtureSeeder(
                 Title = "Chat connection restored",
                 Message = "Queued messages resumed after the connection recovered.",
                 CreatedAtUtc = now.AddHours(-2),
+                OccurrenceCount = 1,
+                LastOccurredAtUtc = now.AddHours(-2),
                 AcknowledgedAtUtc = now.AddHours(-1).AddMinutes(-45),
                 AcknowledgedByLogin = FakeTwitch
                     .FakeTwitchScenarioDefinition

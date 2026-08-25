@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -158,6 +159,9 @@ internal sealed partial class EfPublicChatOutbox
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
             var persisted = await db
                 .PublicChatOutboxMessages.AsNoTracking()
                 .Where(row =>
@@ -192,7 +196,7 @@ internal sealed partial class EfPublicChatOutbox
                 };
                 if (expired is PublicChatClaimUpdate.Expired)
                 {
-                    _ = await RecordAutomaticRaidTerminalAsync(
+                    var expiryAlertChange = await RecordAutomaticRaidTerminalAsync(
                         db,
                         message,
                         AutomaticRaidShoutoutResultCode.NotReady,
@@ -200,6 +204,8 @@ internal sealed partial class EfPublicChatOutbox
                         cancellationToken
                     );
                     _ = await db.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    await PublishCommittedAlertAsync(expiryAlertChange);
                 }
                 return expired;
             }
@@ -308,12 +314,13 @@ internal sealed partial class EfPublicChatOutbox
                     $"Unknown public chat safe pre-send retry decision {decision.GetType().Name}."
                 ),
             };
+            DurableAlertPendingChange? alertChange = null;
             if (
                 decision is PublicChatSafePreSendRetryDecision.Exhausted
                 && update is PublicChatClaimUpdate.Applied
             )
             {
-                _ = await RecordAutomaticRaidTerminalAsync(
+                alertChange = await RecordAutomaticRaidTerminalAsync(
                     db,
                     message,
                     SafePreSendExhaustionResult(diagnostic.HttpStatus),
@@ -322,6 +329,8 @@ internal sealed partial class EfPublicChatOutbox
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
             }
+            await transaction.CommitAsync(cancellationToken);
+            await PublishCommittedAlertAsync(alertChange);
             return update;
         }
         catch (Exception exception) when (IsSqliteContention(exception))
@@ -350,6 +359,9 @@ internal sealed partial class EfPublicChatOutbox
         }
 
         await using var expiryDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var expiryTransaction = await expiryDb.Database.BeginTransactionAsync(
+            cancellationToken
+        );
         if (
             await ExpireOwnedClaimAsync(
                 expiryDb,
@@ -359,7 +371,7 @@ internal sealed partial class EfPublicChatOutbox
             ) == 1
         )
         {
-            _ = await RecordAutomaticRaidTerminalAsync(
+            var alertChange = await RecordAutomaticRaidTerminalAsync(
                 expiryDb,
                 message,
                 AutomaticRaidShoutoutResultCode.NotReady,
@@ -367,9 +379,12 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
             _ = await expiryDb.SaveChangesAsync(cancellationToken);
+            await expiryTransaction.CommitAsync(cancellationToken);
+            await PublishCommittedAlertAsync(alertChange);
             return new PublicChatClaimUpdate.Expired();
         }
 
+        await expiryTransaction.RollbackAsync(cancellationToken);
         return await ExecuteStateTransitionAsync(
             (db, ct) =>
                 db
@@ -512,6 +527,9 @@ internal sealed partial class EfPublicChatOutbox
     )
     {
         await using var expiryDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var expiryTransaction = await expiryDb.Database.BeginTransactionAsync(
+            cancellationToken
+        );
         if (
             await ExpireOwnedClaimAsync(
                 expiryDb,
@@ -521,7 +539,7 @@ internal sealed partial class EfPublicChatOutbox
             ) == 1
         )
         {
-            _ = await RecordAutomaticRaidTerminalAsync(
+            var alertChange = await RecordAutomaticRaidTerminalAsync(
                 expiryDb,
                 message,
                 AutomaticRaidShoutoutResultCode.NotReady,
@@ -529,9 +547,12 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
             _ = await expiryDb.SaveChangesAsync(cancellationToken);
+            await expiryTransaction.CommitAsync(cancellationToken);
+            await PublishCommittedAlertAsync(alertChange);
             return new PublicChatClaimUpdate.Expired();
         }
 
+        await expiryTransaction.RollbackAsync(cancellationToken);
         return await ExecuteStateTransitionAsync(
             (db, ct) =>
                 db
@@ -609,7 +630,7 @@ internal sealed partial class EfPublicChatOutbox
                 );
             }
 
-            var alertCreated = await RecordAutomaticRaidTerminalAsync(
+            var alertChange = await RecordAutomaticRaidTerminalAsync(
                 db,
                 message,
                 automaticRaidResult,
@@ -618,10 +639,7 @@ internal sealed partial class EfPublicChatOutbox
             );
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            if (alertCreated && events is not null)
-            {
-                _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
-            }
+            await PublishCommittedAlertAsync(alertChange);
             return new PublicChatClaimUpdate.Applied();
         }
         catch (Exception exception) when (IsSqliteContention(exception))

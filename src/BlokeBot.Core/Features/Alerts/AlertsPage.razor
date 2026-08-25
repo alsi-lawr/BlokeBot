@@ -70,6 +70,14 @@
                                     </div>
                                     <h3 class="mt-3 text-base font-semibold text-slate-950">@alert.Title</h3>
                                     <p class="mt-2 text-sm leading-6 text-slate-700">@alert.Message</p>
+                                    @if (alert.OccurrenceCount > 1)
+                                    {
+                                        <p class="mt-3 text-xs font-medium text-muted-foreground"
+                                           data-alert-occurrence-count="@alert.OccurrenceCount"
+                                           data-alert-last-occurred-at="@SemanticTimestamp(alert.LastOccurredAtUtc)">
+                                            Occurred @alert.OccurrenceCount times · Last seen @FormatTimestamp(alert.LastOccurredAtUtc)
+                                        </p>
+                                    }
                                     <p class="mt-3 text-xs font-medium text-muted-foreground">First seen @FormatTimestamp(alert.CreatedAtUtc)</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2">
@@ -122,6 +130,14 @@
                                     <td data-label="Alert" class="px-5 py-3">
                                         <p class="font-semibold text-slate-950">@alert.Title</p>
                                         <p class="mt-1 text-xs text-muted-foreground">@AlertAreaLabel(alert.Source)</p>
+                                        @if (alert.OccurrenceCount > 1)
+                                        {
+                                            <p class="mt-1 text-xs text-muted-foreground"
+                                               data-alert-occurrence-count="@alert.OccurrenceCount"
+                                               data-alert-last-occurred-at="@SemanticTimestamp(alert.LastOccurredAtUtc)">
+                                                Occurred @alert.OccurrenceCount times · Last seen @FormatTimestamp(alert.LastOccurredAtUtc)
+                                            </p>
+                                        }
                                     </td>
                                     <td data-label="Importance" class="px-5 py-3 text-slate-700">@ImportanceLabel(alert.Severity)</td>
                                     <td data-label="Handled by" class="px-5 py-3 text-slate-700">@alert.AcknowledgedByLogin</td>

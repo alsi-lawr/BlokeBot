@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -22,14 +23,14 @@ internal sealed partial class EfPublicChatOutbox
             ? AutomaticRaidShoutoutResultCode.RateLimited
             : AutomaticRaidShoutoutResultCode.Unexpected;
 
-    private static async Task<bool> RecordAutomaticRaidTerminalAsync(
+    private Task<DurableAlertPendingChange?> RecordAutomaticRaidTerminalAsync(
         BlokeBotDbContext db,
         PublicChatClaimedMessage message,
         AutomaticRaidShoutoutResultCode resultCode,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken
     ) =>
-        await RecordAutomaticRaidTerminalAsync(
+        RecordAutomaticRaidTerminalAsync(
             db,
             message.DeduplicationKey.Value,
             message.Id,
@@ -38,7 +39,7 @@ internal sealed partial class EfPublicChatOutbox
             cancellationToken
         );
 
-    private static async Task<bool> RecordAutomaticRaidTerminalAsync(
+    private async Task<DurableAlertPendingChange?> RecordAutomaticRaidTerminalAsync(
         BlokeBotDbContext db,
         string deduplicationKey,
         long outboxMessageId,
@@ -62,7 +63,7 @@ internal sealed partial class EfPublicChatOutbox
         );
         if (outcome is null)
         {
-            return false;
+            return null;
         }
 
         outcome.Status =
@@ -92,34 +93,44 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
 
-        if (
-            await db.DurableAlerts.AnyAsync(
-                alert =>
-                    alert.HostId == outcome.HostId
-                    && alert.Source == AutomaticRaidDeliveryCorrelation.AlertSource
-                    && alert.SourceKey == outcome.ProviderMessageId
-                    && alert.AcknowledgedAtUtc == null,
-                cancellationToken
-            )
-        )
-        {
-            return false;
-        }
-
-        _ = db.DurableAlerts.Add(
-            new DurableAlert
-            {
-                HostId = outcome.HostId,
-                Severity = DurableAlertSeverity.Warning,
-                Source = AutomaticRaidDeliveryCorrelation.AlertSource,
-                SourceKey = outcome.ProviderMessageId,
-                Title = "Automatic raid shoutout was not delivered",
-                Message =
-                    $"The durable chat delivery ended with {resultCode}. Check the shoutout delivery settings and Twitch connection.",
-                LinkPath = "/raid-collaboration",
-                CreatedAtUtc = completedAt.UtcDateTime,
-            }
+        var alertService =
+            alerts
+            ?? throw new InvalidOperationException(
+                "Automatic raid terminal outcomes require the durable alert authority."
+            );
+        return await alertService.StageReportAsync(
+            db,
+            new DurableAlertReport(
+                new DurableAlertIdentity(
+                    outcome.HostId,
+                    AutomaticRaidDeliveryCorrelation.AlertSource,
+                    outcome.ProviderMessageId
+                ),
+                DurableAlertSeverity.Warning,
+                "Automatic raid shoutout was not delivered",
+                $"The durable chat delivery ended with {resultCode}. Check the shoutout delivery settings and Twitch connection.",
+                "/raid-collaboration",
+                completedAt.UtcDateTime
+            ),
+            cancellationToken
         );
-        return true;
+    }
+
+    private async ValueTask PublishCommittedAlertAsync(DurableAlertPendingChange? change)
+    {
+        if (change is not null)
+        {
+            await alerts!.PublishCommittedAsync(change);
+        }
+    }
+
+    private async ValueTask PublishCommittedAlertsAsync(
+        IEnumerable<DurableAlertPendingChange> changes
+    )
+    {
+        foreach (var change in changes)
+        {
+            await alerts!.PublishCommittedAsync(change);
+        }
     }
 }

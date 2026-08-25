@@ -1,5 +1,5 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.PublicChat;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,6 +10,8 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotPublicChat(this IServiceCollection services)
     {
+        services.TryAddSingleton<DurableAlertService>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddSingleton<IPublicChatOutbox>(
             static serviceProvider => new EfPublicChatOutbox(
                 serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
@@ -18,7 +20,7 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
                 ),
                 serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
                 serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>(),
-                serviceProvider.GetRequiredService<EventBus<AppEventKind>>()
+                serviceProvider.GetRequiredService<DurableAlertService>()
             )
         );
         _ = services.Replace(

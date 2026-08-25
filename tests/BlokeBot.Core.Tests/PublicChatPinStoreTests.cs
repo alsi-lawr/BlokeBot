@@ -1,4 +1,6 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.PublicChat;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -7,6 +9,54 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class PublicChatPinStoreTests
 {
+    [Test]
+    public async Task TerminalPin_AlertSaveFails_RollsBackOperationAndPublishesNothing()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync(
+            new FailDurableAlertSaveInterceptor()
+        );
+        await SeedPinOperationAsync(
+            dbFactory,
+            PublicChatPinOperationStatus.Attempting,
+            GuessRoundStatus.Open,
+            true
+        );
+        var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.PublicChatPin.AlertRollback"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var store = new EfPublicChatPinStore(
+            dbFactory,
+            TimeProvider.System,
+            new DurableAlertService(dbFactory, TimeProvider.System, events)
+        );
+        var item = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
+            store
+                .CompleteAsync(
+                    item,
+                    new PublicChatPinExecutionOutcome.Terminal("permission-denied"),
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.PublicChatPinOperations.SingleAsync()).Status.ShouldBe(
+            PublicChatPinOperationStatus.Attempting
+        );
+        (await verify.DurableAlerts.CountAsync()).ShouldBe(0);
+        notificationCount.ShouldBe(0);
+    }
+
     [Test]
     [Arguments(false, 0)]
     [Arguments(true, 1)]
@@ -364,6 +414,10 @@ public sealed class PublicChatPinStoreTests
         new(
             dbFactory,
             new ManualTestTimeProvider(new DateTimeOffset(2026, 7, 22, 12, 0, 0, TimeSpan.Zero)),
-            TestEventBus.Create<AppEventKind>()
+            new DurableAlertService(
+                dbFactory,
+                TimeProvider.System,
+                TestEventBus.Create<AppEventKind>()
+            )
         );
 }

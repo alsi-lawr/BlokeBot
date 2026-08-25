@@ -87,6 +87,9 @@ public partial class AlertsPage
             ? "n/a"
             : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm", CultureInfo.InvariantCulture);
 
+    private static string SemanticTimestamp(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Utc).ToString("O", CultureInfo.InvariantCulture);
+
     private static string AlertAreaLabel(string source) =>
         source switch
         {
