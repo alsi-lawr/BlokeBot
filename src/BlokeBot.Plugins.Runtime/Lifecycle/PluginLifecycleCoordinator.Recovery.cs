@@ -62,7 +62,7 @@ public sealed partial class PluginLifecycleCoordinator
 
             var previousPackage = await _packages.ResolveAsync(
                 active.Installation,
-                active.Fence.OperationId,
+                active.PackageOperationId,
                 cancellationToken
             );
             if (previousPackage is not PluginLifecyclePackageResolution.Available previous)
@@ -93,6 +93,7 @@ public sealed partial class PluginLifecycleCoordinator
             var activeState = state with
             {
                 SelectedInstallation = active.Installation,
+                SelectedPackageOperationId = active.PackageOperationId,
                 OperationId = active.Fence.OperationId,
                 SelectedGeneration = active.Fence.Generation,
                 Phase = PluginLifecyclePhase.Active,
@@ -112,7 +113,7 @@ public sealed partial class PluginLifecycleCoordinator
     {
         var selected = await _packages.ResolveAsync(
             state.SelectedInstallation,
-            state.OperationId,
+            state.SelectedPackageOperationId,
             cancellationToken
         );
         if (selected is PluginLifecyclePackageResolution.Available available)
@@ -158,7 +159,7 @@ public sealed partial class PluginLifecycleCoordinator
 
         var resolved = await _packages.ResolveAsync(
             state.SelectedInstallation,
-            state.OperationId,
+            state.SelectedPackageOperationId,
             cancellationToken
         );
         if (resolved is PluginLifecyclePackageResolution.Available available)
@@ -201,7 +202,7 @@ public sealed partial class PluginLifecycleCoordinator
 
         var resolved = await _packages.ResolveAsync(
             state.SelectedInstallation,
-            state.OperationId,
+            state.SelectedPackageOperationId,
             cancellationToken
         );
         if (resolved is PluginLifecyclePackageResolution.Available available)
@@ -231,7 +232,7 @@ public sealed partial class PluginLifecycleCoordinator
     {
         var resolved = await _packages.ResolveAsync(
             state.SelectedInstallation,
-            state.OperationId,
+            state.SelectedPackageOperationId,
             cancellationToken
         );
         if (resolved is not PluginLifecyclePackageResolution.Available available)

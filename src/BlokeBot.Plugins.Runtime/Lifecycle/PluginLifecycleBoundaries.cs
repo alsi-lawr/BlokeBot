@@ -5,6 +5,7 @@ namespace BlokeBot.Plugins.Runtime;
 
 public sealed record PluginLifecyclePackage(
     PluginInstallationIdentity Installation,
+    PluginPackageOperationId PackageOperationId,
     PreparedPluginWorkerPackage PreparedPackage,
     string StateRoot,
     IPluginHostCallDispatcher HostCalls,
@@ -28,7 +29,7 @@ public interface IPluginLifecyclePackageResolver
 {
     ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
     );
 }
@@ -117,7 +118,7 @@ internal sealed class UnavailablePluginLifecyclePackageResolver : IPluginLifecyc
 {
     public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
     ) =>
         ValueTask.FromResult<PluginLifecyclePackageResolution>(

@@ -156,8 +156,12 @@ public sealed class PluginMarketplaceApplicationService
             );
         }
 
-        var operationId = PluginLifecycleOperationId.New();
-        var preparation = await _packages.PrepareAsync(entry, operationId, cancellationToken);
+        var packageOperationId = PluginPackageOperationId.New();
+        var preparation = await _packages.PrepareAsync(
+            entry,
+            packageOperationId,
+            cancellationToken
+        );
         if (preparation is PluginMarketplacePackagePreparationOutcome.Rejected rejected)
         {
             var (code, outcomeCode) = rejected.Code switch
@@ -184,26 +188,27 @@ public sealed class PluginMarketplaceApplicationService
         }
 
         var package = ((PluginMarketplacePackagePreparationOutcome.Prepared)preparation).Package;
+        var operationId = PluginLifecycleOperationId.New();
         var lifecycle =
             operation == PluginMarketplaceOperationKind.Update
                 ? await _lifecycle.ReplaceAsync(operationId, package, cancellationToken)
                 : await _lifecycle.ActivateAsync(operationId, package, cancellationToken);
-        if (lifecycle is PluginLifecycleCommandOutcome.Succeeded succeeded)
+        if (lifecycle is PluginLifecycleCommandOutcome.Succeeded)
         {
             await _packages.RetainOnlyAsync(
-                succeeded.View.Installation,
-                succeeded.View.OperationId,
+                package.Installation,
+                package.PackageOperationId,
                 cancellationToken
             );
         }
         else if (
             operation == PluginMarketplaceOperationKind.Update
-            && lifecycle is PluginLifecycleCommandOutcome.Failed failed
+            && lifecycle is PluginLifecycleCommandOutcome.Failed
         )
         {
             await _packages.RetainOnlyAsync(
-                failed.View.Installation,
-                operationId,
+                package.Installation,
+                package.PackageOperationId,
                 cancellationToken
             );
         }
@@ -211,7 +216,7 @@ public sealed class PluginMarketplaceApplicationService
         {
             await _packages.RemoveOperationAsync(
                 package.Installation,
-                operationId,
+                package.PackageOperationId,
                 cancellationToken
             );
         }

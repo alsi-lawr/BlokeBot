@@ -347,6 +347,7 @@ public sealed class PluginPrivateDataTests
         var module = manifest.Manifest.EntryModule;
         var package = new PluginLifecyclePackage(
             installation,
+            PluginPackageOperationId.New(),
             new(
                 new(
                     installation,

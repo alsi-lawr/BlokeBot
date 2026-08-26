@@ -36,7 +36,7 @@ internal sealed class PluginMarketplacePackageStore(
 
     internal async ValueTask<PluginMarketplacePackagePreparationOutcome> PrepareAsync(
         PluginMarketplaceCatalogEntry entry,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
     )
     {
@@ -49,7 +49,7 @@ internal sealed class PluginMarketplacePackageStore(
         }
 
         var installation = new PluginInstallationIdentity(entry.PluginId, entry.Release);
-        var destination = PackageDirectory(installation, operationId);
+        var destination = PackageDirectory(installation, packageOperationId);
         var parent = Path.GetDirectoryName(destination)!;
         _ = Directory.CreateDirectory(parent);
         var nonce = Guid.NewGuid().ToString("N");
@@ -114,7 +114,7 @@ internal sealed class PluginMarketplacePackageStore(
             }
             catch (IOException)
             {
-                var raced = await ResolveAsync(installation, operationId, cancellationToken);
+                var raced = await ResolveAsync(installation, packageOperationId, cancellationToken);
                 return raced is PluginLifecyclePackageResolution.Available racedAvailable
                     ? new PluginMarketplacePackagePreparationOutcome.Prepared(
                         racedAvailable.Package
@@ -126,7 +126,7 @@ internal sealed class PluginMarketplacePackageStore(
 
             var prepared = accepted.Package with { PackageRoot = destination };
             return new PluginMarketplacePackagePreparationOutcome.Prepared(
-                LifecyclePackage(installation, prepared)
+                LifecyclePackage(installation, packageOperationId, prepared)
             );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -135,7 +135,7 @@ internal sealed class PluginMarketplacePackageStore(
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            var raced = await ResolveAsync(installation, operationId, cancellationToken);
+            var raced = await ResolveAsync(installation, packageOperationId, cancellationToken);
             return raced is PluginLifecyclePackageResolution.Available racedAvailable
                 ? new PluginMarketplacePackagePreparationOutcome.Prepared(racedAvailable.Package)
                 : new PluginMarketplacePackagePreparationOutcome.Rejected(
@@ -148,54 +148,19 @@ internal sealed class PluginMarketplacePackageStore(
             DeleteDirectory(preparing);
             if (!Directory.Exists(destination))
             {
-                DeleteDirectory(OperationDirectory(installation, operationId));
+                DeleteDirectory(OperationDirectory(installation, packageOperationId));
             }
         }
     }
 
     internal async ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
     )
     {
-        var root = PackageDirectory(installation, operationId);
-        var exact = await ResolveAtAsync(installation, root, cancellationToken);
-        if (exact is PluginLifecyclePackageResolution.Available)
-        {
-            await RetainOnlyAsync(installation, operationId, cancellationToken);
-            return exact;
-        }
-
-        var pluginRoot = Path.Combine(_packageRoot, installation.PluginId.Value);
-        if (!Directory.Exists(pluginRoot))
-        {
-            return new PluginLifecyclePackageResolution.Unavailable();
-        }
-
-        PluginLifecyclePackageResolution.Available? available = null;
-        foreach (
-            var candidate in Directory.EnumerateDirectories(
-                pluginRoot,
-                "package",
-                SearchOption.AllDirectories
-            )
-        )
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var resolved = await ResolveAtAsync(installation, candidate, cancellationToken);
-            if (resolved is not PluginLifecyclePackageResolution.Available match)
-            {
-                continue;
-            }
-            if (available is not null)
-            {
-                return new PluginLifecyclePackageResolution.Unavailable();
-            }
-            available = match;
-        }
-
-        return available is null ? new PluginLifecyclePackageResolution.Unavailable() : available;
+        var root = PackageDirectory(installation, packageOperationId);
+        return await ResolveAtAsync(installation, packageOperationId, root, cancellationToken);
     }
 
     internal ValueTask RemoveAsync(PluginId pluginId, CancellationToken cancellationToken)
@@ -207,23 +172,23 @@ internal sealed class PluginMarketplacePackageStore(
 
     internal ValueTask RemoveOperationAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        DeleteDirectory(OperationDirectory(installation, operationId));
+        DeleteDirectory(OperationDirectory(installation, packageOperationId));
         return ValueTask.CompletedTask;
     }
 
     internal ValueTask RetainOnlyAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var retained = Path.GetFullPath(OperationDirectory(installation, operationId));
+        var retained = Path.GetFullPath(OperationDirectory(installation, packageOperationId));
         var pluginRoot = Path.Combine(_packageRoot, installation.PluginId.Value);
         if (!Directory.Exists(pluginRoot))
         {
@@ -257,6 +222,35 @@ internal sealed class PluginMarketplacePackageStore(
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    internal async ValueTask BackfillLegacyPackagesAsync(
+        IReadOnlyList<PluginLifecycleState> states,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var state in states)
+        {
+            await BackfillLegacyPackageAsync(
+                state.SelectedInstallation,
+                state.SelectedPackageOperationId,
+                cancellationToken
+            );
+            if (
+                state.ActiveRuntime is { } active
+                && (
+                    active.Installation != state.SelectedInstallation
+                    || active.PackageOperationId != state.SelectedPackageOperationId
+                )
+            )
+            {
+                await BackfillLegacyPackageAsync(
+                    active.Installation,
+                    active.PackageOperationId,
+                    cancellationToken
+                );
+            }
+        }
     }
 
     internal ValueTask CleanupInterruptedAsync(CancellationToken cancellationToken)
@@ -313,12 +307,21 @@ internal sealed class PluginMarketplacePackageStore(
 
     private string PackageDirectory(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId
-    ) => Path.Combine(OperationDirectory(installation, operationId), "package");
+        PluginPackageOperationId packageOperationId
+    ) => Path.Combine(OperationDirectory(installation, packageOperationId), "package");
+
+    private string LegacyPackageDirectory(PluginInstallationIdentity installation) =>
+        Path.Combine(
+            _packageRoot,
+            installation.PluginId.Value,
+            installation.Release.DeclaredVersion.Value,
+            EncodeTag(installation.Release.Tag.Value),
+            "package"
+        );
 
     private string OperationDirectory(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId
+        PluginPackageOperationId packageOperationId
     ) =>
         Path.Combine(
             _packageRoot,
@@ -326,15 +329,17 @@ internal sealed class PluginMarketplacePackageStore(
             installation.Release.DeclaredVersion.Value,
             EncodeTag(installation.Release.Tag.Value),
             "operations",
-            operationId.Value.ToString("N")
+            packageOperationId.Value.ToString("N")
         );
 
     private PluginLifecyclePackage LifecyclePackage(
         PluginInstallationIdentity installation,
+        PluginPackageOperationId packageOperationId,
         PreparedPluginWorkerPackage package
     ) =>
         new(
             installation,
+            packageOperationId,
             package,
             Path.Combine(
                 Path.GetFullPath(options.PluginPrivateStateRoot),
@@ -344,8 +349,47 @@ internal sealed class PluginMarketplacePackageStore(
             runtime.WorkerLogger
         );
 
+    private async ValueTask BackfillLegacyPackageAsync(
+        PluginInstallationIdentity installation,
+        PluginPackageOperationId packageOperationId,
+        CancellationToken cancellationToken
+    )
+    {
+        var destination = PackageDirectory(installation, packageOperationId);
+        if (Directory.Exists(destination))
+        {
+            return;
+        }
+
+        var legacy = LegacyPackageDirectory(installation);
+        var validation = await PluginMarketplaceMaterializedPackageValidator.ValidateAsync(
+            legacy,
+            runtime.Target,
+            cancellationToken
+        );
+        if (
+            validation
+                is not PluginMarketplaceMaterializedPackageValidationOutcome.Accepted accepted
+            || !Matches(installation, accepted.Package)
+        )
+        {
+            return;
+        }
+
+        try
+        {
+            _ = Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            Directory.Move(legacy, destination);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+    }
+
     private async ValueTask<PluginLifecyclePackageResolution> ResolveAtAsync(
         PluginInstallationIdentity installation,
+        PluginPackageOperationId packageOperationId,
         string root,
         CancellationToken cancellationToken
     )
@@ -363,6 +407,7 @@ internal sealed class PluginMarketplacePackageStore(
             : new PluginLifecyclePackageResolution.Available(
                 LifecyclePackage(
                     installation,
+                    packageOperationId,
                     accepted.Package with
                     {
                         PackageRoot = Path.GetFullPath(root),
@@ -416,7 +461,7 @@ internal sealed class MarketplacePluginLifecyclePackageResolver(
 {
     public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
-    ) => packages.ResolveAsync(installation, operationId, cancellationToken);
+    ) => packages.ResolveAsync(installation, packageOperationId, cancellationToken);
 }

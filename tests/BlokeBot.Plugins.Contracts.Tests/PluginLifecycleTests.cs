@@ -12,6 +12,9 @@ public sealed class PluginLifecycleTests
         var harness = new LifecycleHarness();
         var active = await harness.ActivateAsync("1.0.0", "v1");
         var oldFence = Fence(active);
+        var before = (
+            await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)
+        ).ShouldNotBeNull();
         var replacement = harness.Package("1.0.0", "v1");
         var operationId = Operation();
         harness.Workers.PauseValidation();
@@ -32,6 +35,15 @@ public sealed class PluginLifecycleTests
         replaced.View.Installation.ShouldBe(active.View.Installation);
         replaced.View.OperationId.ShouldBe(operationId);
         replaced.View.Generation.Value.ShouldBe(oldFence.Generation.Value + 1);
+        var selected = (
+            await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)
+        ).ShouldNotBeNull();
+        selected.SelectedPackageOperationId.ShouldBe(replacement.PackageOperationId);
+        selected.SelectedPackageOperationId.ShouldNotBe(before.SelectedPackageOperationId);
+        selected.ActiveRuntime!.PackageOperationId.ShouldBe(replacement.PackageOperationId);
+        harness
+            .Workers.StartedPackages.Last()
+            .PackageOperationId.ShouldBe(replacement.PackageOperationId);
         harness.PendingWork.CancelledFences.ShouldBe([oldFence]);
         harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
         harness
@@ -129,20 +141,22 @@ public sealed class PluginLifecycleTests
     public async Task ColdSameIdentityReplacementRecovery_NeverRestartsPriorSelectedCode()
     {
         var source = new LifecycleHarness();
-        var package = source.Package("1.0.0", "v1");
-        var active = ActiveState(package);
+        var previousPackage = source.Package("1.0.0", "v1");
+        var replacementPackage = source.Package("1.0.0", "v1");
+        var active = ActiveState(previousPackage);
         var replacement = (
             (PluginLifecycleTransitionOutcome.Applied)
                 PluginLifecycleStateMachine.BeginReplacement(
                     active,
-                    package.Installation,
+                    replacementPackage.Installation,
+                    replacementPackage.PackageOperationId,
                     Operation(),
                     DateTimeOffset.UtcNow
                 )
         ).State;
         source.Store.Seed(replacement);
         var packages = new FakePackageResolver();
-        packages.Add(package);
+        packages.Add(replacementPackage);
         var pending = new RecordingPendingWorkCanceller();
         var workers = new FakeLifecycleWorkers();
         var snapshots = new PluginRuntimeSnapshotRegistry();
@@ -167,7 +181,12 @@ public sealed class PluginLifecycleTests
         recovered.Phase.ShouldBe(PluginLifecyclePhase.Active);
         recovered.SelectedFence.ShouldBe(replacement.SelectedFence);
         pending.CancelledFences.ShouldBe([active.SelectedFence]);
-        workers.StartedInstallations.ShouldBe([package.Installation]);
+        workers
+            .StartedPackages.ShouldHaveSingleItem()
+            .PackageOperationId.ShouldBe(replacementPackage.PackageOperationId);
+        workers.StartedPackages.ShouldNotContain(package =>
+            package.PackageOperationId == previousPackage.PackageOperationId
+        );
         _ = snapshots
             .ValidateCallbackCompletion(source.PluginId, active.SelectedFence)
             .ShouldBeOfType<PluginFenceOutcome.Rejected>();
@@ -288,6 +307,7 @@ public sealed class PluginLifecycleTests
         );
         var lifecyclePackage = new PluginLifecyclePackage(
             package.Package.Descriptor.Plugin,
+            PluginPackageOperationId.New(),
             package.Package,
             stateRoot,
             new ReturningTestDispatcher(new PluginValue.Nil()),
@@ -1494,7 +1514,7 @@ public sealed class PluginLifecycleTests
         var exhausted = active with
         {
             SelectedGeneration = maximumGeneration,
-            ActiveRuntime = new(package.Installation, exhaustedFence),
+            ActiveRuntime = new(package.Installation, exhaustedFence, package.PackageOperationId),
         };
         harness.Store.Seed(exhausted);
         harness.Packages.Add(package);
@@ -1548,7 +1568,7 @@ public sealed class PluginLifecycleTests
         active = active with
         {
             SelectedGeneration = maximumGeneration,
-            ActiveRuntime = new(package.Installation, fence),
+            ActiveRuntime = new(package.Installation, fence, package.PackageOperationId),
         };
         var intent = (
             (PluginLifecycleTransitionOutcome.Applied)
@@ -1687,15 +1707,21 @@ public sealed class PluginLifecycleTests
             harness.PluginId,
             state => state is { Phase: PluginLifecyclePhase.Faulted, ActiveRuntime: null }
         );
-        harness.Packages.Add(harness.Package("1.0.0", "v1"));
+        var selectedPackageOperationId = faulted.SelectedPackageOperationId;
+        var restartOperationId = Operation();
 
         var restarted = await harness.Coordinator.RestartAsync(
             harness.PluginId,
-            Operation(),
+            restartOperationId,
             CancellationToken.None
         );
 
         var view = restarted.ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>().View;
+        view.OperationId.ShouldBe(restartOperationId);
+        view.OperationId.Value.ShouldNotBe(selectedPackageOperationId.Value);
+        harness
+            .Packages.Resolutions.Last()
+            .ShouldBe((faulted.SelectedInstallation, selectedPackageOperationId));
         view.Generation.Value.ShouldBe(activated.View.Generation.Value + 1);
         view.AutomaticRestartConsumed.ShouldBeFalse();
         view.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Restarted);
@@ -1945,11 +1971,22 @@ public sealed class PluginLifecycleTests
         var harness = new LifecycleHarness();
         var previous = await harness.ActivateAsync("1.0.0", "v1");
         var oldFence = Fence(previous);
-        var previousPackage = harness.Package("1.0.0", "v1");
+        var previousState = (
+            await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)
+        ).ShouldNotBeNull();
+        var previousPackage = harness.Package("1.0.0", "v1") with
+        {
+            PackageOperationId = previousState.SelectedPackageOperationId,
+        };
         var package = harness.Package("2.0.0", "v2");
         var preparing = (
             await harness.Store.BeginActivationAsync(
-                new(package.Installation, Operation(), DateTimeOffset.UtcNow),
+                new(
+                    package.Installation,
+                    package.PackageOperationId,
+                    Operation(),
+                    DateTimeOffset.UtcNow
+                ),
                 CancellationToken.None
             )
         )
@@ -2062,6 +2099,7 @@ public sealed class PluginLifecycleTests
                 PluginLifecycleStateMachine.BeginActivation(
                     active,
                     selectedPackage.Installation,
+                    selectedPackage.PackageOperationId,
                     Operation(),
                     DateTimeOffset.UtcNow
                 )
@@ -2125,6 +2163,31 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
+    public async Task StartupRecovery_MissingExactPackageFaultsWhenOlderSameTagPackageRemains()
+    {
+        var harness = new LifecycleHarness();
+        var olderPackage = harness.Package("1.0.0", "v1");
+        var selectedPackage = harness.Package("1.0.0", "v1");
+        var selected = ActiveState(selectedPackage);
+        harness.Store.Seed(selected);
+        harness.Packages.Add(olderPackage);
+
+        await harness.Coordinator.RecoverAsync(CancellationToken.None);
+
+        var faulted = (
+            await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)
+        ).ShouldNotBeNull();
+        faulted.Phase.ShouldBe(PluginLifecyclePhase.Faulted);
+        faulted.LatestOutcome.FailureCode.ShouldBe(
+            PluginLifecycleFailureCode.RecoveryPackageUnavailable
+        );
+        harness.Packages.Resolutions.ShouldBe([
+            (selectedPackage.Installation, selectedPackage.PackageOperationId),
+        ]);
+        harness.Workers.StartedPackages.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task ActivationRecovery_StartsSelectedGenerationWithoutRepeatingMigration()
     {
         var migration = new RecordingMigrationOwner();
@@ -2136,6 +2199,7 @@ public sealed class PluginLifecycleTests
                 PluginLifecycleStateMachine.BeginActivation(
                     null,
                     package.Installation,
+                    package.PackageOperationId,
                     Operation(),
                     DateTimeOffset.UtcNow
                 )
@@ -2481,6 +2545,7 @@ public sealed class PluginLifecycleTests
                 PluginLifecycleStateMachine.BeginActivation(
                     null,
                     package.Installation,
+                    package.PackageOperationId,
                     Operation(),
                     DateTimeOffset.UtcNow
                 )
@@ -2508,6 +2573,7 @@ public sealed class PluginLifecycleTests
                 PluginLifecycleStateMachine.BeginActivation(
                     active,
                     replacement.Installation,
+                    replacement.PackageOperationId,
                     Operation(),
                     DateTimeOffset.UtcNow
                 )
@@ -2599,14 +2665,18 @@ internal sealed class LifecycleHarness
     internal async ValueTask<PluginLifecycleCommandOutcome.Succeeded> ActivateAsync(
         string version,
         string tag
-    ) =>
-        (
+    )
+    {
+        var package = Package(version, tag);
+        Packages.Add(package);
+        return (
             await Coordinator.ActivateAsync(
                 PluginLifecycleOperationId.New(),
-                Package(version, tag),
+                package,
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>();
+    }
 
     internal async ValueTask<(PluginId PluginId, PluginLifecycleFence Fence)> ActivateOtherAsync(
         string plugin,
@@ -2615,6 +2685,7 @@ internal sealed class LifecycleHarness
     )
     {
         var package = Package(plugin, version, tag);
+        Packages.Add(package);
         var active = (
             await Coordinator.ActivateAsync(
                 PluginLifecycleOperationId.New(),
@@ -2653,6 +2724,7 @@ internal sealed class LifecycleHarness
         );
         return new(
             installation,
+            PluginPackageOperationId.New(),
             prepared,
             Path.Combine(Path.GetTempPath(), "blokebot-lifecycle-state", plugin),
             new ReturningTestDispatcher(new PluginValue.Nil()),

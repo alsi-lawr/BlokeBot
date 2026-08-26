@@ -101,6 +101,7 @@ public static partial class PluginLifecycleStateMachine
             { Phase: PluginLifecyclePhase.Preparing, ActiveRuntime: { } active } => state with
             {
                 SelectedInstallation = active.Installation,
+                SelectedPackageOperationId = active.PackageOperationId,
                 OperationId = active.Fence.OperationId,
                 SelectedGeneration = active.Fence.Generation,
                 Phase = PluginLifecyclePhase.Active,

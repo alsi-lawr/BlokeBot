@@ -4,6 +4,7 @@ namespace BlokeBot.Plugins.Runtime;
 
 public sealed record PluginLifecycleBeginRequest(
     PluginInstallationIdentity Installation,
+    PluginPackageOperationId PackageOperationId,
     PluginLifecycleOperationId OperationId,
     DateTimeOffset OccurredAtUtc
 );

@@ -401,7 +401,7 @@ public sealed class PluginMarketplaceTests
         _ = (
             await store.PrepareAsync(
                 Entry(),
-                PluginLifecycleOperationId.New(),
+                PluginPackageOperationId.New(),
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>();
@@ -426,7 +426,7 @@ public sealed class PluginMarketplaceTests
         _ = (
             await store.PrepareAsync(
                 incompatibleEntry,
-                PluginLifecycleOperationId.New(),
+                PluginPackageOperationId.New(),
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Rejected>();
@@ -465,7 +465,7 @@ public sealed class PluginMarketplaceTests
         _ = (
             await manifestStore.PrepareAsync(
                 Entry(),
-                PluginLifecycleOperationId.New(),
+                PluginPackageOperationId.New(),
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Rejected>();
@@ -483,10 +483,10 @@ public sealed class PluginMarketplaceTests
             Runtime()
         );
         var entry = Entry();
-        var operationId = PluginLifecycleOperationId.New();
+        var packageOperationId = PluginPackageOperationId.New();
 
         var prepared = (
-            await packageStore.PrepareAsync(entry, operationId, CancellationToken.None)
+            await packageStore.PrepareAsync(entry, packageOperationId, CancellationToken.None)
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>();
         prepared.Package.MatchesIdentity.ShouldBeTrue();
         prepared.Package.StateRoot.ShouldStartWith(options.PluginPrivateStateRoot);
@@ -502,17 +502,17 @@ public sealed class PluginMarketplaceTests
         _ = (
             await restarted.ResolveAsync(
                 prepared.Package.Installation,
-                operationId,
+                packageOperationId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
         _ = (
             await restarted.ResolveAsync(
                 prepared.Package.Installation,
-                PluginLifecycleOperationId.New(),
+                PluginPackageOperationId.New(),
                 CancellationToken.None
             )
-        ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
+        ).ShouldBeOfType<PluginLifecyclePackageResolution.Unavailable>();
 
         var removal = await restarted.RemoveAsync(
             new PluginRemovalContext(entry.PluginId, FixtureFence()),
@@ -522,10 +522,121 @@ public sealed class PluginMarketplaceTests
         _ = (
             await restarted.ResolveAsync(
                 prepared.Package.Installation,
-                operationId,
+                packageOperationId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginLifecyclePackageResolution.Unavailable>();
+    }
+
+    [Test]
+    public async Task PackageStore_CorruptExactPackageNeverFallsBackToOlderSameTagPackage()
+    {
+        using var root = new TemporaryDirectory();
+        var store = new PluginMarketplacePackageStore(
+            Options(root.Path),
+            new QueueArchiveTransport(
+                Archive(PluginContractFixtures.CompletePackage()),
+                Archive(PluginContractFixtures.CompletePackage())
+            ),
+            new(),
+            Runtime()
+        );
+        var older = (
+            await store.PrepareAsync(
+                Entry(),
+                PluginPackageOperationId.New(),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>()
+            .Package;
+        var selected = (
+            await store.PrepareAsync(
+                Entry(),
+                PluginPackageOperationId.New(),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>()
+            .Package;
+        await File.WriteAllTextAsync(
+            Path.Combine(selected.PreparedPackage.PackageRoot, PluginPackage.ManifestPath),
+            "{}"
+        );
+
+        _ = (
+            await store.ResolveAsync(
+                selected.Installation,
+                selected.PackageOperationId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecyclePackageResolution.Unavailable>();
+        _ = (
+            await store.ResolveAsync(
+                older.Installation,
+                older.PackageOperationId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
+    }
+
+    [Test]
+    public async Task PackageStore_BackfillsLegacyPackageToPersistedExactOperation()
+    {
+        using var root = new TemporaryDirectory();
+        var store = new PluginMarketplacePackageStore(
+            Options(root.Path),
+            new FixedArchiveTransport(Archive(PluginContractFixtures.CompletePackage())),
+            new(),
+            Runtime()
+        );
+        var package = (
+            await store.PrepareAsync(
+                Entry(),
+                PluginPackageOperationId.New(),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>()
+            .Package;
+        var operationDirectory = Directory.GetParent(package.PreparedPackage.PackageRoot)!;
+        var tagDirectory = operationDirectory.Parent!.Parent!;
+        var legacyRoot = Path.Combine(tagDirectory.FullName, "package");
+        Directory.Move(package.PreparedPackage.PackageRoot, legacyRoot);
+        _ = PluginWorkerGeneration.TryCreate(1, out var generation);
+        var lifecycleOperationId = PluginLifecycleOperationId.New();
+        var now = DateTimeOffset.UtcNow;
+        var state = new PluginLifecycleState(
+            package.Installation.PluginId,
+            package.Installation,
+            package.PackageOperationId,
+            lifecycleOperationId,
+            generation,
+            new(
+                package.Installation,
+                new(lifecycleOperationId, generation),
+                package.PackageOperationId
+            ),
+            PluginLifecyclePhase.Active,
+            PluginLifecycleOperationKind.Activate,
+            null,
+            false,
+            null,
+            PluginLifecycleOutcome.Progress(PluginLifecycleOutcomeCode.Activated, now),
+            1,
+            now
+        );
+
+        await store.BackfillLegacyPackagesAsync([state], CancellationToken.None);
+
+        _ = (
+            await store.ResolveAsync(
+                package.Installation,
+                package.PackageOperationId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
+        Directory.Exists(legacyRoot).ShouldBeFalse();
     }
 
     [Test]
@@ -567,6 +678,7 @@ public sealed class PluginMarketplaceTests
     public async Task ProductionActivationPublisher_ProjectsPagesAndAutomationCatalogByExactFence()
     {
         using var root = new TemporaryDirectory();
+        var packageOperationId = PluginPackageOperationId.New();
         var operationId = PluginLifecycleOperationId.New();
         var packages = new PluginMarketplacePackageStore(
             Options(root.Path),
@@ -574,7 +686,9 @@ public sealed class PluginMarketplaceTests
             new(),
             Runtime()
         );
-        var package = (await packages.PrepareAsync(Entry(), operationId, CancellationToken.None))
+        var package = (
+            await packages.PrepareAsync(Entry(), packageOperationId, CancellationToken.None)
+        )
             .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>()
             .Package;
         _ = PluginWorkerGeneration.TryCreate(1, out var workerGeneration);

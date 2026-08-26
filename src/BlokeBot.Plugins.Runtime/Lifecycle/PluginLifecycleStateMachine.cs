@@ -28,20 +28,32 @@ public static partial class PluginLifecycleStateMachine
     public static PluginLifecycleTransitionOutcome BeginActivation(
         PluginLifecycleState? current,
         PluginInstallationIdentity installation,
+        PluginPackageOperationId packageOperationId,
         PluginLifecycleOperationId operationId,
         DateTimeOffset now
-    ) => BeginActivation(current, installation, operationId, replace: false, now);
+    ) =>
+        BeginActivation(
+            current,
+            installation,
+            packageOperationId,
+            operationId,
+            replace: false,
+            now
+        );
 
     public static PluginLifecycleTransitionOutcome BeginReplacement(
         PluginLifecycleState? current,
         PluginInstallationIdentity installation,
+        PluginPackageOperationId packageOperationId,
         PluginLifecycleOperationId operationId,
         DateTimeOffset now
-    ) => BeginActivation(current, installation, operationId, replace: true, now);
+    ) =>
+        BeginActivation(current, installation, packageOperationId, operationId, replace: true, now);
 
     private static PluginLifecycleTransitionOutcome BeginActivation(
         PluginLifecycleState? current,
         PluginInstallationIdentity installation,
+        PluginPackageOperationId packageOperationId,
         PluginLifecycleOperationId operationId,
         bool replace,
         DateTimeOffset now
@@ -90,6 +102,7 @@ public static partial class PluginLifecycleStateMachine
             new(
                 installation.PluginId,
                 installation,
+                packageOperationId,
                 operationId,
                 selectedGeneration,
                 current is { Phase: PluginLifecyclePhase.Active } ? current.ActiveRuntime : null,
@@ -153,6 +166,7 @@ public static partial class PluginLifecycleStateMachine
                 state with
                 {
                     SelectedInstallation = active.Installation,
+                    SelectedPackageOperationId = active.PackageOperationId,
                     OperationId = active.Fence.OperationId,
                     SelectedGeneration = active.Fence.Generation,
                     Phase = PluginLifecyclePhase.Active,
@@ -205,7 +219,11 @@ public static partial class PluginLifecycleStateMachine
                 state with
                 {
                     Phase = PluginLifecyclePhase.Active,
-                    ActiveRuntime = new(state.SelectedInstallation, state.SelectedFence),
+                    ActiveRuntime = new(
+                        state.SelectedInstallation,
+                        state.SelectedFence,
+                        state.SelectedPackageOperationId
+                    ),
                     RestartNotBeforeUtc = null,
                     LatestOutcome = PluginLifecycleOutcome.Progress(
                         state.OperationKind == PluginLifecycleOperationKind.Restart

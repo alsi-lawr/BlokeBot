@@ -57,12 +57,14 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
             ? PluginLifecycleStateMachine.BeginReplacement(
                 current,
                 request.Installation,
+                request.PackageOperationId,
                 request.OperationId,
                 request.OccurredAtUtc
             )
             : PluginLifecycleStateMachine.BeginActivation(
                 current,
                 request.Installation,
+                request.PackageOperationId,
                 request.OperationId,
                 request.OccurredAtUtc
             );

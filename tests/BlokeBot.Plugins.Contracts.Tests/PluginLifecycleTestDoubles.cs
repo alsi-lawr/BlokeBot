@@ -75,6 +75,7 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
             var transition = PluginLifecycleStateMachine.BeginActivation(
                 current,
                 request.Installation,
+                request.PackageOperationId,
                 request.OperationId,
                 request.OccurredAtUtc
             );
@@ -104,6 +105,7 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
             var transition = PluginLifecycleStateMachine.BeginReplacement(
                 current,
                 request.Installation,
+                request.PackageOperationId,
                 request.OperationId,
                 request.OccurredAtUtc
             );
@@ -244,20 +246,32 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
 
 internal sealed class FakePackageResolver : IPluginLifecyclePackageResolver
 {
-    private readonly Dictionary<PluginInstallationIdentity, PluginLifecyclePackage> _packages = [];
+    private readonly Dictionary<
+        (PluginInstallationIdentity Installation, PluginPackageOperationId PackageOperationId),
+        PluginLifecyclePackage
+    > _packages = [];
 
-    internal void Add(PluginLifecyclePackage package) => _packages[package.Installation] = package;
+    internal void Add(PluginLifecyclePackage package) =>
+        _packages[(package.Installation, package.PackageOperationId)] = package;
+
+    internal List<(
+        PluginInstallationIdentity Installation,
+        PluginPackageOperationId PackageOperationId
+    )> Resolutions { get; } = [];
 
     public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
-        PluginLifecycleOperationId operationId,
+        PluginPackageOperationId packageOperationId,
         CancellationToken cancellationToken
-    ) =>
-        ValueTask.FromResult<PluginLifecyclePackageResolution>(
-            _packages.TryGetValue(installation, out var package)
+    )
+    {
+        Resolutions.Add((installation, packageOperationId));
+        return ValueTask.FromResult<PluginLifecyclePackageResolution>(
+            _packages.TryGetValue((installation, packageOperationId), out var package)
                 ? new PluginLifecyclePackageResolution.Available(package)
                 : new PluginLifecyclePackageResolution.Unavailable()
         );
+    }
 }
 
 internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
@@ -267,6 +281,8 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
     internal List<FakeLifecycleWorkerSession> Admitted { get; } = [];
 
     internal List<PluginInstallationIdentity> StartedInstallations { get; } = [];
+
+    internal List<PluginLifecyclePackage> StartedPackages { get; } = [];
 
     internal int AdmittedFailuresRemaining { get; set; }
 
@@ -330,6 +346,7 @@ internal sealed class FakeLifecycleWorkers : IPluginLifecycleWorkerManager
         NextDisposalException = null;
         Admitted.Add(worker);
         StartedInstallations.Add(package.Installation);
+        StartedPackages.Add(package);
         return ValueTask.FromResult<PluginLifecycleWorkerStartOutcome>(
             new PluginLifecycleWorkerStartOutcome.Started(worker)
         );

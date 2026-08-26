@@ -75,7 +75,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         }
 
         var begun = await _store.BeginActivationAsync(
-            new(package.Installation, operationId, Now()),
+            new(package.Installation, package.PackageOperationId, operationId, Now()),
             cancellationToken
         );
         return begun is PluginLifecycleStoreBeginOutcome.Rejected rejected
@@ -115,7 +115,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         }
 
         var begun = await _store.BeginReplacementAsync(
-            new(package.Installation, operationId, Now()),
+            new(package.Installation, package.PackageOperationId, operationId, Now()),
             cancellationToken
         );
         if (begun is PluginLifecycleStoreBeginOutcome.Rejected rejected)

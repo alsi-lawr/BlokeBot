@@ -89,12 +89,25 @@ public sealed record PluginLifecycleOutcome(
 
 public sealed record PluginLifecycleActiveRuntime(
     PluginInstallationIdentity Installation,
-    PluginLifecycleFence Fence
-);
+    PluginLifecycleFence Fence,
+    PluginPackageOperationId PackageOperationId
+)
+{
+    public PluginLifecycleActiveRuntime(
+        PluginInstallationIdentity installation,
+        PluginLifecycleFence fence
+    )
+        : this(
+            installation,
+            fence,
+            PluginPackageOperationId.FromLifecycleOperation(fence.OperationId)
+        ) { }
+}
 
 public sealed record PluginLifecycleState(
     PluginId PluginId,
     PluginInstallationIdentity SelectedInstallation,
+    PluginPackageOperationId SelectedPackageOperationId,
     PluginLifecycleOperationId OperationId,
     PluginWorkerGeneration SelectedGeneration,
     PluginLifecycleActiveRuntime? ActiveRuntime,
@@ -108,6 +121,38 @@ public sealed record PluginLifecycleState(
     DateTimeOffset UpdatedAtUtc
 )
 {
+    public PluginLifecycleState(
+        PluginId pluginId,
+        PluginInstallationIdentity selectedInstallation,
+        PluginLifecycleOperationId operationId,
+        PluginWorkerGeneration selectedGeneration,
+        PluginLifecycleActiveRuntime? activeRuntime,
+        PluginLifecyclePhase phase,
+        PluginLifecycleOperationKind operationKind,
+        PluginLifecyclePhase? faultedFrom,
+        bool automaticRestartConsumed,
+        DateTimeOffset? restartNotBeforeUtc,
+        PluginLifecycleOutcome latestOutcome,
+        long revision,
+        DateTimeOffset updatedAtUtc
+    )
+        : this(
+            pluginId,
+            selectedInstallation,
+            PluginPackageOperationId.FromLifecycleOperation(operationId),
+            operationId,
+            selectedGeneration,
+            activeRuntime,
+            phase,
+            operationKind,
+            faultedFrom,
+            automaticRestartConsumed,
+            restartNotBeforeUtc,
+            latestOutcome,
+            revision,
+            updatedAtUtc
+        ) { }
+
     public PluginLifecycleFence SelectedFence => new(OperationId, SelectedGeneration);
 }
 

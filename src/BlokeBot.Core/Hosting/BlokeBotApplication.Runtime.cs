@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Persistence;
+using BlokeBot.Plugins.Runtime;
 
 namespace BlokeBot.Core.Hosting;
 
@@ -21,6 +22,13 @@ public static partial class BlokeBotApplication
         await app
             .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
             .InitializeAsync(cancellationToken);
+        var lifecycleStore = app.Services.GetRequiredService<IPluginLifecycleStore>();
+        await app
+            .Services.GetRequiredService<PluginMarketplacePackageStore>()
+            .BackfillLegacyPackagesAsync(
+                await lifecycleStore.LoadAllAsync(cancellationToken),
+                cancellationToken
+            );
         await app
             .Services.GetRequiredService<HostedChannelRuntimeLifecycleService>()
             .RecoverInterruptedStopsAsync(cancellationToken);

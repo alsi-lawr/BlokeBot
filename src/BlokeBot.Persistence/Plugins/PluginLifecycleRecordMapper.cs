@@ -12,6 +12,7 @@ internal static class PluginLifecycleRecordMapper
             ? parsedPluginId
             : throw new InvalidOperationException("Persisted plugin ID is invalid.");
         var selected = Installation(pluginId, record.SelectedVersion, record.SelectedTag);
+        var selectedPackageOperationId = PackageOperation(record.SelectedPackageOperationId);
         var operationId = Operation(record.OperationId);
         var selectedGeneration = Generation(record.SelectedGeneration);
         var active = ActiveRuntime(record, pluginId);
@@ -23,6 +24,7 @@ internal static class PluginLifecycleRecordMapper
         var state = new PluginLifecycleState(
             pluginId,
             selected,
+            selectedPackageOperationId,
             operationId,
             selectedGeneration,
             active,
@@ -56,11 +58,13 @@ internal static class PluginLifecycleRecordMapper
 
         record.SelectedVersion = state.SelectedInstallation.Release.DeclaredVersion.Value;
         record.SelectedTag = state.SelectedInstallation.Release.Tag.Value;
+        record.SelectedPackageOperationId = state.SelectedPackageOperationId.Value;
         record.OperationId = state.OperationId.Value;
         record.SelectedGeneration = checked((long)state.SelectedGeneration.Value);
         record.ActiveVersion = state.ActiveRuntime?.Installation.Release.DeclaredVersion.Value;
         record.ActiveTag = state.ActiveRuntime?.Installation.Release.Tag.Value;
         record.ActiveOperationId = state.ActiveRuntime?.Fence.OperationId.Value;
+        record.ActivePackageOperationId = state.ActiveRuntime?.PackageOperationId.Value;
         record.ActiveGeneration = state.ActiveRuntime is null
             ? null
             : checked((long)state.ActiveRuntime.Fence.Generation.Value);
@@ -84,11 +88,13 @@ internal static class PluginLifecycleRecordMapper
         record.ActiveVersion is null
         && record.ActiveTag is null
         && record.ActiveOperationId is null
+        && record.ActivePackageOperationId is null
         && record.ActiveGeneration is null
             ? null
         : record.ActiveVersion is null
         || record.ActiveTag is null
         || record.ActiveOperationId is null
+        || record.ActivePackageOperationId is null
         || record.ActiveGeneration is null
             ? throw new InvalidOperationException("Persisted active plugin fence is incomplete.")
         : new(
@@ -96,7 +102,8 @@ internal static class PluginLifecycleRecordMapper
             new(
                 Operation(record.ActiveOperationId.Value),
                 Generation(record.ActiveGeneration.Value)
-            )
+            ),
+            PackageOperation(record.ActivePackageOperationId.Value)
         );
 
     private static PluginInstallationIdentity Installation(
@@ -113,6 +120,11 @@ internal static class PluginLifecycleRecordMapper
         PluginLifecycleOperationId.TryCreate(value, out var operationId)
             ? operationId
             : throw new InvalidOperationException("Persisted lifecycle operation ID is invalid.");
+
+    private static PluginPackageOperationId PackageOperation(Guid value) =>
+        PluginPackageOperationId.TryCreate(value, out var operationId)
+            ? operationId
+            : throw new InvalidOperationException("Persisted package operation ID is invalid.");
 
     private static PluginWorkerGeneration Generation(long value) =>
         value > 0 && PluginWorkerGeneration.TryCreate((ulong)value, out var generation)

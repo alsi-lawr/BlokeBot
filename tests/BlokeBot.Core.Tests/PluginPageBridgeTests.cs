@@ -278,6 +278,7 @@ public sealed class PluginPageBridgeTests
         };
         var package = new PluginLifecyclePackage(
             installation,
+            PluginPackageOperationId.New(),
             prepared,
             "/state/community-link-queue",
             null!,
@@ -288,14 +289,18 @@ public sealed class PluginPageBridgeTests
         var fence = new PluginLifecycleFence(PluginLifecycleOperationId.New(), generation);
 
         _ = (
-            await resolver.ResolveAsync(installation, fence, CancellationToken.None)
+            await resolver.ResolveAsync(
+                installation,
+                package.PackageOperationId,
+                CancellationToken.None
+            )
         ).ShouldBeOfType<PluginPackageAssetResolution.Available>();
         var other = new PluginInstallationIdentity(
             PluginContractFixtures.PluginId("community.other-plugin"),
             installation.Release
         );
         _ = (
-            await resolver.ResolveAsync(other, fence, CancellationToken.None)
+            await resolver.ResolveAsync(other, package.PackageOperationId, CancellationToken.None)
         ).ShouldBeOfType<PluginPackageAssetResolution.Unavailable>();
     }
 
@@ -498,7 +503,7 @@ public sealed class PluginPageBridgeTests
     {
         public ValueTask<PluginPackageAssetResolution> ResolveAsync(
             PluginInstallationIdentity installation,
-            PluginLifecycleFence fence,
+            PluginPackageOperationId packageOperationId,
             CancellationToken cancellationToken
         ) =>
             ValueTask.FromResult<PluginPackageAssetResolution>(
@@ -514,7 +519,7 @@ public sealed class PluginPageBridgeTests
     {
         public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
             PluginInstallationIdentity installation,
-            PluginLifecycleOperationId operationId,
+            PluginPackageOperationId packageOperationId,
             CancellationToken cancellationToken
         ) =>
             ValueTask.FromResult<PluginLifecyclePackageResolution>(

@@ -20,9 +20,13 @@ public sealed partial class BlokeBotDbContext
                         "\"SelectedGeneration\" > 0"
                     );
                     _ = table.HasCheckConstraint(
+                        "CK_plugin_lifecycles_SelectedPackageOperation",
+                        "\"SelectedPackageOperationId\" <> '00000000-0000-0000-0000-000000000000'"
+                    );
+                    _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_ActiveRuntime",
-                        "(\"ActiveVersion\" IS NULL AND \"ActiveTag\" IS NULL AND \"ActiveOperationId\" IS NULL AND \"ActiveGeneration\" IS NULL) OR "
-                            + "(\"ActiveVersion\" IS NOT NULL AND \"ActiveTag\" IS NOT NULL AND \"ActiveOperationId\" IS NOT NULL AND \"ActiveGeneration\" > 0)"
+                        "(\"ActiveVersion\" IS NULL AND \"ActiveTag\" IS NULL AND \"ActiveOperationId\" IS NULL AND \"ActivePackageOperationId\" IS NULL AND \"ActiveGeneration\" IS NULL) OR "
+                            + "(\"ActiveVersion\" IS NOT NULL AND \"ActiveTag\" IS NOT NULL AND \"ActiveOperationId\" IS NOT NULL AND \"ActivePackageOperationId\" IS NOT NULL AND \"ActiveGeneration\" > 0)"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_Phase",
@@ -37,7 +41,7 @@ public sealed partial class BlokeBotDbContext
                         "CK_plugin_lifecycles_FaultShutdown",
                         "\"Phase\" <> 'Faulted' OR \"ActiveOperationId\" IS NULL OR "
                             + "(\"FaultedFrom\" = 'Active' AND \"ActiveVersion\" = \"SelectedVersion\" AND \"ActiveTag\" = \"SelectedTag\" AND "
-                            + "\"ActiveOperationId\" = \"OperationId\" AND \"ActiveGeneration\" = \"SelectedGeneration\")"
+                            + "\"ActiveOperationId\" = \"OperationId\" AND \"ActivePackageOperationId\" = \"SelectedPackageOperationId\" AND \"ActiveGeneration\" = \"SelectedGeneration\")"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_OperationKind",

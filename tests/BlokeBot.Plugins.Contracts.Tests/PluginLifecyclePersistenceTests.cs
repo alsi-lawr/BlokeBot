@@ -16,13 +16,20 @@ public sealed class PluginLifecyclePersistenceTests
     {
         await using var database = await LifecycleDatabase.CreateAsync();
         var store = new EfPluginLifecycleStore(database);
-        var package = new LifecycleHarness().Package("1.0.0", "v1");
-        var active = await AdvanceToActiveAsync(store, package);
+        var harness = new LifecycleHarness();
+        var activePackage = harness.Package("1.0.0", "v1");
+        var replacementPackage = harness.Package("1.0.0", "v1");
+        var active = await AdvanceToActiveAsync(store, activePackage);
         var operationId = PluginLifecycleOperationId.New();
 
         var replacement = (
             await store.BeginReplacementAsync(
-                new(package.Installation, operationId, DateTimeOffset.UtcNow),
+                new(
+                    replacementPackage.Installation,
+                    replacementPackage.PackageOperationId,
+                    operationId,
+                    DateTimeOffset.UtcNow
+                ),
                 CancellationToken.None
             )
         )
@@ -30,13 +37,61 @@ public sealed class PluginLifecyclePersistenceTests
             .State;
 
         replacement.SelectedInstallation.ShouldBe(active.SelectedInstallation);
+        replacement.SelectedPackageOperationId.ShouldBe(replacementPackage.PackageOperationId);
+        replacement.SelectedPackageOperationId.ShouldNotBe(active.SelectedPackageOperationId);
         replacement.OperationId.ShouldBe(operationId);
         replacement.SelectedGeneration.Value.ShouldBe(active.SelectedGeneration.Value + 1);
         replacement.OperationKind.ShouldBe(PluginLifecycleOperationKind.Replace);
         replacement.ActiveRuntime.ShouldBe(active.ActiveRuntime);
-        (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
-            replacement
+        (
+            await store.LoadAsync(replacementPackage.Installation.PluginId, CancellationToken.None)
+        ).ShouldBe(replacement);
+    }
+
+    [Test]
+    public async Task LifecycleMigration_BackfillsExactPackageOperationFromExistingFence()
+    {
+        await using var database = await LifecycleDatabase.CreateAsync(
+            "20260826143119_v0.13.0_PluginLifecycleReplacement"
         );
+        var package = new LifecycleHarness().Package("1.0.0", "v1");
+        var operationId = PluginLifecycleOperationId.New();
+        var now = new DateTimeOffset(2026, 8, 26, 16, 30, 0, TimeSpan.Zero);
+        await using (var db = database.CreateDbContext())
+        {
+            _ = await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO "plugin_lifecycles" (
+                    "PluginId", "SelectedVersion", "SelectedTag", "OperationId",
+                    "SelectedGeneration", "ActiveVersion", "ActiveTag", "ActiveOperationId",
+                    "ActiveGeneration", "Phase", "OperationKind", "FaultedFrom",
+                    "AutomaticRestartConsumed", "RestartNotBeforeUtc", "OutcomeCode",
+                    "FailureCode", "OutcomeDetail", "OutcomeOccurredAtUtc", "Revision",
+                    "UpdatedAtUtc"
+                ) VALUES (
+                    {package.Installation.PluginId.Value},
+                    {package.Installation.Release.DeclaredVersion.Value},
+                    {package.Installation.Release.Tag.Value},
+                    {operationId.Value}, 1,
+                    {package.Installation.Release.DeclaredVersion.Value},
+                    {package.Installation.Release.Tag.Value},
+                    {operationId.Value}, 1, 'Active', 'Activate', NULL, 0, NULL,
+                    'Activated', NULL, NULL, {now.UtcDateTime}, 1, {now.UtcDateTime}
+                );
+                """
+            );
+        }
+
+        await database.MigrateToLatestAsync();
+
+        var migrated = (
+            await new EfPluginLifecycleStore(database).LoadAsync(
+                package.Installation.PluginId,
+                CancellationToken.None
+            )
+        ).ShouldNotBeNull();
+        migrated.SelectedPackageOperationId.Value.ShouldBe(operationId.Value);
+        migrated.ActiveRuntime!.PackageOperationId.ShouldBe(migrated.SelectedPackageOperationId);
     }
 
     [Test]
@@ -47,7 +102,12 @@ public sealed class PluginLifecyclePersistenceTests
         var package = new LifecycleHarness().Package("1.0.0", "v1");
         var begun = (
             await store.BeginActivationAsync(
-                new(package.Installation, PluginLifecycleOperationId.New(), DateTimeOffset.UtcNow),
+                new(
+                    package.Installation,
+                    package.PackageOperationId,
+                    PluginLifecycleOperationId.New(),
+                    DateTimeOffset.UtcNow
+                ),
                 CancellationToken.None
             )
         )
@@ -141,7 +201,12 @@ public sealed class PluginLifecyclePersistenceTests
         var package = new LifecycleHarness().Package("2.0.0", "v2");
         var begun = (
             await store.BeginActivationAsync(
-                new(package.Installation, PluginLifecycleOperationId.New(), DateTimeOffset.UtcNow),
+                new(
+                    package.Installation,
+                    package.PackageOperationId,
+                    PluginLifecycleOperationId.New(),
+                    DateTimeOffset.UtcNow
+                ),
                 CancellationToken.None
             )
         )
@@ -206,10 +271,12 @@ public sealed class PluginLifecyclePersistenceTests
         (
             await store.LoadAsync(firstPackage.Installation.PluginId, CancellationToken.None)
         ).ShouldBeNull();
+        var reinstallPackage = harness.Package("2.0.0", "v2");
         var reinstalled = (
             await store.BeginActivationAsync(
                 new(
-                    harness.Package("2.0.0", "v2").Installation,
+                    reinstallPackage.Installation,
+                    reinstallPackage.PackageOperationId,
                     PluginLifecycleOperationId.New(),
                     DateTimeOffset.UtcNow
                 ),
@@ -232,7 +299,8 @@ public sealed class PluginLifecyclePersistenceTests
         var occurredAt = new DateTimeOffset(2026, 8, 23, 15, 59, 0, TimeSpan.Zero);
         await using (var db = database.CreateDbContext())
         {
-            _ = db.PluginLifecycles.Add(
+            await InsertLegacyLifecycleRecordAsync(
+                db,
                 new PluginLifecycleRecord
                 {
                     PluginId = package.Installation.PluginId.Value,
@@ -248,7 +316,6 @@ public sealed class PluginLifecyclePersistenceTests
                     UpdatedAtUtc = occurredAt.UtcDateTime,
                 }
             );
-            _ = await db.SaveChangesAsync();
             _ = await db.Database.ExecuteSqlRawAsync(
                 "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purging', "
                     + "\"OperationKind\" = 'Purge', \"OutcomeCode\" = 'Purged';"
@@ -304,7 +371,11 @@ public sealed class PluginLifecyclePersistenceTests
         var otherInstallation = new LifecycleHarness().Package("2.0.0", "v2").Installation;
         var mismatchedInstallation = intent with
         {
-            ActiveRuntime = new(otherInstallation, intent.SelectedFence),
+            ActiveRuntime = new(
+                otherInstallation,
+                intent.SelectedFence,
+                intent.SelectedPackageOperationId
+            ),
             Revision = intent.Revision + 1,
         };
         PluginWorkerGeneration
@@ -314,7 +385,8 @@ public sealed class PluginLifecyclePersistenceTests
         {
             ActiveRuntime = new(
                 intent.SelectedInstallation,
-                new(intent.OperationId, mismatchedGeneration)
+                new(intent.OperationId, mismatchedGeneration),
+                intent.SelectedPackageOperationId
             ),
             Revision = intent.Revision + 1,
         };
@@ -391,27 +463,32 @@ public sealed class PluginLifecyclePersistenceTests
         var now = new DateTimeOffset(2026, 8, 23, 18, 30, 0, TimeSpan.Zero);
         await using (var db = database.CreateDbContext())
         {
-            db.PluginLifecycles.AddRange(
-                ParentLegalRemoveFromFaultRecord(
-                    removingId,
-                    PluginLifecyclePhase.Removing,
-                    PluginLifecycleOperationKind.Remove,
-                    now
-                ),
-                ParentLegalRemoveFromFaultRecord(
-                    removedId,
-                    PluginLifecyclePhase.Removed,
-                    PluginLifecycleOperationKind.Remove,
-                    now
-                ),
-                ParentLegalRemoveFromFaultRecord(
-                    legacyPurgeId,
-                    PluginLifecyclePhase.Removing,
-                    PluginLifecycleOperationKind.Remove,
-                    now
-                )
-            );
-            _ = await db.SaveChangesAsync();
+            foreach (
+                var record in new[]
+                {
+                    ParentLegalRemoveFromFaultRecord(
+                        removingId,
+                        PluginLifecyclePhase.Removing,
+                        PluginLifecycleOperationKind.Remove,
+                        now
+                    ),
+                    ParentLegalRemoveFromFaultRecord(
+                        removedId,
+                        PluginLifecyclePhase.Removed,
+                        PluginLifecycleOperationKind.Remove,
+                        now
+                    ),
+                    ParentLegalRemoveFromFaultRecord(
+                        legacyPurgeId,
+                        PluginLifecyclePhase.Removing,
+                        PluginLifecycleOperationKind.Remove,
+                        now
+                    ),
+                }
+            )
+            {
+                await InsertLegacyLifecycleRecordAsync(db, record);
+            }
             _ = await db.Database.ExecuteSqlRawAsync(
                 "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purging', "
                     + "\"OperationKind\" = 'Purge' WHERE \"PluginId\" = {0};",
@@ -486,7 +563,12 @@ public sealed class PluginLifecyclePersistenceTests
     {
         var begun = (
             await store.BeginActivationAsync(
-                new(package.Installation, PluginLifecycleOperationId.New(), DateTimeOffset.UtcNow),
+                new(
+                    package.Installation,
+                    package.PackageOperationId,
+                    PluginLifecycleOperationId.New(),
+                    DateTimeOffset.UtcNow
+                ),
                 CancellationToken.None
             )
         )
@@ -529,6 +611,34 @@ public sealed class PluginLifecyclePersistenceTests
             Revision = 5,
             UpdatedAtUtc = now.UtcDateTime,
         };
+
+    private static async ValueTask InsertLegacyLifecycleRecordAsync(
+        BlokeBotDbContext db,
+        PluginLifecycleRecord record
+    ) =>
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "plugin_lifecycles" (
+                "PluginId", "SelectedVersion", "SelectedTag", "OperationId",
+                "SelectedGeneration", "ActiveVersion", "ActiveTag", "ActiveOperationId",
+                "ActiveGeneration", "Phase", "OperationKind", "FaultedFrom",
+                "AutomaticRestartConsumed", "RestartNotBeforeUtc", "OutcomeCode",
+                "FailureCode", "OutcomeDetail", "OutcomeOccurredAtUtc", "Revision",
+                "UpdatedAtUtc"
+            ) VALUES (
+                {record.PluginId}, {record.SelectedVersion}, {record.SelectedTag},
+                {record.OperationId}, {record.SelectedGeneration}, {record.ActiveVersion},
+                {record.ActiveTag}, {record.ActiveOperationId}, {record.ActiveGeneration},
+                {record.Phase.ToString()}, {record.OperationKind.ToString()},
+                {record.FaultedFrom?.ToString()},
+                {record.AutomaticRestartConsumed}, {record.RestartNotBeforeUtc},
+                {record.OutcomeCode.ToString()},
+                {record.FailureCode?.ToString()},
+                {record.OutcomeDetail}, {record.OutcomeOccurredAtUtc}, {record.Revision},
+                {record.UpdatedAtUtc}
+            );
+            """
+        );
 
     private static async ValueTask WriteAsync(
         IPluginLifecycleStore store,

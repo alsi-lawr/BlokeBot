@@ -695,7 +695,14 @@ public sealed class PluginDynamicDispatchTests
         return new(
             installation,
             fence,
-            new(installation, prepared, "/state/test-plugin", null!, null!)
+            new(
+                installation,
+                PluginPackageOperationId.FromLifecycleOperation(fence.OperationId),
+                prepared,
+                "/state/test-plugin",
+                null!,
+                null!
+            )
         );
     }
 

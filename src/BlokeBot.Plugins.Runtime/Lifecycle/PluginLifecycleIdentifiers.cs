@@ -20,6 +20,28 @@ public sealed record PluginLifecycleOperationId
     public override string ToString() => Value.ToString("D");
 }
 
+public sealed record PluginPackageOperationId
+{
+    private PluginPackageOperationId(Guid value) => Value = value;
+
+    public Guid Value { get; }
+
+    public static PluginPackageOperationId New() => new(Guid.NewGuid());
+
+    public static PluginPackageOperationId FromLifecycleOperation(
+        PluginLifecycleOperationId operationId
+    ) => new(operationId.Value);
+
+    public static bool TryCreate(Guid candidate, out PluginPackageOperationId operationId)
+    {
+        var valid = candidate != Guid.Empty;
+        operationId = valid ? new(candidate) : null!;
+        return valid;
+    }
+
+    public override string ToString() => Value.ToString("D");
+}
+
 public sealed record PluginLifecycleFence(
     PluginLifecycleOperationId OperationId,
     PluginWorkerGeneration Generation

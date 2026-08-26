@@ -10,6 +10,8 @@ public sealed class PluginLifecycleRecord
 
     public string SelectedTag { get; set; } = string.Empty;
 
+    public Guid SelectedPackageOperationId { get; set; }
+
     public Guid OperationId { get; set; }
 
     public long SelectedGeneration { get; set; }
@@ -19,6 +21,8 @@ public sealed class PluginLifecycleRecord
     public string? ActiveTag { get; set; }
 
     public Guid? ActiveOperationId { get; set; }
+
+    public Guid? ActivePackageOperationId { get; set; }
 
     public long? ActiveGeneration { get; set; }
 

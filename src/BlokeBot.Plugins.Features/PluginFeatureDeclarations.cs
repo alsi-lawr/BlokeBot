@@ -10,6 +10,9 @@ public sealed record PluginFeatureDeclaration(
     PluginManifest Manifest
 )
 {
+    public PluginPackageOperationId PackageOperationId { get; init; } =
+        PluginPackageOperationId.FromLifecycleOperation(Fence.OperationId);
+
     public PluginFeatureDescriptor? FindFeature(PluginFeatureId featureId) =>
         Manifest.Features.FirstOrDefault(feature => feature.Id == featureId);
 
@@ -46,6 +49,12 @@ public sealed record PluginDeclarationChangeVersion(long Value);
 public interface IPluginFeatureDeclarationPublisher
 {
     void Publish(ValidatedPluginManifest manifest, PluginLifecycleFence fence);
+
+    void Publish(
+        ValidatedPluginManifest manifest,
+        PluginLifecycleFence fence,
+        PluginPackageOperationId packageOperationId
+    );
 
     void Remove(PluginId pluginId, PluginLifecycleFence fence);
 }
@@ -96,7 +105,18 @@ public sealed class PluginFeatureDeclarationRegistry
         }
     }
 
-    public void Publish(ValidatedPluginManifest manifest, PluginLifecycleFence fence)
+    public void Publish(ValidatedPluginManifest manifest, PluginLifecycleFence fence) =>
+        Publish(
+            manifest,
+            fence,
+            PluginPackageOperationId.FromLifecycleOperation(fence.OperationId)
+        );
+
+    public void Publish(
+        ValidatedPluginManifest manifest,
+        PluginLifecycleFence fence,
+        PluginPackageOperationId packageOperationId
+    )
     {
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(fence);
@@ -104,7 +124,10 @@ public sealed class PluginFeatureDeclarationRegistry
             new(manifest.Manifest.Id, manifest.Manifest.Release),
             fence,
             manifest.Manifest
-        );
+        )
+        {
+            PackageOperationId = packageOperationId,
+        };
         lock (_sync)
         {
             _ = _current.Declarations.TryGetValue(manifest.Manifest.Id, out var previous);

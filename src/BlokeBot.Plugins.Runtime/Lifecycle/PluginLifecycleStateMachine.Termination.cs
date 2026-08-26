@@ -11,6 +11,7 @@ public static partial class PluginLifecycleStateMachine
                         state.FaultedFrom == PluginLifecyclePhase.Active
                         && pending.Installation == state.SelectedInstallation
                         && pending.Fence == state.SelectedFence
+                        && pending.PackageOperationId == state.SelectedPackageOperationId
                     )
                 )
             : state.FaultedFrom is null;

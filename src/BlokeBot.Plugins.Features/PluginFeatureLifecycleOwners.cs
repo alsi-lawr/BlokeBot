@@ -45,7 +45,7 @@ public sealed class PluginFeatureActivationPublisher(
             );
         }
 
-        declarations.Publish(manifest, context.Fence);
+        declarations.Publish(manifest, context.Fence, context.Package.PackageOperationId);
         return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
             new PluginLifecycleOwnerOutcome.Succeeded()
         );
