@@ -28,7 +28,10 @@ public abstract record PluginMarketplaceCommandOutcome
     public sealed record Rejected(
         PluginMarketplaceCommandRejectionCode Code,
         PluginMarketplaceReceipt? Receipt
-    ) : PluginMarketplaceCommandOutcome;
+    ) : PluginMarketplaceCommandOutcome
+    {
+        public PluginLifecycleCommandRejectionCode? LifecycleRejection { get; init; }
+    }
 }
 
 public sealed class PluginMarketplaceApplicationService
@@ -308,11 +311,14 @@ public sealed class PluginMarketplaceApplicationService
             detail,
             cancellationToken
         );
-        return lifecycle is PluginLifecycleCommandOutcome.Rejected
+        return lifecycle is PluginLifecycleCommandOutcome.Rejected lifecycleRejected
             ? new PluginMarketplaceCommandOutcome.Rejected(
                 PluginMarketplaceCommandRejectionCode.LifecycleRejected,
                 receipt
             )
+            {
+                LifecycleRejection = lifecycleRejected.Code,
+            }
             : new PluginMarketplaceCommandOutcome.Completed(lifecycle, receipt);
     }
 

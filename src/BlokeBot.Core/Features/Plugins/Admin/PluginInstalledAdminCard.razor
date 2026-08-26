@@ -1,0 +1,104 @@
+@namespace BlokeBot.Core.Features.Plugins
+@using BlokeBot.Plugins.Runtime
+
+<article class="card" data-installed-plugin="@Plugin.PluginId.Value">
+    <div class="plugin-admin-card__header">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <h3 class="break-words text-base font-bold text-slate-950">@Plugin.Name</h3>
+                <span class="@_statusClass">
+                    <span class="status-pill__dot"></span>
+                    <span class="status-pill__label">@_statusLabel</span>
+                </span>
+            </div>
+            <p class="mt-1 break-words text-sm text-muted-foreground">
+                Version @Plugin.Lifecycle.Installation.Release.DeclaredVersion.Value
+                <span aria-hidden="true"> · </span>
+                <span class="font-mono">@Plugin.Lifecycle.Installation.Release.Tag.Value</span>
+                <span class="font-semibold">(mutable tag)</span>
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            @if (_controlsDisabled)
+            {
+                <button class="btn-secondary" data-plugin-lifecycle-control type="button" disabled>Settings</button>
+            }
+            else
+            {
+                <a class="btn-secondary"
+                   data-plugin-lifecycle-control
+                   href="@($"/plugins/{Plugin.PluginId.Value}/settings")">Settings</a>
+            }
+            @if (Plugin.UpdateRelease is not null)
+            {
+                <button class="btn-secondary" data-plugin-lifecycle-control type="button" disabled="@_controlsDisabled" @onclick="() => Update.InvokeAsync(Plugin)">Update</button>
+            }
+            @if (Plugin.Status == PluginAdminInstalledStatus.Faulted)
+            {
+                <button class="btn-primary" data-plugin-lifecycle-control type="button" disabled="@_controlsDisabled" @onclick="() => Restart.InvokeAsync(Plugin)">Restart</button>
+            }
+            <button class="plugin-admin__danger-button" data-plugin-lifecycle-control type="button" disabled="@_controlsDisabled" @onclick="() => Remove.InvokeAsync(Plugin)">Remove</button>
+        </div>
+    </div>
+
+    @if (Plugin.OperationInProgress || Busy)
+    {
+        <div class="plugin-admin-card__notice" role="status">
+            <span class="status-pill status-pill--blue">@_operationLabel</span>
+            <span>Plugin controls are unavailable until this operation finishes.</span>
+        </div>
+    }
+    else if (Plugin.Lifecycle.LatestOutcome.FailureCode is not null)
+    {
+        <div class="plugin-admin-card__fault" role="alert">
+            <p class="font-semibold">@PluginAdminCopy.Fault(Plugin.Lifecycle.LatestOutcome)</p>
+            @if (Plugin.Lifecycle.LatestOutcome.Detail is { } detail)
+            {
+                <p class="mt-1 break-words text-sm">@detail.Value</p>
+            }
+            @if (Plugin.Lifecycle.AutomaticRestartConsumed)
+            {
+                <p class="mt-1 text-sm">The automatic restart was used.</p>
+            }
+        </div>
+    }
+
+    <CollapsibleSection Title="Features and channels"
+                        Description="@_featureSummary"
+                        InitiallyOpen="false"
+                        Class="plugin-admin-card__details">
+        <div class="space-y-3 p-4">
+            @if (Plugin.Features.Length == 0)
+            {
+                <p class="text-sm text-muted-foreground">This plugin does not declare channel features.</p>
+            }
+            else
+            {
+                <ul class="plugin-admin-card__feature-list">
+                    @foreach (var feature in Plugin.Features)
+                    {
+                        <li>
+                            <a class="font-semibold text-blue-700"
+                               href="@($"/plugins/{Plugin.PluginId.Value}/features/{feature.Id.Value}")">@feature.Name</a>
+                            <span>@ChannelCount(feature.EnabledChannelCount)</span>
+                        </li>
+                    }
+                </ul>
+                <a class="btn-secondary inline-flex" href="/host">Open channel setup</a>
+            }
+        </div>
+    </CollapsibleSection>
+
+    @if (Plugin.LatestReceipt is { } receipt)
+    {
+        <div class="plugin-admin-card__receipt" role="status" data-durable-plugin-outcome>
+            <span class="font-semibold">Latest saved result:</span>
+            <span>@ReceiptOperation(receipt.Operation) · <code>@receipt.OutcomeCode</code></span>
+            <time datetime="@receipt.CompletedAt.ToString("O")">@receipt.CompletedAt.ToString("yyyy-MM-dd HH:mm 'UTC'")</time>
+            @if (!string.IsNullOrWhiteSpace(receipt.SafeDetail))
+            {
+                <span class="break-words">@receipt.SafeDetail</span>
+            }
+        </div>
+    }
+</article>

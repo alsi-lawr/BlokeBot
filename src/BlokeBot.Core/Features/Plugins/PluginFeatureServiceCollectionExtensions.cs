@@ -165,6 +165,7 @@ public static class PluginFeatureServiceCollectionExtensions
                 provider.GetRequiredService<TimeProvider>()
             )
         );
+        services.TryAddSingleton<IPluginAdminApplicationService, PluginAdminApplicationService>();
         _ = services.Replace(
             ServiceDescriptor.Singleton<
                 IPluginLifecyclePackageResolver,

@@ -1,10 +1,12 @@
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Plugins.Features;
+using BlokeBot.Plugins.Runtime;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Simulation;
@@ -15,6 +17,12 @@ internal static class SimulationServiceCollectionExtensions
     {
         _ = services.Replace(
             ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider())
+        );
+        services.TryAddSingleton<PluginRuntimeSnapshotRegistry>();
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IPluginRuntimeInvoker>(static provider =>
+                provider.GetRequiredService<PluginRuntimeSnapshotRegistry>()
+            )
         );
         _ = services.Replace(
             ServiceDescriptor.Singleton<
@@ -75,6 +83,12 @@ internal static class SimulationServiceCollectionExtensions
         );
         _ = services.AddSingleton<SimulationFixtureSeeder>();
         _ = services.AddSingleton<SimulationPluginFeatureScenario>();
+        _ = services.AddSingleton<SimulationPluginAdminScenario>();
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IPluginAdminApplicationService>(static provider =>
+                provider.GetRequiredService<SimulationPluginAdminScenario>()
+            )
+        );
         _ = services.AddSingleton<SimulationReadiness>();
         _ = services.AddSingleton<SimulationStartupCoordinator>();
         return services;

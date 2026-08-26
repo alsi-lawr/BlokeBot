@@ -78,6 +78,22 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
         _ = app.MapPost(
+                "/simulation/plugin-admin/{state}",
+                static (string state, SimulationPluginAdminScenario scenario) =>
+                    scenario.SetState(state) ? Results.Ok() : Results.BadRequest()
+            )
+            .AllowAnonymous();
+        _ = app.MapGet(
+                "/simulation/plugin-admin/{state}/view",
+                static (string state, string? theme, SimulationPluginAdminScenario scenario) =>
+                    scenario.SetState(state)
+                        ? Results.Redirect(
+                            $"/simulation/login?view=plugin-admin&theme={Uri.EscapeDataString(theme ?? "light")}"
+                        )
+                        : Results.BadRequest()
+            )
+            .AllowAnonymous();
+        _ = app.MapPost(
                 "/simulation/configuration-activation/{mode}",
                 static (string mode, SimulationConfigurationActivationObserver observer) =>
                 {

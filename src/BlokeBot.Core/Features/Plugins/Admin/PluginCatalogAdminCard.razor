@@ -1,0 +1,66 @@
+@namespace BlokeBot.Core.Features.Plugins
+
+<article class="card plugin-admin-catalog-card" data-catalog-plugin="@CatalogEntry.Entry.PluginId.Value">
+    <div class="flex min-w-0 items-start gap-3">
+        @if (CatalogEntry.Entry.IconUrl is { } iconUrl)
+        {
+            <img class="plugin-admin-catalog-card__icon" src="@iconUrl" alt="" />
+        }
+        else
+        {
+            <div class="plugin-admin-catalog-card__icon plugin-admin-catalog-card__fallback" aria-hidden="true">◆</div>
+        }
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+                <h3 class="break-words font-bold text-slate-950">@CatalogEntry.Entry.Name</h3>
+                <span class="@(CatalogEntry.Compatible ? "status-pill status-pill--green" : "status-pill status-pill--red")">
+                    @(CatalogEntry.Compatible ? "Compatible" : "Incompatible")
+                </span>
+                @if (CatalogEntry.Installed)
+                {
+                    <span class="status-pill status-pill--blue">@(CatalogEntry.SelectedRelease ? "Installed" : "Another version installed")</span>
+                }
+            </div>
+            <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">By @CatalogEntry.Entry.Author</p>
+        </div>
+    </div>
+
+    <p class="text-sm leading-6 text-slate-700">@CatalogEntry.Entry.Summary</p>
+    <div class="flex flex-wrap gap-2">
+        @foreach (var tag in CatalogEntry.Entry.Tags)
+        {
+            <span class="status-pill status-pill--slate">@tag</span>
+        }
+    </div>
+
+    <dl class="plugin-admin-catalog-card__metadata">
+        <div><dt>Version</dt><dd>@CatalogEntry.Entry.Release.DeclaredVersion.Value</dd></div>
+        <div><dt>Mutable tag</dt><dd class="font-mono">@CatalogEntry.Entry.Release.Tag.Value</dd></div>
+        <div><dt>BlokeBot</dt><dd>@CatalogEntry.Entry.Compatibility.BlokeBot</dd></div>
+        <div><dt>Plugin API</dt><dd>@CatalogEntry.Entry.Compatibility.PluginApi</dd></div>
+    </dl>
+
+    @if (!CatalogEntry.Compatible)
+    {
+        <p class="plugin-admin-catalog-card__incompatible" role="status">This release does not support this BlokeBot version or platform.</p>
+    }
+
+    <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
+        <a class="font-semibold text-blue-700" href="@CatalogEntry.Entry.RepositoryUrl" target="_blank" rel="noreferrer">Open repository</a>
+        <button class="btn-primary"
+                type="button"
+                disabled="@(Busy || CatalogEntry.Installed || !CatalogEntry.Compatible)"
+                @onclick="() => Install.InvokeAsync(CatalogEntry)">Install</button>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public PluginAdminCatalogEntry CatalogEntry { get; set; } = default!;
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<PluginAdminCatalogEntry> Install { get; set; }
+}

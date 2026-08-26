@@ -1,0 +1,48 @@
+@namespace BlokeBot.Core.Features.Plugins
+
+@switch (Catalog)
+{
+    case PluginAdminCatalog.Available available:
+        <div class="plugin-admin-catalogue-status" role="status">
+            @if (available.RefreshInProgress)
+            {
+                <span class="status-pill status-pill--blue">Refreshing</span>
+            }
+            <span>Saved @available.RefreshedAt.ToString("yyyy-MM-dd HH:mm 'UTC'") · @Age(available.Age)</span>
+            @if (available.RefreshFailure is { } failure)
+            {
+                <span class="plugin-admin-catalogue-status__failure">@PluginAdminCopy.RefreshFailure(failure) Search still uses the saved catalogue.</span>
+            }
+        </div>
+        break;
+    case PluginAdminCatalog.Unavailable unavailable:
+        <div class="plugin-admin-catalogue-status" role="status">
+            @if (unavailable.RefreshInProgress)
+            {
+                <span class="status-pill status-pill--blue">Refreshing</span>
+            }
+            @if (unavailable.LastAttemptAt is { } attemptedAt)
+            {
+                <span>Last attempt: @attemptedAt.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+            }
+            @if (unavailable.RefreshFailure is { } unavailableFailure)
+            {
+                <span class="plugin-admin-catalogue-status__failure">@PluginAdminCopy.RefreshFailure(unavailableFailure)</span>
+            }
+        </div>
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public PluginAdminCatalog Catalog { get; set; } = default!;
+
+    private static string Age(TimeSpan age) =>
+        age.TotalMinutes < 1 ? "less than 1 minute old"
+        : age.TotalHours < 1 ? AgeUnit((int)Math.Floor(age.TotalMinutes), "minute")
+        : age.TotalDays < 1 ? AgeUnit((int)Math.Floor(age.TotalHours), "hour")
+        : AgeUnit((int)Math.Floor(age.TotalDays), "day");
+
+    private static string AgeUnit(int count, string unit) =>
+        $"{count} {unit}{(count == 1 ? string.Empty : "s")} old";
+}

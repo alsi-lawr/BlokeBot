@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
@@ -12,6 +13,16 @@ namespace BlokeBot.Core.Features.Admin;
 
 public partial class AdminPage
 {
+    internal const string AdministrationTab = "administration";
+    internal const string PluginsTab = "plugins";
+
+    private static readonly IReadOnlyList<SegmentedTabItem> _adminTabs =
+    [
+        new(AdministrationTab, "Administration"),
+        new(PluginsTab, "Plugins"),
+    ];
+
+    private string _activeAdminTab = AdministrationTab;
     private SiteAccessAdminState? _state;
     private BotAccountAuthorizationStatus? _botAccountStatus;
     private bool _botAccountStageOpen = true;
@@ -33,6 +44,8 @@ public partial class AdminPage
     private IReadOnlyList<AccessListEntryProfile> _siteBlacklistEntries = [];
     private IReadOnlyList<AccessListEntryProfile> _siteWhitelistEntries = [];
     private bool _isBotAccount;
+    private bool _pageContextLoaded;
+    private bool _pluginsVisited;
     private int? _pendingRuntimeHostId;
     private string _newBlacklistLogin = string.Empty;
     private string _newHostLogin = string.Empty;
@@ -40,6 +53,8 @@ public partial class AdminPage
 
     protected override async Task OnInitializedAsync()
     {
+        _activeAdminTab = SegmentedTabs.CanonicalKey(_navigation, _adminTabs);
+        _pluginsVisited = _activeAdminTab == PluginsTab;
         _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
@@ -48,7 +63,19 @@ public partial class AdminPage
                 StateHasChanged
             )
         );
+        _isBotAccount = (await LoadPageContextAsync()).IsBotAccount;
+        _pageContextLoaded = true;
+        if (_pluginsVisited)
+        {
+            StateHasChanged();
+        }
         await LoadAsync();
+    }
+
+    private void SelectAdminTab(string key)
+    {
+        _activeAdminTab = key;
+        _pluginsVisited |= key == PluginsTab;
     }
 
     private async Task AddBlacklistAsync()
@@ -108,7 +135,6 @@ public partial class AdminPage
 
     private async Task LoadAsync()
     {
-        _isBotAccount = (await LoadPageContextAsync()).IsBotAccount;
         _state = await _siteAccess.LoadAdminStateAsync(CancellationToken.None);
         _siteWhitelistEntries = await _accessListProfiles.ResolveAsync(
             _state.Whitelist,

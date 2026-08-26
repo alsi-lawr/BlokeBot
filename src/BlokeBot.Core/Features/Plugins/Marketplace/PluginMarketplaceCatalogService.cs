@@ -9,6 +9,8 @@ public abstract record PluginMarketplaceSearchOutcome
 {
     private PluginMarketplaceSearchOutcome() { }
 
+    public bool RefreshInProgress { get; init; }
+
     public sealed record Available(
         ImmutableArray<PluginMarketplaceCatalogEntry> Entries,
         DateTimeOffset RefreshedAt,
@@ -43,7 +45,10 @@ public sealed class PluginMarketplaceCatalogService
         ArgumentNullException.ThrowIfNull(session);
         if (!session.IsBotAdmin)
         {
-            return new PluginMarketplaceSearchOutcome.Unauthorized();
+            return new PluginMarketplaceSearchOutcome.Unauthorized
+            {
+                RefreshInProgress = _registry.RefreshInProgress,
+            };
         }
 
         var state = _registry.Current;
@@ -52,7 +57,10 @@ public sealed class PluginMarketplaceCatalogService
             return new PluginMarketplaceSearchOutcome.Unavailable(
                 state.LastAttemptAt,
                 state.RefreshFailure
-            );
+            )
+            {
+                RefreshInProgress = _registry.RefreshInProgress,
+            };
         }
 
         var normalized = query?.Trim();
@@ -67,7 +75,10 @@ public sealed class PluginMarketplaceCatalogService
             snapshot.RefreshedAt,
             state.Age(_timeProvider)!.Value,
             state.RefreshFailure
-        );
+        )
+        {
+            RefreshInProgress = _registry.RefreshInProgress,
+        };
     }
 
     internal PluginMarketplaceCatalogEntry? Find(
@@ -98,8 +109,11 @@ internal sealed class PluginMarketplaceCatalogRegistry(
 {
     private readonly SemaphoreSlim _refresh = new(1, 1);
     private PluginMarketplaceCatalogState _current = new(null, null, null, null, null);
+    private int _refreshInProgress;
 
     internal PluginMarketplaceCatalogState Current => Volatile.Read(ref _current);
+
+    internal bool RefreshInProgress => Volatile.Read(ref _refreshInProgress) != 0;
 
     internal async ValueTask InitializeAsync(CancellationToken cancellationToken) =>
         Volatile.Write(ref _current, await store.LoadAsync(cancellationToken));
@@ -109,6 +123,7 @@ internal sealed class PluginMarketplaceCatalogRegistry(
         await _refresh.WaitAsync(cancellationToken);
         try
         {
+            _ = Interlocked.Exchange(ref _refreshInProgress, 1);
             var now = timeProvider.GetUtcNow();
             var download = await transport.DownloadAsync(
                 Current.SourceETag,
@@ -161,6 +176,7 @@ internal sealed class PluginMarketplaceCatalogRegistry(
         }
         finally
         {
+            _ = Interlocked.Exchange(ref _refreshInProgress, 0);
             _ = _refresh.Release();
         }
     }

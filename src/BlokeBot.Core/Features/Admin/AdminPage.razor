@@ -11,6 +11,7 @@
 @using BlokeBot.Core.Features.HostedChannels.Authorization
 @using BlokeBot.Core.Features.HostedChannels.Runtime
 @using BlokeBot.Core.Features.SiteAccess
+@using BlokeBot.Core.Features.Plugins
 @using BlokeBot.Core.Hosts
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
@@ -29,47 +30,78 @@
 
 <div class="mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Admin"
-                Description="Connect the bot and manage who can use BlokeBot." />
+                Description="Manage BlokeBot access, channels, and plugins." />
 
-    @if (_state is null)
+    <SegmentedTabs Id="admin"
+                   AriaLabel="Admin sections"
+                   Items="_adminTabs"
+                   OwnsFragment="true"
+                   ActiveKey="_activeAdminTab"
+                   ActiveKeyChanged="SelectAdminTab" />
+
+    <section id="admin-administration-panel"
+             role="tabpanel"
+             aria-labelledby="admin-administration-tab"
+             hidden="@(_activeAdminTab != AdministrationTab)">
+        @if (_state is null)
+        {
+            <ApplicationCardCollection Owner="admin-page-cards">
+                <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
+            </ApplicationCardCollection>
+        }
+        else
+        {
+            <div class="settings-disclosure-stack">
+            <StudioStage Key="bot-account"
+                         Number="1"
+                         Title="Bot account"
+                         Summary="@_botAccountStageSummary"
+                         Open="@_botAccountStageOpen"
+                         OpenChanged="open => _botAccountStageOpen = open">
+                <BotAccountAuthorizationSection Status="@_botAccountStatus"
+                                                Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
+                                                Clear="@ClearBotAccountAuthorizationAsync"
+                                                Refresh="@RefreshBotAccountAuthorizationAsync" />
+            </StudioStage>
+
+            <SiteAccessSection State="@_state"
+                               WhitelistEntries="@_siteWhitelistEntries"
+                               BlacklistEntries="@_siteBlacklistEntries"
+                               AddBlacklist="@AddBlacklistAsync"
+                               AddWhitelist="@AddWhitelistAsync"
+                               RemoveBlacklist="@RemoveBlacklistAsync"
+                               RemoveWhitelist="@RemoveWhitelistAsync"
+                               ToggleWhitelist="@ToggleWhitelistAsync"
+                               @bind-NewBlacklistLogin="_newBlacklistLogin"
+                               @bind-NewWhitelistLogin="_newWhitelistLogin" />
+
+            <HostedChannelsSection Hosts="@_hosts"
+                                   CreateHost="@CreateHostAsync"
+                                   CanEditHosts="@(!_isBotAccount)"
+                                   RemoveHost="@RemoveHostAsync"
+                                   StartBot="@StartBotAsync"
+                                   StopBot="@StopBotAsync"
+                                   @bind-NewHostLogin="_newHostLogin" />
+            </div>
+        }
+    </section>
+
+    @if (_pluginsVisited)
     {
-        <ApplicationCardCollection Owner="admin-page-cards">
-            <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
-        </ApplicationCardCollection>
-    }
-    else
-    {
-        <div class="settings-disclosure-stack">
-        <StudioStage Key="bot-account"
-                     Number="1"
-                     Title="Bot account"
-                     Summary="@_botAccountStageSummary"
-                     Open="@_botAccountStageOpen"
-                     OpenChanged="open => _botAccountStageOpen = open">
-            <BotAccountAuthorizationSection Status="@_botAccountStatus"
-                                            Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
-                                            Clear="@ClearBotAccountAuthorizationAsync"
-                                            Refresh="@RefreshBotAccountAuthorizationAsync" />
-        </StudioStage>
-
-        <SiteAccessSection State="@_state"
-                           WhitelistEntries="@_siteWhitelistEntries"
-                           BlacklistEntries="@_siteBlacklistEntries"
-                           AddBlacklist="@AddBlacklistAsync"
-                           AddWhitelist="@AddWhitelistAsync"
-                           RemoveBlacklist="@RemoveBlacklistAsync"
-                           RemoveWhitelist="@RemoveWhitelistAsync"
-                           ToggleWhitelist="@ToggleWhitelistAsync"
-                           @bind-NewBlacklistLogin="_newBlacklistLogin"
-                           @bind-NewWhitelistLogin="_newWhitelistLogin" />
-
-        <HostedChannelsSection Hosts="@_hosts"
-                               CreateHost="@CreateHostAsync"
-                               CanEditHosts="@(!_isBotAccount)"
-                               RemoveHost="@RemoveHostAsync"
-                               StartBot="@StartBotAsync"
-                               StopBot="@StopBotAsync"
-                               @bind-NewHostLogin="_newHostLogin" />
-        </div>
+        <section id="admin-plugins-panel"
+                 role="tabpanel"
+                 aria-labelledby="admin-plugins-tab"
+                 hidden="@(_activeAdminTab != PluginsTab)">
+            @if (_pageContextLoaded)
+            {
+                <PluginAdminPanel Session="PageContext.Session" />
+            }
+            else
+            {
+                <ApplicationCardCollection Owner="plugin-admin-loading">
+                    <div class="card p-8 text-sm text-muted-foreground">Loading plugins...</div>
+                </ApplicationCardCollection>
+            }
+        </section>
     }
 </div>

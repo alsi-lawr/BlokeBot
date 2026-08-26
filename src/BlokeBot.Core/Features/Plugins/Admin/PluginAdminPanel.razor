@@ -1,0 +1,104 @@
+@namespace BlokeBot.Core.Features.Plugins
+@using BlokeBot.Core.Auth.Sessions
+@using BlokeBot.Plugins.Contracts
+@using BlokeBot.Plugins.Features
+@using BlokeBot.Plugins.Runtime
+@inject IPluginAdminApplicationService _plugins
+@inject ToastService _toasts
+
+<div class="plugin-admin" data-plugin-admin>
+    @if (_snapshot is null)
+    {
+        <ApplicationCardCollection Owner="plugin-admin-loading">
+            <div class="card p-8 text-sm text-muted-foreground" role="status">Loading plugins...</div>
+        </ApplicationCardCollection>
+    }
+    else
+    {
+        <section class="space-y-3" aria-labelledby="installed-plugins-title">
+            <div class="plugin-admin__section-heading">
+                <div>
+                    <h2 id="installed-plugins-title" class="text-lg font-bold text-slate-950">Installed plugins</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Manage the plugins in this BlokeBot instance.</p>
+                </div>
+                <span class="status-pill status-pill--slate">@_snapshot.Installed.Length installed</span>
+            </div>
+
+            @if (_snapshot.Installed.Length == 0)
+            {
+                <div class="card p-6">
+                    <h3 class="font-semibold text-slate-950">No plugins are installed</h3>
+                    <p class="mt-1 text-sm text-muted-foreground">Find a compatible plugin in the catalogue.</p>
+                </div>
+            }
+            else
+            {
+                <ApplicationCardCollection Owner="installed-plugins">
+                    @foreach (var plugin in _snapshot.Installed)
+                    {
+                        <PluginInstalledAdminCard Plugin="plugin"
+                                                  Busy="@IsBusy(plugin.PluginId)"
+                                                  Update="OpenUpdate"
+                                                  Restart="RestartAsync"
+                                                  Remove="OpenRemove" />
+                    }
+                </ApplicationCardCollection>
+            }
+        </section>
+
+        <section class="space-y-3" aria-labelledby="plugin-catalogue-title">
+            <div class="plugin-admin__section-heading">
+                <div>
+                    <h2 id="plugin-catalogue-title" class="text-lg font-bold text-slate-950">Plugin catalogue</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Search the saved catalogue.</p>
+                </div>
+                <button class="btn-secondary" type="button" disabled="@_loading" @onclick="ReloadAsync">Reload status</button>
+            </div>
+
+            <div class="card p-5">
+                <label class="label" for="plugin-catalogue-search">Search plugins</label>
+                <input id="plugin-catalogue-search"
+                       class="input mt-2"
+                       type="search"
+                       autocomplete="off"
+                       value="@_query"
+                       @oninput="SearchAsync" />
+                <PluginCatalogueStatus Catalog="_snapshot.Catalog" />
+            </div>
+
+            @switch (_snapshot.Catalog)
+            {
+                case PluginAdminCatalog.Available { Entries.Length: 0 }:
+                    <div class="card p-6">
+                        <h3 class="font-semibold text-slate-950">No plugins match this search</h3>
+                        <p class="mt-1 text-sm text-muted-foreground">Change the search text and try again.</p>
+                    </div>
+                    break;
+                case PluginAdminCatalog.Available available:
+                    <div class="plugin-admin__catalog-grid">
+                        @foreach (var entry in available.Entries)
+                        {
+                            <PluginCatalogAdminCard CatalogEntry="entry"
+                                                    Busy="@IsBusy(entry.Entry.PluginId)"
+                                                    Install="OpenInstall" />
+                        }
+                    </div>
+                    break;
+                case PluginAdminCatalog.Unavailable:
+                    <div class="card p-6">
+                        <h3 class="font-semibold text-slate-950">The plugin catalogue is unavailable</h3>
+                        <p class="mt-1 text-sm text-muted-foreground">No saved catalogue is available. Reload the status after the next refresh.</p>
+                    </div>
+                    break;
+            }
+        </section>
+    }
+</div>
+
+@if (_confirmation is not null)
+{
+    <PluginAdminConfirmationDialog Confirmation="_confirmation"
+                                   Busy="@IsBusy(_confirmation.PluginId)"
+                                   Cancel="CloseConfirmation"
+                                   Confirm="ConfirmAsync" />
+}

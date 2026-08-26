@@ -1,0 +1,63 @@
+@namespace BlokeBot.Core.Features.Plugins
+@using BlokeBot.Plugins.Contracts
+
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+     data-plugin-confirmation-dialog
+     @onclick="Cancel">
+    <section class="surface plugin-admin-confirmation"
+             role="alertdialog"
+             aria-modal="true"
+             aria-labelledby="plugin-confirmation-title"
+             aria-describedby="plugin-confirmation-description"
+             @onclick:stopPropagation="true">
+        @switch (Confirmation)
+        {
+            case PluginAdminConfirmation.Install install:
+                <h2 id="plugin-confirmation-title" class="text-lg font-bold text-slate-950">Install @install.Entry.Name?</h2>
+                <div id="plugin-confirmation-description" class="mt-2 space-y-3 text-sm leading-6 text-slate-700">
+                    <p>Install version @install.Entry.Release.DeclaredVersion.Value from tag <span class="font-mono">@install.Entry.Release.Tag.Value</span>.</p>
+                    <p class="plugin-admin-confirmation__warning">This plugin can access files, start processes, and use the network as the BlokeBot account.</p>
+                </div>
+                break;
+            case PluginAdminConfirmation.Update update:
+                <h2 id="plugin-confirmation-title" class="text-lg font-bold text-slate-950">Update @update.Plugin.Name?</h2>
+                <div id="plugin-confirmation-description" class="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+                    <p>Apply version @update.Release.DeclaredVersion.Value from mutable tag <span class="font-mono">@update.Release.Tag.Value</span>.</p>
+                    <p>BlokeBot will stop the current plugin work before it applies the update.</p>
+                </div>
+                break;
+            case PluginAdminConfirmation.Remove remove:
+                <h2 id="plugin-confirmation-title" class="text-lg font-bold text-slate-950">Permanently remove @remove.Plugin.Name?</h2>
+                <div id="plugin-confirmation-description" class="mt-2 text-sm leading-6 text-slate-700">
+                    <p>This action cannot be undone. It permanently deletes:</p>
+                    <ul class="plugin-admin-confirmation__deletion-list">
+                        <li>The package files.</li>
+                        <li>The installation, settings, features, configuration, and secrets.</li>
+                        <li>The schedules and private data.</li>
+                        <li>The automation definitions and ledgers.</li>
+                        <li>Every plugin-dependent flow, node, and item of run history.</li>
+                        <li>The marketplace receipts.</li>
+                        <li>All other plugin context.</li>
+                    </ul>
+                    <p class="mt-3 font-semibold">The catalogue metadata remains.</p>
+                    <div class="field mt-4">
+                        <label class="field__label" for="plugin-removal-confirmation">Type @remove.Plugin.PluginId.Value to confirm</label>
+                        <input id="plugin-removal-confirmation"
+                               class="field__input"
+                               autocomplete="off"
+                               value="@_removalConfirmation"
+                               @oninput="SetRemovalConfirmation" />
+                    </div>
+                </div>
+                break;
+        }
+
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+            <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Cancel">Cancel</button>
+            <button class="@_confirmClass"
+                    type="button"
+                    disabled="@_confirmDisabled"
+                    @onclick="Confirm">@_confirmLabel</button>
+        </div>
+    </section>
+</div>
