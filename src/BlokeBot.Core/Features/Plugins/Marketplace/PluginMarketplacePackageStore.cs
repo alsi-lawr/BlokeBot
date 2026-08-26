@@ -224,35 +224,6 @@ internal sealed class PluginMarketplacePackageStore(
         return ValueTask.CompletedTask;
     }
 
-    internal async ValueTask BackfillLegacyPackagesAsync(
-        IReadOnlyList<PluginLifecycleState> states,
-        CancellationToken cancellationToken
-    )
-    {
-        foreach (var state in states)
-        {
-            await BackfillLegacyPackageAsync(
-                state.SelectedInstallation,
-                state.SelectedPackageOperationId,
-                cancellationToken
-            );
-            if (
-                state.ActiveRuntime is { } active
-                && (
-                    active.Installation != state.SelectedInstallation
-                    || active.PackageOperationId != state.SelectedPackageOperationId
-                )
-            )
-            {
-                await BackfillLegacyPackageAsync(
-                    active.Installation,
-                    active.PackageOperationId,
-                    cancellationToken
-                );
-            }
-        }
-    }
-
     internal ValueTask CleanupInterruptedAsync(CancellationToken cancellationToken)
     {
         if (!Directory.Exists(_packageRoot))
@@ -310,15 +281,6 @@ internal sealed class PluginMarketplacePackageStore(
         PluginPackageOperationId packageOperationId
     ) => Path.Combine(OperationDirectory(installation, packageOperationId), "package");
 
-    private string LegacyPackageDirectory(PluginInstallationIdentity installation) =>
-        Path.Combine(
-            _packageRoot,
-            installation.PluginId.Value,
-            installation.Release.DeclaredVersion.Value,
-            EncodeTag(installation.Release.Tag.Value),
-            "package"
-        );
-
     private string OperationDirectory(
         PluginInstallationIdentity installation,
         PluginPackageOperationId packageOperationId
@@ -348,44 +310,6 @@ internal sealed class PluginMarketplacePackageStore(
             runtime.HostCalls,
             runtime.WorkerLogger
         );
-
-    private async ValueTask BackfillLegacyPackageAsync(
-        PluginInstallationIdentity installation,
-        PluginPackageOperationId packageOperationId,
-        CancellationToken cancellationToken
-    )
-    {
-        var destination = PackageDirectory(installation, packageOperationId);
-        if (Directory.Exists(destination))
-        {
-            return;
-        }
-
-        var legacy = LegacyPackageDirectory(installation);
-        var validation = await PluginMarketplaceMaterializedPackageValidator.ValidateAsync(
-            legacy,
-            runtime.Target,
-            cancellationToken
-        );
-        if (
-            validation
-                is not PluginMarketplaceMaterializedPackageValidationOutcome.Accepted accepted
-            || !Matches(installation, accepted.Package)
-        )
-        {
-            return;
-        }
-
-        try
-        {
-            _ = Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            Directory.Move(legacy, destination);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return;
-        }
-    }
 
     private async ValueTask<PluginLifecyclePackageResolution> ResolveAtAsync(
         PluginInstallationIdentity installation,

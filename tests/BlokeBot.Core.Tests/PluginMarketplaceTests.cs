@@ -529,7 +529,7 @@ public sealed class PluginMarketplaceTests
     }
 
     [Test]
-    public async Task PackageStore_CorruptExactPackageNeverFallsBackToOlderSameTagPackage()
+    public async Task PackageStore_CorruptOrMismatchedExactPackageNeverFallsBackToOlderSameTagPackage()
     {
         using var root = new TemporaryDirectory();
         var store = new PluginMarketplacePackageStore(
@@ -571,6 +571,20 @@ public sealed class PluginMarketplaceTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginLifecyclePackageResolution.Unavailable>();
+        await File.WriteAllBytesAsync(
+            Path.Combine(selected.PreparedPackage.PackageRoot, PluginPackage.ManifestPath),
+            PluginContractFixtures.ManifestReplacing(
+                "community.link-queue",
+                "community.other-queue"
+            )
+        );
+        _ = (
+            await store.ResolveAsync(
+                selected.Installation,
+                selected.PackageOperationId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecyclePackageResolution.Unavailable>();
         _ = (
             await store.ResolveAsync(
                 older.Installation,
@@ -578,65 +592,6 @@ public sealed class PluginMarketplaceTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
-    }
-
-    [Test]
-    public async Task PackageStore_BackfillsLegacyPackageToPersistedExactOperation()
-    {
-        using var root = new TemporaryDirectory();
-        var store = new PluginMarketplacePackageStore(
-            Options(root.Path),
-            new FixedArchiveTransport(Archive(PluginContractFixtures.CompletePackage())),
-            new(),
-            Runtime()
-        );
-        var package = (
-            await store.PrepareAsync(
-                Entry(),
-                PluginPackageOperationId.New(),
-                CancellationToken.None
-            )
-        )
-            .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>()
-            .Package;
-        var operationDirectory = Directory.GetParent(package.PreparedPackage.PackageRoot)!;
-        var tagDirectory = operationDirectory.Parent!.Parent!;
-        var legacyRoot = Path.Combine(tagDirectory.FullName, "package");
-        Directory.Move(package.PreparedPackage.PackageRoot, legacyRoot);
-        _ = PluginWorkerGeneration.TryCreate(1, out var generation);
-        var lifecycleOperationId = PluginLifecycleOperationId.New();
-        var now = DateTimeOffset.UtcNow;
-        var state = new PluginLifecycleState(
-            package.Installation.PluginId,
-            package.Installation,
-            package.PackageOperationId,
-            lifecycleOperationId,
-            generation,
-            new(
-                package.Installation,
-                new(lifecycleOperationId, generation),
-                package.PackageOperationId
-            ),
-            PluginLifecyclePhase.Active,
-            PluginLifecycleOperationKind.Activate,
-            null,
-            false,
-            null,
-            PluginLifecycleOutcome.Progress(PluginLifecycleOutcomeCode.Activated, now),
-            1,
-            now
-        );
-
-        await store.BackfillLegacyPackagesAsync([state], CancellationToken.None);
-
-        _ = (
-            await store.ResolveAsync(
-                package.Installation,
-                package.PackageOperationId,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
-        Directory.Exists(legacyRoot).ShouldBeFalse();
     }
 
     [Test]

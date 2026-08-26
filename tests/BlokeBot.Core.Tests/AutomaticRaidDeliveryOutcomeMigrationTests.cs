@@ -7,18 +7,18 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class AutomaticRaidDeliveryOutcomeMigrationTests
 {
-    private const string _previousMigration = "20260825142439_v0.13.0_OverlayAccessRegeneration";
+    private const string _releasedMigration = "20260822192152_v0.12.0_GuessingSharedAliases";
     private static readonly DateTime _now = new(2026, 8, 25, 15, 30, 0, DateTimeKind.Utc);
 
     [Test]
-    public async Task ExistingOutcomesUpgradeAndQueuedStateDowngradesWithoutFalseDelivery()
+    public async Task Upgrade_PreservesExistingOutcomesAndAcceptsQueuedState()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync(
             new WeeklyAnnouncementMigrationInterceptor()
         );
         await using (var before = await database.CreateDbContextAsync())
         {
-            await before.Database.MigrateAsync(_previousMigration);
+            await before.Database.MigrateAsync(_releasedMigration);
             var host = new BotHost
             {
                 Id = 1,
@@ -75,23 +75,18 @@ public sealed class AutomaticRaidDeliveryOutcomeMigrationTests
             _ = await upgrade.SaveChangesAsync();
         }
 
-        await using (var downgrade = await database.CreateDbContextAsync())
-        {
-            await downgrade.Database.MigrateAsync(_previousMigration);
-        }
-
         await using var verify = await database.CreateDbContextAsync();
-        var downgraded = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+        var queued = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
             outcome.ProviderMessageId == "queued-after-upgrade"
         );
-        downgraded.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Processing);
-        downgraded.ResultCode.ShouldBeNull();
-        downgraded.CompletedAtUtc.ShouldBeNull();
+        queued.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Queued);
+        queued.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Queued);
+        queued.CompletedAtUtc.ShouldBeNull();
         (
             await verify.RaidCollaborationHistory.SingleAsync(history =>
                 history.ProviderMessageId == "queued-after-upgrade"
             )
-        ).ShoutoutOutcome.ShouldBe(RaidShoutoutOutcome.Rejected);
+        ).ShoutoutOutcome.ShouldBe(RaidShoutoutOutcome.Queued);
     }
 
     private static AutomaticRaidShoutoutOutcome Outcome(

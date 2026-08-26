@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class ConfigurationActivationMigrationTests
 {
-    private const string _preB262Migration = "20260825104453_v0.13.0_DurableAlertRecurrence";
+    private const string _releasedMigration = "20260822192152_v0.12.0_GuessingSharedAliases";
     private const string _safeLegacyReason =
         "A previous automatic activation failed. Retry automatic activation.";
 
@@ -18,7 +18,7 @@ public sealed class ConfigurationActivationMigrationTests
         await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync(
             new WeeklyAnnouncementMigrationInterceptor()
         );
-        await MigrateAsync(database, _preB262Migration);
+        await MigrateAsync(database, _releasedMigration);
         var hostId = await SeedHostAsync(database);
         var firstId = Guid.NewGuid();
         var secondId = Guid.NewGuid();
@@ -42,58 +42,6 @@ public sealed class ConfigurationActivationMigrationTests
         secondIssue.Reason.ShouldBe(_safeLegacyReason);
         firstIssue.Reason.ShouldNotContain(FirstCode);
         secondIssue.Reason.ShouldNotContain(SecondCode);
-    }
-
-    [Test]
-    public async Task UpgradedManualFollowUp_DowngradesToFailedWithItsFirstIssueCode()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync(
-            new WeeklyAnnouncementMigrationInterceptor()
-        );
-        await MigrateAsync(database, _preB262Migration);
-        var hostId = await SeedHostAsync(database);
-        await MigrateAsync(database);
-        var activationId = Guid.NewGuid();
-        await using (var seed = await database.CreateDbContextAsync())
-        {
-            var now = DateTime.UtcNow;
-            _ = seed.ConfigurationActivations.Add(
-                new()
-                {
-                    Id = activationId,
-                    HostId = hostId,
-                    EnabledChanges = HostFeatureFlags.Polls,
-                    Status = ConfigurationActivationStatus.ManualFollowUp,
-                    Revision = 1,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now,
-                    IssuesJson = JsonSerializer.Serialize<PersistedIssue[]>([
-                        new("manual-provider-one", "Reconnect the first provider."),
-                        new("manual-provider-two", "Reconnect the second provider."),
-                    ]),
-                }
-            );
-            _ = await seed.SaveChangesAsync();
-        }
-
-        await MigrateAsync(database, _preB262Migration);
-
-        await using var verify = await database.CreateDbContextAsync();
-        var connection = verify.Database.GetDbConnection();
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            "SELECT \"Status\", \"FailureCode\" FROM \"configuration_activations\" "
-            + "WHERE \"Id\" = $id;";
-        var id = command.CreateParameter();
-        id.ParameterName = "$id";
-        id.Value = activationId.ToString();
-        _ = command.Parameters.Add(id);
-        await using var reader = await command.ExecuteReaderAsync();
-        (await reader.ReadAsync()).ShouldBeTrue();
-        reader.GetString(0).ShouldBe("Failed");
-        reader.GetString(1).ShouldBe("manual-provider-one");
-        (await reader.ReadAsync()).ShouldBeFalse();
     }
 
     private static async Task MigrateAsync(

@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260826165201_v0.13.0_PluginPackageProvenance")]
-    partial class v0130_PluginPackageProvenance
+    [Migration("20260826174307_v0.13.0")]
+    partial class v0130
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

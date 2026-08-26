@@ -8,8 +8,7 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class OverlayAccessRegenerationMigrationTests
 {
-    private const string _previousMigration =
-        "20260825124006_v0.13.0_ConfigurationActivationOutcomes";
+    private const string _releasedMigration = "20260822192152_v0.12.0_GuessingSharedAliases";
 
     [Test]
     public async Task Upgrade_PreservesExistingBrowserSourceCredentialsAsUsable()
@@ -20,7 +19,7 @@ public sealed class OverlayAccessRegenerationMigrationTests
         );
         await using (var before = await database.CreateDbContextAsync())
         {
-            await before.Database.MigrateAsync(_previousMigration);
+            await before.Database.MigrateAsync(_releasedMigration);
             var host = new BotHost
             {
                 TwitchUserId = "migration-id",

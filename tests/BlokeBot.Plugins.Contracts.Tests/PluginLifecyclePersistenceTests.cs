@@ -1,10 +1,8 @@
 using BlokeBot.Persistence;
-using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Plugins;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Plugins.Contracts.Tests;
@@ -46,52 +44,6 @@ public sealed class PluginLifecyclePersistenceTests
         (
             await store.LoadAsync(replacementPackage.Installation.PluginId, CancellationToken.None)
         ).ShouldBe(replacement);
-    }
-
-    [Test]
-    public async Task LifecycleMigration_BackfillsExactPackageOperationFromExistingFence()
-    {
-        await using var database = await LifecycleDatabase.CreateAsync(
-            "20260826143119_v0.13.0_PluginLifecycleReplacement"
-        );
-        var package = new LifecycleHarness().Package("1.0.0", "v1");
-        var operationId = PluginLifecycleOperationId.New();
-        var now = new DateTimeOffset(2026, 8, 26, 16, 30, 0, TimeSpan.Zero);
-        await using (var db = database.CreateDbContext())
-        {
-            _ = await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO "plugin_lifecycles" (
-                    "PluginId", "SelectedVersion", "SelectedTag", "OperationId",
-                    "SelectedGeneration", "ActiveVersion", "ActiveTag", "ActiveOperationId",
-                    "ActiveGeneration", "Phase", "OperationKind", "FaultedFrom",
-                    "AutomaticRestartConsumed", "RestartNotBeforeUtc", "OutcomeCode",
-                    "FailureCode", "OutcomeDetail", "OutcomeOccurredAtUtc", "Revision",
-                    "UpdatedAtUtc"
-                ) VALUES (
-                    {package.Installation.PluginId.Value},
-                    {package.Installation.Release.DeclaredVersion.Value},
-                    {package.Installation.Release.Tag.Value},
-                    {operationId.Value}, 1,
-                    {package.Installation.Release.DeclaredVersion.Value},
-                    {package.Installation.Release.Tag.Value},
-                    {operationId.Value}, 1, 'Active', 'Activate', NULL, 0, NULL,
-                    'Activated', NULL, NULL, {now.UtcDateTime}, 1, {now.UtcDateTime}
-                );
-                """
-            );
-        }
-
-        await database.MigrateToLatestAsync();
-
-        var migrated = (
-            await new EfPluginLifecycleStore(database).LoadAsync(
-                package.Installation.PluginId,
-                CancellationToken.None
-            )
-        ).ShouldNotBeNull();
-        migrated.SelectedPackageOperationId.Value.ShouldBe(operationId.Value);
-        migrated.ActiveRuntime!.PackageOperationId.ShouldBe(migrated.SelectedPackageOperationId);
     }
 
     [Test]
@@ -290,51 +242,6 @@ public sealed class PluginLifecyclePersistenceTests
     }
 
     [Test]
-    public async Task LifecycleMigration_ConvertsLegacyPurgeCheckpointToDestructiveRemoval()
-    {
-        await using var database = await LifecycleDatabase.CreateAsync(
-            "20260823152250_v0.13.0_PluginLifecycles"
-        );
-        var package = new LifecycleHarness().Package("1.0.0", "v1");
-        var occurredAt = new DateTimeOffset(2026, 8, 23, 15, 59, 0, TimeSpan.Zero);
-        await using (var db = database.CreateDbContext())
-        {
-            await InsertLegacyLifecycleRecordAsync(
-                db,
-                new PluginLifecycleRecord
-                {
-                    PluginId = package.Installation.PluginId.Value,
-                    SelectedVersion = package.Installation.Release.DeclaredVersion.Value,
-                    SelectedTag = package.Installation.Release.Tag.Value,
-                    OperationId = PluginLifecycleOperationId.New().Value,
-                    SelectedGeneration = 7,
-                    Phase = PluginLifecyclePhase.Removed,
-                    OperationKind = PluginLifecycleOperationKind.Remove,
-                    OutcomeCode = PluginLifecycleOutcomeCode.Removed,
-                    OutcomeOccurredAtUtc = occurredAt.UtcDateTime,
-                    Revision = 8,
-                    UpdatedAtUtc = occurredAt.UtcDateTime,
-                }
-            );
-            _ = await db.Database.ExecuteSqlRawAsync(
-                "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purging', "
-                    + "\"OperationKind\" = 'Purge', \"OutcomeCode\" = 'Purged';"
-            );
-        }
-
-        await database.MigrateToLatestAsync();
-
-        var store = new EfPluginLifecycleStore(database);
-        var migrated = (
-            await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)
-        ).ShouldNotBeNull();
-        migrated.Phase.ShouldBe(PluginLifecyclePhase.Removing);
-        migrated.OperationKind.ShouldBe(PluginLifecycleOperationKind.Remove);
-        migrated.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Removed);
-        migrated.LatestOutcome.OccurredAtUtc.ShouldBe(occurredAt);
-    }
-
-    [Test]
     public async Task LifecycleMigration_ConstrainsAndRoundTripsFaultShutdownCheckpoint()
     {
         await using var database = await LifecycleDatabase.CreateAsync();
@@ -448,93 +355,6 @@ public sealed class PluginLifecyclePersistenceTests
             .ShouldBeOfType<PluginLifecycleTransitionOutcome.Applied>();
     }
 
-    [Test]
-    public async Task LifecycleMigration_NormalizesParentLegalRemoveFromFaultRows()
-    {
-        await using var database = await LifecycleDatabase.CreateAsync(
-            "20260823180232_v0.13.0_PluginLifecycleFaultShutdown"
-        );
-        var harness = new LifecycleHarness();
-        var removingId = harness.PackageFor("fault-removing", "1.0.0", "v1").Installation.PluginId;
-        var removedId = harness.PackageFor("fault-removed", "1.0.0", "v1").Installation.PluginId;
-        var legacyPurgeId = harness
-            .PackageFor("fault-purging", "1.0.0", "v1")
-            .Installation.PluginId;
-        var now = new DateTimeOffset(2026, 8, 23, 18, 30, 0, TimeSpan.Zero);
-        await using (var db = database.CreateDbContext())
-        {
-            foreach (
-                var record in new[]
-                {
-                    ParentLegalRemoveFromFaultRecord(
-                        removingId,
-                        PluginLifecyclePhase.Removing,
-                        PluginLifecycleOperationKind.Remove,
-                        now
-                    ),
-                    ParentLegalRemoveFromFaultRecord(
-                        removedId,
-                        PluginLifecyclePhase.Removed,
-                        PluginLifecycleOperationKind.Remove,
-                        now
-                    ),
-                    ParentLegalRemoveFromFaultRecord(
-                        legacyPurgeId,
-                        PluginLifecyclePhase.Removing,
-                        PluginLifecycleOperationKind.Remove,
-                        now
-                    ),
-                }
-            )
-            {
-                await InsertLegacyLifecycleRecordAsync(db, record);
-            }
-            _ = await db.Database.ExecuteSqlRawAsync(
-                "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purging', "
-                    + "\"OperationKind\" = 'Purge' WHERE \"PluginId\" = {0};",
-                legacyPurgeId.Value
-            );
-        }
-
-        await database.MigrateToLatestAsync();
-
-        var store = new EfPluginLifecycleStore(database);
-        var normalized = (await store.LoadAllAsync(CancellationToken.None)).ToDictionary(state =>
-            state.PluginId
-        );
-        normalized.Keys.ShouldBe([removingId, removedId, legacyPurgeId], ignoreOrder: true);
-        foreach (var state in normalized.Values)
-        {
-            state.Phase.ShouldBe(PluginLifecyclePhase.Removing);
-            state.OperationKind.ShouldBe(PluginLifecycleOperationKind.Remove);
-            state.FaultedFrom.ShouldBeNull();
-            PluginLifecycleStateMachine.HasValidFaultInvariant(state).ShouldBeTrue();
-        }
-
-        var removal = new RecordingRemovalOwner();
-        var coordinator = new PluginLifecycleCoordinator(
-            store,
-            new FakePackageResolver(),
-            [new RecordingMigrationOwner()],
-            [],
-            [removal],
-            new RecordingPendingWorkCanceller(),
-            new FakeLifecycleWorkers(),
-            new PluginRuntimeSnapshotRegistry(),
-            new PluginLifecycleSerialization(),
-            new(TimeSpan.FromSeconds(2), TimeSpan.Zero),
-            TimeProvider.System,
-            NullLogger<PluginLifecycleCoordinator>.Instance
-        );
-
-        await coordinator.RecoverAsync(CancellationToken.None);
-
-        (await store.LoadAsync(removingId, CancellationToken.None)).ShouldBeNull();
-        (await store.LoadAsync(removedId, CancellationToken.None)).ShouldBeNull();
-        (await store.LoadAsync(legacyPurgeId, CancellationToken.None)).ShouldBeNull();
-        removal.Calls.ShouldBe(3);
-    }
-
     private static async ValueTask<PluginLifecycleState> AdvanceToRemovingAsync(
         IPluginLifecycleStore store,
         PluginLifecyclePackage package
@@ -589,57 +409,6 @@ public sealed class PluginLifecyclePersistenceTests
         return active;
     }
 
-    private static PluginLifecycleRecord ParentLegalRemoveFromFaultRecord(
-        PluginId pluginId,
-        PluginLifecyclePhase phase,
-        PluginLifecycleOperationKind operationKind,
-        DateTimeOffset now
-    ) =>
-        new()
-        {
-            PluginId = pluginId.Value,
-            SelectedVersion = "1.0.0",
-            SelectedTag = "v1",
-            OperationId = PluginLifecycleOperationId.New().Value,
-            SelectedGeneration = 1,
-            Phase = phase,
-            OperationKind = operationKind,
-            FaultedFrom = PluginLifecyclePhase.Active,
-            OutcomeCode = PluginLifecycleOutcomeCode.Faulted,
-            FailureCode = PluginLifecycleFailureCode.WorkerExited,
-            OutcomeOccurredAtUtc = now.UtcDateTime,
-            Revision = 5,
-            UpdatedAtUtc = now.UtcDateTime,
-        };
-
-    private static async ValueTask InsertLegacyLifecycleRecordAsync(
-        BlokeBotDbContext db,
-        PluginLifecycleRecord record
-    ) =>
-        _ = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO "plugin_lifecycles" (
-                "PluginId", "SelectedVersion", "SelectedTag", "OperationId",
-                "SelectedGeneration", "ActiveVersion", "ActiveTag", "ActiveOperationId",
-                "ActiveGeneration", "Phase", "OperationKind", "FaultedFrom",
-                "AutomaticRestartConsumed", "RestartNotBeforeUtc", "OutcomeCode",
-                "FailureCode", "OutcomeDetail", "OutcomeOccurredAtUtc", "Revision",
-                "UpdatedAtUtc"
-            ) VALUES (
-                {record.PluginId}, {record.SelectedVersion}, {record.SelectedTag},
-                {record.OperationId}, {record.SelectedGeneration}, {record.ActiveVersion},
-                {record.ActiveTag}, {record.ActiveOperationId}, {record.ActiveGeneration},
-                {record.Phase.ToString()}, {record.OperationKind.ToString()},
-                {record.FaultedFrom?.ToString()},
-                {record.AutomaticRestartConsumed}, {record.RestartNotBeforeUtc},
-                {record.OutcomeCode.ToString()},
-                {record.FailureCode?.ToString()},
-                {record.OutcomeDetail}, {record.OutcomeOccurredAtUtc}, {record.Revision},
-                {record.UpdatedAtUtc}
-            );
-            """
-        );
-
     private static async ValueTask WriteAsync(
         IPluginLifecycleStore store,
         PluginLifecycleState expected,
@@ -656,9 +425,7 @@ public sealed class PluginLifecyclePersistenceTests
         : IDbContextFactory<BlokeBotDbContext>,
             IAsyncDisposable
     {
-        internal static async ValueTask<LifecycleDatabase> CreateAsync(
-            string? targetMigration = null
-        )
+        internal static async ValueTask<LifecycleDatabase> CreateAsync()
         {
             var path = Path.Combine(
                 Path.GetTempPath(),
@@ -670,14 +437,7 @@ public sealed class PluginLifecyclePersistenceTests
                 .Options;
             var database = new LifecycleDatabase(path, options);
             await using var db = database.CreateDbContext();
-            if (targetMigration is null)
-            {
-                await db.Database.MigrateAsync();
-            }
-            else
-            {
-                await db.Database.MigrateAsync(targetMigration);
-            }
+            await db.Database.MigrateAsync();
 
             return database;
         }
@@ -687,12 +447,6 @@ public sealed class PluginLifecyclePersistenceTests
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
         ) => Task.FromResult(CreateDbContext());
-
-        internal async ValueTask MigrateToLatestAsync()
-        {
-            await using var db = CreateDbContext();
-            await db.Database.MigrateAsync();
-        }
 
         public ValueTask DisposeAsync()
         {

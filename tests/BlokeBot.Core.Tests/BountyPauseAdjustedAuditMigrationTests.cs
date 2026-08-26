@@ -7,12 +7,11 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class BountyPauseAdjustedAuditMigrationTests
 {
-    private const string _previousMigration =
-        "20260825151634_v0.13.0_AutomaticRaidDeliveryOutcomes";
+    private const string _releasedMigration = "20260822192152_v0.12.0_GuessingSharedAliases";
     private static readonly DateTime _now = new(2026, 8, 25, 16, 0, 0, DateTimeKind.Utc);
 
     [Test]
-    public async Task ExistingAuditsUpgradeAndPauseAdjustmentDowngradesWithoutLosingHistory()
+    public async Task Upgrade_PreservesExistingAuditsAndAcceptsPauseAdjustment()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync(
             new WeeklyAnnouncementMigrationInterceptor()
@@ -20,7 +19,7 @@ public sealed class BountyPauseAdjustedAuditMigrationTests
         var existingOperation = Guid.NewGuid();
         await using (var before = await database.CreateDbContextAsync())
         {
-            await before.Database.MigrateAsync(_previousMigration);
+            await before.Database.MigrateAsync(_releasedMigration);
             _ = before.Hosts.Add(Host());
             _ = before.Bounties.Add(Bounty());
             _ = await before.SaveChangesAsync();
@@ -55,11 +54,6 @@ public sealed class BountyPauseAdjustedAuditMigrationTests
             _ = await upgrade.SaveChangesAsync();
         }
 
-        await using (var downgrade = await database.CreateDbContextAsync())
-        {
-            await downgrade.Database.MigrateAsync(_previousMigration);
-        }
-
         await using var verify = await database.CreateDbContextAsync();
         var audits = await verify
             .BountyModerationAudits.AsNoTracking()
@@ -69,7 +63,7 @@ public sealed class BountyPauseAdjustedAuditMigrationTests
         audits[0].OperationId.ShouldBe(existingOperation);
         audits[0].Action.ShouldBe(BountyAuditAction.Extended);
         audits[1].OperationId.ShouldBe(pauseOperation);
-        audits[1].Action.ShouldBe(BountyAuditAction.Extended);
+        audits[1].Action.ShouldBe(BountyAuditAction.PauseAdjusted);
         audits[1].Reason.ShouldBe("Deadline moved from OLD to NEW for PAUSE-INTERVAL");
         audits[1].BountyRevision.ShouldBe(3);
         audits[1].ActorTwitchUserId.ShouldBe("BlokeBot.BountyPauseRecovery");
