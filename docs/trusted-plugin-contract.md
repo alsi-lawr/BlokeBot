@@ -44,3 +44,11 @@ occurred is not rolled back.
 
 Manifests declare requirements and descriptors only. They do not register live features, discover
 Razor components, run Lua, fetch marketplace archives, manage workers, or change lifecycle state.
+
+## Author tools
+
+Use the versioned [plugin author reference](plugin-authoring/v1.md), the generated
+[Lua 5.4 language-server stub](../sdk/lua/5.4/v1/blokebot.lua), and the executable
+[published examples](../examples/plugins/README.md). The Contracts test harness validates the
+examples from local source and runs their scenarios through the supported worker protocol without
+installing them or contacting external services.

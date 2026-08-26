@@ -14,6 +14,24 @@
     <PackageReference Include="TUnit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content
+      Include="..\..\docs\plugin-authoring\**\*"
+      Link="AuthoringArtifacts\docs\plugin-authoring\%(RecursiveDir)%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <Content
+      Include="..\..\sdk\lua\**\*"
+      Link="AuthoringArtifacts\sdk\lua\%(RecursiveDir)%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <Content
+      Include="..\..\examples\plugins\**\*"
+      Link="PublishedPluginExamples\%(RecursiveDir)%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
+
   <Target Name="PublishPluginWorkerForTests" AfterTargets="Build">
     <PropertyGroup>
       <_PluginWorkerTestPublishDir>$([System.IO.Path]::GetFullPath('$(OutDir)plugin-worker'))</_PluginWorkerTestPublishDir>

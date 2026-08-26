@@ -1,0 +1,10 @@
+{
+  "runtime": {
+    "version": "Lua 5.4"
+  },
+  "workspace": {
+    "library": [
+      "../../../sdk/lua/5.4/v1"
+    ]
+  }
+}

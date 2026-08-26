@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\src\BlokeBot.Plugins.Contracts\BlokeBot.Plugins.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Plugins.Runtime\BlokeBot.Plugins.Runtime.csproj" />
   </ItemGroup>
 
   <ItemGroup>
