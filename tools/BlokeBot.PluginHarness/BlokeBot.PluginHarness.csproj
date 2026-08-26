@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>BlokeBot.PluginHarness</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>blokebot-plugin</ToolCommandName>
+    <PackageId>BlokeBot.PluginHarness</PackageId>
+    <Description>Offline BlokeBot plugin author validation and worker-protocol harness.</Description>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);IncludePluginWorkersInToolPackage
+    </TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\tests\BlokeBot.Plugins.Contracts.Testing\BlokeBot.Plugins.Contracts.Testing.csproj" />
+    <ProjectReference
+      Include="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      ReferenceOutputAssembly="false"
+      PrivateAssets="all"
+      Private="false"
+    />
+  </ItemGroup>
+
+  <Target Name="PublishPluginWorkerForHarness" AfterTargets="Build">
+    <PropertyGroup>
+      <_PluginWorkerHarnessPublishDir>$([System.IO.Path]::GetFullPath('$(OutDir)plugin-worker'))</_PluginWorkerHarnessPublishDir>
+    </PropertyGroup>
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(NETCoreSdkRuntimeIdentifier);SelfContained=false;PublishDir=$(_PluginWorkerHarnessPublishDir);NoRestore=true"
+    />
+  </Target>
+
+  <Target Name="IncludePluginWorkersInToolPackage">
+    <PropertyGroup>
+      <_PluginWorkerPackRoot>$([System.IO.Path]::GetFullPath('$(BaseOutputPath)$(Configuration)/$(TargetFramework)/plugin-worker-package'))</_PluginWorkerPackRoot>
+    </PropertyGroup>
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=linux-x64;SelfContained=false;PublishDir=$(_PluginWorkerPackRoot)/linux-x64;NoRestore=true"
+    />
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=linux-arm64;SelfContained=false;PublishDir=$(_PluginWorkerPackRoot)/linux-arm64;NoRestore=true"
+    />
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=osx-arm64;SelfContained=false;PublishDir=$(_PluginWorkerPackRoot)/osx-arm64;NoRestore=true"
+    />
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64;SelfContained=false;PublishDir=$(_PluginWorkerPackRoot)/win-x64;NoRestore=true"
+    />
+    <MSBuild
+      Projects="..\..\src\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
+      Targets="Publish"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=win-arm64;SelfContained=false;PublishDir=$(_PluginWorkerPackRoot)/win-arm64;NoRestore=true"
+    />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_PluginWorkerPackRoot)/**/*">
+        <PackagePath>tools/$(TargetFramework)/any/plugin-worker/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+</Project>

@@ -5,6 +5,16 @@ namespace BlokeBot.Plugins.Contracts;
 
 public sealed record PluginReleaseIdentity(SemanticVersion DeclaredVersion, PluginGitTag Tag);
 
+public sealed record PluginGitTagSyntaxContract(
+    int MinimumLength,
+    int MaximumLength,
+    int MinimumCommitShaLength,
+    int MaximumCommitShaLength
+)
+{
+    public static PluginGitTagSyntaxContract Current { get; } = new(1, 128, 7, 64);
+}
+
 public sealed record PluginInstallationIdentity(PluginId PluginId, PluginReleaseIdentity Release);
 
 [JsonConverter(typeof(PluginGitTagJsonConverter))]
@@ -17,7 +27,13 @@ public sealed record PluginGitTag
     public static bool TryCreate(string? candidate, out PluginGitTag tag)
     {
         tag = null!;
-        if (candidate is null or { Length: < 1 or > 128 } || LooksLikeCommitSha(candidate))
+        var contract = PluginGitTagSyntaxContract.Current;
+        if (
+            candidate is null
+            || candidate.Length < contract.MinimumLength
+            || candidate.Length > contract.MaximumLength
+            || LooksLikeCommitSha(candidate)
+        )
         {
             return false;
         }
@@ -54,8 +70,13 @@ public sealed record PluginGitTag
 
     public override string ToString() => Value;
 
-    private static bool LooksLikeCommitSha(string candidate) =>
-        candidate.Length is >= 7 and <= 64 && candidate.All(Uri.IsHexDigit);
+    private static bool LooksLikeCommitSha(string candidate)
+    {
+        var contract = PluginGitTagSyntaxContract.Current;
+        return candidate.Length >= contract.MinimumCommitShaLength
+            && candidate.Length <= contract.MaximumCommitShaLength
+            && candidate.All(Uri.IsHexDigit);
+    }
 }
 
 internal sealed class PluginGitTagJsonConverter : JsonConverter<PluginGitTag>

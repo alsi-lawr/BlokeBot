@@ -49,6 +49,20 @@ Razor components, run Lua, fetch marketplace archives, manage workers, or change
 
 Use the versioned [plugin author reference](plugin-authoring/v1.md), the generated
 [Lua 5.4 language-server stub](../sdk/lua/5.4/v1/blokebot.lua), and the executable
-[published examples](../examples/plugins/README.md). The Contracts test harness validates the
-examples from local source and runs their scenarios through the supported worker protocol without
-installing them or contacting external services.
+[published examples](../examples/plugins/README.md). The offline `BlokeBot.PluginHarness` author
+tool accepts any local source and output directory:
+
+```console
+blokebot-plugin validate ./my-plugin
+blokebot-plugin test ./my-plugin
+blokebot-plugin generate-sdk ./author-kit
+```
+
+`validate` checks every supported runtime identifier. `test` repeats validation and executes
+scenarios through the current runtime's worker without installing into or joining production
+inventory, or contacting Twitch or third parties. `generate-sdk` writes the canonical Lua stub and
+generated author reference beneath the selected output directory.
+
+Exit codes are typed by `PluginHarnessExitCode`: success is `0`, usage is `2`, invalid source is
+`3`, validation failure is `4`, unavailable worker is `5`, test failure is `6`, output I/O failure
+is `7`, and cancellation is `130`.

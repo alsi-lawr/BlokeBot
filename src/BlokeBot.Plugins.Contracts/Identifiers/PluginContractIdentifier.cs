@@ -34,12 +34,23 @@ internal static class PluginContractIdentifierSyntax
 
     internal static bool IsValid(string? candidate)
     {
-        if (candidate is null or { Length: < 1 or > 64 })
+        var contract = PluginIdentifierSyntaxContract.Current;
+        if (
+            candidate is null
+            || candidate.Length < contract.MinimumLength
+            || candidate.Length > contract.MaximumLength
+        )
         {
             return false;
         }
 
-        if (!IsLowerAsciiLetter(candidate[0]) || !IsLowerAlphaNumeric(candidate[^1]))
+        if (
+            (contract.RequiresLowercaseAsciiLetterPrefix && !IsLowerAsciiLetter(candidate[0]))
+            || (
+                contract.RequiresLowercaseAsciiLetterOrDigitSuffix
+                && !IsLowerAlphaNumeric(candidate[^1])
+            )
+        )
         {
             return false;
         }
@@ -47,13 +58,13 @@ internal static class PluginContractIdentifierSyntax
         var previousWasSeparator = false;
         foreach (var character in candidate)
         {
-            var isSeparator = character is '.' or '-' or '_';
+            var isSeparator = contract.Separators.Contains(character, StringComparison.Ordinal);
             if (!IsLowerAlphaNumeric(character) && !isSeparator)
             {
                 return false;
             }
 
-            if (isSeparator && previousWasSeparator)
+            if (isSeparator && previousWasSeparator && !contract.PermitsAdjacentSeparators)
             {
                 return false;
             }

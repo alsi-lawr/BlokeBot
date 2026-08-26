@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BlokeBot.Plugins.Runtime;
 
 namespace BlokeBot.Plugins.Contracts.Testing;
 
@@ -22,11 +24,12 @@ internal static class PluginAuthorReferenceEmitter
         );
         _ = output.AppendLine();
         AppendRuntime(contract, output);
-        AppendIdentityAndSubmission(output);
+        AppendIdentityAndSubmission(contract, output);
         AppendPackage(contract, output);
         AppendManifestShapes(output);
         AppendHostModules(contract, output);
-        AppendInvocationGuidance(output);
+        AppendSemanticSurfaces(contract, output);
+        AppendInvocationGuidance(contract, output);
         AppendExamples(output);
         AppendRemoval(output);
         return output.ToString();
@@ -57,21 +60,29 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("| Lua | 5.4 |");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Plugins are fully trusted Lua 5.4 packages with the full standard library. The worker process limits availability failures; it is not a security boundary. Do not describe a plugin as sandboxed."
+            CultureInfo.InvariantCulture,
+            $"Plugins are `{contract.Runtime.Trust.TrustLevel}` and run with `{contract.Runtime.Trust.OperatingSystemAccess}` operating-system access. The `{contract.Runtime.Trust.ProcessIsolation}` process boundary limits availability failures; it is not a security boundary. The Lua standard library is `{contract.Runtime.Trust.StandardLibrary}`. Do not describe a plugin as sandboxed."
         );
         _ = output.AppendLine();
     }
 
-    private static void AppendIdentityAndSubmission(StringBuilder output)
+    private static void AppendIdentityAndSubmission(
+        PluginAuthoringContract contract,
+        StringBuilder output
+    )
     {
+        var identifiers = contract.IdentifierSyntax;
+        var tags = contract.GitTagSyntax;
         _ = output.AppendLine("## Identity and submission");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Use one stable lowercase plugin ID. Contract IDs are 1-64 characters, start with a lowercase ASCII letter, end with a lowercase letter or digit, and may contain non-adjacent `.`, `-`, or `_` separators."
+            CultureInfo.InvariantCulture,
+            $"Use one stable lowercase plugin ID. `PluginIdentifierSyntaxContract.Current` requires {identifiers.MinimumLength}-{identifiers.MaximumLength} characters, a lowercase ASCII letter prefix, a lowercase ASCII letter or digit suffix, and separators from `{identifiers.Separators}`. Adjacent separators are {(identifiers.PermitsAdjacentSeparators ? "permitted" : "rejected")}."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "A marketplace submission names the manifest's declared semantic version and one mutable Git tag. Do not submit or record a commit SHA as plugin identity."
+            CultureInfo.InvariantCulture,
+            $"A marketplace submission names the manifest's declared semantic version and one mutable Git tag. `PluginGitTagSyntaxContract.Current` accepts {tags.MinimumLength}-{tags.MaximumLength} characters and rejects all-hex values {tags.MinimumCommitShaLength}-{tags.MaximumCommitShaLength} characters long, so a commit SHA is never plugin identity."
         );
         _ = output.AppendLine();
     }
@@ -81,7 +92,8 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("## Package and targets");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            $"The package root contains `{PluginPackage.ManifestPath}`. Declare every Lua module, browser or media asset, and other payload. Paths are relative canonical `/` paths. Absolute paths, `.` or `..` segments, links, undeclared files, missing declared files, and exact or case-folded collisions are rejected."
+            CultureInfo.InvariantCulture,
+            $"The package root contains `{PluginPackage.ManifestPath}`. Declare every Lua module, browser or media asset, and other payload. Paths are relative canonical `/` paths. The canonical package boundary reports concrete `PluginPackageEntryErrorCode` values for absolute, dot-segment, link, undeclared, missing, oversized, duplicate, and case-folded-collision failures. Limits are {PluginContractLimits.MaximumPackageEntries} entries and {PluginContractLimits.MaximumPackageBytes} bytes."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
@@ -202,7 +214,43 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine();
     }
 
-    private static void AppendInvocationGuidance(StringBuilder output)
+    private static void AppendSemanticSurfaces(
+        PluginAuthoringContract contract,
+        StringBuilder output
+    )
+    {
+        _ = output.AppendLine("## Typed outcomes and failure codes");
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            "Every row is generated from the public canonical type. Regenerate this reference when a member or field changes."
+        );
+        _ = output.AppendLine();
+        foreach (var surface in contract.SemanticSurfaces)
+        {
+            _ = output.Append("### ").AppendLine(surface.Title);
+            _ = output.AppendLine();
+            _ = output.AppendLine("| Kind | Canonical member | Shape |");
+            _ = output.AppendLine("| --- | --- | --- |");
+            foreach (var member in PluginAuthoringSemanticCoverage.Members(surface.ContractType))
+            {
+                _ = output
+                    .Append("| ")
+                    .Append(member.Kind)
+                    .Append(" | `")
+                    .Append(member.CanonicalName)
+                    .Append("` | ")
+                    .Append(member.Shape)
+                    .AppendLine(" |");
+            }
+
+            _ = output.AppendLine();
+        }
+    }
+
+    private static void AppendInvocationGuidance(
+        PluginAuthoringContract contract,
+        StringBuilder output
+    )
     {
         _ = output.AppendLine("## Invocations and effects");
         _ = output.AppendLine();
@@ -211,11 +259,13 @@ internal static class PluginAuthorReferenceEmitter
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Host-call waits are always cancellable. Cancellation stops the coroutine from waiting and a later result is not resumed. It does not promise to undo a chat message, schedule, HTTP request, SQLite write, or other effect that completed before cancellation won."
+            CultureInfo.InvariantCulture,
+            $"Host-call waits return the canonical `{nameof(PluginWorkerInvocationOutcome.Cancelled)}` outcome with a `{nameof(PluginCancellationReason)}` and whether the worker terminated. Cancellation stops the coroutine from waiting and a later result is not resumed. It does not promise to undo a chat message, schedule, HTTP request, SQLite write, or other effect that completed before cancellation won."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Use the `storage` module for plugin-private SQLite operations and `http.send` for approved web integrations. Generated and embedded UI pages must use declared modules or browser assets. Keep migrations deterministic and surface a typed update failure when migration Lua fails. A worker crash is isolated from the host and reported as a typed worker failure."
+            CultureInfo.InvariantCulture,
+            $"Use the `storage` module for plugin-private SQLite operations and `http.send` for approved web integrations. Generated and embedded UI pages must use declared modules or browser assets. A failed update migration becomes `{PluginLifecycleFailureCode.MigrationFailed}` and leaves the selected update `{PluginLifecyclePhase.Faulted}` without resuming the old generation. A worker crash reports `{PluginWorkerFailureCode.WorkerExited}` and is isolated by the `{contract.Runtime.Trust.ProcessIsolation}` boundary."
         );
         _ = output.AppendLine();
     }
@@ -235,7 +285,8 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("## Remove");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Remove is destructive for plugin-owned state. It removes the installed package, installation and channel settings, feature state, configuration, secrets, schedules, private data, automation definitions, ledgers, dependent flows and nodes, run history, receipts, and invocation context. Global marketplace catalogue metadata remains available so the plugin can be discovered and installed again."
+            CultureInfo.InvariantCulture,
+            $"`{PluginLifecycleOperationKind.Remove}` is destructive for plugin-owned state. Canonical removal owners delete the installed package, installation and channel settings, feature state, configuration, secrets, schedules, private data, automation definitions, ledgers, dependent flows and nodes, run history, marketplace receipts, and invocation context. A retained owner resource faults removal as `{PluginLifecycleFailureCode.RemovalFailed}`; there is no purge or retention mode. Global marketplace catalogue metadata is not plugin-owned installation state and remains discoverable for a later install."
         );
     }
 
@@ -312,9 +363,15 @@ internal static class PluginAuthorReferenceEmitter
     private static string MarkdownType(PropertyInfo property)
     {
         var rendered = MarkdownType(property.PropertyType);
+        NullabilityState state;
+        lock (_nullability)
+        {
+            state = _nullability.Create(property).ReadState;
+        }
+
         return
             Nullable.GetUnderlyingType(property.PropertyType) is null
-            && _nullability.Create(property).ReadState == NullabilityState.Nullable
+            && state == NullabilityState.Nullable
             ? $"{rendered} or null"
             : rendered;
     }

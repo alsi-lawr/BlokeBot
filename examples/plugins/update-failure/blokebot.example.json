@@ -7,7 +7,7 @@
       "invocationKind": "migration",
       "module": "main",
       "operation": "migrate",
-      "expectation": "failed"
+      "expectation": "migrationFailed"
     }
   ]
 }

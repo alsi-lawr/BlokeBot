@@ -22,6 +22,7 @@ public enum PublishedPluginExampleExpectation
     Failed,
     Cancelled,
     WorkerExited,
+    MigrationFailed,
 }
 
 public sealed record PublishedPluginExampleScenario(
@@ -56,13 +57,35 @@ public sealed record PublishedPluginExampleFailure(
     string Subject
 );
 
+public sealed record PublishedPluginExampleValidationObservation(
+    string Example,
+    ImmutableArray<PluginRuntimeIdentifier> RuntimeIdentifiers
+);
+
+public abstract record PublishedPluginExampleValidationOutcome
+{
+    private PublishedPluginExampleValidationOutcome() { }
+
+    public sealed record Accepted(
+        ImmutableArray<PublishedPluginExampleValidationObservation> Observations
+    ) : PublishedPluginExampleValidationOutcome;
+
+    public sealed record Rejected(ImmutableArray<PublishedPluginExampleFailure> Failures)
+        : PublishedPluginExampleValidationOutcome;
+}
+
+public sealed record PublishedPluginExampleValidationOptions(string SourceRoot);
+
 public sealed record PublishedPluginExampleObservation(
     string Example,
     ImmutableArray<PluginRuntimeIdentifier> ValidatedRuntimeIdentifiers,
     PluginRuntimeIdentifier ExecutedRuntimeIdentifier,
     ImmutableArray<string> ExecutedScenarios,
     bool ExternalEffectRemainedCompleted,
-    bool LateHostResultDiscarded
+    bool LateHostResultDiscarded,
+    bool UpdateMigrationFaulted,
+    bool OldRuntimeRemainedStopped,
+    bool UpdateRecoveryRemainedFaulted
 );
 
 public abstract record PublishedPluginExampleHarnessOutcome

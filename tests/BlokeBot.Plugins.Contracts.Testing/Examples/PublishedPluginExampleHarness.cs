@@ -6,30 +6,54 @@ namespace BlokeBot.Plugins.Contracts.Testing;
 
 public static class PublishedPluginExampleHarness
 {
+    public static async ValueTask<PublishedPluginExampleValidationOutcome> ValidateAsync(
+        PublishedPluginExampleValidationOptions options,
+        CancellationToken cancellationToken
+    )
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var loaded = await LoadAsync(options.SourceRoot, cancellationToken);
+        if (loaded.Failures.Count > 0)
+        {
+            return new PublishedPluginExampleValidationOutcome.Rejected([.. loaded.Failures]);
+        }
+
+        var failures = new List<PublishedPluginExampleFailure>();
+        var observations = new List<PublishedPluginExampleValidationObservation>();
+        foreach (var example in loaded.Examples)
+        {
+            var validated = ValidateExample(example, failures);
+            if (validated.Length == PluginAuthoringContract.Current.RuntimeIdentifiers.Length)
+            {
+                observations.Add(new(example.Name, validated));
+            }
+        }
+
+        return failures.Count == 0
+            ? new PublishedPluginExampleValidationOutcome.Accepted([.. observations])
+            : new PublishedPluginExampleValidationOutcome.Rejected([.. failures]);
+    }
+
     public static async ValueTask<PublishedPluginExampleHarnessOutcome> RunAsync(
         PublishedPluginExampleHarnessOptions options,
         CancellationToken cancellationToken
     )
     {
         ArgumentNullException.ThrowIfNull(options);
-        var failures = new List<PublishedPluginExampleFailure>();
-        IReadOnlyList<PublishedPluginExample> examples;
-        try
+        var loaded = await LoadAsync(options.SourceRoot, cancellationToken);
+        if (loaded.Failures.Count > 0)
         {
-            examples = await PublishedPluginExampleSourceLoader.LoadAsync(
-                options.SourceRoot,
-                cancellationToken
-            );
+            return new PublishedPluginExampleHarnessOutcome.Failed([.. loaded.Failures]);
         }
-        catch (Exception exception) when (exception is IOException or JsonException)
+
+        var failures = new List<PublishedPluginExampleFailure>();
+        var validated = loaded.Examples.ToDictionary(
+            example => example,
+            example => ValidateExample(example, failures)
+        );
+        if (failures.Count > 0)
         {
-            return new PublishedPluginExampleHarnessOutcome.Failed([
-                new(
-                    PublishedPluginExampleFailureCode.SourceInvalid,
-                    Path.GetFileName(options.SourceRoot),
-                    exception.Message
-                ),
-            ]);
+            return new PublishedPluginExampleHarnessOutcome.Failed([.. failures]);
         }
 
         if (!File.Exists(options.WorkerExecutable.Path))
@@ -55,10 +79,11 @@ public static class PublishedPluginExampleHarness
         }
 
         var observations = new List<PublishedPluginExampleObservation>();
-        foreach (var example in examples)
+        foreach (var example in loaded.Examples)
         {
             var observation = await RunExampleAsync(
                 example,
+                validated[example],
                 options.WorkerExecutable,
                 currentRuntimeIdentifier,
                 failures,
@@ -75,46 +100,77 @@ public static class PublishedPluginExampleHarness
             : new PublishedPluginExampleHarnessOutcome.Failed([.. failures]);
     }
 
+    private static async ValueTask<(
+        IReadOnlyList<PublishedPluginExample> Examples,
+        IReadOnlyList<PublishedPluginExampleFailure> Failures
+    )> LoadAsync(string sourceRoot, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var examples = await PublishedPluginExampleSourceLoader.LoadAsync(
+                sourceRoot,
+                cancellationToken
+            );
+            return (examples, []);
+        }
+        catch (Exception exception)
+            when (exception is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return (
+                [],
+                [
+                    new(
+                        PublishedPluginExampleFailureCode.SourceInvalid,
+                        Path.GetFileName(sourceRoot),
+                        exception.Message
+                    ),
+                ]
+            );
+        }
+    }
+
+    private static ImmutableArray<PluginRuntimeIdentifier> ValidateExample(
+        PublishedPluginExample example,
+        List<PublishedPluginExampleFailure> failures
+    )
+    {
+        var validated = ImmutableArray.CreateBuilder<PluginRuntimeIdentifier>();
+        foreach (var runtimeIdentifier in PluginAuthoringContract.Current.RuntimeIdentifiers)
+        {
+            var outcome = PluginPackageValidator.Validate(
+                example.Package,
+                PluginAuthoringContract.Current.Target(runtimeIdentifier)
+            );
+            if (outcome is PluginPackageValidationOutcome.Accepted)
+            {
+                validated.Add(runtimeIdentifier);
+                continue;
+            }
+
+            failures.Add(
+                new(
+                    PublishedPluginExampleFailureCode.PackageRejected,
+                    example.Name,
+                    PackageFailureSubject(
+                        runtimeIdentifier,
+                        (PluginPackageValidationOutcome.Rejected)outcome
+                    )
+                )
+            );
+        }
+
+        return validated.ToImmutable();
+    }
+
     private static async ValueTask<PublishedPluginExampleObservation?> RunExampleAsync(
         PublishedPluginExample example,
+        ImmutableArray<PluginRuntimeIdentifier> validatedRuntimeIdentifiers,
         PluginWorkerExecutable workerExecutable,
         PluginRuntimeIdentifier currentRuntimeIdentifier,
         List<PublishedPluginExampleFailure> failures,
         CancellationToken cancellationToken
     )
     {
-        var validatedRuntimeIdentifiers = ImmutableArray.CreateBuilder<PluginRuntimeIdentifier>();
-        foreach (var runtimeIdentifier in PluginAuthoringContract.Current.RuntimeIdentifiers)
-        {
-            if (
-                PluginPackageValidator.Validate(
-                    example.Package,
-                    PluginAuthoringContract.Current.Target(runtimeIdentifier)
-                ) is PluginPackageValidationOutcome.Accepted
-            )
-            {
-                validatedRuntimeIdentifiers.Add(runtimeIdentifier);
-            }
-            else
-            {
-                failures.Add(
-                    new(
-                        PublishedPluginExampleFailureCode.PackageRejected,
-                        example.Name,
-                        runtimeIdentifier.ToString()
-                    )
-                );
-            }
-        }
-
-        if (
-            validatedRuntimeIdentifiers.Count
-            != PluginAuthoringContract.Current.RuntimeIdentifiers.Length
-        )
-        {
-            return null;
-        }
-
         var root = Path.Combine(
             Path.GetTempPath(),
             $"blokebot-published-example-{Guid.NewGuid():N}"
@@ -143,6 +199,9 @@ public static class PublishedPluginExampleHarness
             var executed = ImmutableArray.CreateBuilder<string>();
             var externalEffectRemainedCompleted = false;
             var lateHostResultDiscarded = false;
+            var updateMigrationFaulted = false;
+            var oldRuntimeRemainedStopped = false;
+            var updateRecoveryRemainedFaulted = false;
             foreach (var scenario in example.Scenarios)
             {
                 var execution = await PublishedPluginExampleScenarioRunner.RunAsync(
@@ -161,15 +220,21 @@ public static class PublishedPluginExampleHarness
                 executed.Add(scenario.Name);
                 externalEffectRemainedCompleted |= execution.ExternalEffectRemainedCompleted;
                 lateHostResultDiscarded |= execution.LateHostResultDiscarded;
+                updateMigrationFaulted |= execution.UpdateMigrationFaulted;
+                oldRuntimeRemainedStopped |= execution.OldRuntimeRemainedStopped;
+                updateRecoveryRemainedFaulted |= execution.UpdateRecoveryRemainedFaulted;
             }
 
             return new(
                 example.Name,
-                validatedRuntimeIdentifiers.ToImmutable(),
+                validatedRuntimeIdentifiers,
                 currentRuntimeIdentifier,
                 executed.ToImmutable(),
                 externalEffectRemainedCompleted,
-                lateHostResultDiscarded
+                lateHostResultDiscarded,
+                updateMigrationFaulted,
+                oldRuntimeRemainedStopped,
+                updateRecoveryRemainedFaulted
             );
         }
         finally
@@ -180,4 +245,20 @@ public static class PublishedPluginExampleHarness
             }
         }
     }
+
+    private static string PackageFailureSubject(
+        PluginRuntimeIdentifier runtimeIdentifier,
+        PluginPackageValidationOutcome.Rejected rejected
+    ) => $"{runtimeIdentifier}: {string.Join(", ", rejected.Errors.Select(PackageErrorCode))}";
+
+    private static string PackageErrorCode(PluginPackageError error) =>
+        error switch
+        {
+            PluginPackageError.Entry entry => entry.Code.ToString(),
+            PluginPackageError.Manifest manifest => string.Join(
+                "+",
+                manifest.Errors.Select(candidate => candidate.Code)
+            ),
+            _ => throw new InvalidOperationException("Unknown package validation error."),
+        };
 }

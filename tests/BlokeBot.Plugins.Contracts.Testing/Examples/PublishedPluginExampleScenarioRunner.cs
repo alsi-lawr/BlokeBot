@@ -14,6 +14,17 @@ internal static class PublishedPluginExampleScenarioRunner
         CancellationToken cancellationToken
     )
     {
+        if (scenario.Expectation == PublishedPluginExampleExpectation.MigrationFailed)
+        {
+            return await PublishedPluginUpdateLifecycleAdapter.RunAsync(
+                package,
+                scenario,
+                workerExecutable,
+                stateRoot,
+                cancellationToken
+            );
+        }
+
         var cancellationFixture =
             scenario.Expectation == PublishedPluginExampleExpectation.Cancelled;
         var host = new PublishedPluginExampleHost(cancellationFixture);
@@ -141,17 +152,46 @@ internal static class PublishedPluginExampleScenarioRunner
 internal sealed record PublishedPluginExampleScenarioExecution(
     PublishedPluginExampleFailure? Failure,
     bool ExternalEffectRemainedCompleted,
-    bool LateHostResultDiscarded
+    bool LateHostResultDiscarded,
+    bool UpdateMigrationFaulted,
+    bool OldRuntimeRemainedStopped,
+    bool UpdateRecoveryRemainedFaulted
 )
 {
     internal static PublishedPluginExampleScenarioExecution Passed(
         bool externalEffectRemainedCompleted = false,
         bool lateHostResultDiscarded = false
-    ) => new(null, externalEffectRemainedCompleted, lateHostResultDiscarded);
+    ) =>
+        new(
+            null,
+            externalEffectRemainedCompleted,
+            lateHostResultDiscarded,
+            UpdateMigrationFaulted: false,
+            OldRuntimeRemainedStopped: false,
+            UpdateRecoveryRemainedFaulted: false
+        );
+
+    internal static PublishedPluginExampleScenarioExecution UpdateFailurePassed() =>
+        new(
+            null,
+            ExternalEffectRemainedCompleted: false,
+            LateHostResultDiscarded: false,
+            UpdateMigrationFaulted: true,
+            OldRuntimeRemainedStopped: true,
+            UpdateRecoveryRemainedFaulted: true
+        );
 
     internal static PublishedPluginExampleScenarioExecution Failed(
         PublishedPluginExampleFailureCode code,
         string subject,
         string detail
-    ) => new(new(code, "$pending", $"{subject}: {detail}"), false, false);
+    ) =>
+        new(
+            new(code, "$pending", $"{subject}: {detail}"),
+            ExternalEffectRemainedCompleted: false,
+            LateHostResultDiscarded: false,
+            UpdateMigrationFaulted: false,
+            OldRuntimeRemainedStopped: false,
+            UpdateRecoveryRemainedFaulted: false
+        );
 }

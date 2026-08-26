@@ -33,5 +33,11 @@ public sealed class PublishedPluginExampleTests
         );
         showcase.ExternalEffectRemainedCompleted.ShouldBeTrue();
         showcase.LateHostResultDiscarded.ShouldBeTrue();
+        var update = passed.Observations.Single(observation =>
+            observation.Example == "update-failure"
+        );
+        update.UpdateMigrationFaulted.ShouldBeTrue();
+        update.OldRuntimeRemainedStopped.ShouldBeTrue();
+        update.UpdateRecoveryRemainedFaulted.ShouldBeTrue();
     }
 }
