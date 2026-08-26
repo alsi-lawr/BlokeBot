@@ -28,7 +28,7 @@ internal static class PluginAuthorReferenceEmitter
         AppendPackage(contract, output);
         AppendManifestShapes(output);
         AppendHostModules(contract, output);
-        AppendSemanticSurfaces(contract, output);
+        AppendCanonicalPublicApi(contract, output);
         AppendInvocationGuidance(contract, output);
         AppendExamples(output);
         AppendRemoval(output);
@@ -214,33 +214,35 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine();
     }
 
-    private static void AppendSemanticSurfaces(
+    private static void AppendCanonicalPublicApi(
         PluginAuthoringContract contract,
         StringBuilder output
     )
     {
-        _ = output.AppendLine("## Typed outcomes and failure codes");
+        _ = output.AppendLine("## Canonical public plugin API");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Every row is generated from the public canonical type. Regenerate this reference when a member or field changes."
+            "Every row is discovered from exported public types and their declared public members in the canonical plugin contract assemblies and namespaces. Regenerate this reference when that surface changes."
         );
         _ = output.AppendLine();
-        foreach (var surface in contract.SemanticSurfaces)
+        foreach (var surface in contract.PublicContractSurfaces)
         {
-            _ = output.Append("### ").AppendLine(surface.Title);
+            _ = output
+                .Append("### `")
+                .Append(surface.Assembly.GetName().Name)
+                .Append("` / `")
+                .Append(surface.Namespace)
+                .AppendLine("`");
             _ = output.AppendLine();
-            _ = output.AppendLine("| Kind | Canonical member | Shape |");
+            _ = output.AppendLine("| Kind | Canonical API | Shape |");
             _ = output.AppendLine("| --- | --- | --- |");
-            foreach (var member in PluginAuthoringSemanticCoverage.Members(surface.ContractType))
+            foreach (
+                var member in surface.ExportedTypes.SelectMany(type =>
+                    PluginAuthoringSemanticCoverage.Members(type)
+                )
+            )
             {
-                _ = output
-                    .Append("| ")
-                    .Append(member.Kind)
-                    .Append(" | `")
-                    .Append(member.CanonicalName)
-                    .Append("` | ")
-                    .Append(member.Shape)
-                    .AppendLine(" |");
+                _ = output.AppendLine(PluginAuthoringSemanticCoverage.MarkdownRow(member));
             }
 
             _ = output.AppendLine();

@@ -58,11 +58,17 @@ blokebot-plugin test ./my-plugin
 blokebot-plugin generate-sdk ./author-kit
 ```
 
-`validate` checks every supported runtime identifier. Optional package-local `tests.toml` metadata defines author-harness scenarios and is not required by normal package validation. `test` repeats validation and executes
-those scenarios through the current runtime's worker without installing into or joining production
-inventory, or contacting Twitch or third parties. `generate-sdk` writes the canonical Lua stub and
-generated author reference beneath the selected output directory.
+`validate` checks every supported runtime identifier and accepts a normal manifest-only package.
+Package-local `tests.toml` metadata is optional author-test input and is not part of normal package
+validation. `test` requires that metadata, repeats package validation, and executes its scenarios
+through the current runtime's worker without installing into or joining production inventory, or
+contacting Twitch or third parties. `generate-sdk` writes the canonical Lua stub and generated author
+reference beneath the selected output directory.
 
 Exit codes are typed by `PluginHarnessExitCode`: success is `0`, usage is `2`, invalid source is
 `3`, validation failure is `4`, unavailable worker is `5`, test failure is `6`, output I/O failure
 is `7`, and cancellation is `130`.
+For `test`, a missing, malformed, or semantically invalid `tests.toml` reports
+`TestMetadataMissing`, `TestMetadataMalformed`, or `TestMetadataInvalid` and exits `6`. An invalid
+source reports `SourceInvalid` and exits `3`; a rejected package reports `PackageRejected` and exits
+`4` before worker execution.

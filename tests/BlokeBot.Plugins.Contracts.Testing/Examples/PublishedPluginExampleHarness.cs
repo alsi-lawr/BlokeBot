@@ -11,15 +11,19 @@ public static class PublishedPluginExampleHarness
     )
     {
         ArgumentNullException.ThrowIfNull(options);
-        var loaded = await LoadAsync(options.SourceRoot, cancellationToken);
-        if (loaded.Failures.Count > 0)
+        var loaded = await PublishedPluginExampleSourceLoader.LoadForValidationAsync(
+            options.SourceRoot,
+            cancellationToken
+        );
+        if (loaded is PublishedPluginExampleSourceLoadOutcome.Rejected rejected)
         {
-            return new PublishedPluginExampleValidationOutcome.Rejected([.. loaded.Failures]);
+            return new PublishedPluginExampleValidationOutcome.Rejected(rejected.Failures);
         }
+        var examples = ((PublishedPluginExampleSourceLoadOutcome.Loaded)loaded).Examples;
 
         var failures = new List<PublishedPluginExampleFailure>();
         var observations = new List<PublishedPluginExampleValidationObservation>();
-        foreach (var example in loaded.Examples)
+        foreach (var example in examples)
         {
             var validated = ValidateExample(example, failures);
             if (validated.Length == PluginAuthoringContract.Current.RuntimeIdentifiers.Length)
@@ -39,14 +43,18 @@ public static class PublishedPluginExampleHarness
     )
     {
         ArgumentNullException.ThrowIfNull(options);
-        var loaded = await LoadAsync(options.SourceRoot, cancellationToken);
-        if (loaded.Failures.Count > 0)
+        var loaded = await PublishedPluginExampleSourceLoader.LoadForTestsAsync(
+            options.SourceRoot,
+            cancellationToken
+        );
+        if (loaded is PublishedPluginExampleSourceLoadOutcome.Rejected rejected)
         {
-            return new PublishedPluginExampleHarnessOutcome.Failed([.. loaded.Failures]);
+            return new PublishedPluginExampleHarnessOutcome.Failed(rejected.Failures);
         }
+        var examples = ((PublishedPluginExampleSourceLoadOutcome.Loaded)loaded).Examples;
 
         var failures = new List<PublishedPluginExampleFailure>();
-        var validated = loaded.Examples.ToDictionary(
+        var validated = examples.ToDictionary(
             example => example,
             example => ValidateExample(example, failures)
         );
@@ -78,7 +86,7 @@ public static class PublishedPluginExampleHarness
         }
 
         var observations = new List<PublishedPluginExampleObservation>();
-        foreach (var example in loaded.Examples)
+        foreach (var example in examples)
         {
             var observation = await RunExampleAsync(
                 example,
@@ -97,34 +105,6 @@ public static class PublishedPluginExampleHarness
         return failures.Count == 0
             ? new PublishedPluginExampleHarnessOutcome.Passed([.. observations])
             : new PublishedPluginExampleHarnessOutcome.Failed([.. failures]);
-    }
-
-    private static async ValueTask<(
-        IReadOnlyList<PublishedPluginExample> Examples,
-        IReadOnlyList<PublishedPluginExampleFailure> Failures
-    )> LoadAsync(string sourceRoot, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var examples = await PublishedPluginExampleSourceLoader.LoadAsync(
-                sourceRoot,
-                cancellationToken
-            );
-            return (examples, []);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return (
-                [],
-                [
-                    new(
-                        PublishedPluginExampleFailureCode.SourceInvalid,
-                        Path.GetFileName(sourceRoot),
-                        exception.Message
-                    ),
-                ]
-            );
-        }
     }
 
     private static ImmutableArray<PluginRuntimeIdentifier> ValidateExample(

@@ -8,53 +8,147 @@ namespace BlokeBot.Plugins.Contracts.Testing;
 public static class PublishedPluginExampleSourceLoader
 {
     private const string _descriptorFile = "tests.toml";
+    private const string _manifestFile = PluginPackage.ManifestPath;
 
-    public static async ValueTask<IReadOnlyList<PublishedPluginExample>> LoadAsync(
+    public static ValueTask<PublishedPluginExampleSourceLoadOutcome> LoadForValidationAsync(
         string sourceRoot,
+        CancellationToken cancellationToken
+    ) => LoadAsync(sourceRoot, requireTestMetadata: false, cancellationToken);
+
+    public static ValueTask<PublishedPluginExampleSourceLoadOutcome> LoadForTestsAsync(
+        string sourceRoot,
+        CancellationToken cancellationToken
+    ) => LoadAsync(sourceRoot, requireTestMetadata: true, cancellationToken);
+
+    private static async ValueTask<PublishedPluginExampleSourceLoadOutcome> LoadAsync(
+        string sourceRoot,
+        bool requireTestMetadata,
         CancellationToken cancellationToken
     )
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRoot);
-        var root = Path.GetFullPath(sourceRoot);
-        if (!Directory.Exists(root))
+        if (string.IsNullOrWhiteSpace(sourceRoot))
         {
-            throw new DirectoryNotFoundException($"Example source root '{root}' was not found.");
+            return Rejected(
+                PublishedPluginExampleFailureCode.SourceInvalid,
+                "$source",
+                "The plugin source path is required."
+            );
         }
 
-        RejectLink(root);
-        var descriptorPaths = EnumerateTree(root, cancellationToken)
-            .OfType<SourceTreeEntry.File>()
-            .Where(entry =>
-                string.Equals(
-                    Path.GetFileName(entry.FullPath),
-                    _descriptorFile,
-                    StringComparison.Ordinal
-                )
-            )
-            .Select(entry => entry.FullPath)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        var examples = new List<PublishedPluginExample>();
-        foreach (var descriptorPath in descriptorPaths)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var directory = Path.GetDirectoryName(descriptorPath)!;
-            var descriptor = await LoadDescriptorAsync(descriptorPath, cancellationToken);
-            if (string.IsNullOrWhiteSpace(descriptor.Name) || descriptor.Scenarios.Count == 0)
+            var root = Path.GetFullPath(sourceRoot);
+            if (!Directory.Exists(root))
             {
-                throw new InvalidDataException(
-                    $"Example descriptor '{descriptorPath}' has no name or scenarios."
+                return Rejected(
+                    PublishedPluginExampleFailureCode.SourceInvalid,
+                    Path.GetFileName(root),
+                    $"Plugin source root '{root}' was not found."
                 );
             }
 
-            var scenarios = descriptor.Scenarios.ToImmutableArray();
-            var package = await LoadPackageAsync(directory, cancellationToken);
-            examples.Add(new(descriptor.Name, directory, package, scenarios));
-        }
+            if (HasLinkEvidence(new DirectoryInfo(root)))
+            {
+                return Rejected(
+                    PublishedPluginExampleFailureCode.SourceInvalid,
+                    Path.GetFileName(root),
+                    $"Plugin source root '{root}' is a filesystem link."
+                );
+            }
 
-        return examples.Count == 0
-            ? throw new InvalidDataException("No published plugin examples were found.")
-            : examples.AsReadOnly();
+            var manifestPaths = EnumerateTree(root, cancellationToken)
+                .OfType<SourceTreeEntry.File>()
+                .Where(entry =>
+                    string.Equals(
+                        Path.GetFileName(entry.FullPath),
+                        _manifestFile,
+                        StringComparison.Ordinal
+                    )
+                )
+                .Select(entry => entry.FullPath)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            if (manifestPaths.Length == 0)
+            {
+                return Rejected(
+                    PublishedPluginExampleFailureCode.SourceInvalid,
+                    Path.GetFileName(root),
+                    $"No {_manifestFile} package was found."
+                );
+            }
+
+            var examples = ImmutableArray.CreateBuilder<PublishedPluginExample>();
+            var failures = ImmutableArray.CreateBuilder<PublishedPluginExampleFailure>();
+            foreach (var manifestPath in manifestPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var directory = Path.GetDirectoryName(manifestPath)!;
+                var name = Path.GetFileName(directory);
+                var scenarios = ImmutableArray<PublishedPluginExampleScenario>.Empty;
+                if (requireTestMetadata)
+                {
+                    var descriptorPath = Path.Combine(directory, _descriptorFile);
+                    if (!File.Exists(descriptorPath))
+                    {
+                        failures.Add(
+                            new(
+                                PublishedPluginExampleFailureCode.TestMetadataMissing,
+                                name,
+                                descriptorPath
+                            )
+                        );
+                        continue;
+                    }
+                    if (HasLinkEvidence(new FileInfo(descriptorPath)))
+                    {
+                        failures.Add(
+                            new(
+                                PublishedPluginExampleFailureCode.SourceInvalid,
+                                name,
+                                descriptorPath
+                            )
+                        );
+                        continue;
+                    }
+
+                    var descriptor = await LoadDescriptorAsync(descriptorPath, cancellationToken);
+                    if (descriptor is SourceDescriptorLoadOutcome.Rejected rejected)
+                    {
+                        failures.Add(new(rejected.Code, name, descriptorPath));
+                        continue;
+                    }
+
+                    var loaded = (SourceDescriptorLoadOutcome.Loaded)descriptor;
+                    name = loaded.Descriptor.Name;
+                    scenarios = [.. loaded.Descriptor.Scenarios];
+                }
+
+                var package = await LoadPackageAsync(directory, cancellationToken);
+                examples.Add(new(name, directory, package, scenarios));
+            }
+
+            return failures.Count == 0
+                ? new PublishedPluginExampleSourceLoadOutcome.Loaded(examples.ToImmutable())
+                : new PublishedPluginExampleSourceLoadOutcome.Rejected(failures.ToImmutable());
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or UnauthorizedAccessException
+                        or ArgumentException
+                        or NotSupportedException
+            )
+        {
+            return Rejected(
+                PublishedPluginExampleFailureCode.SourceInvalid,
+                "$source",
+                exception.Message
+            );
+        }
     }
 
     private static async ValueTask<IReadOnlyList<PluginPackageEntry>> LoadPackageAsync(
@@ -140,15 +234,6 @@ public static class PublishedPluginExampleSourceLoader
         return entries.AsReadOnly();
     }
 
-    private static void RejectLink(string root)
-    {
-        var directory = new DirectoryInfo(root);
-        if (HasLinkEvidence(directory))
-        {
-            throw new InvalidDataException($"Example source root '{root}' is a filesystem link.");
-        }
-    }
-
     private static bool HasLinkEvidence(FileSystemInfo info) =>
         info.LinkTarget is not null || (info.Attributes & FileAttributes.ReparsePoint) != 0;
 
@@ -157,20 +242,20 @@ public static class PublishedPluginExampleSourceLoader
         || relativePath.Equals("README.md", StringComparison.OrdinalIgnoreCase)
         || Path.GetFileName(relativePath).Equals(".luarc.json", StringComparison.Ordinal);
 
-    private static async ValueTask<SourceDescriptor> LoadDescriptorAsync(
+    private static async ValueTask<SourceDescriptorLoadOutcome> LoadDescriptorAsync(
         string path,
         CancellationToken cancellationToken
     )
     {
         if (new FileInfo(path).Length > PluginContractLimits.MaximumManifestBytes)
         {
-            throw new InvalidDataException($"Example descriptor '{path}' is too large.");
+            return InvalidDescriptor();
         }
 
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
         if (bytes.Length > PluginContractLimits.MaximumManifestBytes)
         {
-            throw new InvalidDataException($"Example descriptor '{path}' is too large.");
+            return InvalidDescriptor();
         }
 
         string content;
@@ -178,11 +263,10 @@ public static class PublishedPluginExampleSourceLoader
         {
             content = new UTF8Encoding(false, true).GetString(bytes);
         }
-        catch (DecoderFallbackException exception)
+        catch (DecoderFallbackException)
         {
-            throw new InvalidDataException(
-                $"Example descriptor '{path}' is not valid UTF-8.",
-                exception
+            return new SourceDescriptorLoadOutcome.Rejected(
+                PublishedPluginExampleFailureCode.TestMetadataMalformed
             );
         }
 
@@ -192,57 +276,79 @@ public static class PublishedPluginExampleSourceLoader
             MaxDepth = 8,
             PropertyNameCaseInsensitive = false,
         };
-        TomlTable document;
+        TomlTable? document;
         try
         {
-            document =
-                TomlSerializer.Deserialize<TomlTable>(content, options)
-                ?? throw new InvalidDataException($"Example descriptor '{path}' is empty.");
+            document = TomlSerializer.Deserialize<TomlTable>(content, options);
         }
-        catch (TomlException exception)
+        catch (TomlException)
         {
-            throw new InvalidDataException(
-                $"Example descriptor '{path}' is malformed TOML.",
-                exception
+            return new SourceDescriptorLoadOutcome.Rejected(
+                PublishedPluginExampleFailureCode.TestMetadataMalformed
             );
         }
 
-        return
-            !document.Keys.Any(key => key is not "name" and not "scenarios")
-            && document.TryGetValue("name", out var nameValue)
-            && nameValue is string name
-            && document.TryGetValue("scenarios", out var scenariosValue)
-            && scenariosValue is IEnumerable<object> scenarios
-            ? new(name, scenarios.Select(MapScenario).ToArray())
-            : throw new InvalidDataException($"Example descriptor '{path}' has an invalid shape.");
+        if (
+            document is null
+            || document.Keys.Any(key => key is not "name" and not "scenarios")
+            || !document.TryGetValue("name", out var nameValue)
+            || nameValue is not string name
+            || string.IsNullOrWhiteSpace(name)
+            || !document.TryGetValue("scenarios", out var scenariosValue)
+            || scenariosValue is not IEnumerable<object> scenarioValues
+        )
+        {
+            return InvalidDescriptor();
+        }
+
+        var scenarios = new List<PublishedPluginExampleScenario>();
+        foreach (var scenarioValue in scenarioValues)
+        {
+            if (!TryMapScenario(scenarioValue, out var scenario))
+            {
+                return InvalidDescriptor();
+            }
+            scenarios.Add(scenario);
+        }
+
+        return scenarios.Count > 0
+            ? new SourceDescriptorLoadOutcome.Loaded(new(name, scenarios.AsReadOnly()))
+            : InvalidDescriptor();
     }
 
-    private static PublishedPluginExampleScenario MapScenario(object value) =>
-        value is TomlTable scenario
-        && !scenario.Keys.Any(key =>
-            key
-                is not "name"
-                    and not "workerMode"
-                    and not "invocationKind"
-                    and not "module"
-                    and not "operation"
-                    and not "expectation"
+    private static bool TryMapScenario(object value, out PublishedPluginExampleScenario scenario)
+    {
+        if (
+            value is not TomlTable candidate
+            || candidate.Keys.Any(key =>
+                key
+                    is not "name"
+                        and not "workerMode"
+                        and not "invocationKind"
+                        and not "module"
+                        and not "operation"
+                        and not "expectation"
+            )
+            || !RequiredString(candidate, "name", out var name)
+            || !RequiredString(candidate, "workerMode", out var workerModeName)
+            || !WorkerMode(workerModeName, out var workerMode)
+            || !RequiredString(candidate, "invocationKind", out var invocationKindName)
+            || !InvocationKind(invocationKindName, out var invocationKind)
+            || !RequiredString(candidate, "module", out var moduleName)
+            || !PluginLuaModuleId.TryCreate(moduleName, out var module)
+            || !RequiredString(candidate, "operation", out var operationName)
+            || !PluginHostOperationId.TryCreate(operationName, out var operation)
+            || !RequiredString(candidate, "expectation", out var expectationName)
+            || !Expectation(expectationName, out var expectation)
         )
-        && RequiredString(scenario, "name", out var name)
-        && RequiredString(scenario, "workerMode", out var workerModeName)
-        && WorkerMode(workerModeName, out var workerMode)
-        && RequiredString(scenario, "invocationKind", out var invocationKindName)
-        && InvocationKind(invocationKindName, out var invocationKind)
-        && RequiredString(scenario, "module", out var moduleName)
-        && PluginLuaModuleId.TryCreate(moduleName, out var module)
-        && RequiredString(scenario, "operation", out var operationName)
-        && PluginHostOperationId.TryCreate(operationName, out var operation)
-        && RequiredString(scenario, "expectation", out var expectationName)
-        && Expectation(expectationName, out var expectation)
-            ? new(name, workerMode, invocationKind, module, operation, expectation)
-            : throw new InvalidDataException(
-                "An example scenario has an invalid TOML declaration."
-            );
+        {
+            scenario = null!;
+            return false;
+        }
+
+        scenario = new(name, workerMode, invocationKind, module, operation, expectation);
+        return true;
+    }
 
     private static bool RequiredString(TomlTable table, string name, out string value)
     {
@@ -297,6 +403,15 @@ public static class PublishedPluginExampleSourceLoader
         return value.HasValue;
     }
 
+    private static SourceDescriptorLoadOutcome.Rejected InvalidDescriptor() =>
+        new(PublishedPluginExampleFailureCode.TestMetadataInvalid);
+
+    private static PublishedPluginExampleSourceLoadOutcome.Rejected Rejected(
+        PublishedPluginExampleFailureCode code,
+        string example,
+        string subject
+    ) => new([new(code, example, subject)]);
+
     private abstract record SourceTreeEntry(string RelativePath)
     {
         internal sealed record File(string RelativePath, string FullPath)
@@ -310,4 +425,14 @@ public static class PublishedPluginExampleSourceLoader
         string Name,
         IReadOnlyList<PublishedPluginExampleScenario> Scenarios
     );
+
+    private abstract record SourceDescriptorLoadOutcome
+    {
+        private SourceDescriptorLoadOutcome() { }
+
+        internal sealed record Loaded(SourceDescriptor Descriptor) : SourceDescriptorLoadOutcome;
+
+        internal sealed record Rejected(PublishedPluginExampleFailureCode Code)
+            : SourceDescriptorLoadOutcome;
+    }
 }

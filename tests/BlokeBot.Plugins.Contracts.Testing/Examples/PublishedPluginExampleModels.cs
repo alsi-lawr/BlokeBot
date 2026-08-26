@@ -44,6 +44,9 @@ public sealed record PublishedPluginExample(
 public enum PublishedPluginExampleFailureCode
 {
     SourceInvalid,
+    TestMetadataMissing,
+    TestMetadataMalformed,
+    TestMetadataInvalid,
     PackageRejected,
     WorkerUnavailable,
     WorkerStartRejected,
@@ -56,6 +59,17 @@ public sealed record PublishedPluginExampleFailure(
     string Example,
     string Subject
 );
+
+public abstract record PublishedPluginExampleSourceLoadOutcome
+{
+    private PublishedPluginExampleSourceLoadOutcome() { }
+
+    public sealed record Loaded(ImmutableArray<PublishedPluginExample> Examples)
+        : PublishedPluginExampleSourceLoadOutcome;
+
+    public sealed record Rejected(ImmutableArray<PublishedPluginExampleFailure> Failures)
+        : PublishedPluginExampleSourceLoadOutcome;
+}
 
 public sealed record PublishedPluginExampleValidationObservation(
     string Example,

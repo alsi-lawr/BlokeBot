@@ -1,4 +1,5 @@
 using BlokeBot.PluginHarness;
+using BlokeBot.Plugins.Contracts.Testing;
 using Shouldly;
 
 namespace BlokeBot.Plugins.Contracts.Tests;
@@ -20,6 +21,7 @@ public sealed class PluginHarnessCliTests
             standardError,
             CancellationToken.None
         );
+        await WriteTestsAsync(source.Path);
         var testExit = await PluginHarnessCli.RunAsync(
             ["test", source.Path],
             standardOutput,
@@ -37,11 +39,87 @@ public sealed class PluginHarnessCliTests
         testExit.ShouldBe((int)PluginHarnessExitCode.Success);
         generationExit.ShouldBe((int)PluginHarnessExitCode.Success);
         standardError.ToString().ShouldBeEmpty();
-        standardOutput.ToString().ShouldContain("validated: arbitrary-author-source; targets=5");
+        standardOutput.ToString().ShouldContain("validated:");
+        standardOutput.ToString().ShouldContain("targets=5");
         standardOutput.ToString().ShouldContain("tested: arbitrary-author-source");
         File.Exists(Path.Combine(output.Path, "sdk", "lua", "5.4", "v1", "blokebot.lua"))
             .ShouldBeTrue();
         File.Exists(Path.Combine(output.Path, "docs", "plugin-authoring", "v1.md")).ShouldBeTrue();
+    }
+
+    [Test]
+    [Arguments(null, PublishedPluginExampleFailureCode.TestMetadataMissing)]
+    [Arguments("name = [", PublishedPluginExampleFailureCode.TestMetadataMalformed)]
+    [Arguments(
+        "name = \"invalid\"\n[[scenarios]]\nname = \"bad\"\nworkerMode = \"unknown\"\ninvocationKind = \"command\"\nmodule = \"main\"\noperation = \"run\"\nexpectation = \"returned\"",
+        PublishedPluginExampleFailureCode.TestMetadataInvalid
+    )]
+    public async Task Test_InvalidAuthorMetadataUsesTypedTestFailure(
+        string? metadata,
+        PublishedPluginExampleFailureCode expectedFailure
+    )
+    {
+        using var source = new TemporaryDirectory("invalid-test-metadata");
+        await WritePluginAsync(source.Path);
+        if (metadata is not null)
+        {
+            await File.WriteAllTextAsync(Path.Combine(source.Path, "tests.toml"), metadata);
+        }
+        var standardError = new StringWriter();
+
+        var exit = await PluginHarnessCli.RunAsync(
+            ["test", source.Path],
+            TextWriter.Null,
+            standardError,
+            CancellationToken.None
+        );
+
+        exit.ShouldBe((int)PluginHarnessExitCode.TestFailed);
+        standardError.ToString().ShouldContain(expectedFailure.ToString());
+    }
+
+    [Test]
+    public async Task Test_InvalidSourceAndPackageUseTypedExitsBeforeWorkerExecution()
+    {
+        using var source = new TemporaryDirectory("invalid-package");
+        await WritePluginAsync(source.Path);
+        await WriteTestsAsync(source.Path);
+        await File.WriteAllTextAsync(Path.Combine(source.Path, "plugin.toml"), "not = [toml");
+        var packageError = new StringWriter();
+        var missingError = new StringWriter();
+        var invalidPathError = new StringWriter();
+
+        var packageExit = await PluginHarnessCli.RunAsync(
+            ["test", source.Path],
+            TextWriter.Null,
+            packageError,
+            CancellationToken.None
+        );
+        var sourceExit = await PluginHarnessCli.RunAsync(
+            ["test", Path.Combine(source.Path, "missing")],
+            TextWriter.Null,
+            missingError,
+            CancellationToken.None
+        );
+        var invalidPathExit = await PluginHarnessCli.RunAsync(
+            ["test", "\0"],
+            TextWriter.Null,
+            invalidPathError,
+            CancellationToken.None
+        );
+
+        packageExit.ShouldBe((int)PluginHarnessExitCode.ValidationFailed);
+        packageError
+            .ToString()
+            .ShouldContain(PublishedPluginExampleFailureCode.PackageRejected.ToString());
+        sourceExit.ShouldBe((int)PluginHarnessExitCode.SourceInvalid);
+        missingError
+            .ToString()
+            .ShouldContain(PublishedPluginExampleFailureCode.SourceInvalid.ToString());
+        invalidPathExit.ShouldBe((int)PluginHarnessExitCode.SourceInvalid);
+        invalidPathError
+            .ToString()
+            .ShouldContain(PublishedPluginExampleFailureCode.SourceInvalid.ToString());
     }
 
     [Test]
@@ -70,20 +148,6 @@ public sealed class PluginHarnessCliTests
     private static async Task WritePluginAsync(string root, string declaredPath = "lua/main.lua")
     {
         _ = Directory.CreateDirectory(Path.Combine(root, "lua"));
-        await File.WriteAllTextAsync(
-            Path.Combine(root, "tests.toml"),
-            """
-            name = "arbitrary-author-source"
-
-            [[scenarios]]
-            name = "round-trip"
-            workerMode = "admitted"
-            invocationKind = "command"
-            module = "main"
-            operation = "run"
-            expectation = "returned"
-            """
-        );
         await File.WriteAllTextAsync(
             Path.Combine(root, "plugin.toml"),
             $$"""
@@ -131,6 +195,22 @@ public sealed class PluginHarnessCliTests
             );
         }
     }
+
+    private static Task WriteTestsAsync(string root) =>
+        File.WriteAllTextAsync(
+            Path.Combine(root, "tests.toml"),
+            """
+            name = "arbitrary-author-source"
+
+            [[scenarios]]
+            name = "round-trip"
+            workerMode = "admitted"
+            invocationKind = "command"
+            module = "main"
+            operation = "run"
+            expectation = "returned"
+            """
+        );
 
     private sealed class TemporaryDirectory : IDisposable
     {

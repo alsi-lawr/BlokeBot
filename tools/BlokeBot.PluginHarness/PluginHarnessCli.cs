@@ -49,7 +49,13 @@ public static class PluginHarnessCli
             await error.WriteLineAsync("cancelled: the author operation was cancelled.");
             return (int)PluginHarnessExitCode.Cancelled;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
+            when (exception
+                    is IOException
+                        or UnauthorizedAccessException
+                        or ArgumentException
+                        or NotSupportedException
+            )
         {
             await error.WriteLineAsync($"io-failed: {exception.Message}");
             return (int)PluginHarnessExitCode.OutputFailed;
@@ -64,7 +70,7 @@ public static class PluginHarnessCli
     )
     {
         var validation = await PublishedPluginExampleHarness.ValidateAsync(
-            new(Path.GetFullPath(source)),
+            new(source),
             cancellationToken
         );
         return await ReportValidationAsync(validation, output, error);
@@ -79,7 +85,7 @@ public static class PluginHarnessCli
     {
         var worker = WorkerExecutable();
         var outcome = await PublishedPluginExampleHarness.RunAsync(
-            new(Path.GetFullPath(source), worker),
+            new(source, worker),
             cancellationToken
         );
         switch (outcome)
@@ -94,15 +100,7 @@ public static class PluginHarnessCli
                 return (int)PluginHarnessExitCode.Success;
             case PublishedPluginExampleHarnessOutcome.Failed failed:
                 await ReportFailuresAsync(failed.Failures, error);
-                return failed.Failures.Any(failure =>
-                        failure.Code == PublishedPluginExampleFailureCode.SourceInvalid
-                    )
-                        ? (int)PluginHarnessExitCode.SourceInvalid
-                    : failed.Failures.Any(failure =>
-                        failure.Code == PublishedPluginExampleFailureCode.WorkerUnavailable
-                    )
-                        ? (int)PluginHarnessExitCode.WorkerUnavailable
-                    : (int)PluginHarnessExitCode.TestFailed;
+                return (int)ExitCode(failed.Failures, PluginHarnessExitCode.TestFailed);
             default:
                 throw new InvalidOperationException("Unknown plugin harness outcome.");
         }
@@ -143,11 +141,7 @@ public static class PluginHarnessCli
                 return (int)PluginHarnessExitCode.Success;
             case PublishedPluginExampleValidationOutcome.Rejected rejected:
                 await ReportFailuresAsync(rejected.Failures, error);
-                return rejected.Failures.Any(failure =>
-                    failure.Code == PublishedPluginExampleFailureCode.SourceInvalid
-                )
-                    ? (int)PluginHarnessExitCode.SourceInvalid
-                    : (int)PluginHarnessExitCode.ValidationFailed;
+                return (int)ExitCode(rejected.Failures, PluginHarnessExitCode.ValidationFailed);
             default:
                 throw new InvalidOperationException("Unknown plugin validation outcome.");
         }
@@ -166,12 +160,26 @@ public static class PluginHarnessCli
         }
     }
 
+    private static PluginHarnessExitCode ExitCode(
+        IReadOnlyList<PublishedPluginExampleFailure> failures,
+        PluginHarnessExitCode fallback
+    ) =>
+        failures.Any(failure => failure.Code == PublishedPluginExampleFailureCode.SourceInvalid)
+            ? PluginHarnessExitCode.SourceInvalid
+        : failures.Any(failure => failure.Code == PublishedPluginExampleFailureCode.PackageRejected)
+            ? PluginHarnessExitCode.ValidationFailed
+        : failures.Any(failure =>
+            failure.Code == PublishedPluginExampleFailureCode.WorkerUnavailable
+        )
+            ? PluginHarnessExitCode.WorkerUnavailable
+        : fallback;
+
     private static PluginWorkerExecutable WorkerExecutable()
     {
         var configured = Environment.GetEnvironmentVariable("BLOKEBOT_PLUGIN_WORKER");
         if (!string.IsNullOrWhiteSpace(configured))
         {
-            return new(Path.GetFullPath(configured));
+            return new(configured);
         }
 
         var local = Path.Combine(
