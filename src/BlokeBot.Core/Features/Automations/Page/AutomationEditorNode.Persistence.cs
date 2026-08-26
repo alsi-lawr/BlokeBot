@@ -8,7 +8,12 @@ public sealed partial class AutomationEditorNode
     internal AutomationFlowDraftNode Draft() =>
         new(
             Id,
-            new(Definition.Id.Value, Definition.Schema.Current.Value, ConfigurationJson()),
+            new(
+                Definition.Id.Value,
+                Definition.Schema.Current.Value,
+                ConfigurationJson(),
+                Definition.PluginProvenance
+            ),
             AutomationExpressionLanguage.CurrentVersion,
             FailurePolicy,
             _bindings.ToImmutableDictionary(),
@@ -29,6 +34,15 @@ public sealed partial class AutomationEditorNode
             writer.WriteStartObject();
             foreach (var field in Definition.Configuration)
             {
+                if (
+                    Definition.PluginProvenance is not null
+                    && field.FieldType is AutomationConfigurationFieldType.Data
+                    && _bindings[field.Id].Mode != AutomationInputBindingMode.Fixed
+                    && string.IsNullOrWhiteSpace(_values[field.Id])
+                )
+                {
+                    continue;
+                }
                 WriteField(writer, field, _values[field.Id]);
             }
 

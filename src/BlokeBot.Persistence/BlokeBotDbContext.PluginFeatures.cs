@@ -20,6 +20,9 @@ public sealed partial class BlokeBotDbContext
 
     public DbSet<PluginFeatureStateRecord> PluginFeatureStates => Set<PluginFeatureStateRecord>();
 
+    public DbSet<PluginAutomationInstantiationRecord> PluginAutomationInstantiations =>
+        Set<PluginAutomationInstantiationRecord>();
+
     private static void ConfigurePluginFeatures(ModelBuilder modelBuilder)
     {
         _ = modelBuilder.Entity<PluginInstallationConfigurationRecord>(static entity =>
@@ -128,7 +131,47 @@ public sealed partial class BlokeBotDbContext
         });
 
         ConfigurePluginFeatureStates(modelBuilder);
+        ConfigurePluginAutomationInstantiations(modelBuilder);
     }
+
+    private static void ConfigurePluginAutomationInstantiations(ModelBuilder modelBuilder) =>
+        _ = modelBuilder.Entity<PluginAutomationInstantiationRecord>(static entity =>
+        {
+            _ = entity.ToTable("plugin_automation_instantiations");
+            _ = entity.HasKey(static value => value.Id);
+            _ = entity.Property(static value => value.PluginId).HasMaxLength(64);
+            _ = entity.Property(static value => value.FeatureId).HasMaxLength(64);
+            _ = entity.Property(static value => value.TemplateId).HasMaxLength(64);
+            _ = entity.Property(static value => value.PluginVersion).HasMaxLength(128);
+            _ = entity.Property(static value => value.MutableTag).HasMaxLength(128);
+            _ = entity.Property(static value => value.TemplateHash).HasMaxLength(64);
+            _ = entity
+                .Property(static value => value.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+            _ = entity.Property(static value => value.Diagnostic).HasMaxLength(500);
+            _ = entity
+                .HasIndex(static value => new { value.EnableOperationId, value.TemplateId })
+                .IsUnique();
+            _ = entity.HasIndex(static value => new
+            {
+                value.PluginId,
+                value.FeatureId,
+                value.HostId,
+                value.TemplateId,
+                value.TemplateHash,
+            });
+            _ = entity
+                .HasOne(static value => value.Flow)
+                .WithMany()
+                .HasForeignKey(static value => value.FlowId)
+                .OnDelete(DeleteBehavior.SetNull);
+            _ = entity
+                .HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(static value => value.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
     private static void ConfigurePluginFeatureStates(ModelBuilder modelBuilder) =>
         _ = modelBuilder.Entity<PluginFeatureStateRecord>(static entity =>

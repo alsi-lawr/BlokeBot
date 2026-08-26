@@ -48,6 +48,18 @@ public sealed partial class EfPluginFeatureStore
                     record is null ? null : PluginFeatureRecordMapper.ToDomain(record)
                 );
             }
+            if (
+                await ApplyAutomationsAsync(db, request, cancellationToken) is
+                { } automationConflict
+            )
+            {
+                _ = await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return new PluginFeatureEnableStoreOutcome.Conflict(
+                    automationConflict,
+                    record is null ? null : PluginFeatureRecordMapper.ToDomain(record)
+                );
+            }
             if (record is null)
             {
                 record = PluginFeatureRecordMapper.ToRecord(request.NextState);

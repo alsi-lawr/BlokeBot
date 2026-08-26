@@ -68,6 +68,8 @@ public partial class AutomationNodeInspector
         AutomationPortValueType.Number,
         AutomationPortValueType.Boolean,
         AutomationPortValueType.Timestamp,
+        AutomationPortValueType.Array,
+        AutomationPortValueType.Map,
     ];
 
     private Task ChangedAsync() => Changed.InvokeAsync();

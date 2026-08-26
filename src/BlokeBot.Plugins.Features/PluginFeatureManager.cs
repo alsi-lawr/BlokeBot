@@ -16,7 +16,8 @@ public sealed partial class PluginFeatureManager(
     PluginFeatureSnapshotRegistry snapshots,
     IPluginLifecycleSerialization lifecycleSerialization,
     IPluginCommandActivationGate? commandActivation = null,
-    IPluginFeatureWorkCoordinator? work = null
+    IPluginFeatureWorkCoordinator? work = null,
+    IPluginFeatureAutomationPlanner? automations = null
 )
 {
     public ValueTask<PluginFeatureState?> LoadFeatureStateAsync(

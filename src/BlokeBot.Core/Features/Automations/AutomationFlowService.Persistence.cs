@@ -23,6 +23,9 @@ public sealed partial class AutomationFlowService
             CanvasX = node.Position.X.Value,
             CanvasY = node.Position.Y.Value,
             DisplayAlias = string.IsNullOrWhiteSpace(node.DisplayAlias) ? null : node.DisplayAlias,
+            PluginProvenanceJson = node.Definition.PluginProvenance is { } provenance
+                ? PluginAutomationCatalogRegistry.SerializeProvenance(provenance)
+                : null,
         };
 
     internal static AutomationFlowEdge Persist(Guid flowId, AutomationFlowDraftEdge edge) =>
@@ -63,10 +66,31 @@ public sealed partial class AutomationFlowService
                 return new AutomationFlowDraftRestoreOutcome.Invalid();
             }
 
+            if (
+                node.PluginProvenanceJson is not null
+                && !PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                    node.PluginProvenanceJson,
+                    out _
+                )
+            )
+            {
+                return new AutomationFlowDraftRestoreOutcome.Invalid();
+            }
+
             nodes.Add(
                 new(
                     new(node.Id),
-                    new(node.DefinitionId, node.DefinitionSchemaVersion, configuration),
+                    new(
+                        node.DefinitionId,
+                        node.DefinitionSchemaVersion,
+                        configuration,
+                        PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                            node.PluginProvenanceJson,
+                            out var provenance
+                        )
+                            ? provenance
+                            : null
+                    ),
                     new(node.ExpressionLanguageVersion),
                     node.ContinueOnFailure
                         ? AutomationNodeFailurePolicy.Continue

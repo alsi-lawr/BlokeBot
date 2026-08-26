@@ -4,17 +4,24 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationEditorPage
 {
-    private void AddNode(AutomationDefinitionDescriptor definition)
+    private async Task AddNode(AutomationDefinitionDescriptor definition)
     {
+        await RefreshCatalogAsync();
+        var current = _definitions.SingleOrDefault(candidate => candidate.Id == definition.Id);
         if (
             _editor is null
-            || !AutomationNodeAvailability.Evaluate(definition, _editor.Nodes).IsAvailable
+            || current is null
+            || current.PluginProvenance != definition.PluginProvenance
+            || !AutomationNodeAvailability.Evaluate(current, _editor.Nodes).IsAvailable
         )
         {
+            _feedback =
+                "This node changed or became unavailable. Choose it again from the current Toolbox.";
+            _operationFailed = true;
             return;
         }
 
-        var node = _editor.AddNode(definition);
+        var node = _editor.AddNode(current);
         ApplyFirstReferenceDefaults(node);
         _selectedNodeId = node.Id;
         SetSingleNodeSelection(node.Id);

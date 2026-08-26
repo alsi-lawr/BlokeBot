@@ -12,6 +12,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.ToTable("automation_flows");
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.Name).HasMaxLength(200);
+            _ = b.Property(static x => x.UnavailableReason).HasMaxLength(500);
             _ = b.HasIndex(static x => new { x.HostId, x.IsEnabled });
             _ = b.HasOne<BotHost>()
                 .WithMany()

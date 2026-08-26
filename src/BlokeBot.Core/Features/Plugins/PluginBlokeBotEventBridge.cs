@@ -8,7 +8,8 @@ internal sealed class PluginBlokeBotEventBridge(
     EventBus<AppEventKind> events,
     IPluginDispatchSnapshotProvider dispatch,
     IPluginDispatchInvoker invoker,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    IPluginAutomationSourceAdmission? automationSources = null
 ) : BackgroundService
 {
     private static readonly IReadOnlyDictionary<AppEventKind, PluginBlokeBotEventKind> _sources =
@@ -54,7 +55,7 @@ internal sealed class PluginBlokeBotEventBridge(
                 endpoint.State.Key.HostId,
                 Event: new(endpoint.Descriptor.Id, source, eventId, occurredAt)
             );
-            _ = await invoker.InvokeEventAsync(
+            var outcome = await invoker.InvokeEventAsync(
                 endpoint,
                 context,
                 new PluginValue.Map([
@@ -63,6 +64,19 @@ internal sealed class PluginBlokeBotEventBridge(
                 ]),
                 cancellationToken
             );
+            if (
+                outcome is PluginDispatchInvocationOutcome.Returned returned
+                && !returned.AutomationSources.IsDefaultOrEmpty
+                && automationSources is not null
+            )
+            {
+                await automationSources.AdmitAsync(
+                    endpoint,
+                    context,
+                    returned.AutomationSources,
+                    cancellationToken
+                );
+            }
         }
     }
 }

@@ -55,13 +55,20 @@ public sealed class PluginFeatureDeclarationRegistry
         IPluginFeatureDeclarationPublisher
 {
     private readonly IPluginDispatchSnapshotSink? _dispatch;
+    private readonly IPluginAutomationCatalogSink? _automations;
     private readonly object _sync = new();
     private PluginFeatureDeclarationSnapshot _current = PluginFeatureDeclarationSnapshot.Empty;
     private TaskCompletionSource<PluginDeclarationChangeVersion> _change = NewChangeCompletion();
     private long _version;
 
-    public PluginFeatureDeclarationRegistry(IPluginDispatchSnapshotSink? dispatch = null) =>
+    public PluginFeatureDeclarationRegistry(
+        IPluginDispatchSnapshotSink? dispatch = null,
+        IPluginAutomationCatalogSink? automations = null
+    )
+    {
         _dispatch = dispatch;
+        _automations = automations;
+    }
 
     public PluginFeatureDeclarationSnapshot Current => Volatile.Read(ref _current);
 
@@ -109,6 +116,7 @@ public sealed class PluginFeatureDeclarationRegistry
                 )
             );
             _dispatch?.PublishDeclaration(declaration);
+            _automations?.PublishDeclaration(declaration);
             NotifyLocked();
         }
     }
@@ -130,6 +138,7 @@ public sealed class PluginFeatureDeclarationRegistry
                 new(_current.Declarations.ToImmutableDictionary().Remove(pluginId))
             );
             _dispatch?.RemoveDeclaration(pluginId, fence);
+            _automations?.RemoveDeclaration(pluginId, fence);
             NotifyLocked();
         }
     }

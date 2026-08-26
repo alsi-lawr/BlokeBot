@@ -18,6 +18,7 @@ public partial class AutomationEditorPage
     private readonly HashSet<AutomationNodeId> _selectedNodeIds = [];
     private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];
     private readonly AutomationEditorHistory _history = new();
+    private readonly CancellationTokenSource _catalogChangeCancellation = new();
     private AutomationEditorState? _editor;
     private AutomationFlowCanvas? _canvas;
     private AutomationFlowList? _list;
@@ -57,6 +58,7 @@ public partial class AutomationEditorPage
     private bool _flowRailCollapsed;
     private bool _editorToolsCollapsed;
     private bool _runDrawerCollapsed;
+    private long _catalogRevision;
 
     protected override async Task OnInitializedAsync()
     {
@@ -69,6 +71,7 @@ public partial class AutomationEditorPage
             )
         );
         await LoadAsync();
+        _ = ObserveCatalogChangesAsync(_catalogChangeCancellation.Token);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -127,6 +130,7 @@ public partial class AutomationEditorPage
         if (disposing)
         {
             CancelValidationFeedback();
+            _catalogChangeCancellation.Cancel();
             _history.Clear();
         }
 

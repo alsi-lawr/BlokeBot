@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Features;
 
@@ -5,7 +6,8 @@ namespace BlokeBot.Core.Features.Plugins;
 
 public sealed class PluginFeatureWorkCoordinator(
     PluginDispatchWorkRegistry work,
-    IPluginScheduleStore schedules
+    IPluginScheduleStore schedules,
+    PluginAutomationRunCoordinator? automations = null
 ) : IPluginFeatureWorkCoordinator
 {
     public async ValueTask CancelAndDrainAsync(
@@ -14,6 +16,10 @@ public sealed class PluginFeatureWorkCoordinator(
     )
     {
         await work.CancelAndDrainAsync(state, cancellationToken);
+        if (automations is not null)
+        {
+            await automations.CancelAsync(state, cancellationToken);
+        }
         await schedules.RemoveFeatureAsync(
             state.Key,
             new(state.Fence, state.Generation),
@@ -27,6 +33,10 @@ public sealed class PluginFeatureWorkCoordinator(
     )
     {
         await work.CancelAndDrainPluginAsync(pluginId, cancellationToken);
+        if (automations is not null)
+        {
+            await automations.CancelPluginAsync(pluginId, cancellationToken);
+        }
         await schedules.RemovePluginAsync(pluginId, cancellationToken);
     }
 

@@ -6,7 +6,8 @@ namespace BlokeBot.Core.Features.Plugins;
 public sealed class PluginTwitchEventBridge(
     IPluginHostContextResolver hosts,
     IPluginDispatchSnapshotProvider dispatch,
-    IPluginDispatchInvoker invoker
+    IPluginDispatchInvoker invoker,
+    IPluginAutomationSourceAdmission? automationSources = null
 ) : IPluginTwitchEventObserver
 {
     public Task StreamOnlineAsync(
@@ -235,7 +236,7 @@ public sealed class PluginTwitchEventBridge(
                 stream,
                 Event: new(endpoint.Descriptor.Id, EventName(kind), eventId, occurredAtUtc)
             );
-            _ = await invoker.InvokeEventAsync(
+            var outcome = await invoker.InvokeEventAsync(
                 endpoint,
                 context,
                 new PluginValue.Map([
@@ -248,6 +249,19 @@ public sealed class PluginTwitchEventBridge(
                 ]),
                 cancellationToken
             );
+            if (
+                outcome is PluginDispatchInvocationOutcome.Returned returned
+                && !returned.AutomationSources.IsDefaultOrEmpty
+                && automationSources is not null
+            )
+            {
+                await automationSources.AdmitAsync(
+                    endpoint,
+                    context,
+                    returned.AutomationSources,
+                    cancellationToken
+                );
+            }
         }
     }
 

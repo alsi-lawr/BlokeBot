@@ -217,6 +217,28 @@ public sealed partial class AutomationFlowService
                 );
             }
         }
+
+        if (valid.Configuration is PluginAutomationConfiguration pluginConfiguration)
+        {
+            foreach (var field in descriptor.Configuration.Where(static field => field.Required))
+            {
+                if (
+                    node.InputBindings.GetValueOrDefault(field.Id)?.Mode
+                        == AutomationInputBindingMode.Fixed
+                    && !pluginConfiguration.Values.ContainsKey(field.Id)
+                )
+                {
+                    errors.Add(
+                        new(
+                            node.Id,
+                            "fixed-value-required",
+                            "Enter a value or connect this plugin input.",
+                            field.Id
+                        )
+                    );
+                }
+            }
+        }
     }
 
     private bool ValidOrdinaryBindingExpression(

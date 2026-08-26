@@ -7,7 +7,8 @@ namespace BlokeBot.Core.Features.Plugins;
 internal sealed class PluginCommandModule(
     IPluginHostContextResolver hosts,
     IPluginDispatchSnapshotProvider dispatch,
-    IPluginDispatchInvoker invoker
+    IPluginDispatchInvoker invoker,
+    IPluginAutomationSourceAdmission? automationSources = null
 ) : IChatCommandModule
 {
     public void AddCommands(IChatCommandBuilder commands) => commands.MapDynamic(ExecuteAsync);
@@ -53,6 +54,19 @@ internal sealed class PluginCommandModule(
             ]),
             cancellationToken
         );
+        if (
+            outcome is PluginDispatchInvocationOutcome.Returned returned
+            && !returned.AutomationSources.IsDefaultOrEmpty
+            && automationSources is not null
+        )
+        {
+            await automationSources.AdmitAsync(
+                endpoint,
+                invocationContext,
+                returned.AutomationSources,
+                cancellationToken
+            );
+        }
         return outcome is PluginDispatchInvocationOutcome.Rejected
             ? new CommandHandlingOutcome.Unhandled()
             : new CommandHandlingOutcome.Handled();

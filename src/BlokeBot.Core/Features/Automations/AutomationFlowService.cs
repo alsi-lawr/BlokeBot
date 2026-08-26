@@ -54,7 +54,8 @@ public sealed partial class AutomationFlowService(
                 new(
                     available.Draft,
                     new DateTimeOffset(flow.CreatedAtUtc, TimeSpan.Zero),
-                    new DateTimeOffset(flow.UpdatedAtUtc, TimeSpan.Zero)
+                    new DateTimeOffset(flow.UpdatedAtUtc, TimeSpan.Zero),
+                    flow.UnavailableReason
                 )
             );
         }

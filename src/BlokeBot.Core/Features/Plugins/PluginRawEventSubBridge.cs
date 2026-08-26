@@ -6,7 +6,8 @@ namespace BlokeBot.Core.Features.Plugins;
 public sealed class PluginRawEventSubBridge(
     IPluginHostContextResolver hosts,
     IPluginDispatchSnapshotProvider dispatch,
-    IPluginDispatchInvoker invoker
+    IPluginDispatchInvoker invoker,
+    IPluginAutomationSourceAdmission? automationSources = null
 ) : IEventSubRawObserver
 {
     public async Task RawEventReceivedAsync(
@@ -44,7 +45,25 @@ public sealed class PluginRawEventSubBridge(
                     notification.MessageTimestamp
                 )
             );
-            _ = await invoker.InvokeEventAsync(endpoint, context, input, cancellationToken);
+            var outcome = await invoker.InvokeEventAsync(
+                endpoint,
+                context,
+                input,
+                cancellationToken
+            );
+            if (
+                outcome is PluginDispatchInvocationOutcome.Returned returned
+                && !returned.AutomationSources.IsDefaultOrEmpty
+                && automationSources is not null
+            )
+            {
+                await automationSources.AdmitAsync(
+                    endpoint,
+                    context,
+                    returned.AutomationSources,
+                    cancellationToken
+                );
+            }
         }
     }
 }

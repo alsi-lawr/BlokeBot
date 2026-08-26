@@ -17,7 +17,7 @@
                     type="button"
                     class="@(flow.Draft.Id == CurrentFlowId ? "automation-flow-item automation-flow-item--active" : "automation-flow-item")"
                     @onclick="() => Select.InvokeAsync(flow)">
-                <strong>@FlowDisplayName(flow)</strong>
+                <strong title="@flow.UnavailableReason">@FlowDisplayName(flow)</strong>
                 <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
             </button>
         }
@@ -83,7 +83,8 @@
     public EventCallback Delete { get; set; }
 
     private string FlowStatusLabel(AutomationFlowSnapshot flow) =>
-        flow.Draft.IsEnabled ? "Enabled"
+        flow.UnavailableReason is not null ? "Unavailable"
+        : flow.Draft.IsEnabled ? "Enabled"
         : flow.Draft.Id == CurrentFlowId && Validated && ValidationErrorsEmpty ? "Ready"
         : "Draft";
 

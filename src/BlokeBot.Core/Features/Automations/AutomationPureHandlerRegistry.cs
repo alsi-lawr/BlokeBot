@@ -147,6 +147,8 @@ internal sealed class AutomationPureHandlerRegistry
             AutomationValue.Channel => AutomationPortValueType.Channel,
             AutomationValue.Stream => AutomationPortValueType.Stream,
             AutomationValue.Arguments => AutomationPortValueType.Arguments,
+            AutomationValue.Array => AutomationPortValueType.Array,
+            AutomationValue.Map => AutomationPortValueType.Map,
             AutomationValue.Null nullValue => nullValue.ValueType,
             _ => throw new InvalidOperationException("Unknown automation value type."),
         };

@@ -144,6 +144,8 @@ public sealed partial class AutomationEditorNode
                 new(string.Empty, string.Empty)
             ),
             AutomationPortValueType.Stream => new AutomationValue.Stream(new(null, null, null)),
+            AutomationPortValueType.Array => new AutomationValue.Array([]),
+            AutomationPortValueType.Map => new AutomationValue.Map([]),
             AutomationPortValueType.Flow
             or AutomationPortValueType.Text
             or AutomationPortValueType.Number
@@ -160,7 +162,9 @@ public sealed partial class AutomationEditorNode
             is AutomationPortValueType.Arguments
                 or AutomationPortValueType.Actor
                 or AutomationPortValueType.Channel
-                or AutomationPortValueType.Stream;
+                or AutomationPortValueType.Stream
+                or AutomationPortValueType.Array
+                or AutomationPortValueType.Map;
 
     private static bool TryParseComplexFixedValue(
         string source,
@@ -199,7 +203,9 @@ public sealed partial class AutomationEditorNode
             AutomationValue.Arguments
             or AutomationValue.Actor
             or AutomationValue.Channel
-            or AutomationValue.Stream => SerializeAutomationValue(value),
+            or AutomationValue.Stream
+            or AutomationValue.Array
+            or AutomationValue.Map => SerializeAutomationValue(value),
             AutomationValue.Null => string.Empty,
             _ => string.Empty,
         };

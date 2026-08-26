@@ -6,6 +6,51 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginManifestAndPackageTests
 {
     [Test]
+    [Arguments("array")]
+    [Arguments("map")]
+    public void AutomationPorts_AcceptBoundedStructuredKinds(string valueKind)
+    {
+        var manifest = PluginContractFixtures.ManifestReplacing(
+            "\"valueKind\": \"string\"",
+            $"\"valueKind\": \"{valueKind}\""
+        );
+
+        _ = PluginManifestJson
+            .Validate(manifest, PluginContractFixtures.CompatibleHost())
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+    }
+
+    [Test]
+    public void AutomationPorts_RejectNilAsAConnectableSchemaKind()
+    {
+        var manifest = PluginContractFixtures.ManifestReplacing(
+            "\"valueKind\": \"string\"",
+            "\"valueKind\": \"nil\""
+        );
+
+        ManifestErrors(
+                PluginManifestJson.Validate(manifest, PluginContractFixtures.CompatibleHost())
+            )
+            .Select(static error => error.Code)
+            .ShouldContain(PluginManifestErrorCode.InvalidAutomationDefinition);
+    }
+
+    [Test]
+    public void AutomationTemplate_RejectsDefinitionsOwnedByAnotherFeature()
+    {
+        var manifest = PluginContractFixtures.ManifestReplacing(
+            "\"featureId\": \"publishing\",\n      \"kind\": \"source\"",
+            "\"featureId\": \"collection\",\n      \"kind\": \"source\""
+        );
+
+        ManifestErrors(
+                PluginManifestJson.Validate(manifest, PluginContractFixtures.CompatibleHost())
+            )
+            .Select(static error => error.Code)
+            .ShouldContain(PluginManifestErrorCode.InvalidAutomationTemplate);
+    }
+
+    [Test]
     public void DeclaredMixedPayloadPackage_IsAcceptedForMatchingTarget()
     {
         var target = PluginContractFixtures.CompatibleHost();

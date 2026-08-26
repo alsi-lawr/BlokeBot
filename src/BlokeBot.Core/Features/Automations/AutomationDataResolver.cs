@@ -51,7 +51,8 @@ internal sealed class AutomationDataResolver(
     AutomationCatalogService catalog,
     AutomationPureHandlerRegistry handlers,
     AutomationExpressionService expressions,
-    IAutomationIntegerEntropy integerEntropy
+    IAutomationIntegerEntropy integerEntropy,
+    PluginAutomationExecutionService? pluginExecution = null
 )
 {
     private readonly AutomationSafeTriggerExpressionService _safeExpressions = new();
@@ -296,10 +297,7 @@ internal sealed class AutomationDataResolver(
             AutomationRuntimeSerialization.Definition(producer),
             cancellationToken
         );
-        if (
-            check is not AutomationConfigurationCheck.Valid valid
-            || !handlers.TryResolve(new(producer.DefinitionId), out var handler)
-        )
+        if (check is not AutomationConfigurationCheck.Valid valid)
         {
             await checkpoints.FailAsync(producer, "handler-unavailable", cancellationToken);
             return null;
@@ -336,10 +334,26 @@ internal sealed class AutomationDataResolver(
         AutomationPureNodeResult result;
         try
         {
-            result = await handler.ExecuteAsync(
-                new(valid.Configuration, resolvedInputs.PortValues, executionIntegerEntropy),
-                cancellationToken
-            );
+            result =
+                valid.Configuration is PluginAutomationConfiguration pluginConfiguration
+                && pluginExecution is not null
+                    ? await pluginExecution.ExecutePureAsync(
+                        hostId,
+                        new(producer.DefinitionId),
+                        pluginConfiguration,
+                        resolvedInputs.PortValues,
+                        cancellationToken
+                    )
+                : handlers.TryResolve(new(producer.DefinitionId), out var handler)
+                    ? await handler.ExecuteAsync(
+                        new(
+                            valid.Configuration,
+                            resolvedInputs.PortValues,
+                            executionIntegerEntropy
+                        ),
+                        cancellationToken
+                    )
+                : new AutomationPureNodeResult.Failed("handler-unavailable");
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -390,6 +404,12 @@ internal sealed class AutomationDataResolver(
                 new AutomationValue.Boolean(condition.Predicate),
                 [AutomationValueProvenance.Generated]
             ),
+            (PluginAutomationConfiguration plugin, _)
+                when input.BindingFieldId is { } fieldId
+                    && plugin.Values.TryGetValue(fieldId, out var value) => new(
+                value,
+                [AutomationValueProvenance.Generated]
+            ),
             _ => null,
         };
 
@@ -434,8 +454,30 @@ internal sealed class AutomationDataResolver(
                     ]),
                     [AutomationValueProvenance.PublicChat]
                 ),
-                _ => null,
+                _ => ResolvePluginSource(port, context),
             };
+
+    private static AutomationResolvedValue? ResolvePluginSource(
+        AutomationPortMetadata port,
+        AutomationContext context
+    )
+    {
+        var variable =
+            context.Variables.ForExecution().TryGetValue(new(port.Id.Value), out var found)
+            && found.Sensitivity == AutomationDataSensitivity.Safe
+                ? found
+                : null;
+        return variable is null
+            ? port.Nullability == AutomationPortNullability.Nullable
+                ? new(
+                    new AutomationValue.Null(port.ValueType),
+                    [AutomationValueProvenance.Generated]
+                )
+                : null
+            : AutomationPureHandlerRegistry.ValueType(variable.Value) == port.ValueType
+                ? new(variable.Value, [AutomationValueProvenance.Generated])
+                : null;
+    }
 
     private AutomationResolvedValue? ResolveExpression(
         AutomationExpressionSource expression,

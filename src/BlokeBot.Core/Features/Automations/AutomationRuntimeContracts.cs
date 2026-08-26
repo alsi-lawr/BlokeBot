@@ -136,7 +136,8 @@ public abstract record AutomationFlowValidationOutcome
 public sealed record AutomationFlowSnapshot(
     AutomationFlowDraft Draft,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc
+    DateTimeOffset UpdatedAtUtc,
+    string? UnavailableReason = null
 );
 
 public abstract record AutomationFlowQueryOutcome

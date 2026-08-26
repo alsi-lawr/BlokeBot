@@ -22,6 +22,10 @@ public sealed partial class AutomationRuntimeService(
         .. runCompletionObservers ?? [],
     ];
     private Task? _initialization;
+    private PluginAutomationExecutionService? _pluginExecution;
+
+    internal void UsePluginExecution(PluginAutomationExecutionService execution) =>
+        _pluginExecution = execution;
 
     public async Task<AutomationDispatchOutcome> DispatchAsync(
         AutomationTrigger trigger,
@@ -227,7 +231,10 @@ public sealed partial class AutomationRuntimeService(
                      {source.Id},
                      {context.Event.OccurrenceId},
                      {AutomationRuntimeSerialization.SerializeContext(context)},
-                     {AutomationRuntimeSerialization.SerializeDefinition(flow)},
+                     {AutomationRuntimeSerialization.SerializeDefinition(
+                    flow,
+                    definitionId => CurrentPluginProvenance(flow.HostId, definitionId)
+                )},
                      {"Running"}, {now}, NULL, NULL);
                 """,
                 cancellationToken
@@ -1169,6 +1176,15 @@ public sealed partial class AutomationRuntimeService(
     ) =>
         configuration switch
         {
+            PluginAutomationConfiguration plugin when _pluginExecution is not null =>
+                await ExecutePluginAsync(
+                    hostId,
+                    new(node.DefinitionId),
+                    plugin,
+                    context,
+                    inputs,
+                    cancellationToken
+                ),
             ConditionControlConfiguration => EvaluateCondition(inputs),
             DelayControlConfiguration delay => Delay(delay),
             _ => await ExecuteActionAsync(
@@ -1180,6 +1196,32 @@ public sealed partial class AutomationRuntimeService(
                 cancellationToken
             ),
         };
+
+    private async Task<AutomationNodeExecution> ExecutePluginAsync(
+        AutomationHostId hostId,
+        AutomationDefinitionId definitionId,
+        PluginAutomationConfiguration configuration,
+        AutomationContext context,
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
+        CancellationToken cancellationToken
+    )
+    {
+        var outcome = await _pluginExecution!.ExecuteActionAsync(
+            hostId,
+            definitionId,
+            configuration,
+            inputs,
+            context,
+            cancellationToken
+        );
+        return outcome is AutomationActionOutcome.Failed failed
+            ? new AutomationNodeExecution.Failed(failed.Code)
+            : new AutomationNodeExecution.Succeeded(
+                "plugin-succeeded",
+                "complete",
+                clock.GetUtcNow().UtcDateTime
+            );
+    }
 
     private AutomationNodeExecution Delay(DelayControlConfiguration configuration)
     {
@@ -1344,8 +1386,19 @@ public sealed partial class AutomationRuntimeService(
         new(
             node.DefinitionId,
             node.DefinitionSchemaVersion,
-            System.Text.Json.JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone()
+            System.Text.Json.JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone(),
+            PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                node.PluginProvenanceJson,
+                out var provenance
+            )
+                ? provenance
+                : null
         );
+
+    private AutomationPluginProvenance? CurrentPluginProvenance(int hostId, string definitionId) =>
+        catalog.TryResolvePlugin(new(hostId), new(definitionId), out var definition)
+            ? definition.Descriptor.PluginProvenance
+            : null;
 
     private static AutomationResumeStatus? Terminal(AutomationFlowRunStatus status) =>
         status switch

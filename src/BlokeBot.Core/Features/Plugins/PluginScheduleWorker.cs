@@ -9,7 +9,8 @@ internal sealed class PluginScheduleWorker(
     IPluginFeatureSnapshotProvider features,
     IPluginDispatchInvoker invoker,
     TimeProvider timeProvider,
-    ILogger<PluginScheduleWorker> logger
+    ILogger<PluginScheduleWorker> logger,
+    IPluginAutomationSourceAdmission? automationSources = null
 ) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -88,6 +89,19 @@ internal sealed class PluginScheduleWorker(
             schedule.Input,
             cancellationToken
         );
+        if (
+            outcome is PluginDispatchInvocationOutcome.Returned returned
+            && !returned.AutomationSources.IsDefaultOrEmpty
+            && automationSources is not null
+        )
+        {
+            await automationSources.AdmitAsync(
+                endpoint,
+                context,
+                returned.AutomationSources,
+                cancellationToken
+            );
+        }
         if (outcome is PluginDispatchInvocationOutcome.Failed failed)
         {
             logger.LogWarning(

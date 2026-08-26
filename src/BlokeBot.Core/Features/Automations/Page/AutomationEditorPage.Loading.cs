@@ -51,6 +51,7 @@ public partial class AutomationEditorPage
         var catalog = await _catalogService.DiscoverAsync(hostId, CancellationToken.None);
         _featureEnabled = catalog.Availability == AutomationCatalogAvailability.Enabled;
         _definitions = catalog.Definitions;
+        _catalogRevision = catalog.Revision;
         var runQuery = await _runsService.ListAsync(hostId, CancellationToken.None);
         var hostRuns = runQuery is AutomationRunQueryOutcome.Available runs ? runs.Runs : [];
         _recentRuns = hostRuns;
@@ -90,6 +91,49 @@ public partial class AutomationEditorPage
         }
 
         _recentRuns = hostRuns.Where(run => run.FlowId == _editor?.Id).ToImmutableArray();
+    }
+
+    private async Task ObserveCatalogChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                _ = await _catalogService.WaitForChangeAsync(_catalogRevision, cancellationToken);
+                await InvokeAsync(RefreshCatalogAsync);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private async Task RefreshCatalogAsync()
+    {
+        if (HostId == 0)
+        {
+            return;
+        }
+        var catalog = await _catalogService.DiscoverAsync(new(HostId), CancellationToken.None);
+        _definitions = catalog.Definitions;
+        _catalogRevision = catalog.Revision;
+        if (_editor is not null)
+        {
+            var available = _definitions.ToDictionary(static definition => definition.Id);
+            foreach (var node in _editor.Nodes)
+            {
+                if (
+                    available.TryGetValue(node.Definition.Id, out var current)
+                    && node.RefreshDefinition(current)
+                )
+                {
+                    _ = _unavailableDefinitionIds.Remove(node.Definition.Id);
+                }
+                else
+                {
+                    _ = _unavailableDefinitionIds.Add(node.Definition.Id);
+                }
+            }
+        }
+        StateHasChanged();
     }
 
     private async Task LoadReferenceChoicesAsync()

@@ -151,6 +151,20 @@ internal static class AutomationDataValueSerialization
                 resolved.SafeTriggerFields,
                 resolved.ValueFreeDiagnostic
             ),
+            AutomationValue.Array array => StructuredValue(
+                "array",
+                array,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
+            AutomationValue.Map map => StructuredValue(
+                "map",
+                map,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
             AutomationValue.Null nullValue
                 when nullValue.ValueType != AutomationPortValueType.Flow => Value(
                 "null",
@@ -181,6 +195,23 @@ internal static class AutomationDataValueSerialization
                         .OrderBy(static field => field.Value, StringComparer.Ordinal)
                         .Select(static field => field.Value),
                 ],
+            valueFreeDiagnostic
+        );
+
+    private static PersistedValue StructuredValue(
+        string kind,
+        AutomationValue value,
+        ImmutableArray<AutomationValueProvenance> provenance,
+        ImmutableArray<AutomationSafeTriggerFieldId> safeTriggerFields,
+        bool valueFreeDiagnostic
+    ) =>
+        new(
+            kind,
+            AutomationStructuredValue.Serialize(value),
+            Names(provenance),
+            safeTriggerFields.IsDefaultOrEmpty
+                ? []
+                : [.. safeTriggerFields.Select(static field => field.Value).Order()],
             valueFreeDiagnostic
         );
 
@@ -237,6 +268,8 @@ internal static class AutomationDataValueSerialization
                     ? new AutomationValue.Stream(stream)
                     : null,
                 "arguments" => RestoreArguments(persisted.ValueJson),
+                "array" => RestoreStructured(persisted.ValueJson, AutomationPortValueType.Array),
+                "map" => RestoreStructured(persisted.ValueJson, AutomationPortValueType.Map),
                 "null" => RestoreNull(persisted.ValueJson),
                 _ => null,
             };
@@ -296,6 +329,16 @@ internal static class AutomationDataValueSerialization
             && valueType != AutomationPortValueType.Flow
             && name == valueType.ToString()
             ? new AutomationValue.Null(valueType)
+            : null;
+    }
+
+    private static AutomationValue? RestoreStructured(string json, AutomationPortValueType expected)
+    {
+        using var document = JsonDocument.Parse(json);
+        return
+            AutomationStructuredValue.TryRead(document.RootElement, out var value)
+            && AutomationPureHandlerRegistry.ValueType(value) == expected
+            ? value
             : null;
     }
 
@@ -423,6 +466,8 @@ internal static class AutomationDataValueSerialization
                 " ",
                 arguments.Values.Select(static argument => argument.Value)
             ),
+            AutomationValue.Array array => $"Array ({array.Items.Length} items)",
+            AutomationValue.Map map => $"Map ({map.Properties.Length} fields)",
             AutomationValue.Null => "null",
             _ => string.Empty,
         };

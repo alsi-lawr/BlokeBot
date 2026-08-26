@@ -63,6 +63,8 @@ public enum AutomationPortValueType
     Channel,
     Stream,
     Arguments,
+    Array,
+    Map,
 }
 
 public enum AutomationDataSensitivity
@@ -176,8 +178,40 @@ public sealed record AutomationDefinitionDescriptor(
     ImmutableArray<AutomationConfigurationFieldMetadata> Configuration,
     AutomationActionCapabilities Capabilities,
     AutomationActionRetrySafety RetrySafety,
-    AutomationTriggerContextRequirement? TriggerContextRequirement = null
+    AutomationTriggerContextRequirement? TriggerContextRequirement = null,
+    AutomationPluginProvenance? PluginProvenance = null
 );
+
+public sealed record AutomationPluginProvenance(
+    string PluginId,
+    string PluginVersion,
+    string MutableTag,
+    int ManifestVersion,
+    string FeatureId,
+    string DefinitionId,
+    string DefinitionHash,
+    Guid LifecycleOperationId,
+    long WorkerGeneration,
+    long FeatureGeneration,
+    string? TemplateId = null,
+    string? TemplateHash = null
+)
+{
+    internal bool SameCode(AutomationPluginProvenance other) =>
+        PluginId == other.PluginId
+        && PluginVersion == other.PluginVersion
+        && MutableTag == other.MutableTag
+        && ManifestVersion == other.ManifestVersion
+        && FeatureId == other.FeatureId
+        && DefinitionId == other.DefinitionId
+        && DefinitionHash == other.DefinitionHash;
+
+    internal bool SameExecution(AutomationPluginProvenance other) =>
+        SameCode(other)
+        && LifecycleOperationId == other.LifecycleOperationId
+        && WorkerGeneration == other.WorkerGeneration
+        && FeatureGeneration == other.FeatureGeneration;
+}
 
 public abstract record AutomationValidationTarget
 {
@@ -306,7 +340,8 @@ public sealed record DelayControlConfiguration(TimeSpan Duration) : AutomationCo
 public sealed record PersistedAutomationNodeDefinition(
     string TypeId,
     int SchemaVersion,
-    JsonElement Configuration
+    JsonElement Configuration,
+    AutomationPluginProvenance? PluginProvenance = null
 );
 
 public abstract record AutomationConfigurationParseResult
@@ -368,6 +403,8 @@ public abstract record AutomationValue
 {
     private AutomationValue() { }
 
+    public sealed record Nil : AutomationValue;
+
     public sealed record Text(string Value) : AutomationValue;
 
     public sealed record Number(decimal Value) : AutomationValue;
@@ -385,8 +422,14 @@ public abstract record AutomationValue
     public sealed record Arguments(ImmutableArray<AutomationValueArgument> Values)
         : AutomationValue;
 
+    public sealed record Array(ImmutableArray<AutomationValue> Items) : AutomationValue;
+
+    public sealed record Map(ImmutableArray<AutomationValueProperty> Properties) : AutomationValue;
+
     public sealed record Null(AutomationPortValueType ValueType) : AutomationValue;
 }
+
+public sealed record AutomationValueProperty(string Name, AutomationValue Value);
 
 public sealed record AutomationVariable(
     AutomationValue Value,
@@ -432,7 +475,8 @@ public enum AutomationCatalogAvailability
 
 public sealed record AutomationCatalogSnapshot(
     AutomationCatalogAvailability Availability,
-    ImmutableArray<AutomationDefinitionDescriptor> Definitions
+    ImmutableArray<AutomationDefinitionDescriptor> Definitions,
+    long Revision = 0
 );
 
 public abstract record AutomationConfigurationCheck
@@ -455,6 +499,9 @@ public abstract record AutomationConfigurationCheck
         : AutomationConfigurationCheck;
 
     public sealed record DefinitionMissing(AutomationDefinitionId Id)
+        : AutomationConfigurationCheck;
+
+    public sealed record PluginProvenanceMismatch(AutomationDefinitionId Id)
         : AutomationConfigurationCheck;
 
     public sealed record SchemaUnsupported(

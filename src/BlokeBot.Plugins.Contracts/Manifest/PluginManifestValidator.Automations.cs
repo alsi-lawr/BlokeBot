@@ -37,6 +37,8 @@ public static partial class PluginManifestValidator
                 || !ValidEntryPoint(definition.EntryPoint)
                 || HasDuplicateFields(definition.Inputs)
                 || HasDuplicateFields(definition.Outputs)
+                || definition.Inputs.Any(static field => field.ValueKind == PluginValueKind.Nil)
+                || definition.Outputs.Any(static field => field.ValueKind == PluginValueKind.Nil)
                 || definition
                     .Inputs.Select(field => field.Id)
                     .Intersect(definition.Outputs.Select(field => field.Id))
@@ -86,7 +88,8 @@ public static partial class PluginManifestValidator
         {
             invalid |=
                 !nodeLookup.TryAdd(node.Id, node)
-                || !definitionLookup.ContainsKey(node.DefinitionId)
+                || !definitionLookup.TryGetValue(node.DefinitionId, out var definition)
+                || definition.FeatureId != template.FeatureId
                 || PluginValueValidator.Validate(node.Configuration)
                     is PluginValueValidationOutcome.Invalid;
         }
@@ -122,6 +125,9 @@ public static partial class PluginManifestValidator
         && nodes.TryGetValue(edge.ToNode, out var toNode)
         && definitions.TryGetValue(fromNode.DefinitionId, out var fromDefinition)
         && definitions.TryGetValue(toNode.DefinitionId, out var toDefinition)
-        && fromDefinition.Outputs.Any(field => field.Id == edge.FromOutput)
-        && toDefinition.Inputs.Any(field => field.Id == edge.ToInput);
+        && fromDefinition.Outputs.SingleOrDefault(field => field.Id == edge.FromOutput)
+            is { } output
+        && toDefinition.Inputs.SingleOrDefault(field => field.Id == edge.ToInput) is { } input
+        && output.ValueKind == input.ValueKind
+        && output.ValueKind != PluginValueKind.Nil;
 }

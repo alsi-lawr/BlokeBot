@@ -165,20 +165,26 @@ internal static class AutomationRuntimeSerialization
         );
     }
 
-    internal static string SerializeDefinition(AutomationFlow flow) =>
+    internal static string SerializeDefinition(
+        AutomationFlow flow,
+        Func<string, AutomationPluginProvenance?>? currentProvenance = null
+    ) =>
         JsonSerializer.Serialize(
             new PersistedFlow(
                 flow.Id,
                 flow.HostId,
                 flow.SchemaVersion,
-                flow.Nodes.Select(static node => new PersistedNode(
+                flow.Nodes.Select(node => new PersistedNode(
                         node.Id,
                         node.DefinitionId,
                         node.DefinitionSchemaVersion,
                         node.ConfigurationJson,
                         node.InputBindingsJson,
                         node.ExpressionLanguageVersion,
-                        node.ContinueOnFailure
+                        node.ContinueOnFailure,
+                        currentProvenance?.Invoke(node.DefinitionId) is { } provenance
+                            ? PluginAutomationCatalogRegistry.SerializeProvenance(provenance)
+                            : node.PluginProvenanceJson
                     ))
                     .ToImmutableArray(),
                 flow.Edges.Select(static edge => new PersistedEdge(
@@ -216,7 +222,15 @@ internal static class AutomationRuntimeSerialization
             || flow.Nodes.IsDefault
             || flow.Edges.IsDefault
             || flow.Nodes.Any(static node =>
-                node.Id == Guid.Empty || !IsValidJson(node.ConfigurationJson)
+                node.Id == Guid.Empty
+                || !IsValidJson(node.ConfigurationJson)
+                || (
+                    node.PluginProvenanceJson is not null
+                    && !PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                        node.PluginProvenanceJson,
+                        out _
+                    )
+                )
             )
             || flow.Nodes.Select(static node => node.Id).Distinct().Count() != flow.Nodes.Length
             || flow.Nodes.Any(static node =>
@@ -252,7 +266,13 @@ internal static class AutomationRuntimeSerialization
         new(
             node.DefinitionId,
             node.DefinitionSchemaVersion,
-            JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone()
+            JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone(),
+            PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                node.PluginProvenanceJson,
+                out var provenance
+            )
+                ? provenance
+                : null
         );
 
     private static PersistedVariable Persist(
@@ -309,6 +329,18 @@ internal static class AutomationRuntimeSerialization
                 JsonSerializer.Serialize(arguments.Values, _options),
                 variable.Sensitivity
             ),
+            AutomationValue.Array array => new(
+                name.Value,
+                "array",
+                AutomationStructuredValue.Serialize(array),
+                variable.Sensitivity
+            ),
+            AutomationValue.Map map => new(
+                name.Value,
+                "map",
+                AutomationStructuredValue.Serialize(map),
+                variable.Sensitivity
+            ),
             AutomationValue.Null nullValue
                 when nullValue.ValueType != AutomationPortValueType.Flow => new(
                 name.Value,
@@ -356,6 +388,8 @@ internal static class AutomationRuntimeSerialization
                         _options
                     )
                 ),
+                "array" => RestoreStructured(variable.ValueJson, AutomationPortValueType.Array),
+                "map" => RestoreStructured(variable.ValueJson, AutomationPortValueType.Map),
                 "null" => RestoreNull(variable.ValueJson),
                 _ => throw new InvalidOperationException("Unknown persisted automation value."),
             },
@@ -368,6 +402,16 @@ internal static class AutomationRuntimeSerialization
         return valueType != AutomationPortValueType.Flow && Enum.IsDefined(valueType)
             ? new AutomationValue.Null(valueType)
             : throw new InvalidOperationException("Unknown persisted automation null type.");
+    }
+
+    private static AutomationValue RestoreStructured(string json, AutomationPortValueType expected)
+    {
+        using var document = JsonDocument.Parse(json);
+        return
+            AutomationStructuredValue.TryRead(document.RootElement, out var value)
+            && AutomationPureHandlerRegistry.ValueType(value) == expected
+            ? value
+            : throw new InvalidOperationException("Unknown persisted structured automation value.");
     }
 
     private sealed record PersistedExpression(int LanguageVersion, string Source);
@@ -407,7 +451,8 @@ internal static class AutomationRuntimeSerialization
         string ConfigurationJson,
         string InputBindingsJson,
         int ExpressionLanguageVersion,
-        bool ContinueOnFailure
+        bool ContinueOnFailure,
+        string? PluginProvenanceJson = null
     );
 
     internal sealed record PersistedEdge(

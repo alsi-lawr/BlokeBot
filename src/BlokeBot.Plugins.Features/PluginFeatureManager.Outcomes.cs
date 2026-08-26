@@ -43,6 +43,8 @@ public enum PluginFeatureEnableRejectionCode
     LifecycleNotHealthy,
     GenerationExhausted,
     CommandRouteCollision,
+    AutomationInvalid,
+    AutomationConflict,
     Conflict,
 }
 

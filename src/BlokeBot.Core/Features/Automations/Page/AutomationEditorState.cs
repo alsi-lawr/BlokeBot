@@ -126,6 +126,24 @@ public sealed partial class AutomationEditorNode
 
     internal AutomationDefinitionDescriptor Definition { get; private set; }
 
+    internal bool RefreshDefinition(AutomationDefinitionDescriptor current)
+    {
+        if (Definition.Id != current.Id)
+        {
+            return false;
+        }
+        if (
+            Definition.PluginProvenance is { } previous
+            && current.PluginProvenance is { } replacement
+            && previous.SameCode(replacement)
+        )
+        {
+            Definition = current;
+            return true;
+        }
+        return Definition.PluginProvenance is null && current.PluginProvenance is null;
+    }
+
     internal AutomationCanvasPosition Position { get; set; }
 
     internal AutomationNodeFailurePolicy FailurePolicy { get; set; }

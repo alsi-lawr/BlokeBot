@@ -56,7 +56,8 @@ public sealed record PluginFeatureEnableStoreRequest(
     PluginFeatureState? ExpectedState,
     PluginFeatureState NextState,
     PluginConfigurationRevision ExpectedInstallationRevision,
-    PluginConfigurationRevision ExpectedFeatureRevision
+    PluginConfigurationRevision ExpectedFeatureRevision,
+    PluginAutomationEnableStorePlan? Automation = null
 );
 
 public enum PluginFeatureEnableConflictCode
@@ -64,6 +65,8 @@ public enum PluginFeatureEnableConflictCode
     FeatureState,
     InstallationConfiguration,
     FeatureConfiguration,
+    AutomationProvenance,
+    AutomationName,
 }
 
 public abstract record PluginFeatureEnableStoreOutcome

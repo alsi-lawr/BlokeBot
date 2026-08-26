@@ -91,6 +91,8 @@ internal static partial class AutomationCelTransform
             AutomationPortValueType.Channel => TryChannel(json),
             AutomationPortValueType.Stream => TryStream(json),
             AutomationPortValueType.Arguments => TryArguments(json),
+            AutomationPortValueType.Array => TryJsonArray(json),
+            AutomationPortValueType.Map => TryJsonMap(json),
             _ => null,
         };
         if (parsed is null)
@@ -140,6 +142,16 @@ internal static partial class AutomationCelTransform
                             )
                     ),
             ])
+            : null;
+
+    private static AutomationValue? TryJsonArray(JsonElement json) =>
+        AutomationStructuredValue.TryRead(json, out var value) && value is AutomationValue.Array
+            ? value
+            : null;
+
+    private static AutomationValue? TryJsonMap(JsonElement json) =>
+        AutomationStructuredValue.TryRead(json, out var value) && value is AutomationValue.Map
+            ? value
             : null;
 
     private static bool TryEnum<T>(string text, out T value)

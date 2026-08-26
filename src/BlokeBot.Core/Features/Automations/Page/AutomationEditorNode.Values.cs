@@ -10,6 +10,9 @@ public sealed partial class AutomationEditorNode
     {
         switch (value)
         {
+            case AutomationValue.Nil:
+                writer.WriteNullValue();
+                break;
             case AutomationValue.Text text:
                 writer.WriteStringValue(text.Value);
                 break;
@@ -58,6 +61,12 @@ public sealed partial class AutomationEditorNode
                     writer.WriteStringValue(argument.Value);
                 }
                 writer.WriteEndArray();
+                break;
+            case AutomationValue.Array array:
+                AutomationStructuredValue.Write(writer, array);
+                break;
+            case AutomationValue.Map map:
+                AutomationStructuredValue.Write(writer, map);
                 break;
             case AutomationValue.Null:
                 writer.WriteNullValue();
@@ -110,6 +119,7 @@ public sealed partial class AutomationEditorNode
                 JsonValueKind.Number => value.GetRawText(),
                 JsonValueKind.True => bool.TrueString,
                 JsonValueKind.False => bool.FalseString,
+                JsonValueKind.Array or JsonValueKind.Object => value.GetRawText(),
                 _ => string.Empty,
             }
             : string.Empty;

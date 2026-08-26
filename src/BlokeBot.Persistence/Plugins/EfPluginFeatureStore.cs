@@ -60,6 +60,9 @@ public sealed partial class EfPluginFeatureStore(
             .PluginFeatureStates.Where(value => value.PluginId == pluginId.Value)
             .ExecuteDeleteAsync(cancellationToken);
         _ = await db
+            .PluginAutomationInstantiations.Where(value => value.PluginId == pluginId.Value)
+            .ExecuteDeleteAsync(cancellationToken);
+        _ = await db
             .PluginFeatureConfigurations.Where(value => value.PluginId == pluginId.Value)
             .ExecuteDeleteAsync(cancellationToken);
         _ = await db
@@ -85,6 +88,10 @@ public sealed partial class EfPluginFeatureStore(
                 cancellationToken
             )
             || await db.PluginFeatureStates.AnyAsync(
+                value => value.HostId == hostId.Value,
+                cancellationToken
+            )
+            || await db.PluginAutomationInstantiations.AnyAsync(
                 value => value.HostId == hostId.Value,
                 cancellationToken
             );

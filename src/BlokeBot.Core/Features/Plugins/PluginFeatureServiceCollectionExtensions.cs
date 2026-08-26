@@ -118,6 +118,12 @@ public static class PluginFeatureServiceCollectionExtensions
         >();
         services.TryAddSingleton<PluginPageAssetService>();
         services.TryAddSingleton<IPluginDispatchInvoker, PluginDispatchInvoker>();
+        services.TryAddSingleton<IPluginAutomationInvoker>(provider =>
+            provider.GetRequiredService<IPluginDispatchInvoker>() as IPluginAutomationInvoker
+            ?? throw new InvalidOperationException(
+                "Plugin dispatch invoker lacks automation support."
+            )
+        );
         services.TryAddSingleton<PluginTwitchEventBridge>();
         services.TryAddSingleton<IPluginTwitchEventObserver>(provider =>
             provider.GetRequiredService<PluginTwitchEventBridge>()

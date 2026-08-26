@@ -13,9 +13,14 @@ internal sealed partial class AutomationDefinitionCatalog
         IAutomationDefinition
     > _definitions;
     private readonly ImmutableDictionary<AutomationDefinitionId, AutomationModuleId> _modules;
+    private readonly PluginAutomationCatalogRegistry _plugins;
 
-    public AutomationDefinitionCatalog(IEnumerable<IAutomationCatalogModule> modules)
+    public AutomationDefinitionCatalog(
+        IEnumerable<IAutomationCatalogModule> modules,
+        PluginAutomationCatalogRegistry? plugins = null
+    )
     {
+        _plugins = plugins ?? new();
         var definitions = ImmutableDictionary.CreateBuilder<
             AutomationDefinitionId,
             IAutomationDefinition
@@ -51,16 +56,70 @@ internal sealed partial class AutomationDefinitionCatalog
         _definitions = definitions.ToImmutable();
         _modules = definitionModules.ToImmutable();
         ValidateTriggerContextRequirements(_definitions);
-        Descriptors = _definitions
+        _coreDescriptors = _definitions
             .Values.Select(static definition => definition.Descriptor)
             .OrderBy(static definition => definition.Id.Value, StringComparer.Ordinal)
             .ToImmutableArray();
     }
 
-    internal ImmutableArray<AutomationDefinitionDescriptor> Descriptors { get; }
+    private ImmutableArray<AutomationDefinitionDescriptor> _coreDescriptors { get; }
 
-    internal bool TryResolve(AutomationDefinitionId id, out IAutomationDefinition definition) =>
-        _definitions.TryGetValue(id, out definition!);
+    internal ImmutableArray<AutomationDefinitionDescriptor> DescriptorsForHost(
+        AutomationHostId hostId
+    ) =>
+        [
+            .. _coreDescriptors
+                .Concat(_plugins.DescriptorsForHost(hostId.Value))
+                .OrderBy(static descriptor => descriptor.Id.Value, StringComparer.Ordinal),
+        ];
+
+    internal ImmutableArray<AutomationDefinitionDescriptor> Descriptors =>
+        [
+            .. _coreDescriptors
+                .Concat(_plugins.Current.Descriptors)
+                .OrderBy(static descriptor => descriptor.Id.Value, StringComparer.Ordinal),
+        ];
+
+    internal long Revision => _plugins.Current.Version;
+
+    internal ValueTask<long> WaitForPluginChangeAsync(
+        long observed,
+        CancellationToken cancellationToken
+    ) => _plugins.WaitForChangeAsync(observed, cancellationToken);
+
+    internal bool TryResolve(AutomationDefinitionId id, out IAutomationDefinition definition)
+    {
+        if (_definitions.TryGetValue(id, out definition!))
+        {
+            return true;
+        }
+        if (_plugins.Current.Definitions.TryGetValue(id, out var plugin))
+        {
+            definition = plugin;
+            return true;
+        }
+        definition = null!;
+        return false;
+    }
+
+    internal bool TryResolve(
+        AutomationHostId hostId,
+        AutomationDefinitionId id,
+        out IAutomationDefinition definition
+    )
+    {
+        if (_definitions.TryGetValue(id, out definition!))
+        {
+            return true;
+        }
+        if (_plugins.TryResolve(id, hostId.Value, out var plugin))
+        {
+            definition = plugin;
+            return true;
+        }
+        definition = null!;
+        return false;
+    }
 
     internal bool IsFormat1Definition(AutomationDefinitionId id) =>
         _modules.TryGetValue(id, out var module)
@@ -83,6 +142,7 @@ internal sealed partial class AutomationDefinitionCatalog
             || effective.Capabilities != registered.Capabilities
             || effective.RetrySafety != registered.RetrySafety
             || effective.TriggerContextRequirement != registered.TriggerContextRequirement
+            || effective.PluginProvenance != registered.PluginProvenance
         )
         {
             return false;

@@ -34,6 +34,7 @@ public sealed class AutomationFlow
     public bool IsEnabled { get; set; }
     public bool UseVerticalLayout { get; set; }
     public bool UseSmoothEdges { get; set; }
+    public string? UnavailableReason { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public List<AutomationFlowNode> Nodes { get; set; } = [];
@@ -53,6 +54,7 @@ public sealed class AutomationFlowNode
     public int CanvasX { get; set; }
     public int CanvasY { get; set; }
     public string? DisplayAlias { get; set; }
+    public string? PluginProvenanceJson { get; set; }
     public AutomationFlow Flow { get; set; } = null!;
 }
 

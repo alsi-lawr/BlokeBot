@@ -11,6 +11,11 @@ namespace BlokeBot.Plugins.Contracts;
 )]
 [JsonSerializable(typeof(PluginLiveInvocation.Page), TypeInfoPropertyName = "LivePage")]
 [JsonSerializable(typeof(PluginInvocationContext.Page), TypeInfoPropertyName = "ContextPage")]
+[JsonSerializable(typeof(PluginLiveInvocation.Automation), TypeInfoPropertyName = "LiveAutomation")]
+[JsonSerializable(
+    typeof(PluginInvocationContext.Automation),
+    TypeInfoPropertyName = "ContextAutomation"
+)]
 [JsonSerializable(typeof(PluginValue.Boolean), TypeInfoPropertyName = "PluginBoolean")]
 [JsonSerializable(typeof(PluginValue.String), TypeInfoPropertyName = "PluginString")]
 [JsonSerializable(typeof(PluginHostCallOutcome.Returned), TypeInfoPropertyName = "HostReturned")]

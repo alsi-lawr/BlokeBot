@@ -240,6 +240,159 @@ public sealed class PluginDynamicDispatchTests
     }
 
     [Test]
+    public async Task AutomationInvocation_UsesTypedIpcForEveryKindAndRejectsAnotherHost()
+    {
+        var manifest = AutomationManifest();
+        var fence = PluginFeatureTestContext.Fence();
+        var state = AutomationState(manifest, fence, new PluginFeatureReadiness.Ready());
+        var declaration = Declaration(manifest, fence);
+        var worker = new RecordingWorker();
+        var (invoker, _, _) = AutomationSetup(manifest, state, worker);
+        PluginValue input = new PluginValue.Map([
+            new("array", new PluginValue.Array([new PluginValue.Number(4)])),
+            new("map", new PluginValue.Map([new("enabled", new PluginValue.Boolean(true))])),
+        ]);
+
+        foreach (var descriptor in manifest.Manifest.AutomationDefinitions)
+        {
+            var endpoint = new PluginAutomationEndpoint(declaration, state, descriptor);
+            var outcome = await invoker.InvokeAutomationAsync(
+                endpoint,
+                AutomationContext(endpoint),
+                input,
+                CancellationToken.None
+            );
+
+            _ = outcome.ShouldBeOfType<PluginDispatchInvocationOutcome.Returned>();
+        }
+
+        worker
+            .Invocations.Select(static invocation =>
+                invocation.ShouldBeOfType<PluginLiveInvocation.Automation>().Kind
+            )
+            .ShouldBe(
+                [
+                    PluginAutomationDefinitionKind.Source,
+                    PluginAutomationDefinitionKind.Action,
+                    PluginAutomationDefinitionKind.Value,
+                    PluginAutomationDefinitionKind.Control,
+                    PluginAutomationDefinitionKind.Transform,
+                ],
+                ignoreOrder: true
+            );
+        worker.Invocations.ShouldAllBe(invocation => invocation.Input == input);
+        var first = new PluginAutomationEndpoint(
+            declaration,
+            state,
+            manifest.Manifest.AutomationDefinitions[0]
+        );
+        var invalidContext = AutomationContext(first) with { Host = Host(2) };
+
+        var rejected = await invoker.InvokeAutomationAsync(
+            first,
+            invalidContext,
+            input,
+            CancellationToken.None
+        );
+
+        rejected
+            .ShouldBeOfType<PluginDispatchInvocationOutcome.Rejected>()
+            .Code.ShouldBe(PluginDispatchInvocationRejectionCode.InvalidContext);
+        worker.Invocations.Count.ShouldBe(5);
+    }
+
+    [Test]
+    public async Task AutomationInvocation_IsCancelledByFeatureDrainAndDropsAStaleResult()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var manifest = AutomationManifest();
+        var fence = PluginFeatureTestContext.Fence();
+        var state = AutomationState(manifest, fence, new PluginFeatureReadiness.Ready());
+        var declaration = Declaration(manifest, fence);
+        var descriptor = manifest.Manifest.AutomationDefinitions[0];
+        var endpoint = new PluginAutomationEndpoint(declaration, state, descriptor);
+        var cancellingWorker = new CancellingWorker(expectedInvocations: 1);
+        var (cancellingInvoker, _, cancellingWork) = AutomationSetup(
+            manifest,
+            state,
+            cancellingWorker
+        );
+        var cancelled = cancellingInvoker
+            .InvokeAutomationAsync(
+                endpoint,
+                AutomationContext(endpoint),
+                new PluginValue.Map([]),
+                timeout.Token
+            )
+            .AsTask();
+        await cancellingWorker.AllStarted.Task.WaitAsync(timeout.Token);
+
+        await cancellingWork.CancelAndDrainAsync(state, timeout.Token);
+
+        _ = (await cancelled).ShouldBeOfType<PluginDispatchInvocationOutcome.Cancelled>();
+
+        var staleWorker = new ControlledWorker();
+        var (staleInvoker, staleFeatures, _) = AutomationSetup(manifest, state, staleWorker);
+        var stale = staleInvoker
+            .InvokeAutomationAsync(
+                endpoint,
+                AutomationContext(endpoint),
+                new PluginValue.Map([]),
+                timeout.Token
+            )
+            .AsTask();
+        await staleWorker.Started.Task.WaitAsync(timeout.Token);
+        staleFeatures.Publish(
+            state with
+            {
+                Generation = Generation(2),
+                Readiness = new PluginFeatureReadiness.Disabled(),
+                Revision = Revision(2),
+            }
+        );
+        staleWorker.Complete();
+
+        _ = (await stale).ShouldBeOfType<PluginDispatchInvocationOutcome.Stale>();
+    }
+
+    [Test]
+    public void CallbackResult_ParsesTypedSourceEmissionsFromTheReturnedValue()
+    {
+        PluginValue value = new PluginValue.Map([
+            new(
+                "$automationSources",
+                new PluginValue.Array([
+                    new PluginValue.Map([
+                        new("definition", new PluginValue.String("queued-link")),
+                        new(
+                            "outputs",
+                            new PluginValue.Map([
+                                new(
+                                    "items",
+                                    new PluginValue.Array([
+                                        new PluginValue.Map([
+                                            new("name", new PluginValue.String("first")),
+                                        ]),
+                                    ])
+                                ),
+                            ])
+                        ),
+                    ]),
+                ])
+            ),
+        ]);
+
+        var emission = PluginAutomationCallbackResult.Emissions(value).ShouldHaveSingleItem();
+
+        emission.DefinitionId.Value.ShouldBe("queued-link");
+        _ = emission
+            .Outputs.Properties.Single()
+            .Value.ShouldBeOfType<PluginValue.Array>()
+            .Items.ShouldHaveSingleItem()
+            .ShouldBeOfType<PluginValue.Map>();
+    }
+
+    [Test]
     public async Task WebhookAuthenticationAndHandler_ShareOneCurrentAdmissionAndWorkLease()
     {
         var worker = new WebWorker(authentication: true);
@@ -358,6 +511,113 @@ public sealed class PluginDynamicDispatchTests
             TimeProvider.System
         );
         return new(dispatch, features, work, invoker, activeWorker);
+    }
+
+    private static (
+        PluginDispatchInvoker Invoker,
+        PluginFeatureSnapshotRegistry Features,
+        PluginDispatchWorkRegistry Work
+    ) AutomationSetup(
+        ValidatedPluginManifest manifest,
+        PluginFeatureState state,
+        RecordingWorker worker
+    )
+    {
+        var runtime = new PluginRuntimeSnapshotRegistry();
+        var features = new PluginFeatureSnapshotRegistry();
+        var work = new PluginDispatchWorkRegistry();
+        features.Publish(state);
+        _ = runtime.Publish(Lifecycle(state, manifest), worker);
+        return (new(new(features, runtime), runtime, work, TimeProvider.System), features, work);
+    }
+
+    private static PluginInvocationContext.Automation AutomationContext(
+        PluginAutomationEndpoint endpoint
+    )
+    {
+        PluginAutomationInvocationId.TryCreate(Guid.NewGuid(), out var invocationId).ShouldBeTrue();
+        return new(
+            endpoint.Declaration.Installation,
+            endpoint.State.Key.HostId,
+            endpoint.State.Key.FeatureId,
+            endpoint.Descriptor.Id,
+            invocationId
+        );
+    }
+
+    private static ValidatedPluginManifest AutomationManifest()
+    {
+        var accepted = (
+            (PluginManifestValidationOutcome.Accepted)
+                PluginManifestJson.Validate(
+                    PluginContractFixtures.CompleteManifestJson(),
+                    PluginContractFixtures.CompatibleHost()
+                )
+        ).Manifest;
+        var source = accepted.Manifest.AutomationDefinitions[0];
+        var fields = source.Outputs;
+        System.Collections.Immutable.ImmutableArray<PluginAutomationDefinitionDescriptor> definitions =
+        [
+            .. accepted.Manifest.AutomationDefinitions,
+            source with
+            {
+                Id = AutomationDefinition("value-node"),
+                Kind = PluginAutomationDefinitionKind.Value,
+                EntryPoint = "value_node",
+                Name = "Value node",
+            },
+            source with
+            {
+                Id = AutomationDefinition("control-node"),
+                Kind = PluginAutomationDefinitionKind.Control,
+                EntryPoint = "control_node",
+                Name = "Control node",
+                Inputs = fields,
+                Outputs = [],
+            },
+            source with
+            {
+                Id = AutomationDefinition("transform-node"),
+                Kind = PluginAutomationDefinitionKind.Transform,
+                EntryPoint = "transform_node",
+                Name = "Transform node",
+                Inputs = fields,
+                Outputs = [fields[0] with { Id = AutomationField("result") }],
+            },
+        ];
+        var modified = accepted.Manifest with { AutomationDefinitions = definitions };
+        return (
+            (PluginManifestValidationOutcome.Accepted)
+                PluginManifestValidator.Validate(modified, PluginContractFixtures.CompatibleHost())
+        ).Manifest;
+    }
+
+    private static PluginFeatureState AutomationState(
+        ValidatedPluginManifest manifest,
+        PluginLifecycleFence fence,
+        PluginFeatureReadiness readiness
+    )
+    {
+        var feature = manifest.Manifest.Features.Single(item => item.Id.Value == "publishing");
+        return new(
+            new(manifest.Manifest.Id, feature.Id, Host(1)),
+            fence,
+            Generation(1),
+            readiness,
+            Revision(1)
+        );
+    }
+
+    private static PluginAutomationDefinitionId AutomationDefinition(string value)
+    {
+        PluginAutomationDefinitionId.TryCreate(value, out var id).ShouldBeTrue();
+        return id;
+    }
+
+    private static PluginAutomationFieldId AutomationField(string value)
+    {
+        PluginAutomationFieldId.TryCreate(value, out var id).ShouldBeTrue();
+        return id;
     }
 
     private static ValidatedPluginManifest Manifest()

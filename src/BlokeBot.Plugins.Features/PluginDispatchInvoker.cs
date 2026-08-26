@@ -14,7 +14,11 @@ public abstract record PluginDispatchInvocationOutcome
 {
     private PluginDispatchInvocationOutcome() { }
 
-    public sealed record Returned(PluginValue Value) : PluginDispatchInvocationOutcome;
+    public sealed record Returned(
+        PluginValue Value,
+        System.Collections.Immutable.ImmutableArray<PluginAutomationSourceEmission> AutomationSources =
+            default
+    ) : PluginDispatchInvocationOutcome;
 
     public sealed record Failed(PluginWorkerFailure Failure) : PluginDispatchInvocationOutcome;
 
@@ -104,7 +108,7 @@ public sealed partial class PluginDispatchInvoker(
     IPluginRuntimeInvoker runtime,
     PluginDispatchWorkRegistry work,
     TimeProvider timeProvider
-) : IPluginDispatchInvoker
+) : IPluginDispatchInvoker, IPluginAutomationInvoker
 {
     public ValueTask<PluginDispatchInvocationOutcome> InvokeCommandAsync(
         PluginDispatchEndpoint.Command endpoint,
@@ -196,6 +200,87 @@ public sealed partial class PluginDispatchInvoker(
             invocation,
             workLease.CancellationToken
         );
+        if (!admission.ValidateWorkerResult())
+        {
+            return new PluginDispatchInvocationOutcome.Stale();
+        }
+
+        PluginDispatchInvocationOutcome outcome = result.Outcome switch
+        {
+            PluginWorkerInvocationOutcome.Returned workerReturned =>
+                new PluginDispatchInvocationOutcome.Returned(
+                    workerReturned.Value,
+                    PluginAutomationCallbackResult.Emissions(workerReturned.Value)
+                ),
+            PluginWorkerInvocationOutcome.Failed failed =>
+                new PluginDispatchInvocationOutcome.Failed(failed.Failure),
+            PluginWorkerInvocationOutcome.Cancelled cancelled =>
+                new PluginDispatchInvocationOutcome.Cancelled(cancelled.Reason),
+            _ => throw new InvalidOperationException("Unknown plugin worker invocation outcome."),
+        };
+        return outcome;
+    }
+
+    public async ValueTask<PluginDispatchInvocationOutcome> InvokeAutomationAsync(
+        PluginAutomationEndpoint endpoint,
+        PluginInvocationContext.Automation context,
+        PluginValue input,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            context.Plugin != endpoint.Declaration.Installation
+            || context.Host != endpoint.State.Key.HostId
+            || context.Feature != endpoint.State.Key.FeatureId
+            || context.Definition != endpoint.Descriptor.Id
+        )
+        {
+            return new PluginDispatchInvocationOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.InvalidContext
+            );
+        }
+
+        var expected = new PluginFeatureFence(endpoint.State.Fence, endpoint.State.Generation);
+        var readiness = endpoint.Declaration.FindFeature(endpoint.State.Key.FeatureId)?.Twitch
+            is { Scopes.IsEmpty: true, EventSubTypes.IsEmpty: true }
+            ? PluginFeatureReadinessDependency.Independent
+            : PluginFeatureReadinessDependency.Required;
+        if (
+            admissions.Admit(endpoint.State.Key, expected, readiness)
+            is not PluginFeatureAdmissionOutcome.Admitted admitted
+        )
+        {
+            return new PluginDispatchInvocationOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.FeatureUnavailable
+            );
+        }
+
+        await using var admission = admitted.Admission;
+        if (
+            work.Admit(endpoint.State, cancellationToken)
+            is not PluginDispatchWorkAdmission.Admitted workAdmitted
+        )
+        {
+            return new PluginDispatchInvocationOutcome.Rejected(
+                PluginDispatchInvocationRejectionCode.FeatureStopping
+            );
+        }
+
+        await using var workLease = workAdmitted.Lease;
+        var identity = Identity(endpoint.Declaration, endpoint.State, context);
+        var result = await runtime.InvokeAsync(
+            endpoint.State.Key.PluginId,
+            endpoint.State.Fence,
+            identity,
+            new PluginLiveInvocation.Automation(
+                endpoint.Descriptor.Module,
+                PluginOperation(endpoint.Descriptor.EntryPoint),
+                endpoint.Descriptor.Id,
+                endpoint.Descriptor.Kind,
+                input
+            ),
+            workLease.CancellationToken
+        );
         return !admission.ValidateWorkerResult()
             ? new PluginDispatchInvocationOutcome.Stale()
             : result.Outcome switch
@@ -211,6 +296,11 @@ public sealed partial class PluginDispatchInvoker(
                 ),
             };
     }
+
+    private static PluginHostOperationId PluginOperation(string entryPoint) =>
+        PluginHostOperationId.TryCreate(entryPoint, out var operation)
+            ? operation
+            : throw new InvalidOperationException("Validated plugin operation is invalid.");
 
     private PluginWorkerInvocationIdentity Identity(
         PluginDispatchEndpoint endpoint,

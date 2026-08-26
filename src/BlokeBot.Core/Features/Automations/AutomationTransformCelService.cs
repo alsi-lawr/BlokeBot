@@ -167,6 +167,13 @@ internal sealed partial class AutomationTransformCelService
                 .Values.OrderBy(static argument => argument.Position)
                 .Select(static argument => argument.Value)
                 .ToArray(),
+            AutomationValue.Array array => array.Items.Select(ToCelValue).ToArray(),
+            AutomationValue.Map map => map.Properties.ToDictionary(
+                static property => property.Name,
+                property => ToCelValue(property.Value),
+                StringComparer.Ordinal
+            ),
+            AutomationValue.Nil => null,
             AutomationValue.Null => null,
             _ => null,
         };

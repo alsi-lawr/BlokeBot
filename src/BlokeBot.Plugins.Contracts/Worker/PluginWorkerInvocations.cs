@@ -30,6 +30,7 @@ public sealed record PluginPreparationInvocation(
 [JsonDerivedType(typeof(PluginLiveInvocation.HostAction), "host-action")]
 [JsonDerivedType(typeof(PluginLiveInvocation.Storage), "storage")]
 [JsonDerivedType(typeof(PluginLiveInvocation.Page), "page")]
+[JsonDerivedType(typeof(PluginLiveInvocation.Automation), "automation")]
 public abstract record PluginLiveInvocation
 {
     private PluginLiveInvocation(
@@ -94,6 +95,14 @@ public abstract record PluginLiveInvocation
     public sealed record Page(
         PluginLuaModuleId Module,
         PluginHostOperationId Operation,
+        PluginValue Input
+    ) : PluginLiveInvocation(Module, Operation, Input);
+
+    public sealed record Automation(
+        PluginLuaModuleId Module,
+        PluginHostOperationId Operation,
+        PluginAutomationDefinitionId Definition,
+        PluginAutomationDefinitionKind Kind,
         PluginValue Input
     ) : PluginLiveInvocation(Module, Operation, Input);
 }

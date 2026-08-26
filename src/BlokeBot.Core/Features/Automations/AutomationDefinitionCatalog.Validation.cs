@@ -2,7 +2,7 @@ namespace BlokeBot.Core.Features.Automations;
 
 internal sealed partial class AutomationDefinitionCatalog
 {
-    private static void Validate(
+    internal static void Validate(
         AutomationDefinitionDescriptor descriptor,
         AutomationModuleId moduleId
     )

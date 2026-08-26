@@ -1,12 +1,11 @@
 using System.Diagnostics;
-using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public sealed class AutomationCatalogService
+public sealed partial class AutomationCatalogService
 {
     private readonly AutomationDefinitionCatalog _catalog;
     private readonly HostFeatureService _features;
@@ -16,7 +15,8 @@ public sealed class AutomationCatalogService
         HostFeatureService features,
         AutomationExpressionService? expressions = null,
         IEnumerable<IAutomationPureNodeHandler>? handlers = null,
-        IAutomationIntegerEntropy? integerEntropy = null
+        IAutomationIntegerEntropy? integerEntropy = null,
+        PluginAutomationExecutionService? pluginExecution = null
     )
     {
         _catalog = catalog;
@@ -25,11 +25,19 @@ public sealed class AutomationCatalogService
             this,
             new(catalog, handlers ?? []),
             expressions ?? new(),
-            integerEntropy ?? new AutomationProductionIntegerEntropy()
+            integerEntropy ?? new AutomationProductionIntegerEntropy(),
+            pluginExecution
         );
     }
 
     internal AutomationDataResolver Data { get; }
+
+    internal long CurrentRevision => _catalog.Revision;
+
+    internal ValueTask<long> WaitForChangeAsync(
+        long observed,
+        CancellationToken cancellationToken
+    ) => _catalog.WaitForPluginChangeAsync(observed, cancellationToken);
 
     public async Task<AutomationCatalogSnapshot> DiscoverAsync(
         AutomationHostId hostId,
@@ -43,16 +51,29 @@ public sealed class AutomationCatalogService
                     ? new AutomationCatalogSnapshot(
                         AutomationCatalogAvailability.Enabled,
                         [
-                            .. _catalog.Descriptors.Where(descriptor =>
-                                enabled.Contains(
-                                    NativeOperationAutomations.BackingFeature(descriptor.Id.Value)
-                                )
-                            ),
-                        ]
+                            .. _catalog
+                                .DescriptorsForHost(hostId)
+                                .Where(descriptor =>
+                                    enabled.Contains(
+                                        NativeOperationAutomations.BackingFeature(
+                                            descriptor.Id.Value
+                                        )
+                                    )
+                                ),
+                        ],
+                        _catalog.Revision
                     )
-                    : new AutomationCatalogSnapshot(AutomationCatalogAvailability.Disabled, []),
-            static () =>
-                new AutomationCatalogSnapshot(AutomationCatalogAvailability.HostNotFound, [])
+                    : new AutomationCatalogSnapshot(
+                        AutomationCatalogAvailability.Disabled,
+                        [],
+                        _catalog.Revision
+                    ),
+            () =>
+                new AutomationCatalogSnapshot(
+                    AutomationCatalogAvailability.HostNotFound,
+                    [],
+                    _catalog.Revision
+                )
         );
     }
 
@@ -76,7 +97,9 @@ public sealed class AutomationCatalogService
         ValidateEnabledPersisted(
             new(persisted.TypeId),
             new(persisted.SchemaVersion),
-            persisted.Configuration
+            persisted.Configuration,
+            persisted.PluginProvenance,
+            requireCurrentExecution: false
         );
 
     public bool TryDescribe(
@@ -91,6 +114,24 @@ public sealed class AutomationCatalogService
         }
 
         descriptor = null!;
+        return false;
+    }
+
+    internal bool TryResolvePlugin(
+        AutomationHostId hostId,
+        AutomationDefinitionId definitionId,
+        out IPluginAutomationDefinition definition
+    )
+    {
+        if (
+            _catalog.TryResolve(hostId, definitionId, out var resolved)
+            && resolved is IPluginAutomationDefinition plugin
+        )
+        {
+            definition = plugin;
+            return true;
+        }
+        definition = null!;
         return false;
     }
 
@@ -134,7 +175,14 @@ public sealed class AutomationCatalogService
         var definitionId = new AutomationDefinitionId(persisted.TypeId);
         var schemaVersion = new AutomationSchemaVersion(persisted.SchemaVersion);
         return await HostExistsAsync(hostId, cancellationToken)
-            ? ValidateEnabledPersisted(definitionId, schemaVersion, persisted.Configuration)
+            ? ValidateEnabledPersisted(
+                hostId,
+                definitionId,
+                schemaVersion,
+                persisted.Configuration,
+                persisted.PluginProvenance,
+                requireCurrentExecution: true
+            )
             : new AutomationConfigurationCheck.HostNotFound();
     }
 
@@ -154,9 +202,12 @@ public sealed class AutomationCatalogService
             AutomationCatalogAvailability.Disabled =>
                 new AutomationConfigurationCheck.FeatureDisabled(),
             AutomationCatalogAvailability.Enabled => ValidateEnabledPersisted(
+                hostId,
                 definitionId,
                 schemaVersion,
-                persisted.Configuration
+                persisted.Configuration,
+                persisted.PluginProvenance,
+                requireCurrentExecution: false
             ),
             _ => throw new UnreachableException(),
         };
@@ -178,6 +229,7 @@ public sealed class AutomationCatalogService
             AutomationCatalogAvailability.Disabled =>
                 new AutomationConfigurationCheck.FeatureDisabled(),
             AutomationCatalogAvailability.Enabled => ValidateEnabled(
+                hostId,
                 definitionId,
                 schemaVersion,
                 configuration
@@ -194,7 +246,7 @@ public sealed class AutomationCatalogService
         CancellationToken cancellationToken
     ) =>
         await HostExistsAsync(hostId, cancellationToken)
-            ? ValidateEnabled(definitionId, schemaVersion, configuration)
+            ? ValidateEnabled(hostId, definitionId, schemaVersion, configuration)
             : new AutomationConfigurationCheck.HostNotFound();
 
     private async Task<bool> HostExistsAsync(
@@ -204,92 +256,6 @@ public sealed class AutomationCatalogService
     {
         var result = await _features.Load(hostId.Value).RunAsync(cancellationToken);
         return result.Match(static _ => true, static () => false);
-    }
-
-    private AutomationConfigurationCheck ValidateEnabledPersisted(
-        AutomationDefinitionId definitionId,
-        AutomationSchemaVersion schemaVersion,
-        JsonElement configuration
-    ) =>
-        !_catalog.TryResolve(definitionId, out var definition)
-            ? new AutomationConfigurationCheck.DefinitionMissing(definitionId)
-            : ValidateResolvedPersisted(definition, schemaVersion, configuration);
-
-    private AutomationConfigurationCheck ValidateResolvedPersisted(
-        IAutomationDefinition definition,
-        AutomationSchemaVersion schemaVersion,
-        JsonElement configuration
-    )
-    {
-        var compatibility = definition.Descriptor.Schema.Classify(schemaVersion);
-        return compatibility != AutomationSchemaCompatibilityStatus.Current
-            ? new AutomationConfigurationCheck.SchemaUnsupported(
-                definition.Descriptor.Id,
-                schemaVersion,
-                compatibility
-            )
-            : definition.Parse(configuration) switch
-            {
-                AutomationConfigurationParseResult.Invalid invalid =>
-                    new AutomationConfigurationCheck.Invalid(invalid.Errors),
-                AutomationConfigurationParseResult.Parsed parsed => ValidateDefinition(
-                    definition,
-                    parsed.Configuration
-                ),
-                _ => throw new UnreachableException(),
-            };
-    }
-
-    private AutomationConfigurationCheck ValidateEnabled(
-        AutomationDefinitionId definitionId,
-        AutomationSchemaVersion schemaVersion,
-        AutomationConfiguration configuration
-    ) =>
-        !_catalog.TryResolve(definitionId, out var definition)
-            ? new AutomationConfigurationCheck.DefinitionMissing(definitionId)
-            : ValidateResolved(definition, schemaVersion, configuration);
-
-    private AutomationConfigurationCheck ValidateResolved(
-        IAutomationDefinition definition,
-        AutomationSchemaVersion schemaVersion,
-        AutomationConfiguration configuration
-    )
-    {
-        var compatibility = definition.Descriptor.Schema.Classify(schemaVersion);
-        return compatibility != AutomationSchemaCompatibilityStatus.Current
-            ? new AutomationConfigurationCheck.SchemaUnsupported(
-                definition.Descriptor.Id,
-                schemaVersion,
-                compatibility
-            )
-            : ValidateDefinition(definition, configuration);
-    }
-
-    private static AutomationConfigurationCheck ValidateDefinition(
-        IAutomationDefinition definition,
-        AutomationConfiguration configuration
-    )
-    {
-        var validation = definition.Validate(configuration);
-        if (!validation.IsValid)
-        {
-            return new AutomationConfigurationCheck.Invalid(validation.Errors);
-        }
-
-        var effective = definition is IAutomationEffectiveDefinition effectiveDefinition
-            ? effectiveDefinition.EffectiveDescriptor(configuration)
-            : definition.Descriptor;
-        return !AutomationDefinitionCatalog.IsValidEffectiveDescriptor(
-            definition.Descriptor,
-            effective
-        )
-            ? new AutomationConfigurationCheck.Invalid([
-                new(
-                    new AutomationValidationTarget.Definition(),
-                    "The persisted automation schema is invalid."
-                ),
-            ])
-            : new AutomationConfigurationCheck.Valid(effective, configuration);
     }
 
     private async Task<AutomationCatalogAvailability> AvailabilityAsync(

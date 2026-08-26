@@ -147,13 +147,29 @@ public sealed partial class PluginFeatureManager
             new PluginFeatureReadiness.EnabledDegraded(PendingReason()),
             NextRevision(current?.Revision)
         );
+        var automationPlan = automations?.Prepare(declaration, feature, next, Guid.NewGuid());
+        if (automationPlan is PluginAutomationPlanOutcome.Rejected)
+        {
+            return Completed(Rejected(PluginFeatureEnableRejectionCode.AutomationInvalid));
+        }
         var committed = await store.EnableAsync(
-            new(current, next, installation.Revision, featureConfiguration.Revision),
+            new(
+                current,
+                next,
+                installation.Revision,
+                featureConfiguration.Revision,
+                (automationPlan as PluginAutomationPlanOutcome.Prepared)?.Plan
+            ),
             cancellationToken
         );
         if (committed is PluginFeatureEnableStoreOutcome.Conflict conflict)
         {
-            return Completed(new PluginFeatureEnableOutcome.Superseded(conflict.Current));
+            return
+                conflict.Code
+                    is PluginFeatureEnableConflictCode.AutomationName
+                        or PluginFeatureEnableConflictCode.AutomationProvenance
+                ? Completed(Rejected(PluginFeatureEnableRejectionCode.AutomationConflict))
+                : Completed(new PluginFeatureEnableOutcome.Superseded(conflict.Current));
         }
 
         next = ((PluginFeatureEnableStoreOutcome.Enabled)committed).State;
