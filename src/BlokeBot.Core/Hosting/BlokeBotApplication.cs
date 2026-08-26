@@ -81,10 +81,18 @@ public static partial class BlokeBotApplication
         }
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         var databasePath = builder.Configuration["BlokeBot:DatabasePath"];
-        var pluginStateRoot = !string.IsNullOrWhiteSpace(databasePath)
-            ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, "plugins")
-            : Path.Combine(builder.Environment.ContentRootPath, ".state", "plugins");
+        var writableStateRoot = !string.IsNullOrWhiteSpace(databasePath)
+            ? Path.GetDirectoryName(Path.GetFullPath(databasePath))!
+            : Path.Combine(builder.Environment.ContentRootPath, ".state");
+        var pluginStateRoot = Path.Combine(writableStateRoot, "plugins");
         builder.Services.TryAddSingleton(new PluginPrivateDataOptions(pluginStateRoot));
+        builder.Services.TryAddSingleton(
+            new PluginMarketplaceStorageOptions(
+                Path.Combine(writableStateRoot, "plugin-packages"),
+                pluginStateRoot,
+                TimeSpan.FromHours(1)
+            )
+        );
 
         var twitchEndpoints =
             builder

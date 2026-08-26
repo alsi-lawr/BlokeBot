@@ -60,11 +60,6 @@ public sealed partial class PluginLifecycleCoordinator
             return await CompleteRemovalAsync(state, cancellationToken);
         }
 
-        if (state.Phase == PluginLifecyclePhase.Purging)
-        {
-            return await CompletePurgeAsync(state, cancellationToken);
-        }
-
         var resolved = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
         return resolved is not PluginLifecyclePackageResolution.Available available
                 ? await FaultAsync(
@@ -97,12 +92,8 @@ public sealed partial class PluginLifecycleCoordinator
     )
     {
         var current = await _store.LoadAsync(pluginId, cancellationToken);
-        if (current is null)
-        {
-            var tombstone = await _store.LoadTombstoneAsync(pluginId, cancellationToken);
-            return tombstone is null ? Conflict(null) : Purged(tombstone);
-        }
-
-        return current.Phase == PluginLifecyclePhase.Faulted ? Failed(current) : Succeeded(current);
+        return current is null ? new PluginLifecycleCommandOutcome.Removed(pluginId)
+            : current.Phase == PluginLifecyclePhase.Faulted ? Failed(current)
+            : Succeeded(current);
     }
 }

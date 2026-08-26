@@ -1,8 +1,11 @@
 using BlokeBot.Cli;
+using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Hosting;
+using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Shouldly;
 
@@ -27,6 +30,34 @@ public sealed class BlokeBotHostTests
                 "TwitchBot__Identity__ClientSecret"
             );
             composition.Twitch.OfflineGuidance().ShouldContain("Twitch features are offline");
+        }
+        finally
+        {
+            await Log.CloseAndFlushAsync();
+            Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task HostComposition_StagesMarketplaceStateBesideDatabaseNotPluginPrivateData()
+    {
+        var dataDirectory = TemporaryDirectory();
+        try
+        {
+            await using var composition = BlokeBotHost.Create(
+                new BlokeBotServeOptions(null, null, dataDirectory, null)
+            );
+
+            var options =
+                composition.App.Services.GetRequiredService<PluginMarketplaceStorageOptions>();
+            options.PackageStateRoot.ShouldBe(Path.Combine(dataDirectory, "plugin-packages"));
+            options.PluginPrivateStateRoot.ShouldBe(Path.Combine(dataDirectory, "plugins"));
+            options.PackageStateRoot.ShouldNotStartWith(options.PluginPrivateStateRoot);
+            _ = composition.App.Services.GetRequiredService<PluginMarketplaceApplicationService>();
+            composition
+                .App.Services.GetRequiredService<IPluginLifecyclePackageResolver>()
+                .GetType()
+                .Name.ShouldBe("MarketplacePluginLifecyclePackageResolver");
         }
         finally
         {

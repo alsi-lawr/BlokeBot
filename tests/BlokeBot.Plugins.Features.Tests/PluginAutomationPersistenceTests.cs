@@ -55,7 +55,7 @@ public sealed class PluginAutomationPersistenceTests
     }
 
     [Test]
-    public async Task EnableLedger_IsIdempotentRecreatesDeletedFlowAndPreservesFlowOnPurge()
+    public async Task EnableLedger_IsIdempotentAndRemovalDeletesAllPluginOwnedRows()
     {
         await using var context = await PluginFeatureTestContext.CreateAsync();
         var key = PluginFeatureTestContext.Key("publishing");
@@ -157,13 +157,52 @@ public sealed class PluginAutomationPersistenceTests
             ).ShouldBeTrue();
         }
 
-        await context.Store.PurgeAsync(key.PluginId, CancellationToken.None);
+        await using (var seed = context.Database.CreateDbContext())
+        {
+            _ = seed.PluginInstallationConfigurations.Add(
+                new() { PluginId = key.PluginId.Value, Revision = 1 }
+            );
+            _ = seed.PluginInstallationSecrets.Add(
+                new()
+                {
+                    PluginId = key.PluginId.Value,
+                    SettingId = "token",
+                    ProtectedValue = [1],
+                }
+            );
+            _ = seed.PluginFeatureConfigurations.Add(
+                new()
+                {
+                    PluginId = key.PluginId.Value,
+                    FeatureId = key.FeatureId.Value,
+                    HostId = key.HostId.Value,
+                    Revision = 1,
+                }
+            );
+            _ = seed.PluginFeatureSecrets.Add(
+                new()
+                {
+                    PluginId = key.PluginId.Value,
+                    FeatureId = key.FeatureId.Value,
+                    HostId = key.HostId.Value,
+                    SettingId = "channel-token",
+                    ProtectedValue = [1],
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
 
-        await using var purged = context.Database.CreateDbContext();
-        (await purged.PluginAutomationInstantiations.CountAsync()).ShouldBe(0);
-        var hostFlow = await purged.AutomationFlows.SingleAsync();
-        hostFlow.Id.ShouldBe(recreatedFlowId);
-        hostFlow.IsEnabled.ShouldBeFalse();
+        await context.Store.RemovePluginDataAsync(key.PluginId, CancellationToken.None);
+
+        await using var removed = context.Database.CreateDbContext();
+        (await removed.PluginAutomationInstantiations.CountAsync()).ShouldBe(0);
+        (await removed.AutomationFlows.CountAsync()).ShouldBe(0);
+        (await removed.AutomationFlowNodes.CountAsync()).ShouldBe(0);
+        (await removed.PluginFeatureStates.CountAsync()).ShouldBe(0);
+        (await removed.PluginInstallationConfigurations.CountAsync()).ShouldBe(0);
+        (await removed.PluginInstallationSecrets.CountAsync()).ShouldBe(0);
+        (await removed.PluginFeatureConfigurations.CountAsync()).ShouldBe(0);
+        (await removed.PluginFeatureSecrets.CountAsync()).ShouldBe(0);
     }
 
     private static PluginFeatureState State(

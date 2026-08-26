@@ -5,10 +5,9 @@ namespace BlokeBot.Plugins.Runtime;
 
 public sealed partial class PluginLifecycleCoordinator
 {
-    private async ValueTask<PluginLifecycleCommandOutcome> RemoveOrPurgeAsync(
+    private async ValueTask<PluginLifecycleCommandOutcome> RemoveAsyncCore(
         PluginId pluginId,
         PluginLifecycleOperationId operationId,
-        bool purge,
         CancellationToken cancellationToken
     )
     {
@@ -16,27 +15,13 @@ public sealed partial class PluginLifecycleCoordinator
         var current = await _store.LoadAsync(pluginId, cancellationToken);
         if (current is null)
         {
-            if (purge)
-            {
-                var tombstone = await _store.LoadTombstoneAsync(pluginId, cancellationToken);
-                if (tombstone is not null)
-                {
-                    return Purged(tombstone);
-                }
-            }
-
             return new PluginLifecycleCommandOutcome.Rejected(
                 PluginLifecycleCommandRejectionCode.NotFound,
                 null
             );
         }
 
-        var transition = PluginLifecycleStateMachine.BeginRemoval(
-            current,
-            operationId,
-            purge,
-            Now()
-        );
+        var transition = PluginLifecycleStateMachine.BeginRemoval(current, operationId, Now());
         if (transition is PluginLifecycleTransitionOutcome.Rejected rejected)
         {
             return Rejected(rejected.Code, current);
@@ -75,7 +60,6 @@ public sealed partial class PluginLifecycleCoordinator
             }
 
             current = ((PluginRuntimeDrainOutcome.Ready)drain).State;
-
             var drained = Applied(PluginLifecycleStateMachine.DrainSucceeded(current, Now()));
             var written = await _store.WriteAsync(current, drained, continuationToken);
             if (written is PluginLifecycleStoreWriteOutcome.Conflict drainConflict)
@@ -87,9 +71,7 @@ public sealed partial class PluginLifecycleCoordinator
             _ = _snapshots.Publish(current, worker: null);
         }
 
-        return current.Phase == PluginLifecyclePhase.Purging
-            ? await CompletePurgeAsync(current, continuationToken)
-            : await CompleteRemovalAsync(current, continuationToken);
+        return await CompleteRemovalAsync(current, continuationToken);
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> CompleteRemovalAsync(
@@ -97,29 +79,12 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var removed = Applied(PluginLifecycleStateMachine.RemovalSucceeded(state, Now()));
-        var written = await _store.WriteAsync(state, removed, cancellationToken);
-        if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
-        {
-            return Conflict(conflict.Current);
-        }
-
-        removed = ((PluginLifecycleStoreWriteOutcome.Written)written).State;
-        _ = _snapshots.Publish(removed, worker: null);
-        return Succeeded(removed);
-    }
-
-    private async ValueTask<PluginLifecycleCommandOutcome> CompletePurgeAsync(
-        PluginLifecycleState state,
-        CancellationToken cancellationToken
-    )
-    {
-        foreach (var owner in _purgeOwners)
+        foreach (var owner in _removalOwners)
         {
             PluginLifecycleOwnerOutcome outcome;
             try
             {
-                outcome = await owner.PurgeAsync(
+                outcome = await owner.RemoveAsync(
                     new(state.PluginId, state.SelectedFence),
                     cancellationToken
                 );
@@ -132,13 +97,13 @@ public sealed partial class PluginLifecycleCoordinator
             {
                 _logger.LogError(
                     exception,
-                    "Plugin purge owner {OwnerType} failed for {PluginId}.",
+                    "Plugin removal owner {OwnerType} failed for {PluginId}.",
                     owner.GetType().Name,
                     state.PluginId.Value
                 );
                 outcome = new PluginLifecycleOwnerOutcome.Failed(
                     PluginLifecycleOwnerFailureCode.Failed,
-                    SafeDetail("A plugin purge data owner failed.")
+                    SafeDetail("A plugin removal data owner failed.")
                 );
             }
 
@@ -146,25 +111,25 @@ public sealed partial class PluginLifecycleCoordinator
             {
                 return await FaultAsync(
                     state,
-                    PluginLifecyclePhase.Purging,
-                    PluginLifecycleFailureCode.PurgeFailed,
+                    PluginLifecyclePhase.Removing,
+                    PluginLifecycleFailureCode.RemovalFailed,
                     failed.Detail,
                     cancellationToken
                 );
             }
         }
 
-        var purgedOutcome = PluginLifecycleOutcome.Progress(
-            PluginLifecycleOutcomeCode.Purged,
+        var removedOutcome = PluginLifecycleOutcome.Progress(
+            PluginLifecycleOutcomeCode.Removed,
             Now()
         );
-        var persisted = await _store.CompletePurgeAsync(state, purgedOutcome, cancellationToken);
-        if (persisted is PluginLifecycleStorePurgeOutcome.Conflict conflict)
+        var persisted = await _store.CompleteRemovalAsync(state, removedOutcome, cancellationToken);
+        if (persisted is PluginLifecycleStoreRemovalOutcome.Conflict conflict)
         {
             return Conflict(conflict.Current);
         }
 
         _ = _snapshots.Remove(state.PluginId);
-        return Purged(((PluginLifecycleStorePurgeOutcome.Completed)persisted).Tombstone);
+        return new PluginLifecycleCommandOutcome.Removed(state.PluginId);
     }
 }

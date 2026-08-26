@@ -40,6 +40,17 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
         );
         _ = services.AddSingleton<BlokeBotDatabaseInitializer>();
         _ = services.AddSingleton<IPluginLifecycleStore, EfPluginLifecycleStore>();
+        _ = services.AddSingleton<EfPluginMarketplaceReceiptStore>();
+        _ = services.AddSingleton<IPluginMarketplaceReceiptStore>(provider =>
+            provider.GetRequiredService<EfPluginMarketplaceReceiptStore>()
+        );
+        _ = services.AddSingleton<IPluginRemovalDataOwner>(provider =>
+            provider.GetRequiredService<EfPluginMarketplaceReceiptStore>()
+        );
+        _ = services.AddSingleton<
+            IPluginMarketplaceCatalogStore,
+            EfPluginMarketplaceCatalogStore
+        >();
         _ = services.AddSingleton<PluginSettingValuesCodec>();
         _ = services.AddSingleton<IPluginFeatureStore, EfPluginFeatureStore>();
 

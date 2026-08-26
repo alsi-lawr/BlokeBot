@@ -15,10 +15,10 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class PluginAutomationPurgeTests
+public sealed class PluginAutomationRemovalTests
 {
     [Test]
-    public async Task CompatiblePluginPurge_DisablesFlowAndProjectsUnavailableGraphWithHistory()
+    public async Task CompatiblePluginRemoval_DeletesFlowNodesAndRunHistory()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database);
@@ -39,12 +39,30 @@ public sealed class PluginAutomationPurgeTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginFeatureEnableStoreOutcome.Enabled>();
-        var flowId = await SeedCompletedRunAsync(database, hostId);
+        _ = await SeedCompletedRunAsync(database, hostId);
+        var automations = new PluginAutomationCatalogRegistry();
+        var declarations = new PluginFeatureDeclarationRegistry(automations: automations);
+        var snapshots = new PluginFeatureSnapshotRegistry(automations: automations);
+        var manifest = PluginManifestJson
+            .Validate(
+                PluginContractFixtures.CompleteManifestJson(),
+                PluginContractFixtures.CompatibleHost()
+            )
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+            .Manifest;
+        declarations.Publish(manifest, fence);
+        snapshots.Hydrate([state]);
+        automations.Current.Descriptors.ShouldNotBeEmpty();
 
-        await store.PurgeAsync(pluginId, CancellationToken.None);
+        _ = (
+            await new PluginFeatureRemovalOwner(store, snapshots, declarations).RemoveAsync(
+                new(pluginId, fence),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
+        declarations.Current.Declarations.ShouldNotContainKey(pluginId);
+        automations.Current.Descriptors.ShouldBeEmpty();
 
-        var reason =
-            "Plugin community.link-queue was purged. Reinstall and enable a compatible version to restore this flow.";
         var features = TestHostFeatureServices.Create(
             database,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
@@ -61,11 +79,8 @@ public sealed class PluginAutomationPurgeTests
         );
         var projected = (await flows.ListAsync(new(hostId), CancellationToken.None))
             .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
-            .Flows.ShouldHaveSingleItem();
-        projected.Draft.Id.ShouldBe(new AutomationFlowId(flowId));
-        projected.Draft.IsEnabled.ShouldBeFalse();
-        projected.UnavailableReason.ShouldBe(reason);
-        projected.Draft.Nodes.Length.ShouldBe(1);
+            .Flows;
+        projected.ShouldBeEmpty();
 
         var history = (
             await new AutomationRunQueryService(database, features, catalog).ListAsync(
@@ -74,27 +89,27 @@ public sealed class PluginAutomationPurgeTests
             )
         )
             .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
-            .Runs.ShouldHaveSingleItem();
-        history.FlowId.ShouldBe(new(flowId));
+            .Runs;
+        history.ShouldBeEmpty();
 
         using var editor = new BunitContext();
         var rail = editor.Render<AutomationFlowRail>(parameters =>
             parameters
-                .Add(component => component.Flows, [projected])
-                .Add(component => component.CurrentFlowId, projected.Draft.Id)
-                .Add(component => component.CurrentName, projected.Draft.Name)
+                .Add(component => component.Flows, projected)
+                .Add(component => component.CurrentFlowId, null)
+                .Add(component => component.CurrentName, string.Empty)
                 .Add(component => component.Visible, true)
         );
-        var item = rail.Find(".automation-flow-item");
-        item.TextContent.ShouldContain("Unavailable");
-        item.TextContent.ShouldContain("1 nodes");
-        item.QuerySelector("strong")!.GetAttribute("title").ShouldBe(reason);
+        rail.FindAll("button.automation-flow-item").ShouldBeEmpty();
+        rail.Markup.ShouldContain("Not saved");
+        rail.Markup.ShouldNotContain("Unavailable");
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.PluginFeatureStates.CountAsync()).ShouldBe(0);
         (await verify.PluginAutomationInstantiations.CountAsync()).ShouldBe(0);
-        (await verify.AutomationFlowNodes.CountAsync()).ShouldBe(1);
-        (await verify.AutomationFlowRuns.CountAsync()).ShouldBe(1);
+        (await verify.AutomationFlows.CountAsync()).ShouldBe(0);
+        (await verify.AutomationFlowNodes.CountAsync()).ShouldBe(0);
+        (await verify.AutomationFlowRuns.CountAsync()).ShouldBe(0);
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

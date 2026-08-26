@@ -260,8 +260,7 @@ public static partial class PluginLifecycleStateMachine
                 or PluginLifecyclePhase.Migrating
                 or PluginLifecyclePhase.Activating
                 or PluginLifecyclePhase.Draining
-                or PluginLifecyclePhase.Removing
-                or PluginLifecyclePhase.Purging;
+                or PluginLifecyclePhase.Removing;
 
     private static PluginLifecycleTransitionOutcome.Applied Applied(PluginLifecycleState state) =>
         HasValidFaultInvariant(state)

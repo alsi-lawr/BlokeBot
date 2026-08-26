@@ -8,7 +8,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
     private readonly IPluginLifecycleStore _store;
     private readonly IPluginLifecyclePackageResolver _packages;
     private readonly IReadOnlyList<IPluginMigrationDataOwner> _migrationOwners;
-    private readonly IReadOnlyList<IPluginPurgeDataOwner> _purgeOwners;
+    private readonly IReadOnlyList<IPluginRemovalDataOwner> _removalOwners;
     private readonly IPluginPendingWorkCanceller _pendingWork;
     private readonly IPluginLifecycleWorkerManager _workers;
     private readonly PluginRuntimeSnapshotRegistry _snapshots;
@@ -21,7 +21,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         IPluginLifecycleStore store,
         IPluginLifecyclePackageResolver packages,
         IEnumerable<IPluginMigrationDataOwner> migrationOwners,
-        IEnumerable<IPluginPurgeDataOwner> purgeOwners,
+        IEnumerable<IPluginRemovalDataOwner> removalOwners,
         IPluginPendingWorkCanceller pendingWork,
         IPluginLifecycleWorkerManager workers,
         PluginRuntimeSnapshotRegistry snapshots,
@@ -34,7 +34,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         _store = store;
         _packages = packages;
         _migrationOwners = migrationOwners.ToArray();
-        _purgeOwners = purgeOwners.ToArray();
+        _removalOwners = removalOwners.ToArray();
         _pendingWork = pendingWork;
         _workers = workers;
         _snapshots = snapshots;
@@ -88,13 +88,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         PluginId pluginId,
         PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken
-    ) => RemoveOrPurgeAsync(pluginId, operationId, purge: false, cancellationToken);
-
-    public ValueTask<PluginLifecycleCommandOutcome> PurgeAsync(
-        PluginId pluginId,
-        PluginLifecycleOperationId operationId,
-        CancellationToken cancellationToken
-    ) => RemoveOrPurgeAsync(pluginId, operationId, purge: true, cancellationToken);
+    ) => RemoveAsyncCore(pluginId, operationId, cancellationToken);
 
     private DateTimeOffset Now() => _timeProvider.GetUtcNow();
 
@@ -134,7 +128,4 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
 
     private static PluginLifecycleCommandOutcome Failed(PluginLifecycleState state) =>
         new PluginLifecycleCommandOutcome.Failed(PluginLifecycleView.From(state));
-
-    private static PluginLifecycleCommandOutcome Purged(PluginLifecycleTombstone tombstone) =>
-        new PluginLifecycleCommandOutcome.Purged(tombstone);
 }

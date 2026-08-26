@@ -1,3 +1,4 @@
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Features;
 using BlokeBot.Plugins.Runtime;
@@ -23,6 +24,32 @@ public static class PluginFeatureServiceCollectionExtensions
         services.TryAddSingleton<PluginPrivateDataStore>();
         services.TryAddSingleton<PluginPrivateDataLifecycleOwner>();
         services.TryAddSingleton<PluginOutboundHttpClient>();
+        _ = services
+            .AddHttpClient(
+                GitHubPluginMarketplaceCatalogTransport.ClientName,
+                static client => client.Timeout = Timeout.InfiniteTimeSpan
+            )
+            .ConfigurePrimaryHttpMessageHandler(static () =>
+                new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    MaxConnectionsPerServer = 2,
+                }
+            );
+        _ = services
+            .AddHttpClient(
+                GitHubPluginMarketplaceArchiveTransport.ClientName,
+                static client => client.Timeout = Timeout.InfiniteTimeSpan
+            )
+            .ConfigurePrimaryHttpMessageHandler(static () =>
+                new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    MaxConnectionsPerServer = 2,
+                }
+            );
         _ = services
             .AddHttpClient(
                 PluginOutboundHttpClient.ClientName,
@@ -104,6 +131,46 @@ public static class PluginFeatureServiceCollectionExtensions
         services.TryAddSingleton<IPluginHostCallDispatcher>(provider =>
             provider.GetRequiredService<PluginHostModuleCatalog>()
         );
+        services.TryAddSingleton<PluginMarketplaceCatalogRegistry>();
+        services.TryAddSingleton<PluginMarketplaceCatalogService>(provider =>
+            new(
+                provider.GetRequiredService<PluginMarketplaceCatalogRegistry>(),
+                provider.GetRequiredService<TimeProvider>()
+            )
+        );
+        services.TryAddSingleton<
+            IPluginMarketplaceCatalogTransport,
+            GitHubPluginMarketplaceCatalogTransport
+        >();
+        services.TryAddSingleton<
+            IPluginMarketplaceArchiveTransport,
+            GitHubPluginMarketplaceArchiveTransport
+        >();
+        services.TryAddSingleton<PluginMarketplaceArchiveReader>();
+        services.TryAddSingleton(provider =>
+            PluginMarketplaceRuntimeContext.Create(
+                provider.GetRequiredService<BlokeBotBuildIdentity>(),
+                provider.GetServices<IPluginHostModule>(),
+                provider.GetRequiredService<IPluginHostCallDispatcher>(),
+                provider.GetRequiredService<ILogger<PluginWorkerClient>>()
+            )
+        );
+        services.TryAddSingleton<PluginMarketplacePackageStore>();
+        services.TryAddSingleton<PluginMarketplaceApplicationService>(provider =>
+            new(
+                provider.GetRequiredService<PluginMarketplaceCatalogService>(),
+                provider.GetRequiredService<PluginMarketplacePackageStore>(),
+                provider.GetRequiredService<IPluginLifecycleCoordinator>(),
+                provider.GetRequiredService<IPluginMarketplaceReceiptStore>(),
+                provider.GetRequiredService<TimeProvider>()
+            )
+        );
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<
+                IPluginLifecyclePackageResolver,
+                MarketplacePluginLifecyclePackageResolver
+            >()
+        );
         services.TryAddSingleton<
             IPluginFeatureLifecycleHealth,
             RuntimePluginFeatureLifecycleHealth
@@ -145,13 +212,19 @@ public static class PluginFeatureServiceCollectionExtensions
             >()
         );
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IPluginPurgeDataOwner, PluginFeaturePurgeOwner>()
+            ServiceDescriptor.Singleton<IPluginRemovalDataOwner, PluginFeatureRemovalOwner>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IPluginRemovalDataOwner, PluginScheduleRemovalOwner>()
         );
         _ = services.AddSingleton<IPluginMigrationDataOwner>(provider =>
             provider.GetRequiredService<PluginPrivateDataLifecycleOwner>()
         );
-        _ = services.AddSingleton<IPluginPurgeDataOwner>(provider =>
+        _ = services.AddSingleton<IPluginRemovalDataOwner>(provider =>
             provider.GetRequiredService<PluginPrivateDataLifecycleOwner>()
+        );
+        _ = services.AddSingleton<IPluginRemovalDataOwner>(provider =>
+            provider.GetRequiredService<PluginMarketplacePackageStore>()
         );
         _ = services.Replace(
             ServiceDescriptor.Singleton<
@@ -160,6 +233,7 @@ public static class PluginFeatureServiceCollectionExtensions
             >()
         );
         _ = services.AddHostedService<PluginFeatureSnapshotHydrationService>();
+        _ = services.AddHostedService<PluginMarketplaceRefreshService>();
         _ = services.AddHostedService<PluginFeatureRecoveryService>();
         _ = services.AddHostedService<PluginScheduleWorker>();
         _ = services.AddHostedService<PluginBlokeBotEventBridge>();

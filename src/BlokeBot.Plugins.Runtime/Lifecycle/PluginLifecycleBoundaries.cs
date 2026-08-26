@@ -74,12 +74,12 @@ public interface IPluginMigrationDataOwner
     );
 }
 
-public sealed record PluginPurgeContext(PluginId PluginId, PluginLifecycleFence Fence);
+public sealed record PluginRemovalContext(PluginId PluginId, PluginLifecycleFence Fence);
 
-public interface IPluginPurgeDataOwner
+public interface IPluginRemovalDataOwner
 {
-    ValueTask<PluginLifecycleOwnerOutcome> PurgeAsync(
-        PluginPurgeContext context,
+    ValueTask<PluginLifecycleOwnerOutcome> RemoveAsync(
+        PluginRemovalContext context,
         CancellationToken cancellationToken
     );
 }

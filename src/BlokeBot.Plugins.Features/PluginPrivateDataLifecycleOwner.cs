@@ -9,7 +9,7 @@ internal sealed class PluginPrivateDataLifecycleOwner(
     IPluginLifecycleMigrationRunner migrations,
     IPluginRuntimeSnapshotProvider runtime,
     TimeProvider timeProvider
-) : IPluginMigrationDataOwner, IPluginPurgeDataOwner
+) : IPluginMigrationDataOwner, IPluginRemovalDataOwner
 {
     public async ValueTask<PluginLifecycleOwnerOutcome> MigrateAsync(
         PluginMigrationContext context,
@@ -106,20 +106,20 @@ internal sealed class PluginPrivateDataLifecycleOwner(
         }
     }
 
-    public async ValueTask<PluginLifecycleOwnerOutcome> PurgeAsync(
-        PluginPurgeContext context,
+    public async ValueTask<PluginLifecycleOwnerOutcome> RemoveAsync(
+        PluginRemovalContext context,
         CancellationToken cancellationToken
     )
     {
-        if (!IsCurrent(context.PluginId, context.Fence, PluginLifecyclePhase.Purging))
+        if (!IsCurrent(context.PluginId, context.Fence, PluginLifecyclePhase.Removing))
         {
-            return Failed("Plugin private-data purge is not current.");
+            return Failed("Plugin private-data removal is not current.");
         }
 
-        await store.PurgeAsync(context.PluginId, cancellationToken);
-        return IsCurrent(context.PluginId, context.Fence, PluginLifecyclePhase.Purging)
+        await store.RemovePluginDataAsync(context.PluginId, cancellationToken);
+        return IsCurrent(context.PluginId, context.Fence, PluginLifecyclePhase.Removing)
             ? new PluginLifecycleOwnerOutcome.Succeeded()
-            : Failed("Plugin private-data purge became stale.");
+            : Failed("Plugin private-data removal became stale.");
     }
 
     private bool IsCurrent(

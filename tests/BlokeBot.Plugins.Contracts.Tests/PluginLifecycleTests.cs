@@ -145,7 +145,7 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
-    public async Task Remove_CancelsPendingWorkAndTerminatesAtDrainBoundWithoutPurgingData()
+    public async Task Remove_CancelsPendingWorkAndTerminatesBeforeDeletingDataAtDrainBound()
     {
         var harness = new LifecycleHarness(options: new(TimeSpan.Zero, TimeSpan.Zero));
         var active = await harness.ActivateAsync("1.0.0", "v1");
@@ -165,7 +165,7 @@ public sealed class PluginLifecycleTests
             .View.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.DrainTimedOut);
         harness.PendingWork.Calls.ShouldBe(1);
         harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
-        harness.Purge.Calls.ShouldBe(0);
+        harness.Removal.Calls.ShouldBe(0);
         harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
         await admission.DisposeAsync();
     }
@@ -195,9 +195,7 @@ public sealed class PluginLifecycleTests
 
         await callback.DisposeAsync();
         await harness.Coordinator.RecoverAsync(CancellationToken.None);
-        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!.Phase.ShouldBe(
-            PluginLifecyclePhase.Removed
-        );
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)).ShouldBeNull();
     }
 
     [Test]
@@ -224,9 +222,7 @@ public sealed class PluginLifecycleTests
         harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeFalse();
 
         await harness.Coordinator.RecoverAsync(CancellationToken.None);
-        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!.Phase.ShouldBe(
-            PluginLifecyclePhase.Removed
-        );
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)).ShouldBeNull();
     }
 
     [Test]
@@ -269,9 +265,7 @@ public sealed class PluginLifecycleTests
         harness.Store.ResumeWrite();
         await recovery.WaitAsync(TimeSpan.FromSeconds(2));
 
-        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!.Phase.ShouldBe(
-            PluginLifecyclePhase.Removed
-        );
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)).ShouldBeNull();
     }
 
     [Test]
@@ -777,9 +771,7 @@ public sealed class PluginLifecycleTests
             CancellationToken.None
         );
 
-        thrownOutcome
-            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
-            .View.Phase.ShouldBe(PluginLifecyclePhase.Removed);
+        _ = thrownOutcome.ShouldBeOfType<PluginLifecycleCommandOutcome.Removed>();
         thrownWorker.DisposeCalls.ShouldBe(1);
         thrown.PendingWork.CancelledFences.ShouldBe([Fence(thrownActive)]);
 
@@ -796,9 +788,7 @@ public sealed class PluginLifecycleTests
         );
 
         cancellation.IsCancellationRequested.ShouldBeTrue();
-        canceledOutcome
-            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
-            .View.Phase.ShouldBe(PluginLifecyclePhase.Removed);
+        _ = canceledOutcome.ShouldBeOfType<PluginLifecycleCommandOutcome.Removed>();
         canceledWorker.DisposeCalls.ShouldBe(1);
         canceled.PendingWork.CancelledFences.ShouldBe([Fence(canceledActive)]);
     }
@@ -810,25 +800,18 @@ public sealed class PluginLifecycleTests
         var active = ActiveState(harness.Package("1.0.0", "v1"));
         var draining = (
             (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.BeginRemoval(
-                    active,
-                    Operation(),
-                    purge: false,
-                    DateTimeOffset.UtcNow
-                )
+                PluginLifecycleStateMachine.BeginRemoval(active, Operation(), DateTimeOffset.UtcNow)
         ).State;
         harness.Store.Seed(draining);
 
         await harness.Coordinator.RecoverAsync(CancellationToken.None);
 
-        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None))!.Phase.ShouldBe(
-            PluginLifecyclePhase.Removed
-        );
+        (await harness.Store.LoadAsync(harness.PluginId, CancellationToken.None)).ShouldBeNull();
         harness.PendingWork.CancelledFences.ShouldBe([active.SelectedFence]);
     }
 
     [Test]
-    public async Task RemoveThenReinstall_RetainsOwnedDataAndAdvancesChangedRelease()
+    public async Task RemoveThenReinstall_IsFreshAndStartsAtInitialGeneration()
     {
         var harness = new LifecycleHarness();
         var first = await harness.ActivateAsync("1.0.0", "v1");
@@ -840,85 +823,65 @@ public sealed class PluginLifecycleTests
 
         var reinstalled = await harness.ActivateAsync("2.0.0", "v2");
 
-        reinstalled.View.Generation.Value.ShouldBe(first.View.Generation.Value + 1);
+        reinstalled.View.Generation.Value.ShouldBe(1UL);
         reinstalled.View.Phase.ShouldBe(PluginLifecyclePhase.Active);
-        harness.Purge.Calls.ShouldBe(0);
-        (
-            await harness.Store.LoadTombstoneAsync(harness.PluginId, CancellationToken.None)
-        ).ShouldBeNull();
+        harness.Removal.Calls.ShouldBe(1);
+        first.View.Generation.Value.ShouldBe(1UL);
     }
 
     [Test]
-    public async Task Purge_RetryAndRepeatConvergeToOneRetainedOutcome()
+    public async Task Remove_RetryAfterOwnerFailureDeletesStateAndRepeatIsNotFound()
     {
-        var purge = new RecordingPurgeOwner { FailuresRemaining = 1 };
-        var harness = new LifecycleHarness(purge: purge);
+        var removal = new RecordingRemovalOwner { FailuresRemaining = 1 };
+        var harness = new LifecycleHarness(removal: removal);
         _ = await harness.ActivateAsync("1.0.0", "v1");
-        var removed = await harness.Coordinator.RemoveAsync(
+        var interrupted = await harness.Coordinator.RemoveAsync(
             harness.PluginId,
             Operation(),
             CancellationToken.None
         );
 
-        removed
-            .ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>()
-            .View.Phase.ShouldBe(PluginLifecyclePhase.Removed);
-        purge.Calls.ShouldBe(0);
-
-        var interrupted = await harness.Coordinator.PurgeAsync(
-            harness.PluginId,
-            Operation(),
-            CancellationToken.None
-        );
         interrupted
             .ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>()
             .View.Phase.ShouldBe(PluginLifecyclePhase.Faulted);
 
-        var converged = await harness.Coordinator.PurgeAsync(
+        var converged = await harness.Coordinator.RemoveAsync(
             harness.PluginId,
             Operation(),
             CancellationToken.None
         );
-        var tombstone = converged.ShouldBeOfType<PluginLifecycleCommandOutcome.Purged>().Tombstone;
-        var repeated = await harness.Coordinator.PurgeAsync(
+        _ = converged.ShouldBeOfType<PluginLifecycleCommandOutcome.Removed>();
+        var repeated = await harness.Coordinator.RemoveAsync(
             harness.PluginId,
             Operation(),
             CancellationToken.None
         );
 
         repeated
-            .ShouldBeOfType<PluginLifecycleCommandOutcome.Purged>()
-            .Tombstone.ShouldBe(tombstone);
-        tombstone.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Purged);
-        tombstone.LatestOutcome.FailureCode.ShouldBeNull();
-        purge.Calls.ShouldBe(2);
+            .ShouldBeOfType<PluginLifecycleCommandOutcome.Rejected>()
+            .Code.ShouldBe(PluginLifecycleCommandRejectionCode.NotFound);
+        removal.Calls.ShouldBe(2);
         harness.Store.Count.ShouldBe(0);
-        harness.Store.TombstoneCount.ShouldBe(1);
     }
 
     [Test]
-    public async Task Purge_RemovesRuntimeSlotAndNotifiesLifecycleListeners()
+    public async Task Remove_DeletesRuntimeSlotAndNotifiesLifecycleListeners()
     {
-        var purge = new RecordingPurgeOwner();
-        var harness = new LifecycleHarness(purge: purge);
+        var removal = new RecordingRemovalOwner();
+        var harness = new LifecycleHarness(removal: removal);
         _ = await harness.ActivateAsync("1.0.0", "v1");
-        _ = await harness.Coordinator.RemoveAsync(
-            harness.PluginId,
-            Operation(),
-            CancellationToken.None
-        );
-        purge.Pause();
-        var purging = harness
-            .Coordinator.PurgeAsync(harness.PluginId, Operation(), CancellationToken.None)
+        removal.Pause();
+        var removing = harness
+            .Coordinator.RemoveAsync(harness.PluginId, Operation(), CancellationToken.None)
             .AsTask();
-        await purge.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await removal.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
         var observed = harness.Snapshots.CurrentVersion;
         var changed = harness
             .Snapshots.WaitForChangeAsync(observed, CancellationToken.None)
             .AsTask();
 
-        purge.Resume();
-        _ = (await purging).ShouldBeOfType<PluginLifecycleCommandOutcome.Purged>();
+        removal.Resume();
+        _ = (await removing).ShouldBeOfType<PluginLifecycleCommandOutcome.Removed>();
         var notified = await changed;
 
         notified.Value.ShouldBeGreaterThan(observed.Value);
@@ -1199,7 +1162,7 @@ public sealed class PluginLifecycleTests
             source.Store,
             packages,
             [new RecordingMigrationOwner()],
-            [new RecordingPurgeOwner()],
+            [new RecordingRemovalOwner()],
             pendingWork,
             workers,
             snapshots,
@@ -1844,7 +1807,7 @@ public sealed class PluginLifecycleTests
             harness.Store,
             coldPackages,
             [coldMigration],
-            [new RecordingPurgeOwner()],
+            [new RecordingRemovalOwner()],
             coldPendingWork,
             coldWorkers,
             coldSnapshots,
@@ -2028,7 +1991,7 @@ public sealed class PluginLifecycleTests
     }
 
     [Test]
-    public async Task RemovalAndPurgeRecovery_ConvergeFromDurableCheckpoints()
+    public async Task RemovalRecovery_ConvergesFromDurableCheckpoint()
     {
         var removeHarness = new LifecycleHarness();
         var removing = RemovingState(removeHarness.Package("1.0.0", "v1"));
@@ -2038,38 +2001,8 @@ public sealed class PluginLifecycleTests
 
         (
             await removeHarness.Store.LoadAsync(removeHarness.PluginId, CancellationToken.None)
-        )!.Phase.ShouldBe(PluginLifecyclePhase.Removed);
-        removeHarness.Purge.Calls.ShouldBe(0);
-
-        var purgeHarness = new LifecycleHarness();
-        var removed = RemovingState(purgeHarness.Package("1.0.0", "v1"));
-        removed = (
-            (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.RemovalSucceeded(removed, DateTimeOffset.UtcNow)
-        ).State;
-        var purging = (
-            (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.BeginRemoval(
-                    removed,
-                    Operation(),
-                    purge: true,
-                    DateTimeOffset.UtcNow
-                )
-        ).State;
-        purgeHarness.Store.Seed(purging);
-
-        await purgeHarness.Coordinator.RecoverAsync(CancellationToken.None);
-
-        (
-            await purgeHarness.Store.LoadAsync(purgeHarness.PluginId, CancellationToken.None)
         ).ShouldBeNull();
-        (
-            await purgeHarness.Store.LoadTombstoneAsync(
-                purgeHarness.PluginId,
-                CancellationToken.None
-            )
-        )!.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Purged);
-        purgeHarness.Purge.Calls.ShouldBe(1);
+        removeHarness.Removal.Calls.ShouldBe(1);
     }
 
     [Test]
@@ -2110,10 +2043,7 @@ public sealed class PluginLifecycleTests
                 )
         ).State;
         var removing = RemovingState(package);
-        var removed = (
-            (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.RemovalSucceeded(removing, DateTimeOffset.UtcNow)
-        ).State;
+        var removed = removing with { Phase = PluginLifecyclePhase.Removed };
         mismatched
             .ShouldBeOfType<PluginLifecycleTransitionOutcome.Rejected>()
             .Code.ShouldBe(PluginLifecycleTransitionFailureCode.InvalidTransition);
@@ -2333,7 +2263,7 @@ public sealed class PluginLifecycleTests
             store,
             packages ?? new FakePackageResolver(),
             [new RecordingMigrationOwner()],
-            [new RecordingPurgeOwner()],
+            [new RecordingRemovalOwner()],
             pendingWork,
             workers,
             snapshots,
@@ -2436,12 +2366,7 @@ public sealed class PluginLifecycleTests
         var active = ActiveState(package);
         var draining = (
             (PluginLifecycleTransitionOutcome.Applied)
-                PluginLifecycleStateMachine.BeginRemoval(
-                    active,
-                    Operation(),
-                    purge: false,
-                    DateTimeOffset.UtcNow
-                )
+                PluginLifecycleStateMachine.BeginRemoval(active, Operation(), DateTimeOffset.UtcNow)
         ).State;
         return (
             (PluginLifecycleTransitionOutcome.Applied)
@@ -2455,17 +2380,17 @@ internal sealed class LifecycleHarness
     internal LifecycleHarness(
         PluginLifecycleOptions? options = null,
         IPluginMigrationDataOwner? migration = null,
-        RecordingPurgeOwner? purge = null
+        RecordingRemovalOwner? removal = null
     )
     {
         Migration = migration ?? new RecordingMigrationOwner();
-        Purge = purge ?? new RecordingPurgeOwner();
+        Removal = removal ?? new RecordingRemovalOwner();
         PluginId = Id("test-plugin");
         Coordinator = new(
             Store,
             Packages,
             [Migration],
-            [Purge],
+            [Removal],
             PendingWork,
             Workers,
             Snapshots,
@@ -2484,7 +2409,7 @@ internal sealed class LifecycleHarness
 
     internal IPluginMigrationDataOwner Migration { get; }
 
-    internal RecordingPurgeOwner Purge { get; }
+    internal RecordingRemovalOwner Removal { get; }
 
     internal RecordingPendingWorkCanceller PendingWork { get; } = new();
 

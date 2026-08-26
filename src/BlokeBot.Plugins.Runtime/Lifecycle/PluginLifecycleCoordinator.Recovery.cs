@@ -258,13 +258,6 @@ public sealed partial class PluginLifecycleCoordinator
 
         drained = drainWrite.State;
         _ = _snapshots.Publish(drained, worker: null);
-        if (drained.Phase == PluginLifecyclePhase.Purging)
-        {
-            _ = await CompletePurgeAsync(drained, cancellationToken);
-        }
-        else
-        {
-            _ = await CompleteRemovalAsync(drained, cancellationToken);
-        }
+        _ = await CompleteRemovalAsync(drained, cancellationToken);
     }
 }

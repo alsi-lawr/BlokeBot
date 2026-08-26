@@ -31,18 +31,6 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
         return records.Select(PluginLifecycleRecordMapper.ToDomain).ToArray();
     }
 
-    public async ValueTask<PluginLifecycleTombstone?> LoadTombstoneAsync(
-        PluginId pluginId,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var record = await db
-            .PluginLifecycleOutcomes.AsNoTracking()
-            .SingleOrDefaultAsync(value => value.PluginId == pluginId.Value, cancellationToken);
-        return record is null ? null : PluginLifecycleOutcomeRecordMapper.ToDomain(record);
-    }
-
     public async ValueTask<PluginLifecycleStoreBeginOutcome> BeginActivationAsync(
         PluginLifecycleBeginRequest request,
         CancellationToken cancellationToken
@@ -50,10 +38,6 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var record = await db.PluginLifecycles.SingleOrDefaultAsync(
-            value => value.PluginId == request.Installation.PluginId.Value,
-            cancellationToken
-        );
-        var tombstone = await db.PluginLifecycleOutcomes.SingleOrDefaultAsync(
             value => value.PluginId == request.Installation.PluginId.Value,
             cancellationToken
         );
@@ -77,11 +61,6 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
         else
         {
             PluginLifecycleRecordMapper.Apply(record, begun);
-        }
-
-        if (tombstone is not null)
-        {
-            _ = db.PluginLifecycleOutcomes.Remove(tombstone);
         }
 
         try
@@ -154,18 +133,18 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
         }
     }
 
-    public async ValueTask<PluginLifecycleStorePurgeOutcome> CompletePurgeAsync(
+    public async ValueTask<PluginLifecycleStoreRemovalOutcome> CompleteRemovalAsync(
         PluginLifecycleState expected,
         PluginLifecycleOutcome outcome,
         CancellationToken cancellationToken
     )
     {
         if (
-            expected.Phase != PluginLifecyclePhase.Purging
-            || outcome is not { Code: PluginLifecycleOutcomeCode.Purged, FailureCode: null }
+            expected.Phase != PluginLifecyclePhase.Removing
+            || outcome is not { Code: PluginLifecycleOutcomeCode.Removed, FailureCode: null }
         )
         {
-            return new PluginLifecycleStorePurgeOutcome.Conflict(
+            return new PluginLifecycleStoreRemovalOutcome.Conflict(
                 await LoadAsync(expected.PluginId, cancellationToken)
             );
         }
@@ -175,52 +154,31 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
             value => value.PluginId == expected.PluginId.Value,
             cancellationToken
         );
-        var retained = await db.PluginLifecycleOutcomes.SingleOrDefaultAsync(
-            value => value.PluginId == expected.PluginId.Value,
-            cancellationToken
-        );
         if (record is null)
         {
-            return retained is null
-                ? new PluginLifecycleStorePurgeOutcome.Conflict(null)
-                : new PluginLifecycleStorePurgeOutcome.Completed(
-                    PluginLifecycleOutcomeRecordMapper.ToDomain(retained)
-                );
+            return new PluginLifecycleStoreRemovalOutcome.Completed(expected.PluginId);
         }
 
         var current = PluginLifecycleRecordMapper.ToDomain(record);
         if (current != expected)
         {
-            return new PluginLifecycleStorePurgeOutcome.Conflict(current);
+            return new PluginLifecycleStoreRemovalOutcome.Conflict(current);
         }
 
-        var tombstone = new PluginLifecycleTombstone(expected.PluginId, outcome);
         _ = db.PluginLifecycles.Remove(record);
-        if (retained is null)
-        {
-            _ = db.PluginLifecycleOutcomes.Add(
-                PluginLifecycleOutcomeRecordMapper.FromDomain(tombstone)
-            );
-        }
-        else
-        {
-            db.Entry(retained)
-                .CurrentValues.SetValues(PluginLifecycleOutcomeRecordMapper.FromDomain(tombstone));
-        }
-
         try
         {
             _ = await db.SaveChangesAsync(cancellationToken);
-            return new PluginLifecycleStorePurgeOutcome.Completed(tombstone);
+            return new PluginLifecycleStoreRemovalOutcome.Completed(expected.PluginId);
         }
         catch (DbUpdateConcurrencyException)
         {
-            return await ResolvePurgeRaceAsync(expected.PluginId, cancellationToken);
+            return await ResolveRemovalRaceAsync(expected.PluginId, cancellationToken);
         }
         catch (DbUpdateException)
         {
-            var resolved = await ResolvePurgeRaceAsync(expected.PluginId, cancellationToken);
-            if (resolved is PluginLifecycleStorePurgeOutcome.Completed)
+            var resolved = await ResolveRemovalRaceAsync(expected.PluginId, cancellationToken);
+            if (resolved is PluginLifecycleStoreRemovalOutcome.Completed)
             {
                 return resolved;
             }
@@ -229,16 +187,14 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
         }
     }
 
-    private async ValueTask<PluginLifecycleStorePurgeOutcome> ResolvePurgeRaceAsync(
+    private async ValueTask<PluginLifecycleStoreRemovalOutcome> ResolveRemovalRaceAsync(
         PluginId pluginId,
         CancellationToken cancellationToken
     )
     {
-        var tombstone = await LoadTombstoneAsync(pluginId, cancellationToken);
-        return tombstone is not null
-            ? new PluginLifecycleStorePurgeOutcome.Completed(tombstone)
-            : new PluginLifecycleStorePurgeOutcome.Conflict(
-                await LoadAsync(pluginId, cancellationToken)
-            );
+        var current = await LoadAsync(pluginId, cancellationToken);
+        return current is null
+            ? new PluginLifecycleStoreRemovalOutcome.Completed(pluginId)
+            : new PluginLifecycleStoreRemovalOutcome.Conflict(current);
     }
 }

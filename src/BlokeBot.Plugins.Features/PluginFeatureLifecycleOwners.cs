@@ -3,18 +3,20 @@ using BlokeBot.Plugins.Runtime;
 
 namespace BlokeBot.Plugins.Features;
 
-public sealed class PluginFeaturePurgeOwner(
+public sealed class PluginFeatureRemovalOwner(
     IPluginFeatureStore store,
-    PluginFeatureSnapshotRegistry snapshots
-) : IPluginPurgeDataOwner
+    PluginFeatureSnapshotRegistry snapshots,
+    IPluginFeatureDeclarationPublisher declarations
+) : IPluginRemovalDataOwner
 {
-    public async ValueTask<PluginLifecycleOwnerOutcome> PurgeAsync(
-        PluginPurgeContext context,
+    public async ValueTask<PluginLifecycleOwnerOutcome> RemoveAsync(
+        PluginRemovalContext context,
         CancellationToken cancellationToken
     )
     {
-        await store.PurgeAsync(context.PluginId, cancellationToken);
+        await store.RemovePluginDataAsync(context.PluginId, cancellationToken);
         snapshots.Remove(context.PluginId);
+        declarations.Remove(context.PluginId, context.Fence);
         return new PluginLifecycleOwnerOutcome.Succeeded();
     }
 }

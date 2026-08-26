@@ -22,7 +22,7 @@ public abstract record PluginLifecycleCommandOutcome
 
     public sealed record Failed(PluginLifecycleView View) : PluginLifecycleCommandOutcome;
 
-    public sealed record Purged(PluginLifecycleTombstone Tombstone) : PluginLifecycleCommandOutcome;
+    public sealed record Removed(PluginId PluginId) : PluginLifecycleCommandOutcome;
 
     public sealed record Rejected(
         PluginLifecycleCommandRejectionCode Code,
@@ -39,12 +39,6 @@ public interface IPluginLifecycleCoordinator
     );
 
     ValueTask<PluginLifecycleCommandOutcome> RemoveAsync(
-        PluginId pluginId,
-        PluginLifecycleOperationId operationId,
-        CancellationToken cancellationToken
-    );
-
-    ValueTask<PluginLifecycleCommandOutcome> PurgeAsync(
         PluginId pluginId,
         PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken

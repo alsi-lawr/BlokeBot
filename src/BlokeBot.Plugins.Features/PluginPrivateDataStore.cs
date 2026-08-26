@@ -68,7 +68,10 @@ public sealed partial class PluginPrivateDataStore(PluginPrivateDataOptions opti
         }
     }
 
-    internal async ValueTask PurgeAsync(PluginId pluginId, CancellationToken cancellationToken)
+    internal async ValueTask RemovePluginDataAsync(
+        PluginId pluginId,
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
         var database = options.DatabasePath(pluginId);

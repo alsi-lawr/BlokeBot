@@ -52,26 +52,41 @@ public sealed partial class EfPluginFeatureStore(
             .ToArray();
     }
 
-    public async ValueTask PurgeAsync(PluginId pluginId, CancellationToken cancellationToken)
+    public async ValueTask RemovePluginDataAsync(
+        PluginId pluginId,
+        CancellationToken cancellationToken
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var unavailableReason =
-            $"Plugin {pluginId.Value} was purged. Reinstall and enable a compatible version to restore this flow.";
-        _ = await db
-            .AutomationFlows.Where(flow =>
-                db.PluginAutomationInstantiations.Any(record =>
-                    record.PluginId == pluginId.Value && record.FlowId == flow.Id
+        var flowIds = await db
+            .AutomationFlows.FromSqlInterpolated(
+                $"""
+                SELECT DISTINCT flow.*
+                FROM automation_flows AS flow
+                LEFT JOIN automation_flow_nodes AS node ON node.FlowId = flow.Id
+                WHERE (
+                    node.PluginProvenanceJson IS NOT NULL
+                    AND json_valid(node.PluginProvenanceJson)
+                    AND json_extract(node.PluginProvenanceJson, '$.pluginId') = {pluginId.Value}
+                ) OR EXISTS (
+                    SELECT 1
+                    FROM plugin_automation_instantiations AS ledger
+                    WHERE ledger.FlowId = flow.Id AND ledger.PluginId = {pluginId.Value}
                 )
+                """
             )
-            .ExecuteUpdateAsync(
-                setters =>
-                    setters
-                        .SetProperty(static flow => flow.IsEnabled, false)
-                        .SetProperty(static flow => flow.UnavailableReason, unavailableReason)
-                        .SetProperty(static flow => flow.UpdatedAtUtc, DateTime.UtcNow),
-                cancellationToken
-            );
+            .Select(static flow => flow.Id)
+            .ToArrayAsync(cancellationToken);
+        _ = await db
+            .AutomationFlows.Where(flow => flowIds.Contains(flow.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+        var sourcePrefix = $"plugin.{pluginId.Value.Replace('_', '-')}.";
+        _ = await db
+            .AutomationEventReceipts.Where(value =>
+                value.SourceDefinitionId.StartsWith(sourcePrefix)
+            )
+            .ExecuteDeleteAsync(cancellationToken);
         _ = await db
             .PluginFeatureStates.Where(value => value.PluginId == pluginId.Value)
             .ExecuteDeleteAsync(cancellationToken);

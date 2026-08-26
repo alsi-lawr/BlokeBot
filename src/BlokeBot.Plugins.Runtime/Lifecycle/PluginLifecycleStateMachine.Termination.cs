@@ -18,7 +18,6 @@ public static partial class PluginLifecycleStateMachine
     public static PluginLifecycleTransitionOutcome BeginRemoval(
         PluginLifecycleState state,
         PluginLifecycleOperationId operationId,
-        bool purge,
         DateTimeOffset now
     )
     {
@@ -27,18 +26,15 @@ public static partial class PluginLifecycleStateMachine
             return Rejected(PluginLifecycleTransitionFailureCode.Busy);
         }
 
-        var kind = purge ? PluginLifecycleOperationKind.Purge : PluginLifecycleOperationKind.Remove;
         var phase = state.ActiveRuntime is null
-            ? purge
-                ? PluginLifecyclePhase.Purging
-                : PluginLifecyclePhase.Removing
+            ? PluginLifecyclePhase.Removing
             : PluginLifecyclePhase.Draining;
         return Applied(
             state with
             {
                 OperationId = operationId,
                 Phase = phase,
-                OperationKind = kind,
+                OperationKind = PluginLifecycleOperationKind.Remove,
                 FaultedFrom = null,
                 Revision = state.Revision + 1,
                 UpdatedAtUtc = now,
@@ -59,7 +55,6 @@ public static partial class PluginLifecycleStateMachine
         var phase = state.OperationKind switch
         {
             PluginLifecycleOperationKind.Remove => PluginLifecyclePhase.Removing,
-            PluginLifecycleOperationKind.Purge => PluginLifecyclePhase.Purging,
             PluginLifecycleOperationKind.Restart => PluginLifecyclePhase.Activating,
             PluginLifecycleOperationKind.Activate => PluginLifecyclePhase.Migrating,
         };
@@ -73,18 +68,6 @@ public static partial class PluginLifecycleStateMachine
             }
         );
     }
-
-    public static PluginLifecycleTransitionOutcome RemovalSucceeded(
-        PluginLifecycleState state,
-        DateTimeOffset now
-    ) =>
-        Terminal(
-            state,
-            PluginLifecyclePhase.Removing,
-            PluginLifecyclePhase.Removed,
-            PluginLifecycleOutcomeCode.Removed,
-            now
-        );
 
     public static PluginLifecycleTransitionOutcome BeginRestart(
         PluginLifecycleState state,
@@ -109,14 +92,12 @@ public static partial class PluginLifecycleStateMachine
             PluginLifecyclePhase.Active => PluginLifecyclePhase.Activating,
             PluginLifecyclePhase.Draining => PluginLifecyclePhase.Draining,
             PluginLifecyclePhase.Removing => PluginLifecyclePhase.Removing,
-            PluginLifecyclePhase.Purging => PluginLifecyclePhase.Purging,
             PluginLifecyclePhase.Removed => (PluginLifecyclePhase?)null,
             PluginLifecyclePhase.Faulted => null,
         };
         var operationKind = state.FaultedFrom.Value
             is PluginLifecyclePhase.Draining
                 or PluginLifecyclePhase.Removing
-                or PluginLifecyclePhase.Purging
             ? state.OperationKind
             : PluginLifecycleOperationKind.Restart;
         return phase is null
@@ -222,6 +203,5 @@ public static partial class PluginLifecycleStateMachine
                 or PluginLifecyclePhase.Activating
                 or PluginLifecyclePhase.Active
                 or PluginLifecyclePhase.Draining
-                or PluginLifecyclePhase.Removing
-                or PluginLifecyclePhase.Purging;
+                or PluginLifecyclePhase.Removing;
 }

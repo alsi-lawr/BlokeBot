@@ -234,6 +234,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureAutomations(modelBuilder);
         ConfigureCollectives(modelBuilder);
         ConfigureConfigurationTransfer(modelBuilder);
+        ConfigurePluginMarketplace(modelBuilder);
         ConfigurePluginLifecycles(modelBuilder);
         ConfigurePluginFeatures(modelBuilder);
     }

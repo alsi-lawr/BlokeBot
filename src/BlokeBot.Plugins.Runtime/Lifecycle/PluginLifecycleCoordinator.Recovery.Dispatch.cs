@@ -36,10 +36,6 @@ public sealed partial class PluginLifecycleCoordinator
                 _ = _snapshots.Publish(state, worker: null);
                 _ = await CompleteRemovalAsync(state, cancellationToken);
                 break;
-            case PluginLifecyclePhase.Purging:
-                _ = _snapshots.Publish(state, worker: null);
-                _ = await CompletePurgeAsync(state, cancellationToken);
-                break;
             case PluginLifecyclePhase.Removed:
                 _ = _snapshots.Publish(state, worker: null);
                 break;

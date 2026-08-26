@@ -53,38 +53,35 @@ public sealed class PluginLifecyclePersistenceTests
     }
 
     [Test]
-    public async Task LifecycleStore_RejectsStalePurgeWithoutDeletingWinner()
+    public async Task LifecycleStore_RejectsStaleRemovalWithoutDeletingWinner()
     {
         await using var database = await LifecycleDatabase.CreateAsync();
         var store = new EfPluginLifecycleStore(database);
         var package = new LifecycleHarness().Package("1.0.0", "v1");
-        var purging = await AdvanceToPurgingAsync(store, package);
+        var removing = await AdvanceToRemovingAsync(store, package);
         var winner = Applied(
             PluginLifecycleStateMachine.Fault(
-                purging,
-                PluginLifecyclePhase.Purging,
-                PluginLifecycleFailureCode.PurgeFailed,
+                removing,
+                PluginLifecyclePhase.Removing,
+                PluginLifecycleFailureCode.RemovalFailed,
                 null,
                 DateTimeOffset.UtcNow
             )
         );
-        await WriteAsync(store, purging, winner);
+        await WriteAsync(store, removing, winner);
         var staleOutcome = PluginLifecycleOutcome.Progress(
-            PluginLifecycleOutcomeCode.Purged,
+            PluginLifecycleOutcomeCode.Removed,
             DateTimeOffset.UtcNow
         );
 
         var conflict = (
-            await store.CompletePurgeAsync(purging, staleOutcome, CancellationToken.None)
-        ).ShouldBeOfType<PluginLifecycleStorePurgeOutcome.Conflict>();
+            await store.CompleteRemovalAsync(removing, staleOutcome, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleStoreRemovalOutcome.Conflict>();
 
         conflict.Current.ShouldBe(winner);
         (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
             winner
         );
-        (
-            await store.LoadTombstoneAsync(package.Installation.PluginId, CancellationToken.None)
-        ).ShouldBeNull();
     }
 
     [Test]
@@ -93,7 +90,7 @@ public sealed class PluginLifecyclePersistenceTests
         await using var database = await LifecycleDatabase.CreateAsync();
         var store = new EfPluginLifecycleStore(database);
         var package = new LifecycleHarness().Package("1.0.0", "v1");
-        var purging = await AdvanceToPurgingAsync(store, package);
+        var removing = await AdvanceToRemovingAsync(store, package);
         await using (var db = database.CreateDbContext())
         {
             _ = await Should.ThrowAsync<SqliteException>(async () =>
@@ -104,7 +101,7 @@ public sealed class PluginLifecyclePersistenceTests
         }
 
         (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
-            purging
+            removing
         );
     }
 
@@ -157,37 +154,30 @@ public sealed class PluginLifecyclePersistenceTests
     }
 
     [Test]
-    public async Task Purge_RetryRetainsLatestTombstoneAndAllowsReinstall()
+    public async Task RemovalCompletion_IsIdempotentAndAllowsFreshReinstall()
     {
         await using var database = await LifecycleDatabase.CreateAsync();
         var store = new EfPluginLifecycleStore(database);
         var harness = new LifecycleHarness();
         var firstPackage = harness.Package("1.0.0", "v1");
-        var purging = await AdvanceToPurgingAsync(store, firstPackage);
-        var purged = PluginLifecycleOutcome.Progress(
-            PluginLifecycleOutcomeCode.Purged,
+        var removing = await AdvanceToRemovingAsync(store, firstPackage);
+        var removed = PluginLifecycleOutcome.Progress(
+            PluginLifecycleOutcomeCode.Removed,
             new DateTimeOffset(2026, 8, 23, 16, 0, 0, TimeSpan.Zero)
         );
 
-        var completed = await store.CompletePurgeAsync(purging, purged, CancellationToken.None);
-        var repeated = await store.CompletePurgeAsync(purging, purged, CancellationToken.None);
+        var completed = await store.CompleteRemovalAsync(removing, removed, CancellationToken.None);
+        var repeated = await store.CompleteRemovalAsync(removing, removed, CancellationToken.None);
 
-        var tombstone = completed
-            .ShouldBeOfType<PluginLifecycleStorePurgeOutcome.Completed>()
-            .Tombstone;
+        completed
+            .ShouldBeOfType<PluginLifecycleStoreRemovalOutcome.Completed>()
+            .PluginId.ShouldBe(firstPackage.Installation.PluginId);
         repeated
-            .ShouldBeOfType<PluginLifecycleStorePurgeOutcome.Completed>()
-            .Tombstone.ShouldBe(tombstone);
+            .ShouldBeOfType<PluginLifecycleStoreRemovalOutcome.Completed>()
+            .PluginId.ShouldBe(firstPackage.Installation.PluginId);
         (
             await store.LoadAsync(firstPackage.Installation.PluginId, CancellationToken.None)
         ).ShouldBeNull();
-        (
-            await store.LoadTombstoneAsync(
-                firstPackage.Installation.PluginId,
-                CancellationToken.None
-            )
-        ).ShouldBe(tombstone);
-
         var reinstalled = (
             await store.BeginActivationAsync(
                 new(
@@ -202,16 +192,10 @@ public sealed class PluginLifecyclePersistenceTests
             .State;
 
         reinstalled.SelectedGeneration.Value.ShouldBe(1UL);
-        (
-            await store.LoadTombstoneAsync(
-                firstPackage.Installation.PluginId,
-                CancellationToken.None
-            )
-        ).ShouldBeNull();
     }
 
     [Test]
-    public async Task LifecycleMigration_ConvertsExistingPurgedStateToOutcomeTombstone()
+    public async Task LifecycleMigration_ConvertsLegacyPurgeCheckpointToDestructiveRemoval()
     {
         await using var database = await LifecycleDatabase.CreateAsync(
             "20260823152250_v0.13.0_PluginLifecycles"
@@ -229,8 +213,8 @@ public sealed class PluginLifecyclePersistenceTests
                     OperationId = PluginLifecycleOperationId.New().Value,
                     SelectedGeneration = 7,
                     Phase = PluginLifecyclePhase.Removed,
-                    OperationKind = PluginLifecycleOperationKind.Purge,
-                    OutcomeCode = PluginLifecycleOutcomeCode.Purged,
+                    OperationKind = PluginLifecycleOperationKind.Remove,
+                    OutcomeCode = PluginLifecycleOutcomeCode.Removed,
                     OutcomeOccurredAtUtc = occurredAt.UtcDateTime,
                     Revision = 8,
                     UpdatedAtUtc = occurredAt.UtcDateTime,
@@ -238,23 +222,21 @@ public sealed class PluginLifecyclePersistenceTests
             );
             _ = await db.SaveChangesAsync();
             _ = await db.Database.ExecuteSqlRawAsync(
-                "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purged';"
+                "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purging', "
+                    + "\"OperationKind\" = 'Purge', \"OutcomeCode\" = 'Purged';"
             );
         }
 
         await database.MigrateToLatestAsync();
 
         var store = new EfPluginLifecycleStore(database);
-        (
+        var migrated = (
             await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)
-        ).ShouldBeNull();
-        var tombstone = (
-            await store.LoadTombstoneAsync(package.Installation.PluginId, CancellationToken.None)
-        )!;
-        tombstone.PluginId.ShouldBe(package.Installation.PluginId);
-        tombstone.LatestOutcome.ShouldBe(
-            new PluginLifecycleOutcome(PluginLifecycleOutcomeCode.Purged, null, null, occurredAt)
-        );
+        ).ShouldNotBeNull();
+        migrated.Phase.ShouldBe(PluginLifecyclePhase.Removing);
+        migrated.OperationKind.ShouldBe(PluginLifecycleOperationKind.Remove);
+        migrated.LatestOutcome.Code.ShouldBe(PluginLifecycleOutcomeCode.Removed);
+        migrated.LatestOutcome.OccurredAtUtc.ShouldBe(occurredAt);
     }
 
     [Test]
@@ -375,7 +357,9 @@ public sealed class PluginLifecyclePersistenceTests
         var harness = new LifecycleHarness();
         var removingId = harness.PackageFor("fault-removing", "1.0.0", "v1").Installation.PluginId;
         var removedId = harness.PackageFor("fault-removed", "1.0.0", "v1").Installation.PluginId;
-        var purgingId = harness.PackageFor("fault-purging", "1.0.0", "v1").Installation.PluginId;
+        var legacyPurgeId = harness
+            .PackageFor("fault-purging", "1.0.0", "v1")
+            .Installation.PluginId;
         var now = new DateTimeOffset(2026, 8, 23, 18, 30, 0, TimeSpan.Zero);
         await using (var db = database.CreateDbContext())
         {
@@ -393,13 +377,18 @@ public sealed class PluginLifecyclePersistenceTests
                     now
                 ),
                 ParentLegalRemoveFromFaultRecord(
-                    purgingId,
-                    PluginLifecyclePhase.Purging,
-                    PluginLifecycleOperationKind.Purge,
+                    legacyPurgeId,
+                    PluginLifecyclePhase.Removing,
+                    PluginLifecycleOperationKind.Remove,
                     now
                 )
             );
             _ = await db.SaveChangesAsync();
+            _ = await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Purging', "
+                    + "\"OperationKind\" = 'Purge' WHERE \"PluginId\" = {0};",
+                legacyPurgeId.Value
+            );
         }
 
         await database.MigrateToLatestAsync();
@@ -408,18 +397,21 @@ public sealed class PluginLifecyclePersistenceTests
         var normalized = (await store.LoadAllAsync(CancellationToken.None)).ToDictionary(state =>
             state.PluginId
         );
-        normalized.Keys.ShouldBe([removingId, removedId, purgingId], ignoreOrder: true);
+        normalized.Keys.ShouldBe([removingId, removedId, legacyPurgeId], ignoreOrder: true);
         foreach (var state in normalized.Values)
         {
+            state.Phase.ShouldBe(PluginLifecyclePhase.Removing);
+            state.OperationKind.ShouldBe(PluginLifecycleOperationKind.Remove);
             state.FaultedFrom.ShouldBeNull();
             PluginLifecycleStateMachine.HasValidFaultInvariant(state).ShouldBeTrue();
         }
 
+        var removal = new RecordingRemovalOwner();
         var coordinator = new PluginLifecycleCoordinator(
             store,
             new FakePackageResolver(),
             [new RecordingMigrationOwner()],
-            [new RecordingPurgeOwner()],
+            [removal],
             new RecordingPendingWorkCanceller(),
             new FakeLifecycleWorkers(),
             new PluginRuntimeSnapshotRegistry(),
@@ -431,32 +423,13 @@ public sealed class PluginLifecyclePersistenceTests
 
         await coordinator.RecoverAsync(CancellationToken.None);
 
-        (await store.LoadAsync(removingId, CancellationToken.None))!.Phase.ShouldBe(
-            PluginLifecyclePhase.Removed
-        );
-        (await store.LoadAsync(removedId, CancellationToken.None))!.Phase.ShouldBe(
-            PluginLifecyclePhase.Removed
-        );
-        (await store.LoadAsync(purgingId, CancellationToken.None)).ShouldBeNull();
-        _ = (await store.LoadTombstoneAsync(purgingId, CancellationToken.None)).ShouldNotBeNull();
-        await using (var db = database.CreateDbContext())
-        {
-            _ = await Should.ThrowAsync<SqliteException>(async () =>
-                _ = await db.Database.ExecuteSqlRawAsync(
-                    "UPDATE \"plugin_lifecycles\" SET \"FaultedFrom\" = 'Active' "
-                        + "WHERE \"PluginId\" = 'fault-removing';"
-                )
-            );
-            _ = await Should.ThrowAsync<SqliteException>(async () =>
-                _ = await db.Database.ExecuteSqlRawAsync(
-                    "UPDATE \"plugin_lifecycles\" SET \"Phase\" = 'Faulted' "
-                        + "WHERE \"PluginId\" = 'fault-removed';"
-                )
-            );
-        }
+        (await store.LoadAsync(removingId, CancellationToken.None)).ShouldBeNull();
+        (await store.LoadAsync(removedId, CancellationToken.None)).ShouldBeNull();
+        (await store.LoadAsync(legacyPurgeId, CancellationToken.None)).ShouldBeNull();
+        removal.Calls.ShouldBe(3);
     }
 
-    private static async ValueTask<PluginLifecycleState> AdvanceToPurgingAsync(
+    private static async ValueTask<PluginLifecycleState> AdvanceToRemovingAsync(
         IPluginLifecycleStore store,
         PluginLifecyclePackage package
     )
@@ -466,16 +439,15 @@ public sealed class PluginLifecyclePersistenceTests
             PluginLifecycleStateMachine.BeginRemoval(
                 active,
                 PluginLifecycleOperationId.New(),
-                purge: true,
                 DateTimeOffset.UtcNow
             )
         );
         await WriteAsync(store, active, draining);
-        var purging = Applied(
+        var removing = Applied(
             PluginLifecycleStateMachine.DrainSucceeded(draining, DateTimeOffset.UtcNow)
         );
-        await WriteAsync(store, draining, purging);
-        return purging;
+        await WriteAsync(store, draining, removing);
+        return removing;
     }
 
     private static async ValueTask<PluginLifecycleState> AdvanceToActiveAsync(

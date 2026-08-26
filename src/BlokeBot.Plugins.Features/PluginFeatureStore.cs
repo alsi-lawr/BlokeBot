@@ -122,7 +122,7 @@ public interface IPluginFeatureStore
         CancellationToken cancellationToken
     );
 
-    ValueTask PurgeAsync(PluginId pluginId, CancellationToken cancellationToken);
+    ValueTask RemovePluginDataAsync(PluginId pluginId, CancellationToken cancellationToken);
 
     ValueTask<bool> HasFormat1IncompatibleStateAsync(
         PluginHostId hostId,

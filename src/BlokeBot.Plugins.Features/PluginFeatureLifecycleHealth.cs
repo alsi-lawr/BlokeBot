@@ -15,12 +15,7 @@ public sealed class RuntimePluginFeatureLifecycleHealth(IPluginRuntimeSnapshotPr
 {
     public bool IsCurrent(PluginFeatureDeclaration declaration) =>
         TryGetCurrent(declaration, out var entry)
-        && entry.Phase
-            is not (
-                PluginLifecyclePhase.Removing
-                or PluginLifecyclePhase.Removed
-                or PluginLifecyclePhase.Purging
-            );
+        && entry.Phase is not (PluginLifecyclePhase.Removing or PluginLifecyclePhase.Removed);
 
     public bool IsHealthy(PluginFeatureDeclaration declaration) =>
         TryGetCurrent(declaration, out var entry)

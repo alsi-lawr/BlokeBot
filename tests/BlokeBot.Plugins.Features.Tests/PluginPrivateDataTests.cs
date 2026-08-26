@@ -222,7 +222,7 @@ public sealed class PluginPrivateDataTests
     }
 
     [Test]
-    public async Task LifecycleMigration_FaultRollsBackThenRecoveryCommitsOnceAndPurgeDeletes()
+    public async Task LifecycleMigration_FaultRollsBackThenRecoveryCommitsOnceAndRemovalDeletes()
     {
         await using var root = new TemporaryPrivateDataRoot();
         var store = root.Store();
@@ -275,9 +275,9 @@ public sealed class PluginPrivateDataTests
         ).ShouldBeOfType<PluginSqliteOutcome.Rows>();
         Value(retained).ShouldBe("updated");
 
-        Publish(runtime, updateContext, PluginLifecyclePhase.Purging);
+        Publish(runtime, updateContext, PluginLifecyclePhase.Removing);
         _ = (
-            await owner.PurgeAsync(
+            await owner.RemoveAsync(
                 new(update.Manifest.Id, updateContext.Fence),
                 CancellationToken.None
             )
@@ -383,8 +383,8 @@ public sealed class PluginPrivateDataTests
                 context.Fence.Generation,
                 null,
                 phase,
-                phase == PluginLifecyclePhase.Purging
-                    ? PluginLifecycleOperationKind.Purge
+                phase == PluginLifecyclePhase.Removing
+                    ? PluginLifecycleOperationKind.Remove
                     : PluginLifecycleOperationKind.Activate,
                 null,
                 false,

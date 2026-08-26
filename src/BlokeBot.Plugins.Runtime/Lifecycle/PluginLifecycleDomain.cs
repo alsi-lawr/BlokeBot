@@ -11,7 +11,6 @@ public enum PluginLifecyclePhase
     Draining,
     Removing,
     Removed,
-    Purging,
     Faulted,
 }
 
@@ -19,7 +18,6 @@ public enum PluginLifecycleOperationKind
 {
     Activate,
     Remove,
-    Purge,
     Restart,
 }
 
@@ -35,7 +33,6 @@ public enum PluginLifecycleFailureCode
     DrainTimedOut,
     CancellationFailed,
     RemovalFailed,
-    PurgeFailed,
     RecoveryPackageUnavailable,
     RecoveryFailed,
     GenerationExhausted,
@@ -47,7 +44,6 @@ public enum PluginLifecycleOutcomeCode
     Migrating,
     Activated,
     Removed,
-    Purged,
     RestartScheduled,
     Restarted,
     Faulted,
@@ -89,11 +85,6 @@ public sealed record PluginLifecycleOutcome(
         DateTimeOffset occurredAtUtc
     ) => new(PluginLifecycleOutcomeCode.Faulted, failureCode, detail, occurredAtUtc);
 }
-
-public sealed record PluginLifecycleTombstone(
-    PluginId PluginId,
-    PluginLifecycleOutcome LatestOutcome
-);
 
 public sealed record PluginLifecycleActiveRuntime(
     PluginInstallationIdentity Installation,

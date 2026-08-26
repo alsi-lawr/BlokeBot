@@ -33,6 +33,33 @@ public static class PluginManifestJson
             : PluginManifestValidator.Validate(manifest, target);
     }
 
+    public static async ValueTask<PluginManifestValidationOutcome> ValidateUnboundedAsync(
+        Stream utf8Json,
+        PluginHostCompatibilityTarget target,
+        CancellationToken cancellationToken
+    )
+    {
+        ArgumentNullException.ThrowIfNull(utf8Json);
+        ArgumentNullException.ThrowIfNull(target);
+        PluginManifest? manifest;
+        try
+        {
+            manifest = await JsonSerializer.DeserializeAsync<PluginManifest>(
+                utf8Json,
+                _options,
+                cancellationToken
+            );
+        }
+        catch (JsonException)
+        {
+            return Rejected(PluginManifestErrorCode.MalformedJson, "$");
+        }
+
+        return manifest is null
+            ? Rejected(PluginManifestErrorCode.MalformedJson, "$")
+            : PluginManifestValidator.Validate(manifest, target);
+    }
+
     public static byte[] Serialize(ValidatedPluginManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);

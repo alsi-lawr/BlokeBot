@@ -29,14 +29,14 @@ public abstract record PluginLifecycleStoreWriteOutcome
     public sealed record Conflict(PluginLifecycleState? Current) : PluginLifecycleStoreWriteOutcome;
 }
 
-public abstract record PluginLifecycleStorePurgeOutcome
+public abstract record PluginLifecycleStoreRemovalOutcome
 {
-    private PluginLifecycleStorePurgeOutcome() { }
+    private PluginLifecycleStoreRemovalOutcome() { }
 
-    public sealed record Completed(PluginLifecycleTombstone Tombstone)
-        : PluginLifecycleStorePurgeOutcome;
+    public sealed record Completed(PluginId PluginId) : PluginLifecycleStoreRemovalOutcome;
 
-    public sealed record Conflict(PluginLifecycleState? Current) : PluginLifecycleStorePurgeOutcome;
+    public sealed record Conflict(PluginLifecycleState? Current)
+        : PluginLifecycleStoreRemovalOutcome;
 }
 
 public interface IPluginLifecycleStore
@@ -47,11 +47,6 @@ public interface IPluginLifecycleStore
     );
 
     ValueTask<IReadOnlyList<PluginLifecycleState>> LoadAllAsync(
-        CancellationToken cancellationToken
-    );
-
-    ValueTask<PluginLifecycleTombstone?> LoadTombstoneAsync(
-        PluginId pluginId,
         CancellationToken cancellationToken
     );
 
@@ -66,7 +61,7 @@ public interface IPluginLifecycleStore
         CancellationToken cancellationToken
     );
 
-    ValueTask<PluginLifecycleStorePurgeOutcome> CompletePurgeAsync(
+    ValueTask<PluginLifecycleStoreRemovalOutcome> CompleteRemovalAsync(
         PluginLifecycleState expected,
         PluginLifecycleOutcome outcome,
         CancellationToken cancellationToken
