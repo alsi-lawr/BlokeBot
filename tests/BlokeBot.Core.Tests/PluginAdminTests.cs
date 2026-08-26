@@ -33,7 +33,7 @@ public sealed class PluginAdminTests
     private static readonly DateTimeOffset _now = new(2026, 8, 26, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task NonBotAdmin_LoadingOrInstalling_CannotReadStateOrStartACommand()
+    public async Task NonBotAdmin_LoadingOrMutating_CannotReadStateOrStartACommand()
     {
         var lifecycles = new RecordingLifecycleStore([]);
         var service = CreateApplicationService(
@@ -51,9 +51,18 @@ public sealed class PluginAdminTests
             entry.Release,
             CancellationToken.None
         );
+        var update = await service.UpdateAsync(
+            session,
+            entry.PluginId,
+            entry.Release,
+            CancellationToken.None
+        );
 
         _ = load.ShouldBeOfType<PluginAdminLoadOutcome.Unauthorized>();
         install
+            .ShouldBeOfType<PluginMarketplaceCommandOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceCommandRejectionCode.Unauthorized);
+        update
             .ShouldBeOfType<PluginMarketplaceCommandOutcome.Rejected>()
             .Code.ShouldBe(PluginMarketplaceCommandRejectionCode.Unauthorized);
         lifecycles.LoadAllCalls.ShouldBe(0);
@@ -123,7 +132,7 @@ public sealed class PluginAdminTests
     }
 
     [Test]
-    public async Task InstalledInventory_SearchKeepsMetadataAndOnlyOffersCompatibleUpdates()
+    public async Task InstalledInventory_SelectsTheCurrentCompatibleReleaseDespiteSearchFiltering()
     {
         var active = Lifecycle("community.link-queue", PluginLifecyclePhase.Active);
         var older = CatalogEntry() with { Release = Release("0.9.0", "release-v0.9") };
@@ -143,7 +152,7 @@ public sealed class PluginAdminTests
         var snapshot = outcome.ShouldBeOfType<PluginAdminLoadOutcome.Loaded>().Snapshot;
         var installed = snapshot.Installed.ShouldHaveSingleItem();
         installed.Name.ShouldBe("Link queue");
-        installed.UpdateRelease.ShouldBeNull();
+        installed.UpdateRelease.ShouldBe(CatalogEntry().Release);
         snapshot.Catalog.ShouldBeOfType<PluginAdminCatalog.Available>().Entries.ShouldBeEmpty();
     }
 
@@ -335,12 +344,34 @@ public sealed class PluginAdminTests
     }
 
     [Test]
+    public void CurrentMutableTagUpdate_RequiresConfirmationAndDelegatesTheExactRelease()
+    {
+        var plugin = InstalledPlugin();
+        plugin = plugin with { UpdateRelease = plugin.Lifecycle.Installation.Release };
+        using var context = CreateComponentContext(Snapshot([plugin], []));
+        var service = context.Services.GetRequiredService<RecordingAdminApplicationService>();
+        var panel = context.Render<PluginAdminPanel>(parameters =>
+            parameters.Add(value => value.Session, AdminSession())
+        );
+
+        panel
+            .FindAll("[data-installed-plugin] button")
+            .Single(button => button.TextContent == "Update")
+            .Click();
+        _ = panel.Find("[data-plugin-confirmation-dialog]");
+        service.Updates.ShouldBeEmpty();
+
+        panel.Find("[data-plugin-confirmation-dialog] .btn-primary").Click();
+
+        service.Updates.ShouldBe([(plugin.PluginId, plugin.Lifecycle.Installation.Release)]);
+        service.LoadQueries.ShouldBe([string.Empty, string.Empty]);
+    }
+
+    [Test]
     public void ActiveLifecycleOperation_DisablesEveryConflictingControl()
     {
-        var plugin = InstalledPlugin(PluginLifecyclePhase.Migrating) with
-        {
-            UpdateRelease = Release("2.0.0", "release-v2"),
-        };
+        var plugin = InstalledPlugin(PluginLifecyclePhase.Migrating);
+        plugin = plugin with { UpdateRelease = plugin.Lifecycle.Installation.Release };
         using var context = CreateComponentContext(Snapshot([plugin], []));
         var panel = context.Render<PluginAdminPanel>(parameters =>
             parameters.Add(value => value.Session, AdminSession())
@@ -516,6 +547,7 @@ public sealed class PluginAdminTests
         internal List<string?> LoadQueries { get; } = [];
         internal List<(PluginId PluginId, PluginReleaseIdentity Release)> Installations { get; } =
         [];
+        internal List<(PluginId PluginId, PluginReleaseIdentity Release)> Updates { get; } = [];
         internal List<PluginId> Removals { get; } = [];
 
         public ValueTask<PluginAdminLoadOutcome> LoadAsync(
@@ -552,7 +584,17 @@ public sealed class PluginAdminTests
             PluginId pluginId,
             PluginReleaseIdentity release,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException("Update is not expected.");
+        )
+        {
+            Updates.Add((pluginId, release));
+            var state = Lifecycle(pluginId.Value, PluginLifecyclePhase.Active);
+            return ValueTask.FromResult<PluginMarketplaceCommandOutcome>(
+                new PluginMarketplaceCommandOutcome.Completed(
+                    new PluginLifecycleCommandOutcome.Succeeded(PluginLifecycleView.From(state)),
+                    null
+                )
+            );
+        }
 
         public ValueTask<PluginMarketplaceCommandOutcome> RestartAsync(
             AuthenticatedSession session,

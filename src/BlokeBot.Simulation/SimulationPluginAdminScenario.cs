@@ -167,7 +167,7 @@ internal sealed class SimulationPluginAdminScenario : IPluginAdminApplicationSer
             PluginAdminInstalledStatus.Faulted,
             PluginLifecyclePhase.Faulted,
             Release("1.2.0", "link-queue-current"),
-            null,
+            Release("1.2.0", "link-queue-current"),
             0,
             [],
             new(

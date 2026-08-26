@@ -805,6 +805,15 @@ public sealed class PluginMarketplaceTests
             receipts,
             clock
         );
+        var admin = new PluginAdminApplicationService(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            service
+        );
         var entry = Entry();
 
         _ = (
@@ -822,12 +831,7 @@ public sealed class PluginMarketplaceTests
         );
 
         var updated = (
-            await service.UpdateAsync(
-                Admin(),
-                entry.PluginId,
-                entry.Release,
-                CancellationToken.None
-            )
+            await admin.UpdateAsync(Admin(), entry.PluginId, entry.Release, CancellationToken.None)
         ).ShouldBeOfType<PluginMarketplaceCommandOutcome.Completed>();
         var second = lifecycle.Packages[1];
 
@@ -845,12 +849,7 @@ public sealed class PluginMarketplaceTests
         updated.Receipt.ShouldNotBeNull().Release.ShouldBe(entry.Release);
 
         var missing = (
-            await service.UpdateAsync(
-                Admin(),
-                entry.PluginId,
-                entry.Release,
-                CancellationToken.None
-            )
+            await admin.UpdateAsync(Admin(), entry.PluginId, entry.Release, CancellationToken.None)
         ).ShouldBeOfType<PluginMarketplaceCommandOutcome.Rejected>();
         missing.Code.ShouldBe(PluginMarketplaceCommandRejectionCode.PackageDownloadFailed);
         missing.Receipt.ShouldNotBeNull().OutcomeCode.ShouldBe("package-download-failed");

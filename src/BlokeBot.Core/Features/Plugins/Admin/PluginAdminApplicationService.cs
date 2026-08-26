@@ -140,11 +140,7 @@ internal sealed class PluginAdminApplicationService(
             .FirstOrDefault(release =>
                 release.DeclaredVersion.CompareTo(
                     state.SelectedInstallation.Release.DeclaredVersion
-                ) > 0
-                || (
-                    release.DeclaredVersion == state.SelectedInstallation.Release.DeclaredVersion
-                    && release.Tag != state.SelectedInstallation.Release.Tag
-                )
+                ) >= 0
             );
         var name =
             declaration?.Manifest.Name
