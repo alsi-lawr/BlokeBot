@@ -124,6 +124,7 @@ internal sealed class PluginAutomationDefinition : IPluginAutomationDefinition
 
     private static bool Matches(PluginValueKind expected, AutomationValue value) =>
         expected != PluginValueKind.Nil
+        && value is not (AutomationValue.Nil or AutomationValue.Null)
         && AutomationPureHandlerRegistry.ValueType(value) == ValueType(expected);
 
     private static AutomationValidationResult Invalid(

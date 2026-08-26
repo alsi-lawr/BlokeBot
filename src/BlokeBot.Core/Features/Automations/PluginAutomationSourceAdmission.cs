@@ -7,11 +7,21 @@ using BlokeBot.Plugins.Features;
 
 namespace BlokeBot.Core.Features.Automations;
 
+internal interface IPluginAutomationRunDispatcher
+{
+    Task<AutomationDispatchOutcome> DispatchAsync(
+        AutomationTrigger trigger,
+        CancellationToken cancellationToken
+    );
+}
+
 internal sealed class PluginAutomationSourceAdmission(
     AutomationCatalogService catalog,
-    AutomationRuntimeService runtime,
+    IPluginAutomationRunDispatcher runtime,
     IPluginHostContextResolver hosts,
-    TimeProvider clock
+    TimeProvider clock,
+    PluginFeatureAdmissionService admissions,
+    PluginDispatchWorkRegistry work
 ) : IPluginAutomationSourceAdmission
 {
     public async ValueTask AdmitAsync(
@@ -74,15 +84,48 @@ internal sealed class PluginAutomationSourceAdmission(
                     : [],
                 new AutomationVariableSet(variables)
             );
-            _ = await runtime.DispatchAsync(
-                new(
-                    automationContext,
-                    new PluginAutomationConfiguration(
-                        ImmutableDictionary<AutomationConfigurationFieldId, AutomationValue>.Empty
-                    )
-                ),
-                cancellationToken
-            );
+            var expected = new PluginFeatureFence(endpoint.State.Fence, endpoint.State.Generation);
+            if (
+                admissions.Admit(
+                    endpoint.State.Key,
+                    expected,
+                    PluginFeatureReadinessDependency.Independent
+                )
+                is not PluginFeatureAdmissionOutcome.Admitted admitted
+            )
+            {
+                continue;
+            }
+            await using var admission = admitted.Admission;
+            if (
+                work.Admit(endpoint.State, cancellationToken)
+                is not PluginDispatchWorkAdmission.Admitted workAdmitted
+            )
+            {
+                continue;
+            }
+            await using var workLease = workAdmitted.Lease;
+            if (!admission.ValidateCallbackCompletion())
+            {
+                continue;
+            }
+            try
+            {
+                _ = await runtime.DispatchAsync(
+                    new(
+                        automationContext,
+                        new PluginAutomationConfiguration(
+                            ImmutableDictionary<
+                                AutomationConfigurationFieldId,
+                                AutomationValue
+                            >.Empty
+                        )
+                    ),
+                    workLease.CancellationToken
+                );
+            }
+            catch (OperationCanceledException)
+                when (workLease.CancellationToken.IsCancellationRequested) { }
         }
     }
 
@@ -121,9 +164,13 @@ internal sealed class PluginAutomationSourceAdmission(
             {
                 continue;
             }
-            if (pluginValue is PluginValue.Nil && !output.Required)
+            if (pluginValue is PluginValue.Nil)
             {
-                continue;
+                if (!output.Required)
+                {
+                    continue;
+                }
+                return false;
             }
             if (
                 !AutomationStructuredValue.TryConvert(pluginValue, out var value)

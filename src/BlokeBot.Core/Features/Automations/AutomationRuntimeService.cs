@@ -14,7 +14,7 @@ public sealed partial class AutomationRuntimeService(
     AutomationActionExecutor actions,
     TimeProvider clock,
     IEnumerable<IAutomationRunCompletionObserver>? runCompletionObservers = null
-)
+) : IPluginAutomationRunDispatcher
 {
     private readonly Lock _initializationGate = new();
     private readonly IAutomationRunCompletionObserver[] _runCompletionObservers =

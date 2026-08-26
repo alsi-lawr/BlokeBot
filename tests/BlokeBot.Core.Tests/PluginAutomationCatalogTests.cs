@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Plugins.Contracts;
@@ -104,6 +105,170 @@ public sealed class PluginAutomationCatalogTests
         json.ShouldBe("{\"items\":[3.5,{\"missing\":null}]}");
     }
 
+    [Test]
+    public void TemplatePlan_RejectsDuplicateNullableAndIncompatibleDataConnections()
+    {
+        var manifest = ValidatedManifest().Manifest;
+        var template = manifest.AutomationTemplates.ShouldHaveSingleItem();
+        var source = manifest.AutomationDefinitions.Single(definition =>
+            definition.Id == Definition("queued-link")
+        );
+        var action = manifest.AutomationDefinitions.Single(definition =>
+            definition.Id == Definition("publish-link")
+        );
+        var value = source with
+        {
+            Id = Definition("constant-link"),
+            Kind = PluginAutomationDefinitionKind.Value,
+            Name = "Constant link",
+        };
+        var valueNode = new PluginAutomationTemplateNode(
+            Node("constant"),
+            value.Id,
+            EmptyConfiguration()
+        );
+        var duplicate = manifest with
+        {
+            AutomationDefinitions = manifest.AutomationDefinitions.Add(value),
+            AutomationTemplates =
+            [
+                template with
+                {
+                    Nodes = template.Nodes.Add(valueNode),
+                    Edges = template.Edges.Add(
+                        new(Node("constant"), Field("link"), Node("publish"), Field("link"))
+                    ),
+                },
+            ],
+        };
+        var nullable = manifest with
+        {
+            AutomationDefinitions =
+            [
+                source with
+                {
+                    Outputs = [source.Outputs.ShouldHaveSingleItem() with { Required = false }],
+                },
+                action,
+            ],
+        };
+        var incompatible = manifest with
+        {
+            AutomationDefinitions =
+            [
+                source,
+                action with
+                {
+                    Inputs =
+                    [
+                        action.Inputs.ShouldHaveSingleItem() with
+                        {
+                            ValueKind = PluginValueKind.Number,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        Rejects(duplicate, "more than one Data output");
+        Rejects(nullable, "optional output");
+        Rejects(incompatible, "incompatible Data connection");
+    }
+
+    [Test]
+    public void TemplatePlan_RejectsMissingCrossFeatureAndCyclicDependencies()
+    {
+        var manifest = ValidatedManifest().Manifest;
+        var template = manifest.AutomationTemplates.ShouldHaveSingleItem();
+        var source = manifest.AutomationDefinitions.Single(definition =>
+            definition.Id == Definition("queued-link")
+        );
+        var action = manifest.AutomationDefinitions.Single(definition =>
+            definition.Id == Definition("publish-link")
+        );
+        var missing = manifest with { AutomationTemplates = [template with { Edges = [] }] };
+        var crossFeature = manifest with
+        {
+            AutomationDefinitions = [source with { FeatureId = Feature("collection") }, action],
+        };
+        var transformA = action with
+        {
+            Id = Definition("transform-a"),
+            Kind = PluginAutomationDefinitionKind.Transform,
+            Name = "Transform A",
+            Outputs = source.Outputs,
+        };
+        var transformB = transformA with { Id = Definition("transform-b"), Name = "Transform B" };
+        var cyclic = manifest with
+        {
+            AutomationDefinitions = manifest
+                .AutomationDefinitions.Concat([transformA, transformB])
+                .ToImmutableArray(),
+            AutomationTemplates =
+            [
+                template with
+                {
+                    Nodes = template
+                        .Nodes.Concat([
+                            new(Node("transform-a"), transformA.Id, EmptyConfiguration()),
+                            new(Node("transform-b"), transformB.Id, EmptyConfiguration()),
+                        ])
+                        .ToImmutableArray(),
+                    Edges = template
+                        .Edges.Concat([
+                            new(
+                                Node("transform-a"),
+                                Field("link"),
+                                Node("transform-b"),
+                                Field("link")
+                            ),
+                            new(
+                                Node("transform-b"),
+                                Field("link"),
+                                Node("transform-a"),
+                                Field("link")
+                            ),
+                        ])
+                        .ToImmutableArray(),
+                },
+            ],
+        };
+
+        Rejects(missing, "required input");
+        Rejects(crossFeature, "invalid or cross-feature definition");
+        Rejects(cyclic, "dependency cycle");
+    }
+
+    [Test]
+    public void TemplatePlan_RejectsNilForRequiredInputWithoutThrowing()
+    {
+        var manifest = ValidatedManifest().Manifest;
+        var template = manifest.AutomationTemplates.ShouldHaveSingleItem();
+        var nilConfiguration = new PluginValue.Map([new("link", new PluginValue.Nil())]);
+        var modified = manifest with
+        {
+            AutomationTemplates =
+            [
+                template with
+                {
+                    Nodes = template
+                        .Nodes.Select(node =>
+                            node.Id == Node("publish")
+                                ? node with
+                                {
+                                    Configuration = nilConfiguration,
+                                }
+                                : node
+                        )
+                        .ToImmutableArray(),
+                    Edges = [],
+                },
+            ],
+        };
+
+        Rejects(modified, "invalid node configuration");
+    }
+
     private static ValidatedPluginManifest ValidatedManifest() =>
         PluginManifestJson.Validate(
             PluginContractFixtures.CompleteManifestJson(),
@@ -112,6 +277,31 @@ public sealed class PluginAutomationCatalogTests
             is PluginManifestValidationOutcome.Accepted accepted
             ? accepted.Manifest
             : throw new InvalidOperationException("The plugin fixture is invalid.");
+
+    private static PluginAutomationPlanOutcome Plan(PluginManifest manifest)
+    {
+        var fence = Fence();
+        var declaration = new PluginFeatureDeclaration(
+            new(manifest.Id, manifest.Release),
+            fence,
+            manifest
+        );
+        var state = State(declaration, fence, revision: 1, enabled: true);
+        return new PluginAutomationCatalogRegistry().Prepare(
+            declaration,
+            declaration.FindFeature(Feature("publishing"))!,
+            state,
+            Guid.NewGuid()
+        );
+    }
+
+    private static void Rejects(PluginManifest manifest, string expectedDiagnostic)
+    {
+        var rejected = Plan(manifest).ShouldBeOfType<PluginAutomationPlanOutcome.Rejected>();
+        rejected.Diagnostic.ShouldContain(expectedDiagnostic);
+    }
+
+    private static PluginValue.Map EmptyConfiguration() => new([]);
 
     private static PluginFeatureState State(
         PluginFeatureDeclaration declaration,
@@ -160,4 +350,14 @@ public sealed class PluginAutomationCatalogTests
         PluginAutomationDefinitionId.TryCreate(value, out var id)
             ? id
             : throw new InvalidOperationException("Invalid definition test ID.");
+
+    private static PluginAutomationFieldId Field(string value) =>
+        PluginAutomationFieldId.TryCreate(value, out var id)
+            ? id
+            : throw new InvalidOperationException("Invalid field test ID.");
+
+    private static PluginTemplateNodeId Node(string value) =>
+        PluginTemplateNodeId.TryCreate(value, out var id)
+            ? id
+            : throw new InvalidOperationException("Invalid node test ID.");
 }

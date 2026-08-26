@@ -80,6 +80,7 @@ internal sealed partial class PluginAutomationCatalogRegistry
         IReadOnlyDictionary<PluginAutomationDefinitionId, IPluginAutomationDefinition> definitions
     )
     {
+        ValidateTemplateStructure(template, definitions);
         var templateHash = Hash(
             string.Join(
                 "\n",
@@ -118,6 +119,25 @@ internal sealed partial class PluginAutomationCatalogRegistry
             {
                 throw new PluginAutomationPlanException(
                     $"Template '{template.Id.Value}' has invalid node configuration."
+                );
+            }
+
+            var incoming = template.Edges.Where(edge => edge.ToNode == node.Id).ToArray();
+            if (
+                definition.Descriptor.Inputs.Any(input =>
+                    input.ValueType != AutomationPortValueType.Flow
+                    && input.BindingFieldId is { } fieldId
+                    && incoming.All(edge => edge.ToInput.Value != input.Id.Value)
+                    && definition
+                        .Descriptor.Configuration.Single(field => field.Id == fieldId)
+                        .Required
+                    && accepted.Configuration is PluginAutomationConfiguration configuration
+                    && !configuration.Values.ContainsKey(fieldId)
+                )
+            )
+            {
+                throw new PluginAutomationPlanException(
+                    $"Template '{template.Id.Value}' has a required input without a fixed value or Data connection."
                 );
             }
 
@@ -223,47 +243,6 @@ internal sealed partial class PluginAutomationCatalogRegistry
                     "Plugin automation template configuration must be a bounded JSON map."
                 );
         return AutomationStructuredValue.Serialize(map);
-    }
-
-    private static void EnsureAcyclic(
-        IEnumerable<Guid> nodes,
-        IEnumerable<PluginAutomationStoreEdge> edges
-    )
-    {
-        var adjacency = nodes.ToDictionary(static id => id, static _ => new List<Guid>());
-        foreach (var edge in edges)
-        {
-            adjacency[edge.SourceNodeId].Add(edge.TargetNodeId);
-        }
-        var visiting = new HashSet<Guid>();
-        var visited = new HashSet<Guid>();
-        if (adjacency.Keys.Any(Visit))
-        {
-            throw new PluginAutomationPlanException(
-                "Plugin automation template contains a dependency cycle."
-            );
-        }
-
-        return;
-
-        bool Visit(Guid node)
-        {
-            if (visited.Contains(node))
-            {
-                return false;
-            }
-            if (!visiting.Add(node))
-            {
-                return true;
-            }
-            if (adjacency[node].Any(Visit))
-            {
-                return true;
-            }
-            _ = visiting.Remove(node);
-            _ = visited.Add(node);
-            return false;
-        }
     }
 
     private static PluginAutomationPlanOutcome.Rejected Rejected(string diagnostic) =>

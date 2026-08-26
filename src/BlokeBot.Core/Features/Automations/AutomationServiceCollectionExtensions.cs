@@ -58,6 +58,9 @@ public static class AutomationServiceCollectionExtensions
             }
             return runtime;
         });
+        services.TryAddSingleton<IPluginAutomationRunDispatcher>(provider =>
+            provider.GetRequiredService<AutomationRuntimeService>()
+        );
         _ = services.Replace(
             ServiceDescriptor.Singleton<
                 ICustomCommandAutomationRuntime,
