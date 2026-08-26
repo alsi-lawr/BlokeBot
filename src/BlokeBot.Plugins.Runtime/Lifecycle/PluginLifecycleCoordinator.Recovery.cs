@@ -41,17 +41,28 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
+        if (state.OperationKind == PluginLifecycleOperationKind.Replace)
+        {
+            await RecoverSelectedPreparationAsync(
+                state,
+                _snapshots.StopAdmission(state),
+                cancellationToken
+            );
+            return;
+        }
+
         if (state.ActiveRuntime is { } active)
         {
             var existing = _snapshots.FindCurrent(state.PluginId, active.Fence);
             if (existing?.Worker is not null)
             {
-                await RecoverSelectedPreparationAsync(state, cancellationToken);
+                await RecoverSelectedPreparationAsync(state, publication: null, cancellationToken);
                 return;
             }
 
             var previousPackage = await _packages.ResolveAsync(
                 active.Installation,
+                active.Fence.OperationId,
                 cancellationToken
             );
             if (previousPackage is not PluginLifecyclePackageResolution.Available previous)
@@ -90,31 +101,45 @@ public sealed partial class PluginLifecycleCoordinator
             ObserveWorkerTermination(activeState, previous.Package, restored.Worker);
         }
 
-        await RecoverSelectedPreparationAsync(state, cancellationToken);
+        await RecoverSelectedPreparationAsync(state, publication: null, cancellationToken);
     }
 
     private async ValueTask RecoverSelectedPreparationAsync(
         PluginLifecycleState state,
+        PluginAdmissionStopPublication? publication,
         CancellationToken cancellationToken
     )
     {
-        var selected = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
+        var selected = await _packages.ResolveAsync(
+            state.SelectedInstallation,
+            state.OperationId,
+            cancellationToken
+        );
         if (selected is PluginLifecyclePackageResolution.Available available)
         {
-            _ = await PrepareAndActivateAsync(state, available.Package, cancellationToken);
+            _ = publication is null
+                ? await PrepareAndActivateAsync(state, available.Package, cancellationToken)
+                : await PrepareAndActivateAsync(
+                    state,
+                    available.Package,
+                    publication,
+                    cancellationToken
+                );
             return;
         }
 
-        _ = await FailPreparationAsync(
-            state,
-            new PluginLifecycleWorkerStartOutcome.Failed(
-                PluginLifecycleFailureCode.RecoveryPackageUnavailable,
-                SafeDetail(
-                    "The selected plugin package is unavailable during preparation recovery."
-                )
-            ),
-            cancellationToken
+        var failure = new PluginLifecycleWorkerStartOutcome.Failed(
+            PluginLifecycleFailureCode.RecoveryPackageUnavailable,
+            SafeDetail("The selected plugin package is unavailable during preparation recovery.")
         );
+        _ = publication is null
+            ? await FailPreparationAsync(state, failure, cancellationToken)
+            : await FailSelectedReplacementPreparationAsync(
+                state,
+                failure,
+                publication,
+                cancellationToken
+            );
     }
 
     private async ValueTask RecoverMigrationAsync(
@@ -131,7 +156,11 @@ public sealed partial class PluginLifecycleCoordinator
 
         state = ((PluginRuntimeDrainOutcome.Ready)drain).State;
 
-        var resolved = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
+        var resolved = await _packages.ResolveAsync(
+            state.SelectedInstallation,
+            state.OperationId,
+            cancellationToken
+        );
         if (resolved is PluginLifecyclePackageResolution.Available available)
         {
             _ = await MigrateAndActivateAsync(
@@ -170,7 +199,11 @@ public sealed partial class PluginLifecycleCoordinator
             await DelayUntilAsync(notBefore, cancellationToken);
         }
 
-        var resolved = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
+        var resolved = await _packages.ResolveAsync(
+            state.SelectedInstallation,
+            state.OperationId,
+            cancellationToken
+        );
         if (resolved is PluginLifecyclePackageResolution.Available available)
         {
             _ = await StartAndPublishAsync(
@@ -196,7 +229,11 @@ public sealed partial class PluginLifecycleCoordinator
         CancellationToken cancellationToken
     )
     {
-        var resolved = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
+        var resolved = await _packages.ResolveAsync(
+            state.SelectedInstallation,
+            state.OperationId,
+            cancellationToken
+        );
         if (resolved is not PluginLifecyclePackageResolution.Available available)
         {
             _ = await FaultAsync(
@@ -222,11 +259,40 @@ public sealed partial class PluginLifecycleCoordinator
             return;
         }
 
+        var activationContext = new PluginLifecycleActivationContext(
+            state.SelectedInstallation,
+            state.SelectedFence,
+            available.Package
+        );
+        PluginLifecycleOwnerOutcome publication;
+        try
+        {
+            publication = await PublishActivationAsync(activationContext, cancellationToken);
+        }
+        catch
+        {
+            await DisposeUnpublishedWorkerAsync(restored.Worker, state.PluginId);
+            throw;
+        }
+        if (publication is PluginLifecycleOwnerOutcome.Failed publicationFailure)
+        {
+            await DisposeUnpublishedWorkerAsync(restored.Worker, state.PluginId);
+            _ = await FaultAsync(
+                state,
+                PluginLifecyclePhase.Active,
+                PluginLifecycleFailureCode.ActivationFailed,
+                publicationFailure.Detail,
+                cancellationToken
+            );
+            return;
+        }
+
         var recovered = Applied(PluginLifecycleStateMachine.ActiveRecoverySucceeded(state, Now()));
         var written = await _store.WriteAsync(state, recovered, cancellationToken);
         if (written is not PluginLifecycleStoreWriteOutcome.Written recoveredWrite)
         {
-            await restored.Worker.DisposeAsync();
+            await DisposeUnpublishedWorkerAsync(restored.Worker, state.PluginId);
+            await WithdrawActivationAsync(activationContext, CancellationToken.None);
             return;
         }
 

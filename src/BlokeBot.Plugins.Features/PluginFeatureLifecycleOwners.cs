@@ -5,8 +5,7 @@ namespace BlokeBot.Plugins.Features;
 
 public sealed class PluginFeatureRemovalOwner(
     IPluginFeatureStore store,
-    PluginFeatureSnapshotRegistry snapshots,
-    IPluginFeatureDeclarationPublisher declarations
+    PluginFeatureSnapshotRegistry snapshots
 ) : IPluginRemovalDataOwner
 {
     public async ValueTask<PluginLifecycleOwnerOutcome> RemoveAsync(
@@ -16,14 +15,65 @@ public sealed class PluginFeatureRemovalOwner(
     {
         await store.RemovePluginDataAsync(context.PluginId, cancellationToken);
         snapshots.Remove(context.PluginId);
-        declarations.Remove(context.PluginId, context.Fence);
         return new PluginLifecycleOwnerOutcome.Succeeded();
     }
+}
+
+public sealed class PluginFeatureActivationPublisher(
+    IPluginFeatureDeclarationPublisher declarations
+) : IPluginLifecycleActivationPublisher
+{
+    public ValueTask<PluginLifecycleOwnerOutcome> PublishAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var manifest = context.Package.PreparedPackage.Manifest;
+        if (
+            manifest is null
+            || context.Package.Installation != context.Installation
+            || manifest.Manifest.Id != context.Installation.PluginId
+            || manifest.Manifest.Release != context.Installation.Release
+        )
+        {
+            return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
+                new PluginLifecycleOwnerOutcome.Failed(
+                    PluginLifecycleOwnerFailureCode.Rejected,
+                    InvalidDeclarationDetail()
+                )
+            );
+        }
+
+        declarations.Publish(manifest, context.Fence);
+        return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
+            new PluginLifecycleOwnerOutcome.Succeeded()
+        );
+    }
+
+    public ValueTask WithdrawAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        declarations.Remove(context.Installation.PluginId, context.Fence);
+        return ValueTask.CompletedTask;
+    }
+
+    private static PluginLifecycleSafeDetail InvalidDeclarationDetail() =>
+        PluginLifecycleSafeDetail.TryCreate(
+            "The validated plugin declaration does not match the selected installation.",
+            out var detail
+        )
+            ? detail
+            : throw new InvalidOperationException("Invalid declaration failure detail.");
 }
 
 public sealed class PluginFeaturePendingWorkCanceller(
     IPluginFeatureStore store,
     IPluginFeatureReconciler reconciler,
+    IPluginFeatureDeclarationPublisher declarations,
     IPluginFeatureWorkCoordinator? work = null
 ) : IPluginPendingWorkCanceller
 {
@@ -47,6 +97,7 @@ public sealed class PluginFeaturePendingWorkCanceller(
                 cancellationToken
             );
         }
+        declarations.Remove(pluginId, fence);
         return new PluginLifecycleOwnerOutcome.Succeeded();
     }
 }

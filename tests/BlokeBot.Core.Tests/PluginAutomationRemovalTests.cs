@@ -54,8 +54,9 @@ public sealed class PluginAutomationRemovalTests
         snapshots.Hydrate([state]);
         automations.Current.Descriptors.ShouldNotBeEmpty();
 
+        declarations.Remove(pluginId, fence);
         _ = (
-            await new PluginFeatureRemovalOwner(store, snapshots, declarations).RemoveAsync(
+            await new PluginFeatureRemovalOwner(store, snapshots).RemoveAsync(
                 new(pluginId, fence),
                 CancellationToken.None
             )

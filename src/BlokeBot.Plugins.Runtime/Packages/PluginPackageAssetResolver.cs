@@ -16,6 +16,7 @@ public interface IPluginPackageAssetResolver
 {
     ValueTask<PluginPackageAssetResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleFence fence,
         CancellationToken cancellationToken
     );
 }
@@ -25,10 +26,15 @@ internal sealed class LifecyclePluginPackageAssetResolver(IPluginLifecyclePackag
 {
     public async ValueTask<PluginPackageAssetResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleFence fence,
         CancellationToken cancellationToken
     )
     {
-        var resolution = await packages.ResolveAsync(installation, cancellationToken);
+        var resolution = await packages.ResolveAsync(
+            installation,
+            fence.OperationId,
+            cancellationToken
+        );
         return
             resolution
                 is PluginLifecyclePackageResolution.Available

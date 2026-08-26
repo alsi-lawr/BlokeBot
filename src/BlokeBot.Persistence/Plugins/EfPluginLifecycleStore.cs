@@ -34,6 +34,17 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
     public async ValueTask<PluginLifecycleStoreBeginOutcome> BeginActivationAsync(
         PluginLifecycleBeginRequest request,
         CancellationToken cancellationToken
+    ) => await BeginAsync(request, replace: false, cancellationToken);
+
+    public async ValueTask<PluginLifecycleStoreBeginOutcome> BeginReplacementAsync(
+        PluginLifecycleBeginRequest request,
+        CancellationToken cancellationToken
+    ) => await BeginAsync(request, replace: true, cancellationToken);
+
+    private async ValueTask<PluginLifecycleStoreBeginOutcome> BeginAsync(
+        PluginLifecycleBeginRequest request,
+        bool replace,
+        CancellationToken cancellationToken
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -42,12 +53,19 @@ public sealed class EfPluginLifecycleStore(IDbContextFactory<BlokeBotDbContext> 
             cancellationToken
         );
         var current = record is null ? null : PluginLifecycleRecordMapper.ToDomain(record);
-        var transition = PluginLifecycleStateMachine.BeginActivation(
-            current,
-            request.Installation,
-            request.OperationId,
-            request.OccurredAtUtc
-        );
+        var transition = replace
+            ? PluginLifecycleStateMachine.BeginReplacement(
+                current,
+                request.Installation,
+                request.OperationId,
+                request.OccurredAtUtc
+            )
+            : PluginLifecycleStateMachine.BeginActivation(
+                current,
+                request.Installation,
+                request.OperationId,
+                request.OccurredAtUtc
+            );
         if (transition is PluginLifecycleTransitionOutcome.Rejected rejected)
         {
             return new PluginLifecycleStoreBeginOutcome.Rejected(rejected.Code, current);

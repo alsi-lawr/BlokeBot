@@ -8,6 +8,80 @@ namespace BlokeBot.Plugins.Features.Tests;
 public sealed class PluginDynamicDispatchTests
 {
     [Test]
+    public async Task LifecycleActivationPublisher_HotSwapsExactDeclarationFenceAndRoutes()
+    {
+        var dispatch = new PluginDispatchSnapshotRegistry();
+        var declarations = new PluginFeatureDeclarationRegistry(dispatch);
+        var features = new PluginFeatureSnapshotRegistry(dispatch);
+        var publisher = new PluginFeatureActivationPublisher(declarations);
+        var firstManifest = Manifest();
+        var firstFence = PluginFeatureTestContext.Fence();
+        var firstState = State(firstManifest, firstFence, 1, 1, new PluginFeatureReadiness.Ready());
+
+        _ = (
+            await publisher.PublishAsync(
+                Activation(firstManifest, firstFence),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
+        features.Publish(firstState);
+        dispatch.Current.Commands.ShouldContainKey(new(firstState.Key.HostId, "plugin-route"));
+
+        var firstFeature = firstManifest.Manifest.Features.Single(feature =>
+            feature.Id == firstState.Key.FeatureId
+        );
+        var movedCommand = firstFeature.DispatchDeclarations.Commands[0] with
+        {
+            Route = "moved-route",
+        };
+        var secondManifest = (
+            (PluginManifestValidationOutcome.Accepted)
+                PluginManifestValidator.Validate(
+                    firstManifest.Manifest with
+                    {
+                        Features = firstManifest.Manifest.Features.Replace(
+                            firstFeature,
+                            firstFeature with
+                            {
+                                Dispatch = firstFeature.DispatchDeclarations with
+                                {
+                                    Commands = [movedCommand],
+                                },
+                            }
+                        ),
+                    },
+                    PluginContractFixtures.CompatibleHost()
+                )
+        ).Manifest;
+        var secondFence = PluginFeatureTestContext.Fence(generation: 2);
+
+        _ = (
+            await publisher.PublishAsync(
+                Activation(secondManifest, secondFence),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
+        dispatch.Current.Commands.ShouldBeEmpty();
+        features.Publish(
+            firstState with
+            {
+                Fence = secondFence,
+                Generation = Generation(2),
+                Revision = Revision(2),
+            }
+        );
+
+        dispatch.Current.Commands.ShouldContainKey(new(firstState.Key.HostId, "moved-route"));
+        dispatch.Current.Commands.ShouldNotContainKey(new(firstState.Key.HostId, "plugin-route"));
+        await publisher.WithdrawAsync(
+            Activation(secondManifest, secondFence),
+            CancellationToken.None
+        );
+        declarations.Current.Declarations.ShouldNotContainKey(firstManifest.Manifest.Id);
+        dispatch.Current.Commands.ShouldBeEmpty();
+    }
+
+    [Test]
     public void PublishedFeatureState_ChangesAllDynamicEndpointsInOneSnapshot()
     {
         var dispatch = new PluginDispatchSnapshotRegistry();
@@ -590,6 +664,39 @@ public sealed class PluginDynamicDispatchTests
             (PluginManifestValidationOutcome.Accepted)
                 PluginManifestValidator.Validate(modified, PluginContractFixtures.CompatibleHost())
         ).Manifest;
+    }
+
+    private static PluginLifecycleActivationContext Activation(
+        ValidatedPluginManifest manifest,
+        PluginLifecycleFence fence
+    )
+    {
+        var installation = new PluginInstallationIdentity(
+            manifest.Manifest.Id,
+            manifest.Manifest.Release
+        );
+        var prepared = new PreparedPluginWorkerPackage(
+            new(
+                installation,
+                PluginRuntimeIdentifier.LinuxX64,
+                manifest.Manifest.EntryModule,
+                [
+                    .. manifest.Manifest.LuaModules.Select(module => new PluginWorkerLuaModule(
+                        module.Id,
+                        module.Path
+                    )),
+                ]
+            ),
+            "/packages/test-plugin"
+        )
+        {
+            Manifest = manifest,
+        };
+        return new(
+            installation,
+            fence,
+            new(installation, prepared, "/state/test-plugin", null!, null!)
+        );
     }
 
     private static PluginFeatureState AutomationState(

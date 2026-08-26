@@ -28,6 +28,26 @@ public interface IPluginLifecyclePackageResolver
 {
     ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
+        CancellationToken cancellationToken
+    );
+}
+
+public sealed record PluginLifecycleActivationContext(
+    PluginInstallationIdentity Installation,
+    PluginLifecycleFence Fence,
+    PluginLifecyclePackage Package
+);
+
+public interface IPluginLifecycleActivationPublisher
+{
+    ValueTask<PluginLifecycleOwnerOutcome> PublishAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    );
+
+    ValueTask WithdrawAsync(
+        PluginLifecycleActivationContext context,
         CancellationToken cancellationToken
     );
 }
@@ -97,6 +117,7 @@ internal sealed class UnavailablePluginLifecyclePackageResolver : IPluginLifecyc
 {
     public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken
     ) =>
         ValueTask.FromResult<PluginLifecyclePackageResolution>(

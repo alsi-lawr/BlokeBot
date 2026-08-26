@@ -13,6 +13,48 @@ namespace BlokeBot.Core.Tests;
 public sealed class PluginRawEventSubJourneyTests
 {
     [Test]
+    public async Task PendingWorkCancellation_UsesExactActiveFenceAndCentralEventSubOwner()
+    {
+        var manifest = Manifest();
+        var fence = Fence();
+        var host = Host();
+        var state = State(
+            manifest,
+            fence,
+            host,
+            generation: 1,
+            new PluginFeatureReadiness.Ready(),
+            revision: 1
+        );
+        var declarations = new PluginFeatureDeclarationRegistry();
+        declarations.Publish(manifest, fence);
+        var trigger = new RecordingReconciliationTrigger();
+        var reconciler = new PluginFeatureEventSubReconciler(
+            new HostResolver(host),
+            new ReadyTokenStatusProvider(),
+            trigger
+        );
+        var canceller = new PluginFeaturePendingWorkCanceller(
+            new FixedFeatureStore([state]),
+            reconciler,
+            declarations
+        );
+        var staleFence = Fence();
+
+        _ = (
+            await canceller.CancelAsync(manifest.Manifest.Id, staleFence, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
+        declarations.Current.Declarations.ShouldContainKey(manifest.Manifest.Id);
+        trigger.Calls.ShouldBe(0);
+
+        _ = (
+            await canceller.CancelAsync(manifest.Manifest.Id, fence, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
+        declarations.Current.Declarations.ShouldNotContainKey(manifest.Manifest.Id);
+        trigger.Calls.ShouldBe(1);
+    }
+
+    [Test]
     public async Task CentralStatusPublishedDuringReconciliation_SupersedesStaleHealthyReadiness()
     {
         var manifest = Manifest();
@@ -502,5 +544,50 @@ public sealed class PluginRawEventSubJourneyTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class FixedFeatureStore(IReadOnlyList<PluginFeatureState> states)
+        : IPluginFeatureStore
+    {
+        public ValueTask<IReadOnlyList<PluginFeatureState>> LoadFeatureStatesAsync(
+            PluginId? pluginId,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromResult(states);
+
+        public ValueTask<PluginConfigurationState> LoadConfigurationAsync(
+            PluginConfigurationOwner owner,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public ValueTask<PluginConfigurationStoreWriteOutcome> WriteConfigurationAsync(
+            PluginConfigurationStoreWrite write,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public ValueTask<PluginFeatureState?> LoadFeatureStateAsync(
+            PluginFeatureKey key,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public ValueTask<PluginFeatureEnableStoreOutcome> EnableAsync(
+            PluginFeatureEnableStoreRequest request,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public ValueTask<PluginFeatureStateStoreWriteOutcome> WriteFeatureStateAsync(
+            PluginFeatureState expected,
+            PluginFeatureState next,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public ValueTask RemovePluginDataAsync(
+            PluginId pluginId,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public ValueTask<bool> HasFormat1IncompatibleStateAsync(
+            PluginHostId hostId,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
     }
 }

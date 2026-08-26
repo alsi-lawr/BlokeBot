@@ -107,6 +107,24 @@ public sealed class PluginFeatureDeclarationRegistry
         );
         lock (_sync)
         {
+            _ = _current.Declarations.TryGetValue(manifest.Manifest.Id, out var previous);
+            try
+            {
+                _automations?.PublishDeclaration(declaration);
+                _dispatch?.PublishDeclaration(declaration);
+            }
+            catch
+            {
+                _dispatch?.RemoveDeclaration(manifest.Manifest.Id, fence);
+                _automations?.RemoveDeclaration(manifest.Manifest.Id, fence);
+                if (previous is not null)
+                {
+                    _automations?.PublishDeclaration(previous);
+                    _dispatch?.PublishDeclaration(previous);
+                }
+                throw;
+            }
+
             Volatile.Write(
                 ref _current,
                 new(
@@ -115,8 +133,6 @@ public sealed class PluginFeatureDeclarationRegistry
                         .SetItem(manifest.Manifest.Id, declaration)
                 )
             );
-            _dispatch?.PublishDeclaration(declaration);
-            _automations?.PublishDeclaration(declaration);
             NotifyLocked();
         }
     }

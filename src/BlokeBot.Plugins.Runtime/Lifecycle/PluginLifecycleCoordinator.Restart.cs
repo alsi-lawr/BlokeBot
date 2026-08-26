@@ -60,7 +60,11 @@ public sealed partial class PluginLifecycleCoordinator
             return await CompleteRemovalAsync(state, cancellationToken);
         }
 
-        var resolved = await _packages.ResolveAsync(state.SelectedInstallation, cancellationToken);
+        var resolved = await _packages.ResolveAsync(
+            state.SelectedInstallation,
+            state.OperationId,
+            cancellationToken
+        );
         return resolved is not PluginLifecyclePackageResolution.Available available
                 ? await FaultAsync(
                     state,

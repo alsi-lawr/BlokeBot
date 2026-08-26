@@ -57,6 +57,7 @@ public static partial class PluginLifecycleStateMachine
             PluginLifecycleOperationKind.Remove => PluginLifecyclePhase.Removing,
             PluginLifecycleOperationKind.Restart => PluginLifecyclePhase.Activating,
             PluginLifecycleOperationKind.Activate => PluginLifecyclePhase.Migrating,
+            PluginLifecycleOperationKind.Replace => PluginLifecyclePhase.Migrating,
         };
         return Applied(
             state with

@@ -55,6 +55,11 @@ public interface IPluginLifecycleStore
         CancellationToken cancellationToken
     );
 
+    ValueTask<PluginLifecycleStoreBeginOutcome> BeginReplacementAsync(
+        PluginLifecycleBeginRequest request,
+        CancellationToken cancellationToken
+    );
+
     ValueTask<PluginLifecycleStoreWriteOutcome> WriteAsync(
         PluginLifecycleState expected,
         PluginLifecycleState next,

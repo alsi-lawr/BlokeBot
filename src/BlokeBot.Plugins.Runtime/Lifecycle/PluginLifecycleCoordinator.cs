@@ -8,6 +8,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
     private readonly IPluginLifecycleStore _store;
     private readonly IPluginLifecyclePackageResolver _packages;
     private readonly IReadOnlyList<IPluginMigrationDataOwner> _migrationOwners;
+    private readonly IReadOnlyList<IPluginLifecycleActivationPublisher> _activationPublishers;
     private readonly IReadOnlyList<IPluginRemovalDataOwner> _removalOwners;
     private readonly IPluginPendingWorkCanceller _pendingWork;
     private readonly IPluginLifecycleWorkerManager _workers;
@@ -21,6 +22,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         IPluginLifecycleStore store,
         IPluginLifecyclePackageResolver packages,
         IEnumerable<IPluginMigrationDataOwner> migrationOwners,
+        IEnumerable<IPluginLifecycleActivationPublisher> activationPublishers,
         IEnumerable<IPluginRemovalDataOwner> removalOwners,
         IPluginPendingWorkCanceller pendingWork,
         IPluginLifecycleWorkerManager workers,
@@ -34,6 +36,7 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
         _store = store;
         _packages = packages;
         _migrationOwners = migrationOwners.ToArray();
+        _activationPublishers = activationPublishers.ToArray();
         _removalOwners = removalOwners.ToArray();
         _pendingWork = pendingWork;
         _workers = workers;
@@ -82,6 +85,47 @@ public sealed partial class PluginLifecycleCoordinator : IPluginLifecycleCoordin
                 package,
                 cancellationToken
             );
+    }
+
+    public async ValueTask<PluginLifecycleCommandOutcome> ReplaceAsync(
+        PluginLifecycleOperationId operationId,
+        PluginLifecyclePackage package,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!package.MatchesIdentity)
+        {
+            return new PluginLifecycleCommandOutcome.Rejected(
+                PluginLifecycleCommandRejectionCode.InvalidPackageIdentity,
+                null
+            );
+        }
+
+        await using var lease = await _serialization.AcquireAsync(
+            package.Installation.PluginId,
+            cancellationToken
+        );
+        var pendingFault = await CompletePendingFaultShutdownAsync(
+            package.Installation.PluginId,
+            cancellationToken
+        );
+        if (pendingFault is not null)
+        {
+            return pendingFault;
+        }
+
+        var begun = await _store.BeginReplacementAsync(
+            new(package.Installation, operationId, Now()),
+            cancellationToken
+        );
+        if (begun is PluginLifecycleStoreBeginOutcome.Rejected rejected)
+        {
+            return Rejected(rejected.Code, rejected.Current);
+        }
+
+        var state = ((PluginLifecycleStoreBeginOutcome.Begun)begun).State;
+        var publication = _snapshots.StopAdmission(state);
+        return await PrepareAndActivateAsync(state, package, publication, cancellationToken);
     }
 
     public ValueTask<PluginLifecycleCommandOutcome> RemoveAsync(

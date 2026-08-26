@@ -19,6 +19,7 @@ public enum PluginLifecycleOperationKind
     Activate,
     Remove,
     Restart,
+    Replace,
 }
 
 public enum PluginLifecycleFailureCode

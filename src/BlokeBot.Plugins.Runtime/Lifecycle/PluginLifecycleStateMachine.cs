@@ -30,6 +30,21 @@ public static partial class PluginLifecycleStateMachine
         PluginInstallationIdentity installation,
         PluginLifecycleOperationId operationId,
         DateTimeOffset now
+    ) => BeginActivation(current, installation, operationId, replace: false, now);
+
+    public static PluginLifecycleTransitionOutcome BeginReplacement(
+        PluginLifecycleState? current,
+        PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
+        DateTimeOffset now
+    ) => BeginActivation(current, installation, operationId, replace: true, now);
+
+    private static PluginLifecycleTransitionOutcome BeginActivation(
+        PluginLifecycleState? current,
+        PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
+        bool replace,
+        DateTimeOffset now
     )
     {
         if (current is not null && !HasValidFaultInvariant(current))
@@ -43,7 +58,8 @@ public static partial class PluginLifecycleStateMachine
         }
 
         if (
-            current is { Phase: PluginLifecyclePhase.Active, ActiveRuntime: { } active }
+            !replace
+            && current is { Phase: PluginLifecyclePhase.Active, ActiveRuntime: { } active }
             && active.Installation == installation
         )
         {
@@ -58,7 +74,8 @@ public static partial class PluginLifecycleStateMachine
             return Rejected(PluginLifecycleTransitionFailureCode.FaultedInstallation);
         }
 
-        var releaseChanged = current is null || current.SelectedInstallation != installation;
+        var releaseChanged =
+            replace || current is null || current.SelectedInstallation != installation;
         var selectedGeneration = current?.SelectedGeneration;
         if (
             releaseChanged
@@ -77,7 +94,9 @@ public static partial class PluginLifecycleStateMachine
                 selectedGeneration,
                 current is { Phase: PluginLifecyclePhase.Active } ? current.ActiveRuntime : null,
                 PluginLifecyclePhase.Preparing,
-                PluginLifecycleOperationKind.Activate,
+                replace
+                    ? PluginLifecycleOperationKind.Replace
+                    : PluginLifecycleOperationKind.Activate,
                 null,
                 AutomaticRestartConsumed: current
                     is { Phase: PluginLifecyclePhase.Active, AutomaticRestartConsumed: true },
@@ -127,7 +146,9 @@ public static partial class PluginLifecycleStateMachine
         }
 
         var outcome = PluginLifecycleOutcome.Failure(failureCode, detail, now);
-        return state.ActiveRuntime is { } active
+        return
+            state.ActiveRuntime is { } active
+            && state.OperationKind != PluginLifecycleOperationKind.Replace
             ? Applied(
                 state with
                 {

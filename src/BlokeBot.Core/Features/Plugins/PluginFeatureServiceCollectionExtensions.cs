@@ -215,6 +215,12 @@ public static class PluginFeatureServiceCollectionExtensions
             ServiceDescriptor.Singleton<IPluginRemovalDataOwner, PluginFeatureRemovalOwner>()
         );
         services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IPluginLifecycleActivationPublisher,
+                PluginFeatureActivationPublisher
+            >()
+        );
+        services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IPluginRemovalDataOwner, PluginScheduleRemovalOwner>()
         );
         _ = services.AddSingleton<IPluginMigrationDataOwner>(provider =>

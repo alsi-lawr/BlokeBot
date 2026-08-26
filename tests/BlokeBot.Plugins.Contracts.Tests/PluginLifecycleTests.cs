@@ -7,6 +7,173 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginLifecycleTests
 {
     [Test]
+    public async Task ExplicitReplacement_SameIdentityClosesOldAdmissionAndPublishesFreshFence()
+    {
+        var harness = new LifecycleHarness();
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var oldFence = Fence(active);
+        var replacement = harness.Package("1.0.0", "v1");
+        var operationId = Operation();
+        harness.Workers.PauseValidation();
+
+        var replacing = harness
+            .Coordinator.ReplaceAsync(operationId, replacement, CancellationToken.None)
+            .AsTask();
+        await harness.Workers.ValidationStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        harness
+            .Snapshots.Admit(harness.PluginId, oldFence, PluginFeatureAdmissionReadiness.Ready)
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>()
+            .Code.ShouldBe(PluginAdmissionRejectionCode.StaleOperation);
+
+        harness.Workers.ResumeValidation();
+        var replaced = (await replacing).ShouldBeOfType<PluginLifecycleCommandOutcome.Succeeded>();
+
+        replaced.View.Installation.ShouldBe(active.View.Installation);
+        replaced.View.OperationId.ShouldBe(operationId);
+        replaced.View.Generation.Value.ShouldBe(oldFence.Generation.Value + 1);
+        harness.PendingWork.CancelledFences.ShouldBe([oldFence]);
+        harness.Workers.Admitted[0].Disposed.Task.IsCompleted.ShouldBeTrue();
+        harness
+            .ActivationPublisher.Published.Select(context => context.Fence)
+            .ShouldBe([oldFence, Fence(replaced)]);
+        _ = harness
+            .Snapshots.ValidateCallbackCompletion(harness.PluginId, oldFence)
+            .ShouldBeOfType<PluginFenceOutcome.Rejected>();
+    }
+
+    [Test]
+    public async Task ActivationPublicationFailure_FaultsSelectionBeforeAdmission()
+    {
+        var publisher = new RecordingActivationPublisher { FailuresRemaining = 1 };
+        var harness = new LifecycleHarness(activationPublisher: publisher);
+
+        var failed = (
+            await harness.Coordinator.ActivateAsync(
+                Operation(),
+                harness.Package("1.0.0", "v1"),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>();
+
+        failed.View.Phase.ShouldBe(PluginLifecyclePhase.Faulted);
+        failed.View.LatestOutcome.FailureCode.ShouldBe(PluginLifecycleFailureCode.ActivationFailed);
+        publisher
+            .Withdrawn.ShouldHaveSingleItem()
+            .Fence.ShouldBe(publisher.Published.ShouldHaveSingleItem().Fence);
+        harness.Workers.Admitted.ShouldHaveSingleItem().Disposed.Task.IsCompleted.ShouldBeTrue();
+        _ = harness
+            .Snapshots.Admit(
+                harness.PluginId,
+                new(failed.View.OperationId, failed.View.Generation),
+                PluginFeatureAdmissionReadiness.Ready
+            )
+            .ShouldBeOfType<PluginAdmissionOutcome.Rejected>();
+    }
+
+    [Test]
+    public async Task SelectedReplacementValidationFailure_DrainsOldFenceAndNeverRestoresIt()
+    {
+        var harness = new LifecycleHarness();
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var oldFence = Fence(active);
+        harness.Workers.ValidationFailure = new(
+            PluginLifecycleFailureCode.PreparationRejected,
+            null
+        );
+        var operationId = Operation();
+
+        var failed = (
+            await harness.Coordinator.ReplaceAsync(
+                operationId,
+                harness.Package("1.0.0", "v1"),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Failed>();
+
+        failed.View.OperationId.ShouldBe(operationId);
+        failed.View.Generation.Value.ShouldBe(oldFence.Generation.Value + 1);
+        failed.View.LatestOutcome.FailureCode.ShouldBe(
+            PluginLifecycleFailureCode.PreparationRejected
+        );
+        harness.PendingWork.CancelledFences.ShouldBe([oldFence]);
+        harness.Workers.Admitted.ShouldHaveSingleItem().Disposed.Task.IsCompleted.ShouldBeTrue();
+        _ = harness
+            .Snapshots.ValidateCallbackCompletion(harness.PluginId, oldFence)
+            .ShouldBeOfType<PluginFenceOutcome.Rejected>();
+    }
+
+    [Test]
+    public async Task Removal_UsesPriorFenceForDrainAndCurrentFenceForDestructiveOwners()
+    {
+        var harness = new LifecycleHarness();
+        var active = await harness.ActivateAsync("1.0.0", "v1");
+        var removalOperation = Operation();
+
+        _ = (
+            await harness.Coordinator.RemoveAsync(
+                harness.PluginId,
+                removalOperation,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecycleCommandOutcome.Removed>();
+
+        harness.PendingWork.CancelledFences.ShouldBe([Fence(active)]);
+        var removal = harness.Removal.Contexts.ShouldHaveSingleItem();
+        removal.Fence.OperationId.ShouldBe(removalOperation);
+        removal.Fence.Generation.ShouldBe(active.View.Generation);
+        removal.Fence.ShouldNotBe(Fence(active));
+    }
+
+    [Test]
+    public async Task ColdSameIdentityReplacementRecovery_NeverRestartsPriorSelectedCode()
+    {
+        var source = new LifecycleHarness();
+        var package = source.Package("1.0.0", "v1");
+        var active = ActiveState(package);
+        var replacement = (
+            (PluginLifecycleTransitionOutcome.Applied)
+                PluginLifecycleStateMachine.BeginReplacement(
+                    active,
+                    package.Installation,
+                    Operation(),
+                    DateTimeOffset.UtcNow
+                )
+        ).State;
+        source.Store.Seed(replacement);
+        var packages = new FakePackageResolver();
+        packages.Add(package);
+        var pending = new RecordingPendingWorkCanceller();
+        var workers = new FakeLifecycleWorkers();
+        var snapshots = new PluginRuntimeSnapshotRegistry();
+        var coordinator = new PluginLifecycleCoordinator(
+            source.Store,
+            packages,
+            [new RecordingMigrationOwner()],
+            [new RecordingActivationPublisher()],
+            [new RecordingRemovalOwner()],
+            pending,
+            workers,
+            snapshots,
+            new PluginLifecycleSerialization(),
+            new(TimeSpan.FromSeconds(2), TimeSpan.Zero),
+            TimeProvider.System,
+            NullLogger<PluginLifecycleCoordinator>.Instance
+        );
+
+        await coordinator.RecoverAsync(CancellationToken.None);
+
+        var recovered = (await source.Store.LoadAsync(source.PluginId, CancellationToken.None))!;
+        recovered.Phase.ShouldBe(PluginLifecyclePhase.Active);
+        recovered.SelectedFence.ShouldBe(replacement.SelectedFence);
+        pending.CancelledFences.ShouldBe([active.SelectedFence]);
+        workers.StartedInstallations.ShouldBe([package.Installation]);
+        _ = snapshots
+            .ValidateCallbackCompletion(source.PluginId, active.SelectedFence)
+            .ShouldBeOfType<PluginFenceOutcome.Rejected>();
+    }
+
+    [Test]
     public async Task Update_KeepsOldGenerationAdmittedUntilMigrationFence()
     {
         var harness = new LifecycleHarness();
@@ -1162,6 +1329,7 @@ public sealed class PluginLifecycleTests
             source.Store,
             packages,
             [new RecordingMigrationOwner()],
+            [],
             [new RecordingRemovalOwner()],
             pendingWork,
             workers,
@@ -1807,6 +1975,7 @@ public sealed class PluginLifecycleTests
             harness.Store,
             coldPackages,
             [coldMigration],
+            [],
             [new RecordingRemovalOwner()],
             coldPendingWork,
             coldWorkers,
@@ -2263,6 +2432,7 @@ public sealed class PluginLifecycleTests
             store,
             packages ?? new FakePackageResolver(),
             [new RecordingMigrationOwner()],
+            [],
             [new RecordingRemovalOwner()],
             pendingWork,
             workers,
@@ -2380,16 +2550,19 @@ internal sealed class LifecycleHarness
     internal LifecycleHarness(
         PluginLifecycleOptions? options = null,
         IPluginMigrationDataOwner? migration = null,
-        RecordingRemovalOwner? removal = null
+        RecordingRemovalOwner? removal = null,
+        RecordingActivationPublisher? activationPublisher = null
     )
     {
         Migration = migration ?? new RecordingMigrationOwner();
         Removal = removal ?? new RecordingRemovalOwner();
+        ActivationPublisher = activationPublisher ?? new RecordingActivationPublisher();
         PluginId = Id("test-plugin");
         Coordinator = new(
             Store,
             Packages,
             [Migration],
+            [ActivationPublisher],
             [Removal],
             PendingWork,
             Workers,
@@ -2410,6 +2583,8 @@ internal sealed class LifecycleHarness
     internal IPluginMigrationDataOwner Migration { get; }
 
     internal RecordingRemovalOwner Removal { get; }
+
+    internal RecordingActivationPublisher ActivationPublisher { get; }
 
     internal RecordingPendingWorkCanceller PendingWork { get; } = new();
 

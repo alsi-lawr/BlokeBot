@@ -12,6 +12,34 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginLifecyclePersistenceTests
 {
     [Test]
+    public async Task LifecycleStore_PersistsSameIdentityReplacementAsFreshSelection()
+    {
+        await using var database = await LifecycleDatabase.CreateAsync();
+        var store = new EfPluginLifecycleStore(database);
+        var package = new LifecycleHarness().Package("1.0.0", "v1");
+        var active = await AdvanceToActiveAsync(store, package);
+        var operationId = PluginLifecycleOperationId.New();
+
+        var replacement = (
+            await store.BeginReplacementAsync(
+                new(package.Installation, operationId, DateTimeOffset.UtcNow),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginLifecycleStoreBeginOutcome.Begun>()
+            .State;
+
+        replacement.SelectedInstallation.ShouldBe(active.SelectedInstallation);
+        replacement.OperationId.ShouldBe(operationId);
+        replacement.SelectedGeneration.Value.ShouldBe(active.SelectedGeneration.Value + 1);
+        replacement.OperationKind.ShouldBe(PluginLifecycleOperationKind.Replace);
+        replacement.ActiveRuntime.ShouldBe(active.ActiveRuntime);
+        (await store.LoadAsync(package.Installation.PluginId, CancellationToken.None)).ShouldBe(
+            replacement
+        );
+    }
+
+    [Test]
     public async Task LifecycleStore_RejectsStaleCheckpointWithoutOverwritingWinner()
     {
         await using var database = await LifecycleDatabase.CreateAsync();
@@ -411,6 +439,7 @@ public sealed class PluginLifecyclePersistenceTests
             store,
             new FakePackageResolver(),
             [new RecordingMigrationOwner()],
+            [],
             [removal],
             new RecordingPendingWorkCanceller(),
             new FakeLifecycleWorkers(),

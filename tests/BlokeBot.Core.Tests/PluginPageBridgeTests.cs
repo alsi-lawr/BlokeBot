@@ -284,16 +284,18 @@ public sealed class PluginPageBridgeTests
             null!
         );
         var resolver = new LifecyclePluginPackageAssetResolver(new FixedLifecycleResolver(package));
+        _ = PluginWorkerGeneration.TryCreate(1, out var generation);
+        var fence = new PluginLifecycleFence(PluginLifecycleOperationId.New(), generation);
 
         _ = (
-            await resolver.ResolveAsync(installation, CancellationToken.None)
+            await resolver.ResolveAsync(installation, fence, CancellationToken.None)
         ).ShouldBeOfType<PluginPackageAssetResolution.Available>();
         var other = new PluginInstallationIdentity(
             PluginContractFixtures.PluginId("community.other-plugin"),
             installation.Release
         );
         _ = (
-            await resolver.ResolveAsync(other, CancellationToken.None)
+            await resolver.ResolveAsync(other, fence, CancellationToken.None)
         ).ShouldBeOfType<PluginPackageAssetResolution.Unavailable>();
     }
 
@@ -496,6 +498,7 @@ public sealed class PluginPageBridgeTests
     {
         public ValueTask<PluginPackageAssetResolution> ResolveAsync(
             PluginInstallationIdentity installation,
+            PluginLifecycleFence fence,
             CancellationToken cancellationToken
         ) =>
             ValueTask.FromResult<PluginPackageAssetResolution>(
@@ -511,6 +514,7 @@ public sealed class PluginPageBridgeTests
     {
         public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
             PluginInstallationIdentity installation,
+            PluginLifecycleOperationId operationId,
             CancellationToken cancellationToken
         ) =>
             ValueTask.FromResult<PluginLifecyclePackageResolution>(

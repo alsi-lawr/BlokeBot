@@ -1,3 +1,4 @@
+using BlokeBot.Plugins.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Plugins.Runtime;
@@ -8,16 +9,30 @@ public sealed partial class PluginLifecycleCoordinator
         PluginLifecycleState state,
         PluginLifecyclePackage package,
         CancellationToken cancellationToken
+    ) => await PrepareAndActivateAsync(state, package, publication: null, cancellationToken);
+
+    private async ValueTask<PluginLifecycleCommandOutcome> PrepareAndActivateAsync(
+        PluginLifecycleState state,
+        PluginLifecyclePackage package,
+        PluginAdmissionStopPublication? publication,
+        CancellationToken cancellationToken
     )
     {
         var validation = await _workers.ValidateAsync(package, cancellationToken);
         if (validation is PluginLifecycleWorkerStartOutcome.Failed failed)
         {
-            return await FailPreparationAsync(state, failed, cancellationToken);
+            return publication is null
+                ? await FailPreparationAsync(state, failed, cancellationToken)
+                : await FailSelectedReplacementPreparationAsync(
+                    state,
+                    failed,
+                    publication,
+                    cancellationToken
+                );
         }
 
         var migrating = Applied(PluginLifecycleStateMachine.PreparationSucceeded(state, Now()));
-        var publication = _snapshots.StopAdmission(migrating);
+        publication ??= _snapshots.StopAdmission(migrating);
         var migrationFence = await WriteCheckpointAsync(
             state,
             migrating,
@@ -102,13 +117,66 @@ public sealed partial class PluginLifecycleCoordinator
         }
 
         var worker = ((PluginLifecycleWorkerStartOutcome.Started)started).Worker;
+        var context = new PluginLifecycleActivationContext(
+            state.SelectedInstallation,
+            state.SelectedFence,
+            package
+        );
+        PluginLifecycleOwnerOutcome publication;
+        try
+        {
+            publication = await PublishActivationAsync(context, cancellationToken);
+        }
+        catch
+        {
+            await DisposeUnpublishedWorkerAsync(worker, context.Installation.PluginId);
+            throw;
+        }
+        if (publication is PluginLifecycleOwnerOutcome.Failed publicationFailure)
+        {
+            await DisposeUnpublishedWorkerAsync(worker, context.Installation.PluginId);
+            return await FaultAsync(
+                state,
+                PluginLifecyclePhase.Activating,
+                PluginLifecycleFailureCode.ActivationFailed,
+                publicationFailure.Detail,
+                cancellationToken
+            );
+        }
+
         var active = Applied(
             PluginLifecycleStateMachine.ActivationSucceeded(state, Now(), recovered)
         );
-        var written = await _store.WriteAsync(state, active, cancellationToken);
+        PluginLifecycleStoreWriteOutcome written;
+        try
+        {
+            written = await _store.WriteAsync(state, active, cancellationToken);
+        }
+        catch
+        {
+            var current = await _store.LoadAsync(state.PluginId, CancellationToken.None);
+            if (current == active)
+            {
+                _ = _snapshots.Publish(active, worker);
+                ObserveWorkerTermination(active, package, worker);
+                return Succeeded(active);
+            }
+
+            await DisposeUnpublishedWorkerAsync(worker, context.Installation.PluginId);
+            await WithdrawActivationAsync(context, CancellationToken.None);
+            throw;
+        }
         if (written is PluginLifecycleStoreWriteOutcome.Conflict conflict)
         {
-            await worker.DisposeAsync();
+            if (conflict.Current == active)
+            {
+                _ = _snapshots.Publish(active, worker);
+                ObserveWorkerTermination(active, package, worker);
+                return Succeeded(active);
+            }
+
+            await DisposeUnpublishedWorkerAsync(worker, context.Installation.PluginId);
+            await WithdrawActivationAsync(context, CancellationToken.None);
             return Conflict(conflict.Current);
         }
 
@@ -116,6 +184,131 @@ public sealed partial class PluginLifecycleCoordinator
         _ = _snapshots.Publish(active, worker);
         ObserveWorkerTermination(active, package, worker);
         return Succeeded(active);
+    }
+
+    private async ValueTask DisposeUnpublishedWorkerAsync(
+        IPluginLifecycleWorkerSession worker,
+        PluginId pluginId
+    )
+    {
+        try
+        {
+            await worker.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Unpublished plugin worker disposal failed for {PluginId}.",
+                pluginId.Value
+            );
+        }
+    }
+
+    private async ValueTask<PluginLifecycleOwnerOutcome> PublishActivationAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var publisher in _activationPublishers)
+        {
+            try
+            {
+                var outcome = await publisher.PublishAsync(context, cancellationToken);
+                if (outcome is PluginLifecycleOwnerOutcome.Failed)
+                {
+                    await WithdrawActivationAsync(context, CancellationToken.None);
+                    return outcome;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await WithdrawActivationAsync(context, CancellationToken.None);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Plugin activation publisher {PublisherType} failed for {PluginId}.",
+                    publisher.GetType().Name,
+                    context.Installation.PluginId.Value
+                );
+                await WithdrawActivationAsync(context, CancellationToken.None);
+                return new PluginLifecycleOwnerOutcome.Failed(
+                    PluginLifecycleOwnerFailureCode.Failed,
+                    SafeDetail("Plugin declarations could not be published.")
+                );
+            }
+        }
+
+        return new PluginLifecycleOwnerOutcome.Succeeded();
+    }
+
+    private async ValueTask WithdrawActivationAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var publisher in _activationPublishers.Reverse())
+        {
+            try
+            {
+                await publisher.WithdrawAsync(context, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Plugin activation publication rollback {PublisherType} failed for {PluginId}.",
+                    publisher.GetType().Name,
+                    context.Installation.PluginId.Value
+                );
+            }
+        }
+    }
+
+    private async ValueTask<PluginLifecycleCommandOutcome> FailSelectedReplacementPreparationAsync(
+        PluginLifecycleState state,
+        PluginLifecycleWorkerStartOutcome.Failed failure,
+        PluginAdmissionStopPublication publication,
+        CancellationToken cancellationToken
+    )
+    {
+        var migrating = Applied(PluginLifecycleStateMachine.PreparationSucceeded(state, Now()));
+        var checkpoint = await WriteCheckpointAsync(
+            state,
+            migrating,
+            publication,
+            PluginCheckpointRollbackPolicy.SettleRuntime,
+            cancellationToken
+        );
+        if (checkpoint is PluginCheckpointWriteOutcome.Rejected rejected)
+        {
+            return rejected.Outcome;
+        }
+
+        var committed = (PluginCheckpointWriteOutcome.Committed)checkpoint;
+        var drain = await CancelDrainAndCheckpointAsync(
+            committed.State,
+            publication.Ownership,
+            committed.Continuation == PluginCheckpointContinuation.LifecycleOwned
+                ? CancellationToken.None
+                : cancellationToken
+        );
+        if (drain is PluginRuntimeDrainOutcome.Failed drainFailure)
+        {
+            return drainFailure.Outcome;
+        }
+
+        var ready = ((PluginRuntimeDrainOutcome.Ready)drain).State;
+        return await FaultAsync(
+            ready,
+            ready.Phase,
+            failure.Code,
+            failure.Detail,
+            cancellationToken
+        );
     }
 
     private async ValueTask<PluginLifecycleCommandOutcome> FailPreparationAsync(

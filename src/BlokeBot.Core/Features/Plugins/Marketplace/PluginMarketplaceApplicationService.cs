@@ -156,7 +156,8 @@ public sealed class PluginMarketplaceApplicationService
             );
         }
 
-        var preparation = await _packages.PrepareAsync(entry, cancellationToken);
+        var operationId = PluginLifecycleOperationId.New();
+        var preparation = await _packages.PrepareAsync(entry, operationId, cancellationToken);
         if (preparation is PluginMarketplacePackagePreparationOutcome.Rejected rejected)
         {
             var (code, outcomeCode) = rejected.Code switch
@@ -183,11 +184,37 @@ public sealed class PluginMarketplaceApplicationService
         }
 
         var package = ((PluginMarketplacePackagePreparationOutcome.Prepared)preparation).Package;
-        var lifecycle = await _lifecycle.ActivateAsync(
-            PluginLifecycleOperationId.New(),
-            package,
-            cancellationToken
-        );
+        var lifecycle =
+            operation == PluginMarketplaceOperationKind.Update
+                ? await _lifecycle.ReplaceAsync(operationId, package, cancellationToken)
+                : await _lifecycle.ActivateAsync(operationId, package, cancellationToken);
+        if (lifecycle is PluginLifecycleCommandOutcome.Succeeded succeeded)
+        {
+            await _packages.RetainOnlyAsync(
+                succeeded.View.Installation,
+                succeeded.View.OperationId,
+                cancellationToken
+            );
+        }
+        else if (
+            operation == PluginMarketplaceOperationKind.Update
+            && lifecycle is PluginLifecycleCommandOutcome.Failed failed
+        )
+        {
+            await _packages.RetainOnlyAsync(
+                failed.View.Installation,
+                operationId,
+                cancellationToken
+            );
+        }
+        else if (lifecycle is PluginLifecycleCommandOutcome.Rejected)
+        {
+            await _packages.RemoveOperationAsync(
+                package.Installation,
+                operationId,
+                cancellationToken
+            );
+        }
         return await RecordLifecycleAsync(
             pluginId,
             operation,

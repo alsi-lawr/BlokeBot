@@ -36,6 +36,7 @@ internal sealed class PluginMarketplacePackageStore(
 
     internal async ValueTask<PluginMarketplacePackagePreparationOutcome> PrepareAsync(
         PluginMarketplaceCatalogEntry entry,
+        PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken
     )
     {
@@ -48,13 +49,7 @@ internal sealed class PluginMarketplacePackageStore(
         }
 
         var installation = new PluginInstallationIdentity(entry.PluginId, entry.Release);
-        var existing = await ResolveAsync(installation, cancellationToken);
-        if (existing is PluginLifecyclePackageResolution.Available available)
-        {
-            return new PluginMarketplacePackagePreparationOutcome.Prepared(available.Package);
-        }
-
-        var destination = PackageDirectory(installation);
+        var destination = PackageDirectory(installation, operationId);
         var parent = Path.GetDirectoryName(destination)!;
         _ = Directory.CreateDirectory(parent);
         var nonce = Guid.NewGuid().ToString("N");
@@ -119,7 +114,7 @@ internal sealed class PluginMarketplacePackageStore(
             }
             catch (IOException)
             {
-                var raced = await ResolveAsync(installation, cancellationToken);
+                var raced = await ResolveAsync(installation, operationId, cancellationToken);
                 return raced is PluginLifecyclePackageResolution.Available racedAvailable
                     ? new PluginMarketplacePackagePreparationOutcome.Prepared(
                         racedAvailable.Package
@@ -140,7 +135,7 @@ internal sealed class PluginMarketplacePackageStore(
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            var raced = await ResolveAsync(installation, cancellationToken);
+            var raced = await ResolveAsync(installation, operationId, cancellationToken);
             return raced is PluginLifecyclePackageResolution.Available racedAvailable
                 ? new PluginMarketplacePackagePreparationOutcome.Prepared(racedAvailable.Package)
                 : new PluginMarketplacePackagePreparationOutcome.Rejected(
@@ -151,34 +146,116 @@ internal sealed class PluginMarketplacePackageStore(
         {
             DeleteFile(archivePath);
             DeleteDirectory(preparing);
+            if (!Directory.Exists(destination))
+            {
+                DeleteDirectory(OperationDirectory(installation, operationId));
+            }
         }
     }
 
     internal async ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken
     )
     {
-        var root = PackageDirectory(installation);
-        var validation = await PluginMarketplaceMaterializedPackageValidator.ValidateAsync(
-            root,
-            runtime.Target,
-            cancellationToken
-        );
-        return
-            validation
-                is not PluginMarketplaceMaterializedPackageValidationOutcome.Accepted accepted
-            || !Matches(installation, accepted.Package)
-            ? new PluginLifecyclePackageResolution.Unavailable()
-            : new PluginLifecyclePackageResolution.Available(
-                LifecyclePackage(installation, accepted.Package)
-            );
+        var root = PackageDirectory(installation, operationId);
+        var exact = await ResolveAtAsync(installation, root, cancellationToken);
+        if (exact is PluginLifecyclePackageResolution.Available)
+        {
+            await RetainOnlyAsync(installation, operationId, cancellationToken);
+            return exact;
+        }
+
+        var pluginRoot = Path.Combine(_packageRoot, installation.PluginId.Value);
+        if (!Directory.Exists(pluginRoot))
+        {
+            return new PluginLifecyclePackageResolution.Unavailable();
+        }
+
+        PluginLifecyclePackageResolution.Available? available = null;
+        foreach (
+            var candidate in Directory.EnumerateDirectories(
+                pluginRoot,
+                "package",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var resolved = await ResolveAtAsync(installation, candidate, cancellationToken);
+            if (resolved is not PluginLifecyclePackageResolution.Available match)
+            {
+                continue;
+            }
+            if (available is not null)
+            {
+                return new PluginLifecyclePackageResolution.Unavailable();
+            }
+            available = match;
+        }
+
+        return available is null ? new PluginLifecyclePackageResolution.Unavailable() : available;
     }
 
     internal ValueTask RemoveAsync(PluginId pluginId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         DeleteDirectory(Path.Combine(_packageRoot, pluginId.Value));
+        return ValueTask.CompletedTask;
+    }
+
+    internal ValueTask RemoveOperationAsync(
+        PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        DeleteDirectory(OperationDirectory(installation, operationId));
+        return ValueTask.CompletedTask;
+    }
+
+    internal ValueTask RetainOnlyAsync(
+        PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var retained = Path.GetFullPath(OperationDirectory(installation, operationId));
+        var pluginRoot = Path.Combine(_packageRoot, installation.PluginId.Value);
+        if (!Directory.Exists(pluginRoot))
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        foreach (
+            var operationDirectory in Directory
+                .EnumerateDirectories(pluginRoot, "*", SearchOption.AllDirectories)
+                .Where(path =>
+                    string.Equals(
+                        Path.GetFileName(Path.GetDirectoryName(path)),
+                        "operations",
+                        StringComparison.Ordinal
+                    )
+                )
+                .ToArray()
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (
+                !string.Equals(
+                    Path.GetFullPath(operationDirectory),
+                    retained,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                DeleteDirectory(operationDirectory);
+            }
+        }
+
         return ValueTask.CompletedTask;
     }
 
@@ -234,13 +311,22 @@ internal sealed class PluginMarketplacePackageStore(
         }
     }
 
-    private string PackageDirectory(PluginInstallationIdentity installation) =>
+    private string PackageDirectory(
+        PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId
+    ) => Path.Combine(OperationDirectory(installation, operationId), "package");
+
+    private string OperationDirectory(
+        PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId
+    ) =>
         Path.Combine(
             _packageRoot,
             installation.PluginId.Value,
             installation.Release.DeclaredVersion.Value,
             EncodeTag(installation.Release.Tag.Value),
-            "package"
+            "operations",
+            operationId.Value.ToString("N")
         );
 
     private PluginLifecyclePackage LifecyclePackage(
@@ -257,6 +343,33 @@ internal sealed class PluginMarketplacePackageStore(
             runtime.HostCalls,
             runtime.WorkerLogger
         );
+
+    private async ValueTask<PluginLifecyclePackageResolution> ResolveAtAsync(
+        PluginInstallationIdentity installation,
+        string root,
+        CancellationToken cancellationToken
+    )
+    {
+        var validation = await PluginMarketplaceMaterializedPackageValidator.ValidateAsync(
+            root,
+            runtime.Target,
+            cancellationToken
+        );
+        return
+            validation
+                is not PluginMarketplaceMaterializedPackageValidationOutcome.Accepted accepted
+            || !Matches(installation, accepted.Package)
+            ? new PluginLifecyclePackageResolution.Unavailable()
+            : new PluginLifecyclePackageResolution.Available(
+                LifecyclePackage(
+                    installation,
+                    accepted.Package with
+                    {
+                        PackageRoot = Path.GetFullPath(root),
+                    }
+                )
+            );
+    }
 
     private static bool Matches(
         PluginInstallationIdentity installation,
@@ -303,6 +416,7 @@ internal sealed class MarketplacePluginLifecyclePackageResolver(
 {
     public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken
-    ) => packages.ResolveAsync(installation, cancellationToken);
+    ) => packages.ResolveAsync(installation, operationId, cancellationToken);
 }

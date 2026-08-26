@@ -151,6 +151,7 @@ public sealed partial class PluginLifecycleCoordinator
 
         var resolved = await _packages.ResolveAsync(
             scheduled.SelectedInstallation,
+            scheduled.OperationId,
             CancellationToken.None
         );
         if (resolved is not PluginLifecyclePackageResolution.Available available)

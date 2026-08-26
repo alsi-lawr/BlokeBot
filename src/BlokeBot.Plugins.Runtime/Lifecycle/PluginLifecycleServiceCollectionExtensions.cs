@@ -41,6 +41,7 @@ public static class PluginLifecycleServiceCollectionExtensions
             provider.GetRequiredService<IPluginLifecycleStore>(),
             provider.GetRequiredService<IPluginLifecyclePackageResolver>(),
             provider.GetServices<IPluginMigrationDataOwner>(),
+            provider.GetServices<IPluginLifecycleActivationPublisher>(),
             provider.GetServices<IPluginRemovalDataOwner>(),
             provider.GetRequiredService<IPluginPendingWorkCanceller>(),
             provider.GetRequiredService<IPluginLifecycleWorkerManager>(),

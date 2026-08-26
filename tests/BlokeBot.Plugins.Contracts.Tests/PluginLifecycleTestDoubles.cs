@@ -93,6 +93,35 @@ internal sealed class InMemoryLifecycleStore : IPluginLifecycleStore
         }
     }
 
+    public ValueTask<PluginLifecycleStoreBeginOutcome> BeginReplacementAsync(
+        PluginLifecycleBeginRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        lock (_sync)
+        {
+            _ = _states.TryGetValue(request.Installation.PluginId, out var current);
+            var transition = PluginLifecycleStateMachine.BeginReplacement(
+                current,
+                request.Installation,
+                request.OperationId,
+                request.OccurredAtUtc
+            );
+            if (transition is PluginLifecycleTransitionOutcome.Rejected rejected)
+            {
+                return ValueTask.FromResult<PluginLifecycleStoreBeginOutcome>(
+                    new PluginLifecycleStoreBeginOutcome.Rejected(rejected.Code, current)
+                );
+            }
+
+            var begun = ((PluginLifecycleTransitionOutcome.Applied)transition).State;
+            _states[begun.PluginId] = begun;
+            return ValueTask.FromResult<PluginLifecycleStoreBeginOutcome>(
+                new PluginLifecycleStoreBeginOutcome.Begun(begun)
+            );
+        }
+    }
+
     public ValueTask<PluginLifecycleStoreRemovalOutcome> CompleteRemovalAsync(
         PluginLifecycleState expected,
         PluginLifecycleOutcome outcome,
@@ -221,6 +250,7 @@ internal sealed class FakePackageResolver : IPluginLifecyclePackageResolver
 
     public ValueTask<PluginLifecyclePackageResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleOperationId operationId,
         CancellationToken cancellationToken
     ) =>
         ValueTask.FromResult<PluginLifecyclePackageResolution>(
@@ -364,6 +394,43 @@ internal sealed class RecordingMigrationOwner : IPluginMigrationDataOwner
     }
 }
 
+internal sealed class RecordingActivationPublisher : IPluginLifecycleActivationPublisher
+{
+    internal List<PluginLifecycleActivationContext> Published { get; } = [];
+
+    internal List<PluginLifecycleActivationContext> Withdrawn { get; } = [];
+
+    internal int FailuresRemaining { get; set; }
+
+    public ValueTask<PluginLifecycleOwnerOutcome> PublishAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        Published.Add(context);
+        if (FailuresRemaining > 0)
+        {
+            FailuresRemaining--;
+            return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
+                new PluginLifecycleOwnerOutcome.Failed(PluginLifecycleOwnerFailureCode.Failed, null)
+            );
+        }
+
+        return ValueTask.FromResult<PluginLifecycleOwnerOutcome>(
+            new PluginLifecycleOwnerOutcome.Succeeded()
+        );
+    }
+
+    public ValueTask WithdrawAsync(
+        PluginLifecycleActivationContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        Withdrawn.Add(context);
+        return ValueTask.CompletedTask;
+    }
+}
+
 internal sealed class ThrowingMigrationOwner : IPluginMigrationDataOwner
 {
     public ValueTask<PluginLifecycleOwnerOutcome> MigrateAsync(
@@ -377,6 +444,8 @@ internal sealed class RecordingRemovalOwner : IPluginRemovalDataOwner
     private TaskCompletionSource? _gate;
 
     internal int Calls { get; private set; }
+
+    internal List<PluginRemovalContext> Contexts { get; } = [];
 
     internal int FailuresRemaining { get; set; }
 
@@ -397,6 +466,7 @@ internal sealed class RecordingRemovalOwner : IPluginRemovalDataOwner
     )
     {
         Calls++;
+        Contexts.Add(context);
         _ = Started.TrySetResult();
         if (_gate is not null)
         {

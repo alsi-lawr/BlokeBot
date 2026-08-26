@@ -21,6 +21,7 @@ internal sealed class UnavailablePluginPackageAssetResolver : IPluginPackageAsse
 {
     public ValueTask<PluginPackageAssetResolution> ResolveAsync(
         PluginInstallationIdentity installation,
+        PluginLifecycleFence fence,
         CancellationToken cancellationToken
     ) =>
         ValueTask.FromResult<PluginPackageAssetResolution>(
@@ -67,6 +68,7 @@ internal sealed class PluginPageAssetService(
 
         var packageResolution = await packages.ResolveAsync(
             embedded.Declaration.Installation,
+            embedded.Declaration.Fence,
             cancellationToken
         );
         if (

@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -398,7 +399,11 @@ public sealed class PluginMarketplaceTests
         );
 
         _ = (
-            await store.PrepareAsync(Entry(), CancellationToken.None)
+            await store.PrepareAsync(
+                Entry(),
+                PluginLifecycleOperationId.New(),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>();
     }
 
@@ -419,7 +424,11 @@ public sealed class PluginMarketplaceTests
         };
 
         _ = (
-            await store.PrepareAsync(incompatibleEntry, CancellationToken.None)
+            await store.PrepareAsync(
+                incompatibleEntry,
+                PluginLifecycleOperationId.New(),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Rejected>();
         archive.Calls.ShouldBe(0);
 
@@ -454,7 +463,11 @@ public sealed class PluginMarketplaceTests
             Runtime()
         );
         _ = (
-            await manifestStore.PrepareAsync(Entry(), CancellationToken.None)
+            await manifestStore.PrepareAsync(
+                Entry(),
+                PluginLifecycleOperationId.New(),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Rejected>();
     }
 
@@ -470,9 +483,10 @@ public sealed class PluginMarketplaceTests
             Runtime()
         );
         var entry = Entry();
+        var operationId = PluginLifecycleOperationId.New();
 
         var prepared = (
-            await packageStore.PrepareAsync(entry, CancellationToken.None)
+            await packageStore.PrepareAsync(entry, operationId, CancellationToken.None)
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>();
         prepared.Package.MatchesIdentity.ShouldBeTrue();
         prepared.Package.StateRoot.ShouldStartWith(options.PluginPrivateStateRoot);
@@ -486,7 +500,18 @@ public sealed class PluginMarketplaceTests
             Runtime()
         );
         _ = (
-            await restarted.ResolveAsync(prepared.Package.Installation, CancellationToken.None)
+            await restarted.ResolveAsync(
+                prepared.Package.Installation,
+                operationId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
+        _ = (
+            await restarted.ResolveAsync(
+                prepared.Package.Installation,
+                PluginLifecycleOperationId.New(),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<PluginLifecyclePackageResolution.Available>();
 
         var removal = await restarted.RemoveAsync(
@@ -495,7 +520,11 @@ public sealed class PluginMarketplaceTests
         );
         _ = removal.ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
         _ = (
-            await restarted.ResolveAsync(prepared.Package.Installation, CancellationToken.None)
+            await restarted.ResolveAsync(
+                prepared.Package.Installation,
+                operationId,
+                CancellationToken.None
+            )
         ).ShouldBeOfType<PluginLifecyclePackageResolution.Unavailable>();
     }
 
@@ -532,6 +561,83 @@ public sealed class PluginMarketplaceTests
         Directory.Exists(interrupted).ShouldBeFalse();
         File.Exists(interruptedArchive).ShouldBeFalse();
         Directory.Exists(retained).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task ProductionActivationPublisher_ProjectsPagesAndAutomationCatalogByExactFence()
+    {
+        using var root = new TemporaryDirectory();
+        var operationId = PluginLifecycleOperationId.New();
+        var packages = new PluginMarketplacePackageStore(
+            Options(root.Path),
+            new FixedArchiveTransport(Archive(PluginContractFixtures.CompletePackage())),
+            new(),
+            Runtime()
+        );
+        var package = (await packages.PrepareAsync(Entry(), operationId, CancellationToken.None))
+            .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Prepared>()
+            .Package;
+        _ = PluginWorkerGeneration.TryCreate(1, out var workerGeneration);
+        var fence = new PluginLifecycleFence(operationId, workerGeneration);
+        var runtime = new PluginRuntimeSnapshotRegistry();
+        var dispatch = new PluginDispatchSnapshotRegistry(runtime);
+        var automations = new PluginAutomationCatalogRegistry();
+        var declarations = new PluginFeatureDeclarationRegistry(dispatch, automations);
+        var features = new PluginFeatureSnapshotRegistry(dispatch, automations);
+        var publisher = new PluginFeatureActivationPublisher(declarations);
+        var context = new PluginLifecycleActivationContext(package.Installation, fence, package);
+
+        _ = (
+            await publisher.PublishAsync(context, CancellationToken.None)
+        ).ShouldBeOfType<PluginLifecycleOwnerOutcome.Succeeded>();
+        _ = PluginHostId.TryCreate(1, out var hostId);
+        _ = PluginFeatureGeneration.TryCreate(1, out var featureGeneration);
+        _ = PluginFeatureRevision.TryCreate(1, out var revision);
+        foreach (var feature in package.PreparedPackage.Manifest!.Manifest.Features)
+        {
+            features.Publish(
+                new(
+                    new(package.Installation.PluginId, feature.Id, hostId),
+                    fence,
+                    featureGeneration,
+                    new PluginFeatureReadiness.Ready(),
+                    revision
+                )
+            );
+        }
+        var now = DateTimeOffset.UtcNow;
+        _ = runtime.Publish(
+            new(
+                package.Installation.PluginId,
+                package.Installation,
+                operationId,
+                workerGeneration,
+                new(package.Installation, fence),
+                PluginLifecyclePhase.Active,
+                PluginLifecycleOperationKind.Activate,
+                null,
+                false,
+                null,
+                PluginLifecycleOutcome.Progress(PluginLifecycleOutcomeCode.Activated, now),
+                1,
+                now
+            ),
+            new PassiveLifecycleWorker()
+        );
+
+        automations.DescriptorsForHost(hostId.Value).ShouldNotBeEmpty();
+        _ = PluginFeatureId.TryCreate("collection", out var collection);
+        _ = new PluginPageCatalog(declarations, features, runtime)
+            .Resolve(package.Installation.PluginId, collection, hostId, "queue-preview")
+            .ShouldBeOfType<PluginPageResolution.Available>();
+
+        await publisher.WithdrawAsync(context, CancellationToken.None);
+
+        declarations.Current.Declarations.ShouldNotContainKey(package.Installation.PluginId);
+        automations.DescriptorsForHost(hostId.Value).ShouldBeEmpty();
+        _ = new PluginPageCatalog(declarations, features, runtime)
+            .Resolve(package.Installation.PluginId, collection, hostId, "queue-preview")
+            .ShouldBeOfType<PluginPageResolution.Missing>();
     }
 
     [Test]
@@ -591,6 +697,97 @@ public sealed class PluginMarketplaceTests
         receipt.OutcomeCode.ShouldBe("Activated");
         receipt.ToString().ShouldNotContain(lifecycle.OperationId.ToString());
         receipt.ToString().ShouldNotContain("36697a9e");
+    }
+
+    [Test]
+    public async Task ExplicitUpdate_RedownloadsMovedTagIntoFreshOperationAndDropsOldPackage()
+    {
+        using var root = new TemporaryDirectory();
+        var options = Options(root.Path);
+        var clock = new ManualTimeProvider(_now);
+        var database = await CreateDatabaseAsync(root.Path);
+        using var registry = new PluginMarketplaceCatalogRegistry(
+            new EfPluginMarketplaceCatalogStore(database),
+            new QueueCatalogTransport(
+                new PluginMarketplaceCatalogDownload.Delivered(Catalog(), null, null)
+            ),
+            clock
+        );
+        await registry.RefreshAsync(CancellationToken.None);
+        var firstPackage = PluginContractFixtures.CompletePackage();
+        var movedPackage = firstPackage
+            .Select(entry =>
+                entry is PluginPackageEntry.File { Path: "lua/main.lua" }
+                    ? new PluginPackageEntry.File(
+                        entry.Path,
+                        Encoding.UTF8.GetBytes("return { moved = true }\n")
+                    )
+                    : entry
+            )
+            .ToArray();
+        var archive = new QueueArchiveTransport(Archive(firstPackage), Archive(movedPackage), null);
+        var packages = new PluginMarketplacePackageStore(options, archive, new(), Runtime());
+        var lifecycle = new RecordingLifecycleCoordinator();
+        var receipts = new MemoryReceiptStore();
+        var service = new PluginMarketplaceApplicationService(
+            CreateCatalogService(registry, clock),
+            packages,
+            lifecycle,
+            receipts,
+            clock
+        );
+        var entry = Entry();
+
+        _ = (
+            await service.InstallAsync(
+                Admin(),
+                entry.PluginId,
+                entry.Release,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginMarketplaceCommandOutcome.Completed>();
+        var first = lifecycle.Packages.ShouldHaveSingleItem();
+        var firstRoot = first.PreparedPackage.PackageRoot;
+        (await File.ReadAllTextAsync(Path.Combine(firstRoot, "lua/main.lua"))).ShouldBe(
+            "return {}\n"
+        );
+
+        var updated = (
+            await service.UpdateAsync(
+                Admin(),
+                entry.PluginId,
+                entry.Release,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginMarketplaceCommandOutcome.Completed>();
+        var second = lifecycle.Packages[1];
+
+        lifecycle.Replacements.ShouldBe(1);
+        archive.Calls.ShouldBe(2);
+        second.Installation.ShouldBe(first.Installation);
+        second.PreparedPackage.PackageRoot.ShouldNotBe(firstRoot);
+        (
+            await File.ReadAllTextAsync(
+                Path.Combine(second.PreparedPackage.PackageRoot, "lua/main.lua")
+            )
+        ).ShouldBe("return { moved = true }\n");
+        Directory.Exists(firstRoot).ShouldBeFalse();
+        Directory.Exists(second.PreparedPackage.PackageRoot).ShouldBeTrue();
+        updated.Receipt.ShouldNotBeNull().Release.ShouldBe(entry.Release);
+
+        var missing = (
+            await service.UpdateAsync(
+                Admin(),
+                entry.PluginId,
+                entry.Release,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PluginMarketplaceCommandOutcome.Rejected>();
+        missing.Code.ShouldBe(PluginMarketplaceCommandRejectionCode.PackageDownloadFailed);
+        missing.Receipt.ShouldNotBeNull().OutcomeCode.ShouldBe("package-download-failed");
+        missing.Receipt.ToString().ShouldNotContain("github.com");
+        lifecycle.Replacements.ShouldBe(1);
+        Directory.Exists(second.PreparedPackage.PackageRoot).ShouldBeTrue();
     }
 
     [Test]
@@ -964,6 +1161,32 @@ public sealed class PluginMarketplaceTests
         }
     }
 
+    private sealed class QueueArchiveTransport(params byte[]?[] archives)
+        : IPluginMarketplaceArchiveTransport
+    {
+        private readonly Queue<byte[]?> _archives = new(archives);
+
+        internal int Calls { get; private set; }
+
+        public async ValueTask<PluginMarketplaceArchiveDownload> DownloadAsync(
+            Uri repository,
+            PluginGitTag tag,
+            string destination,
+            CancellationToken cancellationToken
+        )
+        {
+            Calls++;
+            var archive = _archives.Count == 0 ? null : _archives.Dequeue();
+            if (archive is null)
+            {
+                return new PluginMarketplaceArchiveDownload.Failed();
+            }
+
+            await File.WriteAllBytesAsync(destination, archive, cancellationToken);
+            return new PluginMarketplaceArchiveDownload.Delivered();
+        }
+    }
+
     private sealed class UnavailableHostCalls : IPluginHostCallDispatcher
     {
         public ValueTask<PluginHostCallOutcome> DispatchAsync(
@@ -975,6 +1198,16 @@ public sealed class PluginMarketplaceTests
                     new(PluginHostFailureCode.Unavailable, "Unavailable in marketplace test.")
                 )
             );
+    }
+
+    private sealed class PassiveLifecycleWorker : IPluginLifecycleWorkerSession
+    {
+        public PluginWorkerMode Mode => PluginWorkerMode.Admitted;
+
+        public Task<PluginWorkerFailure> Termination { get; } =
+            new TaskCompletionSource<PluginWorkerFailure>().Task;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
@@ -1081,6 +1314,9 @@ public sealed class PluginMarketplaceTests
     private sealed class RecordingLifecycleCoordinator : IPluginLifecycleCoordinator
     {
         internal int Activations { get; private set; }
+        internal int Replacements { get; private set; }
+        internal List<PluginLifecyclePackage> Packages { get; } = [];
+        private ulong _generation;
         internal PluginLifecycleOperationId OperationId { get; private set; } =
             PluginLifecycleOperationId.New();
 
@@ -1091,8 +1327,9 @@ public sealed class PluginMarketplaceTests
         )
         {
             Activations++;
+            Packages.Add(package);
             OperationId = operationId;
-            _ = PluginWorkerGeneration.TryCreate(1, out var generation);
+            _ = PluginWorkerGeneration.TryCreate(++_generation, out var generation);
             var outcome = PluginLifecycleOutcome.Progress(
                 PluginLifecycleOutcomeCode.Activated,
                 _now
@@ -1109,6 +1346,16 @@ public sealed class PluginMarketplaceTests
                     )
                 )
             );
+        }
+
+        public ValueTask<PluginLifecycleCommandOutcome> ReplaceAsync(
+            PluginLifecycleOperationId operationId,
+            PluginLifecyclePackage package,
+            CancellationToken cancellationToken
+        )
+        {
+            Replacements++;
+            return ActivateAsync(operationId, package, cancellationToken);
         }
 
         public ValueTask<PluginLifecycleCommandOutcome> RemoveAsync(

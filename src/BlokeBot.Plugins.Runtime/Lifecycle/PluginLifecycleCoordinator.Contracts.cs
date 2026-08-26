@@ -38,6 +38,12 @@ public interface IPluginLifecycleCoordinator
         CancellationToken cancellationToken
     );
 
+    ValueTask<PluginLifecycleCommandOutcome> ReplaceAsync(
+        PluginLifecycleOperationId operationId,
+        PluginLifecyclePackage package,
+        CancellationToken cancellationToken
+    );
+
     ValueTask<PluginLifecycleCommandOutcome> RemoveAsync(
         PluginId pluginId,
         PluginLifecycleOperationId operationId,

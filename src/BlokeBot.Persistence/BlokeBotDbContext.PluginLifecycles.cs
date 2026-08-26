@@ -41,7 +41,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_OperationKind",
-                        "\"OperationKind\" IN ('Activate', 'Remove', 'Restart')"
+                        "\"OperationKind\" IN ('Activate', 'Remove', 'Replace', 'Restart')"
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_lifecycles_OutcomeCode",
