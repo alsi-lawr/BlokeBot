@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
@@ -136,10 +136,10 @@ public enum PluginBlokeBotEventKind
     TwitchOperationsChanged,
 }
 
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
-[JsonDerivedType(typeof(PluginEventSource.Twitch), "twitch")]
-[JsonDerivedType(typeof(PluginEventSource.TwitchRaw), "twitchRaw")]
-[JsonDerivedType(typeof(PluginEventSource.BlokeBot), "blokeBot")]
+[TomlPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[TomlDerivedType(typeof(PluginEventSource.Twitch), "twitch")]
+[TomlDerivedType(typeof(PluginEventSource.TwitchRaw), "twitchRaw")]
+[TomlDerivedType(typeof(PluginEventSource.BlokeBot), "blokeBot")]
 public abstract record PluginEventSource
 {
     private PluginEventSource() { }
@@ -166,9 +166,9 @@ public sealed record PluginScheduleHandlerDescriptor(
     PluginCallbackRequirements Requirements
 );
 
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
-[JsonDerivedType(typeof(PluginWebhookAuthentication.Public), "public")]
-[JsonDerivedType(typeof(PluginWebhookAuthentication.Callback), "callback")]
+[TomlPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[TomlDerivedType(typeof(PluginWebhookAuthentication.Public), "public")]
+[TomlDerivedType(typeof(PluginWebhookAuthentication.Callback), "callback")]
 public abstract record PluginWebhookAuthentication
 {
     private PluginWebhookAuthentication() { }

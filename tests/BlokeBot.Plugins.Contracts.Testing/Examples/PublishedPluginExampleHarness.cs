@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Text.Json;
 using BlokeBot.Plugins.Runtime;
 
 namespace BlokeBot.Plugins.Contracts.Testing;
@@ -113,8 +112,7 @@ public static class PublishedPluginExampleHarness
             );
             return (examples, []);
         }
-        catch (Exception exception)
-            when (exception is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             return (
                 [],

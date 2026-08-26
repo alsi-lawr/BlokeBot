@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
@@ -18,6 +19,7 @@ public sealed record PluginGitTagSyntaxContract(
 public sealed record PluginInstallationIdentity(PluginId PluginId, PluginReleaseIdentity Release);
 
 [JsonConverter(typeof(PluginGitTagJsonConverter))]
+[TomlConverter(typeof(PluginGitTagTomlConverter))]
 public sealed record PluginGitTag
 {
     private PluginGitTag(string value) => Value = value;

@@ -144,8 +144,8 @@ public sealed class PluginFeatureNavigationTests
     }
 
     private static ValidatedPluginManifest ValidatedManifest() =>
-        PluginManifestJson.Validate(
-            PluginContractFixtures.CompleteManifestJson(),
+        PluginManifestToml.Validate(
+            PluginContractFixtures.CompleteManifestToml(),
             PluginContractFixtures.CompatibleHost()
         )
             is PluginManifestValidationOutcome.Accepted accepted

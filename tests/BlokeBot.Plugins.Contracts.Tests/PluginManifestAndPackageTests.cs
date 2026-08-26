@@ -11,11 +11,11 @@ public sealed class PluginManifestAndPackageTests
     public void AutomationPorts_AcceptBoundedStructuredKinds(string valueKind)
     {
         var manifest = PluginContractFixtures.ManifestReplacing(
-            "\"valueKind\": \"string\"",
-            $"\"valueKind\": \"{valueKind}\""
+            "valueKind = \"string\"",
+            $"valueKind = \"{valueKind}\""
         );
 
-        _ = PluginManifestJson
+        _ = PluginManifestToml
             .Validate(manifest, PluginContractFixtures.CompatibleHost())
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
     }
@@ -24,12 +24,12 @@ public sealed class PluginManifestAndPackageTests
     public void AutomationPorts_RejectNilAsAConnectableSchemaKind()
     {
         var manifest = PluginContractFixtures.ManifestReplacing(
-            "\"valueKind\": \"string\"",
-            "\"valueKind\": \"nil\""
+            "valueKind = \"string\"",
+            "valueKind = \"nil\""
         );
 
         ManifestErrors(
-                PluginManifestJson.Validate(manifest, PluginContractFixtures.CompatibleHost())
+                PluginManifestToml.Validate(manifest, PluginContractFixtures.CompatibleHost())
             )
             .Select(static error => error.Code)
             .ShouldContain(PluginManifestErrorCode.InvalidAutomationDefinition);
@@ -39,12 +39,12 @@ public sealed class PluginManifestAndPackageTests
     public void AutomationTemplate_RejectsDefinitionsOwnedByAnotherFeature()
     {
         var manifest = PluginContractFixtures.ManifestReplacing(
-            "\"featureId\": \"publishing\",\n      \"kind\": \"source\"",
-            "\"featureId\": \"collection\",\n      \"kind\": \"source\""
+            "featureId = \"publishing\"\nkind = \"source\"",
+            "featureId = \"collection\"\nkind = \"source\""
         );
 
         ManifestErrors(
-                PluginManifestJson.Validate(manifest, PluginContractFixtures.CompatibleHost())
+                PluginManifestToml.Validate(manifest, PluginContractFixtures.CompatibleHost())
             )
             .Select(static error => error.Code)
             .ShouldContain(PluginManifestErrorCode.InvalidAutomationTemplate);
@@ -55,25 +55,79 @@ public sealed class PluginManifestAndPackageTests
     {
         var target = PluginContractFixtures.CompatibleHost();
 
-        var manifestOutcome = PluginManifestJson.Validate(
-            PluginContractFixtures.CompleteManifestJson(),
+        var manifestOutcome = PluginManifestToml.Validate(
+            PluginContractFixtures.CompleteManifestToml(),
             target
         );
         var acceptedManifest =
             manifestOutcome.ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
-        var serialized = PluginManifestJson.Serialize(acceptedManifest.Manifest);
+        var serialized = PluginManifestToml.Serialize(acceptedManifest.Manifest);
         var packageOutcome = PluginPackageValidator.Validate(
             PluginContractFixtures.CompletePackage(),
             target
         );
 
-        _ = PluginManifestJson
+        _ = PluginManifestToml
             .Validate(serialized, target)
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+        PluginManifestToml.Serialize(acceptedManifest.Manifest).ShouldBe(serialized);
         var acceptedPackage =
             packageOutcome.ShouldBeOfType<PluginPackageValidationOutcome.Accepted>();
         acceptedPackage.Manifest.Manifest.Id.Value.ShouldBe("community.link-queue");
         acceptedPackage.Manifest.Manifest.Release.Tag.Value.ShouldBe("community-link-queue");
+    }
+
+    [Test]
+    public void TomlRoundTrip_PreservesEveryPluginValueShape()
+    {
+        var target = PluginContractFixtures.CompatibleHost();
+        var accepted = PluginManifestToml
+            .Validate(PluginContractFixtures.CompleteManifestToml(), target)
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+            .Manifest;
+        var template = accepted.Manifest.AutomationTemplates.ShouldHaveSingleItem();
+        var node = template.Nodes[0];
+        var configuration = new PluginValue.Map([
+            new("nil", new PluginValue.Nil()),
+            new("boolean", new PluginValue.Boolean(true)),
+            new("number", new PluginValue.Number(3.5)),
+            new("string", new PluginValue.String("value")),
+            new(
+                "array",
+                new PluginValue.Array([
+                    new PluginValue.Boolean(false),
+                    new PluginValue.Map([new("nested", new PluginValue.String("map"))]),
+                ])
+            ),
+        ]);
+        var manifest = accepted.Manifest with
+        {
+            AutomationTemplates = accepted.Manifest.AutomationTemplates.Replace(
+                template,
+                template with
+                {
+                    Nodes = template.Nodes.Replace(
+                        node,
+                        node with
+                        {
+                            Configuration = configuration,
+                        }
+                    ),
+                }
+            ),
+        };
+        var validated = PluginManifestValidator
+            .Validate(manifest, target)
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+
+        var roundTripped = PluginManifestToml
+            .Validate(PluginManifestToml.Serialize(validated.Manifest), target)
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+            .Manifest.Manifest.AutomationTemplates.ShouldHaveSingleItem()
+            .Nodes[0]
+            .Configuration;
+
+        PluginValueComparer.SemanticallyEquals(configuration, roundTripped).ShouldBeTrue();
     }
 
     [Test]
@@ -85,29 +139,39 @@ public sealed class PluginManifestAndPackageTests
             "0123456789abcdef0123456789abcdef01234567"
         );
         var shaField = PluginContractFixtures.ManifestReplacing(
-            "\"tag\": \"community-link-queue\"",
-            "\"tag\": \"community-link-queue\", \"commitSha\": \"0123456789abcdef\""
+            "tag = \"community-link-queue\"",
+            "tag = \"community-link-queue\"\ncommitSha = \"0123456789abcdef\""
         );
         var nullDescription = PluginContractFixtures.ManifestReplacing(
-            "\"description\": \"Collects community links and publishes them on a schedule.\"",
-            "\"description\": null"
+            "description = \"Collects community links and publishes them on a schedule.\"",
+            "description = 42"
+        );
+        var unknownVariantField = PluginContractFixtures.ManifestReplacing(
+            "maximumLength = 256\nkind = \"secret\"",
+            "maximumLength = 256\nkind = \"secret\"\nminimum = 1"
         );
 
-        var shaTagErrors = ManifestErrors(PluginManifestJson.Validate(shaTag, target));
-        var shaFieldErrors = ManifestErrors(PluginManifestJson.Validate(shaField, target));
+        var shaTagErrors = ManifestErrors(PluginManifestToml.Validate(shaTag, target));
+        var shaFieldErrors = ManifestErrors(PluginManifestToml.Validate(shaField, target));
         var nullDescriptionErrors = ManifestErrors(
-            PluginManifestJson.Validate(nullDescription, target)
+            PluginManifestToml.Validate(nullDescription, target)
+        );
+        var unknownVariantErrors = ManifestErrors(
+            PluginManifestToml.Validate(unknownVariantField, target)
         );
 
         shaTagErrors
             .Select(error => error.Code)
-            .ShouldContain(PluginManifestErrorCode.MalformedJson);
+            .ShouldContain(PluginManifestErrorCode.MalformedToml);
         shaFieldErrors
             .Select(error => error.Code)
-            .ShouldContain(PluginManifestErrorCode.MalformedJson);
+            .ShouldContain(PluginManifestErrorCode.MalformedToml);
         nullDescriptionErrors
             .Select(error => error.Code)
-            .ShouldContain(PluginManifestErrorCode.MalformedJson);
+            .ShouldContain(PluginManifestErrorCode.MalformedToml);
+        unknownVariantErrors
+            .Select(error => error.Code)
+            .ShouldContain(PluginManifestErrorCode.MalformedToml);
     }
 
     [Test]
@@ -115,33 +179,33 @@ public sealed class PluginManifestAndPackageTests
     {
         var target = PluginContractFixtures.CompatibleHost();
         var duplicate = PluginContractFixtures.ManifestReplacing(
-            "\"id\": \"publishing\"",
-            "\"id\": \"collection\""
+            "id = \"publishing\"",
+            "id = \"collection\""
         );
         var incompatible = PluginContractFixtures.ManifestReplacing(
-            "\"minimumApiVersion\": 1,\n    \"maximumApiVersion\": 1",
-            "\"minimumApiVersion\": 2,\n    \"maximumApiVersion\": 2"
+            "minimumApiVersion = 1\nmaximumApiVersion = 1",
+            "minimumApiVersion = 2\nmaximumApiVersion = 2"
         );
         var escapingModule = PluginContractFixtures.ManifestReplacing(
-            "\"path\": \"lua/main.lua\"",
-            "\"path\": \"../main.lua\""
+            "path = \"lua/main.lua\"",
+            "path = \"../main.lua\""
         );
         var duplicateAsset = PluginContractFixtures.ManifestReplacing(
-            "\"id\": \"queue-script\"",
-            "\"id\": \"queue-document\""
+            "id = \"queue-script\"",
+            "id = \"queue-document\""
         );
         var malformedId = PluginContractFixtures.ManifestReplacing(
             "community.link-queue",
             "Community.LinkQueue"
         );
 
-        var duplicateErrors = ManifestErrors(PluginManifestJson.Validate(duplicate, target));
-        var incompatibleErrors = ManifestErrors(PluginManifestJson.Validate(incompatible, target));
-        var escapingErrors = ManifestErrors(PluginManifestJson.Validate(escapingModule, target));
+        var duplicateErrors = ManifestErrors(PluginManifestToml.Validate(duplicate, target));
+        var incompatibleErrors = ManifestErrors(PluginManifestToml.Validate(incompatible, target));
+        var escapingErrors = ManifestErrors(PluginManifestToml.Validate(escapingModule, target));
         var duplicateAssetErrors = ManifestErrors(
-            PluginManifestJson.Validate(duplicateAsset, target)
+            PluginManifestToml.Validate(duplicateAsset, target)
         );
-        var malformedIdErrors = ManifestErrors(PluginManifestJson.Validate(malformedId, target));
+        var malformedIdErrors = ManifestErrors(PluginManifestToml.Validate(malformedId, target));
 
         duplicateErrors
             .Select(error => error.Code)
@@ -157,7 +221,7 @@ public sealed class PluginManifestAndPackageTests
             .ShouldContain(PluginManifestErrorCode.DuplicateIdentifier);
         malformedIdErrors
             .Select(error => error.Code)
-            .ShouldContain(PluginManifestErrorCode.MalformedJson);
+            .ShouldContain(PluginManifestErrorCode.MalformedToml);
     }
 
     [Test]
@@ -174,20 +238,20 @@ public sealed class PluginManifestAndPackageTests
         );
 
         ManifestErrors(
-                PluginManifestJson.Validate(missingPurpose, PluginContractFixtures.CompatibleHost())
+                PluginManifestToml.Validate(missingPurpose, PluginContractFixtures.CompatibleHost())
             )
             .Select(error => error.Code)
             .ShouldContain(PluginManifestErrorCode.InvalidPayload);
         ManifestErrors(
-                PluginManifestJson.Validate(
+                PluginManifestToml.Validate(
                     unsupportedTarget,
                     PluginContractFixtures.CompatibleHost()
                 )
             )
             .Select(error => error.Code)
-            .ShouldContain(PluginManifestErrorCode.MalformedJson);
+            .ShouldContain(PluginManifestErrorCode.MalformedToml);
         ManifestErrors(
-                PluginManifestJson.Validate(missingTargets, PluginContractFixtures.CompatibleHost())
+                PluginManifestToml.Validate(missingTargets, PluginContractFixtures.CompatibleHost())
             )
             .Select(error => error.Code)
             .ShouldContain(PluginManifestErrorCode.InvalidPayload);
@@ -228,7 +292,7 @@ public sealed class PluginManifestAndPackageTests
                 PluginContractFixtures.PackageWith(
                     new PluginPackageEntry.File(
                         PluginPackage.ManifestPath,
-                        PluginContractFixtures.CompleteManifestJson()
+                        PluginContractFixtures.CompleteManifestToml()
                     )
                 ),
                 PluginPackageEntryErrorCode.DuplicatePath
@@ -287,6 +351,27 @@ public sealed class PluginManifestAndPackageTests
                 PluginPackageValidator.Validate(oversized, PluginContractFixtures.CompatibleHost())
             )
             .ShouldContain(PluginPackageEntryErrorCode.EntryTooLarge);
+    }
+
+    [Test]
+    public void PackagePolicy_UsesCanonicalManifestSizeBound()
+    {
+        var package = PluginContractFixtures
+            .CompletePackage()
+            .Select(entry =>
+                entry.Path == PluginPackage.ManifestPath
+                    ? new PluginPackageEntry.File(
+                        PluginPackage.ManifestPath,
+                        new byte[PluginContractLimits.MaximumManifestBytes + 1]
+                    )
+                    : entry
+            )
+            .ToArray();
+
+        PackageManifestErrorCodes(
+                PluginPackageValidator.Validate(package, PluginContractFixtures.CompatibleHost())
+            )
+            .ShouldContain(PluginManifestErrorCode.ManifestTooLarge);
     }
 
     private static IReadOnlyList<PluginManifestError> ManifestErrors(

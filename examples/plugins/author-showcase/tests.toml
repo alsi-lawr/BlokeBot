@@ -1,0 +1,89 @@
+name = "author-showcase"
+
+[[scenarios]]
+name = "lifecycle"
+workerMode = "admitted"
+invocationKind = "lifecycle"
+module = "main"
+operation = "setup"
+expectation = "returned"
+
+[[scenarios]]
+name = "migration"
+workerMode = "staging"
+invocationKind = "migration"
+module = "main"
+operation = "migrate"
+expectation = "returned"
+
+[[scenarios]]
+name = "command-host-modules"
+workerMode = "admitted"
+invocationKind = "command"
+module = "main"
+operation = "host_calls"
+expectation = "returned"
+
+[[scenarios]]
+name = "event"
+workerMode = "admitted"
+invocationKind = "event"
+module = "main"
+operation = "on_event"
+expectation = "returned"
+
+[[scenarios]]
+name = "schedule"
+workerMode = "admitted"
+invocationKind = "schedule"
+module = "main"
+operation = "on_schedule"
+expectation = "returned"
+
+[[scenarios]]
+name = "webhook"
+workerMode = "admitted"
+invocationKind = "hostAction"
+module = "main"
+operation = "on_webhook"
+expectation = "returned"
+
+[[scenarios]]
+name = "action"
+workerMode = "admitted"
+invocationKind = "hostAction"
+module = "main"
+operation = "on_action"
+expectation = "returned"
+
+[[scenarios]]
+name = "sqlite"
+workerMode = "admitted"
+invocationKind = "storage"
+module = "main"
+operation = "storage_roundtrip"
+expectation = "returned"
+
+[[scenarios]]
+name = "generated-ui"
+workerMode = "admitted"
+invocationKind = "page"
+module = "main"
+operation = "render_page"
+expectation = "returned"
+
+[[scenarios]]
+name = "automation"
+workerMode = "admitted"
+invocationKind = "automation"
+module = "main"
+operation = "automation_action"
+expectation = "returned"
+
+[[scenarios]]
+name = "cancellable-host-wait"
+workerMode = "admitted"
+invocationKind = "schedule"
+module = "main"
+operation = "cancel_wait"
+expectation = "cancelled"

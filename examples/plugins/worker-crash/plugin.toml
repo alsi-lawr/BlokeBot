@@ -1,0 +1,46 @@
+manifestVersion = 1
+id = "examples.worker-crash"
+name = "Worker crash fixture"
+description = "Demonstrates worker crash isolation."
+entryModule = "main"
+assets = []
+payloads = []
+settings = []
+hostModules = []
+migrations = []
+automationDefinitions = []
+automationTemplates = []
+generatedPages = []
+embeddedPages = []
+[release]
+declaredVersion = "1.0.0"
+tag = "examples-worker-crash-v1"
+[compatibility]
+minimumApiVersion = 1
+maximumApiVersion = 1
+minimumBlokeBotVersion = "0.13.0"
+maximumBlokeBotVersionExclusive = "0.14.0"
+luaVersion = "lua54"
+[[luaModules]]
+id = "main"
+path = "lua/main.lua"
+[[features]]
+id = "crash"
+name = "Crash fixture"
+description = "Terminates only its worker process."
+settings = []
+automationTemplates = []
+[features.twitch]
+scopes = []
+eventSubTypes = []
+[features.dispatch]
+events = []
+schedules = []
+webhooks = []
+actions = []
+[[features.dispatch.commands]]
+route = "worker-crash"
+module = "main"
+operation = "crash"
+[features.dispatch.commands.requirements]
+twitchReady = false

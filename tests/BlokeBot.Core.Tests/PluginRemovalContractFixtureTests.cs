@@ -240,9 +240,9 @@ public sealed class PluginRemovalContractFixtureTests
 
         private static PluginLifecyclePackage Package(string root, PluginId pluginId)
         {
-            var accepted = PluginManifestJson
+            var accepted = PluginManifestToml
                 .Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
                 .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()

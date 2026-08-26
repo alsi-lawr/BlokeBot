@@ -1,0 +1,264 @@
+manifestVersion = 1
+id = "community.link-queue"
+name = "Community link queue"
+description = "Collects community links and publishes them on a schedule."
+entryModule = "main"
+[release]
+declaredVersion = "1.2.0"
+tag = "community-link-queue"
+[compatibility]
+minimumApiVersion = 1
+maximumApiVersion = 1
+minimumBlokeBotVersion = "0.13.0"
+maximumBlokeBotVersionExclusive = "0.14.0"
+luaVersion = "lua54"
+[[luaModules]]
+id = "main"
+path = "lua/main.lua"
+
+[[luaModules]]
+id = "events"
+path = "lua/events.lua"
+
+[[luaModules]]
+id = "pages"
+path = "lua/pages.lua"
+
+[[luaModules]]
+id = "migrations"
+path = "lua/migrations.lua"
+[[assets]]
+id = "queue-document"
+path = "web/index.html"
+kind = "browser"
+mediaType = "text/html"
+purpose = "Provides the embedded queue preview document."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[assets]]
+id = "queue-script"
+path = "web/app.js"
+kind = "browser"
+mediaType = "application/javascript"
+purpose = "Runs the embedded queue preview client."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[assets]]
+id = "queue-icon"
+path = "media/icon.webp"
+kind = "media"
+mediaType = "image/webp"
+purpose = "Displays the queue feature icon."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+[[payloads]]
+id = "native-helper"
+path = "payloads/linux-x64/libqueue.so"
+purpose = "Provides the plugin-managed native queue helper."
+runtimeIdentifiers = ["linux-x64"]
+maximumBytes = 65536
+
+[[payloads]]
+id = "managed-helper"
+path = "payloads/managed/Queue.Helper.dll"
+purpose = "Provides a plugin-managed portable .NET helper."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[payloads]]
+id = "wasm-helper"
+path = "payloads/portable/queue.wasm"
+purpose = "Provides a plugin-managed WebAssembly helper."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+[[settings]]
+id = "moderation-mode"
+name = "Moderation mode"
+description = "Controls how submitted links are admitted."
+scope = "installation"
+required = true
+[settings.schema]
+kind = "choice"
+[[settings.schema.choices]]
+id = "manual"
+name = "Manual review"
+
+[[settings.schema.choices]]
+id = "automatic"
+name = "Automatic review"
+
+[[settings]]
+id = "service-token"
+name = "Service token"
+description = "Connects the installation to the queue service."
+scope = "installation"
+required = true
+[settings.schema]
+maximumLength = 256
+kind = "secret"
+
+[[settings]]
+id = "collect-messages"
+name = "Collect messages"
+description = "Allows links from chat."
+scope = "channel"
+required = true
+[settings.schema]
+kind = "boolean"
+
+[[settings]]
+id = "chat-command"
+name = "Chat command"
+description = "Sets the link command."
+scope = "channel"
+required = true
+[settings.schema]
+maximumLength = 24
+kind = "text"
+
+[[settings]]
+id = "queue-note"
+name = "Queue note"
+description = "Shows a note with the channel queue."
+scope = "channel"
+required = false
+[settings.schema]
+maximumLength = 500
+kind = "multilineText"
+
+[[settings]]
+id = "maximum-links"
+name = "Maximum links"
+description = "Limits the number of queued links."
+scope = "channel"
+required = true
+[settings.schema]
+minimum = 1
+maximum = 100
+kind = "integer"
+
+[[settings]]
+id = "minimum-score"
+name = "Minimum score"
+description = "Sets the score required for publication."
+scope = "channel"
+required = true
+[settings.schema]
+minimum = 0.0
+maximum = 10.0
+decimalPlaces = 1
+kind = "number"
+
+[[settings]]
+id = "wait-between-links"
+name = "Wait between links"
+description = "Sets the delay before another link is accepted."
+scope = "channel"
+required = true
+[settings.schema]
+minimumSeconds = 0
+maximumSeconds = 3600
+kind = "duration"
+
+[[settings]]
+id = "publish-time"
+name = "Publish time"
+description = "Sets the channel publication time."
+scope = "channel"
+required = true
+[settings.schema]
+maximumLength = 32
+kind = "text"
+[[features]]
+id = "collection"
+name = "Link collection"
+description = "Collects links from chat."
+settings = ["moderation-mode", "service-token", "collect-messages", "chat-command", "queue-note", "maximum-links", "minimum-score", "wait-between-links"]
+automationTemplates = []
+[features.twitch]
+scopes = ["moderator:read:chatters"]
+eventSubTypes = ["channel.chat.message"]
+
+[[features]]
+id = "publishing"
+name = "Scheduled publishing"
+description = "Publishes approved links on a schedule."
+settings = ["publish-time"]
+automationTemplates = ["publish-links"]
+[features.twitch]
+scopes = []
+eventSubTypes = []
+[[hostModules]]
+id = "chat"
+minimumVersion = 1
+maximumVersion = 1
+[[migrations]]
+id = "settings-v1-v2"
+fromVersion = "1.0.0"
+toVersion = "1.2.0"
+module = "migrations"
+entryPoint = "migrate_settings"
+[[automationDefinitions]]
+id = "queued-link"
+featureId = "publishing"
+kind = "source"
+name = "Queued link"
+description = "Provides the next approved link."
+module = "events"
+entryPoint = "next_link"
+inputs = []
+[[automationDefinitions.outputs]]
+id = "link"
+name = "Link"
+valueKind = "string"
+required = true
+
+[[automationDefinitions]]
+id = "publish-link"
+featureId = "publishing"
+kind = "action"
+name = "Publish link"
+description = "Publishes one approved link."
+module = "events"
+entryPoint = "publish_link"
+outputs = []
+[[automationDefinitions.inputs]]
+id = "link"
+name = "Link"
+valueKind = "string"
+required = true
+[[automationTemplates]]
+id = "publish-links"
+featureId = "publishing"
+name = "Publish approved links"
+[[automationTemplates.nodes]]
+id = "queued"
+definitionId = "queued-link"
+configuration = { kind = "map", properties = [] }
+
+[[automationTemplates.nodes]]
+id = "publish"
+definitionId = "publish-link"
+configuration = { kind = "map", properties = [] }
+[[automationTemplates.edges]]
+fromNode = "queued"
+fromOutput = "link"
+toNode = "publish"
+toInput = "link"
+[[generatedPages]]
+id = "queue-management"
+featureId = "collection"
+route = "queue-management"
+title = "Queue management"
+module = "pages"
+renderEntryPoint = "render_queue"
+[[embeddedPages]]
+id = "queue-preview"
+featureId = "collection"
+route = "queue-preview"
+title = "Queue preview"
+documentAsset = "queue-document"
+assets = ["queue-document", "queue-script", "queue-icon"]
+messageOrigins = ["https://plugin.example/"]

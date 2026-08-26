@@ -74,8 +74,8 @@ public sealed class PluginAutomationExecutionTests
 
     private static ValidatedPluginManifest Manifest()
     {
-        var accepted = PluginManifestJson.Validate(
-            PluginContractFixtures.CompleteManifestJson(),
+        var accepted = PluginManifestToml.Validate(
+            PluginContractFixtures.CompleteManifestToml(),
             PluginContractFixtures.CompatibleHost()
         );
         var manifest = ((PluginManifestValidationOutcome.Accepted)accepted).Manifest.Manifest;

@@ -113,8 +113,8 @@ public sealed class PluginAutomationSourceAdmissionTests
 
     private static ValidatedPluginManifest ManifestWithSourceCommand()
     {
-        var accepted = PluginManifestJson.Validate(
-            PluginContractFixtures.CompleteManifestJson(),
+        var accepted = PluginManifestToml.Validate(
+            PluginContractFixtures.CompleteManifestToml(),
             PluginContractFixtures.CompatibleHost()
         );
         var manifest = ((PluginManifestValidationOutcome.Accepted)accepted).Manifest;

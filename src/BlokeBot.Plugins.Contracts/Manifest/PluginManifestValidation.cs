@@ -3,7 +3,7 @@ namespace BlokeBot.Plugins.Contracts;
 public enum PluginManifestErrorCode
 {
     ManifestTooLarge,
-    MalformedJson,
+    MalformedToml,
     InvalidText,
     InvalidCompatibilityRange,
     TooManyDeclarations,

@@ -1,0 +1,32 @@
+manifestVersion = 1
+id = "examples.update-failure"
+name = "Update failure fixture"
+description = "Demonstrates a typed migration failure."
+entryModule = "main"
+assets = []
+payloads = []
+settings = []
+features = []
+hostModules = []
+automationDefinitions = []
+automationTemplates = []
+generatedPages = []
+embeddedPages = []
+[release]
+declaredVersion = "2.0.0"
+tag = "examples-update-failure-v2"
+[compatibility]
+minimumApiVersion = 1
+maximumApiVersion = 1
+minimumBlokeBotVersion = "0.13.0"
+maximumBlokeBotVersionExclusive = "0.14.0"
+luaVersion = "lua54"
+[[luaModules]]
+id = "main"
+path = "lua/main.lua"
+[[migrations]]
+id = "breaking-update"
+fromVersion = "1.0.0"
+toVersion = "2.0.0"
+module = "main"
+entryPoint = "migrate"

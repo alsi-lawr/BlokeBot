@@ -2,7 +2,7 @@ namespace BlokeBot.Plugins.Contracts;
 
 public static class PluginPackage
 {
-    public const string ManifestPath = "blokebot.plugin.json";
+    public const string ManifestPath = "plugin.toml";
 }
 
 public abstract record PluginPackageEntry

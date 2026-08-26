@@ -15,12 +15,12 @@ and host API contracts. KeraLua is preferred, but an engine name does not bypass
 ## Package identity
 
 A plugin has one stable plugin ID. A selected installation records the plugin's declared semantic
-version and one mutable Git tag. A tag must not be a commit hash. Manifests, catalogue records, and
+version and one mutable Git tag. A tag must not be a commit hash. TOML manifests, catalogue records, and
 installation records do not have a commit-SHA identity field.
 
 ## Package content
 
-The canonical package contains `blokebot.plugin.json`, declared `.lua` source modules, and any
+The canonical package contains `plugin.toml`, declared `.lua` source modules, and any
 marketplace-reviewed declared payloads. Payloads can include browser or media assets, native files,
 .NET assemblies, WebAssembly, and other plugin-managed files. Every payload declares its path,
 purpose, maximum size, and explicit supported BlokeBot release RIDs. The validator enforces target,
@@ -42,7 +42,7 @@ call and coroutine IDs. When cancellation wins, the caller stops waiting and a l
 admitted or resumed. Provider cooperation can be requested, but an external effect that already
 occurred is not rolled back.
 
-Manifests declare requirements and descriptors only. They do not register live features, discover
+`plugin.toml` declares requirements and descriptors only. It does not register live features, discover
 Razor components, run Lua, fetch marketplace archives, manage workers, or change lifecycle state.
 
 ## Author tools
@@ -58,8 +58,8 @@ blokebot-plugin test ./my-plugin
 blokebot-plugin generate-sdk ./author-kit
 ```
 
-`validate` checks every supported runtime identifier. `test` repeats validation and executes
-scenarios through the current runtime's worker without installing into or joining production
+`validate` checks every supported runtime identifier. Optional package-local `tests.toml` metadata defines author-harness scenarios and is not required by normal package validation. `test` repeats validation and executes
+those scenarios through the current runtime's worker without installing into or joining production
 inventory, or contacting Twitch or third parties. `generate-sdk` writes the canonical Lua stub and
 generated author reference beneath the selected output directory.
 

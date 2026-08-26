@@ -1,9 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
 [JsonConverter(typeof(PluginApiVersionJsonConverter))]
+[TomlConverter(typeof(PluginApiVersionTomlConverter))]
 public sealed record PluginApiVersion : IComparable<PluginApiVersion>
 {
     private PluginApiVersion(int value) => Value = value;

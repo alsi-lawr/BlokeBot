@@ -43,9 +43,9 @@ public sealed class PluginAutomationRemovalTests
         var automations = new PluginAutomationCatalogRegistry();
         var declarations = new PluginFeatureDeclarationRegistry(automations: automations);
         var snapshots = new PluginFeatureSnapshotRegistry(automations: automations);
-        var manifest = PluginManifestJson
+        var manifest = PluginManifestToml
             .Validate(
-                PluginContractFixtures.CompleteManifestJson(),
+                PluginContractFixtures.CompleteManifestToml(),
                 PluginContractFixtures.CompatibleHost()
             )
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()

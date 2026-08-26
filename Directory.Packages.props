@@ -34,5 +34,6 @@
     <PackageVersion Include="Spectre.Console.Cli" Version="0.55.0" />
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageVersion Include="TUnit" Version="1.58.0" />
+    <PackageVersion Include="Tomlyn" Version="2.10.1" />
   </ItemGroup>
 </Project>

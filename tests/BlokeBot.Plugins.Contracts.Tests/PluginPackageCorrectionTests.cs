@@ -6,19 +6,19 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginPackageCorrectionTests
 {
     [Test]
-    public void DuplicateJsonProperties_AreRejectedAtCanonicalIngress()
+    public void DuplicateTomlKeys_AreRejectedAtCanonicalIngress()
     {
         var duplicateTag = PluginContractFixtures.ManifestReplacing(
-            "\"tag\": \"community-link-queue\"",
-            "\"tag\": \"community-link-queue\", \"tag\": \"replacement-tag\""
+            "tag = \"community-link-queue\"",
+            "tag = \"community-link-queue\"\ntag = \"replacement-tag\""
         );
         var duplicateIdentity = PluginContractFixtures.ManifestReplacing(
-            "\"id\": \"community.link-queue\"",
-            "\"id\": \"community.link-queue\", \"id\": \"community.other\""
+            "id = \"community.link-queue\"",
+            "id = \"community.link-queue\"\nid = \"community.other\""
         );
 
-        ManifestErrorCodes(duplicateTag).ShouldContain(PluginManifestErrorCode.MalformedJson);
-        ManifestErrorCodes(duplicateIdentity).ShouldContain(PluginManifestErrorCode.MalformedJson);
+        ManifestErrorCodes(duplicateTag).ShouldContain(PluginManifestErrorCode.MalformedToml);
+        ManifestErrorCodes(duplicateIdentity).ShouldContain(PluginManifestErrorCode.MalformedToml);
     }
 
     [Test]
@@ -40,27 +40,24 @@ public sealed class PluginPackageCorrectionTests
     public void MigrationTransitions_IgnoreBuildMetadataForDuplicateRoutes()
     {
         var releaseWithMetadata = PluginContractFixtures.ManifestReplacing(
-            "\"declaredVersion\": \"1.2.0\"",
-            "\"declaredVersion\": \"1.2.0+package.7\""
+            "declaredVersion = \"1.2.0\"",
+            "declaredVersion = \"1.2.0+package.7\""
         );
         var duplicateTransition = PluginContractFixtures.ManifestReplacing(
-            "\"entryPoint\": \"migrate_settings\"\n    }\n  ],\n  \"automationDefinitions\"",
+            "entryPoint = \"migrate_settings\"\n[[automationDefinitions]]",
             """
-            "entryPoint": "migrate_settings"
-                },
-                {
-                  "id": "settings-v1-v2-build",
-                  "fromVersion": "1.0.0+route.2",
-                  "toVersion": "1.2.0+route.2",
-                  "module": "migrations",
-                  "entryPoint": "migrate_settings_build"
-                }
-              ],
-              "automationDefinitions"
+            entryPoint = "migrate_settings"
+            [[migrations]]
+            id = "settings-v1-v2-build"
+            fromVersion = "1.0.0+route.2"
+            toVersion = "1.2.0+route.2"
+            module = "migrations"
+            entryPoint = "migrate_settings_build"
+            [[automationDefinitions]]
             """
         );
 
-        var acceptedRelease = PluginManifestJson
+        var acceptedRelease = PluginManifestToml
             .Validate(releaseWithMetadata, PluginContractFixtures.CompatibleHost())
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
         acceptedRelease.Manifest.Manifest.Release.DeclaredVersion.Value.ShouldBe("1.2.0+package.7");
@@ -72,7 +69,7 @@ public sealed class PluginPackageCorrectionTests
     }
 
     private static IReadOnlyList<PluginManifestErrorCode> ManifestErrorCodes(byte[] manifest) =>
-        PluginManifestJson
+        PluginManifestToml
             .Validate(manifest, PluginContractFixtures.CompatibleHost())
             .ShouldBeOfType<PluginManifestValidationOutcome.Rejected>()
             .Errors.Select(error => error.Code)

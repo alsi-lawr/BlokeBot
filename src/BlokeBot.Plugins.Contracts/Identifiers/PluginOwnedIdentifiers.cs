@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginId>))]
 public sealed record PluginId : PluginContractIdentifier, IPluginContractIdentifier<PluginId>
 {
     private PluginId(string value)
@@ -17,6 +19,7 @@ public sealed record PluginId : PluginContractIdentifier, IPluginContractIdentif
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginSettingId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginSettingId>))]
 public sealed record PluginSettingId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginSettingId>
@@ -33,6 +36,7 @@ public sealed record PluginSettingId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginSettingChoiceId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginSettingChoiceId>))]
 public sealed record PluginSettingChoiceId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginSettingChoiceId>
@@ -49,6 +53,7 @@ public sealed record PluginSettingChoiceId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginFeatureId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginFeatureId>))]
 public sealed record PluginFeatureId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginFeatureId>
@@ -65,6 +70,7 @@ public sealed record PluginFeatureId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginEventHandlerId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginEventHandlerId>))]
 public sealed record PluginEventHandlerId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginEventHandlerId>
@@ -81,6 +87,7 @@ public sealed record PluginEventHandlerId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginScheduleHandlerId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginScheduleHandlerId>))]
 public sealed record PluginScheduleHandlerId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginScheduleHandlerId>
@@ -97,6 +104,7 @@ public sealed record PluginScheduleHandlerId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginWebhookId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginWebhookId>))]
 public sealed record PluginWebhookId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginWebhookId>
@@ -113,6 +121,7 @@ public sealed record PluginWebhookId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginActionId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginActionId>))]
 public sealed record PluginActionId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginActionId>
@@ -129,6 +138,7 @@ public sealed record PluginActionId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginMigrationId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginMigrationId>))]
 public sealed record PluginMigrationId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginMigrationId>
@@ -145,6 +155,7 @@ public sealed record PluginMigrationId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginLuaModuleId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginLuaModuleId>))]
 public sealed record PluginLuaModuleId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginLuaModuleId>
@@ -161,6 +172,7 @@ public sealed record PluginLuaModuleId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginAutomationDefinitionId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginAutomationDefinitionId>))]
 public sealed record PluginAutomationDefinitionId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginAutomationDefinitionId>
@@ -177,6 +189,7 @@ public sealed record PluginAutomationDefinitionId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginAutomationTemplateId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginAutomationTemplateId>))]
 public sealed record PluginAutomationTemplateId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginAutomationTemplateId>
@@ -193,6 +206,7 @@ public sealed record PluginAutomationTemplateId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginTemplateNodeId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginTemplateNodeId>))]
 public sealed record PluginTemplateNodeId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginTemplateNodeId>
@@ -209,6 +223,7 @@ public sealed record PluginTemplateNodeId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginPageId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginPageId>))]
 public sealed record PluginPageId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginPageId>
@@ -225,6 +240,7 @@ public sealed record PluginPageId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginAssetId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginAssetId>))]
 public sealed record PluginAssetId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginAssetId>
@@ -241,6 +257,7 @@ public sealed record PluginAssetId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginPayloadId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginPayloadId>))]
 public sealed record PluginPayloadId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginPayloadId>
@@ -257,6 +274,7 @@ public sealed record PluginPayloadId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginAutomationFieldId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginAutomationFieldId>))]
 public sealed record PluginAutomationFieldId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginAutomationFieldId>

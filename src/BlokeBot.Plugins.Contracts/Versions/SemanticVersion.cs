@@ -1,10 +1,12 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
 [JsonConverter(typeof(SemanticVersionJsonConverter))]
+[TomlConverter(typeof(SemanticVersionTomlConverter))]
 public sealed record SemanticVersion : IComparable<SemanticVersion>
 {
     private SemanticVersion(

@@ -5,9 +5,9 @@ namespace BlokeBot.Plugins.Contracts.Testing;
 public static class PluginContractFixtures
 {
     private const string _manifestResource =
-        "BlokeBot.Plugins.Contracts.Testing.Fixtures.complete-valid-manifest.json";
+        "BlokeBot.Plugins.Contracts.Testing.Fixtures.complete-valid-manifest.toml";
 
-    public static byte[] CompleteManifestJson()
+    public static byte[] CompleteManifestToml()
     {
         using var stream =
             typeof(PluginContractFixtures).Assembly.GetManifestResourceStream(_manifestResource)
@@ -49,7 +49,7 @@ public static class PluginContractFixtures
     {
         var lua = Encoding.UTF8.GetBytes("return {}\n");
         return Array.AsReadOnly<PluginPackageEntry>([
-            new PluginPackageEntry.File(PluginPackage.ManifestPath, CompleteManifestJson()),
+            new PluginPackageEntry.File(PluginPackage.ManifestPath, CompleteManifestToml()),
             new PluginPackageEntry.File("lua/main.lua", lua),
             new PluginPackageEntry.File(
                 "lua/events.lua",
@@ -81,7 +81,7 @@ public static class PluginContractFixtures
     public static byte[] ManifestReplacing(string oldValue, string newValue) =>
         Encoding.UTF8.GetBytes(
             Encoding
-                .UTF8.GetString(CompleteManifestJson())
+                .UTF8.GetString(CompleteManifestToml())
                 .Replace(oldValue, newValue, StringComparison.Ordinal)
         );
 

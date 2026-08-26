@@ -71,53 +71,52 @@ public sealed class PluginHarnessCliTests
     {
         _ = Directory.CreateDirectory(Path.Combine(root, "lua"));
         await File.WriteAllTextAsync(
-            Path.Combine(root, "blokebot.example.json"),
+            Path.Combine(root, "tests.toml"),
             """
-            {
-              "name": "arbitrary-author-source",
-              "scenarios": [{
-                "name": "round-trip",
-                "workerMode": "admitted",
-                "invocationKind": "command",
-                "module": "main",
-                "operation": "run",
-                "expectation": "returned"
-              }]
-            }
+            name = "arbitrary-author-source"
+
+            [[scenarios]]
+            name = "round-trip"
+            workerMode = "admitted"
+            invocationKind = "command"
+            module = "main"
+            operation = "run"
+            expectation = "returned"
             """
         );
         await File.WriteAllTextAsync(
-            Path.Combine(root, "blokebot.plugin.json"),
+            Path.Combine(root, "plugin.toml"),
             $$"""
-            {
-              "manifestVersion": 1,
-              "id": "examples.arbitrary-source",
-              "name": "Arbitrary author source",
-              "description": "Exercises an author-selected directory.",
-              "release": {
-                "declaredVersion": "1.0.0",
-                "tag": "examples-arbitrary-source-v1"
-              },
-              "compatibility": {
-                "minimumApiVersion": 1,
-                "maximumApiVersion": 1,
-                "minimumBlokeBotVersion": "0.13.0",
-                "maximumBlokeBotVersionExclusive": "0.14.0",
-                "luaVersion": "lua54"
-              },
-              "entryModule": "main",
-              "luaModules": [{ "id": "main", "path": "{{declaredPath}}" }],
-              "assets": [],
-              "payloads": [],
-              "settings": [],
-              "features": [],
-              "hostModules": [],
-              "migrations": [],
-              "automationDefinitions": [],
-              "automationTemplates": [],
-              "generatedPages": [],
-              "embeddedPages": []
-            }
+            manifestVersion = 1
+            id = "examples.arbitrary-source"
+            name = "Arbitrary author source"
+            description = "Exercises an author-selected directory."
+            entryModule = "main"
+            assets = []
+            payloads = []
+            settings = []
+            features = []
+            hostModules = []
+            migrations = []
+            automationDefinitions = []
+            automationTemplates = []
+            generatedPages = []
+            embeddedPages = []
+
+            [release]
+            declaredVersion = "1.0.0"
+            tag = "examples-arbitrary-source-v1"
+
+            [compatibility]
+            minimumApiVersion = 1
+            maximumApiVersion = 1
+            minimumBlokeBotVersion = "0.13.0"
+            maximumBlokeBotVersionExclusive = "0.14.0"
+            luaVersion = "lua54"
+
+            [[luaModules]]
+            id = "main"
+            path = "{{declaredPath}}"
             """
         );
         await File.WriteAllTextAsync(

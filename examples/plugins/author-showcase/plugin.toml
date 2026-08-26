@@ -1,0 +1,248 @@
+manifestVersion = 1
+id = "examples.author-showcase"
+name = "Author showcase"
+description = "Exercises supported plugin author contracts without external services."
+entryModule = "main"
+[release]
+declaredVersion = "1.1.0"
+tag = "examples-author-showcase-v1"
+[compatibility]
+minimumApiVersion = 1
+maximumApiVersion = 1
+minimumBlokeBotVersion = "0.13.0"
+maximumBlokeBotVersionExclusive = "0.14.0"
+luaVersion = "lua54"
+[[luaModules]]
+id = "main"
+path = "lua/main.lua"
+[[assets]]
+id = "showcase-document"
+path = "web/index.html"
+kind = "browser"
+mediaType = "text/html"
+purpose = "Provides the embedded showcase page."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[assets]]
+id = "showcase-script"
+path = "web/app.js"
+kind = "browser"
+mediaType = "application/javascript"
+purpose = "Runs the embedded showcase page."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[assets]]
+id = "showcase-icon"
+path = "media/icon.webp"
+kind = "media"
+mediaType = "image/webp"
+purpose = "Displays the showcase icon."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+[[payloads]]
+id = "native-example"
+path = "payloads/example.so"
+purpose = "Demonstrates a declared plugin-managed native payload."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[payloads]]
+id = "dotnet-example"
+path = "payloads/Example.Helper.dll"
+purpose = "Demonstrates a declared plugin-managed .NET payload."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+
+[[payloads]]
+id = "wasm-example"
+path = "payloads/example.wasm"
+purpose = "Demonstrates a declared plugin-managed WebAssembly payload."
+runtimeIdentifiers = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+maximumBytes = 65536
+[[settings]]
+id = "enabled"
+name = "Enabled"
+description = "Controls the example feature."
+scope = "channel"
+required = true
+[settings.schema]
+kind = "boolean"
+
+[[settings]]
+id = "message"
+name = "Message"
+description = "Sets the example response."
+scope = "channel"
+required = true
+[settings.schema]
+maximumLength = 200
+kind = "text"
+
+[[settings]]
+id = "api-token"
+name = "API token"
+description = "Supplies a private example value."
+scope = "installation"
+required = false
+[settings.schema]
+maximumLength = 256
+kind = "secret"
+[[features]]
+id = "showcase"
+name = "Author showcase"
+description = "Exercises commands, events, schedules, pages, web actions, and automations."
+settings = ["enabled", "message", "api-token"]
+automationTemplates = ["showcase-flow"]
+[features.twitch]
+scopes = []
+eventSubTypes = []
+[features.dispatch]
+[[features.dispatch.commands]]
+route = "author-showcase"
+module = "main"
+operation = "host_calls"
+[features.dispatch.commands.requirements]
+twitchReady = false
+[[features.dispatch.events]]
+id = "host-change"
+module = "main"
+operation = "on_event"
+[features.dispatch.events.source]
+kind = "hostedChannelsChanged"
+type = "blokeBot"
+[features.dispatch.events.requirements]
+twitchReady = false
+[[features.dispatch.schedules]]
+id = "daily"
+module = "main"
+operation = "on_schedule"
+[features.dispatch.schedules.requirements]
+twitchReady = false
+[[features.dispatch.webhooks]]
+id = "incoming"
+module = "main"
+operation = "on_webhook"
+[features.dispatch.webhooks.requirements]
+twitchReady = false
+[features.dispatch.webhooks.authentication]
+kind = "public"
+[[features.dispatch.actions]]
+id = "refresh"
+module = "main"
+operation = "on_action"
+[features.dispatch.actions.requirements]
+twitchReady = false
+[[hostModules]]
+id = "diagnostics"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "responses"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "chat"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "overlay"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "points"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "twitch"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "schedules"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "storage"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "http"
+minimumVersion = 1
+maximumVersion = 1
+[[migrations]]
+id = "settings-v1"
+fromVersion = "1.0.0"
+toVersion = "1.1.0"
+module = "main"
+entryPoint = "migrate"
+[[automationDefinitions]]
+id = "example-source"
+featureId = "showcase"
+kind = "source"
+name = "Example source"
+description = "Produces an example value."
+module = "main"
+entryPoint = "automation_source"
+inputs = []
+[[automationDefinitions.outputs]]
+id = "message"
+name = "Message"
+valueKind = "string"
+required = true
+
+[[automationDefinitions]]
+id = "example-action"
+featureId = "showcase"
+kind = "action"
+name = "Example action"
+description = "Consumes an example value."
+module = "main"
+entryPoint = "automation_action"
+outputs = []
+[[automationDefinitions.inputs]]
+id = "message"
+name = "Message"
+valueKind = "string"
+required = true
+[[automationTemplates]]
+id = "showcase-flow"
+featureId = "showcase"
+name = "Showcase flow"
+[[automationTemplates.nodes]]
+id = "source"
+definitionId = "example-source"
+configuration = { kind = "map", properties = [] }
+
+[[automationTemplates.nodes]]
+id = "action"
+definitionId = "example-action"
+configuration = { kind = "map", properties = [] }
+[[automationTemplates.edges]]
+fromNode = "source"
+fromOutput = "message"
+toNode = "action"
+toInput = "message"
+[[generatedPages]]
+id = "showcase-generated"
+featureId = "showcase"
+route = "author-showcase"
+title = "Author showcase"
+module = "main"
+renderEntryPoint = "render_page"
+[[embeddedPages]]
+id = "showcase-embedded"
+featureId = "showcase"
+route = "author-showcase-embedded"
+title = "Author showcase embedded"
+documentAsset = "showcase-document"
+assets = ["showcase-document", "showcase-script", "showcase-icon"]
+messageOrigins = []

@@ -440,15 +440,15 @@ public sealed class PluginMarketplaceTests
                         PluginPackage.ManifestPath,
                         Encoding.UTF8.GetBytes(
                             Encoding
-                                .UTF8.GetString(PluginContractFixtures.CompleteManifestJson())
+                                .UTF8.GetString(PluginContractFixtures.CompleteManifestToml())
                                 .Replace(
-                                    "\"minimumBlokeBotVersion\": \"0.13.0\"",
-                                    "\"minimumBlokeBotVersion\": \"0.14.0\"",
+                                    "minimumBlokeBotVersion = \"0.13.0\"",
+                                    "minimumBlokeBotVersion = \"0.14.0\"",
                                     StringComparison.Ordinal
                                 )
                                 .Replace(
-                                    "\"maximumBlokeBotVersionExclusive\": \"0.14.0\"",
-                                    "\"maximumBlokeBotVersionExclusive\": \"0.15.0\"",
+                                    "maximumBlokeBotVersionExclusive = \"0.14.0\"",
+                                    "maximumBlokeBotVersionExclusive = \"0.15.0\"",
                                     StringComparison.Ordinal
                                 )
                         )
@@ -561,7 +561,7 @@ public sealed class PluginMarketplaceTests
             .Package;
         await File.WriteAllTextAsync(
             Path.Combine(selected.PreparedPackage.PackageRoot, PluginPackage.ManifestPath),
-            "{}"
+            "malformed = ["
         );
 
         _ = (

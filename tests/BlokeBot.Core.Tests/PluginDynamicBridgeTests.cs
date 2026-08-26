@@ -709,8 +709,8 @@ public sealed class PluginDynamicBridgeTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -748,8 +748,8 @@ public sealed class PluginDynamicBridgeTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -781,8 +781,8 @@ public sealed class PluginDynamicBridgeTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;

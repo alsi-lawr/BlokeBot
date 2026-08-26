@@ -1,0 +1,9 @@
+name = "update-failure"
+
+[[scenarios]]
+name = "migration-failure"
+workerMode = "staging"
+invocationKind = "migration"
+module = "main"
+operation = "migrate"
+expectation = "migrationFailed"

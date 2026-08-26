@@ -10,8 +10,8 @@ public sealed class PluginDispatchManifestProtocolTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -102,16 +102,11 @@ public sealed class PluginDispatchManifestProtocolTests
                 )
         ).Manifest;
 
-        var json = PluginManifestJson.Serialize(validated);
-        var jsonText = System.Text.Encoding.UTF8.GetString(json);
-        jsonText.ShouldContain("\"webhooks\"");
-        jsonText.ShouldContain("\"actions\"");
-        jsonText.ShouldNotContain("webhookDeclarations");
-        jsonText.ShouldNotContain("actionDeclarations");
+        var serialized = PluginManifestToml.Serialize(validated);
 
         var roundTripped = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(json, PluginContractFixtures.CompatibleHost())
+                PluginManifestToml.Validate(serialized, PluginContractFixtures.CompatibleHost())
         )
             .Manifest.Manifest.Features.Single(item => item.Id == feature.Id)
             .DispatchDeclarations;
@@ -136,8 +131,8 @@ public sealed class PluginDispatchManifestProtocolTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -184,8 +179,8 @@ public sealed class PluginDispatchManifestProtocolTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -277,8 +272,8 @@ public sealed class PluginDispatchManifestProtocolTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -332,9 +327,9 @@ public sealed class PluginDispatchManifestProtocolTests
         var manifest = validated
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
             .Manifest;
-        var roundTripped = PluginManifestJson
+        var roundTripped = PluginManifestToml
             .Validate(
-                PluginManifestJson.Serialize(manifest),
+                PluginManifestToml.Serialize(manifest),
                 PluginContractFixtures.CompatibleHost()
             )
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()

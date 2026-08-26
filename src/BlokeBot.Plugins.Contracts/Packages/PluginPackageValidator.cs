@@ -29,7 +29,7 @@ public static class PluginPackageValidator
             return new PluginPackageValidationOutcome.Rejected(errors.AsReadOnly());
         }
 
-        var manifestOutcome = PluginManifestJson.Validate(manifestFile.Content, target);
+        var manifestOutcome = PluginManifestToml.Validate(manifestFile.Content, target);
         if (manifestOutcome is PluginManifestValidationOutcome.Rejected rejected)
         {
             return new PluginPackageValidationOutcome.Rejected(

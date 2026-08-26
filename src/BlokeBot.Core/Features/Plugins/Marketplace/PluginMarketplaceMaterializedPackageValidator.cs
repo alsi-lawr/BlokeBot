@@ -47,7 +47,7 @@ internal static class PluginMarketplaceMaterializedPackageValidator
                 bufferSize: 64 * 1024,
                 FileOptions.Asynchronous | FileOptions.SequentialScan
             );
-            manifestOutcome = await PluginManifestJson.ValidateUnboundedAsync(
+            manifestOutcome = await PluginManifestToml.ValidateAsync(
                 manifest,
                 target,
                 cancellationToken

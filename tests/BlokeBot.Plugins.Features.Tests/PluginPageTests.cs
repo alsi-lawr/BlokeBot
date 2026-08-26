@@ -271,8 +271,8 @@ public sealed class PluginPageTests
     {
         var accepted = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;

@@ -2,8 +2,8 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using BlokeBot.Plugins.Runtime;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts.Testing;
 
@@ -104,7 +104,7 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine();
         foreach (var runtimeIdentifier in contract.RuntimeIdentifiers)
         {
-            _ = output.Append("- `").Append(JsonEnum(runtimeIdentifier)).AppendLine("`");
+            _ = output.Append("- `").Append(TomlEnum(runtimeIdentifier)).AppendLine("`");
         }
 
         _ = output.AppendLine();
@@ -119,7 +119,7 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("## Manifest shapes");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "JSON names and shapes below come from the canonical `PluginManifest` graph. JSON is camel-case, rejects unknown or duplicate members, and uses the listed discriminator values for variant records."
+            "TOML names and shapes below come from the canonical `PluginManifest` graph. TOML keys are camel-case, reject unknown or duplicate declarations, and use the listed discriminator values for variant records."
         );
         _ = output.AppendLine();
         foreach (var type in ManifestTypes())
@@ -132,14 +132,14 @@ internal static class PluginAuthorReferenceEmitter
                     .Append("Values: ")
                     .AppendJoin(
                         ", ",
-                        Enum.GetValues(type).Cast<object>().Select(value => $"`{JsonEnum(value)}`")
+                        Enum.GetValues(type).Cast<object>().Select(value => $"`{TomlEnum(value)}`")
                     )
                     .AppendLine();
                 _ = output.AppendLine();
                 continue;
             }
 
-            var alternatives = type.GetCustomAttributes<JsonDerivedTypeAttribute>().ToArray();
+            var alternatives = type.GetCustomAttributes<TomlDerivedTypeAttribute>().ToArray();
             if (alternatives.Length > 0)
             {
                 _ = output
@@ -147,7 +147,7 @@ internal static class PluginAuthorReferenceEmitter
                     .AppendJoin(
                         ", ",
                         alternatives.Select(alternative =>
-                            $"`{alternative.TypeDiscriminator}` -> `{DisplayName(alternative.DerivedType)}`"
+                            $"`{alternative.Discriminator}` -> `{DisplayName(alternative.DerivedType)}`"
                         )
                     )
                     .AppendLine();
@@ -155,13 +155,13 @@ internal static class PluginAuthorReferenceEmitter
                 continue;
             }
 
-            _ = output.AppendLine("| JSON member | Type |");
+            _ = output.AppendLine("| TOML key | Type |");
             _ = output.AppendLine("| --- | --- |");
             foreach (
                 var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
             )
             {
-                if (!IsManifestJsonProperty(property))
+                if (!IsManifestTomlProperty(property))
                 {
                     continue;
                 }
@@ -198,11 +198,11 @@ internal static class PluginAuthorReferenceEmitter
                     .Append("` | `")
                     .Append(operation.Id.Value)
                     .Append("` | ")
-                    .AppendJoin(", ", operation.PermittedContexts.Select(JsonEnum))
+                    .AppendJoin(", ", operation.PermittedContexts.Select(TomlEnum))
                     .Append(" | ")
-                    .AppendJoin(", ", operation.ArgumentKinds.Select(JsonEnum))
+                    .AppendJoin(", ", operation.ArgumentKinds.Select(TomlEnum))
                     .Append(" | ")
-                    .Append(JsonEnum(operation.ResultKind))
+                    .Append(TomlEnum(operation.ResultKind))
                     .AppendLine(" |");
             }
         }
@@ -275,7 +275,7 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("## Executable examples");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Published sources live under `examples/plugins`. The Contracts test harness packages each example from local files, validates it for its declared runtime targets, and executes every declared scenario through the supported worker protocol. The harness has deterministic host adapters and does not install into the production local-source directory, join production inventory, contact Twitch, or make third-party network requests."
+            "Published sources live under `examples/plugins`. Optional package-local `tests.toml` files define author-harness scenarios; they are not part of normal plugin package validation. The Contracts test harness packages each example from local files, validates it for its declared runtime targets, and executes every declared scenario through the supported worker protocol. The harness has deterministic host adapters and does not install into the production local-source directory, join production inventory, contact Twitch, or make third-party network requests."
         );
         _ = output.AppendLine();
     }
@@ -316,7 +316,7 @@ internal static class PluginAuthorReferenceEmitter
                 continue;
             }
 
-            foreach (var derived in type.GetCustomAttributes<JsonDerivedTypeAttribute>())
+            foreach (var derived in type.GetCustomAttributes<TomlDerivedTypeAttribute>())
             {
                 pending.Enqueue(derived.DerivedType);
             }
@@ -325,7 +325,7 @@ internal static class PluginAuthorReferenceEmitter
                 var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
             )
             {
-                if (IsManifestJsonProperty(property))
+                if (IsManifestTomlProperty(property))
                 {
                     pending.Enqueue(property.PropertyType);
                 }
@@ -372,7 +372,7 @@ internal static class PluginAuthorReferenceEmitter
         return
             Nullable.GetUnderlyingType(property.PropertyType) is null
             && state == NullabilityState.Nullable
-            ? $"{rendered} or null"
+            ? $"{rendered} (optional)"
             : rendered;
     }
 
@@ -381,7 +381,7 @@ internal static class PluginAuthorReferenceEmitter
         var nullable = Nullable.GetUnderlyingType(type);
         if (nullable is not null)
         {
-            return $"{MarkdownType(nullable)} or null";
+            return $"{MarkdownType(nullable)} (optional)";
         }
 
         if (type == typeof(string))
@@ -431,17 +431,22 @@ internal static class PluginAuthorReferenceEmitter
     private static string DisplayName(Type type) =>
         type.DeclaringType is null ? type.Name : $"{type.DeclaringType.Name}.{type.Name}";
 
-    private static bool IsManifestJsonProperty(PropertyInfo property) =>
+    private static bool IsManifestTomlProperty(PropertyInfo property) =>
         property.SetMethod is not null
-        && property.GetCustomAttribute<JsonIgnoreAttribute>() is null;
+        && property.GetCustomAttribute<TomlIgnoreAttribute>() is null;
 
-    private static string JsonEnum<TEnum>(TEnum value)
-        where TEnum : struct, Enum => JsonEnum((object)value);
+    private static string TomlEnum<TEnum>(TEnum value)
+        where TEnum : struct, Enum => TomlEnum((object)value);
 
-    private static string JsonEnum(object value)
-    {
-        var member = value.GetType().GetMember(value.ToString()!)[0];
-        return member.GetCustomAttribute<JsonStringEnumMemberNameAttribute>()?.Name
-            ?? JsonNamingPolicy.CamelCase.ConvertName(value.ToString()!);
-    }
+    private static string TomlEnum(object value) =>
+        value is PluginRuntimeIdentifier runtimeIdentifier
+            ? runtimeIdentifier switch
+            {
+                PluginRuntimeIdentifier.LinuxX64 => "linux-x64",
+                PluginRuntimeIdentifier.LinuxArm64 => "linux-arm64",
+                PluginRuntimeIdentifier.MacOsArm64 => "osx-arm64",
+                PluginRuntimeIdentifier.WindowsX64 => "win-x64",
+                PluginRuntimeIdentifier.WindowsArm64 => "win-arm64",
+            }
+            : JsonNamingPolicy.CamelCase.ConvertName(value.ToString()!);
 }

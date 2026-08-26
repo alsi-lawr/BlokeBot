@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
@@ -9,15 +9,15 @@ public enum PluginSettingScope
     Channel,
 }
 
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
-[JsonDerivedType(typeof(PluginSettingSchema.Boolean), "boolean")]
-[JsonDerivedType(typeof(PluginSettingSchema.Text), "text")]
-[JsonDerivedType(typeof(PluginSettingSchema.MultilineText), "multilineText")]
-[JsonDerivedType(typeof(PluginSettingSchema.Integer), "integer")]
-[JsonDerivedType(typeof(PluginSettingSchema.Number), "number")]
-[JsonDerivedType(typeof(PluginSettingSchema.Duration), "duration")]
-[JsonDerivedType(typeof(PluginSettingSchema.Choice), "choice")]
-[JsonDerivedType(typeof(PluginSettingSchema.Secret), "secret")]
+[TomlPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[TomlDerivedType(typeof(PluginSettingSchema.Boolean), "boolean")]
+[TomlDerivedType(typeof(PluginSettingSchema.Text), "text")]
+[TomlDerivedType(typeof(PluginSettingSchema.MultilineText), "multilineText")]
+[TomlDerivedType(typeof(PluginSettingSchema.Integer), "integer")]
+[TomlDerivedType(typeof(PluginSettingSchema.Number), "number")]
+[TomlDerivedType(typeof(PluginSettingSchema.Duration), "duration")]
+[TomlDerivedType(typeof(PluginSettingSchema.Choice), "choice")]
+[TomlDerivedType(typeof(PluginSettingSchema.Secret), "secret")]
 public abstract record PluginSettingSchema
 {
     private PluginSettingSchema() { }
@@ -169,6 +169,7 @@ public sealed record PluginFeatureDescriptor(
     PluginDispatchDeclarations? Dispatch = null
 )
 {
+    [TomlIgnore]
     public PluginDispatchDeclarations DispatchDeclarations =>
         Dispatch ?? PluginDispatchDeclarations.Empty;
 }

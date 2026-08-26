@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
+using Tomlyn.Serialization;
 
 namespace BlokeBot.Plugins.Contracts;
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginHostModuleId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginHostModuleId>))]
 public sealed record PluginHostModuleId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginHostModuleId>
@@ -19,6 +21,7 @@ public sealed record PluginHostModuleId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginHostOperationId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginHostOperationId>))]
 public sealed record PluginHostOperationId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginHostOperationId>
@@ -35,6 +38,7 @@ public sealed record PluginHostOperationId
 }
 
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginEngineId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginEngineId>))]
 public sealed record PluginEngineId
     : PluginContractIdentifier,
         IPluginContractIdentifier<PluginEngineId>

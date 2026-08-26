@@ -96,8 +96,8 @@ internal sealed class PluginFeatureTestContext : IAsyncDisposable
     {
         var validated = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;

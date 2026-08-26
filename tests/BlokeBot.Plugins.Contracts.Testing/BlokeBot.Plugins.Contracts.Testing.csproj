@@ -5,6 +5,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Fixtures\complete-valid-manifest.json" />
+    <EmbeddedResource Include="Fixtures\complete-valid-manifest.toml" />
   </ItemGroup>
 </Project>

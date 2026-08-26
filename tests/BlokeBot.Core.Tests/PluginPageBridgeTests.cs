@@ -4,7 +4,6 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
-using System.Text.Json.Nodes;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Hosts;
@@ -250,8 +249,8 @@ public sealed class PluginPageBridgeTests
     {
         var manifest = (
             (PluginManifestValidationOutcome.Accepted)
-                PluginManifestJson.Validate(
-                    PluginContractFixtures.CompleteManifestJson(),
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
                     PluginContractFixtures.CompatibleHost()
                 )
         ).Manifest;
@@ -402,31 +401,40 @@ public sealed class PluginPageBridgeTests
 
         private static byte[] ManifestWithSecondaryDocument()
         {
-            var manifest = JsonNode
-                .Parse(PluginContractFixtures.CompleteManifestJson())!
-                .AsObject();
-            manifest["assets"]!
-                .AsArray()
-                .Add(
-                    new JsonObject
+            var accepted = PluginManifestToml
+                .Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
+                    PluginContractFixtures.CompatibleHost()
+                )
+                .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+                .Manifest;
+            PluginAssetId.TryCreate("secondary-document", out var assetId).ShouldBeTrue();
+            var embeddedPage = accepted.Manifest.EmbeddedPages.ShouldHaveSingleItem();
+            var manifest = accepted.Manifest with
+            {
+                Assets = accepted.Manifest.Assets.Add(
+                    new(
+                        assetId,
+                        "web/secondary.html",
+                        PluginAssetKind.Browser,
+                        "text/html",
+                        "Provides an additional navigable queue document.",
+                        Enum.GetValues<PluginRuntimeIdentifier>().ToImmutableArray(),
+                        65_536
+                    )
+                ),
+                EmbeddedPages = accepted.Manifest.EmbeddedPages.Replace(
+                    embeddedPage,
+                    embeddedPage with
                     {
-                        ["id"] = "secondary-document",
-                        ["path"] = "web/secondary.html",
-                        ["kind"] = "browser",
-                        ["mediaType"] = "text/html",
-                        ["purpose"] = "Provides an additional navigable queue document.",
-                        ["runtimeIdentifiers"] = new JsonArray(
-                            "linux-x64",
-                            "linux-arm64",
-                            "osx-arm64",
-                            "win-x64",
-                            "win-arm64"
-                        ),
-                        ["maximumBytes"] = 65_536,
+                        Assets = embeddedPage.Assets.Add(assetId),
                     }
-                );
-            manifest["embeddedPages"]![0]!["assets"]!.AsArray().Add("secondary-document");
-            return Encoding.UTF8.GetBytes(manifest.ToJsonString());
+                ),
+            };
+            var validated = PluginManifestValidator
+                .Validate(manifest, PluginContractFixtures.CompatibleHost())
+                .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+            return PluginManifestToml.Serialize(validated.Manifest);
         }
 
         public async ValueTask DisposeAsync()
@@ -439,12 +447,12 @@ public sealed class PluginPageBridgeTests
 
     private sealed record PageSetup(ValidatedPluginManifest Manifest, PluginPageCatalog Catalogue)
     {
-        internal static PageSetup Create(byte[]? manifestJson = null)
+        internal static PageSetup Create(byte[]? manifestToml = null)
         {
             var manifest = (
                 (PluginManifestValidationOutcome.Accepted)
-                    PluginManifestJson.Validate(
-                        manifestJson ?? PluginContractFixtures.CompleteManifestJson(),
+                    PluginManifestToml.Validate(
+                        manifestToml ?? PluginContractFixtures.CompleteManifestToml(),
                         PluginContractFixtures.CompatibleHost()
                     )
             ).Manifest;

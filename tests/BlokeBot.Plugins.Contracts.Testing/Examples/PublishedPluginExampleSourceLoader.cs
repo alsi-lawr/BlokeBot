@@ -1,13 +1,13 @@
 using System.Collections.Immutable;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text;
+using Tomlyn;
+using Tomlyn.Model;
 
 namespace BlokeBot.Plugins.Contracts.Testing;
 
 public static class PublishedPluginExampleSourceLoader
 {
-    private const string _descriptorFile = "blokebot.example.json";
-    private static readonly JsonSerializerOptions _options = CreateOptions();
+    private const string _descriptorFile = "tests.toml";
 
     public static async ValueTask<IReadOnlyList<PublishedPluginExample>> LoadAsync(
         string sourceRoot,
@@ -39,24 +39,15 @@ public static class PublishedPluginExampleSourceLoader
         {
             cancellationToken.ThrowIfCancellationRequested();
             var directory = Path.GetDirectoryName(descriptorPath)!;
-            await using var descriptorStream = File.OpenRead(descriptorPath);
-            var descriptor =
-                await JsonSerializer.DeserializeAsync<SourceDescriptor>(
-                    descriptorStream,
-                    _options,
-                    cancellationToken
-                )
-                ?? throw new InvalidDataException(
-                    $"Example descriptor '{descriptorPath}' is empty."
-                );
-            if (string.IsNullOrWhiteSpace(descriptor.Name) || descriptor.Scenarios.IsDefaultOrEmpty)
+            var descriptor = await LoadDescriptorAsync(descriptorPath, cancellationToken);
+            if (string.IsNullOrWhiteSpace(descriptor.Name) || descriptor.Scenarios.Count == 0)
             {
                 throw new InvalidDataException(
                     $"Example descriptor '{descriptorPath}' has no name or scenarios."
                 );
             }
 
-            var scenarios = descriptor.Scenarios.Select(MapScenario).ToImmutableArray();
+            var scenarios = descriptor.Scenarios.ToImmutableArray();
             var package = await LoadPackageAsync(directory, cancellationToken);
             examples.Add(new(descriptor.Name, directory, package, scenarios));
         }
@@ -166,33 +157,144 @@ public static class PublishedPluginExampleSourceLoader
         || relativePath.Equals("README.md", StringComparison.OrdinalIgnoreCase)
         || Path.GetFileName(relativePath).Equals(".luarc.json", StringComparison.Ordinal);
 
-    private static PublishedPluginExampleScenario MapScenario(SourceScenario scenario) =>
-        !string.IsNullOrWhiteSpace(scenario.Name)
-        && PluginLuaModuleId.TryCreate(scenario.Module, out var module)
-        && PluginHostOperationId.TryCreate(scenario.Operation, out var operation)
-            ? new(
-                scenario.Name,
-                scenario.WorkerMode,
-                scenario.InvocationKind,
-                module,
-                operation,
-                scenario.Expectation
-            )
-            : throw new InvalidDataException("An example scenario has invalid identifiers.");
-
-    private static JsonSerializerOptions CreateOptions()
+    private static async ValueTask<SourceDescriptor> LoadDescriptorAsync(
+        string path,
+        CancellationToken cancellationToken
+    )
     {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        if (new FileInfo(path).Length > PluginContractLimits.MaximumManifestBytes)
         {
-            AllowDuplicateProperties = false,
+            throw new InvalidDataException($"Example descriptor '{path}' is too large.");
+        }
+
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        if (bytes.Length > PluginContractLimits.MaximumManifestBytes)
+        {
+            throw new InvalidDataException($"Example descriptor '{path}' is too large.");
+        }
+
+        string content;
+        try
+        {
+            content = new UTF8Encoding(false, true).GetString(bytes);
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidDataException(
+                $"Example descriptor '{path}' is not valid UTF-8.",
+                exception
+            );
+        }
+
+        var options = new TomlSerializerOptions
+        {
+            DuplicateKeyHandling = TomlDuplicateKeyHandling.Error,
+            MaxDepth = 8,
             PropertyNameCaseInsensitive = false,
-            RespectRequiredConstructorParameters = true,
-            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         };
-        options.Converters.Add(
-            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
-        );
-        return options;
+        TomlTable document;
+        try
+        {
+            document =
+                TomlSerializer.Deserialize<TomlTable>(content, options)
+                ?? throw new InvalidDataException($"Example descriptor '{path}' is empty.");
+        }
+        catch (TomlException exception)
+        {
+            throw new InvalidDataException(
+                $"Example descriptor '{path}' is malformed TOML.",
+                exception
+            );
+        }
+
+        return
+            !document.Keys.Any(key => key is not "name" and not "scenarios")
+            && document.TryGetValue("name", out var nameValue)
+            && nameValue is string name
+            && document.TryGetValue("scenarios", out var scenariosValue)
+            && scenariosValue is IEnumerable<object> scenarios
+            ? new(name, scenarios.Select(MapScenario).ToArray())
+            : throw new InvalidDataException($"Example descriptor '{path}' has an invalid shape.");
+    }
+
+    private static PublishedPluginExampleScenario MapScenario(object value) =>
+        value is TomlTable scenario
+        && !scenario.Keys.Any(key =>
+            key
+                is not "name"
+                    and not "workerMode"
+                    and not "invocationKind"
+                    and not "module"
+                    and not "operation"
+                    and not "expectation"
+        )
+        && RequiredString(scenario, "name", out var name)
+        && RequiredString(scenario, "workerMode", out var workerModeName)
+        && WorkerMode(workerModeName, out var workerMode)
+        && RequiredString(scenario, "invocationKind", out var invocationKindName)
+        && InvocationKind(invocationKindName, out var invocationKind)
+        && RequiredString(scenario, "module", out var moduleName)
+        && PluginLuaModuleId.TryCreate(moduleName, out var module)
+        && RequiredString(scenario, "operation", out var operationName)
+        && PluginHostOperationId.TryCreate(operationName, out var operation)
+        && RequiredString(scenario, "expectation", out var expectationName)
+        && Expectation(expectationName, out var expectation)
+            ? new(name, workerMode, invocationKind, module, operation, expectation)
+            : throw new InvalidDataException(
+                "An example scenario has an invalid TOML declaration."
+            );
+
+    private static bool RequiredString(TomlTable table, string name, out string value)
+    {
+        var valid = table.TryGetValue(name, out var candidate) && candidate is string;
+        value = valid ? (string)candidate! : string.Empty;
+        return valid && !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool WorkerMode(string name, out PluginWorkerMode mode)
+    {
+        var value = name switch
+        {
+            "admitted" => PluginWorkerMode.Admitted,
+            "staging" => PluginWorkerMode.Staging,
+            _ => (PluginWorkerMode?)null,
+        };
+        mode = value.GetValueOrDefault();
+        return value.HasValue;
+    }
+
+    private static bool InvocationKind(string name, out PublishedPluginExampleInvocationKind kind)
+    {
+        var value = name switch
+        {
+            "lifecycle" => PublishedPluginExampleInvocationKind.Lifecycle,
+            "migration" => PublishedPluginExampleInvocationKind.Migration,
+            "command" => PublishedPluginExampleInvocationKind.Command,
+            "event" => PublishedPluginExampleInvocationKind.Event,
+            "schedule" => PublishedPluginExampleInvocationKind.Schedule,
+            "hostAction" => PublishedPluginExampleInvocationKind.HostAction,
+            "storage" => PublishedPluginExampleInvocationKind.Storage,
+            "page" => PublishedPluginExampleInvocationKind.Page,
+            "automation" => PublishedPluginExampleInvocationKind.Automation,
+            _ => (PublishedPluginExampleInvocationKind?)null,
+        };
+        kind = value.GetValueOrDefault();
+        return value.HasValue;
+    }
+
+    private static bool Expectation(string name, out PublishedPluginExampleExpectation expectation)
+    {
+        var value = name switch
+        {
+            "returned" => PublishedPluginExampleExpectation.Returned,
+            "failed" => PublishedPluginExampleExpectation.Failed,
+            "cancelled" => PublishedPluginExampleExpectation.Cancelled,
+            "workerExited" => PublishedPluginExampleExpectation.WorkerExited,
+            "migrationFailed" => PublishedPluginExampleExpectation.MigrationFailed,
+            _ => (PublishedPluginExampleExpectation?)null,
+        };
+        expectation = value.GetValueOrDefault();
+        return value.HasValue;
     }
 
     private abstract record SourceTreeEntry(string RelativePath)
@@ -204,14 +306,8 @@ public static class PublishedPluginExampleSourceLoader
             : SourceTreeEntry(RelativePath);
     }
 
-    private sealed record SourceDescriptor(string Name, ImmutableArray<SourceScenario> Scenarios);
-
-    private sealed record SourceScenario(
+    private sealed record SourceDescriptor(
         string Name,
-        PluginWorkerMode WorkerMode,
-        PublishedPluginExampleInvocationKind InvocationKind,
-        string Module,
-        string Operation,
-        PublishedPluginExampleExpectation Expectation
+        IReadOnlyList<PublishedPluginExampleScenario> Scenarios
     );
 }

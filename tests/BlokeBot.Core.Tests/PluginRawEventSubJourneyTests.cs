@@ -235,9 +235,9 @@ public sealed class PluginRawEventSubJourneyTests
 
     private static ValidatedPluginManifest Manifest()
     {
-        var accepted = PluginManifestJson
+        var accepted = PluginManifestToml
             .Validate(
-                PluginContractFixtures.CompleteManifestJson(),
+                PluginContractFixtures.CompleteManifestToml(),
                 PluginContractFixtures.CompatibleHost()
             )
             .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
