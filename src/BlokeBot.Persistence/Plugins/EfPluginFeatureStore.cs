@@ -56,6 +56,22 @@ public sealed partial class EfPluginFeatureStore(
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var unavailableReason =
+            $"Plugin {pluginId.Value} was purged. Reinstall and enable a compatible version to restore this flow.";
+        _ = await db
+            .AutomationFlows.Where(flow =>
+                db.PluginAutomationInstantiations.Any(record =>
+                    record.PluginId == pluginId.Value && record.FlowId == flow.Id
+                )
+            )
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(static flow => flow.IsEnabled, false)
+                        .SetProperty(static flow => flow.UnavailableReason, unavailableReason)
+                        .SetProperty(static flow => flow.UpdatedAtUtc, DateTime.UtcNow),
+                cancellationToken
+            );
         _ = await db
             .PluginFeatureStates.Where(value => value.PluginId == pluginId.Value)
             .ExecuteDeleteAsync(cancellationToken);

@@ -101,10 +101,24 @@ internal sealed class PluginAutomationExecutionService(
                 }
                 return new AutomationPureNodeResult.Failed("plugin-output-invalid");
             }
-            var converted =
-                value is PluginValue.Nil && output.Nullability == AutomationPortNullability.Nullable
-                    ? new AutomationValue.Null(output.ValueType)
-                : AutomationStructuredValue.TryConvert(value, out var structured) ? structured
+            if (value is PluginValue.Nil)
+            {
+                if (output.Nullability == AutomationPortNullability.NonNullable)
+                {
+                    return new AutomationPureNodeResult.Failed("plugin-output-invalid");
+                }
+                outputs.Add(
+                    output.Id,
+                    new(
+                        new AutomationValue.Null(output.ValueType),
+                        provenance,
+                        ValueFreeDiagnostic: true
+                    )
+                );
+                continue;
+            }
+            var converted = AutomationStructuredValue.TryConvert(value, out var structured)
+                ? structured
                 : null;
             if (
                 converted is null
