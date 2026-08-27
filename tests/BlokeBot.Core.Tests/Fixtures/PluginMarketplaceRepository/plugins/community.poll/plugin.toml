@@ -1,37 +1,32 @@
 manifestVersion = 1
-id = "examples.update-failure"
-name = "Update failure fixture"
-description = "Demonstrates a typed migration failure."
+id = "community.poll"
+name = "Community poll"
+description = "Runs a bounded community poll."
 entryModule = "main"
 assets = []
 payloads = []
 settings = []
 features = []
 hostModules = []
+migrations = []
 automationDefinitions = []
 automationTemplates = []
 generatedPages = []
 embeddedPages = []
 [marketplace]
-author = "BlokeBot"
-tags = ["example", "migration"]
+author = "BlokeBot community"
+tags = ["poll", "chat"]
 mediaUrls = []
 [release]
-declaredVersion = "2.0.0"
-tag = "examples-update-failure-v2"
+declaredVersion = "1.0.0"
+tag = "community-poll"
 [compatibility]
 minimumApiVersion = 1
 maximumApiVersion = 1
 minimumBlokeBotVersion = "0.13.0"
 maximumBlokeBotVersionExclusive = "0.14.0"
 luaVersion = "lua54"
-supportedTargets = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
+supportedTargets = ["linux-x64"]
 [[luaModules]]
 id = "main"
 path = "lua/main.lua"
-[[migrations]]
-id = "breaking-update"
-fromVersion = "1.0.0"
-toVersion = "2.0.0"
-module = "main"
-entryPoint = "migrate"

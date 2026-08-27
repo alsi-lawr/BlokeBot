@@ -1,9 +1,9 @@
 using System.Text;
-using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Persistence.Plugins;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Contracts.Testing;
 using BlokeBot.Plugins.Features;
@@ -29,7 +29,7 @@ public sealed class ReferencePluginLifecycleSmokeTests
         if (string.IsNullOrWhiteSpace(packagePath))
         {
             throw new InvalidOperationException(
-                $"Set {_packagePathVariable} to the exact community-link-queue package directory."
+                $"Set {_packagePathVariable} to the exact community.link-queue package directory."
             );
         }
 
@@ -128,9 +128,6 @@ public sealed class ReferencePluginLifecycleSmokeTests
         internal static async Task<ReferenceLifecycleFixture> CreateAsync(string packagePath)
         {
             var fullPackagePath = Path.GetFullPath(packagePath);
-            var cataloguePath = Path.GetFullPath(
-                Path.Combine(fullPackagePath, "..", "..", "catalog.json")
-            );
             if (!File.Exists(Path.Combine(fullPackagePath, PluginPackage.ManifestPath)))
             {
                 throw new InvalidOperationException(
@@ -143,13 +140,6 @@ public sealed class ReferencePluginLifecycleSmokeTests
                     $"Reference package tests.toml was not found at '{fullPackagePath}'."
                 );
             }
-            if (!File.Exists(cataloguePath))
-            {
-                throw new InvalidOperationException(
-                    $"Reference catalogue was not found at '{cataloguePath}'."
-                );
-            }
-
             var loaded = await PublishedPluginExampleSourceLoader.LoadForTestsAsync(
                 fullPackagePath,
                 CancellationToken.None
@@ -168,7 +158,7 @@ public sealed class ReferencePluginLifecycleSmokeTests
                 accepted.Manifest.Manifest.Id,
                 accepted.Manifest.Manifest.Release
             );
-            AssertCatalogue(cataloguePath, accepted.Manifest.Manifest);
+            AssertRepositoryLayout(fullPackagePath, accepted.Manifest.Manifest);
 
             var root = Path.Combine(
                 Path.GetTempPath(),
@@ -234,7 +224,7 @@ public sealed class ReferencePluginLifecycleSmokeTests
                 var database = provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>();
                 var hosts = await SeedDatabaseAsync(
                     database,
-                    cataloguePath,
+                    fullPackagePath,
                     accepted.Manifest.Manifest
                 );
                 var runtime = provider.GetRequiredService<PluginRuntimeSnapshotRegistry>();
@@ -957,37 +947,18 @@ public sealed class ReferencePluginLifecycleSmokeTests
             return encoded.TrimEnd('=').Replace('+', '-').Replace('/', '_');
         }
 
-        private static void AssertCatalogue(string path, PluginManifest manifest)
+        private static void AssertRepositoryLayout(string packagePath, PluginManifest manifest)
         {
-            using var document = JsonDocument.Parse(File.ReadAllBytes(path));
-            var plugin = document
-                .RootElement.GetProperty("plugins")
-                .EnumerateArray()
-                .Single(candidate => candidate.GetProperty("id").GetString() == manifest.Id.Value);
-            plugin
-                .GetProperty("version")
-                .GetString()
-                .ShouldBe(manifest.Release.DeclaredVersion.Value);
-            plugin.GetProperty("tag").GetString().ShouldBe(manifest.Release.Tag.Value);
-            var source = plugin.GetProperty("source");
-            source
-                .GetProperty("repositoryUrl")
-                .GetString()
-                .ShouldBe("https://github.com/alsi-lawr/blokebot-plugins");
-            source.GetProperty("packagePath").GetString().ShouldBe("plugins/community-link-queue");
+            Path.GetFileName(packagePath).ShouldBe(manifest.Id.Value);
+            Path.GetFileName(Path.GetDirectoryName(packagePath)).ShouldBe("plugins");
         }
 
         private static async Task<(PluginHostId First, PluginHostId Second)> SeedDatabaseAsync(
             IDbContextFactory<BlokeBotDbContext> database,
-            string cataloguePath,
+            string packagePath,
             PluginManifest manifest
         )
         {
-            using var catalogue = JsonDocument.Parse(await File.ReadAllBytesAsync(cataloguePath));
-            var entry = catalogue
-                .RootElement.GetProperty("plugins")
-                .EnumerateArray()
-                .Single(candidate => candidate.GetProperty("id").GetString() == manifest.Id.Value);
             await using var db = await database.CreateDbContextAsync();
             _ = await db.Database.EnsureCreatedAsync();
             var first = new BotHost
@@ -1007,35 +978,38 @@ public sealed class ReferencePluginLifecycleSmokeTests
                 CreatedAtUtc = DateTime.UtcNow,
             };
             db.Hosts.AddRange(first, second);
-            _ = db.PluginMarketplaceCatalogState.Add(
-                new()
-                {
-                    Id = 1,
-                    SchemaVersion = catalogue.RootElement.GetProperty("schemaVersion").GetInt32(),
-                    FetchedAtUtc = DateTime.UtcNow,
-                    LastAttemptAtUtc = DateTime.UtcNow,
-                }
-            );
-            var source = entry.GetProperty("source");
-            var compatibility = entry.GetProperty("compatibility");
-            _ = db.PluginMarketplaceCatalogEntries.Add(
-                new()
-                {
-                    SnapshotId = 1,
-                    PluginId = manifest.Id.Value,
-                    DeclaredVersion = manifest.Release.DeclaredVersion.Value,
-                    MutableTag = manifest.Release.Tag.Value,
-                    Name = entry.GetProperty("name").GetString()!,
-                    Summary = entry.GetProperty("summary").GetString()!,
-                    Author = entry.GetProperty("author").GetString()!,
-                    RepositoryUrl = source.GetProperty("repositoryUrl").GetString()!,
-                    PackagePath = source.GetProperty("packagePath").GetString()!,
-                    CompatibilityBlokeBot = compatibility.GetProperty("blokeBot").GetString()!,
-                    CompatibilityPluginApi = compatibility.GetProperty("pluginApi").GetString()!,
-                    CompatibilityLua = compatibility.GetProperty("lua").GetString()!,
-                }
-            );
             _ = await db.SaveChangesAsync();
+            var repository = new PluginMarketplaceRepositorySnapshot([
+                new(
+                    "plugins",
+                    PluginMarketplaceRepositoryEntryKind.Directory,
+                    ReadOnlyMemory<byte>.Empty
+                ),
+                new(
+                    $"plugins/{manifest.Id.Value}",
+                    PluginMarketplaceRepositoryEntryKind.Directory,
+                    ReadOnlyMemory<byte>.Empty
+                ),
+                new(
+                    $"plugins/{manifest.Id.Value}/{PluginPackage.ManifestPath}",
+                    PluginMarketplaceRepositoryEntryKind.File,
+                    await File.ReadAllBytesAsync(
+                        Path.Combine(packagePath, PluginPackage.ManifestPath)
+                    )
+                ),
+            ]);
+            var entry = PluginMarketplaceRepositoryDiscovery
+                .Validate(repository)
+                .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Accepted>()
+                .Entries.ShouldHaveSingleItem();
+            entry.PluginId.ShouldBe(manifest.Id);
+            _ = await new EfPluginMarketplaceCatalogStore(database).ReplaceAsync(
+                new(1, DateTimeOffset.UtcNow, [entry]),
+                DateTimeOffset.UtcNow,
+                null,
+                null,
+                CancellationToken.None
+            );
             PluginHostId.TryCreate(first.Id, out var firstId).ShouldBeTrue();
             PluginHostId.TryCreate(second.Id, out var secondId).ShouldBeTrue();
             return (firstId, secondId);

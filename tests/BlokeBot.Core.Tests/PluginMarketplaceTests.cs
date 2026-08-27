@@ -1,7 +1,9 @@
+using System.Collections.Immutable;
 using System.Formats.Tar;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Plugins;
@@ -23,102 +25,213 @@ public sealed class PluginMarketplaceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 26, 10, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public void CatalogValidation_RequiresStrictV1CuratedMutableTagMetadata()
+    public void RepositoryDiscovery_ProjectsMultipleManifestsInDeterministicOrder()
     {
-        var accepted = PluginMarketplaceCatalogParser
-            .Validate(Catalog())
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Accepted>();
+        var repository = RepositoryFixture();
 
-        var entry = accepted.Entries.ShouldHaveSingleItem();
-        entry.PluginId.Value.ShouldBe("community.link-queue");
-        entry.Release.DeclaredVersion.Value.ShouldBe("1.2.0");
-        entry.Release.Tag.Value.ShouldBe("community-link-queue");
-        entry.MediaUrls.ShouldHaveSingleItem().Host.ShouldBe("cdn.example.test");
+        var accepted = PluginMarketplaceRepositoryDiscovery
+            .Validate(repository)
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Accepted>();
 
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Catalog(tag: "36697a9e3b436713d939f30d9007febb1e3e1eda"))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Rejected>();
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Catalog(repository: "https://github.com/someone/other"))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Accepted>();
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Catalog(repository: "https://gitlab.com/someone/other"))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Rejected>();
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Catalog(extra: "\"unexpected\":true,"))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Rejected>();
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Encoding.UTF8.GetBytes("{partial"))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Rejected>();
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Catalog(schemaVersion: 2))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Rejected>();
-        _ = PluginMarketplaceCatalogParser
-            .Validate(Catalog(blokeBot: "not-a-range"))
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Rejected>();
-        var padded = Catalog().Concat(new byte[2 * 1024 * 1024]).ToArray();
-        padded.AsSpan(Catalog().Length).Fill((byte)' ');
-        _ = PluginMarketplaceCatalogParser
-            .Validate(padded)
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Accepted>();
+        accepted
+            .Entries.Select(static entry => entry.PluginId.Value)
+            .ShouldBe(["community.link-queue", "community.poll"]);
+        var queue = accepted.Entries[0];
+        queue.Author.ShouldBe("BlokeBot community");
+        queue.Tags.ShouldBe(["queue", "chat"]);
+        queue.IconUrl.ShouldNotBeNull().Host.ShouldBe("images.example.test");
+        queue.MediaUrls.ShouldHaveSingleItem().Host.ShouldBe("media.example.test");
+        queue.RepositoryUrl.ShouldBe(new Uri("https://github.com/alsi-lawr/blokebot-plugins"));
+        queue.PackagePath.ShouldBe("plugins/community.link-queue");
+        queue.Release.Tag.Value.ShouldBe("community-link-queue");
     }
 
     [Test]
-    public async Task GitHubTransports_UseOnlyFixedRawCatalogAndSelectedMutableTagArchiveUrls()
+    public void RepositoryDiscovery_RejectsLayoutManifestAndTargetViolations()
     {
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(new([]))
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.InvalidLayout);
+
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(
+                new(
+                    Repository()
+                        .Entries.Where(entry => entry.Path != "plugins/community.link-queue")
+                        .ToImmutableArray()
+                )
+            )
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.InvalidLayout);
+
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(
+                Repository(
+                    new RepositoryPlugin(
+                        "community.first",
+                        Manifest("community.duplicate", "Duplicate", "duplicate-release")
+                    ),
+                    new RepositoryPlugin(
+                        "community.second",
+                        Manifest("community.duplicate", "Duplicate", "duplicate-release")
+                    )
+                )
+            )
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.DuplicatePlugin);
+
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(
+                Repository(
+                    new RepositoryPlugin(
+                        "community.wrong-directory",
+                        Manifest("community.actual-id", "Actual plugin", "actual-release")
+                    )
+                )
+            )
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.InvalidLayout);
+
+        var missingManifest = Repository()
+            .Entries.Add(
+                new(
+                    "plugins/community.missing",
+                    PluginMarketplaceRepositoryEntryKind.Directory,
+                    ReadOnlyMemory<byte>.Empty
+                )
+            );
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(new(missingManifest))
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.InvalidLayout);
+
+        var unsafeRepository = Repository()
+            .Entries.Add(
+                new(
+                    "plugins/community.link-queue/../escape",
+                    PluginMarketplaceRepositoryEntryKind.File,
+                    ReadOnlyMemory<byte>.Empty
+                )
+            );
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(new(unsafeRepository))
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.InvalidLayout);
+
+        var unsupportedTarget = ManifestReplacing(
+            Manifest(),
+            "supportedTargets = [\"linux-x64\", \"linux-arm64\", \"osx-arm64\", \"win-x64\", \"win-arm64\"]",
+            "supportedTargets = [\"linux-x64\"]"
+        );
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(Repository(new RepositoryPlugin("community.link-queue", unsupportedTarget)))
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplaceRepositoryFailureCode.InvalidManifest);
+    }
+
+    [Test]
+    public async Task GitHubTransports_UseFixedRepositoryTreeBlobsAndSelectedMutableTagArchive()
+    {
+        var manifest = Manifest();
+        var objectId = new string('a', 40);
         var handler = new RecordingHttpHandler(request =>
-            request.RequestUri == GitHubPluginMarketplaceCatalogTransport.CatalogUrl
+            request.RequestUri == GitHubPluginMarketplaceRepositoryTransport.TreeUrl
                 ? new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new ByteArrayContent(Catalog()),
+                    Content = new ByteArrayContent(TreeDocument(objectId, manifest.Length)),
                 }
-                : new HttpResponseMessage(HttpStatusCode.OK)
+            : request.RequestUri?.AbsoluteUri.EndsWith(objectId, StringComparison.Ordinal) == true
+                ? new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new ByteArrayContent([1, 2, 3]),
+                    Content = new ByteArrayContent(BlobDocument(manifest)),
                 }
+            : new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([1, 2, 3]),
+            }
         );
         var clients = new FixedHttpClientFactory(handler);
-        var catalog = new GitHubPluginMarketplaceCatalogTransport(clients);
-        _ = (
-            await catalog.DownloadAsync("\"previous\"", _now, CancellationToken.None)
-        ).ShouldBeOfType<PluginMarketplaceCatalogDownload.Delivered>();
+        var repository = new GitHubPluginMarketplaceRepositoryTransport(clients);
+        var delivered = (
+            await repository.DownloadAsync("\"previous\"", _now, CancellationToken.None)
+        ).ShouldBeOfType<PluginMarketplaceRepositoryDownload.Delivered>();
+        _ = PluginMarketplaceRepositoryDiscovery
+            .Validate(delivered.Repository)
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Accepted>();
         _ = PluginGitTag.TryCreate("release/v1.2.0", out var tag);
         var archives = new GitHubPluginMarketplaceArchiveTransport(clients);
         using var root = new TemporaryDirectory();
         var archivePath = Path.Combine(root.Path, "archive.tar.gz");
         _ = (
             await archives.DownloadAsync(
-                new Uri("https://github.com/community/blokebot-plugins"),
+                new Uri("https://github.com/alsi-lawr/blokebot-plugins"),
                 tag,
                 archivePath,
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginMarketplaceArchiveDownload.Delivered>();
-        (await File.ReadAllBytesAsync(archivePath)).ShouldBe([1, 2, 3]);
 
-        handler.Requests.Count.ShouldBe(2);
+        handler.Requests.ShouldBe([
+            "https://api.github.com/repos/alsi-lawr/blokebot-plugins/git/trees/master?recursive=1",
+            $"https://api.github.com/repos/alsi-lawr/blokebot-plugins/git/blobs/{objectId}",
+            "https://codeload.github.com/alsi-lawr/blokebot-plugins/tar.gz/refs/tags/release%2Fv1.2.0",
+        ]);
         handler.ETags[0].ShouldBe("\"previous\"");
         handler.ModifiedSince[0].ShouldBe(_now);
-        handler
-            .Requests[0]
-            .ShouldBe(
-                "https://raw.githubusercontent.com/alsi-lawr/blokebot-plugins/master/catalog.json"
-            );
-        handler
-            .Requests[1]
-            .ShouldBe(
-                "https://codeload.github.com/community/blokebot-plugins/tar.gz/refs/tags/release%2Fv1.2.0"
-            );
+        (await File.ReadAllBytesAsync(archivePath)).ShouldBe([1, 2, 3]);
     }
 
     [Test]
-    public async Task RefreshSnapshot_SearchIsLocalAndRetainsLastValidAcrossOutageAndRestart()
+    public async Task RepositoryTransport_PartialManifestDownloadRejectsTheWholeCandidate()
+    {
+        var firstManifest = Manifest();
+        var secondManifest = Manifest("community.poll", "Community poll", "poll-release");
+        var firstObjectId = new string('a', 40);
+        var secondObjectId = new string('b', 40);
+        var handler = new RecordingHttpHandler(request =>
+            request.RequestUri == GitHubPluginMarketplaceRepositoryTransport.TreeUrl
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(
+                        TreeDocument(
+                            firstObjectId,
+                            firstManifest.Length,
+                            secondObjectId,
+                            secondManifest.Length
+                        )
+                    ),
+                }
+            : request.RequestUri?.AbsoluteUri.EndsWith(firstObjectId, StringComparison.Ordinal)
+            == true
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(BlobDocument(firstManifest)),
+                }
+            : new HttpResponseMessage(HttpStatusCode.NotFound)
+        );
+
+        _ = (
+            await new GitHubPluginMarketplaceRepositoryTransport(
+                new FixedHttpClientFactory(handler)
+            ).DownloadAsync(null, null, CancellationToken.None)
+        ).ShouldBeOfType<PluginMarketplaceRepositoryDownload.Failed>();
+        handler.Requests.Count.ShouldBe(3);
+    }
+
+    [Test]
+    public async Task RefreshSnapshot_SearchIsLocalAndRetainsLastValidAcrossInvalidAndOfflineRefreshes()
     {
         using var root = new TemporaryDirectory();
         var clock = new ManualTimeProvider(_now);
-        var transport = new QueueCatalogTransport(
-            new PluginMarketplaceCatalogDownload.Delivered(Catalog(), null, null),
-            new PluginMarketplaceCatalogDownload.Failed()
+        var invalidManifest = Repository(
+            new RepositoryPlugin("community.link-queue", Manifest()),
+            new RepositoryPlugin("community.poll", Encoding.UTF8.GetBytes("malformed = ["))
+        );
+        var transport = new QueueRepositoryTransport(
+            new PluginMarketplaceRepositoryDownload.Delivered(Repository(), null, null),
+            new PluginMarketplaceRepositoryDownload.Delivered(invalidManifest, null, null),
+            new PluginMarketplaceRepositoryDownload.Failed()
         );
         var database = await CreateDatabaseAsync(root.Path);
         using var registry = new PluginMarketplaceCatalogRegistry(
@@ -131,12 +244,20 @@ public sealed class PluginMarketplaceTests
         var service = CreateCatalogService(registry, clock);
 
         var available = service
-            .Search(Admin(), "queue")
+            .Search(Admin(), "BlokeBot community")
             .ShouldBeOfType<PluginMarketplaceSearchOutcome.Available>();
-        available.Entries.ShouldHaveSingleItem().Name.ShouldBe("Link queue");
+        available.Entries.ShouldHaveSingleItem().Name.ShouldBe("Community link queue");
         transport.Calls.ShouldBe(1);
 
-        clock.Advance(TimeSpan.FromHours(2));
+        clock.Advance(TimeSpan.FromHours(1));
+        await registry.RefreshAsync(CancellationToken.None);
+        var invalid = service
+            .Search(Admin(), "chat")
+            .ShouldBeOfType<PluginMarketplaceSearchOutcome.Available>();
+        invalid.Entries.ShouldHaveSingleItem().Name.ShouldBe("Community link queue");
+        invalid.RefreshFailure.ShouldBe(PluginMarketplaceRefreshFailureCode.InvalidManifest);
+
+        clock.Advance(TimeSpan.FromHours(1));
         await registry.RefreshAsync(CancellationToken.None);
         var stale = service
             .Search(Admin(), null)
@@ -144,21 +265,32 @@ public sealed class PluginMarketplaceTests
         stale.Age.ShouldBe(TimeSpan.FromHours(2));
         stale.RefreshFailure.ShouldBe(PluginMarketplaceRefreshFailureCode.DownloadFailed);
 
-        var restartTransport = new QueueCatalogTransport();
+        var restartTransport = new QueueRepositoryTransport();
         using var restarted = new PluginMarketplaceCatalogRegistry(
             new EfPluginMarketplaceCatalogStore(new TestDbContextFactory(database.Options)),
             restartTransport,
             clock
         );
         await restarted.InitializeAsync(CancellationToken.None);
-        _ = CreateCatalogService(restarted, clock)
+        var restartedAvailable = CreateCatalogService(restarted, clock)
             .Search(Admin(), null)
             .ShouldBeOfType<PluginMarketplaceSearchOutcome.Available>();
+        var restartedEntry = restartedAvailable.Entries.ShouldHaveSingleItem();
+        restartedEntry.Author.ShouldBe("BlokeBot community");
+        restartedEntry.MediaUrls.ShouldHaveSingleItem().Host.ShouldBe("media.example.test");
+        restartedEntry.Compatibility.SupportedTargets.ShouldBe([
+            PluginRuntimeIdentifier.LinuxX64,
+            PluginRuntimeIdentifier.LinuxArm64,
+            PluginRuntimeIdentifier.MacOsArm64,
+            PluginRuntimeIdentifier.WindowsX64,
+            PluginRuntimeIdentifier.WindowsArm64,
+        ]);
         restartTransport.Calls.ShouldBe(0);
 
         await using var context = database.CreateDbContext();
         (await context.PluginMarketplaceCatalogEntries.CountAsync()).ShouldBe(1);
         (await context.Set<PluginMarketplaceCatalogTagRecord>().CountAsync()).ShouldBe(2);
+        (await context.Set<PluginMarketplaceCatalogTargetRecord>().CountAsync()).ShouldBe(5);
         var columns = await context
             .Database.SqlQueryRaw<string>(
                 "SELECT name AS Value FROM pragma_table_info('plugin_marketplace_catalog_entries')"
@@ -174,7 +306,7 @@ public sealed class PluginMarketplaceTests
 
     [Test]
     public Task ConditionalRefresh_ETagOnlySurvivesRestartAnd304() =>
-        AssertConditionalRestartAsync("\"catalog-v1\"", null);
+        AssertConditionalRestartAsync("\"repository-v1\"", null);
 
     [Test]
     public Task ConditionalRefresh_LastModifiedOnlySurvivesRestartAnd304() =>
@@ -182,7 +314,7 @@ public sealed class PluginMarketplaceTests
 
     [Test]
     public Task ConditionalRefresh_ETagAndLastModifiedSurviveRestartAnd304() =>
-        AssertConditionalRestartAsync("W/\"catalog-v1\"", _now.AddMinutes(-5));
+        AssertConditionalRestartAsync("W/\"repository-v1\"", _now.AddMinutes(-5));
 
     [Test]
     public async Task CatalogStore_ReplacementIsAtomicWhenTheNewSnapshotFails()
@@ -213,7 +345,7 @@ public sealed class PluginMarketplaceTests
 
         var retained = await store.LoadAsync(CancellationToken.None);
         retained.LastValid.ShouldNotBeNull().RefreshedAt.ShouldBe(_now);
-        retained.LastValid.Entries.ShouldHaveSingleItem().Name.ShouldBe("Link queue");
+        retained.LastValid.Entries.ShouldHaveSingleItem().Name.ShouldBe("Community link queue");
     }
 
     [Test]
@@ -224,7 +356,7 @@ public sealed class PluginMarketplaceTests
         var database = await CreateDatabaseAsync(root.Path);
         using var registry = new PluginMarketplaceCatalogRegistry(
             new EfPluginMarketplaceCatalogStore(database),
-            new QueueCatalogTransport(new PluginMarketplaceCatalogDownload.Failed()),
+            new QueueRepositoryTransport(new PluginMarketplaceRepositoryDownload.Failed()),
             clock
         );
         await registry.InitializeAsync(CancellationToken.None);
@@ -246,9 +378,9 @@ public sealed class PluginMarketplaceTests
         using var root = new TemporaryDirectory();
         var options = Options(root.Path);
         var clock = new ManualPeriodicTimeProvider(_now);
-        var transport = new QueueCatalogTransport(
-            new PluginMarketplaceCatalogDownload.Delivered(Catalog(), null, null),
-            new PluginMarketplaceCatalogDownload.Failed()
+        var transport = new QueueRepositoryTransport(
+            new PluginMarketplaceRepositoryDownload.Delivered(Repository(), null, null),
+            new PluginMarketplaceRepositoryDownload.Failed()
         );
         var database = await CreateDatabaseAsync(root.Path);
         using var registry = new PluginMarketplaceCatalogRegistry(
@@ -296,7 +428,12 @@ public sealed class PluginMarketplaceTests
         _ = Directory.CreateDirectory(packagePath);
 
         _ = (
-            await reader.ExtractAsync(archivePath, "plugins/link-queue", packagePath, default)
+            await reader.ExtractAsync(
+                archivePath,
+                "plugins/community.link-queue",
+                packagePath,
+                default
+            )
         ).ShouldBeOfType<PluginMarketplaceArchiveReadOutcome.Accepted>();
         var validated = (
             await PluginMarketplaceMaterializedPackageValidator.ValidateAsync(
@@ -334,7 +471,12 @@ public sealed class PluginMarketplaceTests
         _ = Directory.CreateDirectory(packagePath);
 
         _ = (
-            await reader.ExtractAsync(archivePath, "plugins/link-queue", packagePath, default)
+            await reader.ExtractAsync(
+                archivePath,
+                "plugins/community.link-queue",
+                packagePath,
+                default
+            )
         ).ShouldBeOfType<PluginMarketplaceArchiveReadOutcome.Rejected>();
     }
 
@@ -351,7 +493,7 @@ public sealed class PluginMarketplaceTests
         _ = (
             await new PluginMarketplaceArchiveReader().ExtractAsync(
                 archivePath,
-                "plugins/link-queue",
+                "plugins/community.link-queue",
                 packagePath,
                 default
             )
@@ -374,7 +516,12 @@ public sealed class PluginMarketplaceTests
 
         _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             new PluginMarketplaceArchiveReader()
-                .ExtractAsync(archivePath, "plugins/link-queue", packagePath, cancellation.Token)
+                .ExtractAsync(
+                    archivePath,
+                    "plugins/community.link-queue",
+                    packagePath,
+                    cancellation.Token
+                )
                 .AsTask()
         );
     }
@@ -408,7 +555,7 @@ public sealed class PluginMarketplaceTests
     }
 
     [Test]
-    public async Task PackageStore_RejectsCatalogAndB244ManifestIncompatibility()
+    public async Task PackageStore_RejectsSnapshotIncompatibilityAndTaggedManifestMismatch()
     {
         using var root = new TemporaryDirectory();
         var archive = new FixedArchiveTransport(Archive(PluginContractFixtures.CompletePackage()));
@@ -420,7 +567,10 @@ public sealed class PluginMarketplaceTests
         );
         var incompatibleEntry = Entry() with
         {
-            Compatibility = Entry().Compatibility with { Targets = ["win-x64"] },
+            Compatibility = Entry().Compatibility with
+            {
+                SupportedTargets = [PluginRuntimeIdentifier.WindowsX64],
+            },
         };
 
         _ = (
@@ -469,6 +619,36 @@ public sealed class PluginMarketplaceTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Rejected>();
+
+        var mismatchedPackage = PluginContractFixtures
+            .CompletePackage()
+            .Select(entry =>
+                entry is PluginPackageEntry.File { Path: PluginPackage.ManifestPath }
+                    ? new PluginPackageEntry.File(
+                        PluginPackage.ManifestPath,
+                        PluginContractFixtures.ManifestReplacing(
+                            "community.link-queue",
+                            "community.other-queue"
+                        )
+                    )
+                    : entry
+            )
+            .ToArray();
+        var identityStore = new PluginMarketplacePackageStore(
+            Options(Path.Combine(root.Path, "identity")),
+            new FixedArchiveTransport(Archive(mismatchedPackage)),
+            new(),
+            Runtime()
+        );
+        (
+            await identityStore.PrepareAsync(
+                Entry(),
+                PluginPackageOperationId.New(),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PluginMarketplacePackagePreparationOutcome.Rejected>()
+            .Code.ShouldBe(PluginMarketplacePackageFailureCode.IdentityMismatch);
     }
 
     [Test]
@@ -718,8 +898,8 @@ public sealed class PluginMarketplaceTests
         var database = await CreateDatabaseAsync(root.Path);
         using var registry = new PluginMarketplaceCatalogRegistry(
             new EfPluginMarketplaceCatalogStore(database),
-            new QueueCatalogTransport(
-                new PluginMarketplaceCatalogDownload.Delivered(Catalog(), null, null)
+            new QueueRepositoryTransport(
+                new PluginMarketplaceRepositoryDownload.Delivered(Repository(), null, null)
             ),
             clock
         );
@@ -777,8 +957,8 @@ public sealed class PluginMarketplaceTests
         var database = await CreateDatabaseAsync(root.Path);
         using var registry = new PluginMarketplaceCatalogRegistry(
             new EfPluginMarketplaceCatalogStore(database),
-            new QueueCatalogTransport(
-                new PluginMarketplaceCatalogDownload.Delivered(Catalog(), null, null)
+            new QueueRepositoryTransport(
+                new PluginMarketplaceRepositoryDownload.Delivered(Repository(), null, null)
             ),
             clock
         );
@@ -925,8 +1105,12 @@ public sealed class PluginMarketplaceTests
         using (
             var registry = new PluginMarketplaceCatalogRegistry(
                 new EfPluginMarketplaceCatalogStore(database),
-                new QueueCatalogTransport(
-                    new PluginMarketplaceCatalogDownload.Delivered(Catalog(), entityTag, modifiedAt)
+                new QueueRepositoryTransport(
+                    new PluginMarketplaceRepositoryDownload.Delivered(
+                        Repository(),
+                        entityTag,
+                        modifiedAt
+                    )
                 ),
                 clock
             )
@@ -937,8 +1121,8 @@ public sealed class PluginMarketplaceTests
         }
 
         clock.Advance(TimeSpan.FromHours(1));
-        var transport = new QueueCatalogTransport(
-            new PluginMarketplaceCatalogDownload.NotModified(null, null)
+        var transport = new QueueRepositoryTransport(
+            new PluginMarketplaceRepositoryDownload.NotModified(null, null)
         );
         using var restarted = new PluginMarketplaceCatalogRegistry(
             new EfPluginMarketplaceCatalogStore(new TestDbContextFactory(database.Options)),
@@ -981,13 +1165,170 @@ public sealed class PluginMarketplaceTests
             NullLogger<PluginWorkerClient>.Instance
         );
 
-    private static PluginMarketplaceCatalogEntry Entry()
+    private static PluginMarketplaceCatalogEntry Entry() =>
+        PluginMarketplaceRepositoryDiscovery
+            .Validate(Repository())
+            .ShouldBeOfType<PluginMarketplaceRepositoryDiscoveryOutcome.Accepted>()
+            .Entries.ShouldHaveSingleItem();
+
+    private static PluginMarketplaceRepositorySnapshot Repository() =>
+        Repository(new RepositoryPlugin("community.link-queue", Manifest()));
+
+    private static PluginMarketplaceRepositorySnapshot RepositoryFixture()
     {
-        var catalog = PluginMarketplaceCatalogParser
-            .Validate(Catalog())
-            .ShouldBeOfType<PluginMarketplaceCatalogValidationOutcome.Accepted>();
-        return catalog.Entries.ShouldHaveSingleItem();
+        var root = Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "PluginMarketplaceRepository"
+        );
+        return new(
+            Directory
+                .EnumerateFileSystemEntries(root, "*", SearchOption.AllDirectories)
+                .OrderByDescending(static path => path, StringComparer.Ordinal)
+                .Select(path =>
+                {
+                    var relative = Path.GetRelativePath(root, path)
+                        .Replace(Path.DirectorySeparatorChar, '/');
+                    var directory = Directory.Exists(path);
+                    return new PluginMarketplaceRepositoryEntry(
+                        relative,
+                        directory
+                            ? PluginMarketplaceRepositoryEntryKind.Directory
+                            : PluginMarketplaceRepositoryEntryKind.File,
+                        !directory && Path.GetFileName(path) == PluginPackage.ManifestPath
+                            ? File.ReadAllBytes(path)
+                            : ReadOnlyMemory<byte>.Empty
+                    );
+                })
+                .ToImmutableArray()
+        );
     }
+
+    private static PluginMarketplaceRepositorySnapshot Repository(params RepositoryPlugin[] plugins)
+    {
+        var entries = ImmutableArray.CreateBuilder<PluginMarketplaceRepositoryEntry>();
+        entries.Add(
+            new(
+                "plugins",
+                PluginMarketplaceRepositoryEntryKind.Directory,
+                ReadOnlyMemory<byte>.Empty
+            )
+        );
+        foreach (var plugin in plugins)
+        {
+            entries.Add(
+                new(
+                    $"plugins/{plugin.Directory}",
+                    PluginMarketplaceRepositoryEntryKind.Directory,
+                    ReadOnlyMemory<byte>.Empty
+                )
+            );
+            entries.Add(
+                new(
+                    $"plugins/{plugin.Directory}/{PluginPackage.ManifestPath}",
+                    PluginMarketplaceRepositoryEntryKind.File,
+                    plugin.Manifest
+                )
+            );
+        }
+
+        return new(entries.ToImmutable());
+    }
+
+    private static byte[] Manifest(
+        string pluginId = "community.link-queue",
+        string name = "Community link queue",
+        string tag = "community-link-queue"
+    ) =>
+        ManifestReplacing(
+            ManifestReplacing(
+                ManifestReplacing(
+                    PluginContractFixtures.CompleteManifestToml(),
+                    "community.link-queue",
+                    pluginId
+                ),
+                "Community link queue",
+                name
+            ),
+            "community-link-queue",
+            tag
+        );
+
+    private static byte[] ManifestReplacing(byte[] manifest, string oldValue, string newValue) =>
+        Encoding.UTF8.GetBytes(
+            Encoding.UTF8.GetString(manifest).Replace(oldValue, newValue, StringComparison.Ordinal)
+        );
+
+    private static byte[] TreeDocument(
+        string objectId,
+        int manifestBytes,
+        string? secondObjectId = null,
+        int secondManifestBytes = 0
+    )
+    {
+        const string EmptyObjectId = "0000000000000000000000000000000000000000";
+        var entries = new List<object>
+        {
+            new
+            {
+                path = "plugins",
+                mode = "040000",
+                type = "tree",
+                sha = EmptyObjectId,
+            },
+            new
+            {
+                path = "plugins/community.link-queue",
+                mode = "040000",
+                type = "tree",
+                sha = EmptyObjectId,
+            },
+            new
+            {
+                path = "plugins/community.link-queue/plugin.toml",
+                mode = "100644",
+                type = "blob",
+                sha = objectId,
+                size = manifestBytes,
+            },
+        };
+        if (secondObjectId is not null)
+        {
+            entries.Add(
+                new
+                {
+                    path = "plugins/community.poll",
+                    mode = "040000",
+                    type = "tree",
+                    sha = EmptyObjectId,
+                }
+            );
+            entries.Add(
+                new
+                {
+                    path = "plugins/community.poll/plugin.toml",
+                    mode = "100644",
+                    type = "blob",
+                    sha = secondObjectId,
+                    size = secondManifestBytes,
+                }
+            );
+        }
+
+        return JsonSerializer.SerializeToUtf8Bytes(new { tree = entries, truncated = false });
+    }
+
+    private static byte[] BlobDocument(byte[] manifest) =>
+        JsonSerializer.SerializeToUtf8Bytes(
+            new
+            {
+                content = Convert.ToBase64String(manifest),
+                encoding = "base64",
+                size = manifest.Length,
+            }
+        );
+
+    private sealed record RepositoryPlugin(string Directory, byte[] Manifest);
 
     private static PluginLifecycleFence FixtureFence()
     {
@@ -1011,43 +1352,6 @@ public sealed class PluginMarketplaceTests
             IsBotAdmin = true,
             IsBotAccount = true,
         };
-
-    private static byte[] Catalog(
-        string tag = "community-link-queue",
-        string repository = "https://github.com/community/blokebot-plugins",
-        int schemaVersion = 1,
-        string extra = "",
-        string blokeBot = ">=0.13.0 <0.14.0"
-    ) =>
-        Encoding.UTF8.GetBytes(
-            $$$"""
-            {
-              "schemaVersion": {{{schemaVersion}}},
-              "plugins": [{
-                {{{extra}}}
-                "id": "community.link-queue",
-                "name": "Link queue",
-                "summary": "Queue links from chat.",
-                "author": "Community",
-                "tags": ["queue", "chat"],
-                "iconUrl": "https://images.example.test/icon.png",
-                "mediaUrls": ["https://cdn.example.test/demo.webp"],
-                "source": {
-                  "repositoryUrl": "{{{repository}}}",
-                  "packagePath": "plugins/link-queue"
-                },
-                "version": "1.2.0",
-                "tag": "{{{tag}}}",
-                "compatibility": {
-                  "blokeBot": "{{{blokeBot}}}",
-                  "pluginApi": "1",
-                  "lua": "5.4",
-                  "targets": ["linux-x64"]
-                }
-              }]
-            }
-            """
-        );
 
     private static byte[] Archive(
         IReadOnlyList<PluginPackageEntry> package,
@@ -1076,7 +1380,7 @@ public sealed class PluginMarketplaceTests
                 writer.WriteEntry(
                     new PaxTarEntry(
                         TarEntryType.RegularFile,
-                        $"blokebot-plugins-fixture/plugins/link-queue/{file.Path}"
+                        $"blokebot-plugins-fixture/plugins/community.link-queue/{file.Path}"
                     )
                     {
                         DataStream = new MemoryStream(file.Content.ToArray(), writable: false),
@@ -1100,7 +1404,7 @@ public sealed class PluginMarketplaceTests
                     writer.WriteEntry(
                         new PaxTarEntry(
                             TarEntryType.SymbolicLink,
-                            "blokebot-plugins-fixture/plugins/link-queue/link"
+                            "blokebot-plugins-fixture/plugins/community.link-queue/link"
                         )
                         {
                             LinkName = "../../outside",
@@ -1111,7 +1415,7 @@ public sealed class PluginMarketplaceTests
                     writer.WriteEntry(
                         new PaxTarEntry(
                             TarEntryType.HardLink,
-                            "blokebot-plugins-fixture/plugins/link-queue/link"
+                            "blokebot-plugins-fixture/plugins/community.link-queue/link"
                         )
                         {
                             LinkName = "blokebot-plugins-fixture/outside",
@@ -1119,17 +1423,17 @@ public sealed class PluginMarketplaceTests
                     );
                     break;
                 case ArchiveAttack.CaseCollision:
-                    Write("blokebot-plugins-fixture/plugins/link-queue/A.lua");
-                    Write("blokebot-plugins-fixture/plugins/link-queue/a.lua");
+                    Write("blokebot-plugins-fixture/plugins/community.link-queue/A.lua");
+                    Write("blokebot-plugins-fixture/plugins/community.link-queue/a.lua");
                     break;
                 case ArchiveAttack.Traversal:
-                    Write("blokebot-plugins-fixture/plugins/link-queue/../outside");
+                    Write("blokebot-plugins-fixture/plugins/community.link-queue/../outside");
                     break;
                 case ArchiveAttack.AbsolutePath:
-                    Write("/blokebot-plugins-fixture/plugins/link-queue/outside");
+                    Write("/blokebot-plugins-fixture/plugins/community.link-queue/outside");
                     break;
                 case ArchiveAttack.WindowsAbsolutePath:
-                    Write("C:/blokebot-plugins-fixture/plugins/link-queue/outside");
+                    Write("C:/blokebot-plugins-fixture/plugins/community.link-queue/outside");
                     break;
             }
 
@@ -1181,16 +1485,17 @@ public sealed class PluginMarketplaceTests
         }
     }
 
-    private sealed class QueueCatalogTransport(params PluginMarketplaceCatalogDownload[] outcomes)
-        : IPluginMarketplaceCatalogTransport
+    private sealed class QueueRepositoryTransport(
+        params PluginMarketplaceRepositoryDownload[] outcomes
+    ) : IPluginMarketplaceRepositoryTransport
     {
-        private readonly Queue<PluginMarketplaceCatalogDownload> _outcomes = new(outcomes);
+        private readonly Queue<PluginMarketplaceRepositoryDownload> _outcomes = new(outcomes);
 
         internal int Calls { get; private set; }
 
         internal List<(string? ETag, DateTimeOffset? ModifiedSince)> Conditions { get; } = [];
 
-        public ValueTask<PluginMarketplaceCatalogDownload> DownloadAsync(
+        public ValueTask<PluginMarketplaceRepositoryDownload> DownloadAsync(
             string? entityTag,
             DateTimeOffset? modifiedSince,
             CancellationToken cancellationToken
@@ -1200,7 +1505,7 @@ public sealed class PluginMarketplaceTests
             Conditions.Add((entityTag, modifiedSince));
             return ValueTask.FromResult(
                 _outcomes.Count == 0
-                    ? new PluginMarketplaceCatalogDownload.Failed()
+                    ? new PluginMarketplaceRepositoryDownload.Failed()
                     : _outcomes.Dequeue()
             );
         }

@@ -30,7 +30,10 @@ def smoke(package: Path, configuration: str) -> None:
     package = package.resolve()
     _require_file(package / "plugin.toml", "Reference package manifest")
     _require_file(package / "tests.toml", "Reference package scenarios")
-    _require_file(package.parent.parent / "catalog.json", "Reference plugin catalogue")
+    if package.parent.name != "plugins":
+        raise ReferencePluginSmokeError(
+            f"Reference package must use plugins/<plugin-id>: {package}"
+        )
 
     repository = Path(__file__).resolve().parents[2]
     harness = (
@@ -76,7 +79,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Run the deterministic author-harness and explicit lifecycle smoke against one "
-            "exact local community-link-queue package. Build the PluginHarness and Core.Tests "
+            "exact local community.link-queue package. Build the PluginHarness and Core.Tests "
             "first; this command never calls Twitch or the configured metadata endpoint."
         )
     )

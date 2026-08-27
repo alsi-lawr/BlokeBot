@@ -9,50 +9,81 @@ public static partial class PluginManifestValidator
     {
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(target);
-        var errors = new List<PluginManifestError>();
-
-        ValidateName(manifest.Name, "$.name", errors);
-        ValidateText(manifest.Description, "$.description", required: true, errors);
-        ValidateCompatibilityRanges(manifest.Compatibility, errors);
-        ValidateModulesAssetsAndPayloads(manifest, errors);
-        ValidateSettingsAndFeatures(manifest, errors);
-        ValidateHostModulesAndMigrations(manifest, errors);
-        ValidateAutomations(manifest, errors);
-        ValidatePages(manifest, errors);
+        var errors = ValidateDeclaration(manifest);
 
         if (
             PluginCompatibilityEvaluator.Evaluate(manifest, target)
-            is PluginCompatibilityOutcome.Incompatible incompatible
+            is PluginCompatibilityOutcome.Incompatible
         )
         {
-            var incompatibleTargetLocations = incompatible
-                .Failures.Where(failure =>
-                    failure.Code == PluginCompatibilityFailureCode.IncompatiblePayloadTarget
-                )
-                .Select(failure =>
-                    manifest.Assets.Any(asset => asset.Path == failure.Subject)
-                        ? "$.assets.runtimeIdentifiers"
-                        : "$.payloads.runtimeIdentifiers"
-                )
-                .Distinct(StringComparer.Ordinal);
-            foreach (var location in incompatibleTargetLocations)
-            {
-                errors.Add(new(PluginManifestErrorCode.IncompatiblePayloadTarget, location));
-            }
-
-            if (
-                incompatible.Failures.Any(failure =>
-                    failure.Code != PluginCompatibilityFailureCode.IncompatiblePayloadTarget
-                )
-            )
-            {
-                errors.Add(new(PluginManifestErrorCode.IncompatibleDeclaration, "$.compatibility"));
-            }
+            errors.Add(new(PluginManifestErrorCode.IncompatibleDeclaration, "$.compatibility"));
         }
 
         return errors.Count == 0
             ? new PluginManifestValidationOutcome.Accepted(new(manifest))
             : new PluginManifestValidationOutcome.Rejected(errors.AsReadOnly());
+    }
+
+    internal static PluginManifestDeclarationValidationOutcome ValidateForMarketplace(
+        PluginManifest manifest
+    )
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        var errors = ValidateDeclaration(manifest);
+        return errors.Count == 0
+            ? new PluginManifestDeclarationValidationOutcome.Accepted(new(manifest))
+            : new PluginManifestDeclarationValidationOutcome.Rejected(errors.AsReadOnly());
+    }
+
+    private static List<PluginManifestError> ValidateDeclaration(PluginManifest manifest)
+    {
+        var errors = new List<PluginManifestError>();
+        if (manifest.ManifestVersion != PluginRuntimeContract.Current.ManifestVersion)
+        {
+            errors.Add(new(PluginManifestErrorCode.IncompatibleDeclaration, "$.manifestVersion"));
+        }
+
+        ValidateName(manifest.Name, "$.name", errors);
+        ValidateText(manifest.Description, "$.description", required: true, errors);
+        ValidateMarketplace(manifest.Marketplace, errors);
+        ValidateCompatibilityRanges(manifest.Compatibility, errors);
+        ValidateReleaseTargets(manifest, errors);
+        ValidateModulesAssetsAndPayloads(manifest, errors);
+        ValidateSettingsAndFeatures(manifest, errors);
+        ValidateHostModulesAndMigrations(manifest, errors);
+        ValidateAutomations(manifest, errors);
+        ValidatePages(manifest, errors);
+        return errors;
+    }
+
+    private static void ValidateMarketplace(
+        PluginMarketplaceMetadata marketplace,
+        List<PluginManifestError> errors
+    )
+    {
+        if (
+            marketplace is null
+            || string.IsNullOrWhiteSpace(marketplace.Author)
+            || marketplace.Author.Length > PluginContractLimits.MaximumMarketplaceAuthorCharacters
+            || marketplace.Author.Any(char.IsControl)
+            || marketplace.Tags.IsDefault
+            || marketplace.Tags.Length > PluginContractLimits.MaximumMarketplaceTags
+            || marketplace.Tags.Any(tag =>
+                string.IsNullOrWhiteSpace(tag)
+                || tag.Length > PluginContractLimits.MaximumMarketplaceTagCharacters
+                || tag.Any(char.IsControl)
+            )
+            || marketplace.Tags.Distinct(StringComparer.Ordinal).Count() != marketplace.Tags.Length
+            || !ValidHttpsUrl(marketplace.IconUrl, optional: true)
+            || marketplace.MediaUrls.IsDefault
+            || marketplace.MediaUrls.Length > PluginContractLimits.MaximumMarketplaceMediaUrls
+            || marketplace.MediaUrls.Any(url => !ValidHttpsUrl(url, optional: false))
+            || marketplace.MediaUrls.Distinct(StringComparer.Ordinal).Count()
+                != marketplace.MediaUrls.Length
+        )
+        {
+            errors.Add(new(PluginManifestErrorCode.InvalidMarketplace, "$.marketplace"));
+        }
     }
 
     private static void ValidateCompatibilityRanges(
@@ -65,11 +96,52 @@ public static partial class PluginManifestValidator
             || declaration.MinimumBlokeBotVersion.CompareTo(
                 declaration.MaximumBlokeBotVersionExclusive
             ) >= 0
+            || declaration.SupportedTargets.IsDefaultOrEmpty
+            || declaration.SupportedTargets.Distinct().Count()
+                != declaration.SupportedTargets.Length
+            || declaration.LuaVersion != PluginRuntimeContract.Current.LuaVersion
         )
         {
             errors.Add(new(PluginManifestErrorCode.InvalidCompatibilityRange, "$.compatibility"));
         }
     }
+
+    private static void ValidateReleaseTargets(
+        PluginManifest manifest,
+        List<PluginManifestError> errors
+    )
+    {
+        if (manifest.Compatibility.SupportedTargets.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var declaredTargets = manifest
+            .Assets.Select(static asset => asset.RuntimeIdentifiers)
+            .Concat(manifest.Payloads.Select(static payload => payload.RuntimeIdentifiers))
+            .SelectMany(static targets => targets);
+        if (
+            declaredTargets.Any(target => !manifest.Compatibility.SupportedTargets.Contains(target))
+        )
+        {
+            errors.Add(
+                new(
+                    PluginManifestErrorCode.InvalidCompatibilityRange,
+                    "$.compatibility.supportedTargets"
+                )
+            );
+        }
+    }
+
+    private static bool ValidHttpsUrl(string? value, bool optional) =>
+        value is null
+            ? optional
+            : value.Length <= PluginContractLimits.MaximumMarketplaceUrlCharacters
+                && value.StartsWith("https://", StringComparison.Ordinal)
+                && Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                && uri.Scheme == Uri.UriSchemeHttps
+                && !string.IsNullOrWhiteSpace(uri.Host)
+                && string.IsNullOrEmpty(uri.UserInfo);
 
     private static void ValidateText(
         string? value,

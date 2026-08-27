@@ -12,6 +12,7 @@ internal static class PluginManifestTomlShape
                 "id",
                 "name",
                 "description",
+                "marketplace",
                 "release",
                 "compatibility",
                 "entryModule",
@@ -28,6 +29,7 @@ internal static class PluginManifestTomlShape
                 "embeddedPages",
             ]
         )
+        && Child(manifest, "marketplace", Marketplace)
         && Child(manifest, "release", Release)
         && Child(manifest, "compatibility", Compatibility)
         && Children(manifest, "luaModules", LuaModule)
@@ -44,6 +46,9 @@ internal static class PluginManifestTomlShape
 
     private static bool Release(TomlTable table) => Table(table, ["declaredVersion", "tag"]);
 
+    private static bool Marketplace(TomlTable table) =>
+        Table(table, ["author", "tags", "iconUrl", "mediaUrls"]);
+
     private static bool Compatibility(TomlTable table) =>
         Table(
             table,
@@ -53,6 +58,7 @@ internal static class PluginManifestTomlShape
                 "minimumBlokeBotVersion",
                 "maximumBlokeBotVersionExclusive",
                 "luaVersion",
+                "supportedTargets",
             ]
         );
 

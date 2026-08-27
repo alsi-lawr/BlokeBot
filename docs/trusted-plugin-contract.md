@@ -15,8 +15,14 @@ and host API contracts. KeraLua is preferred, but an engine name does not bypass
 ## Package identity
 
 A plugin has one stable plugin ID. A selected installation records the plugin's declared semantic
-version and one mutable Git tag. A tag must not be a commit hash. TOML manifests, catalogue records, and
-installation records do not have a commit-SHA identity field.
+version and one mutable Git tag. A tag must not be a commit hash. Manifests, derived marketplace
+snapshots, and installation records do not have a commit-SHA identity field.
+
+The curated repository layout is `plugins/<plugin-id>/plugin.toml`. The directory name must exactly
+match the manifest ID. The manifest owns the author, search tags, optional presentation URLs,
+release targets, version, mutable tag, compatibility, and runtime declarations. There is no global
+catalogue or generated index. BlokeBot enumerates the fixed repository layout and transactionally
+replaces its local searchable snapshot only after every discovered manifest passes validation.
 
 ## Package content
 
@@ -42,8 +48,9 @@ call and coroutine IDs. When cancellation wins, the caller stops waiting and a l
 admitted or resumed. Provider cooperation can be requested, but an external effect that already
 occurred is not rolled back.
 
-`plugin.toml` declares requirements and descriptors only. It does not register live features, discover
-Razor components, run Lua, fetch marketplace archives, manage workers, or change lifecycle state.
+`plugin.toml` declares marketplace metadata, requirements, and descriptors only. It does not register
+live features, discover Razor components, run Lua, fetch marketplace archives, manage workers, or
+change lifecycle state.
 
 ## Author tools
 

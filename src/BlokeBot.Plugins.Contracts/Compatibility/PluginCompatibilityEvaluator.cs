@@ -63,7 +63,16 @@ public static class PluginCompatibilityEvaluator
             );
         }
 
-        EvaluatePayloadTargets(manifest, target.RuntimeIdentifier, failures);
+        if (!declaration.SupportedTargets.Contains(target.RuntimeIdentifier))
+        {
+            failures.Add(
+                new(
+                    PluginCompatibilityFailureCode.UnsupportedReleaseTarget,
+                    target.RuntimeIdentifier.ToString()
+                )
+            );
+        }
+
         EvaluateHostModules(manifest.HostModules, target.HostModules, failures);
         return failures.Count == 0
             ? new PluginCompatibilityOutcome.Compatible()
@@ -120,29 +129,6 @@ public static class PluginCompatibilityEvaluator
                         requirement.Id.Value
                     )
                 );
-            }
-        }
-    }
-
-    private static void EvaluatePayloadTargets(
-        PluginManifest manifest,
-        PluginRuntimeIdentifier runtimeIdentifier,
-        List<PluginCompatibilityFailure> failures
-    )
-    {
-        var declarations = manifest
-            .Assets.Select(asset => (asset.Path, asset.RuntimeIdentifiers))
-            .Concat(
-                manifest.Payloads.Select(payload => (payload.Path, payload.RuntimeIdentifiers))
-            );
-        foreach (var (path, runtimeIdentifiers) in declarations)
-        {
-            if (
-                runtimeIdentifiers.IsDefaultOrEmpty
-                || !runtimeIdentifiers.Contains(runtimeIdentifier)
-            )
-            {
-                failures.Add(new(PluginCompatibilityFailureCode.IncompatiblePayloadTarget, path));
             }
         }
     }

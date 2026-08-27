@@ -12,6 +12,11 @@ public static class PluginContractLimits
     public const int MaximumDeclarationsPerSurface = 128;
     public const int MaximumNameCharacters = 120;
     public const int MaximumDescriptionCharacters = 1_000;
+    public const int MaximumMarketplaceAuthorCharacters = 100;
+    public const int MaximumMarketplaceTags = 20;
+    public const int MaximumMarketplaceTagCharacters = 40;
+    public const int MaximumMarketplaceMediaUrls = 20;
+    public const int MaximumMarketplaceUrlCharacters = 2_048;
     public const int MaximumPluginValueDepth = 16;
     public const int MaximumPluginValueNodes = 1_024;
     public const int MaximumPluginValueStringBytes = 64 * 1024;

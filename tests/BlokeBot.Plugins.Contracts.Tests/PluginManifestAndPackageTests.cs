@@ -258,17 +258,99 @@ public sealed class PluginManifestAndPackageTests
     }
 
     [Test]
-    public void PackagePolicy_RejectsTargetIncompatiblePayload()
+    public void PackagePolicy_RejectsUnsupportedReleaseTarget()
     {
         var target = PluginContractFixtures.CompatibleHost() with
         {
             RuntimeIdentifier = PluginRuntimeIdentifier.WindowsX64,
         };
-
-        PackageManifestErrorCodes(
-                PluginPackageValidator.Validate(PluginContractFixtures.CompletePackage(), target)
+        var linuxOnlyManifest = PluginContractFixtures.ManifestReplacing(
+            "[\"linux-x64\", \"linux-arm64\", \"osx-arm64\", \"win-x64\", \"win-arm64\"]",
+            "[\"linux-x64\"]"
+        );
+        var linuxOnlyPackage = PluginContractFixtures
+            .CompletePackage()
+            .Select(entry =>
+                entry.Path == PluginPackage.ManifestPath
+                    ? new PluginPackageEntry.File(PluginPackage.ManifestPath, linuxOnlyManifest)
+                    : entry
             )
-            .ShouldContain(PluginManifestErrorCode.IncompatiblePayloadTarget);
+            .ToArray();
+
+        PackageManifestErrorCodes(PluginPackageValidator.Validate(linuxOnlyPackage, target))
+            .ShouldContain(PluginManifestErrorCode.IncompatibleDeclaration);
+    }
+
+    [Test]
+    public void ManifestTargets_AcceptSeparateLinuxAndWindowsAssetAndPayloadDeclarations()
+    {
+        var manifest = PluginManifestToml
+            .Validate(
+                PluginContractFixtures.CompleteManifestToml(),
+                PluginContractFixtures.CompatibleHost()
+            )
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+            .Manifest.Manifest;
+        manifest = manifest with
+        {
+            Compatibility = manifest.Compatibility with
+            {
+                SupportedTargets =
+                [
+                    PluginRuntimeIdentifier.LinuxX64,
+                    PluginRuntimeIdentifier.WindowsX64,
+                ],
+            },
+            Assets =
+            [
+                manifest.Assets[0] with
+                {
+                    RuntimeIdentifiers = [PluginRuntimeIdentifier.LinuxX64],
+                },
+                manifest.Assets[1] with
+                {
+                    RuntimeIdentifiers = [PluginRuntimeIdentifier.WindowsX64],
+                },
+                manifest.Assets[2] with
+                {
+                    RuntimeIdentifiers = [PluginRuntimeIdentifier.WindowsX64],
+                },
+            ],
+            Payloads =
+            [
+                manifest.Payloads[0] with
+                {
+                    RuntimeIdentifiers = [PluginRuntimeIdentifier.LinuxX64],
+                },
+                manifest.Payloads[1] with
+                {
+                    RuntimeIdentifiers = [PluginRuntimeIdentifier.WindowsX64],
+                },
+                manifest.Payloads[2] with
+                {
+                    RuntimeIdentifiers = [PluginRuntimeIdentifier.WindowsX64],
+                },
+            ],
+        };
+
+        foreach (
+            var runtimeIdentifier in new[]
+            {
+                PluginRuntimeIdentifier.LinuxX64,
+                PluginRuntimeIdentifier.WindowsX64,
+            }
+        )
+        {
+            _ = PluginManifestValidator
+                .Validate(
+                    manifest,
+                    PluginContractFixtures.CompatibleHost() with
+                    {
+                        RuntimeIdentifier = runtimeIdentifier,
+                    }
+                )
+                .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+        }
     }
 
     [Test]

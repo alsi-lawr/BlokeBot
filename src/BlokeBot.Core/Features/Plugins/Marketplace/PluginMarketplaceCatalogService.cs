@@ -103,7 +103,7 @@ public sealed class PluginMarketplaceCatalogService
 
 internal sealed class PluginMarketplaceCatalogRegistry(
     IPluginMarketplaceCatalogStore store,
-    IPluginMarketplaceCatalogTransport transport,
+    IPluginMarketplaceRepositoryTransport transport,
     TimeProvider timeProvider
 ) : IDisposable
 {
@@ -131,7 +131,7 @@ internal sealed class PluginMarketplaceCatalogRegistry(
                 cancellationToken
             );
             PluginMarketplaceCatalogState next;
-            if (download is PluginMarketplaceCatalogDownload.NotModified notModified)
+            if (download is PluginMarketplaceRepositoryDownload.NotModified notModified)
             {
                 next = await store.RecordNotModifiedAsync(
                     now,
@@ -140,10 +140,10 @@ internal sealed class PluginMarketplaceCatalogRegistry(
                     cancellationToken
                 );
             }
-            else if (download is PluginMarketplaceCatalogDownload.Delivered delivered)
+            else if (download is PluginMarketplaceRepositoryDownload.Delivered delivered)
             {
-                var validation = PluginMarketplaceCatalogParser.Validate(delivered.Content);
-                if (validation is PluginMarketplaceCatalogValidationOutcome.Accepted accepted)
+                var discovery = PluginMarketplaceRepositoryDiscovery.Validate(delivered.Repository);
+                if (discovery is PluginMarketplaceRepositoryDiscoveryOutcome.Accepted accepted)
                 {
                     next = await store.ReplaceAsync(
                         new(1, now, accepted.Entries),
@@ -155,10 +155,10 @@ internal sealed class PluginMarketplaceCatalogRegistry(
                 }
                 else
                 {
-                    var rejected = (PluginMarketplaceCatalogValidationOutcome.Rejected)validation;
+                    var rejected = (PluginMarketplaceRepositoryDiscoveryOutcome.Rejected)discovery;
                     next = await store.RecordFailureAsync(
                         now,
-                        Map(rejected.Failure.Code),
+                        Map(rejected.Code),
                         cancellationToken
                     );
                 }
@@ -184,17 +184,15 @@ internal sealed class PluginMarketplaceCatalogRegistry(
     public void Dispose() => _refresh.Dispose();
 
     private static PluginMarketplaceRefreshFailureCode Map(
-        PluginMarketplaceCatalogFailureCode code
+        PluginMarketplaceRepositoryFailureCode code
     ) =>
         code switch
         {
-            PluginMarketplaceCatalogFailureCode.MalformedJson =>
-                PluginMarketplaceRefreshFailureCode.MalformedCatalog,
-            PluginMarketplaceCatalogFailureCode.UnsupportedSchema =>
-                PluginMarketplaceRefreshFailureCode.UnsupportedSchema,
-            PluginMarketplaceCatalogFailureCode.InvalidEntry =>
-                PluginMarketplaceRefreshFailureCode.InvalidEntry,
-            PluginMarketplaceCatalogFailureCode.DuplicateRelease =>
-                PluginMarketplaceRefreshFailureCode.DuplicateRelease,
+            PluginMarketplaceRepositoryFailureCode.InvalidLayout =>
+                PluginMarketplaceRefreshFailureCode.RepositoryInvalid,
+            PluginMarketplaceRepositoryFailureCode.InvalidManifest =>
+                PluginMarketplaceRefreshFailureCode.InvalidManifest,
+            PluginMarketplaceRepositoryFailureCode.DuplicatePlugin =>
+                PluginMarketplaceRefreshFailureCode.DuplicatePlugin,
         };
 }

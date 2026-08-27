@@ -82,14 +82,13 @@ internal static class PluginAdminCopy
     internal static string RefreshFailure(PluginMarketplaceRefreshFailureCode failure) =>
         failure switch
         {
-            PluginMarketplaceRefreshFailureCode.DownloadFailed => "The catalogue download failed.",
-            PluginMarketplaceRefreshFailureCode.MalformedCatalog =>
-                "The catalogue data is malformed.",
-            PluginMarketplaceRefreshFailureCode.UnsupportedSchema =>
-                "The catalogue format is not supported.",
-            PluginMarketplaceRefreshFailureCode.InvalidEntry =>
-                "The catalogue contains an invalid plugin entry.",
-            PluginMarketplaceRefreshFailureCode.DuplicateRelease =>
-                "The catalogue contains a duplicate plugin release.",
+            PluginMarketplaceRefreshFailureCode.DownloadFailed =>
+                "The plugin repository download failed.",
+            PluginMarketplaceRefreshFailureCode.RepositoryInvalid =>
+                "The plugin repository layout is invalid.",
+            PluginMarketplaceRefreshFailureCode.InvalidManifest =>
+                "The plugin repository contains an invalid manifest.",
+            PluginMarketplaceRefreshFailureCode.DuplicatePlugin =>
+                "The plugin repository contains a duplicate plugin.",
         };
 }

@@ -42,6 +42,35 @@ public static class PluginManifestToml
         }
     }
 
+    internal static PluginManifestDeclarationValidationOutcome ValidateForMarketplace(
+        ReadOnlyMemory<byte> utf8Toml
+    )
+    {
+        if (utf8Toml.Length > PluginContractLimits.MaximumManifestBytes)
+        {
+            return DeclarationRejected(PluginManifestErrorCode.ManifestTooLarge, "$toml");
+        }
+
+        try
+        {
+            var toml = _utf8.GetString(utf8Toml.Span);
+            var document = TomlSerializer.Deserialize<TomlTable>(toml, _options);
+            if (document is null || !PluginManifestTomlShape.HasOnlyKnownFields(document))
+            {
+                return DeclarationRejected(PluginManifestErrorCode.MalformedToml, "$toml");
+            }
+
+            var manifest = TomlSerializer.Deserialize<PluginManifest>(toml, _options);
+            return manifest is null
+                ? DeclarationRejected(PluginManifestErrorCode.MalformedToml, "$toml")
+                : PluginManifestValidator.ValidateForMarketplace(manifest);
+        }
+        catch (Exception exception) when (exception is TomlException or DecoderFallbackException)
+        {
+            return DeclarationRejected(PluginManifestErrorCode.MalformedToml, "$toml");
+        }
+    }
+
     public static async ValueTask<PluginManifestValidationOutcome> ValidateAsync(
         Stream utf8Toml,
         PluginHostCompatibilityTarget target,
@@ -77,6 +106,14 @@ public static class PluginManifestToml
         string location
     ) =>
         new PluginManifestValidationOutcome.Rejected(
+            Array.AsReadOnly([new PluginManifestError(code, location)])
+        );
+
+    private static PluginManifestDeclarationValidationOutcome DeclarationRejected(
+        PluginManifestErrorCode code,
+        string location
+    ) =>
+        new PluginManifestDeclarationValidationOutcome.Rejected(
             Array.AsReadOnly([new PluginManifestError(code, location)])
         );
 

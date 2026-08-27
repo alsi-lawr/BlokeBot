@@ -290,25 +290,28 @@ internal sealed class SimulationPluginAdminScenario : IPluginAdminApplicationSer
         PluginReleaseIdentity release,
         bool compatible,
         bool installed
-    ) =>
-        new(
+    )
+    {
+        var pluginId = Id(id);
+        return new(
             new(
-                Id(id),
+                pluginId,
                 name,
                 summary,
                 author,
                 ["chat", "workflow"],
                 null,
                 [],
-                new("https://github.com/community/blokebot-plugins"),
-                $"plugins/{id.Replace(".", "-", StringComparison.Ordinal)}",
+                PluginMarketplaceRepositoryAuthority.RepositoryUrl,
+                PluginMarketplaceRepositoryAuthority.PackagePath(pluginId),
                 release,
-                new(">=0.13.0 <0.14.0", "1", "5.4", ["linux-x64"])
+                SimulationPluginFeatureManifest.Load().Manifest.Compatibility
             ),
             compatible,
             installed,
             installed
         );
+    }
 
     private static PluginAdminFeatureItem Feature(string id, string name, int enabledChannels)
     {

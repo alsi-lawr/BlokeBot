@@ -6537,7 +6537,7 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
+                        .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PackagePath")
@@ -6555,7 +6555,7 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.Property<string>("Summary")
                         .IsRequired()
-                        .HasMaxLength(300)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.HasKey("PluginId", "DeclaredVersion", "MutableTag");
@@ -6624,7 +6624,7 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.ToTable("plugin_marketplace_catalog_state", null, t =>
                         {
-                            t.HasCheckConstraint("CK_plugin_marketplace_catalog_state_FailureCode", "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('DownloadFailed', 'MalformedCatalog', 'UnsupportedSchema', 'InvalidEntry', 'DuplicateRelease')");
+                            t.HasCheckConstraint("CK_plugin_marketplace_catalog_state_FailureCode", "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('DownloadFailed', 'RepositoryInvalid', 'InvalidManifest', 'DuplicatePlugin')");
 
                             t.HasCheckConstraint("CK_plugin_marketplace_catalog_state_Id", "\"Id\" = 1");
 

@@ -403,7 +403,7 @@ namespace BlokeBot.Persistence.Migrations
                     table.PrimaryKey("PK_plugin_marketplace_catalog_state", x => x.Id);
                     table.CheckConstraint(
                         "CK_plugin_marketplace_catalog_state_FailureCode",
-                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('DownloadFailed', 'MalformedCatalog', 'UnsupportedSchema', 'InvalidEntry', 'DuplicateRelease')"
+                        "\"FailureCode\" IS NULL OR \"FailureCode\" IN ('DownloadFailed', 'RepositoryInvalid', 'InvalidManifest', 'DuplicatePlugin')"
                     );
                     table.CheckConstraint("CK_plugin_marketplace_catalog_state_Id", "\"Id\" = 1");
                     table.CheckConstraint(
@@ -536,8 +536,8 @@ namespace BlokeBot.Persistence.Migrations
                         nullable: false
                     ),
                     SnapshotId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Summary = table.Column<string>(type: "TEXT", maxLength: 300, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 120, nullable: false),
+                    Summary = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
                     Author = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     IconUrl = table.Column<string>(type: "TEXT", maxLength: 2048, nullable: true),
                     RepositoryUrl = table.Column<string>(

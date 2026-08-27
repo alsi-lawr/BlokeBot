@@ -34,6 +34,7 @@ public enum PluginCompatibilityFailureCode
     UnsupportedApiVersion,
     IncompatibleBlokeBotVersion,
     UnsupportedLuaVersion,
+    UnsupportedReleaseTarget,
     MissingHostModule,
     IncompatibleHostModuleVersion,
     IncompatiblePayloadTarget,

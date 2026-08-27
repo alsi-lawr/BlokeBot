@@ -26,7 +26,7 @@ public static class PluginFeatureServiceCollectionExtensions
         services.TryAddSingleton<PluginOutboundHttpClient>();
         _ = services
             .AddHttpClient(
-                GitHubPluginMarketplaceCatalogTransport.ClientName,
+                GitHubPluginMarketplaceRepositoryTransport.ClientName,
                 static client => client.Timeout = Timeout.InfiniteTimeSpan
             )
             .ConfigurePrimaryHttpMessageHandler(static () =>
@@ -145,8 +145,8 @@ public static class PluginFeatureServiceCollectionExtensions
             )
         );
         services.TryAddSingleton<
-            IPluginMarketplaceCatalogTransport,
-            GitHubPluginMarketplaceCatalogTransport
+            IPluginMarketplaceRepositoryTransport,
+            GitHubPluginMarketplaceRepositoryTransport
         >();
         services.TryAddSingleton<
             IPluginMarketplaceArchiveTransport,

@@ -86,8 +86,8 @@ public sealed partial class BlokeBotDbContext
                     _ = table.HasCheckConstraint(
                         "CK_plugin_marketplace_catalog_state_FailureCode",
                         "\"FailureCode\" IS NULL OR \"FailureCode\" IN "
-                            + "('DownloadFailed', 'MalformedCatalog', "
-                            + "'UnsupportedSchema', 'InvalidEntry', 'DuplicateRelease')"
+                            + "('DownloadFailed', 'RepositoryInvalid', "
+                            + "'InvalidManifest', 'DuplicatePlugin')"
                     );
                 }
             );
@@ -120,8 +120,8 @@ public sealed partial class BlokeBotDbContext
             _ = entity.Property(value => value.PluginId).HasMaxLength(100);
             _ = entity.Property(value => value.DeclaredVersion).HasMaxLength(128);
             _ = entity.Property(value => value.MutableTag).HasMaxLength(128);
-            _ = entity.Property(value => value.Name).HasMaxLength(100);
-            _ = entity.Property(value => value.Summary).HasMaxLength(300);
+            _ = entity.Property(value => value.Name).HasMaxLength(120);
+            _ = entity.Property(value => value.Summary).HasMaxLength(1_000);
             _ = entity.Property(value => value.Author).HasMaxLength(100);
             _ = entity.Property(value => value.IconUrl).HasMaxLength(2_048);
             _ = entity.Property(value => value.RepositoryUrl).HasMaxLength(2_048);

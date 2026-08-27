@@ -7,6 +7,7 @@ public sealed record PluginManifest(
     PluginId Id,
     string Name,
     string Description,
+    PluginMarketplaceMetadata Marketplace,
     PluginReleaseIdentity Release,
     PluginCompatibilityDeclaration Compatibility,
     PluginLuaModuleId EntryModule,
@@ -23,6 +24,13 @@ public sealed record PluginManifest(
     ImmutableArray<PluginEmbeddedPageDescriptor> EmbeddedPages
 );
 
+public sealed record PluginMarketplaceMetadata(
+    string Author,
+    ImmutableArray<string> Tags,
+    string? IconUrl = null,
+    ImmutableArray<string> MediaUrls = default
+);
+
 public enum PluginLuaVersion
 {
     Lua54,
@@ -33,7 +41,8 @@ public sealed record PluginCompatibilityDeclaration(
     PluginApiVersion MaximumApiVersion,
     SemanticVersion MinimumBlokeBotVersion,
     SemanticVersion MaximumBlokeBotVersionExclusive,
-    PluginLuaVersion LuaVersion
+    PluginLuaVersion LuaVersion,
+    ImmutableArray<PluginRuntimeIdentifier> SupportedTargets
 );
 
 public sealed record PluginLuaModuleDescriptor(PluginLuaModuleId Id, string Path);

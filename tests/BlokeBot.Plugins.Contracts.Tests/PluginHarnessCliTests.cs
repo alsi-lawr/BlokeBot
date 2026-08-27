@@ -167,6 +167,11 @@ public sealed class PluginHarnessCliTests
             generatedPages = []
             embeddedPages = []
 
+            [marketplace]
+            author = "BlokeBot"
+            tags = ["example"]
+            mediaUrls = []
+
             [release]
             declaredVersion = "1.0.0"
             tag = "examples-arbitrary-source-v1"
@@ -177,6 +182,7 @@ public sealed class PluginHarnessCliTests
             minimumBlokeBotVersion = "0.13.0"
             maximumBlokeBotVersionExclusive = "0.14.0"
             luaVersion = "lua54"
+            supportedTargets = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
 
             [[luaModules]]
             id = "main"

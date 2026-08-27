@@ -19,6 +19,10 @@ internal static class SimulationPluginFeatureManifest
         automationTemplates = []
         generatedPages = []
         embeddedPages = []
+        [marketplace]
+        author = "BlokeBot"
+        tags = ["simulation"]
+        mediaUrls = []
         [release]
         declaredVersion = "1.2.0"
         tag = "community-link-queue"
@@ -28,6 +32,7 @@ internal static class SimulationPluginFeatureManifest
         minimumBlokeBotVersion = "0.13.0"
         maximumBlokeBotVersionExclusive = "0.14.0"
         luaVersion = "lua54"
+        supportedTargets = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
         [[luaModules]]
         id = "main"
         path = "lua/main.lua"

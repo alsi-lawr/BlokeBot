@@ -5,6 +5,7 @@ public enum PluginManifestErrorCode
     ManifestTooLarge,
     MalformedToml,
     InvalidText,
+    InvalidMarketplace,
     InvalidCompatibilityRange,
     TooManyDeclarations,
     DuplicateIdentifier,
@@ -35,6 +36,24 @@ public sealed class ValidatedPluginManifest
     internal ValidatedPluginManifest(PluginManifest manifest) => Manifest = manifest;
 
     public PluginManifest Manifest { get; }
+}
+
+internal sealed class ValidatedPluginManifestDeclaration
+{
+    internal ValidatedPluginManifestDeclaration(PluginManifest manifest) => Manifest = manifest;
+
+    internal PluginManifest Manifest { get; }
+}
+
+internal abstract record PluginManifestDeclarationValidationOutcome
+{
+    private PluginManifestDeclarationValidationOutcome() { }
+
+    internal sealed record Accepted(ValidatedPluginManifestDeclaration Declaration)
+        : PluginManifestDeclarationValidationOutcome;
+
+    internal sealed record Rejected(IReadOnlyList<PluginManifestError> Errors)
+        : PluginManifestDeclarationValidationOutcome;
 }
 
 public abstract record PluginManifestValidationOutcome

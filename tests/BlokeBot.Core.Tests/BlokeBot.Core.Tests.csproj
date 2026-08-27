@@ -19,4 +19,10 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Fixtures/PluginMarketplaceRepository/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

@@ -3,6 +3,11 @@ id = "community.link-queue"
 name = "Community link queue"
 description = "Collects community links and publishes them on a schedule."
 entryModule = "main"
+[marketplace]
+author = "BlokeBot community"
+tags = ["queue", "chat"]
+iconUrl = "https://images.example.test/link-queue.png"
+mediaUrls = ["https://media.example.test/link-queue.webp"]
 [release]
 declaredVersion = "1.2.0"
 tag = "community-link-queue"
@@ -12,6 +17,7 @@ maximumApiVersion = 1
 minimumBlokeBotVersion = "0.13.0"
 maximumBlokeBotVersionExclusive = "0.14.0"
 luaVersion = "lua54"
+supportedTargets = ["linux-x64", "linux-arm64", "osx-arm64", "win-x64", "win-arm64"]
 [[luaModules]]
 id = "main"
 path = "lua/main.lua"

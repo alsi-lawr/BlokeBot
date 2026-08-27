@@ -139,7 +139,7 @@ public sealed class PluginAdminTests
         var incompatibleNewer = CatalogEntry() with
         {
             Release = Release("2.0.0", "release-v2"),
-            Compatibility = new(">=0.13.0 <0.14.0", "1", "5.4", ["windows-x64"]),
+            Compatibility = Compatibility(PluginRuntimeIdentifier.WindowsX64),
         };
         var service = CreateApplicationService(
             new RecordingLifecycleStore([active]),
@@ -385,7 +385,7 @@ public sealed class PluginAdminTests
         IPluginLifecycleStore lifecycles,
         IPluginMarketplaceReceiptStore receipts,
         PluginMarketplaceCatalogState catalogState,
-        IPluginMarketplaceCatalogTransport? transport = null
+        IPluginMarketplaceRepositoryTransport? transport = null
     )
     {
         var clock = new FixedTimeProvider(_now);
@@ -511,12 +511,24 @@ public sealed class PluginAdminTests
             ["queue", "chat"],
             null,
             [],
-            new("https://github.com/community/blokebot-plugins"),
-            "plugins/link-queue",
+            new("https://github.com/alsi-lawr/blokebot-plugins"),
+            "plugins/community.link-queue",
             Release("1.0.0", "release-v1"),
-            new(">=0.13.0 <0.14.0", "1", "5.4", ["linux-x64"])
+            Compatibility(PluginRuntimeIdentifier.LinuxX64)
         );
     }
+
+    private static PluginCompatibilityDeclaration Compatibility(
+        params PluginRuntimeIdentifier[] targets
+    ) =>
+        new(
+            PluginApiVersion.V1,
+            PluginApiVersion.V1,
+            PluginContractFixtures.SemanticVersion("0.13.0"),
+            PluginContractFixtures.SemanticVersion("0.14.0"),
+            PluginLuaVersion.Lua54,
+            [.. targets]
+        );
 
     private static PluginReleaseIdentity Release(string versionValue, string tagValue)
     {
@@ -720,11 +732,11 @@ public sealed class PluginAdminTests
             );
     }
 
-    private sealed class RejectingCatalogTransport : IPluginMarketplaceCatalogTransport
+    private sealed class RejectingCatalogTransport : IPluginMarketplaceRepositoryTransport
     {
         internal int Calls { get; private set; }
 
-        public ValueTask<PluginMarketplaceCatalogDownload> DownloadAsync(
+        public ValueTask<PluginMarketplaceRepositoryDownload> DownloadAsync(
             string? entityTag,
             DateTimeOffset? modifiedSince,
             CancellationToken cancellationToken

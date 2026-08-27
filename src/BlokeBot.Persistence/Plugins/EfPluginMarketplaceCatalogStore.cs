@@ -1,12 +1,10 @@
-using System.Collections.Immutable;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Features;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Persistence.Plugins;
 
-public sealed class EfPluginMarketplaceCatalogStore(
+public sealed partial class EfPluginMarketplaceCatalogStore(
     IDbContextFactory<BlokeBotDbContext> contextFactory
 ) : IPluginMarketplaceCatalogStore
 {
@@ -37,7 +35,22 @@ public sealed class EfPluginMarketplaceCatalogStore(
         if (snapshot.SchemaVersion != 1)
         {
             throw new ArgumentException(
-                "Unsupported marketplace schema version.",
+                "Unsupported marketplace snapshot schema version.",
+                nameof(snapshot)
+            );
+        }
+
+        if (
+            snapshot.Entries.IsDefault
+            || snapshot.Entries.Any(entry =>
+                entry.RepositoryUrl != PluginMarketplaceRepositoryAuthority.RepositoryUrl
+                || entry.PackagePath
+                    != PluginMarketplaceRepositoryAuthority.PackagePath(entry.PluginId)
+            )
+        )
+        {
+            throw new ArgumentException(
+                "A marketplace snapshot entry is outside the curated repository.",
                 nameof(snapshot)
             );
         }
@@ -150,9 +163,9 @@ public sealed class EfPluginMarketplaceCatalogStore(
                 IconUrl = entry.IconUrl?.AbsoluteUri,
                 RepositoryUrl = entry.RepositoryUrl.AbsoluteUri.TrimEnd('/'),
                 PackagePath = entry.PackagePath,
-                CompatibilityBlokeBot = entry.Compatibility.BlokeBot,
-                CompatibilityPluginApi = entry.Compatibility.PluginApi,
-                CompatibilityLua = entry.Compatibility.Lua,
+                CompatibilityBlokeBot = BlokeBotRange(entry.Compatibility),
+                CompatibilityPluginApi = ApiRange(entry.Compatibility),
+                CompatibilityLua = "5.4",
             }
         );
         context.AddRange(
@@ -182,7 +195,7 @@ public sealed class EfPluginMarketplaceCatalogStore(
             )
         );
         context.AddRange(
-            entry.Compatibility.Targets.Select(
+            entry.Compatibility.SupportedTargets.Select(
                 (value, position) =>
                     new PluginMarketplaceCatalogTargetRecord
                     {
@@ -190,150 +203,9 @@ public sealed class EfPluginMarketplaceCatalogStore(
                         DeclaredVersion = version,
                         MutableTag = tag,
                         Position = position,
-                        Value = value,
+                        Value = RuntimeIdentifier(value),
                     }
             )
         );
     }
-
-    private static async ValueTask<PluginMarketplaceCatalogState> MapAsync(
-        BlokeBotDbContext context,
-        PluginMarketplaceCatalogStateRecord state,
-        CancellationToken cancellationToken
-    )
-    {
-        var attemptedAt = Utc(state.LastAttemptAtUtc);
-        if (state.SchemaVersion is null || state.FetchedAtUtc is null)
-        {
-            var invalid =
-                state.SchemaVersion is not null
-                || state.FetchedAtUtc is not null
-                || await context.PluginMarketplaceCatalogEntries.AnyAsync(cancellationToken);
-            return invalid
-                ? throw InvalidData()
-                : new(
-                    null,
-                    attemptedAt,
-                    state.FailureCode,
-                    state.SourceETag,
-                    Utc(state.SourceModifiedAtUtc)
-                );
-        }
-
-        if (state.SchemaVersion != 1)
-        {
-            throw InvalidData();
-        }
-
-        var entryRecords = await context
-            .PluginMarketplaceCatalogEntries.AsNoTracking()
-            .OrderBy(value => value.PluginId)
-            .ThenBy(value => value.DeclaredVersion)
-            .ThenBy(value => value.MutableTag)
-            .ToArrayAsync(cancellationToken);
-        var tags = await context
-            .Set<PluginMarketplaceCatalogTagRecord>()
-            .AsNoTracking()
-            .OrderBy(value => value.Position)
-            .ToArrayAsync(cancellationToken);
-        var media = await context
-            .Set<PluginMarketplaceCatalogMediaRecord>()
-            .AsNoTracking()
-            .OrderBy(value => value.Position)
-            .ToArrayAsync(cancellationToken);
-        var targets = await context
-            .Set<PluginMarketplaceCatalogTargetRecord>()
-            .AsNoTracking()
-            .OrderBy(value => value.Position)
-            .ToArrayAsync(cancellationToken);
-        var entries = entryRecords
-            .Select(entry => Map(entry, tags, media, targets))
-            .ToImmutableArray();
-        return new(
-            new(state.SchemaVersion.Value, Utc(state.FetchedAtUtc.Value), entries),
-            attemptedAt,
-            state.FailureCode,
-            state.SourceETag,
-            Utc(state.SourceModifiedAtUtc)
-        );
-    }
-
-    private static PluginMarketplaceCatalogEntry Map(
-        PluginMarketplaceCatalogEntryRecord record,
-        IReadOnlyList<PluginMarketplaceCatalogTagRecord> tags,
-        IReadOnlyList<PluginMarketplaceCatalogMediaRecord> media,
-        IReadOnlyList<PluginMarketplaceCatalogTargetRecord> targets
-    )
-    {
-        if (
-            !PluginId.TryCreate(record.PluginId, out var pluginId)
-            || !SemanticVersion.TryCreate(record.DeclaredVersion, out var version)
-            || !PluginGitTag.TryCreate(record.MutableTag, out var tag)
-            || !TryHttps(record.IconUrl, optional: true, out var iconUrl)
-            || !TryHttps(record.RepositoryUrl, optional: false, out var repositoryUrl)
-        )
-        {
-            throw InvalidData();
-        }
-
-        var key = (record.PluginId, record.DeclaredVersion, record.MutableTag);
-        var entryTags = tags.Where(value =>
-                Key(value.PluginId, value.DeclaredVersion, value.MutableTag) == key
-            )
-            .Select(value => value.Value)
-            .ToImmutableArray();
-        var entryMedia = media
-            .Where(value => Key(value.PluginId, value.DeclaredVersion, value.MutableTag) == key)
-            .Select(value =>
-                TryHttps(value.Url, optional: false, out var uri) ? uri! : throw InvalidData()
-            )
-            .ToImmutableArray();
-        var entryTargets = targets
-            .Where(value => Key(value.PluginId, value.DeclaredVersion, value.MutableTag) == key)
-            .Select(value => value.Value)
-            .ToImmutableArray();
-        return new(
-            pluginId,
-            record.Name,
-            record.Summary,
-            record.Author,
-            entryTags,
-            iconUrl,
-            entryMedia,
-            repositoryUrl!,
-            record.PackagePath,
-            new(version, tag),
-            new(
-                record.CompatibilityBlokeBot,
-                record.CompatibilityPluginApi,
-                record.CompatibilityLua,
-                entryTargets
-            )
-        );
-    }
-
-    private static (string PluginId, string Version, string Tag) Key(
-        string pluginId,
-        string version,
-        string tag
-    ) => (pluginId, version, tag);
-
-    private static bool TryHttps(string? value, bool optional, out Uri? uri)
-    {
-        uri = null;
-        return value is null
-            ? optional
-            : value.StartsWith("https://", StringComparison.Ordinal)
-                && Uri.TryCreate(value, UriKind.Absolute, out uri)
-                && uri.Scheme == Uri.UriSchemeHttps
-                && string.IsNullOrEmpty(uri.UserInfo);
-    }
-
-    private static DateTimeOffset Utc(DateTime value) =>
-        new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
-
-    private static DateTimeOffset? Utc(DateTime? value) => value is null ? null : Utc(value.Value);
-
-    private static InvalidOperationException InvalidData() =>
-        new("Persisted plugin marketplace catalog data is invalid.");
 }

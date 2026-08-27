@@ -3,12 +3,17 @@ using BlokeBot.Plugins.Contracts;
 
 namespace BlokeBot.Plugins.Features;
 
-public sealed record PluginMarketplaceCompatibility(
-    string BlokeBot,
-    string PluginApi,
-    string Lua,
-    ImmutableArray<string> Targets
-);
+internal static class PluginMarketplaceRepositoryAuthority
+{
+    internal static Uri RepositoryUrl { get; } =
+        new("https://github.com/alsi-lawr/blokebot-plugins");
+
+    internal static string PackagePath(PluginId pluginId)
+    {
+        ArgumentNullException.ThrowIfNull(pluginId);
+        return $"plugins/{pluginId.Value}";
+    }
+}
 
 public sealed record PluginMarketplaceCatalogEntry(
     PluginId PluginId,
@@ -21,7 +26,7 @@ public sealed record PluginMarketplaceCatalogEntry(
     Uri RepositoryUrl,
     string PackagePath,
     PluginReleaseIdentity Release,
-    PluginMarketplaceCompatibility Compatibility
+    PluginCompatibilityDeclaration Compatibility
 );
 
 public sealed record PluginMarketplaceCatalogSnapshot(
@@ -42,37 +47,12 @@ public sealed record PluginMarketplaceCatalogState(
         LastValid is null ? null : timeProvider.GetUtcNow() - LastValid.RefreshedAt;
 }
 
-public enum PluginMarketplaceCatalogFailureCode
-{
-    MalformedJson,
-    UnsupportedSchema,
-    InvalidEntry,
-    DuplicateRelease,
-}
-
 public enum PluginMarketplaceRefreshFailureCode
 {
     DownloadFailed,
-    MalformedCatalog,
-    UnsupportedSchema,
-    InvalidEntry,
-    DuplicateRelease,
-}
-
-public sealed record PluginMarketplaceCatalogFailure(
-    PluginMarketplaceCatalogFailureCode Code,
-    string Location
-);
-
-public abstract record PluginMarketplaceCatalogValidationOutcome
-{
-    private PluginMarketplaceCatalogValidationOutcome() { }
-
-    public sealed record Accepted(ImmutableArray<PluginMarketplaceCatalogEntry> Entries)
-        : PluginMarketplaceCatalogValidationOutcome;
-
-    public sealed record Rejected(PluginMarketplaceCatalogFailure Failure)
-        : PluginMarketplaceCatalogValidationOutcome;
+    RepositoryInvalid,
+    InvalidManifest,
+    DuplicatePlugin,
 }
 
 public interface IPluginMarketplaceCatalogStore

@@ -85,6 +85,10 @@ internal static class PluginAuthorReferenceEmitter
             $"A marketplace submission names the manifest's declared semantic version and one mutable Git tag. `PluginGitTagSyntaxContract.Current` accepts {tags.MinimumLength}-{tags.MaximumLength} characters and rejects all-hex values {tags.MinimumCommitShaLength}-{tags.MaximumCommitShaLength} characters long, so a commit SHA is never plugin identity."
         );
         _ = output.AppendLine();
+        _ = output.AppendLine(
+            $"The curated repository path is `plugins/<plugin-id>/{PluginPackage.ManifestPath}`. The directory name exactly matches the manifest ID. The manifest owns author, search tags, optional presentation URLs, supported release targets, release identity, compatibility, and runtime declarations; there is no global catalogue or generated index."
+        );
+        _ = output.AppendLine();
     }
 
     private static void AppendPackage(PluginAuthoringContract contract, StringBuilder output)
@@ -97,7 +101,7 @@ internal static class PluginAuthorReferenceEmitter
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Every asset and payload declares its path, purpose, maximum size, and supported runtime identifiers. Compatibility requires the selected runtime identifier on every declaration. Payloads may be native files, .NET assemblies, WebAssembly, or another plugin-managed type. Admission enforces declarations, targets, paths, links, collisions, and byte limits; it does not infer or police a payload's byte type from its extension."
+            "Every asset and payload declares its path, purpose, maximum size, and supported runtime identifiers. Every declaration target must be one of the manifest's supported release targets; separate declarations may select different target subsets. Payloads may be native files, .NET assemblies, WebAssembly, or another plugin-managed type. Admission enforces declarations, targets, paths, links, collisions, and byte limits; it does not infer or police a payload's byte type from its extension."
         );
         _ = output.AppendLine();
         _ = output.AppendLine("Supported runtime identifiers:");
@@ -296,7 +300,7 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine();
         _ = output.AppendLine(
             CultureInfo.InvariantCulture,
-            $"`{PluginLifecycleOperationKind.Remove}` is destructive for plugin-owned state. Canonical removal owners delete the installed package, installation and channel settings, feature state, configuration, secrets, schedules, private data, automation definitions, ledgers, dependent flows and nodes, run history, marketplace receipts, and invocation context. A retained owner resource faults removal as `{PluginLifecycleFailureCode.RemovalFailed}`; there is no purge or retention mode. Global marketplace catalogue metadata is not plugin-owned installation state and remains discoverable for a later install."
+            $"`{PluginLifecycleOperationKind.Remove}` is destructive for plugin-owned state. Canonical removal owners delete the installed package, installation and channel settings, feature state, configuration, secrets, schedules, private data, automation definitions, ledgers, dependent flows and nodes, run history, marketplace receipts, and invocation context. A retained owner resource faults removal as `{PluginLifecycleFailureCode.RemovalFailed}`; there is no purge or retention mode. The derived marketplace snapshot is not plugin-owned installation state and remains discoverable for a later install."
         );
     }
 
@@ -350,6 +354,11 @@ internal static class PluginAuthorReferenceEmitter
 
     private static Type Unwrap(Type type)
     {
+        if (type == typeof(string))
+        {
+            return type;
+        }
+
         var nullable = Nullable.GetUnderlyingType(type);
         if (nullable is not null)
         {

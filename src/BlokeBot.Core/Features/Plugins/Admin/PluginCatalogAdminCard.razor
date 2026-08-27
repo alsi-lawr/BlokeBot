@@ -1,4 +1,5 @@
 @namespace BlokeBot.Core.Features.Plugins
+@using BlokeBot.Plugins.Contracts
 
 <article class="card plugin-admin-catalog-card" data-catalog-plugin="@CatalogEntry.Entry.PluginId.Value">
     <div class="flex min-w-0 items-start gap-3">
@@ -36,8 +37,8 @@
     <dl class="plugin-admin-catalog-card__metadata">
         <div><dt>Version</dt><dd>@CatalogEntry.Entry.Release.DeclaredVersion.Value</dd></div>
         <div><dt>Mutable tag</dt><dd class="font-mono">@CatalogEntry.Entry.Release.Tag.Value</dd></div>
-        <div><dt>BlokeBot</dt><dd>@CatalogEntry.Entry.Compatibility.BlokeBot</dd></div>
-        <div><dt>Plugin API</dt><dd>@CatalogEntry.Entry.Compatibility.PluginApi</dd></div>
+        <div><dt>BlokeBot</dt><dd>@BlokeBotRange(CatalogEntry.Entry.Compatibility)</dd></div>
+        <div><dt>Plugin API</dt><dd>@PluginApiRange(CatalogEntry.Entry.Compatibility)</dd></div>
     </dl>
 
     @if (!CatalogEntry.Compatible)
@@ -63,4 +64,14 @@
 
     [Parameter, EditorRequired]
     public EventCallback<PluginAdminCatalogEntry> Install { get; set; }
+
+    private static string BlokeBotRange(PluginCompatibilityDeclaration compatibility) =>
+        $">={compatibility.MinimumBlokeBotVersion.Value} <{compatibility.MaximumBlokeBotVersionExclusive.Value}";
+
+    private static string PluginApiRange(PluginCompatibilityDeclaration compatibility) =>
+        compatibility.MinimumApiVersion == compatibility.MaximumApiVersion
+            ? compatibility.MinimumApiVersion.Value.ToString(
+                System.Globalization.CultureInfo.InvariantCulture
+            )
+            : $"{compatibility.MinimumApiVersion.Value}-{compatibility.MaximumApiVersion.Value}";
 }
