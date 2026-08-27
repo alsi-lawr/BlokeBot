@@ -277,7 +277,7 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("## Executable examples");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Published sources live under `examples/plugins`. Optional package-local `tests.toml` files define author-harness scenarios; they are not part of normal plugin package validation. The Contracts test harness packages each example from local files, validates it for its declared runtime targets, and executes every declared scenario through the supported worker protocol. The harness has deterministic host adapters and does not install into the production local-source directory, join production inventory, contact Twitch, or make third-party network requests."
+            "Published sources live under `examples/plugins`. Optional package-local `tests.toml` files define author-harness scenarios; they are not part of normal plugin package validation. The Contracts test harness packages each example from local files, validates it for every supported RID, and executes every declared scenario through the supported worker protocol on the current RID. The harness has deterministic host adapters and does not install into the production local-source directory, join production inventory, contact Twitch, or make third-party network requests."
         );
         _ = output.AppendLine();
     }
