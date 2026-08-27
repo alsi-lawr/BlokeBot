@@ -137,7 +137,7 @@ public partial class PluginFeaturePage
             case PluginPageResolution.Removed:
                 PresentState(
                     "This plugin was removed",
-                    "Reinstall the plugin to use this page. Its retained settings have not been changed.",
+                    "Reinstall the plugin to use this page. Removing it deleted its settings and data.",
                     null,
                     string.Empty
                 );

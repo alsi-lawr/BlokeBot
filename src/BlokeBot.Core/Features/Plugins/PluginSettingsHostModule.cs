@@ -35,18 +35,21 @@ public sealed class PluginSettingsHostModule(
             return Unavailable();
         }
 
-        var configuration = await store.LoadConfigurationAsync(owner, cancellationToken);
-        var protectedSecrets = await store.LoadProtectedSecretsAsync(owner, cancellationToken);
+        var snapshot = await store.LoadConfigurationSnapshotAsync(owner, cancellationToken);
         var values = ImmutableArray.CreateBuilder<PluginValueProperty>();
         foreach (
-            var entry in configuration.Values.Entries.Where(entry =>
+            var entry in snapshot.Configuration.Values.Entries.Where(entry =>
                 declared.Contains(entry.SettingId)
             )
         )
         {
             values.Add(new(entry.SettingId.Value, Value(entry.Value)));
         }
-        foreach (var entry in protectedSecrets.Where(entry => declared.Contains(entry.SettingId)))
+        foreach (
+            var entry in snapshot.ProtectedSecrets.Where(entry =>
+                declared.Contains(entry.SettingId)
+            )
+        )
         {
             var key = owner.Match<PluginSecretKey>(
                 installationOwner => new PluginSecretKey.Installation(

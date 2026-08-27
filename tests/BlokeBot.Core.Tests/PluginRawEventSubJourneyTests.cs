@@ -559,7 +559,7 @@ public sealed class PluginRawEventSubJourneyTests
             CancellationToken cancellationToken
         ) => throw new NotSupportedException();
 
-        public ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadProtectedSecretsAsync(
+        public ValueTask<PluginConfigurationReadSnapshot> LoadConfigurationSnapshotAsync(
             PluginConfigurationOwner owner,
             CancellationToken cancellationToken
         ) => throw new NotSupportedException();

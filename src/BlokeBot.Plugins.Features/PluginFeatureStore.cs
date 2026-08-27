@@ -35,6 +35,11 @@ public sealed record PluginConfigurationState(
     PluginConfigurationRevision Revision
 );
 
+public sealed record PluginConfigurationReadSnapshot(
+    PluginConfigurationState Configuration,
+    IReadOnlyList<PluginProtectedSecretEntry> ProtectedSecrets
+);
+
 public sealed record PluginConfigurationStoreWrite(
     PluginConfigurationState Expected,
     PluginSettingValues Values,
@@ -96,7 +101,7 @@ public interface IPluginFeatureStore
         CancellationToken cancellationToken
     );
 
-    ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadProtectedSecretsAsync(
+    ValueTask<PluginConfigurationReadSnapshot> LoadConfigurationSnapshotAsync(
         PluginConfigurationOwner owner,
         CancellationToken cancellationToken
     );

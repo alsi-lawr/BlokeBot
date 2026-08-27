@@ -303,6 +303,43 @@ public sealed class PluginPageBridgeTests
         ).ShouldBeOfType<PluginPackageAssetResolution.Unavailable>();
     }
 
+    [Test]
+    public async Task RemovedPluginPage_StatesThatRemoveDeletedPluginSettingsAndData()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        using var context = UiTestContextFactory.Create(database, hostId: 1);
+        var setup = PageSetup.Create();
+        _ = setup.Runtime.Publish(
+            setup.Lifecycle with
+            {
+                ActiveRuntime = null,
+                Phase = PluginLifecyclePhase.Removed,
+            },
+            worker: null
+        );
+        _ = context.Services.AddSingleton(setup.Catalogue);
+        _ = context.Services.AddSingleton<PluginPageSessionRegistry>();
+        _ = context.Services.AddSingleton<IPluginDispatchInvoker>(new UnavailableDispatchInvoker());
+        _ = context.Services.AddSingleton<IPluginDispatchSnapshotProvider>(
+            new EmptyDispatchSnapshotProvider()
+        );
+        var page = setup.Manifest.Manifest.GeneratedPages.ShouldHaveSingleItem();
+
+        var rendered = context.Render<PluginFeaturePage>(parameters =>
+            parameters
+                .Add(component => component.PluginIdValue, setup.Manifest.Manifest.Id.Value)
+                .Add(component => component.FeatureIdValue, page.FeatureId.Value)
+                .Add(component => component.RouteValue, page.Route)
+        );
+
+        rendered.WaitForAssertion(() =>
+        {
+            rendered.Markup.ShouldContain("This plugin was removed");
+            rendered.Markup.ShouldContain("Removing it deleted its settings and data.");
+            rendered.Markup.ShouldNotContain("retained settings");
+        });
+    }
+
     private static HttpRequestMessage Request(string route, int selectedHost)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, route);
@@ -445,7 +482,12 @@ public sealed class PluginPageBridgeTests
         }
     }
 
-    private sealed record PageSetup(ValidatedPluginManifest Manifest, PluginPageCatalog Catalogue)
+    private sealed record PageSetup(
+        ValidatedPluginManifest Manifest,
+        PluginPageCatalog Catalogue,
+        PluginRuntimeSnapshotRegistry Runtime,
+        PluginLifecycleState Lifecycle
+    )
     {
         internal static PageSetup Create(byte[]? manifestToml = null)
         {
@@ -484,26 +526,60 @@ public sealed class PluginPageBridgeTests
                 manifest.Manifest.Release
             );
             var now = DateTimeOffset.UtcNow;
-            _ = runtime.Publish(
-                new(
-                    manifest.Manifest.Id,
-                    installation,
-                    fence.OperationId,
-                    fence.Generation,
-                    new(installation, fence),
-                    PluginLifecyclePhase.Active,
-                    PluginLifecycleOperationKind.Activate,
-                    null,
-                    false,
-                    null,
-                    PluginLifecycleOutcome.Progress(PluginLifecycleOutcomeCode.Activated, now),
-                    1,
-                    now
-                ),
-                new EmptyWorker()
+            var lifecycle = new PluginLifecycleState(
+                manifest.Manifest.Id,
+                installation,
+                fence.OperationId,
+                fence.Generation,
+                new(installation, fence),
+                PluginLifecyclePhase.Active,
+                PluginLifecycleOperationKind.Activate,
+                null,
+                false,
+                null,
+                PluginLifecycleOutcome.Progress(PluginLifecycleOutcomeCode.Activated, now),
+                1,
+                now
             );
-            return new(manifest, new(declarations, features, runtime));
+            _ = runtime.Publish(lifecycle, new EmptyWorker());
+            return new(manifest, new(declarations, features, runtime), runtime, lifecycle);
         }
+    }
+
+    private sealed class EmptyDispatchSnapshotProvider : IPluginDispatchSnapshotProvider
+    {
+        public PluginDispatchSnapshot Current => PluginDispatchSnapshot.Empty;
+    }
+
+    private sealed class UnavailableDispatchInvoker : IPluginDispatchInvoker
+    {
+        public ValueTask<PluginDispatchInvocationOutcome> InvokeCommandAsync(
+            PluginDispatchEndpoint.Command endpoint,
+            PluginInvocationContext.Channel context,
+            PluginValue input,
+            CancellationToken cancellationToken
+        ) => Unavailable();
+
+        public ValueTask<PluginDispatchInvocationOutcome> InvokeEventAsync(
+            PluginDispatchEndpoint.Event endpoint,
+            PluginInvocationContext.Channel context,
+            PluginValue input,
+            CancellationToken cancellationToken
+        ) => Unavailable();
+
+        public ValueTask<PluginDispatchInvocationOutcome> InvokeScheduleAsync(
+            PluginDispatchEndpoint.Schedule endpoint,
+            PluginInvocationContext.Channel context,
+            PluginValue input,
+            CancellationToken cancellationToken
+        ) => Unavailable();
+
+        private static ValueTask<PluginDispatchInvocationOutcome> Unavailable() =>
+            ValueTask.FromResult<PluginDispatchInvocationOutcome>(
+                new PluginDispatchInvocationOutcome.Rejected(
+                    PluginDispatchInvocationRejectionCode.FeatureUnavailable
+                )
+            );
     }
 
     private sealed class PackageResolver(ValidatedPluginManifest manifest, string root)

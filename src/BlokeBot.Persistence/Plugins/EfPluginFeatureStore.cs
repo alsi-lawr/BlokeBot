@@ -1,3 +1,4 @@
+using System.Data;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Features;
 using Microsoft.EntityFrameworkCore;
@@ -9,23 +10,28 @@ public sealed partial class EfPluginFeatureStore(
     PluginSettingValuesCodec codec
 ) : IPluginFeatureStore
 {
-    public ValueTask<PluginConfigurationState> LoadConfigurationAsync(
+    public async ValueTask<PluginConfigurationState> LoadConfigurationAsync(
         PluginConfigurationOwner owner,
         CancellationToken cancellationToken
-    ) =>
-        owner.Match(
-            installation => LoadInstallationAsync(installation, cancellationToken),
-            feature => LoadFeatureConfigurationAsync(feature, cancellationToken)
-        );
+    ) => (await LoadConfigurationSnapshotAsync(owner, cancellationToken)).Configuration;
 
-    public ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadProtectedSecretsAsync(
+    public async ValueTask<PluginConfigurationReadSnapshot> LoadConfigurationSnapshotAsync(
         PluginConfigurationOwner owner,
         CancellationToken cancellationToken
-    ) =>
-        owner.Match(
-            installation => LoadInstallationSecretsAsync(installation, cancellationToken),
-            feature => LoadFeatureSecretsAsync(feature, cancellationToken)
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken
         );
+        var snapshot = await owner.Match(
+            installation => LoadInstallationSnapshotAsync(db, installation, cancellationToken),
+            feature => LoadFeatureSnapshotAsync(db, feature, cancellationToken)
+        );
+        await transaction.CommitAsync(cancellationToken);
+        return snapshot;
+    }
 
     public async ValueTask<PluginFeatureState?> LoadFeatureStateAsync(
         PluginFeatureKey key,

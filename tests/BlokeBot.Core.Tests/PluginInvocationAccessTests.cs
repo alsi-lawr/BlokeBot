@@ -1,3 +1,4 @@
+using System.Data.Common;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Plugins;
@@ -6,6 +7,8 @@ using BlokeBot.Plugins.Contracts.Testing;
 using BlokeBot.Plugins.Features;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -125,6 +128,93 @@ public sealed class PluginInvocationAccessTests
         _ = protector
             .Unprotect(second, protectedSecret)
             .ShouldBeOfType<PluginSecretUnprotectOutcome.Failed>();
+    }
+
+    [Test]
+    public async Task SettingsRead_OverlappingAtomicWrite_ReturnsOneConsistentSqliteSnapshot()
+    {
+        var barrier = new ConfigurationSnapshotBarrier();
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(barrier);
+        await SeedHostsAsync(database);
+        var store = new EfPluginFeatureStore(database, new());
+        var declaration = Declaration();
+        var protector = new DataProtectionPluginSecretProtector(
+            new EphemeralDataProtectionProvider()
+        );
+        var module = new PluginSettingsHostModule(store, declaration.Registry, protector);
+        var installation = declaration.Declaration.Installation;
+        var owner = new PluginConfigurationOwner.Installation(installation.PluginId);
+        var setting = Setting("service-token");
+        const string OldToken = "old-token-value";
+        const string NewToken = "new-token-value";
+        var initial = await store.WriteConfigurationAsync(
+            new(
+                new(owner, PluginSettingValues.Empty, [], PluginConfigurationRevision.Initial),
+                InstallationValues("manual"),
+                new(
+                    [
+                        new(
+                            setting,
+                            protector.Protect(
+                                new PluginSecretKey.Installation(installation.PluginId, setting),
+                                Plaintext(OldToken)
+                            )
+                        ),
+                    ],
+                    []
+                )
+            ),
+            CancellationToken.None
+        );
+        var expected = initial.ShouldBeOfType<PluginConfigurationStoreWriteOutcome.Written>().State;
+        var identity = Identity(Host(1), installation);
+        barrier.Arm();
+
+        var read = module
+            .InvokeAsync(
+                identity,
+                Call(module.Descriptor, 0, identity.Context),
+                CancellationToken.None
+            )
+            .AsTask();
+        await barrier.WaitUntilReadPausedAsync();
+        var write = Task.Run(async () =>
+            await store.WriteConfigurationAsync(
+                new(
+                    expected,
+                    InstallationValues("automatic"),
+                    new(
+                        [
+                            new(
+                                setting,
+                                protector.Protect(
+                                    new PluginSecretKey.Installation(
+                                        installation.PluginId,
+                                        setting
+                                    ),
+                                    Plaintext(NewToken)
+                                )
+                            ),
+                        ],
+                        []
+                    )
+                ),
+                CancellationToken.None
+            )
+        );
+        await barrier.WaitUntilWriteAttemptedAsync();
+        var completedBeforeReadReleased = write.IsCompleted;
+
+        barrier.ReleaseRead();
+        var returned = (await read).ShouldBeOfType<PluginHostCallOutcome.Returned>();
+        _ = (await write).ShouldBeOfType<PluginConfigurationStoreWriteOutcome.Written>();
+        completedBeforeReadReleased.ShouldBeFalse();
+        var values = Properties(returned.Value.ShouldBeOfType<PluginValue.Map>());
+        var mode = values["moderation-mode"].ShouldBeOfType<PluginValue.String>().Value;
+        var token = values["service-token"].ShouldBeOfType<PluginValue.String>().Value;
+        var completeOld = mode == "manual" && token == OldToken;
+        var completeNew = mode == "automatic" && token == NewToken;
+        (completeOld || completeNew).ShouldBeTrue();
     }
 
     private static async Task WriteFeatureAsync(
@@ -267,6 +357,19 @@ public sealed class PluginInvocationAccessTests
             ? created.Values
             : throw new InvalidOperationException("Duplicate setting fixture.");
 
+    private static PluginSettingValues InstallationValues(string mode) =>
+        Values(
+            new PluginSettingValueEntry(
+                Setting("moderation-mode"),
+                new PluginSettingValue.Choice(Choice(mode))
+            )
+        );
+
+    private static PluginSecretPlaintext Plaintext(string value) =>
+        PluginSecretPlaintext.TryCreate(value, 256, out var plaintext)
+            ? plaintext
+            : throw new InvalidOperationException("Invalid secret fixture.");
+
     private static PluginSettingId Setting(string value) =>
         PluginSettingId.TryCreate(value, out var setting)
             ? setting
@@ -319,4 +422,72 @@ public sealed class PluginInvocationAccessTests
         PluginWorkerCancellationId.TryCreate(Guid.NewGuid(), out var id)
             ? id
             : throw new InvalidOperationException("Invalid cancellation fixture.");
+
+    private sealed class ConfigurationSnapshotBarrier
+        : DbCommandInterceptor,
+            IDbConnectionInterceptor
+    {
+        private readonly TaskCompletionSource _readPaused = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _readReleased = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _writeAttempted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _armed;
+        private int _connectionsOpened;
+        private int _intercepted;
+
+        internal void Arm() => _ = Interlocked.Exchange(ref _armed, 1);
+
+        internal async Task WaitUntilReadPausedAsync() =>
+            await _readPaused.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        internal async Task WaitUntilWriteAttemptedAsync() =>
+            await _writeAttempted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        internal void ReleaseRead() => _ = _readReleased.TrySetResult();
+
+        public Task ConnectionOpenedAsync(
+            DbConnection connection,
+            ConnectionEndEventData eventData,
+            CancellationToken cancellationToken = default
+        )
+        {
+            ((SqliteConnection)connection).DefaultTimeout = 10;
+            if (
+                Volatile.Read(ref _armed) == 1
+                && Interlocked.Increment(ref _connectionsOpened) == 2
+            )
+            {
+                _ = _writeAttempted.TrySetResult();
+            }
+            return Task.CompletedTask;
+        }
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                Volatile.Read(ref _armed) == 1
+                && command.CommandText.Contains(
+                    "FROM \"plugin_installation_secrets\"",
+                    StringComparison.Ordinal
+                )
+                && Interlocked.CompareExchange(ref _intercepted, 1, 0) == 0
+            )
+            {
+                _ = _readPaused.TrySetResult();
+                await _readReleased.Task.WaitAsync(cancellationToken);
+            }
+
+            return result;
+        }
+    }
 }

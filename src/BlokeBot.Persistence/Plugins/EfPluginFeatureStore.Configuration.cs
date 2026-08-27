@@ -1,4 +1,3 @@
-using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Features;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -57,32 +56,28 @@ public sealed partial class EfPluginFeatureStore
         );
     }
 
-    private async ValueTask<PluginConfigurationState> LoadInstallationAsync(
+    private async ValueTask<PluginConfigurationReadSnapshot> LoadInstallationSnapshotAsync(
+        BlokeBotDbContext db,
         PluginConfigurationOwner.Installation owner,
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var record = await db
             .PluginInstallationConfigurations.AsNoTracking()
             .SingleOrDefaultAsync(
                 value => value.PluginId == owner.PluginId.Value,
                 cancellationToken
             );
-        var secrets = await db
-            .PluginInstallationSecrets.AsNoTracking()
-            .Where(value => value.PluginId == owner.PluginId.Value)
-            .Select(value => value.SettingId)
-            .ToListAsync(cancellationToken);
-        return Configuration(owner, record?.ValuesJson, record?.Revision, secrets);
+        var secrets = await LoadInstallationSecretsAsync(db, owner, cancellationToken);
+        return Snapshot(owner, record?.ValuesJson, record?.Revision, secrets);
     }
 
-    private async ValueTask<PluginConfigurationState> LoadFeatureConfigurationAsync(
+    private async ValueTask<PluginConfigurationReadSnapshot> LoadFeatureSnapshotAsync(
+        BlokeBotDbContext db,
         PluginConfigurationOwner.Feature owner,
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var key = owner.Key;
         var record = await db
             .PluginFeatureConfigurations.AsNoTracking()
@@ -93,23 +88,15 @@ public sealed partial class EfPluginFeatureStore
                     && value.HostId == key.HostId.Value,
                 cancellationToken
             );
-        var secrets = await db
-            .PluginFeatureSecrets.AsNoTracking()
-            .Where(value =>
-                value.PluginId == key.PluginId.Value
-                && value.FeatureId == key.FeatureId.Value
-                && value.HostId == key.HostId.Value
-            )
-            .Select(value => value.SettingId)
-            .ToListAsync(cancellationToken);
-        return Configuration(owner, record?.ValuesJson, record?.Revision, secrets);
+        var secrets = await LoadFeatureSecretsAsync(db, owner, cancellationToken);
+        return Snapshot(owner, record?.ValuesJson, record?.Revision, secrets);
     }
 
-    private PluginConfigurationState Configuration(
+    private PluginConfigurationReadSnapshot Snapshot(
         PluginConfigurationOwner owner,
         string? json,
         long? revisionValue,
-        IEnumerable<string> secretIds
+        IReadOnlyList<PluginProtectedSecretEntry> secrets
     )
     {
         var revision =
@@ -117,19 +104,18 @@ public sealed partial class EfPluginFeatureStore
             && PluginConfigurationRevision.TryCreate(value, out var parsed)
                 ? parsed
                 : PluginConfigurationRevision.Initial;
-        var secrets = secretIds.Select(SecretPresence).ToArray();
         return new(
-            owner,
-            json is null ? PluginSettingValues.Empty : Decode(json),
-            secrets,
-            revision
+            new(
+                owner,
+                json is null ? PluginSettingValues.Empty : Decode(json),
+                secrets
+                    .Select(static secret => new PluginSecretPresence(secret.SettingId, true))
+                    .ToArray(),
+                revision
+            ),
+            secrets
         );
     }
-
-    private static PluginSecretPresence SecretPresence(string value) =>
-        PluginSettingId.TryCreate(value, out var settingId)
-            ? new(settingId, true)
-            : throw new InvalidOperationException("Persisted plugin secret identity is invalid.");
 
     private static async Task WriteInstallationAsync(
         BlokeBotDbContext db,

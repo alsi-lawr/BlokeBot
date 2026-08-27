@@ -7,11 +7,11 @@ namespace BlokeBot.Persistence.Plugins;
 public sealed partial class EfPluginFeatureStore
 {
     private async ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadInstallationSecretsAsync(
+        BlokeBotDbContext db,
         PluginConfigurationOwner.Installation owner,
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var records = await db
             .PluginInstallationSecrets.AsNoTracking()
             .Where(value => value.PluginId == owner.PluginId.Value)
@@ -21,12 +21,12 @@ public sealed partial class EfPluginFeatureStore
     }
 
     private async ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadFeatureSecretsAsync(
+        BlokeBotDbContext db,
         PluginConfigurationOwner.Feature owner,
         CancellationToken cancellationToken
     )
     {
         var key = owner.Key;
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var records = await db
             .PluginFeatureSecrets.AsNoTracking()
             .Where(value =>
