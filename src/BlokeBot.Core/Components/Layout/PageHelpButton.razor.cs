@@ -99,7 +99,9 @@ public partial class PageHelpButton
         path switch
         {
             "/" => new(_homeHelp, "/dashboard"),
-            "/admin" => new(_adminHelp, "/channels"),
+            "/admin" => fragment == "plugins"
+                ? new(_adminHelp, "/server-owners/plugins")
+                : new(_adminHelp, "/channels"),
             "/alerts" => new(_alertsHelp, "/troubleshooting"),
             "/guessing" => new(_guessingDashboardHelp, "/guessing"),
             "/guessing/settings" => new(_guessingSettingsHelp, "/guessing"),

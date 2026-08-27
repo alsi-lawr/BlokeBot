@@ -95,7 +95,6 @@ internal static partial class SiteGuideCatalog
                     [
                         "If you deleted an automatic flow, disable and enable the feature. BlokeBot creates the flow again.",
                         "If the plugin is faulted or absent, ask a BlokeBot administrator to recover the installation.",
-                        "Format 1 cannot export a channel that contains plugin-owned settings, secrets, feature state, or plugin automation content.",
                     ],
                     Links =
                     [

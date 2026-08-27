@@ -177,15 +177,6 @@
         width: 100%;
     }
 
-    .plugin-admin-confirmation__warning {
-        background: var(--tone-amber-bg);
-        border: 1px solid var(--tone-amber-ring);
-        border-radius: 0.5rem;
-        color: var(--tone-amber-fg);
-        font-weight: 650;
-        padding: 0.75rem;
-    }
-
     .plugin-admin-confirmation__deletion-list {
         display: grid;
         gap: 0.25rem;

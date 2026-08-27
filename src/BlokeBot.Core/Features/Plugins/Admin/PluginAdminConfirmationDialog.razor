@@ -14,16 +14,14 @@
         {
             case PluginAdminConfirmation.Install install:
                 <h2 id="plugin-confirmation-title" class="text-lg font-bold text-slate-950">Install @install.Entry.Name?</h2>
-                <div id="plugin-confirmation-description" class="mt-2 space-y-3 text-sm leading-6 text-slate-700">
+                <div id="plugin-confirmation-description" class="mt-2 text-sm leading-6 text-slate-700">
                     <p>Install version @install.Entry.Release.DeclaredVersion.Value from tag <span class="font-mono">@install.Entry.Release.Tag.Value</span>.</p>
-                    <p class="plugin-admin-confirmation__warning">This plugin can access files, start processes, and use the network as the BlokeBot account.</p>
                 </div>
                 break;
             case PluginAdminConfirmation.Update update:
                 <h2 id="plugin-confirmation-title" class="text-lg font-bold text-slate-950">Update @update.Plugin.Name?</h2>
-                <div id="plugin-confirmation-description" class="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+                <div id="plugin-confirmation-description" class="mt-2 text-sm leading-6 text-slate-700">
                     <p>Apply version @update.Release.DeclaredVersion.Value from mutable tag <span class="font-mono">@update.Release.Tag.Value</span>.</p>
-                    <p>BlokeBot will stop the current plugin work before it applies the update.</p>
                 </div>
                 break;
             case PluginAdminConfirmation.Remove remove:

@@ -99,6 +99,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Update is always a manual administrator action. It downloads and validates the current package at the selected mutable tag.",
+                        "BlokeBot stops the current plugin work before it applies the update.",
                         "The old version stays active during non-durable preparation. If durable migration starts, the old code can never resume.",
                         "A validation, migration, or activation failure faults the selected installation. Correct the package or tag, then start a new administrator action.",
                     ],

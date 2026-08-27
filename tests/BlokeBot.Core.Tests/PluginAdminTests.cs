@@ -325,14 +325,10 @@ public sealed class PluginAdminTests
         );
 
         panel.Find("[data-catalog-plugin] .btn-primary").Click();
-        var warning = panel.FindAll(
-            "[data-plugin-confirmation-dialog] .plugin-admin-confirmation__warning"
-        );
-        warning
+        panel
+            .FindAll("[data-plugin-confirmation-dialog] #plugin-confirmation-description p")
             .ShouldHaveSingleItem()
-            .TextContent.ShouldBe(
-                "This plugin can access files, start processes, and use the network as the BlokeBot account."
-            );
+            .TextContent.ShouldBe("Install version 1.0.0 from tag release-v1.");
         service.Installations.ShouldBeEmpty();
         panel.Find("[data-plugin-confirmation-dialog] .btn-secondary").Click();
         service.Installations.ShouldBeEmpty();
@@ -358,7 +354,10 @@ public sealed class PluginAdminTests
             .FindAll("[data-installed-plugin] button")
             .Single(button => button.TextContent == "Update")
             .Click();
-        _ = panel.Find("[data-plugin-confirmation-dialog]");
+        panel
+            .FindAll("[data-plugin-confirmation-dialog] #plugin-confirmation-description p")
+            .ShouldHaveSingleItem()
+            .TextContent.ShouldBe("Apply version 1.0.0 from mutable tag release-v1.");
         service.Updates.ShouldBeEmpty();
 
         panel.Find("[data-plugin-confirmation-dialog] .btn-primary").Click();

@@ -50,6 +50,19 @@ public sealed class PageHelpButtonTests
             .ShouldBeTrue();
 
     [Test]
+    [Arguments("/admin#plugins", "https://guide.example.com/server-owners/plugins")]
+    [Arguments("/admin#administration", "https://guide.example.com/channels")]
+    public void AdminHelp_LinksToTheGuideForTheSelectedPanel(string location, string expected)
+    {
+        using var context = CreateContext("https://guide.example.com");
+        var help = RenderAt(context, location);
+
+        help.Find("button[aria-label='Page help']").Click();
+
+        help.Find("[data-help-guide]").GetAttribute("href").ShouldBe(expected);
+    }
+
+    [Test]
     public void HelpTrigger_TogglesClosedAndKeepsFocusOnTheTrigger()
     {
         using var context = CreateContext(null);
