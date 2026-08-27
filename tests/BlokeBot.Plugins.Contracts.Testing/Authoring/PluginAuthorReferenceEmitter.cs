@@ -186,6 +186,14 @@ internal static class PluginAuthorReferenceEmitter
             "Call `blokebot.host.call(module, operation, ...)`. Values are limited to nil, boolean, finite number, string, array, and string-keyed map. The generated Lua language-server stub supplies one overload per operation."
         );
         _ = output.AppendLine();
+        _ = output.AppendLine(
+            "`context.current` takes no arguments. The host derives its result from the admitted invocation; plugins cannot supply or override identities. Every result includes `kind`, `pluginId`, `pluginVersion`, and `pluginTag`. Channel results also include `hostId`, `featureId`, and any applicable `actor`, `stream`, `command`, `event`, `schedule`, or `web` map. Automation and page results include their exact host, feature, and invocation map. Migration results include only the migration identity in addition to the common fields."
+        );
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            "`settings.installation` and `settings.feature` also take no arguments. They return only configured values declared for the invoking plugin and exact installation or host-feature owner. Protected values are available only inside that admitted plugin invocation. Do not copy protected values into logs, diagnostics, audit fields, failure messages, or generated documents. Missing optional values are absent from the returned map; a configuration read or decryption fault returns only the generic typed host failure. Settings reads are unavailable during migration."
+        );
+        _ = output.AppendLine();
         _ = output.AppendLine("| Module | Operation | Contexts | Arguments | Result |");
         _ = output.AppendLine("| --- | --- | --- | --- | --- |");
         foreach (var module in contract.HostModules)

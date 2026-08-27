@@ -38,6 +38,7 @@ public sealed partial class PluginHostModuleCatalog
             || (
                 module.Descriptor.Id != PluginStandardHostModules.Storage.Id
                 && module.Descriptor.Id != PluginStandardHostModules.Diagnostics.Id
+                && module.Descriptor.Id != PluginStandardHostModules.Context.Id
             )
         )
         {

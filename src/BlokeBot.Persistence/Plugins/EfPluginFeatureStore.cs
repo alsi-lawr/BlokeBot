@@ -18,6 +18,15 @@ public sealed partial class EfPluginFeatureStore(
             feature => LoadFeatureConfigurationAsync(feature, cancellationToken)
         );
 
+    public ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadProtectedSecretsAsync(
+        PluginConfigurationOwner owner,
+        CancellationToken cancellationToken
+    ) =>
+        owner.Match(
+            installation => LoadInstallationSecretsAsync(installation, cancellationToken),
+            feature => LoadFeatureSecretsAsync(feature, cancellationToken)
+        );
+
     public async ValueTask<PluginFeatureState?> LoadFeatureStateAsync(
         PluginFeatureKey key,
         CancellationToken cancellationToken

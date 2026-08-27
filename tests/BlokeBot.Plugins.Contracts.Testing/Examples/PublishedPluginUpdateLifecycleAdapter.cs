@@ -178,7 +178,7 @@ internal static class PublishedPluginUpdateLifecycleAdapter
                     package,
                     PublishedPluginExampleInvocationKind.Migration
                 ),
-                new(scenario.Module, scenario.Operation, new PluginValue.Nil()),
+                new(scenario.Module, scenario.Operation, scenario.Input),
                 cancellationToken
             );
             var engineFailure =

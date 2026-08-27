@@ -101,6 +101,12 @@ public static class PluginFeatureServiceCollectionExtensions
             ServiceDescriptor.Singleton<IPluginHostModule, PluginDiagnosticsHostModule>()
         );
         services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IPluginHostModule, PluginContextHostModule>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IPluginHostModule, PluginSettingsHostModule>()
+        );
+        services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IPluginHostModule, PluginResponsesHostModule>()
         );
         services.TryAddEnumerable(

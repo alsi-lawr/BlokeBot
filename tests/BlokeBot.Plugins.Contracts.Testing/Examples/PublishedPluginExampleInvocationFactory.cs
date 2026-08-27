@@ -10,49 +10,49 @@ internal static class PublishedPluginExampleInvocationFactory
             PublishedPluginExampleInvocationKind.Lifecycle => new PluginLiveInvocation.Lifecycle(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Migration => new PluginLiveInvocation.Migration(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Command => new PluginLiveInvocation.Command(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Event => new PluginLiveInvocation.Event(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Schedule => new PluginLiveInvocation.Schedule(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.HostAction => new PluginLiveInvocation.HostAction(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Storage => new PluginLiveInvocation.Storage(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Page => new PluginLiveInvocation.Page(
                 scenario.Module,
                 scenario.Operation,
-                new PluginValue.Nil()
+                scenario.Input
             ),
             PublishedPluginExampleInvocationKind.Automation => new PluginLiveInvocation.Automation(
                 scenario.Module,
                 scenario.Operation,
                 AutomationDefinitionId(),
                 PluginAutomationDefinitionKind.Action,
-                new PluginValue.Nil()
+                scenario.Input
             ),
         };
 

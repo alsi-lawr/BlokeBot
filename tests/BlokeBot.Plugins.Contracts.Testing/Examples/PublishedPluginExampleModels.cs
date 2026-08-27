@@ -31,7 +31,9 @@ public sealed record PublishedPluginExampleScenario(
     PublishedPluginExampleInvocationKind InvocationKind,
     PluginLuaModuleId Module,
     PluginHostOperationId Operation,
-    PublishedPluginExampleExpectation Expectation
+    PublishedPluginExampleExpectation Expectation,
+    PluginValue Input,
+    ImmutableArray<string> ExpectedHostCalls
 );
 
 public sealed record PublishedPluginExample(

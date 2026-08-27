@@ -34,7 +34,7 @@ internal sealed partial class KeraLuaPluginEngine
             || operationValue is not PluginValue.String operationText
             || !PluginHostOperationId.TryCreate(operationText.Value, out var operation)
             || !properties.TryGetValue("arguments", out var argumentsValue)
-            || argumentsValue is not PluginValue.Array arguments
+            || Arguments(argumentsValue) is not { } arguments
             || !PluginHostCallId.TryCreate(Guid.NewGuid(), out var callId)
         )
         {
@@ -54,6 +54,14 @@ internal sealed partial class KeraLuaPluginEngine
             arguments.Items
         );
     }
+
+    private static PluginValue.Array? Arguments(PluginValue value) =>
+        value switch
+        {
+            PluginValue.Array arguments => arguments,
+            PluginValue.Map { Properties.IsEmpty: true } => new([]),
+            _ => null,
+        };
 
     private static void PushHostOutcome(Lua lua, PluginHostCallOutcome outcome)
     {

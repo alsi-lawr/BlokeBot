@@ -114,14 +114,77 @@ public sealed record PluginSecretChanges(
 public interface IPluginSecretProtector
 {
     PluginProtectedSecret Protect(PluginSecretKey key, PluginSecretPlaintext plaintext);
+
+    PluginSecretUnprotectOutcome Unprotect(
+        PluginSecretKey key,
+        PluginProtectedSecret protectedSecret
+    );
+}
+
+public abstract record PluginSecretUnprotectOutcome
+{
+    private PluginSecretUnprotectOutcome() { }
+
+    public sealed record Unprotected(PluginSecretPlaintext Value) : PluginSecretUnprotectOutcome;
+
+    public sealed record Failed : PluginSecretUnprotectOutcome;
 }
 
 public sealed class DataProtectionPluginSecretProtector(IDataProtectionProvider dataProtection)
     : IPluginSecretProtector
 {
+    private static readonly UTF8Encoding _utf8 = new(false, true);
+
     public PluginProtectedSecret Protect(PluginSecretKey key, PluginSecretPlaintext plaintext)
     {
-        var purposes = key.Match<string[]>(
+        var protector = dataProtection.CreateProtector(Purposes(key));
+        var bytes = Encoding.UTF8.GetBytes(plaintext.Value);
+        try
+        {
+            return new(protector.Protect(bytes));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    public PluginSecretUnprotectOutcome Unprotect(
+        PluginSecretKey key,
+        PluginProtectedSecret protectedSecret
+    )
+    {
+        byte[]? plaintext = null;
+        try
+        {
+            plaintext = dataProtection
+                .CreateProtector(Purposes(key))
+                .Unprotect(protectedSecret.Bytes.ToArray());
+            var value = _utf8.GetString(plaintext);
+            return PluginSecretPlaintext.TryCreate(
+                value,
+                PluginContractLimits.MaximumSecretSettingCharacters,
+                out var secret
+            )
+                ? new PluginSecretUnprotectOutcome.Unprotected(secret)
+                : new PluginSecretUnprotectOutcome.Failed();
+        }
+        catch (Exception exception)
+            when (exception is CryptographicException or DecoderFallbackException)
+        {
+            return new PluginSecretUnprotectOutcome.Failed();
+        }
+        finally
+        {
+            if (plaintext is not null)
+            {
+                CryptographicOperations.ZeroMemory(plaintext);
+            }
+        }
+    }
+
+    private static string[] Purposes(PluginSecretKey key) =>
+        key.Match<string[]>(
             installation =>
                 [
                     "BlokeBot.Plugins.Features.Secret.v1",
@@ -139,14 +202,4 @@ public sealed class DataProtectionPluginSecretProtector(IDataProtectionProvider 
                     feature.SettingId.Value,
                 ]
         );
-        var bytes = Encoding.UTF8.GetBytes(plaintext.Value);
-        try
-        {
-            return new(dataProtection.CreateProtector(purposes).Protect(bytes));
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-        }
-    }
 }

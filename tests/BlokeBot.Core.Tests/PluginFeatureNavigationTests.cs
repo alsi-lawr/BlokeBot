@@ -247,6 +247,11 @@ public sealed class PluginFeatureNavigationTests
             PluginSecretKey key,
             PluginSecretPlaintext plaintext
         ) => new(new byte[] { 1 });
+
+        public PluginSecretUnprotectOutcome Unprotect(
+            PluginSecretKey key,
+            PluginProtectedSecret protectedSecret
+        ) => new PluginSecretUnprotectOutcome.Failed();
     }
 
     private static NavMenuRouteBindings Routes(

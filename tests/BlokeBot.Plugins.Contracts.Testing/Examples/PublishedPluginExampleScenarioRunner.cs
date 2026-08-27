@@ -75,7 +75,19 @@ internal static class PublishedPluginExampleScenarioRunner
             return PublishedPluginExampleScenarioExecution.Failed(
                 PublishedPluginExampleFailureCode.InvocationExpectationMismatch,
                 scenario.Name,
-                result.Outcome.GetType().Name
+                OutcomeSubject(result.Outcome)
+            );
+        }
+
+        if (
+            !scenario.ExpectedHostCalls.IsDefaultOrEmpty
+            && !host.Calls.SequenceEqual(scenario.ExpectedHostCalls, StringComparer.Ordinal)
+        )
+        {
+            return PublishedPluginExampleScenarioExecution.Failed(
+                PublishedPluginExampleFailureCode.InvocationExpectationMismatch,
+                scenario.Name,
+                $"host calls were [{string.Join(", ", host.Calls)}]"
             );
         }
 
@@ -107,7 +119,7 @@ internal static class PublishedPluginExampleScenarioRunner
         scenario.WorkerMode == PluginWorkerMode.Staging
             ? client.PrepareAsync(
                 identity,
-                new(scenario.Module, scenario.Operation, new PluginValue.Nil()),
+                new(scenario.Module, scenario.Operation, scenario.Input),
                 cancellationToken
             )
             : client.InvokeAsync(
@@ -146,6 +158,17 @@ internal static class PublishedPluginExampleScenarioRunner
                 PublishedPluginExampleExpectation.WorkerExited
             ) => true,
             _ => false,
+        };
+
+    private static string OutcomeSubject(PluginWorkerInvocationOutcome outcome) =>
+        outcome switch
+        {
+            PluginWorkerInvocationOutcome.Returned => "returned",
+            PluginWorkerInvocationOutcome.Failed failed =>
+                $"failed with {failed.Failure.Code}: {failed.Failure.SafeMessage}",
+            PluginWorkerInvocationOutcome.Cancelled cancelled =>
+                $"cancelled with {cancelled.Reason}",
+            _ => throw new UnreachableException("Unknown plugin invocation outcome."),
         };
 }
 

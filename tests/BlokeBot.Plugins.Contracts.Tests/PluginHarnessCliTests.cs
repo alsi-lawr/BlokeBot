@@ -160,7 +160,7 @@ public sealed class PluginHarnessCliTests
             payloads = []
             settings = []
             features = []
-            hostModules = []
+            hostModules = [{ id = "diagnostics", minimumVersion = 1, maximumVersion = 1 }]
             migrations = []
             automationDefinitions = []
             automationTemplates = []
@@ -185,13 +185,13 @@ public sealed class PluginHarnessCliTests
         );
         await File.WriteAllTextAsync(
             Path.Combine(root, declaredPath.Replace('/', Path.DirectorySeparatorChar)),
-            "return { run = function(input) return input end }\n"
+            "return { run = function(input) blokebot.host.call('diagnostics', 'log', 'information', input.message); return input end }\n"
         );
         if (declaredPath != "lua/main.lua")
         {
             await File.WriteAllTextAsync(
                 Path.Combine(root, "lua", "main.lua"),
-                "return { run = function(input) return input end }\n"
+                "return { run = function(input) blokebot.host.call('diagnostics', 'log', 'information', input.message); return input end }\n"
             );
         }
     }
@@ -209,6 +209,8 @@ public sealed class PluginHarnessCliTests
             module = "main"
             operation = "run"
             expectation = "returned"
+            input = { message = "typed scenario input", nested = { enabled = true }, values = ["one", 2] }
+            expectedHostCalls = ["diagnostics.log"]
             """
         );
 

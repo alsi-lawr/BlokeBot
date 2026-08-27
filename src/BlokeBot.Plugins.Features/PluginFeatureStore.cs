@@ -96,6 +96,11 @@ public interface IPluginFeatureStore
         CancellationToken cancellationToken
     );
 
+    ValueTask<IReadOnlyList<PluginProtectedSecretEntry>> LoadProtectedSecretsAsync(
+        PluginConfigurationOwner owner,
+        CancellationToken cancellationToken
+    );
+
     ValueTask<PluginConfigurationStoreWriteOutcome> WriteConfigurationAsync(
         PluginConfigurationStoreWrite write,
         CancellationToken cancellationToken

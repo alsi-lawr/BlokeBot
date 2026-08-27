@@ -19,6 +19,28 @@ public sealed class PluginWorkerProcessTests
         _ = outcome.ShouldBeOfType<PluginEngineFixtureOutcome.Passed>();
     }
 
+    [Test]
+    public async Task KeraLuaWorker_PreservesAZeroArgumentHostCall()
+    {
+        var dispatcher = new CapturingDispatcher(new PluginValue.Nil());
+        var execution = RealWorkerFixtureAdapter
+            .RunResultAsync(
+                "return blokebot.host.call('context', 'current')",
+                dispatcher,
+                PluginContractFixtures.CoroutineId(),
+                CancellationToken.None
+            )
+            .AsTask();
+
+        var call = await dispatcher.Call.Task;
+        var result = await execution;
+
+        call.Module.Value.ShouldBe("context");
+        call.Operation.Value.ShouldBe("current");
+        call.Arguments.ShouldBeEmpty();
+        _ = result.Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>();
+    }
+
     private sealed class RealWorkerFixtureAdapter : IPluginEngineContractFixtureAdapter
     {
         public PluginEngineDescriptor Descriptor => PluginWorkerEngineContract.Selected;
@@ -131,7 +153,7 @@ public sealed class PluginWorkerProcessTests
             return result.Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>().Value;
         }
 
-        private static async ValueTask<PluginWorkerInvocationResult> RunResultAsync(
+        internal static async ValueTask<PluginWorkerInvocationResult> RunResultAsync(
             string program,
             IPluginHostCallDispatcher dispatcher,
             PluginCoroutineId coroutineId,

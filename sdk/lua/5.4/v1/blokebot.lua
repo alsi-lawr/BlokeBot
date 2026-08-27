@@ -8,6 +8,9 @@
 ---@class BlokeBotHost
 local host = {}
 
+---@overload fun(module: "context", operation: "current"): table<string, BlokeBotValue>
+---@overload fun(module: "settings", operation: "installation"): table<string, BlokeBotValue>
+---@overload fun(module: "settings", operation: "feature"): table<string, BlokeBotValue>
 ---@overload fun(module: "diagnostics", operation: "log", argument1: string, argument2: string): nil
 ---@overload fun(module: "responses", operation: "chat", argument1: string): nil
 ---@overload fun(module: "responses", operation: "whisper", argument1: string): nil

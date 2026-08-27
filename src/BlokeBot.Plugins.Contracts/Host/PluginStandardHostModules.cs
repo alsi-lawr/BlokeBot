@@ -4,6 +4,16 @@ namespace BlokeBot.Plugins.Contracts;
 
 public static class PluginStandardHostModules
 {
+    public static PluginHostModuleDescriptor Context { get; } =
+        Module("context", Operation("current", AllContexts(), [], PluginValueKind.Map));
+
+    public static PluginHostModuleDescriptor Settings { get; } =
+        Module(
+            "settings",
+            Operation("installation", LiveContexts(), [], PluginValueKind.Map),
+            Operation("feature", FeatureContexts(), [], PluginValueKind.Map)
+        );
+
     public static PluginHostModuleDescriptor Diagnostics { get; } =
         Module(
             "diagnostics",
@@ -100,7 +110,19 @@ public static class PluginStandardHostModules
         );
 
     public static ImmutableArray<PluginHostModuleDescriptor> All { get; } =
-    [Diagnostics, Responses, Chat, Overlay, Points, Twitch, Schedules, Storage, Http];
+    [
+        Context,
+        Settings,
+        Diagnostics,
+        Responses,
+        Chat,
+        Overlay,
+        Points,
+        Twitch,
+        Schedules,
+        Storage,
+        Http,
+    ];
 
     private static PluginHostModuleDescriptor Module(
         string id,
@@ -142,6 +164,13 @@ public static class PluginStandardHostModules
     private static ImmutableArray<PluginInvocationContextKind> LiveContexts() =>
         [
             PluginInvocationContextKind.Installation,
+            PluginInvocationContextKind.Channel,
+            PluginInvocationContextKind.Automation,
+            PluginInvocationContextKind.Page,
+        ];
+
+    private static ImmutableArray<PluginInvocationContextKind> FeatureContexts() =>
+        [
             PluginInvocationContextKind.Channel,
             PluginInvocationContextKind.Automation,
             PluginInvocationContextKind.Page,

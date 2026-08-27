@@ -328,6 +328,8 @@ public static class PublishedPluginExampleSourceLoader
                         and not "module"
                         and not "operation"
                         and not "expectation"
+                        and not "input"
+                        and not "expectedHostCalls"
             )
             || !RequiredString(candidate, "name", out var name)
             || !RequiredString(candidate, "workerMode", out var workerModeName)
@@ -340,14 +342,109 @@ public static class PublishedPluginExampleSourceLoader
             || !PluginHostOperationId.TryCreate(operationName, out var operation)
             || !RequiredString(candidate, "expectation", out var expectationName)
             || !Expectation(expectationName, out var expectation)
+            || !Input(candidate, out var input)
+            || !ExpectedHostCalls(candidate, out var expectedHostCalls)
         )
         {
             scenario = null!;
             return false;
         }
 
-        scenario = new(name, workerMode, invocationKind, module, operation, expectation);
+        scenario = new(
+            name,
+            workerMode,
+            invocationKind,
+            module,
+            operation,
+            expectation,
+            input,
+            expectedHostCalls
+        );
         return true;
+    }
+
+    private static bool Input(TomlTable table, out PluginValue input)
+    {
+        if (!table.TryGetValue("input", out var value))
+        {
+            input = new PluginValue.Nil();
+            return true;
+        }
+
+        return TryValue(value, out input)
+            && PluginValueValidator.Validate(input) is PluginValueValidationOutcome.Valid;
+    }
+
+    private static bool TryValue(object? value, out PluginValue result)
+    {
+        switch (value)
+        {
+            case bool boolean:
+                result = new PluginValue.Boolean(boolean);
+                return true;
+            case string text:
+                result = new PluginValue.String(text);
+                return true;
+            case long integer:
+                result = new PluginValue.Number(integer);
+                return true;
+            case double number when double.IsFinite(number):
+                result = new PluginValue.Number(number);
+                return true;
+            case TomlTable map:
+                var properties = ImmutableArray.CreateBuilder<PluginValueProperty>();
+                foreach (var property in map)
+                {
+                    if (!TryValue(property.Value, out var mapped))
+                    {
+                        result = null!;
+                        return false;
+                    }
+                    properties.Add(new(property.Key, mapped));
+                }
+                result = new PluginValue.Map(properties.ToImmutable());
+                return true;
+            case IEnumerable<object> array:
+                var items = ImmutableArray.CreateBuilder<PluginValue>();
+                foreach (var item in array)
+                {
+                    if (!TryValue(item, out var mapped))
+                    {
+                        result = null!;
+                        return false;
+                    }
+                    items.Add(mapped);
+                }
+                result = new PluginValue.Array(items.ToImmutable());
+                return true;
+            default:
+                result = null!;
+                return false;
+        }
+    }
+
+    private static bool ExpectedHostCalls(TomlTable table, out ImmutableArray<string> expected)
+    {
+        if (!table.TryGetValue("expectedHostCalls", out var value))
+        {
+            expected = [];
+            return true;
+        }
+        if (value is not IEnumerable<object> values)
+        {
+            expected = [];
+            return false;
+        }
+
+        var raw = values.ToArray();
+        var calls = raw.OfType<string>().ToArray();
+        expected = [.. calls];
+        return calls.Length == raw.Length
+            && calls.All(call =>
+                call.Split('.') is [var module, var operation]
+                && PluginHostModuleId.TryCreate(module, out _)
+                && PluginHostOperationId.TryCreate(operation, out _)
+            );
     }
 
     private static bool RequiredString(TomlTable table, string name, out string value)
