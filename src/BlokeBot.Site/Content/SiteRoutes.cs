@@ -14,6 +14,7 @@ internal static class SiteRoutes
         "/channels",
         "/connect",
         "/tools",
+        "/plugins",
         "/configuration-transfer",
         "/overlays",
         "/overlays/cues",
@@ -45,6 +46,7 @@ internal static class SiteRoutes
         "/automations/actions",
         "/troubleshooting",
         "/moderators",
+        "/server-owners/plugins",
         "/server-owners",
     ];
 

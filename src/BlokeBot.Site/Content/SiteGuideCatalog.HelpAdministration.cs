@@ -46,6 +46,29 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Plugin failures",
+                    Bullets =
+                    [
+                        "Marketplace unavailable: wait for one successful catalogue refresh. If Admin shows an older snapshot, search can still use it.",
+                        "Install or Update unavailable: confirm GitHub access and the mutable tag. An absent or moved tag needs a corrected catalogue entry or package release.",
+                        "Validation fault: correct the manifest, package declarations, target support, paths, links, collisions, or size limits.",
+                        "Migration or activation fault: read the latest operation message. The old code cannot resume after durable migration starts.",
+                        "Worker fault: BlokeBot tries one automatic restart. Correct the cause and select Restart after the next fault.",
+                        "Needs attention: complete the required Twitch scope or EventSub action. Independent work can remain available.",
+                        "Command absent: check built-in and custom commands first. Those routes shadow a plugin command.",
+                        "Feature enablement rejected: correct a plugin command collision, invalid automatic flow, or flow name that already exists.",
+                        "Automatic flow deleted: disable and enable the feature to create the flow again.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink("Recover a plugin installation", "server-owners/plugins"),
+                        new SiteLink("Recover a channel plugin feature", "plugins"),
+                    ],
+                    Note =
+                        "Remove is permanent. After Remove, no plugin settings, private data, page, flow, run history, receipt, context, or latest outcome remains.",
+                },
+                new SiteGuideSection
+                {
                     Heading = "Privacy, saved preferences and data requests",
                     Paragraphs =
                     [

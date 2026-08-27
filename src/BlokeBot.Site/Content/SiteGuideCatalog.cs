@@ -17,8 +17,10 @@ internal static partial class SiteGuideCatalog
         .Concat(CreateTwitchOperationPages())
         .Concat(CreateCommandPages())
         .Concat(CreateGameAndPointPages())
+        .Concat(CreateChannelPluginPages())
         .Concat(CreateAutomationPages())
         .Concat(CreateAutomationCatalogPages())
+        .Concat(CreatePluginAdministrationPages())
         .Concat(CreateHelpAdministrationPages())
         .ToDictionary(static page => page.Route, StringComparer.Ordinal);
 
@@ -35,6 +37,7 @@ internal static partial class SiteGuideCatalog
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
+                GuideLink("Channel plugins", "plugins"),
                 GuideLink("Configuration transfer", "configuration-transfer"),
             ]
         ),
@@ -110,6 +113,7 @@ internal static partial class SiteGuideCatalog
             [
                 GuideLink("Troubleshooting", "troubleshooting"),
                 GuideLink("Moderator access", "moderators"),
+                GuideLink("Plugin administration", "server-owners/plugins"),
                 GuideLink("Server owners", "server-owners"),
                 new SiteLink("Privacy notice", "privacy"),
             ]
