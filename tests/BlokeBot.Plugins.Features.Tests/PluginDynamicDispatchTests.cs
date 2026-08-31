@@ -106,7 +106,8 @@ public sealed class PluginDynamicDispatchTests
             .Current.Schedules.Select(endpoint => endpoint.State.Key)
             .ShouldBe([first.Key, second.Key], ignoreOrder: true);
         dispatch.Current.Webhooks.Count.ShouldBe(2);
-        dispatch.Current.Actions.Count.ShouldBe(2);
+        dispatch.Current.HttpActions.Count.ShouldBe(2);
+        dispatch.Current.PageActions.Count.ShouldBe(2);
 
         features.Publish(
             first with
@@ -121,7 +122,8 @@ public sealed class PluginDynamicDispatchTests
         dispatch.Current.Events.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
         dispatch.Current.Schedules.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
         dispatch.Current.Webhooks.Values.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
-        dispatch.Current.Actions.Values.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
+        dispatch.Current.HttpActions.Values.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
+        dispatch.Current.PageActions.Values.ShouldHaveSingleItem().State.Key.ShouldBe(second.Key);
 
         declarations.Remove(manifest.Manifest.Id, fence);
 
@@ -129,7 +131,8 @@ public sealed class PluginDynamicDispatchTests
         dispatch.Current.Events.ShouldBeEmpty();
         dispatch.Current.Schedules.ShouldBeEmpty();
         dispatch.Current.Webhooks.ShouldBeEmpty();
-        dispatch.Current.Actions.ShouldBeEmpty();
+        dispatch.Current.HttpActions.ShouldBeEmpty();
+        dispatch.Current.PageActions.ShouldBeEmpty();
     }
 
     [Test]
@@ -750,6 +753,9 @@ public sealed class PluginDynamicDispatchTests
         PluginScheduleHandlerId.TryCreate("refresh", out var scheduleId).ShouldBeTrue();
         PluginWebhookId.TryCreate("incoming", out var webhookId).ShouldBeTrue();
         PluginActionId.TryCreate("refresh", out var actionId).ShouldBeTrue();
+        PluginActionId.TryCreate("page-refresh", out var pageActionId).ShouldBeTrue();
+        PluginPageActionInputId.TryCreate("query", out var pageInputId).ShouldBeTrue();
+        PluginHostOperationId.TryCreate("handle_page", out var pageOperation).ShouldBeTrue();
         PluginHostOperationId.TryCreate("authenticate", out var authentication).ShouldBeTrue();
         var modified = accepted.Manifest with
         {
@@ -796,7 +802,21 @@ public sealed class PluginDynamicDispatchTests
                                 new PluginWebhookAuthentication.Callback(module, authentication)
                             ),
                         ],
-                        [new(actionId, module, operation, PluginCallbackRequirements.Independent)]
+                        [
+                            new PluginActionDescriptor.Http(
+                                actionId,
+                                module,
+                                operation,
+                                PluginCallbackRequirements.Independent
+                            ),
+                            new PluginActionDescriptor.Page(
+                                pageActionId,
+                                module,
+                                pageOperation,
+                                PluginCallbackRequirements.Independent,
+                                [new(pageInputId, "Query", PluginValueKind.String, true)]
+                            ),
+                        ]
                     ),
                 }
             ),

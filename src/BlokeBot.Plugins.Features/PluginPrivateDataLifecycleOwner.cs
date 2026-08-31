@@ -217,11 +217,7 @@ internal sealed class PluginPrivateDataLifecycleOwner(
     }
 
     private static PluginValue MigrationInput(PluginMigrationDescriptor migration) =>
-        new PluginValue.Map([
-            new("migrationId", new PluginValue.String(migration.Id.Value)),
-            new("fromVersion", new PluginValue.String(migration.FromVersion.Value)),
-            new("toVersion", new PluginValue.String(migration.ToVersion.Value)),
-        ]);
+        PluginInvocationInputs.Migration(migration);
 
     private static PluginLifecycleOwnerOutcome.Failed Failed(string detail) =>
         new(

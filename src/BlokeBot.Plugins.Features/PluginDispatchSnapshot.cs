@@ -119,12 +119,12 @@ public abstract record PluginDispatchEndpoint
         public PluginWebhookDescriptor Descriptor { get; }
     }
 
-    public sealed record Action : PluginDispatchEndpoint
+    public sealed record HttpAction : PluginDispatchEndpoint
     {
-        internal Action(
+        internal HttpAction(
             PluginFeatureDeclaration declaration,
             PluginFeatureState state,
-            PluginActionDescriptor descriptor
+            PluginActionDescriptor.Http descriptor
         )
             : base(
                 declaration,
@@ -134,7 +134,25 @@ public abstract record PluginDispatchEndpoint
                 descriptor.Requirements
             ) => Descriptor = descriptor;
 
-        public PluginActionDescriptor Descriptor { get; }
+        public PluginActionDescriptor.Http Descriptor { get; }
+    }
+
+    public sealed record PageAction : PluginDispatchEndpoint
+    {
+        internal PageAction(
+            PluginFeatureDeclaration declaration,
+            PluginFeatureState state,
+            PluginActionDescriptor.Page descriptor
+        )
+            : base(
+                declaration,
+                state,
+                descriptor.Module,
+                descriptor.Operation,
+                descriptor.Requirements
+            ) => Descriptor = descriptor;
+
+        public PluginActionDescriptor.Page Descriptor { get; }
     }
 }
 
@@ -145,14 +163,16 @@ public sealed class PluginDispatchSnapshot
         ImmutableArray<PluginDispatchEndpoint.Event> events,
         ImmutableArray<PluginDispatchEndpoint.Schedule> schedules,
         ImmutableDictionary<PluginWebhookRouteKey, PluginDispatchEndpoint.Webhook> webhooks,
-        ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.Action> actions
+        ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.HttpAction> httpActions,
+        ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.PageAction> pageActions
     )
     {
         Commands = commands;
         Events = events;
         Schedules = schedules;
         Webhooks = webhooks;
-        Actions = actions;
+        HttpActions = httpActions;
+        PageActions = pageActions;
     }
 
     public IReadOnlyDictionary<
@@ -169,7 +189,15 @@ public sealed class PluginDispatchSnapshot
         PluginDispatchEndpoint.Webhook
     > Webhooks { get; }
 
-    public IReadOnlyDictionary<PluginActionRouteKey, PluginDispatchEndpoint.Action> Actions { get; }
+    public IReadOnlyDictionary<
+        PluginActionRouteKey,
+        PluginDispatchEndpoint.HttpAction
+    > HttpActions { get; }
+
+    public IReadOnlyDictionary<
+        PluginActionRouteKey,
+        PluginDispatchEndpoint.PageAction
+    > PageActions { get; }
 
     public static PluginDispatchSnapshot Empty { get; } =
         new(
@@ -177,7 +205,8 @@ public sealed class PluginDispatchSnapshot
             [],
             [],
             ImmutableDictionary<PluginWebhookRouteKey, PluginDispatchEndpoint.Webhook>.Empty,
-            ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.Action>.Empty
+            ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.HttpAction>.Empty,
+            ImmutableDictionary<PluginActionRouteKey, PluginDispatchEndpoint.PageAction>.Empty
         );
 }
 

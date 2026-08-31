@@ -33,6 +33,7 @@
 
 ---@class ExamplesAuthorShowcaseExampleActionOutput
 
+---Input delivered for a declared BlokeBot event.
 ---@class ExamplesAuthorShowcaseHostChangeEventInput: BlokeBotEventInput
 
 ---@class ExamplesAuthorShowcaseHandlers
@@ -41,7 +42,7 @@
 ---@field ["on_schedule"] fun(input: BlokeBotScheduleInput): BlokeBotValue
 ---@field ["on_webhook"] fun(input: BlokeBotWebInput): BlokeBotValue
 ---@field ["on_action"] fun(input: BlokeBotWebInput): BlokeBotValue
----@field ["migrate"] fun(input: BlokeBotValue): BlokeBotValue
+---@field ["migrate"] fun(input: BlokeBotMigrationInput): BlokeBotValue
 ---@field ["render_page"] fun(input: BlokeBotPageInput): BlokeBotValue
 ---@field ["automation_source"] fun(input: ExamplesAuthorShowcaseExampleSourceInput): ExamplesAuthorShowcaseExampleSourceOutput
 ---@field ["automation_action"] fun(input: ExamplesAuthorShowcaseExampleActionInput): ExamplesAuthorShowcaseExampleActionOutput
@@ -52,7 +53,7 @@
 ---@field ["on_schedule"] fun(input: BlokeBotScheduleInput): BlokeBotValue
 ---@field ["on_webhook"] fun(input: BlokeBotWebInput): BlokeBotValue
 ---@field ["on_action"] fun(input: BlokeBotWebInput): BlokeBotValue
----@field ["migrate"] fun(input: BlokeBotValue): BlokeBotValue
+---@field ["migrate"] fun(input: BlokeBotMigrationInput): BlokeBotValue
 ---@field ["render_page"] fun(input: BlokeBotPageInput): BlokeBotValue
 ---@field ["automation_source"] fun(input: ExamplesAuthorShowcaseExampleSourceInput): ExamplesAuthorShowcaseExampleSourceOutput
 ---@field ["automation_action"] fun(input: ExamplesAuthorShowcaseExampleActionInput): ExamplesAuthorShowcaseExampleActionOutput

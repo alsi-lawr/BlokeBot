@@ -137,6 +137,23 @@ public sealed record PluginActionId
         );
 }
 
+[JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginPageActionInputId>))]
+[TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginPageActionInputId>))]
+public sealed record PluginPageActionInputId
+    : PluginContractIdentifier,
+        IPluginContractIdentifier<PluginPageActionInputId>
+{
+    private PluginPageActionInputId(string value)
+        : base(value) { }
+
+    public static bool TryCreate(string? candidate, out PluginPageActionInputId identifier) =>
+        PluginContractIdentifierSyntax.TryCreate(
+            candidate,
+            static value => new PluginPageActionInputId(value),
+            out identifier
+        );
+}
+
 [JsonConverter(typeof(PluginContractIdentifierJsonConverter<PluginMigrationId>))]
 [TomlConverter(typeof(PluginContractIdentifierTomlConverter<PluginMigrationId>))]
 public sealed record PluginMigrationId

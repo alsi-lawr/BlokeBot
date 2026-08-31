@@ -98,13 +98,20 @@ public partial class PluginFeaturePage
             request.ActionId
         );
         if (
-            !_dispatch.Current.Actions.TryGetValue(key, out var action)
+            !_dispatch.Current.PageActions.TryGetValue(key, out var action)
             || action.Declaration.Installation != page.Definition.Declaration.Installation
             || action.State.Fence != page.State.Fence
             || action.State.Generation != page.State.Generation
         )
         {
             return Rejected("This plugin action is unavailable.");
+        }
+        if (
+            PluginPageActionInputValidator.Validate(action.Descriptor, request.Input)
+            is not PluginPageActionInputValidationOutcome.Accepted accepted
+        )
+        {
+            return Rejected("The plugin action input is invalid.");
         }
 
         var context = new PluginInvocationContext.Page(
@@ -116,7 +123,7 @@ public partial class PluginFeaturePage
         var outcome = await _invoker.InvokePageActionAsync(
             action,
             context,
-            request.Input,
+            accepted.Input,
             CancellationToken.None
         );
         return outcome switch

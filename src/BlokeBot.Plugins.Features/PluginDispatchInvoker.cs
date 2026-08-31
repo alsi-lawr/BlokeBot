@@ -67,7 +67,7 @@ public interface IPluginDispatchInvoker
         );
 
     ValueTask<PluginWebDispatchOutcome> InvokeActionAsync(
-        PluginDispatchEndpoint.Action endpoint,
+        PluginDispatchEndpoint.HttpAction endpoint,
         PluginInvocationContext.Channel context,
         PluginValue input,
         CancellationToken cancellationToken
@@ -91,7 +91,7 @@ public interface IPluginDispatchInvoker
         );
 
     ValueTask<PluginDispatchInvocationOutcome> InvokePageActionAsync(
-        PluginDispatchEndpoint.Action endpoint,
+        PluginDispatchEndpoint.PageAction endpoint,
         PluginInvocationContext.Page context,
         PluginValue input,
         CancellationToken cancellationToken

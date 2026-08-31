@@ -130,9 +130,13 @@ public sealed class PluginDispatchSnapshotRegistry
             PluginWebhookRouteKey,
             PluginDispatchEndpoint.Webhook
         >();
-        var actions = ImmutableDictionary.CreateBuilder<
+        var httpActions = ImmutableDictionary.CreateBuilder<
             PluginActionRouteKey,
-            PluginDispatchEndpoint.Action
+            PluginDispatchEndpoint.HttpAction
+        >();
+        var pageActions = ImmutableDictionary.CreateBuilder<
+            PluginActionRouteKey,
+            PluginDispatchEndpoint.PageAction
         >();
         var eligible = _features
             .States.Values.Where(static state => state.Enabled)
@@ -164,14 +168,21 @@ public sealed class PluginDispatchSnapshotRegistry
             }
             foreach (var descriptor in source.Feature.DispatchDeclarations.Actions)
             {
-                actions[
-                    new(
-                        source.State.Key.PluginId,
-                        source.State.Key.FeatureId,
-                        source.State.Key.HostId,
-                        descriptor.Id
-                    )
-                ] = new(source.Declaration, source.State, descriptor);
+                var key = new PluginActionRouteKey(
+                    source.State.Key.PluginId,
+                    source.State.Key.FeatureId,
+                    source.State.Key.HostId,
+                    descriptor.Id
+                );
+                switch (descriptor)
+                {
+                    case PluginActionDescriptor.Http http:
+                        httpActions[key] = new(source.Declaration, source.State, http);
+                        break;
+                    case PluginActionDescriptor.Page page:
+                        pageActions[key] = new(source.Declaration, source.State, page);
+                        break;
+                }
             }
         }
 
@@ -210,7 +221,8 @@ public sealed class PluginDispatchSnapshotRegistry
                 events.ToImmutable(),
                 schedules.ToImmutable(),
                 webhooks.ToImmutable(),
-                actions.ToImmutable()
+                httpActions.ToImmutable(),
+                pageActions.ToImmutable()
             )
         );
 

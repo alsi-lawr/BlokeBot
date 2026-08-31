@@ -37,6 +37,41 @@ public sealed class PluginInvocationAccessTests
     }
 
     [Test]
+    public async Task HttpSend_ValidatesAndReturnsTheCanonicalStructuredShapes()
+    {
+        using var client = new HttpClient(new FixedHttpHandler());
+        var module = new PluginHttpHostModule(
+            new PluginOutboundHttpClient(new FixedHttpClientFactory(client))
+        );
+        var request = PluginStructuredValueSchemas.HttpRequest.Create(
+            PluginStructuredValueSchemas.HttpRequestMethod.Value(new PluginValue.String("POST")),
+            PluginStructuredValueSchemas.HttpRequestUrl.Value(
+                new PluginValue.String("https://example.invalid/resource")
+            ),
+            PluginStructuredValueSchemas.HttpRequestHeaders.Value(
+                new PluginValue.Map([new("content-type", new PluginValue.String("text/plain"))])
+            ),
+            PluginStructuredValueSchemas.HttpRequestBody.Value(new PluginValue.String("hello"))
+        );
+        var operation = module.Descriptor.Operations.ShouldHaveSingleItem();
+        var call = new PluginHostCall(
+            CallId(),
+            CoroutineId(),
+            module.Descriptor.Id,
+            operation.Id,
+            Identity(Host(7)).Context,
+            [request]
+        );
+
+        var outcome = await module.InvokeAsync(Identity(Host(7)), call, CancellationToken.None);
+
+        var returned = outcome
+            .ShouldBeOfType<PluginHostCallOutcome.Returned>()
+            .Value.ShouldBeOfType<PluginValue.Map>();
+        PluginStructuredValueSchemas.HttpResponse.Accepts(returned).ShouldBeTrue();
+    }
+
+    [Test]
     public async Task SettingsReads_UseTheExactInstallationAndHostFeatureOwners()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -356,6 +391,25 @@ public sealed class PluginInvocationAccessTests
         PluginSettingValues.Create(entries) is PluginSettingValuesOutcome.Created created
             ? created.Values
             : throw new InvalidOperationException("Duplicate setting fixture.");
+
+    private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class FixedHttpHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult(
+                new HttpResponseMessage(System.Net.HttpStatusCode.Created)
+                {
+                    Content = new StringContent("accepted"),
+                }
+            );
+    }
 
     private static PluginSettingValues InstallationValues(string mode) =>
         Values(

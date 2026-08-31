@@ -31,7 +31,7 @@ public sealed partial class PluginDispatchInvoker
     ) => InvokeWebhookCoreAsync(endpoint, context, input, cancellationToken);
 
     public ValueTask<PluginWebDispatchOutcome> InvokeActionAsync(
-        PluginDispatchEndpoint.Action endpoint,
+        PluginDispatchEndpoint.HttpAction endpoint,
         PluginInvocationContext.Channel context,
         PluginValue input,
         CancellationToken cancellationToken

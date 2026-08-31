@@ -13,7 +13,8 @@ internal sealed record PluginProjectHandlerDescriptor(
 
 internal sealed record PluginProjectDerivedInputDescriptor(
     string TypeName,
-    PluginInvocationInputSchemaDescriptor Schema
+    PluginLuaSchemaDescriptor Schema,
+    bool ExtendsSchema
 );
 
 internal sealed record PluginProjectHandlerCatalog(
@@ -41,7 +42,7 @@ internal sealed record PluginProjectHandlerCatalog(
             {
                 var inputType =
                     $"{prefix}{PluginProjectTypeEmitter.TypeName(@event.Id.Value)}EventInput";
-                inputs.Add(new(inputType, EventSchema(@event.Source)));
+                inputs.Add(new(inputType, EventSchema(@event.Source), true));
                 handlers.Add(Handler(@event.Module, @event.Operation, inputType));
             }
             handlers.AddRange(
@@ -60,15 +61,27 @@ internal sealed record PluginProjectHandlerCatalog(
                     )
                 )
             );
-            handlers.AddRange(
-                feature.DispatchDeclarations.Actions.Select(action =>
-                    Handler(
-                        action.Module,
-                        action.Operation,
-                        PluginInvocationInputSchemas.Web.LuaTypeName
-                    )
-                )
-            );
+            foreach (var action in feature.DispatchDeclarations.Actions)
+            {
+                switch (action)
+                {
+                    case PluginActionDescriptor.Http http:
+                        handlers.Add(
+                            Handler(
+                                http.Module,
+                                http.Operation,
+                                PluginInvocationInputSchemas.Web.LuaTypeName
+                            )
+                        );
+                        break;
+                    case PluginActionDescriptor.Page page:
+                        var inputType =
+                            $"{prefix}{PluginProjectTypeEmitter.TypeName(feature.Id.Value)}{PluginProjectTypeEmitter.TypeName(page.Id.Value)}PageActionInput";
+                        inputs.Add(new(inputType, PageActionSchema(inputType, page), false));
+                        handlers.Add(Handler(page.Module, page.Operation, inputType));
+                        break;
+                }
+            }
             handlers.AddRange(
                 feature.DispatchDeclarations.Webhooks.SelectMany(webhook =>
                     webhook.Authentication is PluginWebhookAuthentication.Callback callback
@@ -88,7 +101,11 @@ internal sealed record PluginProjectHandlerCatalog(
         }
         handlers.AddRange(
             manifest.Migrations.Select(migration =>
-                Handler(migration.Module, HostOperation(migration.EntryPoint), "BlokeBotValue")
+                Handler(
+                    migration.Module,
+                    HostOperation(migration.EntryPoint),
+                    PluginInvocationInputSchemas.Migration.LuaTypeName
+                )
             )
         );
         handlers.AddRange(
@@ -124,11 +141,30 @@ internal sealed record PluginProjectHandlerCatalog(
         string skeletonStatement = "return input"
     ) => new(module.Value, operation.Value, inputType, resultType, skeletonStatement);
 
-    private static PluginInvocationInputSchemaDescriptor EventSchema(PluginEventSource source) =>
+    private static PluginLuaSchemaDescriptor EventSchema(PluginEventSource source) =>
         source is PluginEventSource.Twitch ? PluginInvocationInputSchemas.TwitchEvent
         : source is PluginEventSource.TwitchRaw ? PluginInvocationInputSchemas.TwitchRawEvent
         : source is PluginEventSource.BlokeBot ? PluginInvocationInputSchemas.BlokeBotEvent
         : throw new UnreachableException("Unknown plugin event source.");
+
+    private static PluginLuaSchemaDescriptor PageActionSchema(
+        string typeName,
+        PluginActionDescriptor.Page action
+    ) =>
+        new(
+            typeName,
+            $"Input delivered to the declared page action '{action.Id.Value}'.",
+            [
+                .. action
+                    .Inputs.OrderBy(static field => field.Id.Value, StringComparer.Ordinal)
+                    .Select(field => new PluginLuaFieldDescriptor(
+                        field.Id.Value,
+                        PluginLuaFieldShape.For(field.ValueKind),
+                        field.Name,
+                        field.Required
+                    )),
+            ]
+        );
 
     private static PluginHostOperationId HostOperation(string value) =>
         PluginHostOperationId.TryCreate(value, out var operation)

@@ -21,7 +21,9 @@ public sealed record PluginAuthoringContract(
     PluginGitTagSyntaxContract GitTagSyntax,
     ImmutableArray<PluginRuntimeIdentifier> RuntimeIdentifiers,
     ImmutableArray<PluginHostModuleDescriptor> HostModules,
-    ImmutableArray<PluginInvocationInputSchemaDescriptor> InvocationInputSchemas,
+    ImmutableArray<PluginLuaSchemaDescriptor> InvocationInputSchemas,
+    ImmutableArray<PluginLuaSchemaDescriptor> StructuredValueSchemas,
+    ImmutableArray<PluginLuaUnionDescriptor> StructuredValueUnions,
     ImmutableArray<PluginAuthoringContractSurface> PublicContractSurfaces
 )
 {
@@ -33,6 +35,8 @@ public sealed record PluginAuthoringContract(
             [.. Enum.GetValues<PluginRuntimeIdentifier>()],
             PluginStandardHostModules.All,
             PluginInvocationInputSchemas.All,
+            PluginStructuredValueSchemas.All,
+            PluginStructuredValueSchemas.Unions,
             [Surface(typeof(PluginRuntimeContract)), Surface(typeof(PluginLifecycleOutcome))]
         );
 

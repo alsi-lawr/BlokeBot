@@ -29,6 +29,7 @@ internal static class PluginAuthorReferenceEmitter
         AppendManifestShapes(output);
         AppendHostModules(contract, output);
         AppendInvocationInputs(contract, output);
+        AppendStructuredValues(contract, output);
         AppendCanonicalPublicApi(contract, output);
         AppendInvocationGuidance(contract, output);
         AppendExamples(output);
@@ -317,7 +318,11 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine("## Invocations and effects");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Features may declare settings, Twitch requirements, commands, event handlers, schedules, webhooks, actions, automation definitions and templates, generated pages, and embedded pages. A declaration does not register a live feature or run Lua."
+            "Features may declare settings, Twitch requirements, commands, event handlers, schedules, typed HTTP or page actions, automation definitions and templates, generated pages, and embedded pages. A declaration does not register a live feature or run Lua."
+        );
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            "An HTTP action is admitted only through the fixed authenticated HTTP action endpoint and receives `BlokeBotWebInput`. A page action is admitted only from a generated form or embedded-page bridge message; its `inputs` declarations are validated exactly and generate a plugin-specific LuaLS input class. Declare separate action entries and handler operations when one logical operation needs both sources; the generator does not merge them into a union or generic page map."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
@@ -333,6 +338,55 @@ internal static class PluginAuthorReferenceEmitter
             CultureInfo.InvariantCulture,
             $"Use the `storage` module for plugin-private SQLite operations and `http.send` for approved web integrations. Generated and embedded UI pages must use declared modules or browser assets. A failed update migration becomes `{PluginLifecycleFailureCode.MigrationFailed}` and leaves the selected update `{PluginLifecyclePhase.Faulted}` without resuming the old generation. A worker crash reports `{PluginWorkerFailureCode.WorkerExited}` and is isolated by the `{contract.Runtime.Trust.ProcessIsolation}` boundary."
         );
+        _ = output.AppendLine();
+    }
+
+    private static void AppendStructuredValues(
+        PluginAuthoringContract contract,
+        StringBuilder output
+    )
+    {
+        _ = output.AppendLine("## Typed structured values");
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            "Context and HTTP maps are emitted from the same canonical schemas used by runtime mapping and validation."
+        );
+        _ = output.AppendLine();
+        foreach (var schema in contract.StructuredValueSchemas)
+        {
+            _ = output.Append("### `").Append(schema.LuaTypeName).AppendLine("`");
+            _ = output.AppendLine();
+            _ = output.AppendLine(schema.Description);
+            _ = output.AppendLine();
+            _ = output.AppendLine("| Field | Lua type | Required | Description |");
+            _ = output.AppendLine("| --- | --- | --- | --- |");
+            foreach (var field in schema.Fields)
+            {
+                _ = output
+                    .Append("| `")
+                    .Append(field.Name)
+                    .Append("` | `")
+                    .Append(field.Shape.LuaTypeName)
+                    .Append("` | ")
+                    .Append(field.Required ? "yes" : "no")
+                    .Append(" | ")
+                    .Append(field.Description)
+                    .AppendLine(" |");
+            }
+            _ = output.AppendLine();
+        }
+        foreach (var union in contract.StructuredValueUnions)
+        {
+            _ = output
+                .Append("- `")
+                .Append(union.LuaTypeName)
+                .Append("`: ")
+                .AppendJoin(
+                    ", ",
+                    union.Alternatives.Select(static alternative => $"`{alternative.LuaTypeName}`")
+                )
+                .AppendLine();
+        }
         _ = output.AppendLine();
     }
 

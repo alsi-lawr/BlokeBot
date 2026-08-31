@@ -4,17 +4,13 @@ namespace BlokeBot.Plugins.Contracts;
 
 public static class PluginInvocationInputSchemas
 {
-    public static PluginInvocationInputFieldDescriptor CommandRoute { get; } =
-        Field("route", PluginInvocationInputFieldShape.String, "The normalized command route.");
+    public static PluginLuaFieldDescriptor CommandRoute { get; } =
+        Field("route", PluginLuaFieldShape.String, "The normalized command route.");
 
-    public static PluginInvocationInputFieldDescriptor CommandArguments { get; } =
-        Field(
-            "arguments",
-            PluginInvocationInputFieldShape.StringArray,
-            "The ordered command arguments."
-        );
+    public static PluginLuaFieldDescriptor CommandArguments { get; } =
+        Field("arguments", PluginLuaFieldShape.StringArray, "The ordered command arguments.");
 
-    public static PluginInvocationInputSchemaDescriptor Command { get; } =
+    public static PluginLuaSchemaDescriptor Command { get; } =
         Schema(
             "BlokeBotCommandInput",
             "Input delivered to a declared command handler.",
@@ -22,54 +18,38 @@ public static class PluginInvocationInputSchemas
             CommandArguments
         );
 
-    public static PluginInvocationInputFieldDescriptor WebMethod { get; } =
-        Field("method", PluginInvocationInputFieldShape.String, "The uppercase HTTP method.");
+    public static PluginLuaFieldDescriptor WebMethod { get; } =
+        Field("method", PluginLuaFieldShape.String, "The uppercase HTTP method.");
 
-    public static PluginInvocationInputFieldDescriptor WebHeaders { get; } =
+    public static PluginLuaFieldDescriptor WebHeaders { get; } =
         Field(
             "headers",
-            PluginInvocationInputFieldShape.StringMap,
+            PluginLuaFieldShape.StringMap,
             "The request headers with lowercase names."
         );
 
-    public static PluginInvocationInputFieldDescriptor WebBodyBase64 { get; } =
-        Field(
-            "bodyBase64",
-            PluginInvocationInputFieldShape.String,
-            "The request body encoded as base64."
-        );
+    public static PluginLuaFieldDescriptor WebBodyBase64 { get; } =
+        Field("bodyBase64", PluginLuaFieldShape.String, "The request body encoded as base64.");
 
-    public static PluginInvocationInputSchemaDescriptor Web { get; } =
+    public static PluginLuaSchemaDescriptor Web { get; } =
         Schema(
             "BlokeBotWebInput",
-            "Input delivered to declared webhook, action, and webhook authentication handlers.",
+            "Input delivered to declared webhook, HTTP action, and webhook authentication handlers.",
             WebMethod,
             WebHeaders,
             WebBodyBase64
         );
 
-    public static PluginInvocationInputFieldDescriptor PageVersion { get; } =
-        Field(
-            "version",
-            PluginInvocationInputFieldShape.WholeNumber,
-            "The generated page input version."
-        );
+    public static PluginLuaFieldDescriptor PageVersion { get; } =
+        Field("version", PluginLuaFieldShape.WholeNumber, "The generated page input version.");
 
-    public static PluginInvocationInputFieldDescriptor PageHostId { get; } =
-        Field(
-            "hostId",
-            PluginInvocationInputFieldShape.WholeNumber,
-            "The selected BlokeBot host ID."
-        );
+    public static PluginLuaFieldDescriptor PageHostId { get; } =
+        Field("hostId", PluginLuaFieldShape.WholeNumber, "The selected BlokeBot host ID.");
 
-    public static PluginInvocationInputFieldDescriptor PageSessionId { get; } =
-        Field(
-            "sessionId",
-            PluginInvocationInputFieldShape.String,
-            "The generated page session ID."
-        );
+    public static PluginLuaFieldDescriptor PageSessionId { get; } =
+        Field("sessionId", PluginLuaFieldShape.String, "The generated page session ID.");
 
-    public static PluginInvocationInputSchemaDescriptor Page { get; } =
+    public static PluginLuaSchemaDescriptor Page { get; } =
         Schema(
             "BlokeBotPageInput",
             "Input delivered to a generated page renderer.",
@@ -78,17 +58,13 @@ public static class PluginInvocationInputSchemas
             PageSessionId
         );
 
-    public static PluginInvocationInputFieldDescriptor EventId { get; } =
-        Field(
-            "event_id",
-            PluginInvocationInputFieldShape.String,
-            "The stable event correlation ID."
-        );
+    public static PluginLuaFieldDescriptor EventId { get; } =
+        Field("event_id", PluginLuaFieldShape.String, "The stable event correlation ID.");
 
-    public static PluginInvocationInputFieldDescriptor EventSource { get; } =
-        Field("source", PluginInvocationInputFieldShape.String, "The canonical event source name.");
+    public static PluginLuaFieldDescriptor EventSource { get; } =
+        Field("source", PluginLuaFieldShape.String, "The canonical event source name.");
 
-    public static PluginInvocationInputSchemaDescriptor BlokeBotEvent { get; } =
+    public static PluginLuaSchemaDescriptor BlokeBotEvent { get; } =
         Schema(
             "BlokeBotEventInput",
             "Input delivered for a declared BlokeBot event.",
@@ -96,14 +72,14 @@ public static class PluginInvocationInputSchemas
             EventSource
         );
 
-    public static PluginInvocationInputFieldDescriptor EventOccurredAt { get; } =
+    public static PluginLuaFieldDescriptor EventOccurredAt { get; } =
         Field(
             "occurred_at",
-            PluginInvocationInputFieldShape.String,
+            PluginLuaFieldShape.String,
             "The UTC event timestamp in round-trip format."
         );
 
-    public static PluginInvocationInputSchemaDescriptor TwitchEvent { get; } =
+    public static PluginLuaSchemaDescriptor TwitchEvent { get; } =
         Schema(
             "BlokeBotTwitchEventInput",
             "Input delivered for a declared typed Twitch event.",
@@ -112,17 +88,13 @@ public static class PluginInvocationInputSchemas
             EventOccurredAt
         );
 
-    public static PluginInvocationInputFieldDescriptor RawSubscriptionType { get; } =
-        Field("type", PluginInvocationInputFieldShape.String, "The EventSub subscription type.");
+    public static PluginLuaFieldDescriptor RawSubscriptionType { get; } =
+        Field("type", PluginLuaFieldShape.String, "The EventSub subscription type.");
 
-    public static PluginInvocationInputFieldDescriptor RawSubscriptionVersion { get; } =
-        Field(
-            "version",
-            PluginInvocationInputFieldShape.String,
-            "The EventSub subscription version."
-        );
+    public static PluginLuaFieldDescriptor RawSubscriptionVersion { get; } =
+        Field("version", PluginLuaFieldShape.String, "The EventSub subscription version.");
 
-    public static PluginInvocationInputSchemaDescriptor TwitchRawSubscription { get; } =
+    public static PluginLuaSchemaDescriptor TwitchRawSubscription { get; } =
         Schema(
             "BlokeBotTwitchRawSubscription",
             "Subscription identity included with a raw Twitch event.",
@@ -130,17 +102,17 @@ public static class PluginInvocationInputSchemas
             RawSubscriptionVersion
         );
 
-    public static PluginInvocationInputFieldDescriptor RawSubscription { get; } =
+    public static PluginLuaFieldDescriptor RawSubscription { get; } =
         Field(
             "subscription",
-            new PluginInvocationInputFieldShape.Structured(TwitchRawSubscription),
+            new PluginLuaFieldShape.Structured(TwitchRawSubscription),
             "The raw EventSub subscription identity."
         );
 
-    public static PluginInvocationInputFieldDescriptor RawEvent { get; } =
-        Field("event", PluginInvocationInputFieldShape.Map, "The raw EventSub event payload.");
+    public static PluginLuaFieldDescriptor RawEvent { get; } =
+        Field("event", PluginLuaFieldShape.Map, "The raw EventSub event payload.");
 
-    public static PluginInvocationInputSchemaDescriptor TwitchRawEvent { get; } =
+    public static PluginLuaSchemaDescriptor TwitchRawEvent { get; } =
         Schema(
             "BlokeBotTwitchRawEventInput",
             "Input delivered for a declared raw Twitch EventSub event.",
@@ -148,18 +120,45 @@ public static class PluginInvocationInputSchemas
             RawEvent
         );
 
-    public static ImmutableArray<PluginInvocationInputSchemaDescriptor> All { get; } =
-    [Command, Web, Page, BlokeBotEvent, TwitchEvent, TwitchRawSubscription, TwitchRawEvent];
+    public static PluginLuaFieldDescriptor MigrationId { get; } =
+        Field("migrationId", PluginLuaFieldShape.String, "The declared migration ID.");
 
-    private static PluginInvocationInputFieldDescriptor Field(
+    public static PluginLuaFieldDescriptor MigrationFromVersion { get; } =
+        Field("fromVersion", PluginLuaFieldShape.String, "The source semantic version.");
+
+    public static PluginLuaFieldDescriptor MigrationToVersion { get; } =
+        Field("toVersion", PluginLuaFieldShape.String, "The target semantic version.");
+
+    public static PluginLuaSchemaDescriptor Migration { get; } =
+        Schema(
+            "BlokeBotMigrationInput",
+            "Input delivered to a declared migration handler.",
+            MigrationId,
+            MigrationFromVersion,
+            MigrationToVersion
+        );
+
+    public static ImmutableArray<PluginLuaSchemaDescriptor> All { get; } =
+    [
+        Command,
+        Web,
+        Page,
+        BlokeBotEvent,
+        TwitchEvent,
+        TwitchRawSubscription,
+        TwitchRawEvent,
+        Migration,
+    ];
+
+    private static PluginLuaFieldDescriptor Field(
         string name,
-        PluginInvocationInputFieldShape shape,
+        PluginLuaFieldShape shape,
         string description
     ) => new(name, shape, description);
 
-    private static PluginInvocationInputSchemaDescriptor Schema(
+    private static PluginLuaSchemaDescriptor Schema(
         string luaTypeName,
         string description,
-        params ReadOnlySpan<PluginInvocationInputFieldDescriptor> fields
+        params ReadOnlySpan<PluginLuaFieldDescriptor> fields
     ) => new(luaTypeName, description, [.. fields]);
 }

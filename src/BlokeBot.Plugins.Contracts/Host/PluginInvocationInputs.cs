@@ -85,4 +85,17 @@ public static class PluginInvocationInputs
             PluginInvocationInputSchemas.RawEvent.Value(eventPayload)
         );
     }
+
+    public static PluginValue.Map Migration(PluginMigrationDescriptor migration) =>
+        PluginInvocationInputSchemas.Migration.Create(
+            PluginInvocationInputSchemas.MigrationId.Value(
+                new PluginValue.String(migration.Id.Value)
+            ),
+            PluginInvocationInputSchemas.MigrationFromVersion.Value(
+                new PluginValue.String(migration.FromVersion.Value)
+            ),
+            PluginInvocationInputSchemas.MigrationToVersion.Value(
+                new PluginValue.String(migration.ToVersion.Value)
+            )
+        );
 }

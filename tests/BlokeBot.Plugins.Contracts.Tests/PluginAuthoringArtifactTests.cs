@@ -104,7 +104,7 @@ public sealed class PluginAuthoringArtifactTests
     }
 
     [Test]
-    public async Task GeneratedSdk_ProvidesEveryCanonicalStructuredInputFieldToLuaLs()
+    public async Task GeneratedSdk_ProvidesEveryCanonicalStructuredFieldToLuaLs()
     {
         var root = Path.Combine(Path.GetTempPath(), $"blokebot-luals-test-{Guid.NewGuid():N}");
         _ = Directory.CreateDirectory(root);
@@ -166,22 +166,159 @@ public sealed class PluginAuthoringArtifactTests
         }
     }
 
+    [Test]
+    public async Task GeneratedPluginTypes_GiveEachPageActionItsExactManifestInputInLuaLs()
+    {
+        var accepted = PluginManifestToml
+            .Validate(
+                PluginContractFixtures.CompleteManifestToml(),
+                PluginAuthoringContract.Current.Target(PluginRuntimeIdentifier.LinuxX64)
+            )
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+        var feature = accepted.Manifest.Manifest.Features.Single(candidate =>
+            candidate.Id.Value == "collection"
+        );
+        _ = PluginActionId.TryCreate("review", out var action);
+        _ = PluginPageActionInputId.TryCreate("decision", out var decision);
+        _ = PluginPageActionInputId.TryCreate("limit", out var limit);
+        _ = PluginHostOperationId.TryCreate("review", out var operation);
+        var manifest = accepted.Manifest.Manifest with
+        {
+            Features = accepted.Manifest.Manifest.Features.Replace(
+                feature,
+                feature with
+                {
+                    Dispatch = feature.DispatchDeclarations with
+                    {
+                        Actions =
+                        [
+                            new PluginActionDescriptor.Page(
+                                action,
+                                accepted.Manifest.Manifest.EntryModule,
+                                operation,
+                                PluginCallbackRequirements.Independent,
+                                [
+                                    new(decision, "Review decision", PluginValueKind.String, true),
+                                    new(
+                                        limit,
+                                        "Optional result limit",
+                                        PluginValueKind.Number,
+                                        false
+                                    ),
+                                ]
+                            ),
+                        ],
+                    },
+                }
+            ),
+        };
+        _ = PluginManifestValidator
+            .Validate(
+                manifest,
+                PluginAuthoringContract.Current.Target(PluginRuntimeIdentifier.LinuxX64)
+            )
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>();
+
+        var root = Path.Combine(Path.GetTempPath(), $"blokebot-luals-page-{Guid.NewGuid():N}");
+        _ = Directory.CreateDirectory(root);
+        try
+        {
+            var sdk = PluginAuthoringArtifacts
+                .Generate()
+                .Single(artifact =>
+                    artifact.RelativePath.EndsWith(".lua", StringComparison.Ordinal)
+                );
+            var projectTypes = PluginProjectArtifacts
+                .Generate(manifest)
+                .Single(artifact =>
+                    artifact.RelativePath.EndsWith("plugin.lua", StringComparison.Ordinal)
+                );
+            await File.WriteAllTextAsync(Path.Combine(root, "blokebot.lua"), sdk.Content);
+            await File.WriteAllTextAsync(Path.Combine(root, "plugin.lua"), projectTypes.Content);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "probe.lua"),
+                """
+                ---@type CommunityLinkQueueMainHandlers
+                local handlers = {
+                  ["review"] = function(input)
+                    ---@type string
+                    local decision = input["decision"]
+                    ---@type number|nil
+                    local limit = input["limit"]
+                    return { decision = decision, limit = limit }
+                  end,
+                }
+                return handlers
+                """
+            );
+            await File.WriteAllTextAsync(
+                Path.Combine(root, ".luarc.json"),
+                """
+                {
+                  "runtime": { "version": "Lua 5.4" },
+                  "diagnostics": {
+                    "severity": {
+                      "assign-type-mismatch": "Error!",
+                      "undefined-field": "Error!"
+                    }
+                  }
+                }
+                """
+            );
+
+            var diagnostics = await RunLuaLanguageServerAsync(root);
+            diagnostics.ExitCode.ShouldBe(0, diagnostics.Output);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunLuaLanguageServerAsync(string root)
+    {
+        using var process = new Process
+        {
+            StartInfo =
+            {
+                FileName =
+                    Environment.GetEnvironmentVariable("BLOKEBOT_LUA_LANGUAGE_SERVER")
+                    ?? "lua-language-server",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            },
+        };
+        process.StartInfo.ArgumentList.Add($"--check={root}");
+        process.StartInfo.ArgumentList.Add("--checklevel=Warning");
+        process.StartInfo.ArgumentList.Add("--check_format=pretty");
+        process.StartInfo.ArgumentList.Add($"--configpath={Path.Combine(root, ".luarc.json")}");
+        _ = process.Start();
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return (process.ExitCode, $"{await standardOutput}\n{await standardError}");
+    }
+
     private static string LuaLsProbe(PluginAuthoringContract contract)
     {
         var output = new StringBuilder();
-        for (
-            var schemaIndex = 0;
-            schemaIndex < contract.InvocationInputSchemas.Length;
-            schemaIndex++
-        )
+        var schemas = contract.InvocationInputSchemas.AddRange(contract.StructuredValueSchemas);
+        for (var schemaIndex = 0; schemaIndex < schemas.Length; schemaIndex++)
         {
-            var schema = contract.InvocationInputSchemas[schemaIndex];
+            var schema = schemas[schemaIndex];
             _ = output.Append("---@param input ").AppendLine(schema.LuaTypeName);
             _ = output.Append("local function probe_").Append(schemaIndex).AppendLine("(input)");
             for (var fieldIndex = 0; fieldIndex < schema.Fields.Length; fieldIndex++)
             {
                 var field = schema.Fields[fieldIndex];
-                _ = output.Append("  ---@type ").AppendLine(field.Shape.LuaTypeName);
+                _ = output
+                    .Append("  ---@type ")
+                    .Append(field.Shape.LuaTypeName)
+                    .AppendLine(field.Required ? string.Empty : "|nil");
                 _ = output
                     .Append("  local field_")
                     .Append(fieldIndex)

@@ -92,10 +92,17 @@ public sealed class PluginWorkerProcessTests
     }
 
     [Test]
-    public async Task KeraLuaWorker_ReceivesEveryCanonicalWebAndPageInputField()
+    public async Task KeraLuaWorker_ReceivesEveryCanonicalWebPageAndMigrationInputField()
     {
         PluginHostId.TryCreate(7, out var hostId).ShouldBeTrue();
         var sessionId = PluginContractFixtures.PageSessionId();
+        var migration = (
+            (PluginManifestValidationOutcome.Accepted)
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
+                    PluginContractFixtures.CompatibleHost()
+                )
+        ).Manifest.Manifest.Migrations.ShouldHaveSingleItem();
         var inputs = new[]
         {
             (
@@ -109,6 +116,10 @@ public sealed class PluginWorkerProcessTests
             (
                 Schema: PluginInvocationInputSchemas.Page,
                 Value: PluginInvocationInputs.Page(hostId, sessionId)
+            ),
+            (
+                Schema: PluginInvocationInputSchemas.Migration,
+                Value: PluginInvocationInputs.Migration(migration)
             ),
         };
 

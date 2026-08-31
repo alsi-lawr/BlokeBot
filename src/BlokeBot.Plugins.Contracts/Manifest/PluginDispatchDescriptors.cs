@@ -187,9 +187,57 @@ public sealed record PluginWebhookDescriptor(
     PluginWebhookAuthentication Authentication
 );
 
-public sealed record PluginActionDescriptor(
-    PluginActionId Id,
-    PluginLuaModuleId Module,
-    PluginHostOperationId Operation,
-    PluginCallbackRequirements Requirements
+public sealed record PluginPageActionInputDescriptor(
+    PluginPageActionInputId Id,
+    string Name,
+    PluginValueKind ValueKind,
+    bool Required
 );
+
+[TomlPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[TomlDerivedType(typeof(PluginActionDescriptor.Http), "http")]
+[TomlDerivedType(typeof(PluginActionDescriptor.Page), "page")]
+public abstract record PluginActionDescriptor
+{
+    private protected PluginActionDescriptor(
+        PluginActionId id,
+        PluginLuaModuleId module,
+        PluginHostOperationId operation,
+        PluginCallbackRequirements requirements
+    )
+    {
+        Id = id;
+        Module = module;
+        Operation = operation;
+        Requirements = requirements;
+    }
+
+    public PluginActionId Id { get; }
+
+    public PluginLuaModuleId Module { get; }
+
+    public PluginHostOperationId Operation { get; }
+
+    public PluginCallbackRequirements Requirements { get; }
+
+    public sealed record Http(
+        PluginActionId Id,
+        PluginLuaModuleId Module,
+        PluginHostOperationId Operation,
+        PluginCallbackRequirements Requirements
+    ) : PluginActionDescriptor(Id, Module, Operation, Requirements);
+
+    public sealed record Page : PluginActionDescriptor
+    {
+        public Page(
+            PluginActionId id,
+            PluginLuaModuleId module,
+            PluginHostOperationId operation,
+            PluginCallbackRequirements requirements,
+            ImmutableArray<PluginPageActionInputDescriptor> inputs
+        )
+            : base(id, module, operation, requirements) => Inputs = inputs;
+
+        public ImmutableArray<PluginPageActionInputDescriptor> Inputs { get; }
+    }
+}

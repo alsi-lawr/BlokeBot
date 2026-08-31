@@ -139,7 +139,7 @@ internal static partial class PluginProjectTypeEmitter
         var catalog = PluginProjectHandlerCatalog.Create(manifest);
         foreach (var input in catalog.DerivedInputs)
         {
-            AppendEventInput(input.TypeName, input.Schema, output);
+            AppendDerivedInput(input, output);
         }
 
         AppendHandlerClass($"{prefix}Handlers", catalog.Handlers, output);

@@ -21,7 +21,7 @@
 ---@field ["route"] string # The normalized command route.
 ---@field ["arguments"] string[] # The ordered command arguments.
 
----Input delivered to declared webhook, action, and webhook authentication handlers.
+---Input delivered to declared webhook, HTTP action, and webhook authentication handlers.
 ---@class BlokeBotWebInput
 ---@field ["method"] string # The uppercase HTTP method.
 ---@field ["headers"] table<string, string> # The request headers with lowercase names.
@@ -54,6 +54,12 @@
 ---@field ["subscription"] BlokeBotTwitchRawSubscription # The raw EventSub subscription identity.
 ---@field ["event"] table<string, BlokeBotValue> # The raw EventSub event payload.
 
+---Input delivered to a declared migration handler.
+---@class BlokeBotMigrationInput
+---@field ["migrationId"] string # The declared migration ID.
+---@field ["fromVersion"] string # The source semantic version.
+---@field ["toVersion"] string # The target semantic version.
+
 
 ---@class BlokeBotInstallationSettings: table<string, BlokeBotValue>
 ---@class BlokeBotFeatureSettings: table<string, BlokeBotValue>
@@ -69,91 +75,129 @@
 ---@field reason BlokeBotCancellationReason
 ---@alias BlokeBotHostTerminalOutcome BlokeBotHostFailure|BlokeBotHostCancellation
 
+---The admitted channel actor.
 ---@class BlokeBotActorContext
----@field login string
----@field displayName string
----@field twitchUserId? string
----@field isBroadcaster boolean
----@field isModerator boolean
----@field isSubscriber boolean
----@class BlokeBotStreamContext
----@field streamId? string
----@field isLive boolean
----@class BlokeBotCommandContext
----@field route string
----@field arguments string[]
----@class BlokeBotEventContext
----@field handlerId string
----@field source string
----@field eventId string
----@field occurredAt string
----@class BlokeBotScheduleContext
----@field handlerId string
----@field scheduleId string
----@field dueAt string
----@class BlokeBotWebContext
----@field kind "webhook"|"action"
----@field routeId string
----@field method string
----@class BlokeBotAutomationContext
----@field definitionId string
----@field invocationId string
----@class BlokeBotMigrationContext
----@field migrationId string
----@field fromVersion string
----@field toVersion string
----@class BlokeBotPageContext
----@field pageId string
----@field sessionId string
+---@field ["login"] string # The actor's normalized login.
+---@field ["displayName"] string # The actor's display name.
+---@field ["twitchUserId"]? string # The actor's Twitch user ID.
+---@field ["isBroadcaster"] boolean # Whether the actor is the broadcaster.
+---@field ["isModerator"] boolean # Whether the actor is a moderator.
+---@field ["isSubscriber"] boolean # Whether the actor is a subscriber.
 
+---The admitted stream state.
+---@class BlokeBotStreamContext
+---@field ["streamId"]? string # The current Twitch stream ID.
+---@field ["isLive"] boolean # Whether the channel is live.
+
+---The admitted command invocation.
+---@class BlokeBotCommandContext
+---@field ["route"] string # The normalized command route.
+---@field ["arguments"] string[] # The ordered command arguments.
+
+---The admitted event invocation.
+---@class BlokeBotEventContext
+---@field ["handlerId"] string # The declared event handler ID.
+---@field ["source"] string # The canonical event source.
+---@field ["eventId"] string # The stable event correlation ID.
+---@field ["occurredAt"] string # The UTC event timestamp.
+
+---The admitted schedule invocation.
+---@class BlokeBotScheduleContext
+---@field ["handlerId"] string # The declared schedule handler ID.
+---@field ["scheduleId"] string # The schedule invocation ID.
+---@field ["dueAt"] string # The UTC scheduled time.
+
+---The admitted HTTP invocation.
+---@class BlokeBotWebContext
+---@field ["kind"] "webhook"|"action" # The HTTP admission surface.
+---@field ["routeId"] string # The declared webhook or HTTP action ID.
+---@field ["method"] string # The uppercase HTTP method.
+
+---The admitted automation invocation.
+---@class BlokeBotAutomationContext
+---@field ["definitionId"] string # The automation definition ID.
+---@field ["invocationId"] string # The automation invocation ID.
+
+---The admitted migration identity.
+---@class BlokeBotMigrationContext
+---@field ["migrationId"] string # The declared migration ID.
+---@field ["fromVersion"] string # The source semantic version.
+---@field ["toVersion"] string # The target semantic version.
+
+---The admitted page identity.
+---@class BlokeBotPageContext
+---@field ["pageId"] string # The declared page ID.
+---@field ["sessionId"] string # The generated page session ID.
+
+---Fields common to every admitted invocation context.
 ---@class BlokeBotContextBase
----@field pluginId string
----@field pluginVersion string
----@field pluginTag string
+---@field ["pluginId"] string # The invoking plugin ID.
+---@field ["pluginVersion"] string # The invoking plugin version.
+---@field ["pluginTag"] string # The invoking plugin release tag.
+
+---An installation lifecycle invocation.
 ---@class BlokeBotInstallationContext: BlokeBotContextBase
----@field kind "installation"
+---@field ["kind"] "installation" # The context kind.
+
+---A channel-scoped invocation.
 ---@class BlokeBotChannelContext: BlokeBotContextBase
----@field kind "channel"
----@field hostId integer
----@field featureId string
----@field actor? BlokeBotActorContext
----@field stream? BlokeBotStreamContext
----@field command? BlokeBotCommandContext
----@field event? BlokeBotEventContext
----@field schedule? BlokeBotScheduleContext
----@field web? BlokeBotWebContext
+---@field ["kind"] "channel" # The context kind.
+---@field ["hostId"] integer # The selected BlokeBot host ID.
+---@field ["featureId"] string # The admitted plugin feature ID.
+---@field ["actor"]? BlokeBotActorContext # The admitted actor.
+---@field ["stream"]? BlokeBotStreamContext # The current stream.
+---@field ["command"]? BlokeBotCommandContext # The command invocation.
+---@field ["event"]? BlokeBotEventContext # The event invocation.
+---@field ["schedule"]? BlokeBotScheduleContext # The schedule invocation.
+---@field ["web"]? BlokeBotWebContext # The HTTP invocation.
+
+---An automation invocation.
 ---@class BlokeBotAutomationInvocationContext: BlokeBotContextBase
----@field kind "automation"
----@field hostId integer
----@field featureId string
----@field automation BlokeBotAutomationContext
+---@field ["kind"] "automation" # The context kind.
+---@field ["hostId"] integer # The selected BlokeBot host ID.
+---@field ["featureId"] string # The admitted plugin feature ID.
+---@field ["automation"] BlokeBotAutomationContext # The automation invocation.
+
+---A migration invocation.
 ---@class BlokeBotMigrationInvocationContext: BlokeBotContextBase
----@field kind "migration"
----@field migration BlokeBotMigrationContext
+---@field ["kind"] "migration" # The context kind.
+---@field ["migration"] BlokeBotMigrationContext # The migration identity.
+
+---A plugin page invocation.
 ---@class BlokeBotPageInvocationContext: BlokeBotContextBase
----@field kind "page"
----@field hostId integer
----@field featureId string
----@field page BlokeBotPageContext
+---@field ["kind"] "page" # The context kind.
+---@field ["hostId"] integer # The selected BlokeBot host ID.
+---@field ["featureId"] string # The admitted plugin feature ID.
+---@field ["page"] BlokeBotPageContext # The page identity.
+
+---An outbound HTTP request.
+---@class BlokeBotHttpRequest
+---@field ["method"] "GET"|"POST"|"PUT"|"PATCH"|"DELETE"|"HEAD" # The HTTP method.
+---@field ["url"] string # The absolute HTTP or HTTPS URL.
+---@field ["headers"]? table<string, string> # Optional request headers.
+---@field ["body"]? string # Optional UTF-8 request body.
+
+---A completed HTTP response.
+---@class BlokeBotHttpResponse
+---@field ["kind"] "response" # The HTTP outcome kind.
+---@field ["status"] integer # The HTTP response status.
+---@field ["headers"] table<string, string> # The response headers.
+---@field ["bodyBase64"] string # The response body encoded as base64.
+
+---An HTTP request rejected before transport.
+---@class BlokeBotHttpRejected
+---@field ["kind"] "rejected" # The HTTP outcome kind.
+---@field ["code"] string # The stable HTTP rejection code.
+
+---An HTTP transport failure.
+---@class BlokeBotHttpFailed
+---@field ["kind"] "failed" # The HTTP outcome kind.
+---@field ["code"] string # The stable HTTP failure code.
+
+---The exact admitted invocation context.
 ---@alias BlokeBotContext BlokeBotInstallationContext|BlokeBotChannelContext|BlokeBotAutomationInvocationContext|BlokeBotMigrationInvocationContext|BlokeBotPageInvocationContext
 
----@alias BlokeBotHttpMethod "GET"|"POST"|"PUT"|"PATCH"|"DELETE"|"HEAD"
----@class BlokeBotHttpRequest
----@field method BlokeBotHttpMethod
----@field url string
----@field headers? table<string, string>
----@field body? string
----@class BlokeBotHttpResponse
----@field kind "response"
----@field status integer
----@field headers table<string, string>
----@field bodyBase64 string
----@class BlokeBotHttpRejected
----@field kind "rejected"
----@field code string
----@class BlokeBotHttpFailed
----@field kind "failed"
----@field code string
+---The typed outbound HTTP outcome.
 ---@alias BlokeBotHttpOutcome BlokeBotHttpResponse|BlokeBotHttpRejected|BlokeBotHttpFailed
 
 ---@class BlokeBotContextModule

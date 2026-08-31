@@ -118,7 +118,7 @@ public sealed class PluginPageTests
     }
 
     [Test]
-    public void GeneratedDocument_RequiresVersionKnownActionAndSurfaceBounds()
+    public void GeneratedDocument_AdmitsOnlyPageActionsWithExactDeclaredFieldsAndSurfaceBounds()
     {
         var setup = Setup();
         var feature = setup.Manifest.Manifest.Features.Single(candidate =>
@@ -144,6 +144,59 @@ public sealed class PluginPageTests
             .Parse(valid, feature)
             .ShouldBeOfType<PluginPageDocumentParseOutcome.Parsed>();
         parsed.Document.Sections.Length.ShouldBe(2);
+
+        var wrongFieldShape = Document([
+            Map(
+                ("kind", Text("form")),
+                ("title", Text("Queue controls")),
+                ("action", Text(action.Value)),
+                (
+                    "fields",
+                    Array(
+                        Map(
+                            ("id", Text("query")),
+                            ("label", Text("Query")),
+                            ("kind", Text("number"))
+                        )
+                    )
+                )
+            ),
+        ]);
+        PluginPageDocumentParser
+            .Parse(wrongFieldShape, feature)
+            .ShouldBeOfType<PluginPageDocumentParseOutcome.Rejected>()
+            .Errors.ShouldContain(error => error.Code == PluginPageDocumentErrorCode.InvalidSchema);
+
+        _ = PluginActionId.TryCreate("http-refresh", out var httpAction);
+        _ = PluginHostOperationId.TryCreate("http_refresh", out var httpOperation);
+        var withHttpAction = feature with
+        {
+            Dispatch = feature.DispatchDeclarations with
+            {
+                Actions = feature.DispatchDeclarations.Actions.Add(
+                    new PluginActionDescriptor.Http(
+                        httpAction,
+                        setup.Manifest.Manifest.EntryModule,
+                        httpOperation,
+                        PluginCallbackRequirements.Independent
+                    )
+                ),
+            },
+        };
+        PluginPageDocumentParser
+            .Parse(
+                Document([
+                    Map(
+                        ("kind", Text("form")),
+                        ("title", Text("HTTP action")),
+                        ("action", Text(httpAction.Value)),
+                        ("fields", Array())
+                    ),
+                ]),
+                withHttpAction
+            )
+            .ShouldBeOfType<PluginPageDocumentParseOutcome.Rejected>()
+            .Errors.ShouldContain(error => error.Code == PluginPageDocumentErrorCode.UnknownAction);
 
         PluginPageDocumentParser
             .Parse(Document([], version: 2), feature)
@@ -175,6 +228,39 @@ public sealed class PluginPageTests
             )
             .ShouldBeOfType<PluginPageDocumentParseOutcome.Rejected>()
             .Errors.ShouldContain(error => error.Code == PluginPageDocumentErrorCode.LimitExceeded);
+    }
+
+    [Test]
+    public void PageActionInput_RequiresExactlyTheDeclaredFieldsAndValueKinds()
+    {
+        _ = PluginActionId.TryCreate("review", out var actionId);
+        _ = PluginLuaModuleId.TryCreate("main", out var module);
+        _ = PluginHostOperationId.TryCreate("review", out var operation);
+        _ = PluginPageActionInputId.TryCreate("query", out var query);
+        _ = PluginPageActionInputId.TryCreate("limit", out var limit);
+        var action = new PluginActionDescriptor.Page(
+            actionId,
+            module,
+            operation,
+            PluginCallbackRequirements.Independent,
+            [
+                new(query, "Query", PluginValueKind.String, true),
+                new(limit, "Limit", PluginValueKind.Number, false),
+            ]
+        );
+
+        _ = PluginPageActionInputValidator
+            .Validate(action, Map(("query", Text("cats")), ("limit", new PluginValue.Number(2))))
+            .ShouldBeOfType<PluginPageActionInputValidationOutcome.Accepted>();
+        _ = PluginPageActionInputValidator
+            .Validate(action, Map(("limit", new PluginValue.Number(2))))
+            .ShouldBeOfType<PluginPageActionInputValidationOutcome.Rejected>();
+        _ = PluginPageActionInputValidator
+            .Validate(action, Map(("query", new PluginValue.Number(2))))
+            .ShouldBeOfType<PluginPageActionInputValidationOutcome.Rejected>();
+        _ = PluginPageActionInputValidator
+            .Validate(action, Map(("query", Text("cats")), ("extra", Text("value"))))
+            .ShouldBeOfType<PluginPageActionInputValidationOutcome.Rejected>();
     }
 
     [Test]
@@ -281,6 +367,7 @@ public sealed class PluginPageTests
         );
         var module = accepted.Manifest.LuaModules[0].Id;
         _ = PluginActionId.TryCreate("refresh", out var action);
+        _ = PluginPageActionInputId.TryCreate("query", out var query);
         _ = PluginHostOperationId.TryCreate("handle", out var operation);
         var modified = accepted.Manifest with
         {
@@ -293,7 +380,15 @@ public sealed class PluginPageTests
                         [],
                         [],
                         [],
-                        [new(action, module, operation, PluginCallbackRequirements.Independent)]
+                        [
+                            new PluginActionDescriptor.Page(
+                                action,
+                                module,
+                                operation,
+                                PluginCallbackRequirements.Independent,
+                                [new(query, "Query", PluginValueKind.String, false)]
+                            ),
+                        ]
                     ),
                 }
             ),

@@ -127,7 +127,20 @@ internal static class PluginManifestTomlShape
         && Child(table, "authentication", WebhookAuthentication);
 
     private static bool Action(TomlTable table) =>
-        Callback(table, ["id", "module", "operation", "requirements"]);
+        table.TryGetValue("kind", out var kind)
+        && kind is string name
+        && name switch
+        {
+            "http" => Callback(table, ["kind", "id", "module", "operation", "requirements"]),
+            "page" => Callback(
+                table,
+                ["kind", "id", "module", "operation", "requirements", "inputs"]
+            ) && Children(table, "inputs", PageActionInput),
+            _ => false,
+        };
+
+    private static bool PageActionInput(TomlTable table) =>
+        Table(table, ["id", "name", "valueKind", "required"]);
 
     private static bool Callback(TomlTable table, IReadOnlyList<string> fields) =>
         Table(table, fields) && Child(table, "requirements", Requirements);

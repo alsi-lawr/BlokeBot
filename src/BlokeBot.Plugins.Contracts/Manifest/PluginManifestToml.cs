@@ -122,6 +122,7 @@ public static class PluginManifestToml
         {
             Converters =
             [
+                new PluginPageActionInputsTomlConverter(),
                 new PluginContractIdentifierTomlConverter<PluginId>(),
                 new PluginContractIdentifierTomlConverter<PluginSettingId>(),
                 new PluginContractIdentifierTomlConverter<PluginSettingChoiceId>(),
@@ -130,6 +131,7 @@ public static class PluginManifestToml
                 new PluginContractIdentifierTomlConverter<PluginScheduleHandlerId>(),
                 new PluginContractIdentifierTomlConverter<PluginWebhookId>(),
                 new PluginContractIdentifierTomlConverter<PluginActionId>(),
+                new PluginContractIdentifierTomlConverter<PluginPageActionInputId>(),
                 new PluginContractIdentifierTomlConverter<PluginMigrationId>(),
                 new PluginContractIdentifierTomlConverter<PluginLuaModuleId>(),
                 new PluginContractIdentifierTomlConverter<PluginAutomationDefinitionId>(),

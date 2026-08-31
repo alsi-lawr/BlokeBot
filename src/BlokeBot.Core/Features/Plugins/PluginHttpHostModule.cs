@@ -32,6 +32,10 @@ public sealed class PluginHttpHostModule(PluginOutboundHttpClient http) : IPlugi
     private static bool TryRequest(PluginValue.Map value, out PluginHttpRequest request)
     {
         request = null!;
+        if (!PluginStructuredValueSchemas.HttpRequest.Accepts(value))
+        {
+            return false;
+        }
         var properties = value.Properties.ToDictionary(
             static property => property.Name,
             static property => property.Value,
@@ -52,7 +56,10 @@ public sealed class PluginHttpHostModule(PluginOutboundHttpClient http) : IPlugi
         var headers = ImmutableDictionary.CreateBuilder<string, string>(
             StringComparer.OrdinalIgnoreCase
         );
-        if (properties.TryGetValue("headers", out var headerValue))
+        if (
+            properties.TryGetValue("headers", out var headerValue)
+            && headerValue is not PluginValue.Nil
+        )
         {
             if (headerValue is not PluginValue.Map headerMap)
             {
@@ -71,7 +78,7 @@ public sealed class PluginHttpHostModule(PluginOutboundHttpClient http) : IPlugi
         }
 
         var body = ReadOnlyMemory<byte>.Empty;
-        if (properties.TryGetValue("body", out var bodyValue))
+        if (properties.TryGetValue("body", out var bodyValue) && bodyValue is not PluginValue.Nil)
         {
             if (bodyValue is not PluginValue.String text)
             {
@@ -90,11 +97,14 @@ public sealed class PluginHttpHostModule(PluginOutboundHttpClient http) : IPlugi
     private static PluginValue.Map ToValue(PluginHttpOutcome outcome) =>
         outcome switch
         {
-            PluginHttpOutcome.Response response => Map(
-                new("kind", new PluginValue.String("response")),
-                new("status", new PluginValue.Number(response.StatusCode)),
-                new(
-                    "headers",
+            PluginHttpOutcome.Response response => PluginStructuredValueSchemas.HttpResponse.Create(
+                PluginStructuredValueSchemas.HttpResponseKind.Value(
+                    new PluginValue.String("response")
+                ),
+                PluginStructuredValueSchemas.HttpResponseStatus.Value(
+                    new PluginValue.Number(response.StatusCode)
+                ),
+                PluginStructuredValueSchemas.HttpResponseHeaders.Value(
                     new PluginValue.Map(
                         response
                             .Headers.Select(header => new PluginValueProperty(
@@ -104,24 +114,26 @@ public sealed class PluginHttpHostModule(PluginOutboundHttpClient http) : IPlugi
                             .ToImmutableArray()
                     )
                 ),
-                new(
-                    "bodyBase64",
+                PluginStructuredValueSchemas.HttpResponseBodyBase64.Value(
                     new PluginValue.String(Convert.ToBase64String(response.Body.Span))
                 )
             ),
-            PluginHttpOutcome.Rejected rejected => Map(
-                new("kind", new PluginValue.String("rejected")),
-                new("code", new PluginValue.String(Code(rejected.Code)))
+            PluginHttpOutcome.Rejected rejected => PluginStructuredValueSchemas.HttpRejected.Create(
+                PluginStructuredValueSchemas.HttpRejectedKind.Value(
+                    new PluginValue.String("rejected")
+                ),
+                PluginStructuredValueSchemas.HttpRejectedCode.Value(
+                    new PluginValue.String(Code(rejected.Code))
+                )
             ),
-            PluginHttpOutcome.Failed failed => Map(
-                new("kind", new PluginValue.String("failed")),
-                new("code", new PluginValue.String(Code(failed.Code)))
+            PluginHttpOutcome.Failed failed => PluginStructuredValueSchemas.HttpFailed.Create(
+                PluginStructuredValueSchemas.HttpFailedKind.Value(new PluginValue.String("failed")),
+                PluginStructuredValueSchemas.HttpFailedCode.Value(
+                    new PluginValue.String(Code(failed.Code))
+                )
             ),
-            _ => Map(new PluginValueProperty("kind", new PluginValue.String("failed"))),
+            _ => throw new InvalidOperationException("Unknown plugin HTTP outcome."),
         };
-
-    private static PluginValue.Map Map(params PluginValueProperty[] properties) =>
-        new([.. properties]);
 
     private static string Code<TCode>(TCode code)
         where TCode : struct, Enum => code.ToString().ToLowerInvariant();

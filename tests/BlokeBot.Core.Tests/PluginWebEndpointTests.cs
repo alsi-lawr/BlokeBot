@@ -71,6 +71,11 @@ public sealed class PluginWebEndpointTests
         wrongHost.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         host.Invoker.Actions.ShouldBeEmpty();
 
+        using var pageOnlyRequest = Request(Route("actions", "page-refresh", hostId: 1));
+        using var pageOnly = await host.Client.SendAsync(pageOnlyRequest);
+        pageOnly.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        host.Invoker.Actions.ShouldBeEmpty();
+
         using var currentHostRequest = Request(Route("actions", "refresh", hostId: 1));
         using var currentHost = await host.Client.SendAsync(currentHostRequest);
         currentHost.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -148,6 +153,9 @@ public sealed class PluginWebEndpointTests
             _ = PluginHostOperationId.TryCreate("handle", out var operation);
             _ = PluginWebhookId.TryCreate("incoming", out var webhook);
             _ = PluginActionId.TryCreate("refresh", out var action);
+            _ = PluginActionId.TryCreate("page-refresh", out var pageAction);
+            _ = PluginPageActionInputId.TryCreate("query", out var pageInput);
+            _ = PluginHostOperationId.TryCreate("handle_page", out var pageOperation);
             var manifest = (
                 (PluginManifestValidationOutcome.Accepted)
                     PluginManifestValidator.Validate(
@@ -171,11 +179,25 @@ public sealed class PluginWebEndpointTests
                                             ),
                                         ],
                                         [
-                                            new(
+                                            new PluginActionDescriptor.Http(
                                                 action,
                                                 module,
                                                 operation,
                                                 PluginCallbackRequirements.Independent
+                                            ),
+                                            new PluginActionDescriptor.Page(
+                                                pageAction,
+                                                module,
+                                                pageOperation,
+                                                PluginCallbackRequirements.Independent,
+                                                [
+                                                    new(
+                                                        pageInput,
+                                                        "Query",
+                                                        PluginValueKind.String,
+                                                        true
+                                                    ),
+                                                ]
                                             ),
                                         ]
                                     ),
@@ -262,7 +284,7 @@ public sealed class PluginWebEndpointTests
         }
 
         public ValueTask<PluginWebDispatchOutcome> InvokeActionAsync(
-            PluginDispatchEndpoint.Action endpoint,
+            PluginDispatchEndpoint.HttpAction endpoint,
             PluginInvocationContext.Channel context,
             PluginValue input,
             CancellationToken cancellationToken

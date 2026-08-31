@@ -129,7 +129,10 @@ public static partial class PluginPageDocumentParser
         {
             return Invalid<PluginPageSection>(location, errors);
         }
-        if (!feature.DispatchDeclarations.Actions.Any(candidate => candidate.Id == action))
+        var descriptor = feature
+            .DispatchDeclarations.Actions.OfType<PluginActionDescriptor.Page>()
+            .SingleOrDefault(candidate => candidate.Id == action);
+        if (descriptor is null)
         {
             errors.Add(new(PluginPageDocumentErrorCode.UnknownAction, $"{location}.action"));
         }
@@ -153,10 +156,15 @@ public static partial class PluginPageDocumentParser
                 parsed.Add(field);
             }
         }
+        var parsedFields = parsed.ToImmutable();
         if (
-            parsed.Select(static field => field.Id).Distinct(StringComparer.Ordinal).Count()
-            != parsed.Count
+            parsedFields.Select(static field => field.Id).Distinct(StringComparer.Ordinal).Count()
+            != parsedFields.Length
         )
+        {
+            errors.Add(new(PluginPageDocumentErrorCode.InvalidSchema, $"{location}.fields"));
+        }
+        if (descriptor is not null && !FieldsMatch(descriptor.Inputs, parsedFields))
         {
             errors.Add(new(PluginPageDocumentErrorCode.InvalidSchema, $"{location}.fields"));
         }
@@ -165,9 +173,32 @@ public static partial class PluginPageDocumentParser
             description,
             action,
             submitLabel ?? "Run action",
-            parsed.ToImmutable()
+            parsedFields
         );
     }
+
+    private static bool FieldsMatch(
+        IReadOnlyCollection<PluginPageActionInputDescriptor> declared,
+        IReadOnlyCollection<PluginPageField> rendered
+    ) =>
+        declared.Count == rendered.Count
+        && declared.All(input =>
+            rendered.Any(field =>
+                field.Id == input.Id.Value
+                && field.Required == input.Required
+                && ValueKind(field.Kind) == input.ValueKind
+            )
+        );
+
+    private static PluginValueKind ValueKind(PluginPageFieldKind kind) =>
+        kind switch
+        {
+            PluginPageFieldKind.Number => PluginValueKind.Number,
+            PluginPageFieldKind.Boolean => PluginValueKind.Boolean,
+            PluginPageFieldKind.Text
+            or PluginPageFieldKind.Multiline
+            or PluginPageFieldKind.Choice => PluginValueKind.String,
+        };
 
     private static PluginPageField? ParseField(
         PluginValue value,

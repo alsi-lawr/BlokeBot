@@ -57,6 +57,7 @@ public static partial class PluginManifestValidator
                 && modules.Contains(action.Module)
                 && action.Operation is not null
                 && action.Requirements is not null
+                && ValidAction(action)
             )
             && RawEventSubDeclarationsAreComplete(feature, dispatch);
         if (!valid)
@@ -128,4 +129,113 @@ public static partial class PluginManifestValidator
                 && callback.Operation is not null,
             _ => false,
         };
+
+    private static bool ValidAction(PluginActionDescriptor action) =>
+        action switch
+        {
+            PluginActionDescriptor.Http => true,
+            PluginActionDescriptor.Page page => !page.Inputs.IsDefault
+                && page.Inputs.Length <= PluginContractLimits.MaximumPageFields
+                && page.Inputs.Select(static input => input.Id).Distinct().Count()
+                    == page.Inputs.Length
+                && page.Inputs.All(input =>
+                    input.Id is not null
+                    && IsValidText(input.Name, required: true)
+                    && Enum.IsDefined(input.ValueKind)
+                    && input.ValueKind != PluginValueKind.Nil
+                ),
+            _ => false,
+        };
+
+    private static void ValidatePageActionHandlerContracts(
+        PluginManifest manifest,
+        List<PluginManifestError> errors
+    )
+    {
+        var entrypoints = HandlerEntrypoints(manifest).ToArray();
+        if (
+            manifest
+                .Features.SelectMany(static feature => feature.DispatchDeclarations.Actions)
+                .OfType<PluginActionDescriptor.Page>()
+                .Where(static page => page.Module is not null && page.Operation is not null)
+                .Any(page =>
+                    entrypoints.Count(entrypoint =>
+                        entrypoint.Module == page.Module
+                        && entrypoint.Operation == page.Operation.Value
+                    ) != 1
+                )
+        )
+        {
+            errors.Add(
+                new(
+                    PluginManifestErrorCode.InvalidDispatchDeclaration,
+                    "$.features.dispatch.actions"
+                )
+            );
+        }
+    }
+
+    private static IEnumerable<(PluginLuaModuleId Module, string Operation)> HandlerEntrypoints(
+        PluginManifest manifest
+    )
+    {
+        foreach (var feature in manifest.Features)
+        {
+            var dispatch = feature.DispatchDeclarations;
+            foreach (var callback in dispatch.Commands)
+            {
+                if (callback.Module is not null && callback.Operation is not null)
+                {
+                    yield return (callback.Module, callback.Operation.Value);
+                }
+            }
+            foreach (var callback in dispatch.Events)
+            {
+                if (callback.Module is not null && callback.Operation is not null)
+                {
+                    yield return (callback.Module, callback.Operation.Value);
+                }
+            }
+            foreach (var callback in dispatch.Schedules)
+            {
+                if (callback.Module is not null && callback.Operation is not null)
+                {
+                    yield return (callback.Module, callback.Operation.Value);
+                }
+            }
+            foreach (var callback in dispatch.Webhooks)
+            {
+                if (callback.Module is not null && callback.Operation is not null)
+                {
+                    yield return (callback.Module, callback.Operation.Value);
+                }
+                if (callback.Authentication is PluginWebhookAuthentication.Callback authentication)
+                {
+                    if (authentication.Module is not null && authentication.Operation is not null)
+                    {
+                        yield return (authentication.Module, authentication.Operation.Value);
+                    }
+                }
+            }
+            foreach (var callback in dispatch.Actions)
+            {
+                if (callback.Module is not null && callback.Operation is not null)
+                {
+                    yield return (callback.Module, callback.Operation.Value);
+                }
+            }
+        }
+        foreach (var migration in manifest.Migrations)
+        {
+            yield return (migration.Module, migration.EntryPoint);
+        }
+        foreach (var page in manifest.GeneratedPages)
+        {
+            yield return (page.Module, page.RenderEntryPoint);
+        }
+        foreach (var automation in manifest.AutomationDefinitions)
+        {
+            yield return (automation.Module, automation.EntryPoint);
+        }
+    }
 }

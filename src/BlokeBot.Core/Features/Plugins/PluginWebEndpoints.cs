@@ -86,7 +86,7 @@ internal static class PluginWebEndpoints
             || !PluginHostId.TryCreate(host, out var hostId)
             || !PluginFeatureId.TryCreate(feature, out var featureId)
             || !PluginActionId.TryCreate(action, out var actionId)
-            || !snapshots.Current.Actions.TryGetValue(
+            || !snapshots.Current.HttpActions.TryGetValue(
                 new(pluginId, featureId, hostId, actionId),
                 out var endpoint
             )

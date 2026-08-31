@@ -145,7 +145,10 @@
         _submitting = true;
         try
         {
-            var properties = form.Fields.Select(field => new PluginValueProperty(field.Id, ToPluginValue(form, field))).ToImmutableArray();
+            var properties = form.Fields
+                .Where(field => field.Required || _values.ContainsKey((form.Action, field.Id)))
+                .Select(field => new PluginValueProperty(field.Id, ToPluginValue(form, field)))
+                .ToImmutableArray();
             await OnSubmit.InvokeAsync(new(form.Action, new PluginValue.Map(properties)));
         }
         finally

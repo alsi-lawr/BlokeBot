@@ -23,6 +23,9 @@ public sealed class PluginDispatchManifestProtocolTests
         PluginWebhookId.TryCreate("public-hook", out var publicHook).ShouldBeTrue();
         PluginWebhookId.TryCreate("signed-hook", out var signedHook).ShouldBeTrue();
         PluginActionId.TryCreate("approve", out var action).ShouldBeTrue();
+        PluginActionId.TryCreate("review", out var pageAction).ShouldBeTrue();
+        PluginPageActionInputId.TryCreate("decision", out var decision).ShouldBeTrue();
+        PluginHostOperationId.TryCreate("review", out var review).ShouldBeTrue();
         PluginHostOperationId.TryCreate("authenticate", out var authenticate).ShouldBeTrue();
         var validated = (
             (PluginManifestValidationOutcome.Accepted)
@@ -87,11 +90,25 @@ public sealed class PluginDispatchManifestProtocolTests
                                         ),
                                     ],
                                     [
-                                        new(
+                                        new PluginActionDescriptor.Http(
                                             action,
                                             module,
                                             operation,
                                             PluginCallbackRequirements.Independent
+                                        ),
+                                        new PluginActionDescriptor.Page(
+                                            pageAction,
+                                            module,
+                                            review,
+                                            PluginCallbackRequirements.Independent,
+                                            [
+                                                new(
+                                                    decision,
+                                                    "Decision",
+                                                    PluginValueKind.String,
+                                                    true
+                                                ),
+                                            ]
                                         ),
                                     ]
                                 ),
@@ -123,7 +140,13 @@ public sealed class PluginDispatchManifestProtocolTests
         _ = roundTripped
             .Webhooks.Single(hook => hook.Id == signedHook)
             .Authentication.ShouldBeOfType<PluginWebhookAuthentication.Callback>();
-        roundTripped.Actions.ShouldHaveSingleItem().Id.ShouldBe(action);
+        _ = roundTripped
+            .Actions.Single(candidate => candidate.Id == action)
+            .ShouldBeOfType<PluginActionDescriptor.Http>();
+        var page = roundTripped
+            .Actions.Single(candidate => candidate.Id == pageAction)
+            .ShouldBeOfType<PluginActionDescriptor.Page>();
+        page.Inputs.ShouldHaveSingleItem().Id.ShouldBe(decision);
     }
 
     [Test]
@@ -162,6 +185,61 @@ public sealed class PluginDispatchManifestProtocolTests
                                 ),
                             ]
                         ),
+                    }
+                ),
+            },
+            PluginContractFixtures.CompatibleHost()
+        );
+
+        Errors(outcome)
+            .ShouldContain(error =>
+                error.Code == PluginManifestErrorCode.InvalidDispatchDeclaration
+            );
+    }
+
+    [Test]
+    public void HttpAndPageActionContracts_RequireSeparateHandlerOperations()
+    {
+        var accepted = (
+            (PluginManifestValidationOutcome.Accepted)
+                PluginManifestToml.Validate(
+                    PluginContractFixtures.CompleteManifestToml(),
+                    PluginContractFixtures.CompatibleHost()
+                )
+        ).Manifest;
+        var feature = accepted.Manifest.Features.Single(item => item.Id.Value == "collection");
+        var module = accepted.Manifest.EntryModule;
+        _ = PluginActionId.TryCreate("refresh-http", out var httpAction);
+        _ = PluginActionId.TryCreate("refresh-page", out var pageAction);
+        _ = PluginPageActionInputId.TryCreate("query", out var query);
+        _ = PluginHostOperationId.TryCreate("refresh", out var operation);
+
+        var outcome = PluginManifestValidator.Validate(
+            accepted.Manifest with
+            {
+                Features = accepted.Manifest.Features.Replace(
+                    feature,
+                    feature with
+                    {
+                        Dispatch = feature.DispatchDeclarations with
+                        {
+                            Actions =
+                            [
+                                new PluginActionDescriptor.Http(
+                                    httpAction,
+                                    module,
+                                    operation,
+                                    PluginCallbackRequirements.Independent
+                                ),
+                                new PluginActionDescriptor.Page(
+                                    pageAction,
+                                    module,
+                                    operation,
+                                    PluginCallbackRequirements.Independent,
+                                    [new(query, "Query", PluginValueKind.String, true)]
+                                ),
+                            ],
+                        },
                     }
                 ),
             },

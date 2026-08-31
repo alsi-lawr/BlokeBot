@@ -12,7 +12,7 @@ public sealed partial class PluginDispatchInvoker
     ) => InvokePageCoreAsync(endpoint, context, input, cancellationToken);
 
     public ValueTask<PluginDispatchInvocationOutcome> InvokePageActionAsync(
-        PluginDispatchEndpoint.Action endpoint,
+        PluginDispatchEndpoint.PageAction endpoint,
         PluginInvocationContext.Page context,
         PluginValue input,
         CancellationToken cancellationToken

@@ -18,8 +18,8 @@ internal static class PluginLuaLanguageServerStubEmitter
         );
         _ = output.AppendLine();
         AppendCoreTypes(contract, output);
-        AppendContextTypes(output);
-        AppendHttpTypes(output);
+        AppendSchemas(contract.StructuredValueSchemas, output);
+        AppendUnions(contract.StructuredValueUnions, output);
         AppendHostModules(contract, output);
         return output.ToString();
     }
@@ -45,22 +45,7 @@ internal static class PluginLuaLanguageServerStubEmitter
         _ = output.AppendLine("---@alias BlokeBotSqlRow table<string, BlokeBotSqlParameter>");
         _ = output.AppendLine("---@alias BlokeBotProtectedValue string");
         _ = output.AppendLine();
-        foreach (var schema in contract.InvocationInputSchemas)
-        {
-            _ = output.Append("---").AppendLine(schema.Description);
-            _ = output.Append("---@class ").AppendLine(schema.LuaTypeName);
-            foreach (var field in schema.Fields)
-            {
-                _ = output
-                    .Append("---@field [\"")
-                    .Append(field.Name)
-                    .Append("\"] ")
-                    .Append(field.Shape.LuaTypeName)
-                    .Append(" # ")
-                    .AppendLine(field.Description);
-            }
-            _ = output.AppendLine();
-        }
+        AppendSchemas(contract.InvocationInputSchemas, output);
         _ = output.AppendLine();
         _ = output.AppendLine(
             "---@class BlokeBotInstallationSettings: table<string, BlokeBotValue>"
@@ -86,105 +71,55 @@ internal static class PluginLuaLanguageServerStubEmitter
         _ = output.AppendLine();
     }
 
-    private static void AppendContextTypes(StringBuilder output)
+    private static void AppendSchemas(
+        IEnumerable<PluginLuaSchemaDescriptor> schemas,
+        StringBuilder output
+    )
     {
-        _ = output.AppendLine("---@class BlokeBotActorContext");
-        _ = output.AppendLine("---@field login string");
-        _ = output.AppendLine("---@field displayName string");
-        _ = output.AppendLine("---@field twitchUserId? string");
-        _ = output.AppendLine("---@field isBroadcaster boolean");
-        _ = output.AppendLine("---@field isModerator boolean");
-        _ = output.AppendLine("---@field isSubscriber boolean");
-        _ = output.AppendLine("---@class BlokeBotStreamContext");
-        _ = output.AppendLine("---@field streamId? string");
-        _ = output.AppendLine("---@field isLive boolean");
-        _ = output.AppendLine("---@class BlokeBotCommandContext");
-        _ = output.AppendLine("---@field route string");
-        _ = output.AppendLine("---@field arguments string[]");
-        _ = output.AppendLine("---@class BlokeBotEventContext");
-        _ = output.AppendLine("---@field handlerId string");
-        _ = output.AppendLine("---@field source string");
-        _ = output.AppendLine("---@field eventId string");
-        _ = output.AppendLine("---@field occurredAt string");
-        _ = output.AppendLine("---@class BlokeBotScheduleContext");
-        _ = output.AppendLine("---@field handlerId string");
-        _ = output.AppendLine("---@field scheduleId string");
-        _ = output.AppendLine("---@field dueAt string");
-        _ = output.AppendLine("---@class BlokeBotWebContext");
-        _ = output.AppendLine("---@field kind \"webhook\"|\"action\"");
-        _ = output.AppendLine("---@field routeId string");
-        _ = output.AppendLine("---@field method string");
-        _ = output.AppendLine("---@class BlokeBotAutomationContext");
-        _ = output.AppendLine("---@field definitionId string");
-        _ = output.AppendLine("---@field invocationId string");
-        _ = output.AppendLine("---@class BlokeBotMigrationContext");
-        _ = output.AppendLine("---@field migrationId string");
-        _ = output.AppendLine("---@field fromVersion string");
-        _ = output.AppendLine("---@field toVersion string");
-        _ = output.AppendLine("---@class BlokeBotPageContext");
-        _ = output.AppendLine("---@field pageId string");
-        _ = output.AppendLine("---@field sessionId string");
-        _ = output.AppendLine();
-        _ = output.AppendLine("---@class BlokeBotContextBase");
-        _ = output.AppendLine("---@field pluginId string");
-        _ = output.AppendLine("---@field pluginVersion string");
-        _ = output.AppendLine("---@field pluginTag string");
-        _ = output.AppendLine("---@class BlokeBotInstallationContext: BlokeBotContextBase");
-        _ = output.AppendLine("---@field kind \"installation\"");
-        _ = output.AppendLine("---@class BlokeBotChannelContext: BlokeBotContextBase");
-        _ = output.AppendLine("---@field kind \"channel\"");
-        _ = output.AppendLine("---@field hostId integer");
-        _ = output.AppendLine("---@field featureId string");
-        _ = output.AppendLine("---@field actor? BlokeBotActorContext");
-        _ = output.AppendLine("---@field stream? BlokeBotStreamContext");
-        _ = output.AppendLine("---@field command? BlokeBotCommandContext");
-        _ = output.AppendLine("---@field event? BlokeBotEventContext");
-        _ = output.AppendLine("---@field schedule? BlokeBotScheduleContext");
-        _ = output.AppendLine("---@field web? BlokeBotWebContext");
-        _ = output.AppendLine("---@class BlokeBotAutomationInvocationContext: BlokeBotContextBase");
-        _ = output.AppendLine("---@field kind \"automation\"");
-        _ = output.AppendLine("---@field hostId integer");
-        _ = output.AppendLine("---@field featureId string");
-        _ = output.AppendLine("---@field automation BlokeBotAutomationContext");
-        _ = output.AppendLine("---@class BlokeBotMigrationInvocationContext: BlokeBotContextBase");
-        _ = output.AppendLine("---@field kind \"migration\"");
-        _ = output.AppendLine("---@field migration BlokeBotMigrationContext");
-        _ = output.AppendLine("---@class BlokeBotPageInvocationContext: BlokeBotContextBase");
-        _ = output.AppendLine("---@field kind \"page\"");
-        _ = output.AppendLine("---@field hostId integer");
-        _ = output.AppendLine("---@field featureId string");
-        _ = output.AppendLine("---@field page BlokeBotPageContext");
-        _ = output.AppendLine(
-            "---@alias BlokeBotContext BlokeBotInstallationContext|BlokeBotChannelContext|BlokeBotAutomationInvocationContext|BlokeBotMigrationInvocationContext|BlokeBotPageInvocationContext"
-        );
-        _ = output.AppendLine();
+        foreach (var schema in schemas)
+        {
+            _ = output.Append("---").AppendLine(schema.Description);
+            _ = output.Append("---@class ").Append(schema.LuaTypeName);
+            if (schema.BaseSchema is not null)
+            {
+                _ = output.Append(": ").Append(schema.BaseSchema.LuaTypeName);
+            }
+            _ = output.AppendLine();
+            foreach (var field in schema.Fields)
+            {
+                _ = output
+                    .Append("---@field [\"")
+                    .Append(field.Name)
+                    .Append("\"]")
+                    .Append(field.Required ? string.Empty : "?")
+                    .Append(' ')
+                    .Append(field.Shape.LuaTypeName)
+                    .Append(" # ")
+                    .AppendLine(field.Description);
+            }
+            _ = output.AppendLine();
+        }
     }
 
-    private static void AppendHttpTypes(StringBuilder output)
+    private static void AppendUnions(
+        IEnumerable<PluginLuaUnionDescriptor> unions,
+        StringBuilder output
+    )
     {
-        _ = output.AppendLine(
-            "---@alias BlokeBotHttpMethod \"GET\"|\"POST\"|\"PUT\"|\"PATCH\"|\"DELETE\"|\"HEAD\""
-        );
-        _ = output.AppendLine("---@class BlokeBotHttpRequest");
-        _ = output.AppendLine("---@field method BlokeBotHttpMethod");
-        _ = output.AppendLine("---@field url string");
-        _ = output.AppendLine("---@field headers? table<string, string>");
-        _ = output.AppendLine("---@field body? string");
-        _ = output.AppendLine("---@class BlokeBotHttpResponse");
-        _ = output.AppendLine("---@field kind \"response\"");
-        _ = output.AppendLine("---@field status integer");
-        _ = output.AppendLine("---@field headers table<string, string>");
-        _ = output.AppendLine("---@field bodyBase64 string");
-        _ = output.AppendLine("---@class BlokeBotHttpRejected");
-        _ = output.AppendLine("---@field kind \"rejected\"");
-        _ = output.AppendLine("---@field code string");
-        _ = output.AppendLine("---@class BlokeBotHttpFailed");
-        _ = output.AppendLine("---@field kind \"failed\"");
-        _ = output.AppendLine("---@field code string");
-        _ = output.AppendLine(
-            "---@alias BlokeBotHttpOutcome BlokeBotHttpResponse|BlokeBotHttpRejected|BlokeBotHttpFailed"
-        );
-        _ = output.AppendLine();
+        foreach (var union in unions)
+        {
+            _ = output.Append("---").AppendLine(union.Description);
+            _ = output
+                .Append("---@alias ")
+                .Append(union.LuaTypeName)
+                .Append(' ')
+                .AppendJoin(
+                    '|',
+                    union.Alternatives.Select(static alternative => alternative.LuaTypeName)
+                )
+                .AppendLine();
+            _ = output.AppendLine();
+        }
     }
 
     private static void AppendHostModules(PluginAuthoringContract contract, StringBuilder output)

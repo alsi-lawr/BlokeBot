@@ -45,6 +45,7 @@ public sealed class PluginPageBridgeTests
                         new("query", "Query", PluginPageFieldKind.Text, true, null, []),
                         new("limit", "Limit", PluginPageFieldKind.Number, false, null, []),
                         new("notify", "Notify", PluginPageFieldKind.Boolean, false, null, []),
+                        new("notes", "Notes", PluginPageFieldKind.Text, false, null, []),
                     ]
                 ),
                 new PluginPageSection.Table(
@@ -83,6 +84,7 @@ public sealed class PluginPageBridgeTests
         submitted
             .Input.Properties.Single(property => property.Name == "notify")
             .Value.ShouldBe(new PluginValue.Boolean(true));
+        submitted.Input.Properties.ShouldNotContain(property => property.Name == "notes");
         rendered.Find("[role=region]").GetAttribute("aria-label").ShouldBe("Results");
     }
 

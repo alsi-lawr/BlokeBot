@@ -134,6 +134,7 @@ twitchReady = false
 [features.dispatch.webhooks.authentication]
 kind = "public"
 [[features.dispatch.actions]]
+kind = "http"
 id = "refresh"
 module = "main"
 operation = "on_action"
