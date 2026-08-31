@@ -58,10 +58,7 @@ internal sealed class PluginBlokeBotEventBridge(
             var outcome = await invoker.InvokeEventAsync(
                 endpoint,
                 context,
-                new PluginValue.Map([
-                    new("event_id", new PluginValue.String(eventId)),
-                    new("source", new PluginValue.String(source)),
-                ]),
+                PluginInvocationInputs.BlokeBotEvent(eventId, source),
                 cancellationToken
             );
             if (

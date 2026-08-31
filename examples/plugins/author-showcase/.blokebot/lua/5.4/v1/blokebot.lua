@@ -16,11 +16,44 @@
 ---@alias BlokeBotSqlRow table<string, BlokeBotSqlParameter>
 ---@alias BlokeBotProtectedValue string
 
+---Input delivered to a declared command handler.
 ---@class BlokeBotCommandInput
----@field route string
----@field arguments string[]
----@class BlokeBotWebInput: table<string, BlokeBotValue>
----@class BlokeBotPageInput: table<string, BlokeBotValue>
+---@field ["route"] string # The normalized command route.
+---@field ["arguments"] string[] # The ordered command arguments.
+
+---Input delivered to declared webhook, action, and webhook authentication handlers.
+---@class BlokeBotWebInput
+---@field ["method"] string # The uppercase HTTP method.
+---@field ["headers"] table<string, string> # The request headers with lowercase names.
+---@field ["bodyBase64"] string # The request body encoded as base64.
+
+---Input delivered to a generated page renderer.
+---@class BlokeBotPageInput
+---@field ["version"] integer # The generated page input version.
+---@field ["hostId"] integer # The selected BlokeBot host ID.
+---@field ["sessionId"] string # The generated page session ID.
+
+---Input delivered for a declared BlokeBot event.
+---@class BlokeBotEventInput
+---@field ["event_id"] string # The stable event correlation ID.
+---@field ["source"] string # The canonical event source name.
+
+---Input delivered for a declared typed Twitch event.
+---@class BlokeBotTwitchEventInput
+---@field ["event_id"] string # The stable event correlation ID.
+---@field ["source"] string # The canonical event source name.
+---@field ["occurred_at"] string # The UTC event timestamp in round-trip format.
+
+---Subscription identity included with a raw Twitch event.
+---@class BlokeBotTwitchRawSubscription
+---@field ["type"] string # The EventSub subscription type.
+---@field ["version"] string # The EventSub subscription version.
+
+---Input delivered for a declared raw Twitch EventSub event.
+---@class BlokeBotTwitchRawEventInput
+---@field ["subscription"] BlokeBotTwitchRawSubscription # The raw EventSub subscription identity.
+---@field ["event"] table<string, BlokeBotValue> # The raw EventSub event payload.
+
 
 ---@class BlokeBotInstallationSettings: table<string, BlokeBotValue>
 ---@class BlokeBotFeatureSettings: table<string, BlokeBotValue>

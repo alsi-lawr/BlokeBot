@@ -19,6 +19,7 @@
       developmentPackages = pkgs: [
         pkgs.dotnet-sdk_10
         pkgs.nodejs_22
+        pkgs.lua-language-server
         pkgs.nixfmt
       ];
       commonSourceFiles = lib: [

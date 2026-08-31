@@ -21,6 +21,7 @@ public sealed record PluginAuthoringContract(
     PluginGitTagSyntaxContract GitTagSyntax,
     ImmutableArray<PluginRuntimeIdentifier> RuntimeIdentifiers,
     ImmutableArray<PluginHostModuleDescriptor> HostModules,
+    ImmutableArray<PluginInvocationInputSchemaDescriptor> InvocationInputSchemas,
     ImmutableArray<PluginAuthoringContractSurface> PublicContractSurfaces
 )
 {
@@ -31,6 +32,7 @@ public sealed record PluginAuthoringContract(
             PluginGitTagSyntaxContract.Current,
             [.. Enum.GetValues<PluginRuntimeIdentifier>()],
             PluginStandardHostModules.All,
+            PluginInvocationInputSchemas.All,
             [Surface(typeof(PluginRuntimeContract)), Surface(typeof(PluginLifecycleOutcome))]
         );
 

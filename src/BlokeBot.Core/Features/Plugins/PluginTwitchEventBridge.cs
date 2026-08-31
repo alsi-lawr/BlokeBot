@@ -239,14 +239,7 @@ public sealed class PluginTwitchEventBridge(
             var outcome = await invoker.InvokeEventAsync(
                 endpoint,
                 context,
-                new PluginValue.Map([
-                    new("event_id", new PluginValue.String(eventId)),
-                    new("source", new PluginValue.String(EventName(kind))),
-                    new(
-                        "occurred_at",
-                        new PluginValue.String(occurredAtUtc.ToUniversalTime().ToString("O"))
-                    ),
-                ]),
+                PluginInvocationInputs.TwitchEvent(eventId, EventName(kind), occurredAtUtc),
                 cancellationToken
             );
             if (

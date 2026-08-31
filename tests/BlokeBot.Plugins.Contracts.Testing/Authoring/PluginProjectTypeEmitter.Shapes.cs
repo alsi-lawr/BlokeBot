@@ -6,20 +6,11 @@ internal static partial class PluginProjectTypeEmitter
 {
     private static void AppendEventInput(
         string name,
-        PluginEventSource source,
+        PluginInvocationInputSchemaDescriptor schema,
         StringBuilder output
     )
     {
-        _ = output.Append("---@class ").Append(name).AppendLine(": table<string, BlokeBotValue>");
-        if (source is not PluginEventSource.TwitchRaw)
-        {
-            _ = output.AppendLine("---@field event_id string");
-            _ = output.AppendLine("---@field source string");
-        }
-        if (source is PluginEventSource.Twitch)
-        {
-            _ = output.AppendLine("---@field occurred_at string");
-        }
+        _ = output.Append("---@class ").Append(name).Append(": ").AppendLine(schema.LuaTypeName);
         _ = output.AppendLine();
     }
 
@@ -33,6 +24,4 @@ internal static partial class PluginProjectTypeEmitter
             PluginValueKind.Array => "BlokeBotValue[]",
             PluginValueKind.Map => "table<string, BlokeBotValue>",
         };
-
-    private sealed record Handler(string Module, string Operation, string Input, string Result);
 }

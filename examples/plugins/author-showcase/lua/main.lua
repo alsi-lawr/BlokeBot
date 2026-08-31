@@ -57,7 +57,7 @@ local handlers = {
   end,
   render_page = function() return { title = "Author showcase", body = "Generated locally" } end,
   automation_source = function() return { message = "automation" } end,
-  automation_action = function() return "automation" end,
+  automation_action = function() return {} end,
   cancel_wait = function() return blokebot.schedules.once("daily", "2026-08-26T20:00:00Z", map()) end,
   host_failure = function() return blokebot.responses.chat("reject fixture") end,
 }

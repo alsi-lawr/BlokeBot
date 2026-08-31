@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using BlokeBot.Plugins.Contracts.Testing;
 using Shouldly;
 
@@ -99,6 +101,99 @@ public sealed class PluginAuthoringArtifactTests
         types.ShouldContain("CommunityLinkQueueEventsHandlers");
         types.ShouldContain("migrate_settings\"] fun(input:");
         types.ShouldContain("render_queue\"] fun(input:");
+    }
+
+    [Test]
+    public async Task GeneratedSdk_ProvidesEveryCanonicalStructuredInputFieldToLuaLs()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"blokebot-luals-test-{Guid.NewGuid():N}");
+        _ = Directory.CreateDirectory(root);
+        try
+        {
+            var contract = PluginAuthoringContract.Current;
+            var sdk = PluginProjectArtifacts
+                .Scaffold(PluginContractFixtures.PluginId("examples.luals-inputs"))
+                .Single(artifact =>
+                    artifact.RelativePath.EndsWith("blokebot.lua", StringComparison.Ordinal)
+                );
+            await File.WriteAllTextAsync(Path.Combine(root, "blokebot.lua"), sdk.Content);
+            await File.WriteAllTextAsync(Path.Combine(root, "probe.lua"), LuaLsProbe(contract));
+            await File.WriteAllTextAsync(
+                Path.Combine(root, ".luarc.json"),
+                """
+                {
+                  "runtime": { "version": "Lua 5.4" },
+                  "diagnostics": {
+                    "severity": {
+                      "assign-type-mismatch": "Error!",
+                      "undefined-field": "Error!"
+                    }
+                  }
+                }
+                """
+            );
+
+            using var process = new Process
+            {
+                StartInfo =
+                {
+                    FileName =
+                        Environment.GetEnvironmentVariable("BLOKEBOT_LUA_LANGUAGE_SERVER")
+                        ?? "lua-language-server",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                },
+            };
+            process.StartInfo.ArgumentList.Add($"--check={root}");
+            process.StartInfo.ArgumentList.Add("--checklevel=Warning");
+            process.StartInfo.ArgumentList.Add("--check_format=pretty");
+            process.StartInfo.ArgumentList.Add($"--configpath={Path.Combine(root, ".luarc.json")}");
+            _ = process.Start();
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            var diagnostics = $"{await standardOutput}\n{await standardError}";
+
+            process.ExitCode.ShouldBe(0, diagnostics);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    private static string LuaLsProbe(PluginAuthoringContract contract)
+    {
+        var output = new StringBuilder();
+        for (
+            var schemaIndex = 0;
+            schemaIndex < contract.InvocationInputSchemas.Length;
+            schemaIndex++
+        )
+        {
+            var schema = contract.InvocationInputSchemas[schemaIndex];
+            _ = output.Append("---@param input ").AppendLine(schema.LuaTypeName);
+            _ = output.Append("local function probe_").Append(schemaIndex).AppendLine("(input)");
+            for (var fieldIndex = 0; fieldIndex < schema.Fields.Length; fieldIndex++)
+            {
+                var field = schema.Fields[fieldIndex];
+                _ = output.Append("  ---@type ").AppendLine(field.Shape.LuaTypeName);
+                _ = output
+                    .Append("  local field_")
+                    .Append(fieldIndex)
+                    .Append(" = input[\"")
+                    .Append(field.Name)
+                    .AppendLine("\"]");
+            }
+            _ = output.AppendLine("  return input");
+            _ = output.AppendLine("end");
+            _ = output.AppendLine();
+        }
+        return output.ToString();
     }
 
     private static string PluginLuaType(PluginLuaValueShape shape) =>

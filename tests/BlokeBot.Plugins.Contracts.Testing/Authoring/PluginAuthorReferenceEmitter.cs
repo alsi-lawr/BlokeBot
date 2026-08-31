@@ -28,6 +28,7 @@ internal static class PluginAuthorReferenceEmitter
         AppendPackage(contract, output);
         AppendManifestShapes(output);
         AppendHostModules(contract, output);
+        AppendInvocationInputs(contract, output);
         AppendCanonicalPublicApi(contract, output);
         AppendInvocationGuidance(contract, output);
         AppendExamples(output);
@@ -274,6 +275,40 @@ internal static class PluginAuthorReferenceEmitter
         }
     }
 
+    private static void AppendInvocationInputs(
+        PluginAuthoringContract contract,
+        StringBuilder output
+    )
+    {
+        _ = output.AppendLine("## Typed handler inputs");
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            "The runtime and generated LuaLS classes use these canonical structured invocation schemas. Regenerate the project when its manifest declarations change."
+        );
+        _ = output.AppendLine();
+        foreach (var schema in contract.InvocationInputSchemas)
+        {
+            _ = output.Append("### `").Append(schema.LuaTypeName).AppendLine("`");
+            _ = output.AppendLine();
+            _ = output.AppendLine(schema.Description);
+            _ = output.AppendLine();
+            _ = output.AppendLine("| Field | Lua type | Description |");
+            _ = output.AppendLine("| --- | --- | --- |");
+            foreach (var field in schema.Fields)
+            {
+                _ = output
+                    .Append("| `")
+                    .Append(field.Name)
+                    .Append("` | `")
+                    .Append(field.Shape.LuaTypeName)
+                    .Append("` | ")
+                    .Append(field.Description)
+                    .AppendLine(" |");
+            }
+            _ = output.AppendLine();
+        }
+    }
+
     private static void AppendInvocationGuidance(
         PluginAuthoringContract contract,
         StringBuilder output
@@ -283,6 +318,10 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine();
         _ = output.AppendLine(
             "Features may declare settings, Twitch requirements, commands, event handlers, schedules, webhooks, actions, automation definitions and templates, generated pages, and embedded pages. A declaration does not register a live feature or run Lua."
+        );
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            $"`blokebot-plugin generate` writes executable no-op implementations for every declared handler to the generator-owned `{PluginProjectArtifacts.GeneratedRoot}/{PluginProjectArtifacts.GeneratedHandlerSkeleton}` artifact. Copy or adapt a skeleton into an author-owned declared Lua module; generation replaces the skeleton artifact and never edits author Lua."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(

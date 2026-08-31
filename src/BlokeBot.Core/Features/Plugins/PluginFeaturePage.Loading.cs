@@ -71,11 +71,7 @@ public partial class PluginFeaturePage
             endpoint.Definition.Id,
             _session!.Id
         );
-        var input = new PluginValue.Map([
-            new("version", new PluginValue.Number(1)),
-            new("hostId", new PluginValue.Number(endpoint.State.Key.HostId.Value)),
-            new("sessionId", new PluginValue.String(_session.Id.Value.ToString("D"))),
-        ]);
+        var input = PluginInvocationInputs.Page(endpoint.State.Key.HostId, _session.Id);
         var outcome = await _invoker.InvokePageAsync(
             endpoint,
             context,

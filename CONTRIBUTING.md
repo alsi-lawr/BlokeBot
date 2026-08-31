@@ -9,7 +9,8 @@ tickets out of that pull request, and include `Closes #<issue-number>` in its de
 merge closes the ticket. For an issue in another repository, use
 `Closes <owner>/<repository>#<issue-number>`.
 
-Enter the supported development environment with `nix develop`, or install the .NET SDK selected by `global.json` plus Node.js and npm.
+Enter the supported development environment with `nix develop`, or install the .NET SDK selected by
+`global.json` plus Node.js, npm, and Lua language server.
 
 ```console
 dotnet tool restore

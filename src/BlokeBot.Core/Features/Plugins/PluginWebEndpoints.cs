@@ -131,7 +131,7 @@ internal static class PluginWebEndpoints
             return null;
         }
 
-        var headers = ImmutableArray.CreateBuilder<PluginValueProperty>();
+        var headers = ImmutableArray.CreateBuilder<KeyValuePair<string, string>>();
         var headerBytes = 0;
         foreach (var header in request.Headers.OrderBy(static header => header.Key))
         {
@@ -142,7 +142,7 @@ internal static class PluginWebEndpoints
             {
                 return null;
             }
-            headers.Add(new(header.Key.ToLowerInvariant(), new PluginValue.String(value)));
+            headers.Add(new(header.Key, value));
         }
 
         using var body = new MemoryStream();
@@ -161,14 +161,7 @@ internal static class PluginWebEndpoints
             body.Write(buffer, 0, read);
         }
 
-        var input = new PluginValue.Map([
-            new("method", new PluginValue.String(request.Method.ToUpperInvariant())),
-            new("headers", new PluginValue.Map(headers.ToImmutable())),
-            new("bodyBase64", new PluginValue.String(Convert.ToBase64String(body.ToArray()))),
-        ]);
-        return PluginValueValidator.Validate(input) is PluginValueValidationOutcome.Valid
-            ? input
-            : null;
+        return PluginInvocationInputs.Web(request.Method, headers, body.ToArray());
     }
 
     private static IResult MapWebhook(PluginWebDispatchOutcome outcome) =>

@@ -13,23 +13,18 @@ internal static class PluginRawEventSubEnvelopeMapper
             using var document = JsonDocument.Parse(notification.EventJson);
             if (
                 document.RootElement.ValueKind is not JsonValueKind.Object
-                || Map(document.RootElement) is not { } eventPayload
+                || Map(document.RootElement) is not PluginValue.Map eventPayload
             )
             {
                 envelope = null!;
                 return false;
             }
 
-            envelope = new([
-                new(
-                    "subscription",
-                    new PluginValue.Map([
-                        new("type", new PluginValue.String(notification.SubscriptionType)),
-                        new("version", new PluginValue.String(notification.SubscriptionVersion)),
-                    ])
-                ),
-                new("event", eventPayload),
-            ]);
+            envelope = PluginInvocationInputs.TwitchRawEvent(
+                notification.SubscriptionType,
+                notification.SubscriptionVersion,
+                eventPayload
+            );
             return PluginValueValidator.Validate(envelope) is PluginValueValidationOutcome.Valid;
         }
         catch (JsonException)

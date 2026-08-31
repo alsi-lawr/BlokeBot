@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Features;
 
@@ -40,18 +39,7 @@ internal sealed class PluginCommandModule(
         var outcome = await invoker.InvokeCommandAsync(
             endpoint,
             invocationContext,
-            new PluginValue.Map([
-                new("route", new PluginValue.String(route)),
-                new(
-                    "arguments",
-                    new PluginValue.Array(
-                        args.Select(static argument =>
-                                (PluginValue)new PluginValue.String(argument)
-                            )
-                            .ToImmutableArray()
-                    )
-                ),
-            ]),
+            PluginInvocationInputs.Command(route, args),
             cancellationToken
         );
         if (

@@ -91,6 +91,125 @@ public sealed class PluginWorkerProcessTests
         );
     }
 
+    [Test]
+    public async Task KeraLuaWorker_ReceivesEveryCanonicalWebAndPageInputField()
+    {
+        PluginHostId.TryCreate(7, out var hostId).ShouldBeTrue();
+        var sessionId = PluginContractFixtures.PageSessionId();
+        var inputs = new[]
+        {
+            (
+                Schema: PluginInvocationInputSchemas.Web,
+                Value: PluginInvocationInputs.Web(
+                    "POST",
+                    new Dictionary<string, string> { ["content-type"] = "application/json" },
+                    "{}"u8
+                )
+            ),
+            (
+                Schema: PluginInvocationInputSchemas.Page,
+                Value: PluginInvocationInputs.Page(hostId, sessionId)
+            ),
+        };
+
+        foreach (var input in inputs)
+        {
+            var assertions = string.Join(
+                ' ',
+                input.Schema.Fields.Select(field => $"assert(input[\"{field.Name}\"] ~= nil);")
+            );
+            var result = await RealWorkerFixtureAdapter.RunResultAsync(
+                $"{assertions} return input",
+                new ReturningDispatcher(new PluginValue.Nil()),
+                PluginContractFixtures.CoroutineId(),
+                CancellationToken.None,
+                input: input.Value
+            );
+
+            var returned = result.Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>();
+            PluginValueComparer.SemanticallyEquals(input.Value, returned.Value).ShouldBeTrue();
+        }
+    }
+
+    [Test]
+    public async Task Generate_AddsExecutableDeclaredHandlerSkeletonsWithoutChangingAuthorLua()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"blokebot-generated-handler-test-{Guid.NewGuid():N}"
+        );
+        try
+        {
+            var initialized = await PluginProjectWriter.InitializeAsync(
+                PluginContractFixtures.PluginId("examples.generated-handlers"),
+                root,
+                CancellationToken.None
+            );
+            _ = initialized.ShouldBeOfType<PluginProjectWriteOutcome.Written>();
+            var authorPath = Path.Combine(root, "lua", "main.lua");
+            var authorLua = await File.ReadAllBytesAsync(authorPath);
+            var manifestPath = Path.Combine(root, PluginPackage.ManifestPath);
+            var manifest = await File.ReadAllTextAsync(manifestPath);
+            var hostModules = manifest.IndexOf("\n[[hostModules]]", StringComparison.Ordinal);
+            await File.WriteAllTextAsync(
+                manifestPath,
+                manifest.Insert(
+                    hostModules,
+                    """
+
+                    [[features.dispatch.commands]]
+                    route = "generated-handler"
+                    module = "main"
+                    operation = "handle_generated"
+                    [features.dispatch.commands.requirements]
+                    twitchReady = false
+                    """
+                )
+            );
+
+            var generated = await PluginProjectWriter.GenerateAsync(root, CancellationToken.None);
+            _ = generated.ShouldBeOfType<PluginProjectWriteOutcome.Written>();
+            (await File.ReadAllBytesAsync(authorPath)).ShouldBe(authorLua);
+
+            var skeleton = await File.ReadAllBytesAsync(
+                Path.Combine(
+                    root,
+                    PluginProjectArtifacts.GeneratedRoot.Replace('/', Path.DirectorySeparatorChar),
+                    PluginProjectArtifacts.GeneratedHandlerSkeleton
+                )
+            );
+            var package = PluginContractFixtures
+                .CompletePackage()
+                .Select(entry =>
+                    entry.Path == "lua/events.lua"
+                        ? new PluginPackageEntry.File(entry.Path, skeleton)
+                        : entry
+                )
+                .ToArray();
+            var result = await RealWorkerFixtureAdapter.RunResultAsync(
+                "local generated = require('events'); return generated['main']['handle_generated']({ marker = 'new declaration' })",
+                new ReturningDispatcher(new PluginValue.Nil()),
+                PluginContractFixtures.CoroutineId(),
+                CancellationToken.None,
+                package
+            );
+
+            var value = result
+                .Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>()
+                .Value.ShouldBeOfType<PluginValue.Map>();
+            value.Properties.ShouldContain(
+                new PluginValueProperty("marker", new PluginValue.String("new declaration"))
+            );
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private sealed class RealWorkerFixtureAdapter : IPluginEngineContractFixtureAdapter
     {
         public PluginEngineDescriptor Descriptor => PluginWorkerEngineContract.Selected;
@@ -208,7 +327,8 @@ public sealed class PluginWorkerProcessTests
             IPluginHostCallDispatcher dispatcher,
             PluginCoroutineId coroutineId,
             CancellationToken cancellationToken,
-            IReadOnlyList<PluginPackageEntry>? package = null
+            IReadOnlyList<PluginPackageEntry>? package = null,
+            PluginValue? input = null
         )
         {
             var root = Path.Combine(Path.GetTempPath(), $"blokebot-worker-test-{Guid.NewGuid():N}");
@@ -249,7 +369,7 @@ public sealed class PluginWorkerProcessTests
                     new PluginLiveInvocation.Command(
                         ModuleId("main"),
                         OperationId("run"),
-                        new PluginValue.Nil()
+                        input ?? new PluginValue.Nil()
                     ),
                     cancellationToken
                 );

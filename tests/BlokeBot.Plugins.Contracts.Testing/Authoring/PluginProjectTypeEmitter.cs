@@ -136,96 +136,18 @@ internal static partial class PluginProjectTypeEmitter
 
     private static void AppendHandlers(PluginManifest manifest, string prefix, StringBuilder output)
     {
-        var handlers = new List<Handler>();
-        foreach (var feature in manifest.Features)
+        var catalog = PluginProjectHandlerCatalog.Create(manifest);
+        foreach (var input in catalog.DerivedInputs)
         {
-            handlers.AddRange(
-                feature.DispatchDeclarations.Commands.Select(command => new Handler(
-                    command.Module.Value,
-                    command.Operation.Value,
-                    "BlokeBotCommandInput",
-                    "BlokeBotValue"
-                ))
-            );
-            foreach (var @event in feature.DispatchDeclarations.Events)
-            {
-                var input = $"{prefix}{TypeName(@event.Id.Value)}EventInput";
-                AppendEventInput(input, @event.Source, output);
-                handlers.Add(
-                    new(@event.Module.Value, @event.Operation.Value, input, "BlokeBotValue")
-                );
-            }
-            handlers.AddRange(
-                feature.DispatchDeclarations.Schedules.Select(schedule => new Handler(
-                    schedule.Module.Value,
-                    schedule.Operation.Value,
-                    "BlokeBotScheduleInput",
-                    "BlokeBotValue"
-                ))
-            );
-            handlers.AddRange(
-                feature.DispatchDeclarations.Webhooks.Select(webhook => new Handler(
-                    webhook.Module.Value,
-                    webhook.Operation.Value,
-                    "BlokeBotWebInput",
-                    "BlokeBotValue"
-                ))
-            );
-            handlers.AddRange(
-                feature.DispatchDeclarations.Actions.Select(action => new Handler(
-                    action.Module.Value,
-                    action.Operation.Value,
-                    "BlokeBotWebInput",
-                    "BlokeBotValue"
-                ))
-            );
-            handlers.AddRange(
-                feature.DispatchDeclarations.Webhooks.SelectMany(webhook =>
-                    webhook.Authentication is PluginWebhookAuthentication.Callback callback
-                        ?
-                        [
-                            new Handler(
-                                callback.Module.Value,
-                                callback.Operation.Value,
-                                "BlokeBotWebInput",
-                                "boolean"
-                            ),
-                        ]
-                        : Array.Empty<Handler>()
-                )
-            );
+            AppendEventInput(input.TypeName, input.Schema, output);
         }
-        handlers.AddRange(
-            manifest.Migrations.Select(migration => new Handler(
-                migration.Module.Value,
-                migration.EntryPoint,
-                "BlokeBotValue",
-                "BlokeBotValue"
-            ))
-        );
-        handlers.AddRange(
-            manifest.GeneratedPages.Select(page => new Handler(
-                page.Module.Value,
-                page.RenderEntryPoint,
-                "BlokeBotPageInput",
-                "BlokeBotValue"
-            ))
-        );
-        handlers.AddRange(
-            manifest.AutomationDefinitions.Select(definition => new Handler(
-                definition.Module.Value,
-                definition.EntryPoint,
-                $"{prefix}{TypeName(definition.Id.Value)}Input",
-                $"{prefix}{TypeName(definition.Id.Value)}Output"
-            ))
-        );
 
-        AppendHandlerClass($"{prefix}Handlers", handlers, output);
+        AppendHandlerClass($"{prefix}Handlers", catalog.Handlers, output);
         foreach (var module in manifest.LuaModules)
         {
             AppendHandlerClass(
                 $"{prefix}{TypeName(module.Id.Value)}Handlers",
-                handlers.Where(handler => handler.Module == module.Id.Value),
+                catalog.Handlers.Where(handler => handler.Module == module.Id.Value),
                 output
             );
         }
@@ -233,7 +155,7 @@ internal static partial class PluginProjectTypeEmitter
 
     private static void AppendHandlerClass(
         string name,
-        IEnumerable<Handler> handlers,
+        IEnumerable<PluginProjectHandlerDescriptor> handlers,
         StringBuilder output
     )
     {
@@ -243,11 +165,11 @@ internal static partial class PluginProjectTypeEmitter
         )
         {
             var shapes = group
-                .Select(handler => (handler.Input, handler.Result))
+                .Select(handler => (handler.InputType, handler.ResultType))
                 .Distinct()
                 .ToArray();
-            var input = shapes.Length == 1 ? shapes[0].Input : "BlokeBotValue";
-            var result = shapes.Length == 1 ? shapes[0].Result : "BlokeBotValue";
+            var input = shapes.Length == 1 ? shapes[0].InputType : "BlokeBotValue";
+            var result = shapes.Length == 1 ? shapes[0].ResultType : "BlokeBotValue";
             _ = output
                 .Append("---@field [\"")
                 .Append(group.Key)

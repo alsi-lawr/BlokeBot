@@ -71,8 +71,10 @@ It creates `plugin.toml`, an author-owned Lua entry module, starter `tests.toml`
 versioned generated files under `.blokebot/lua/5.4/v1`. Plugin code imports the public facade with
 `local blokebot = require("blokebot")`; the worker's generic module/operation dispatcher is private.
 `generate` validates `plugin.toml` for every supported target, then atomically replaces only the
-generator-owned SDK and plugin-specific settings, automation, and handler types. It never modifies
-author-owned Lua.
+generator-owned SDK, plugin-specific settings, automation and handler types, and executable
+`handler-skeletons.lua`. The skeleton artifact contains no-op implementations for every declared
+handler which authors can copy or adapt into declared modules. Regeneration replaces that artifact
+and never modifies author-owned Lua.
 
 Named calls return their typed success value directly. `pcall` receives a tagged host-failure table
 when the host rejects a call. An uncaught failure or authoritative cancellation ends the invocation;

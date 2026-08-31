@@ -17,6 +17,7 @@ public static class PluginProjectArtifacts
 {
     public const string GeneratedRoot = ".blokebot/lua/5.4/v1";
     public const string GeneratedMarker = ".generated-by-blokebot-plugin";
+    public const string GeneratedHandlerSkeleton = "handler-skeletons.lua";
 
     public static ImmutableArray<PluginProjectArtifact> Generate(PluginManifest manifest)
     {
@@ -26,6 +27,10 @@ public static class PluginProjectArtifacts
         [
             new($"{GeneratedRoot}/blokebot.lua", PluginLuaLanguageServerStubEmitter.Emit(contract)),
             new($"{GeneratedRoot}/plugin.lua", PluginProjectTypeEmitter.Emit(manifest)),
+            new(
+                $"{GeneratedRoot}/{GeneratedHandlerSkeleton}",
+                PluginProjectHandlerSkeletonEmitter.Emit(manifest)
+            ),
             new(
                 $"{GeneratedRoot}/{GeneratedMarker}",
                 $"BlokeBot plugin generator v{contract.Runtime.HostApiVersion.Value}\n"

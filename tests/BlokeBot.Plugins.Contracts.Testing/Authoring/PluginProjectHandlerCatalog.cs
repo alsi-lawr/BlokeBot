@@ -1,0 +1,156 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+
+namespace BlokeBot.Plugins.Contracts.Testing;
+
+internal sealed record PluginProjectHandlerDescriptor(
+    string Module,
+    string Operation,
+    string InputType,
+    string ResultType,
+    string SkeletonStatement
+);
+
+internal sealed record PluginProjectDerivedInputDescriptor(
+    string TypeName,
+    PluginInvocationInputSchemaDescriptor Schema
+);
+
+internal sealed record PluginProjectHandlerCatalog(
+    ImmutableArray<PluginProjectHandlerDescriptor> Handlers,
+    ImmutableArray<PluginProjectDerivedInputDescriptor> DerivedInputs
+)
+{
+    internal static PluginProjectHandlerCatalog Create(PluginManifest manifest)
+    {
+        var prefix = PluginProjectTypeEmitter.TypeName(manifest.Id.Value);
+        var handlers = ImmutableArray.CreateBuilder<PluginProjectHandlerDescriptor>();
+        var inputs = ImmutableArray.CreateBuilder<PluginProjectDerivedInputDescriptor>();
+        foreach (var feature in manifest.Features)
+        {
+            handlers.AddRange(
+                feature.DispatchDeclarations.Commands.Select(command =>
+                    Handler(
+                        command.Module,
+                        command.Operation,
+                        PluginInvocationInputSchemas.Command.LuaTypeName
+                    )
+                )
+            );
+            foreach (var @event in feature.DispatchDeclarations.Events)
+            {
+                var inputType =
+                    $"{prefix}{PluginProjectTypeEmitter.TypeName(@event.Id.Value)}EventInput";
+                inputs.Add(new(inputType, EventSchema(@event.Source)));
+                handlers.Add(Handler(@event.Module, @event.Operation, inputType));
+            }
+            handlers.AddRange(
+                feature.DispatchDeclarations.Schedules.Select(schedule =>
+                    Handler(schedule.Module, schedule.Operation, "BlokeBotScheduleInput")
+                )
+            );
+            handlers.AddRange(
+                feature.DispatchDeclarations.Webhooks.Select(webhook =>
+                    Handler(
+                        webhook.Module,
+                        webhook.Operation,
+                        PluginInvocationInputSchemas.Web.LuaTypeName,
+                        "BlokeBotValue",
+                        "return { status = 200, body = \"\" }"
+                    )
+                )
+            );
+            handlers.AddRange(
+                feature.DispatchDeclarations.Actions.Select(action =>
+                    Handler(
+                        action.Module,
+                        action.Operation,
+                        PluginInvocationInputSchemas.Web.LuaTypeName
+                    )
+                )
+            );
+            handlers.AddRange(
+                feature.DispatchDeclarations.Webhooks.SelectMany(webhook =>
+                    webhook.Authentication is PluginWebhookAuthentication.Callback callback
+                        ?
+                        [
+                            Handler(
+                                callback.Module,
+                                callback.Operation,
+                                PluginInvocationInputSchemas.Web.LuaTypeName,
+                                "boolean",
+                                "return true"
+                            ),
+                        ]
+                        : Array.Empty<PluginProjectHandlerDescriptor>()
+                )
+            );
+        }
+        handlers.AddRange(
+            manifest.Migrations.Select(migration =>
+                Handler(migration.Module, HostOperation(migration.EntryPoint), "BlokeBotValue")
+            )
+        );
+        handlers.AddRange(
+            manifest.GeneratedPages.Select(page =>
+                Handler(
+                    page.Module,
+                    HostOperation(page.RenderEntryPoint),
+                    PluginInvocationInputSchemas.Page.LuaTypeName,
+                    "BlokeBotValue",
+                    "return {}"
+                )
+            )
+        );
+        handlers.AddRange(
+            manifest.AutomationDefinitions.Select(definition =>
+                Handler(
+                    definition.Module,
+                    HostOperation(definition.EntryPoint),
+                    $"{prefix}{PluginProjectTypeEmitter.TypeName(definition.Id.Value)}Input",
+                    $"{prefix}{PluginProjectTypeEmitter.TypeName(definition.Id.Value)}Output",
+                    AutomationResult(definition)
+                )
+            )
+        );
+        return new(handlers.ToImmutable(), inputs.Distinct().ToImmutableArray());
+    }
+
+    private static PluginProjectHandlerDescriptor Handler(
+        PluginLuaModuleId module,
+        PluginHostOperationId operation,
+        string inputType,
+        string resultType = "BlokeBotValue",
+        string skeletonStatement = "return input"
+    ) => new(module.Value, operation.Value, inputType, resultType, skeletonStatement);
+
+    private static PluginInvocationInputSchemaDescriptor EventSchema(PluginEventSource source) =>
+        source is PluginEventSource.Twitch ? PluginInvocationInputSchemas.TwitchEvent
+        : source is PluginEventSource.TwitchRaw ? PluginInvocationInputSchemas.TwitchRawEvent
+        : source is PluginEventSource.BlokeBot ? PluginInvocationInputSchemas.BlokeBotEvent
+        : throw new UnreachableException("Unknown plugin event source.");
+
+    private static PluginHostOperationId HostOperation(string value) =>
+        PluginHostOperationId.TryCreate(value, out var operation)
+            ? operation
+            : throw new InvalidOperationException($"Invalid handler operation '{value}'.");
+
+    private static string AutomationResult(PluginAutomationDefinitionDescriptor definition)
+    {
+        var fields = definition
+            .Outputs.OrderBy(static field => field.Id.Value, StringComparer.Ordinal)
+            .Select(field => $"[\"{field.Id.Value}\"] = {DefaultValue(field.ValueKind)}")
+            .ToArray();
+        return fields.Length == 0 ? "return {}" : $"return {{ {string.Join(", ", fields)} }}";
+    }
+
+    private static string DefaultValue(PluginValueKind kind) =>
+        kind switch
+        {
+            PluginValueKind.Nil => "nil",
+            PluginValueKind.Boolean => "false",
+            PluginValueKind.Number => "0",
+            PluginValueKind.String => "\"\"",
+            PluginValueKind.Array or PluginValueKind.Map => "{}",
+        };
+}

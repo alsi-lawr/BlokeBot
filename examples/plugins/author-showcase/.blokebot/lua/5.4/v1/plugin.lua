@@ -33,9 +33,7 @@
 
 ---@class ExamplesAuthorShowcaseExampleActionOutput
 
----@class ExamplesAuthorShowcaseHostChangeEventInput: table<string, BlokeBotValue>
----@field event_id string
----@field source string
+---@class ExamplesAuthorShowcaseHostChangeEventInput: BlokeBotEventInput
 
 ---@class ExamplesAuthorShowcaseHandlers
 ---@field ["host_calls"] fun(input: BlokeBotCommandInput): BlokeBotValue
