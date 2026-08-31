@@ -88,12 +88,25 @@ internal sealed partial class KeraLuaPluginEngine
                 lua.PushString("safeMessage");
                 lua.PushString(failed.Failure.SafeMessage);
                 lua.RawSet(table);
+                lua.PushString("code");
+                lua.PushString(CamelCase(failed.Failure.Code));
+                lua.RawSet(table);
                 break;
-            case PluginHostCallOutcome.Cancelled:
+            case PluginHostCallOutcome.Cancelled cancelled:
                 lua.PushString("kind");
                 lua.PushString("cancelled");
                 lua.RawSet(table);
+                lua.PushString("reason");
+                lua.PushString(CamelCase(cancelled.Reason));
+                lua.RawSet(table);
                 break;
         }
+    }
+
+    private static string CamelCase<TValue>(TValue value)
+        where TValue : struct, Enum
+    {
+        var text = value.ToString();
+        return char.ToLowerInvariant(text[0]) + text[1..];
     }
 }

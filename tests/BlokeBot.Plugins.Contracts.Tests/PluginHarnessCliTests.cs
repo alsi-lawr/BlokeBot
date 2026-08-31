@@ -7,10 +7,9 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginHarnessCliTests
 {
     [Test]
-    public async Task AuthorCommands_UseArbitraryLocalSourceAndOutputDirectories()
+    public async Task AuthorCommands_ValidateTestAndGenerateAnArbitraryLocalProject()
     {
         using var source = new TemporaryDirectory("source");
-        using var output = new TemporaryDirectory("output");
         await WritePluginAsync(source.Path);
         var standardOutput = new StringWriter();
         var standardError = new StringWriter();
@@ -29,7 +28,7 @@ public sealed class PluginHarnessCliTests
             CancellationToken.None
         );
         var generationExit = await PluginHarnessCli.RunAsync(
-            ["generate-sdk", output.Path],
+            ["generate", source.Path],
             standardOutput,
             standardError,
             CancellationToken.None
@@ -42,9 +41,106 @@ public sealed class PluginHarnessCliTests
         standardOutput.ToString().ShouldContain("validated:");
         standardOutput.ToString().ShouldContain("targets=5");
         standardOutput.ToString().ShouldContain("tested: arbitrary-author-source");
-        File.Exists(Path.Combine(output.Path, "sdk", "lua", "5.4", "v1", "blokebot.lua"))
+        File.Exists(Path.Combine(source.Path, ".blokebot", "lua", "5.4", "v1", "blokebot.lua"))
             .ShouldBeTrue();
-        File.Exists(Path.Combine(output.Path, "docs", "plugin-authoring", "v1.md")).ShouldBeTrue();
+        File.Exists(Path.Combine(source.Path, ".blokebot", "lua", "5.4", "v1", "plugin.lua"))
+            .ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task Init_CreatesAUsableProjectAndGeneratePreservesAuthorLua()
+    {
+        using var parent = new TemporaryDirectory("init");
+        var destination = Path.Combine(parent.Path, "project");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var initialized = await PluginHarnessCli.RunAsync(
+            ["init", "examples.generated-starter", destination],
+            output,
+            error,
+            CancellationToken.None
+        );
+        var validated = await PluginHarnessCli.RunAsync(
+            ["validate", destination],
+            output,
+            error,
+            CancellationToken.None
+        );
+        var tested = await PluginHarnessCli.RunAsync(
+            ["test", destination],
+            output,
+            error,
+            CancellationToken.None
+        );
+        var authorLua = Path.Combine(destination, "lua", "main.lua");
+        var authored = (await File.ReadAllTextAsync(authorLua)) + "-- author-owned\n";
+        await File.WriteAllTextAsync(authorLua, authored);
+        var generatedTypePath = Path.Combine(
+            destination,
+            ".blokebot",
+            "lua",
+            "5.4",
+            "v1",
+            "plugin.lua"
+        );
+        var before = await File.ReadAllTextAsync(generatedTypePath);
+        var generated = await PluginHarnessCli.RunAsync(
+            ["generate", destination],
+            output,
+            error,
+            CancellationToken.None
+        );
+        var after = await File.ReadAllTextAsync(generatedTypePath);
+
+        initialized.ShouldBe((int)PluginHarnessExitCode.Success);
+        validated.ShouldBe((int)PluginHarnessExitCode.Success);
+        tested.ShouldBe((int)PluginHarnessExitCode.Success);
+        generated.ShouldBe((int)PluginHarnessExitCode.Success);
+        error.ToString().ShouldBeEmpty();
+        (await File.ReadAllTextAsync(authorLua)).ShouldBe(authored);
+        after.ShouldBe(before);
+        after.ShouldContain("ExamplesGeneratedStarterHandlers");
+        after.ShouldContain("response-message");
+    }
+
+    [Test]
+    public async Task Init_RejectsInvalidIdsLinksAndNonEmptyDestinationsWithoutOverwrite()
+    {
+        using var parent = new TemporaryDirectory("init-rejections");
+        var invalidDestination = Path.Combine(parent.Path, "invalid");
+        var nonEmpty = Path.Combine(parent.Path, "non-empty");
+        _ = Directory.CreateDirectory(nonEmpty);
+        var sentinel = Path.Combine(nonEmpty, "sentinel.txt");
+        await File.WriteAllTextAsync(sentinel, "preserve");
+        var link = Path.Combine(parent.Path, "linked");
+        _ = Directory.CreateSymbolicLink(link, nonEmpty);
+
+        var invalid = await PluginHarnessCli.RunAsync(
+            ["init", "Unsafe ID", invalidDestination],
+            TextWriter.Null,
+            TextWriter.Null,
+            CancellationToken.None
+        );
+        var occupied = await PluginHarnessCli.RunAsync(
+            ["init", "examples.safe", nonEmpty],
+            TextWriter.Null,
+            TextWriter.Null,
+            CancellationToken.None
+        );
+        var linked = await PluginHarnessCli.RunAsync(
+            ["init", "examples.safe", link],
+            TextWriter.Null,
+            TextWriter.Null,
+            CancellationToken.None
+        );
+
+        invalid.ShouldBe((int)PluginHarnessExitCode.ProjectRejected);
+        occupied.ShouldBe((int)PluginHarnessExitCode.ProjectRejected);
+        linked.ShouldBe((int)PluginHarnessExitCode.ProjectRejected);
+        Directory.Exists(invalidDestination).ShouldBeFalse();
+        (await File.ReadAllTextAsync(sentinel)).ShouldBe("preserve");
+        Directory.EnumerateFileSystemEntries(nonEmpty).ShouldBe([sentinel]);
     }
 
     [Test]
@@ -191,13 +287,13 @@ public sealed class PluginHarnessCliTests
         );
         await File.WriteAllTextAsync(
             Path.Combine(root, declaredPath.Replace('/', Path.DirectorySeparatorChar)),
-            "return { run = function(input) blokebot.host.call('diagnostics', 'log', 'information', input.message); return input end }\n"
+            "local blokebot = require('blokebot'); return { run = function(input) blokebot.diagnostics.log('information', input.message); return input end }\n"
         );
         if (declaredPath != "lua/main.lua")
         {
             await File.WriteAllTextAsync(
                 Path.Combine(root, "lua", "main.lua"),
-                "return { run = function(input) blokebot.host.call('diagnostics', 'log', 'information', input.message); return input end }\n"
+                "local blokebot = require('blokebot'); return { run = function(input) blokebot.diagnostics.log('information', input.message); return input end }\n"
             );
         }
     }

@@ -240,7 +240,8 @@ public static class PublishedPluginExampleSourceLoader
     private static bool Ignored(string relativePath) =>
         relativePath == _descriptorFile
         || relativePath.Equals("README.md", StringComparison.OrdinalIgnoreCase)
-        || Path.GetFileName(relativePath).Equals(".luarc.json", StringComparison.Ordinal);
+        || Path.GetFileName(relativePath).Equals(".luarc.json", StringComparison.Ordinal)
+        || relativePath.StartsWith(".blokebot/", StringComparison.Ordinal);
 
     private static async ValueTask<SourceDescriptorLoadOutcome> LoadDescriptorAsync(
         string path,

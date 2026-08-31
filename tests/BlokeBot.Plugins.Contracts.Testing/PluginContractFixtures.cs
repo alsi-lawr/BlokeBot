@@ -31,12 +31,21 @@ public static class PluginContractFixtures
                     [
                         new(
                             HostOperationId("send-message"),
+                            "send_message",
+                            "Sends a fixture message.",
                             [
                                 PluginInvocationContextKind.Channel,
                                 PluginInvocationContextKind.Automation,
                             ],
-                            [PluginValueKind.String],
-                            PluginValueKind.Nil,
+                            [
+                                new PluginHostParameterDescriptor(
+                                    "message",
+                                    PluginLuaValueShape.String,
+                                    "The fixture message."
+                                ),
+                            ],
+                            PluginLuaValueShape.Nil,
+                            "No value.",
                             MaximumArgumentBytes: PluginContractLimits.MaximumPluginValuePayloadBytes,
                             MaximumResultBytes: PluginContractLimits.MaximumPluginValuePayloadBytes
                         ),

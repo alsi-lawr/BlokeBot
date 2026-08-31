@@ -57,24 +57,36 @@ change lifecycle state.
 Use the versioned [plugin author reference](plugin-authoring/v1.md), the generated
 [Lua 5.4 language-server stub](../sdk/lua/5.4/v1/blokebot.lua), and the executable
 [published examples](../examples/plugins/README.md). The offline `BlokeBot.PluginHarness` author
-tool accepts any local source and output directory:
+tool creates and validates ordinary local projects:
 
 ```console
+blokebot-plugin init community.my-plugin ./my-plugin
+blokebot-plugin generate ./my-plugin
 blokebot-plugin validate ./my-plugin
 blokebot-plugin test ./my-plugin
-blokebot-plugin generate-sdk ./author-kit
 ```
+
+`init` rejects an invalid plugin ID, a linked destination, or a non-empty destination before writing.
+It creates `plugin.toml`, an author-owned Lua entry module, starter `tests.toml`, `.luarc.json`, and
+versioned generated files under `.blokebot/lua/5.4/v1`. Plugin code imports the public facade with
+`local blokebot = require("blokebot")`; the worker's generic module/operation dispatcher is private.
+`generate` validates `plugin.toml` for every supported target, then atomically replaces only the
+generator-owned SDK and plugin-specific settings, automation, and handler types. It never modifies
+author-owned Lua.
+
+Named calls return their typed success value directly. `pcall` receives a tagged host-failure table
+when the host rejects a call. An uncaught failure or authoritative cancellation ends the invocation;
+neither is represented by an ambiguous nil value.
 
 `validate` checks every supported runtime identifier and accepts a normal manifest-only package.
 Package-local `tests.toml` metadata is optional author-test input and is not part of normal package
 validation. `test` requires that metadata, repeats package validation, and executes its scenarios
 through the current runtime's worker without installing into or joining production inventory, or
-contacting Twitch or third parties. `generate-sdk` writes the canonical Lua stub and generated author
-reference beneath the selected output directory.
+contacting Twitch or third parties.
 
 Exit codes are typed by `PluginHarnessExitCode`: success is `0`, usage is `2`, invalid source is
 `3`, validation failure is `4`, unavailable worker is `5`, test failure is `6`, output I/O failure
-is `7`, and cancellation is `130`.
+is `7`, rejected project initialization or generation is `8`, and cancellation is `130`.
 For `test`, a missing, malformed, or semantically invalid `tests.toml` reports
 `TestMetadataMissing`, `TestMetadataMalformed`, or `TestMetadataInvalid` and exits `6`. An invalid
 source reports `SourceInvalid` and exits `3`; a rejected package reports `PackageRejected` and exits

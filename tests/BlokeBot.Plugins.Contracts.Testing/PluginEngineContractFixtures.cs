@@ -22,10 +22,10 @@ public static class PluginEngineFixturePrograms
         + "assert(utf8.char(0x41) == 'A'); return 'full-standard-library-ok'";
 
     public const string Coroutine =
-        "return blokebot.host.call('chat', 'send-message', 'fixture message')";
+        "local blokebot = require('blokebot'); return blokebot.chat.send('fixture message')";
 
     public const string Cancellation =
-        "return blokebot.host.call('chat', 'send-message', 'cancel after external effect')";
+        "local blokebot = require('blokebot'); return blokebot.chat.send('cancel after external effect')";
 
     public const string Packaging = "local module = require('events'); return module.answer";
 }
@@ -244,7 +244,7 @@ public static class PluginEngineContractFixtures
             PluginContractFixtures.HostCallId(),
             PluginContractFixtures.CoroutineId(),
             PluginContractFixtures.HostModuleId("chat"),
-            PluginContractFixtures.HostOperationId("send-message"),
+            PluginContractFixtures.HostOperationId("send"),
             new PluginInvocationContext.Channel(new(plugin, new(version, tag)), host),
             [new PluginValue.String(message)]
         );

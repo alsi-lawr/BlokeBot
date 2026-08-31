@@ -140,6 +140,16 @@ operation = "on_action"
 [features.dispatch.actions.requirements]
 twitchReady = false
 [[hostModules]]
+id = "context"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
+id = "settings"
+minimumVersion = 1
+maximumVersion = 1
+
+[[hostModules]]
 id = "diagnostics"
 minimumVersion = 1
 maximumVersion = 1

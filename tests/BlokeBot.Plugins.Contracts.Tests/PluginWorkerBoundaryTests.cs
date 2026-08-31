@@ -148,7 +148,7 @@ public sealed class PluginWorkerBoundaryTests
     public async Task InvocationConcurrency_RejectsSecondCallWithoutQueueing()
     {
         await using var package = await MaterializedPluginTestPackage.CreateAsync(
-            "return { run = function() return blokebot.host.call('chat', 'send-message', 'one') end }"
+            "return { run = function() local blokebot = require('blokebot'); return blokebot.chat.send('one') end }"
         );
         var dispatcher = new BlockingTestDispatcher();
         await using var worker = await package.StartAsync(PluginWorkerMode.Admitted, dispatcher);

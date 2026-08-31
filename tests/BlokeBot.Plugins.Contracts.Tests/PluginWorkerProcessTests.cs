@@ -25,7 +25,7 @@ public sealed class PluginWorkerProcessTests
         var dispatcher = new CapturingDispatcher(new PluginValue.Nil());
         var execution = RealWorkerFixtureAdapter
             .RunResultAsync(
-                "return blokebot.host.call('context', 'current')",
+                "local blokebot = require('blokebot'); return blokebot.context.current()",
                 dispatcher,
                 PluginContractFixtures.CoroutineId(),
                 CancellationToken.None
@@ -39,6 +39,56 @@ public sealed class PluginWorkerProcessTests
         call.Operation.Value.ShouldBe("current");
         call.Arguments.ShouldBeEmpty();
         _ = result.Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>();
+    }
+
+    [Test]
+    public async Task KeraLuaWorker_ExposesOnlyTheVersionedFacade()
+    {
+        var result = await RealWorkerFixtureAdapter.RunResultAsync(
+            "local blokebot = require('blokebot'); return { api = blokebot.api_version, host_private = blokebot.host == nil }",
+            new ReturningDispatcher(new PluginValue.Nil()),
+            PluginContractFixtures.CoroutineId(),
+            CancellationToken.None
+        );
+
+        var value = result
+            .Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>()
+            .Value.ShouldBeOfType<PluginValue.Map>();
+        value.Properties.ShouldContain(new PluginValueProperty("api", new PluginValue.Number(1)));
+        value.Properties.ShouldContain(
+            new PluginValueProperty("host_private", new PluginValue.Boolean(true))
+        );
+    }
+
+    [Test]
+    public async Task KeraLuaWorker_ExposesHostFailuresAsTaggedLuaOutcomes()
+    {
+        var result = await RealWorkerFixtureAdapter.RunResultAsync(
+            "local blokebot = require('blokebot'); local ok, failure = pcall(blokebot.chat.send, 'rejected'); assert(not ok); return failure",
+            new OutcomeDispatcher(
+                new PluginHostCallOutcome.Failed(
+                    new(PluginHostFailureCode.ProviderRejected, "Fixture message was rejected.")
+                )
+            ),
+            PluginContractFixtures.CoroutineId(),
+            CancellationToken.None
+        );
+
+        var value = result
+            .Outcome.ShouldBeOfType<PluginWorkerInvocationOutcome.Returned>()
+            .Value.ShouldBeOfType<PluginValue.Map>();
+        value.Properties.ShouldContain(
+            new PluginValueProperty("kind", new PluginValue.String("failed"))
+        );
+        value.Properties.ShouldContain(
+            new PluginValueProperty("code", new PluginValue.String("providerRejected"))
+        );
+        value.Properties.ShouldContain(
+            new PluginValueProperty(
+                "safeMessage",
+                new PluginValue.String("Fixture message was rejected.")
+            )
+        );
     }
 
     private sealed class RealWorkerFixtureAdapter : IPluginEngineContractFixtureAdapter
@@ -268,6 +318,15 @@ public sealed class PluginWorkerProcessTests
             PluginHostCall call,
             CancellationToken cancellationToken
         ) => ValueTask.FromResult<PluginHostCallOutcome>(new PluginHostCallOutcome.Returned(value));
+    }
+
+    private sealed class OutcomeDispatcher(PluginHostCallOutcome outcome)
+        : IPluginHostCallDispatcher
+    {
+        public ValueTask<PluginHostCallOutcome> DispatchAsync(
+            PluginHostCall call,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromResult(outcome);
     }
 
     private sealed class CapturingDispatcher(PluginValue value) : IPluginHostCallDispatcher

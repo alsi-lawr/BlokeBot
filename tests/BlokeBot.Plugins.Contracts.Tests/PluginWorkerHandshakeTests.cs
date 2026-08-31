@@ -76,7 +76,7 @@ public sealed class PluginWorkerHandshakeTests
     public async Task MismatchedCancellationIdentity_IsRejectedAsProtocolViolation()
     {
         await using var package = await MaterializedPluginTestPackage.CreateAsync(
-            "return { run = function() return blokebot.host.call('chat', 'send-message', 'wait') end }"
+            "return { run = function() local blokebot = require('blokebot'); return blokebot.chat.send('wait') end }"
         );
         var pipeName = $"blokebot-plugin-protocol-{Guid.NewGuid():N}";
         await using var pipe = new NamedPipeServerStream(

@@ -62,18 +62,4 @@ public static class PluginAuthoringArtifacts
 
         return failures.AsReadOnly();
     }
-
-    public static async ValueTask WriteAsync(
-        string repositoryRoot,
-        CancellationToken cancellationToken
-    )
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
-        foreach (var artifact in Generate())
-        {
-            var path = Path.Combine(repositoryRoot, artifact.RelativePath);
-            _ = Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await File.WriteAllTextAsync(path, artifact.Content, cancellationToken);
-        }
-    }
 }

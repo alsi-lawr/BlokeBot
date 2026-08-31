@@ -8,17 +8,7 @@ internal sealed partial class KeraLuaPluginEngine : IDisposable
 {
     private const string _cancellationMarker = "__BLOKEBOT_CANCELLED__";
     private const string _hostCallMarker = "blokebot-host-call-v1";
-    private const string _bootstrap =
-        "blokebot = blokebot or {}; blokebot.host = blokebot.host or {}; "
-        + "function blokebot.host.call(module, operation, ...) "
-        + "local response = coroutine.yield({ marker = '"
-        + _hostCallMarker
-        + "', module = module, operation = operation, arguments = {...} }); "
-        + "if response.kind == 'returned' then return response.value end; "
-        + "if response.kind == 'cancelled' then error('"
-        + _cancellationMarker
-        + "', 0) end; "
-        + "error(response.safeMessage or 'Host call failed.', 0); end";
+    private static readonly string _bootstrap = PluginLuaFacadeBootstrap.Emit(_hostCallMarker);
 
     private readonly PluginWorkerPackageDescriptor _package;
     private readonly string _packageRoot;

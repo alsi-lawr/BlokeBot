@@ -77,6 +77,11 @@ internal sealed class PublishedPluginExampleHost(bool delayFirstCall) : IPluginH
     ) =>
         (call.Module.Value, call.Operation.Value) switch
         {
+            ("responses", "chat")
+                when call.Arguments is [PluginValue.String { Value: "reject fixture" }] =>
+                new PluginHostCallOutcome.Failed(
+                    new(PluginHostFailureCode.ProviderRejected, "Example response was rejected.")
+                ),
             ("context", "current") when identity is not null => Returned(Context(identity)),
             ("settings", "installation") => Returned(
                 new PluginValue.Map([

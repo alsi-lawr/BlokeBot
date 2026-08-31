@@ -1,1 +1,4 @@
-return { migrate = function() error("example migration failed") end }
+---@type ExamplesUpdateFailureMainHandlers
+local handlers = { migrate = function() error("example migration failed") end }
+
+return handlers

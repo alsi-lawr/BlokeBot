@@ -184,10 +184,10 @@ internal static class PluginAuthorReferenceEmitter
 
     private static void AppendHostModules(PluginAuthoringContract contract, StringBuilder output)
     {
-        _ = output.AppendLine("## Host calls");
+        _ = output.AppendLine("## Typed Lua API");
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Call `blokebot.host.call(module, operation, ...)`. Values are limited to nil, boolean, finite number, string, array, and string-keyed map. The generated Lua language-server stub supplies one overload per operation."
+            "Import the versioned public module once with `local blokebot = require(\"blokebot\")`. Each host operation is a named function with generated LuaLS parameter, return, structured-value, failure, and cancellation types. The generic module/operation dispatcher is private worker transport."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
@@ -198,30 +198,43 @@ internal static class PluginAuthorReferenceEmitter
             "`settings.installation` and `settings.feature` also take no arguments. They return only configured values declared for the invoking plugin and exact installation or host-feature owner. Protected values are available only inside that admitted plugin invocation. Do not copy protected values into logs, diagnostics, audit fields, failure messages, or generated documents. Missing optional values are absent from the returned map; a configuration read or decryption fault returns only the generic typed host failure. Settings reads are unavailable during migration."
         );
         _ = output.AppendLine();
-        _ = output.AppendLine("| Module | Operation | Contexts | Arguments | Result |");
+        _ = output.AppendLine("| Function | Description | Contexts | Parameters | Returns |");
         _ = output.AppendLine("| --- | --- | --- | --- | --- |");
         foreach (var module in contract.HostModules)
         {
             foreach (var operation in module.Operations)
             {
                 _ = output
-                    .Append("| `")
+                    .Append("| `blokebot.")
                     .Append(module.Id.Value)
-                    .Append("` | `")
-                    .Append(operation.Id.Value)
+                    .Append('.')
+                    .Append(operation.LuaFunctionName)
                     .Append("` | ")
+                    .Append(operation.Description)
+                    .Append(" | ")
                     .AppendJoin(", ", operation.PermittedContexts.Select(TomlEnum))
                     .Append(" | ")
-                    .AppendJoin(", ", operation.ArgumentKinds.Select(TomlEnum))
+                    .AppendJoin(
+                        ", ",
+                        operation.Parameters.Select(parameter =>
+                            $"`{parameter.Name}: {PluginLuaLanguageServerStubEmitter.LuaType(parameter.Shape)}`"
+                        )
+                    )
                     .Append(" | ")
-                    .Append(TomlEnum(operation.ResultKind))
+                    .Append('`')
+                    .Append(PluginLuaLanguageServerStubEmitter.LuaType(operation.ResultShape))
+                    .Append('`')
                     .AppendLine(" |");
             }
         }
 
         _ = output.AppendLine();
         _ = output.AppendLine(
-            "Declare every host module your plugin uses with a minimum and maximum API version. Host failures and cancellations are typed outcomes. Treat safe failure messages as operator-readable detail, not provider internals."
+            "A successful named call returns the documented value directly. `pcall` receives a `BlokeBotHostFailure` table when the host rejects a call, including its stable `kind`, `code`, and safe message. An uncaught failure terminates the invocation. Cancellation remains authoritative and ends the invocation with a `BlokeBotHostCancellation`; it never becomes an ambiguous nil return."
+        );
+        _ = output.AppendLine();
+        _ = output.AppendLine(
+            "Declare every host module your plugin uses with a minimum and maximum API version. Treat safe failure messages as operator-readable detail, not provider internals."
         );
         _ = output.AppendLine();
     }

@@ -13,6 +13,7 @@ public enum PluginHarnessExitCode
     WorkerUnavailable = 5,
     TestFailed = 6,
     OutputFailed = 7,
+    ProjectRejected = 8,
     Cancelled = 130,
 }
 
@@ -28,7 +29,10 @@ public static class PluginHarnessCli
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
-        if (arguments.Count != 2)
+        if (
+            arguments.Count == 0
+            || (arguments[0] == "init" ? arguments.Count != 3 : arguments.Count != 2)
+        )
         {
             await WriteUsageAsync(error);
             return (int)PluginHarnessExitCode.InvalidUsage;
@@ -38,9 +42,16 @@ public static class PluginHarnessCli
         {
             return arguments[0] switch
             {
+                "init" => await InitializeAsync(
+                    arguments[1],
+                    arguments[2],
+                    output,
+                    error,
+                    cancellationToken
+                ),
                 "validate" => await ValidateAsync(arguments[1], output, error, cancellationToken),
                 "test" => await TestAsync(arguments[1], output, error, cancellationToken),
-                "generate-sdk" => await GenerateSdkAsync(arguments[1], output, cancellationToken),
+                "generate" => await GenerateAsync(arguments[1], output, error, cancellationToken),
                 _ => await UnknownCommandAsync(arguments[0], error),
             };
         }
@@ -106,21 +117,56 @@ public static class PluginHarnessCli
         }
     }
 
-    private static async Task<int> GenerateSdkAsync(
+    private static async Task<int> InitializeAsync(
+        string pluginId,
         string destination,
         TextWriter output,
+        TextWriter error,
         CancellationToken cancellationToken
     )
     {
-        var fullDestination = Path.GetFullPath(destination);
-        await PluginAuthoringArtifacts.WriteAsync(fullDestination, cancellationToken);
-        foreach (var artifact in PluginAuthoringArtifacts.Generate())
+        if (!PluginId.TryCreate(pluginId, out var id))
         {
-            await output.WriteLineAsync(
-                $"generated: {Path.Combine(fullDestination, artifact.RelativePath)}"
-            );
+            await error.WriteLineAsync($"invalid-plugin-id: {pluginId}");
+            return (int)PluginHarnessExitCode.ProjectRejected;
         }
-        return (int)PluginHarnessExitCode.Success;
+
+        var outcome = await PluginProjectWriter.InitializeAsync(id, destination, cancellationToken);
+        return await ReportProjectWriteAsync("initialized", outcome, output, error);
+    }
+
+    private static async Task<int> GenerateAsync(
+        string source,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken
+    )
+    {
+        var outcome = await PluginProjectWriter.GenerateAsync(source, cancellationToken);
+        return await ReportProjectWriteAsync("generated", outcome, output, error);
+    }
+
+    private static async Task<int> ReportProjectWriteAsync(
+        string verb,
+        PluginProjectWriteOutcome outcome,
+        TextWriter output,
+        TextWriter error
+    )
+    {
+        switch (outcome)
+        {
+            case PluginProjectWriteOutcome.Written written:
+                foreach (var path in written.Paths)
+                {
+                    await output.WriteLineAsync($"{verb}: {path}");
+                }
+                return (int)PluginHarnessExitCode.Success;
+            case PluginProjectWriteOutcome.Rejected rejected:
+                await error.WriteLineAsync($"{rejected.Code}: {rejected.Subject}");
+                return (int)PluginHarnessExitCode.ProjectRejected;
+            default:
+                throw new InvalidOperationException("Unknown plugin project write outcome.");
+        }
     }
 
     private static async Task<int> ReportValidationAsync(
@@ -219,6 +265,6 @@ public static class PluginHarnessCli
 
     private static Task WriteUsageAsync(TextWriter writer) =>
         writer.WriteLineAsync(
-            "Usage: blokebot-plugin validate <source> | test <source> | generate-sdk <output>"
+            "Usage: blokebot-plugin init <plugin-id> <destination> | generate <source> | validate <source> | test <source>"
         );
 }

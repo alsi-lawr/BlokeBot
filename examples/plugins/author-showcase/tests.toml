@@ -23,6 +23,16 @@ invocationKind = "command"
 module = "main"
 operation = "host_calls"
 expectation = "returned"
+expectedHostCalls = ["context.current", "settings.installation", "settings.feature", "diagnostics.log", "responses.chat", "responses.whisper", "chat.send", "overlay.play-cue", "points.add", "twitch.create-marker", "schedules.once", "schedules.cancel", "schedules.recurring", "schedules.cancel", "storage.execute", "storage.query", "http.send"]
+
+[[scenarios]]
+name = "typed-host-failure"
+workerMode = "admitted"
+invocationKind = "command"
+module = "main"
+operation = "host_failure"
+expectation = "failed"
+expectedHostCalls = ["responses.chat"]
 
 [[scenarios]]
 name = "event"
