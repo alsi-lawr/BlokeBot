@@ -1,5 +1,6 @@
 using BlokeBot.Cli;
 using BlokeBot.Core.Hosting;
+using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.DataProtection;
@@ -23,6 +24,10 @@ internal static class BlokeBotHost
         try
         {
             await using var composition = Create(options);
+            await using var databaseLease = await BlokeBotDatabaseRuntimeLease.AcquireAsync(
+                composition.Database,
+                cancellationToken
+            );
             await composition.App.InitializeBlokeBotPersistenceAsync(cancellationToken);
             await composition.App.StartAsync(cancellationToken);
 
@@ -49,6 +54,16 @@ internal static class BlokeBotHost
         {
             BlokeBotHostLogging.HostFailure(exception);
             console.WriteLine(exception.Summary);
+            return 1;
+        }
+        catch (BlokeBotProcessOwnershipException exception)
+        {
+            console.WriteLine($"blokebot: {exception.Message}");
+            return 1;
+        }
+        catch (BlokeBotDatabaseOwnershipException exception)
+        {
+            console.WriteLine($"blokebot: {exception.Message}");
             return 1;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -88,38 +103,48 @@ internal static class BlokeBotHost
             databaseSettings.Provider
         );
         var database = databaseSettings.CreateConfiguration(statePaths);
-        _ = builder.Configuration.AddInMemoryCollection(
-            new Dictionary<string, string?>
-            {
-                [BlokeBotMainDatabaseSettings.ProviderKey] = databaseSettings.Provider.ToString(),
-                [BlokeBotMainDatabaseSettings.StateDirectoryKey] = statePaths.StateDirectory,
-                [BlokeBotMainDatabaseSettings.DatabasePathKey] =
-                    databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
-                        ? statePaths.DatabasePath
-                        : null,
-                ["TwitchBot:Identity:TokenCachePath"] = statePaths.TokenCachePath,
-            }
-        );
+        var processLease = BlokeBotProcessLease.Acquire(statePaths.StateDirectory);
+        try
+        {
+            _ = builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    [BlokeBotMainDatabaseSettings.ProviderKey] =
+                        databaseSettings.Provider.ToString(),
+                    [BlokeBotMainDatabaseSettings.StateDirectoryKey] = statePaths.StateDirectory,
+                    [BlokeBotMainDatabaseSettings.DatabasePathKey] =
+                        databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
+                            ? statePaths.DatabasePath
+                            : null,
+                    ["TwitchBot:Identity:TokenCachePath"] = statePaths.TokenCachePath,
+                }
+            );
 
-        _ = builder.Host.UseSerilog(
-            (context, services, logging) =>
-                BlokeBotHostLogging.ConfigureProduction(
-                    logging,
-                    context.Configuration,
-                    services,
-                    statePaths.StateDirectory
-                )
-        );
-        _ = builder.Services.AddBlokeBotPersistence(database);
-        _ = builder.Services.AddBlokeBotPluginRuntime();
-        ConfigureDataProtection(builder.Services, statePaths);
-        var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
-        _ = builder.AddBlokeBotCore(twitch.Mode);
+            _ = builder.Host.UseSerilog(
+                (context, services, logging) =>
+                    BlokeBotHostLogging.ConfigureProduction(
+                        logging,
+                        context.Configuration,
+                        services,
+                        statePaths.StateDirectory
+                    )
+            );
+            _ = builder.Services.AddBlokeBotPersistence(database);
+            _ = builder.Services.AddBlokeBotPluginRuntime();
+            ConfigureDataProtection(builder.Services, statePaths);
+            var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
+            _ = builder.AddBlokeBotCore(twitch.Mode);
 
-        var app = builder.Build();
-        _ = app.UseSerilogRequestLogging();
-        _ = app.UseBlokeBotCore(twitch.Mode);
-        return new BlokeBotHostComposition(app, twitch, statePaths);
+            var app = builder.Build();
+            _ = app.UseSerilogRequestLogging();
+            _ = app.UseBlokeBotCore(twitch.Mode);
+            return new BlokeBotHostComposition(app, twitch, statePaths, database, processLease);
+        }
+        catch
+        {
+            processLease.Dispose();
+            throw;
+        }
     }
 
     internal static void Configure(WebApplicationBuilder builder, BlokeBotServeOptions options)
@@ -175,7 +200,8 @@ internal static class BlokeBotHost
     internal static BlokeBotStatePaths ResolveStatePaths(
         IConfiguration configuration,
         string? dataDirectory,
-        BlokeBotDatabaseProvider provider
+        BlokeBotDatabaseProvider provider,
+        bool prepareDatabaseFile = true
     )
     {
         var (operatingSystem, platformEnvironment) = BlokeBotPlatformEnvironment.Current();
@@ -197,7 +223,7 @@ internal static class BlokeBotHost
         var paths = ((BlokeBotStatePathResolution.Resolved)resolution).Paths;
         var preparation = BlokeBotStatePathPreparer.Prepare(
             paths,
-            prepareDatabaseFile: provider == BlokeBotDatabaseProvider.Sqlite
+            prepareDatabaseFile: prepareDatabaseFile && provider == BlokeBotDatabaseProvider.Sqlite
         );
         return preparation switch
         {
@@ -227,7 +253,9 @@ internal static class BlokeBotHost
 internal sealed record BlokeBotHostComposition(
     WebApplication App,
     BlokeBotTwitchModeSelection Twitch,
-    BlokeBotStatePaths StatePaths
+    BlokeBotStatePaths StatePaths,
+    BlokeBotDatabaseConfiguration Database,
+    BlokeBotProcessLease ProcessLease
 ) : IAsyncDisposable
 {
     public async ValueTask DisposeAsync()
@@ -241,7 +269,14 @@ internal sealed record BlokeBotHostComposition(
         }
         finally
         {
-            await App.DisposeAsync();
+            try
+            {
+                await App.DisposeAsync();
+            }
+            finally
+            {
+                ProcessLease.Dispose();
+            }
         }
     }
 }

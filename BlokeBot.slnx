@@ -16,6 +16,7 @@
   <Folder Name="/src/">
     <Project Path="src/BlokeBot.PluginWorker/BlokeBot.PluginWorker.csproj" />
     <Project Path="src/BlokeBot.Commands/BlokeBot.Commands.csproj" />
+    <Project Path="src/BlokeBot.DatabaseCutover/BlokeBot.DatabaseCutover.csproj" />
     <Project Path="src/BlokeBot.Core/BlokeBot.Core.csproj" />
     <Project Path="src/BlokeBot.Eventing/BlokeBot.Eventing.csproj" />
     <Project Path="src/BlokeBot.Functional/BlokeBot.Functional.csproj" />

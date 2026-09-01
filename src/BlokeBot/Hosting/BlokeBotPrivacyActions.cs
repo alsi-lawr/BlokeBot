@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlokeBot.Cli;
+using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Privacy;
 using Spectre.Console;
@@ -58,7 +59,8 @@ internal static class BlokeBotPrivacyActions
                 }
 
                 return 0;
-            }
+            },
+            ct
         );
 
     internal static async Task<int> EraseAsync(
@@ -102,14 +104,16 @@ internal static class BlokeBotPrivacyActions
                         + "age out on the configured snapshot schedule."
                 );
                 return 0;
-            }
+            },
+            ct
         );
     }
 
     private static async Task<int> RunAsync(
         BlokeBotPrivacyOptions options,
         IAnsiConsole console,
-        Func<BlokeBotDbContext, PrivacySubject, Task<int>> action
+        Func<BlokeBotDbContext, PrivacySubject, Task<int>> action,
+        CancellationToken cancellationToken
     )
     {
         PrivacySubject subject;
@@ -152,26 +156,51 @@ internal static class BlokeBotPrivacyActions
             options.DataDirectory,
             databaseSettings.Provider
         );
-        if (
-            databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
-            && !File.Exists(statePaths.DatabasePath)
-        )
-        {
-            console.WriteLine($"blokebot: no database found at {statePaths.DatabasePath}.");
-            return 1;
-        }
-
-        BlokeBotDatabaseConfiguration database;
+        BlokeBotProcessLease processLease;
         try
         {
-            database = databaseSettings.CreateConfiguration(statePaths);
+            processLease = BlokeBotProcessLease.Acquire(statePaths.StateDirectory);
         }
-        catch (BlokeBotHostStartupException exception)
+        catch (BlokeBotProcessOwnershipException exception)
         {
-            console.WriteLine(exception.Summary);
+            console.WriteLine($"blokebot: {exception.Message}");
             return 1;
         }
-        await using var db = database.CreateDbContext();
-        return await action(db, subject);
+        using (processLease)
+        {
+            if (
+                databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
+                && !File.Exists(statePaths.DatabasePath)
+            )
+            {
+                console.WriteLine($"blokebot: no database found at {statePaths.DatabasePath}.");
+                return 1;
+            }
+
+            BlokeBotDatabaseConfiguration database;
+            try
+            {
+                database = databaseSettings.CreateConfiguration(statePaths);
+            }
+            catch (BlokeBotHostStartupException exception)
+            {
+                console.WriteLine(exception.Summary);
+                return 1;
+            }
+            await using var db = database.CreateDbContext();
+            try
+            {
+                await using var databaseLease = await BlokeBotDatabaseRuntimeLease.AcquireAsync(
+                    database,
+                    cancellationToken
+                );
+                return await action(db, subject);
+            }
+            catch (BlokeBotDatabaseOwnershipException exception)
+            {
+                console.WriteLine($"blokebot: {exception.Message}");
+                return 1;
+            }
+        }
     }
 }

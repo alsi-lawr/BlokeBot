@@ -46,6 +46,34 @@ public sealed class BlokeBotCliTests
         passThrough.Output.ShouldNotContain("secret.invalid");
     }
 
+    [Test]
+    public async Task DatabaseCutover_MissingSourceDoesNotCreateSQLiteDatabase()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"blokebot-cutover-cli-tests-{Guid.NewGuid():N}"
+        );
+        _ = Directory.CreateDirectory(root);
+        try
+        {
+            var response = await TerminalAsync([
+                "database",
+                "cutover-postgresql",
+                "--data-dir",
+                root,
+                "--postgresql-connection-string-file",
+                Path.Combine(root, "target.connection"),
+            ]);
+
+            response.ExitCode.ShouldNotBe(0);
+            File.Exists(Path.Combine(root, "blokebot.db")).ShouldBeFalse();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<CliResponse> TerminalAsync(
         IReadOnlyList<string> arguments,
         IBlokeBotCommandRuntime? runtime = null

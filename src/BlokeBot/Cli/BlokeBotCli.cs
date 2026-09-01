@@ -63,6 +63,18 @@ internal static class BlokeBotCli
                         );
                 }
             );
+            _ = configuration.AddBranch(
+                "database",
+                database =>
+                {
+                    database.SetDescription("Run offline main-database operations.");
+                    _ = database
+                        .AddCommand<BlokeBotDatabaseCutoverCommand>("cutover-postgresql")
+                        .WithDescription(
+                            "Copy the stopped SQLite main database to an empty PostgreSql target."
+                        );
+                }
+            );
         });
 
         var normalizedArguments = arguments.Count == 0 ? ["help"] : arguments;
@@ -88,6 +100,9 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
                                       [--output FILE] [--data-dir PATH] [--config PATH]
               blokebot privacy erase --confirm [--login LOGIN] [--user-id ID] [--host-id ID]
                                      [--data-dir PATH] [--config PATH]
+              blokebot database cutover-postgresql --postgresql-connection-string-file FILE
+                                                    [--operation-id UUID] [--batch-size ROWS]
+                                                    [--data-dir PATH] [--config PATH]
 
             Commands:
               help            Show this help and exit.
@@ -98,6 +113,9 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
               privacy erase   Delete that identity's rows and strip its identity from
                               records kept for aggregate or audit integrity. Scope to
                               one channel with --host-id. Safe to re-run.
+              database cutover-postgresql
+                              Copy the stopped SQLite main database to PostgreSql and
+                              verify it without changing active configuration.
 
             Serve options:
               --host HOST      Dashboard host. Default: 127.0.0.1.
@@ -218,6 +236,34 @@ internal sealed class BlokeBotPrivacyEraseSettings : BlokeBotPrivacyCommandSetti
 {
     [CommandOption("--confirm")]
     public bool Confirm { get; init; }
+}
+
+internal sealed class BlokeBotDatabaseCutoverSettings : CommandSettings
+{
+    [CommandOption("--postgresql-connection-string-file <FILE>")]
+    public required string PostgreSqlConnectionStringFile { get; init; }
+
+    [CommandOption("--operation-id <UUID>")]
+    public Guid? OperationId { get; init; }
+
+    [CommandOption("--batch-size <ROWS>")]
+    public int BatchSize { get; init; } = 500;
+
+    [CommandOption("--data-dir <PATH>")]
+    public string? DataDirectory { get; init; }
+
+    [CommandOption("--config <PATH>")]
+    public string? ConfigurationPath { get; init; }
+}
+
+internal sealed class BlokeBotDatabaseCutoverCommand(IAnsiConsole console)
+    : AsyncCommand<BlokeBotDatabaseCutoverSettings>
+{
+    protected override Task<int> ExecuteAsync(
+        CommandContext context,
+        BlokeBotDatabaseCutoverSettings settings,
+        CancellationToken cancellationToken
+    ) => BlokeBotDatabaseCutoverActions.RunAsync(settings, console, cancellationToken);
 }
 
 internal sealed class BlokeBotPrivacyExportCommand(IAnsiConsole console)
