@@ -38,7 +38,11 @@ public static partial class MainDatabaseStatements
                     LEFT JOIN automation_flow_nodes AS node ON node."FlowId" = flow."Id"
                     WHERE (
                         node."PluginProvenanceJson" IS NOT NULL
-                        AND (node."PluginProvenanceJson"::jsonb)->>'pluginId' = {pluginId}
+                        AND CASE
+                            WHEN pg_input_is_valid(node."PluginProvenanceJson", 'jsonb')
+                            THEN (node."PluginProvenanceJson"::jsonb)->>'pluginId' = {pluginId}
+                            ELSE FALSE
+                        END
                     ) OR EXISTS (
                         SELECT 1
                         FROM plugin_automation_instantiations AS ledger

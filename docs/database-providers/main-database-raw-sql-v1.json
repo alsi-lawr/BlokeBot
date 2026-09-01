@@ -137,10 +137,10 @@
       "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Plugins.cs",
       "source_line": 34,
       "api": "FromSqlInterpolated",
-      "source_marker": "node.\"PluginProvenanceJson\"::jsonb",
+      "source_marker": "pg_input_is_valid(node.\"PluginProvenanceJson\", 'jsonb')",
       "sql_verb": "SELECT",
-      "purpose": "Select plugin-owned automation flows on PostgreSQL.",
-      "dialect_dependency": "postgresql_jsonb_extract"
+      "purpose": "Select plugin-owned automation flows on PostgreSQL while ignoring malformed provenance text.",
+      "dialect_dependency": "postgresql_guarded_jsonb_extract"
     },
     {
       "id": "automatic-raid-expired-event-cleanup",

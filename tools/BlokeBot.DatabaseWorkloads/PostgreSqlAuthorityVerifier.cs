@@ -144,16 +144,6 @@ internal static partial class PostgreSqlAuthorityVerifier
                 "viewer ambiguity tombstone"
             );
             Require(
-                await MainDatabaseStatements.PluginAutomationFlowIdsAsync(
-                    db,
-                    "synthetic-plugin",
-                    cancellationToken
-                )
-                    is [var ownedFlow]
-                    && ownedFlow == flowId,
-                "plugin JSON flow selection"
-            );
-            Require(
                 await MainDatabaseStatements.TryRecordRaidCollaborationAsync(
                     db,
                     new(
@@ -180,7 +170,14 @@ internal static partial class PostgreSqlAuthorityVerifier
         var outcomes = await ReadOutcomesAsync(options, cancellationToken);
         Require(outcomes["serialized_revision"] == 2, "serialized revision");
         Require(outcomes["serialized_audits"] == 1, "serialized audit atomicity");
-        return outcomes;
+        var pluginJsonOutcomes = await VerifyPluginJsonRemovalAsync(
+            options,
+            flowId,
+            cancellationToken
+        );
+        return outcomes
+            .Concat(pluginJsonOutcomes)
+            .ToDictionary(static entry => entry.Key, static entry => entry.Value);
     }
 
     private static DbContextOptions<BlokeBotDbContext> Options(WorkloadDatabase database)
@@ -238,6 +235,7 @@ internal static partial class PostgreSqlAuthorityVerifier
                 ],
             }
         );
+        SeedPluginJsonFixtures(db);
         _ = db.CustomCommands.Add(
             new()
             {

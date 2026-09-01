@@ -52,7 +52,8 @@ Both providers produced the same outcomes in every measured repetition:
 The separate PostgreSQL authority verifier also passed deterministic duplicate receipt admission,
 bounded immediate-write admission, cancellation before admission, automation/community/command/
 raid/viewer idempotent writes, guarded raid collaboration, and PostgreSQL JSON flow selection. It
-left no workload schema behind.
+verified that malformed provenance is ignored while valid provenance and ledger-owned flows are
+removed, and left no workload schema behind.
 
 These measurements describe this synthetic fixture. They show that the measured SQLite write
 admission bottleneck does not reproduce on PostgreSQL in the same form. They do not establish a

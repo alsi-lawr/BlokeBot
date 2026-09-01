@@ -35,7 +35,7 @@ SQL or a generic repository.
 | raid-collaboration admission | guarded `INSERT OR IGNORE ... SELECT` | guarded `INSERT ... SELECT ... ON CONFLICT DO NOTHING` | The insert, feature flag, event fence, and duplicate check are one statement. |
 | viewer stream session, attendance, and ambiguity tombstone | `INSERT OR IGNORE` | `INSERT ... ON CONFLICT DO NOTHING` | Repeated observation creates at most one authoritative row. |
 | expired receipt and claim cleanup | quoted bounded SQL | the same quoted bounded SQL | Cleanup stays inside the caller's transaction and does not delete the current claim window. |
-| plugin-owned automation flow selection | `json_valid` and `json_extract` | `jsonb` extraction | Plugin removal selects the same owned flows on both providers. |
+| plugin-owned automation flow selection | `json_valid` and `json_extract` | guarded `pg_input_is_valid` plus `jsonb` extraction | Malformed provenance is ignored; valid provenance and ownership-ledger rows select the same plugin data on both providers. |
 
 The exact execution-site register is `main-database-raw-sql-v1.json`. Explicit SQLite migration
 history, `HetznerBaselineBridge`, and the weekly-announcement migration interceptor remain
