@@ -143,6 +143,7 @@ public sealed partial class DatabaseCutoverRunner
                     null,
                     targetConnection,
                     tables,
+                    options.BatchSize,
                     cancellationToken
                 );
                 if (reconcile.Failure is not null)

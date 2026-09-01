@@ -4,6 +4,7 @@ internal enum CutoverPhase
 {
     Prepared,
     Copying,
+    RestoringSelfReferences,
     AdvancingSequences,
     Verifying,
     Verified,
@@ -15,7 +16,7 @@ internal sealed record CutoverTableCheckpoint(
     string Table,
     long RowsCopied,
     string PrefixHash,
-    bool SelfReferencesApplied
+    long SelfReferenceRowsRestored
 );
 
 internal sealed record CutoverReceipt(
@@ -32,7 +33,7 @@ internal sealed record CutoverReceipt(
     DateTimeOffset? CompletedAtUtc
 )
 {
-    internal const int CurrentFormatVersion = 2;
+    internal const int CurrentFormatVersion = 3;
 
     internal CutoverReceipt WithPhase(CutoverPhase phase) =>
         this with
@@ -42,10 +43,13 @@ internal sealed record CutoverReceipt(
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
 
-    internal CutoverReceipt WithCheckpoint(CutoverTableCheckpoint checkpoint) =>
+    internal CutoverReceipt WithCheckpoint(
+        CutoverTableCheckpoint checkpoint,
+        CutoverPhase phase = CutoverPhase.Copying
+    ) =>
         this with
         {
-            Phase = CutoverPhase.Copying,
+            Phase = phase,
             Checkpoints = Checkpoints
                 .Where(item => !StringComparer.Ordinal.Equals(item.Table, checkpoint.Table))
                 .Append(checkpoint)

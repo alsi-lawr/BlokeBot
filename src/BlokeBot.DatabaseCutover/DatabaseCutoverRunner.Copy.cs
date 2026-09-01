@@ -13,6 +13,7 @@ public sealed partial class DatabaseCutoverRunner
         SqliteTransaction? sourceTransaction,
         NpgsqlConnection target,
         IReadOnlyList<CutoverTable> tables,
+        int batchSize,
         CancellationToken cancellationToken
     )
     {
@@ -45,6 +46,7 @@ public sealed partial class DatabaseCutoverRunner
                 table,
                 sourceProjection,
                 checkpoint,
+                batchSize,
                 cancellationToken
             );
             if (targetState.Failure is not null)
@@ -60,7 +62,7 @@ public sealed partial class DatabaseCutoverRunner
             if (
                 checkpoint is null
                 || checkpoint.RowsCopied != targetState.Projection.Count
-                || checkpoint.SelfReferencesApplied != targetState.SelfReferencesApplied
+                || checkpoint.SelfReferenceRowsRestored != targetState.SelfReferenceRowsRestored
                 || !StringComparer.Ordinal.Equals(
                     checkpoint.PrefixHash,
                     targetState.Projection.Hash
@@ -72,7 +74,7 @@ public sealed partial class DatabaseCutoverRunner
                         table.Name,
                         targetState.Projection.Count,
                         targetState.Projection.Hash,
-                        targetState.SelfReferencesApplied
+                        targetState.SelfReferenceRowsRestored
                     )
                 );
                 await store.WriteAsync(receipt, cancellationToken);
@@ -153,7 +155,7 @@ public sealed partial class DatabaseCutoverRunner
                         table.Name,
                         copied,
                         sourcePrefix.Hash,
-                        SelfReferencesApplied: !stageSelfReferences
+                        SelfReferenceRowsRestored: stageSelfReferences ? 0 : copied
                     )
                 );
                 await store.WriteAsync(receipt, cancellationToken);
@@ -166,7 +168,7 @@ public sealed partial class DatabaseCutoverRunner
                         table.Name,
                         0,
                         sourceProjection.Hash,
-                        SelfReferencesApplied: true
+                        SelfReferenceRowsRestored: 0
                     )
                 );
                 await store.WriteAsync(receipt, cancellationToken);
@@ -175,49 +177,20 @@ public sealed partial class DatabaseCutoverRunner
             var checkpoint = receipt.Checkpoints.Single(item =>
                 StringComparer.Ordinal.Equals(item.Table, table.Name)
             );
-            if (stageSelfReferences && !checkpoint.SelfReferencesApplied)
+            if (stageSelfReferences && checkpoint.SelfReferenceRowsRestored < checkpoint.RowsCopied)
             {
-                await ApplySelfReferencesAsync(
+                receipt = await ApplySelfReferencesAsync(
+                    receipt,
+                    store,
                     source,
                     sourceTransaction,
                     target,
                     table,
+                    checkpoint,
+                    sourceProjection,
                     batchSize,
                     cancellationToken
                 );
-                var sourceFinal = await CutoverProjection.ReadAsync(
-                    source,
-                    sourceTransaction,
-                    table,
-                    null,
-                    cancellationToken
-                );
-                var targetFinal = await CutoverProjection.ReadAsync(
-                    target,
-                    null,
-                    table,
-                    null,
-                    cancellationToken
-                );
-                if (
-                    sourceFinal.Count != targetFinal.Count
-                    || !StringComparer.Ordinal.Equals(sourceFinal.Hash, targetFinal.Hash)
-                )
-                {
-                    throw new InvalidOperationException(
-                        $"PostgreSql changed self references while copying table {table.Name}."
-                    );
-                }
-
-                receipt = receipt.WithCheckpoint(
-                    new CutoverTableCheckpoint(
-                        table.Name,
-                        targetFinal.Count,
-                        targetFinal.Hash,
-                        SelfReferencesApplied: true
-                    )
-                );
-                await store.WriteAsync(receipt, cancellationToken);
             }
         }
 
@@ -298,7 +271,9 @@ public sealed partial class DatabaseCutoverRunner
         }
 
         await transaction.CommitAsync(cancellationToken);
-        _batchCommitted?.Invoke(new CutoverBatchCommit(table.Name, rows.Count));
+        _batchCommitted?.Invoke(
+            new CutoverBatchCommit(table.Name, rows.Count, CutoverBatchPhase.Copy)
+        );
     }
 
     private static NpgsqlDbType ParameterType(string storeType) =>
@@ -316,4 +291,10 @@ public sealed partial class DatabaseCutoverRunner
         };
 }
 
-internal sealed record CutoverBatchCommit(string Table, int Rows);
+internal enum CutoverBatchPhase
+{
+    Copy,
+    SelfReferenceRestoration,
+}
+
+internal sealed record CutoverBatchCommit(string Table, int Rows, CutoverBatchPhase Phase);

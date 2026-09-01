@@ -12,6 +12,7 @@ public sealed partial class DatabaseCutoverRunner
         CutoverTable table,
         TableProjection sourceProjection,
         CutoverTableCheckpoint? checkpoint,
+        int batchSize,
         CancellationToken cancellationToken
     )
     {
@@ -25,10 +26,7 @@ public sealed partial class DatabaseCutoverRunner
         if (
             targetFinal.Count > sourceProjection.Count
             || (checkpoint is not null && checkpoint.RowsCopied > targetFinal.Count)
-            || (
-                checkpoint is { SelfReferencesApplied: true }
-                && checkpoint.RowsCopied < sourceProjection.Count
-            )
+            || !ValidSelfReferenceProgress(table, checkpoint, sourceProjection.Count)
         )
         {
             return CutoverReconciledTable.Rejected(
@@ -44,7 +42,8 @@ public sealed partial class DatabaseCutoverRunner
                 table,
                 checkpoint.RowsCopied,
                 cancellationToken,
-                stageSelfReferences: !checkpoint.SelfReferencesApplied
+                stageSelfReferences: table.SelfReferences.Count > 0
+                    && checkpoint.SelfReferenceRowsRestored < checkpoint.RowsCopied
             );
             if (!StringComparer.Ordinal.Equals(checkpoint.PrefixHash, checkpointSource.Hash))
             {
@@ -54,32 +53,21 @@ public sealed partial class DatabaseCutoverRunner
             }
         }
 
-        if (targetFinal.Count == 0)
+        var restored = checkpoint?.SelfReferenceRowsRestored ?? 0;
+        if (table.SelfReferences.Count == 0)
         {
-            var emptyIsFinal = sourceProjection.Count == 0 || table.SelfReferences.Count == 0;
-            return new(targetFinal, emptyIsFinal, null);
-        }
-
-        var sourcePrefix = await CutoverProjection.ReadAsync(
-            source,
-            sourceTransaction,
-            table,
-            targetFinal.Count,
-            cancellationToken
-        );
-        if (StringComparer.Ordinal.Equals(sourcePrefix.Hash, targetFinal.Hash))
-        {
-            return new(targetFinal, SelfReferencesApplied: true, null);
-        }
-
-        if (
-            table.SelfReferences.Count == 0
-            || await HasSelfReferenceValuesAsync(target, table, cancellationToken)
-        )
-        {
-            return CutoverReconciledTable.Rejected(
-                $"The PostgreSql target contains unrelated data in table {table.Name}."
+            var sourcePrefix = await CutoverProjection.ReadAsync(
+                source,
+                sourceTransaction,
+                table,
+                targetFinal.Count,
+                cancellationToken
             );
+            return StringComparer.Ordinal.Equals(sourcePrefix.Hash, targetFinal.Hash)
+                ? new(targetFinal, targetFinal.Count, null)
+                : CutoverReconciledTable.Rejected(
+                    $"The PostgreSql target contains unrelated data in table {table.Name}."
+                );
         }
 
         var sourceStaged = await CutoverProjection.ReadAsync(
@@ -98,167 +86,143 @@ public sealed partial class DatabaseCutoverRunner
             cancellationToken,
             stageSelfReferences: true
         );
-        return StringComparer.Ordinal.Equals(sourceStaged.Hash, targetStaged.Hash)
-            ? new(targetStaged, SelfReferencesApplied: false, null)
+        if (
+            !StringComparer.Ordinal.Equals(sourceStaged.Hash, targetStaged.Hash)
+            || !await SelfReferenceStateIsRecoverableAsync(
+                source,
+                sourceTransaction,
+                target,
+                table,
+                targetFinal.Count,
+                restored,
+                batchSize,
+                cancellationToken
+            )
+        )
+        {
+            return CutoverReconciledTable.Rejected(
+                $"The PostgreSql target contains unrelated data in table {table.Name}."
+            );
+        }
+
+        if (restored < targetFinal.Count)
+        {
+            return new(targetStaged, restored, null);
+        }
+
+        var sourceFinal = await CutoverProjection.ReadAsync(
+            source,
+            sourceTransaction,
+            table,
+            targetFinal.Count,
+            cancellationToken
+        );
+        return StringComparer.Ordinal.Equals(sourceFinal.Hash, targetFinal.Hash)
+            ? new(targetFinal, restored, null)
             : CutoverReconciledTable.Rejected(
                 $"The PostgreSql target contains unrelated data in table {table.Name}."
             );
     }
 
-    private static async Task<bool> HasSelfReferenceValuesAsync(
-        NpgsqlConnection target,
+    private static bool ValidSelfReferenceProgress(
         CutoverTable table,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var command = target.CreateCommand();
-        command.CommandText =
-            $"SELECT EXISTS (SELECT 1 FROM {CutoverProjection.Quote(table.Name)} WHERE {string.Join(" OR ", table.SelfReferenceColumns.Select(column => $"{CutoverProjection.Quote(column)} IS NOT NULL"))});";
-        return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
-    }
+        CutoverTableCheckpoint? checkpoint,
+        long sourceRows
+    ) =>
+        checkpoint is null
+        || (
+            checkpoint.RowsCopied >= 0
+            && checkpoint.SelfReferenceRowsRestored >= 0
+            && checkpoint.SelfReferenceRowsRestored <= checkpoint.RowsCopied
+            && (
+                table.SelfReferences.Count == 0
+                    ? checkpoint.SelfReferenceRowsRestored == checkpoint.RowsCopied
+                    : checkpoint.SelfReferenceRowsRestored == 0
+                        || checkpoint.RowsCopied == sourceRows
+            )
+        );
 
-    private static async Task ApplySelfReferencesAsync(
+    private static async Task<bool> SelfReferenceStateIsRecoverableAsync(
         SqliteConnection source,
         SqliteTransaction? sourceTransaction,
         NpgsqlConnection target,
         CutoverTable table,
+        long rowCount,
+        long restored,
         int batchSize,
         CancellationToken cancellationToken
     )
     {
-        await using var transaction = await target.BeginTransactionAsync(cancellationToken);
         long offset = 0;
-        while (true)
+        while (offset < rowCount)
         {
-            var rows = await ReadSelfReferenceBatchAsync(
+            var limit = (int)Math.Min(batchSize, rowCount - offset);
+            var sourceRows = await ReadSelfReferenceBatchAsync(
                 source,
                 sourceTransaction,
                 table,
                 offset,
-                batchSize,
+                limit,
+                postgreSql: false,
                 cancellationToken
             );
-            if (rows.Count == 0)
+            var targetRows = await ReadSelfReferenceBatchAsync(
+                target,
+                null,
+                table,
+                offset,
+                limit,
+                postgreSql: true,
+                cancellationToken
+            );
+            if (sourceRows.Count == 0 || sourceRows.Count != targetRows.Count)
             {
-                break;
+                return false;
             }
 
-            foreach (var row in rows.Where(row => row.HasReference))
+            for (var index = 0; index < sourceRows.Count; index++)
             {
-                await UpdateSelfReferencesAsync(target, transaction, table, row, cancellationToken);
-            }
-
-            offset += rows.Count;
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-    }
-
-    private static async Task<IReadOnlyList<CutoverSelfReferenceRow>> ReadSelfReferenceBatchAsync(
-        SqliteConnection source,
-        SqliteTransaction? transaction,
-        CutoverTable table,
-        long offset,
-        int limit,
-        CancellationToken cancellationToken
-    )
-    {
-        var columns = table
-            .KeyColumns.Concat(table.SelfReferenceColumns)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        await using var command = source.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText =
-            $"SELECT {string.Join(", ", columns.Select(CutoverProjection.Quote))} FROM {CutoverProjection.Quote(table.Name)} ORDER BY {CutoverProjection.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset;";
-        _ = command.Parameters.AddWithValue("$limit", limit);
-        _ = command.Parameters.AddWithValue("$offset", offset);
-        var rows = new List<CutoverSelfReferenceRow>(limit);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            rows.Add(
-                new CutoverSelfReferenceRow(
-                    columns,
-                    columns
-                        .Select(column =>
-                            reader.IsDBNull(reader.GetOrdinal(column))
-                                ? null
-                                : reader.GetValue(reader.GetOrdinal(column))
-                        )
-                        .ToArray(),
-                    table.SelfReferenceColumns.Any(column =>
-                        !reader.IsDBNull(reader.GetOrdinal(column))
+                var matchesSource = SelfReferencesMatch(
+                    table,
+                    sourceRows[index],
+                    targetRows[index]
+                );
+                if (
+                    (offset + index < restored && !matchesSource)
+                    || (
+                        offset + index >= restored
+                        && !matchesSource
+                        && !targetRows[index].SelfReferencesAreNull(table)
                     )
                 )
-            );
-        }
-
-        return rows;
-    }
-
-    private static async Task UpdateSelfReferencesAsync(
-        NpgsqlConnection target,
-        NpgsqlTransaction transaction,
-        CutoverTable table,
-        CutoverSelfReferenceRow row,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var command = target.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText =
-            $"UPDATE {CutoverProjection.Quote(table.Name)} SET {string.Join(", ", table.SelfReferenceColumns.Select((column, index) => $"{CutoverProjection.Quote(column)} = @self{index}"))} WHERE {string.Join(" AND ", table.KeyColumns.Select((column, index) => $"{CutoverProjection.Quote(column)} = @key{index}"))};";
-        AddValues(command, "self", table, table.SelfReferenceColumns, row);
-        AddValues(command, "key", table, table.KeyColumns, row);
-        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
-        {
-            throw new InvalidOperationException(
-                $"PostgreSql could not restore one self reference in table {table.Name}."
-            );
-        }
-    }
-
-    private static void AddValues(
-        NpgsqlCommand command,
-        string prefix,
-        CutoverTable table,
-        IEnumerable<string> columns,
-        CutoverSelfReferenceRow row
-    )
-    {
-        foreach (var (column, index) in columns.Select((column, index) => (column, index)))
-        {
-            var definition = table.Columns.Single(candidate => candidate.Name == column);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter
                 {
-                    ParameterName = $"{prefix}{index}",
-                    NpgsqlDbType = ParameterType(definition.TargetStoreType),
-                    Value = row.Value(column) is { } value
-                        ? CutoverValues.ForTarget(value, definition.TargetStoreType)
-                        : DBNull.Value,
+                    return false;
                 }
-            );
+            }
+
+            offset += sourceRows.Count;
         }
+
+        return true;
     }
 }
 
 internal sealed record CutoverReconciledTable(
     TableProjection? Projection,
-    bool SelfReferencesApplied,
+    long SelfReferenceRowsRestored,
     string? Failure
 )
 {
-    internal static CutoverReconciledTable Rejected(string failure) =>
-        new(null, SelfReferencesApplied: false, failure);
+    internal static CutoverReconciledTable Rejected(string failure) => new(null, 0, failure);
 }
 
-internal sealed record CutoverSelfReferenceRow(
-    string[] Columns,
-    object?[] Values,
-    bool HasReference
-)
+internal sealed record CutoverSelfReferenceRow(string[] Columns, object?[] Values)
 {
     internal object? Value(string column) => Values[Array.IndexOf(Columns, column)];
+
+    internal bool HasReference(CutoverTable table) =>
+        table.SelfReferenceColumns.Any(column => Value(column) is not null);
+
+    internal bool SelfReferencesAreNull(CutoverTable table) =>
+        table.SelfReferenceColumns.All(column => Value(column) is null);
 }

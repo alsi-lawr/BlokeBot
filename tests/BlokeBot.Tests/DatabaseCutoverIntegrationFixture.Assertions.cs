@@ -111,7 +111,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         ((bool)(await metadata.ExecuteScalarAsync() ?? false)).ShouldBeTrue();
     }
 
-    internal async Task AssertPendingWorkExistsExactlyOnceAsync()
+    internal async Task AssertPendingWorkPreservedAsync()
     {
         var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
         await using var db = configuration.CreateDbContext();
@@ -123,6 +123,16 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         messages[0].Id.ShouldBe(PendingOutboxId);
         messages[0].Status.ShouldBe(PublicChatOutboxStatus.Pending);
         messages[0].AttemptCount.ShouldBe(0);
+    }
+
+    internal async Task<long?> MergedSubmissionTargetAsync()
+    {
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        await using var db = configuration.CreateDbContext();
+        return await db
+            .RequestSubmissions.Where(submission => submission.Id == MergedSubmissionId)
+            .Select(submission => submission.MergedIntoSubmissionId)
+            .SingleAsync();
     }
 
     internal async Task StartPostgreSqlAndWriteAsync()

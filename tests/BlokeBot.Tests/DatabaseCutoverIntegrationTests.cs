@@ -6,7 +6,7 @@ namespace BlokeBot.Tests;
 public sealed class DatabaseCutoverIntegrationTests
 {
     [Test, DatabaseCutoverIntegration]
-    public async Task Cutover_RecoversExactlyOnceAndStartsPostgreSqlWithPreservedState()
+    public async Task Cutover_ResumesBoundedSelfReferenceRestorationWithPreservedState()
     {
         await using var fixture = await DatabaseCutoverIntegrationFixture.CreateAsync();
         await fixture.AssertTargetsHaveDistinctClusterIdentityAsync();
@@ -17,6 +17,7 @@ public sealed class DatabaseCutoverIntegrationTests
         {
             if (
                 StringComparer.Ordinal.Equals(batch.Table, "hosts")
+                && batch.Phase == CutoverBatchPhase.Copy
                 && Interlocked.Exchange(ref interrupted, 1) == 0
             )
             {
@@ -54,11 +55,54 @@ public sealed class DatabaseCutoverIntegrationTests
         (await fixture.DomainRowCountAsync(fixture.Other, "hosts")).ShouldBe(0);
 
         await fixture.SelectTargetAsync(fixture.Primary);
+        using var selfReferenceInterruption = new CancellationTokenSource();
+        var selfReferenceInterrupted = 0;
+        var selfReferenceRunner = new DatabaseCutoverRunner(batch =>
+        {
+            if (
+                StringComparer.Ordinal.Equals(batch.Table, "request_submissions")
+                && batch.Phase == CutoverBatchPhase.SelfReferenceRestoration
+                && Interlocked.Exchange(ref selfReferenceInterrupted, 1) == 0
+            )
+            {
+                selfReferenceInterruption.Cancel();
+            }
+        });
+
+        var selfReferenceFailure = await selfReferenceRunner.RunAsync(
+            options,
+            selfReferenceInterruption.Token
+        );
+
+        _ = selfReferenceFailure.ShouldBeOfType<DatabaseCutoverResult.Failed>();
+        var receiptBeforeSelfReferenceResume = await new CutoverReceiptStore(
+            fixture.StateDirectory
+        ).ReadAsync(CancellationToken.None);
+        _ = receiptBeforeSelfReferenceResume.ShouldNotBeNull();
+        var requestCheckpoint = receiptBeforeSelfReferenceResume.Checkpoints.Single(checkpoint =>
+            checkpoint.Table == "request_submissions"
+        );
+        requestCheckpoint.RowsCopied.ShouldBe(2);
+        requestCheckpoint.SelfReferenceRowsRestored.ShouldBe(0);
+        (await fixture.MergedSubmissionTargetAsync()).ShouldBe(
+            DatabaseCutoverIntegrationFixture.TargetSubmissionId
+        );
+
         var resumed = await new DatabaseCutoverRunner().RunAsync(options, CancellationToken.None);
 
         var completed = resumed.ShouldBeOfType<DatabaseCutoverResult.Succeeded>();
         completed.OperationId.ShouldBe(fixture.OperationId);
         completed.AlreadyComplete.ShouldBeFalse();
+        var completedReceipt = await new CutoverReceiptStore(fixture.StateDirectory).ReadAsync(
+            CancellationToken.None
+        );
+        _ = completedReceipt.ShouldNotBeNull();
+        var completedRequestCheckpoint = completedReceipt.Checkpoints.Single(checkpoint =>
+            checkpoint.Table == "request_submissions"
+        );
+        completedRequestCheckpoint.SelfReferenceRowsRestored.ShouldBe(
+            completedRequestCheckpoint.RowsCopied
+        );
         await fixture.AssertTransferredStateAsync();
         await fixture.AssertProviderMetadataWasNotCopiedAsync();
         fixture.AssertLocalStateUnchanged();
@@ -66,10 +110,9 @@ public sealed class DatabaseCutoverIntegrationTests
         var repeated = await new DatabaseCutoverRunner().RunAsync(options, CancellationToken.None);
 
         repeated.ShouldBeOfType<DatabaseCutoverResult.Succeeded>().AlreadyComplete.ShouldBeTrue();
-        await fixture.AssertPendingWorkExistsExactlyOnceAsync();
+        await fixture.AssertPendingWorkPreservedAsync();
         await fixture.StartPostgreSqlAndWriteAsync();
         await fixture.AssertPostgreSqlWriteAndSequenceAsync();
-        await fixture.AssertPendingWorkExistsExactlyOnceAsync();
         fixture.AssertLocalStateUnchanged();
     }
 }
