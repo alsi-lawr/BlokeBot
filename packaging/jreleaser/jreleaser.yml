@@ -3,6 +3,12 @@ hooks:
     before:
       - filter:
           includes:
+            - assemble
+        run: >-
+          {{basedir}}/packaging/jreleaser/prepare_executables.sh
+          {{basedir}}/artifacts/publish
+      - filter:
+          includes:
             - publish
         run: >-
           {{basedir}}/packaging/jreleaser/finalize_metadata.sh

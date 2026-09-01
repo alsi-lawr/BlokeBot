@@ -54,6 +54,26 @@ declare -A scoop_architecture=(
 )
 declare -A archive_root archive_hash archive_url
 
+temporary_directory="$(mktemp -d)"
+trap 'rm -rf "$temporary_directory"' EXIT
+for rid in linux-x64 linux-arm64 osx-arm64; do
+  root="blokebot-v${version}-${rid}"
+  worker="$root/bin/plugin-worker/BlokeBot.PluginWorker"
+  if [ "$rid" = osx-arm64 ]; then
+    path="$release_directory/${root}.zip"
+    test -f "$path" || { echo "Required macOS archive does not exist: $path" >&2; exit 2; }
+    unzip -q "$path" "$worker" -d "$temporary_directory"
+  else
+    path="$release_directory/${root}.tar.gz"
+    test -f "$path" || { echo "Required Linux archive does not exist: $path" >&2; exit 2; }
+    tar -xzf "$path" -C "$temporary_directory" "$worker"
+  fi
+  test -x "$temporary_directory/$worker" || {
+    echo "$path contains a plugin worker without executable permission: $worker" >&2
+    exit 2
+  }
+done
+
 for rid in win-x64 win-arm64; do
   root="blokebot-v${version}-${rid}"
   path="$release_directory/${root}.zip"
