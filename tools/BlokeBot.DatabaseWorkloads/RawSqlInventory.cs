@@ -42,7 +42,7 @@ public static partial class RawSqlInventory
             ) ?? throw new InventoryDriftException("The raw SQL inventory is empty.");
         var valid =
             document.SchemaVersion == 1
-            && document.SourceCommit == "f32c4893fda9735a0080816f40959ac9064c7002"
+            && document.SourceCommit == "2166d8209b316db64607bb8f92dc2e0d5772406c"
             && document.Statements.Count > 0
             && document.Statements.Select(static entry => entry.Id).Distinct().Count()
                 == document.Statements.Count
@@ -107,16 +107,37 @@ public static partial class RawSqlInventory
                     StringComparison.Ordinal
                 )
             )
-            .SelectMany(static path => SqliteCatalog().Matches(File.ReadAllText(path)))
-            .Select(static match => match.Value)
+            .SelectMany(path =>
+            {
+                var source = File.ReadAllText(path);
+                var relativePath = Path.GetRelativePath(root, path)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                return SqliteCatalog()
+                    .Matches(source)
+                    .Select(match => new CatalogReference(
+                        relativePath,
+                        SourceLine(source, match.Index),
+                        match.Value
+                    ));
+            })
+            .OrderBy(static reference => reference.Path, StringComparer.Ordinal)
+            .ThenBy(static reference => reference.SourceLine)
             .ToArray();
-        if (
-            catalogReferences.Length != 3
-            || catalogReferences.Any(static value => value != "sqlite_schema")
-        )
+        CatalogReference[] reviewedCatalogReferences =
+        [
+            new(
+                "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
+                115,
+                "sqlite_schema"
+            ),
+            new("src/BlokeBot.Persistence/HetznerBaselineBridge.cs", 71, "sqlite_schema"),
+            new("src/BlokeBot.Persistence/HetznerBaselineBridge.cs", 90, "sqlite_schema"),
+            new("src/BlokeBot.Persistence/HetznerBaselineBridge.cs", 111, "sqlite_schema"),
+        ];
+        if (!catalogReferences.SequenceEqual(reviewedCatalogReferences))
         {
             throw new InventoryDriftException(
-                "The SQLite schema-catalog inventory no longer matches the three legacy-bridge sqlite_schema reads."
+                "The SQLite schema-catalog inventory no longer matches the reviewed legacy-bridge and cutover sqlite_schema reads."
             );
         }
 
@@ -161,7 +182,7 @@ public static partial class RawSqlInventory
             yield return new(
                 relativePath,
                 SourceLine(source, match.Index),
-                match.Groups[1].Success ? match.Groups[1].Value : "SqliteCommand.CommandText",
+                match.Groups[1].Success ? match.Groups[1].Value : "DbCommand.CommandText",
                 NormalizeWhitespace(source[match.Index..end])
             );
         }
@@ -191,4 +212,6 @@ public static partial class RawSqlInventory
         string Api,
         string NormalizedSource
     );
+
+    private sealed record CatalogReference(string Path, int SourceLine, string Value);
 }

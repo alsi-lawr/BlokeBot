@@ -1,9 +1,9 @@
 # Main-database provider inventory
 
-This inventory was reconciled for BLOKEBOT-271 from base commit
-`f32c4893fda9735a0080816f40959ac9064c7002`. SQLite remains the default main provider. PostgreSQL is
-the first server provider. Plugin-private databases in `BlokeBot.Plugins.Features` remain separate
-SQLite stores.
+This inventory was reconciled through BLOKEBOT-272 from commit
+`2166d8209b316db64607bb8f92dc2e0d5772406c`. SQLite remains the default main provider. PostgreSQL
+is the first server provider. Plugin-private databases in `BlokeBot.Plugins.Features` remain
+separate SQLite stores.
 
 ## Runtime provider boundaries
 
@@ -24,19 +24,24 @@ adapter.
 
 ## Raw SQL register
 
-`main-database-raw-sql-v1.json` registers 24 execution sites:
+`main-database-raw-sql-v1.json` registers 47 execution sites:
 
 - four SQLite-only `HetznerBaselineBridge` catalog/history statements;
+- two PostgreSQL runtime shared-ownership statements;
 - nine named SQLite/PostgreSQL idempotent insert authorities;
 - host locking, two bounded cleanup statements, and automatic-raid cleanup;
 - separate SQLite and PostgreSQL plugin JSON queries;
 - the two closed provider SQL dispatch sites; and
-- PostgreSQL's two transaction-local lock bounds and transaction-scoped immediate-write lock.
+- PostgreSQL's two transaction-local lock bounds and transaction-scoped immediate-write lock; and
+- 21 offline cutover statements: seven identity, ownership, session, privilege, and physical
+  catalog reads; three SQLite exclusive-lease statements; three canonical copy statements; two
+  bounded self-reference statements; and six sequence or constraint verification statements.
 
 The register records the exact path, line, API, source marker, purpose, and dialect dependency. The
-verifier also requires exactly three `sqlite_schema` references, all in the legacy bridge. It fails
-for an unregistered raw SQL API, an unregistered named insert authority, a stale marker, an unused
-entry, or any `sqlite_master` reference.
+verifier also requires the exact reviewed set of four `sqlite_schema` references: three in the
+legacy bridge and one cutover physical-catalog read. It fails for an unregistered raw SQL API, an
+unregistered named insert authority, a stale marker, an unused entry, an unreviewed catalog read,
+or any `sqlite_master` reference.
 
 ## Reproduce the inventory
 
