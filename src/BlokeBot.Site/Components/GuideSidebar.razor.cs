@@ -5,19 +5,26 @@ namespace BlokeBot.Site.Components;
 
 public partial class GuideSidebar
 {
-    private string _currentTopicLabel
+    private string _currentRelativePath
     {
         get
         {
             var relativeUri = _navigation.ToBaseRelativePath(_navigation.Uri);
-            var relativePath = relativeUri.Split('?', '#')[0].Trim('/');
-            return relativePath == "guide"
-                ? "All help topics"
-                : SiteGuideCatalog
-                    .NavigationGroups.SelectMany(group => group.Links)
-                    .FirstOrDefault(link => link.Href == relativePath)
-                    ?.Label
-                    ?? "All help topics";
+            return relativeUri.Split('?', '#')[0].Trim('/');
         }
     }
+
+    private string _currentTopicLabel =>
+        _currentRelativePath == "guide"
+            ? "All help topics"
+            : SiteGuideCatalog
+                .NavigationGroups.SelectMany(group => group.Links)
+                .FirstOrDefault(link => LinkPath(link) == _currentRelativePath)
+                ?.Label
+                ?? "All help topics";
+
+    private bool IsCurrentGroup(SiteGuideNavigationGroup group) =>
+        group.Links.Any(link => LinkPath(link) == _currentRelativePath);
+
+    private static string LinkPath(SiteLink link) => link.Href.Split('?', '#')[0].Trim('/');
 }

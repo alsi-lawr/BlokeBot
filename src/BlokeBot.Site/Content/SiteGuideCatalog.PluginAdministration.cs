@@ -142,10 +142,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Links =
                     [
-                        new SiteLink(
-                            "Read the plugin author and API reference",
-                            "https://github.com/alsi-lawr/BlokeBot/blob/master/docs/plugin-authoring/v1.md"
-                        ),
+                        new SiteLink("Plugin development wiki", "plugin-development"),
                         new SiteLink(
                             "Read the trusted plugin contract",
                             "https://github.com/alsi-lawr/BlokeBot/blob/master/docs/trusted-plugin-contract.md"

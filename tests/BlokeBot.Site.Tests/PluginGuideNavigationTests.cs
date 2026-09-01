@@ -12,7 +12,7 @@ namespace BlokeBot.Site.Tests;
 public sealed partial class PluginGuideNavigationTests
 {
     [Test]
-    public async Task PluginGuides_DirectRoutesAndRenderedLocalTargets_AreServed()
+    public async Task PluginGuidesAndWiki_DirectRoutesAndRenderedLocalTargets_AreServed()
     {
         await using var app = SiteApplication.Build([
             "--urls=http://127.0.0.1:0",
@@ -29,7 +29,9 @@ public sealed partial class PluginGuideNavigationTests
             using var client = new HttpClient { BaseAddress = new Uri(address) };
             var targets = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (var route in new[] { "/plugins", "/server-owners/plugins" })
+            foreach (
+                var route in new[] { "/plugins", "/server-owners/plugins", "/plugin-development" }
+            )
             {
                 using var response = await client.GetAsync(route);
                 response.StatusCode.ShouldBe(HttpStatusCode.OK);

@@ -14,8 +14,8 @@
                 </NavLink>
                 @foreach (var group in SiteGuideCatalog.NavigationGroups)
                 {
-                    <div class="guide-sidebar__group">
-                        <p>@group.Label</p>
+                    <details class="guide-sidebar__group" open="@IsCurrentGroup(group)">
+                        <summary>@group.Label</summary>
                         <ul>
                             @foreach (var link in group.Links)
                             {
@@ -31,7 +31,7 @@
                                 </li>
                             }
                         </ul>
-                    </div>
+                    </details>
                 }
             </div>
         </details>

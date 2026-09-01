@@ -20,6 +20,15 @@ internal static partial class SiteGuideCatalog
         .Concat(CreateChannelPluginPages())
         .Concat(CreateAutomationPages())
         .Concat(CreateAutomationCatalogPages())
+        .Concat(CreatePluginDevelopmentOverviewPages())
+        .Concat(CreatePluginManifestPages())
+        .Concat(CreatePluginLuaSdkPages())
+        .Concat(CreatePluginHandlerPages())
+        .Concat(CreatePluginHostApiPages())
+        .Concat(CreatePluginPagePages())
+        .Concat(CreatePluginAutomationPages())
+        .Concat(CreatePluginReleasePages())
+        .Concat(CreatePluginTroubleshootingPages())
         .Concat(CreatePluginAdministrationPages())
         .Concat(CreateHelpAdministrationPages())
         .ToDictionary(static page => page.Route, StringComparer.Ordinal);
@@ -39,6 +48,20 @@ internal static partial class SiteGuideCatalog
                 GuideLink("Channel tools", "tools"),
                 GuideLink("Channel plugins", "plugins"),
                 GuideLink("Configuration transfer", "configuration-transfer"),
+            ]
+        ),
+        new(
+            "Plugin development",
+            [
+                GuideLink("Overview", "plugin-development"),
+                GuideLink("plugin.toml", "plugin-development/manifest"),
+                GuideLink("Lua SDK", "plugin-development/lua-sdk"),
+                GuideLink("Handlers", "plugin-development/handlers"),
+                GuideLink("Host API", "plugin-development/host-api"),
+                GuideLink("Pages", "plugin-development/pages"),
+                GuideLink("Automations", "plugin-development/automations"),
+                GuideLink("Testing and releases", "plugin-development/test-publish"),
+                GuideLink("Troubleshooting", "plugin-development/troubleshooting"),
             ]
         ),
         new(
