@@ -12,7 +12,7 @@ plugin-owned SQLite stores and are not part of the database-provider change.
 | operational | `src/BlokeBot.Persistence/BlokeBotPersistenceServiceCollectionExtensions.cs` | builds one file connection string and always calls `UseSqlite` |
 | migration-only | `src/BlokeBot.Persistence/BlokeBotDbContextFactory.cs` | design-time `UseSqlite("Data Source=blokebot.db")` |
 | EF-neutral | `src/BlokeBot.Persistence/BlokeBotDatabaseInitializer.cs` | runs the legacy bridge and then EF migrations |
-| legacy bridge | `src/BlokeBot.Persistence/HetznerBaselineBridge.cs` | casts to `SqliteConnection`, reads `sqlite_master`, and creates SQLite migration-history rows |
+| legacy bridge | `src/BlokeBot.Persistence/HetznerBaselineBridge.cs` | casts to `SqliteConnection`, reads `sqlite_schema`, and creates SQLite migration-history rows |
 | migration-only | `src/BlokeBot.Persistence/WeeklyAnnouncementMigrationInterceptor.cs` | branches on `SqliteConnection` while upgrading legacy announcements |
 | EF-neutral | `src/BlokeBot.Persistence/Migrations/` | the released SQLite migration history and model snapshot; retained as a SQLite history |
 
@@ -37,6 +37,35 @@ The migration files with authored SQL are:
 
 All other files in that directory use EF migration operations but remain part of the SQLite-only
 released history.
+
+## Exact raw SQL register
+
+`main-database-raw-sql-v1.json` is the authoritative statement register. It records the source path,
+line, API, identifying SQL marker, verb, purpose, and dialect dependency for every main-database raw
+SQL execution site at the frozen commit.
+
+| ID | Source | SQL and purpose | Dialect dependency |
+| --- | --- | --- | --- |
+| `automation-dispatch-host-write-boundary` | `AutomationRuntimeService.cs:175` | no-op `UPDATE hosts` to acquire the automation dispatch write boundary | SQLite no-op update write lock |
+| `automation-flow-run-admission` | `AutomationRuntimeService.cs:221` | admit one unique automation run | `INSERT OR IGNORE` |
+| `twitch-event-host-write-boundary` | `TwitchEventAutomationRuntime.cs:425` | no-op `UPDATE hosts` to order receipt admission with feature state | SQLite no-op update write lock |
+| `twitch-event-expired-receipt-cleanup` | `TwitchEventAutomationRuntime.cs:449` | delete expired automation receipts before admission | provider-specific raw `DELETE` |
+| `twitch-event-receipt-admission` | `TwitchEventAutomationRuntime.cs:454` | claim one provider message in the deduplication window | `INSERT OR IGNORE` |
+| `community-source-event-admission` | `CommunityProgressionService.cs:559` | claim one community source event | `INSERT OR IGNORE` |
+| `custom-command-invocation-admission` | `CustomCommandInvocationClaimStore.cs:34` | claim once-per-stream/user command authority | `INSERT OR IGNORE` |
+| `custom-command-expired-claim-cleanup` | `CustomCommandInvocationClaimStore.cs:55` | delete an ordered, limited batch of expired stream claims | SQLite delete/subquery/order/limit shape |
+| `raid-collaboration-event-admission` | `RaidCollaborationService.cs:436` | admit a raid behind feature and event fences | SQLite insert-ignore/select/bitwise shape |
+| `automatic-raid-expired-event-cleanup` | `AutomaticRaidShoutoutRunner.cs:101` | delete expired automatic-raid claims | provider-specific raw `DELETE` |
+| `automatic-raid-event-admission` | `AutomaticRaidShoutoutRunner.cs:106` | claim one automatic-raid provider message | `INSERT OR IGNORE` |
+| `viewer-passport-host-write-boundary` | `ViewerPassportService.cs:399` | no-op `UPDATE hosts` before feature and continuity checks | SQLite no-op update write lock |
+| `viewer-passport-stream-session-admission` | `ViewerPassportService.cs:420` | create one host/stream session | `INSERT OR IGNORE` |
+| `viewer-passport-stream-attendance-admission` | `ViewerPassportService.cs:475` | create one passport/session/generation attendance row | `INSERT OR IGNORE` |
+| `plugin-owned-automation-flow-selection` | `EfPluginFeatureStore.cs:78` | find plugin-owned automation flows before data removal | SQLite `json_valid`/`json_extract` query |
+| `viewer-passport-ambiguity-tombstone-admission` | `ViewerPassportAmbiguityTombstones.cs:38` | retain newest ambiguity tombstones | `INSERT OR IGNORE` |
+| `hetzner-baseline-history-creation` | `HetznerBaselineBridge.cs:46` | create migration history and insert the recognized baseline | SQLite quoted DDL/history bootstrap |
+| `hetzner-baseline-history-detection` | `HetznerBaselineBridge.cs:68` | detect migration history | `sqlite_schema` catalog |
+| `hetzner-existing-schema-detection` | `HetznerBaselineBridge.cs:87` | detect an existing application schema | `sqlite_schema` catalog |
+| `hetzner-schema-signature-read` | `HetznerBaselineBridge.cs:109` | read ordered DDL for the legacy signature | `sqlite_schema` catalog and DDL text |
 
 ## Dialect, transactions, and error classification
 
@@ -96,4 +125,12 @@ rg -n --glob '*.cs' \
 
 rg -n 'DatabasePath|StateDirectory|blokebot\.db|AddBlokeBotPersistence' \
   src/BlokeBot src/BlokeBot.Core src/BlokeBot.Persistence src/BlokeBot.Simulation flake.nix README.md
+
+dotnet run -c Release --project tools/BlokeBot.DatabaseWorkloads -- verify-inventory \
+  --repo-root . \
+  --inventory docs/database-providers/main-database-raw-sql-v1.json
 ```
+
+The executable verifier fails for an unregistered raw SQL API or `SqliteCommand.CommandText`, a
+stale path/line/API/marker, an unused register entry, any `sqlite_master` reference, or any change
+from the three registered `sqlite_schema` reads.

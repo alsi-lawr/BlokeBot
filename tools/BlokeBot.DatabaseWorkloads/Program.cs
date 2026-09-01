@@ -24,9 +24,16 @@ public static class BaselineCli
             }
 
             var options = Parse(args.Skip(1).ToArray());
+            if (args[0] == "verify-inventory")
+            {
+                var inventory = RawSqlInventory.Load(Required(options, "inventory"));
+                RawSqlInventory.Verify(Required(options, "repo-root"), inventory);
+                Console.WriteLine(inventory.Statements.Count);
+                return 0;
+            }
             var protocolPath = Required(options, "protocol");
             var digestPath = Required(options, "digest");
-            var protocol = FrozenProtocol.Load(protocolPath, digestPath);
+            var protocol = FrozenProtocol.Load(FrozenProtocolVersion.V1, protocolPath, digestPath);
             if (args[0] == "verify-protocol")
             {
                 Console.WriteLine(FrozenProtocol.Digest(protocolPath));
@@ -58,6 +65,7 @@ public static class BaselineCli
                         or IOException
                         or InvalidDataException
                         or ProtocolDriftException
+                        or InventoryDriftException
             )
         {
             Console.Error.WriteLine(exception.Message);
@@ -96,6 +104,7 @@ public static class BaselineCli
             BlokeBot main-database workload baseline
 
             verify-protocol --protocol PATH --digest PATH
+            verify-inventory --repo-root PATH --inventory PATH
             run-sqlite --protocol PATH --digest PATH --database NEW_PATH --output PATH
 
             run-sqlite refuses an existing database path. It creates an offline synthetic database and

@@ -66,8 +66,15 @@ public sealed record RedactionProtocol(
 
 public sealed class ProtocolDriftException(string message) : Exception(message);
 
+public enum FrozenProtocolVersion
+{
+    V1,
+}
+
 public static class FrozenProtocol
 {
+    private const string _v1Sha256 =
+        "b1901eb7d00a5a2c08650fd6619def775712f93db31c479559548414e4a180da";
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -76,20 +83,36 @@ public static class FrozenProtocol
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
-    public static WorkloadProtocol Load(string protocolPath, string digestPath)
+    public static WorkloadProtocol Load(
+        FrozenProtocolVersion version,
+        string protocolPath,
+        string digestPath
+    )
     {
         var protocolBytes = File.ReadAllBytes(protocolPath);
-        var expectedDigest = File.ReadAllText(digestPath).Trim();
+        var sidecarDigest = File.ReadAllText(digestPath).Trim();
+        var canonicalDigest = CanonicalDigest(version);
         var actualDigest = Convert.ToHexStringLower(SHA256.HashData(protocolBytes));
         if (
             !CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(expectedDigest),
+                Convert.FromHexString(sidecarDigest),
                 Convert.FromHexString(actualDigest)
             )
         )
         {
             throw new ProtocolDriftException(
-                $"Protocol digest mismatch. Expected {expectedDigest}; actual {actualDigest}."
+                $"Protocol sidecar mismatch. Expected {sidecarDigest}; actual {actualDigest}."
+            );
+        }
+        if (
+            !CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(canonicalDigest),
+                Convert.FromHexString(actualDigest)
+            )
+        )
+        {
+            throw new ProtocolDriftException(
+                $"Protocol version {version} is not the canonical frozen document."
             );
         }
 
@@ -102,6 +125,12 @@ public static class FrozenProtocol
 
     public static string Digest(string protocolPath) =>
         Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(protocolPath)));
+
+    public static string CanonicalDigest(FrozenProtocolVersion version) =>
+        version switch
+        {
+            FrozenProtocolVersion.V1 => _v1Sha256,
+        };
 
     private static void Validate(WorkloadProtocol protocol)
     {

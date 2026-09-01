@@ -21,17 +21,47 @@ public sealed class FrozenProtocolTests
         {
             File.Copy(protocol, temporaryProtocol, overwrite: true);
             FrozenProtocol
-                .Load(temporaryProtocol, digest)
+                .Load(FrozenProtocolVersion.V1, temporaryProtocol, digest)
                 .ProtocolId.ShouldBe("blokebot-database-workloads-v1");
             File.AppendAllText(temporaryProtocol, " ");
 
             _ = Should.Throw<ProtocolDriftException>(() =>
-                FrozenProtocol.Load(temporaryProtocol, digest)
+                FrozenProtocol.Load(FrozenProtocolVersion.V1, temporaryProtocol, digest)
             );
         }
         finally
         {
             File.Delete(temporaryProtocol);
+        }
+    }
+
+    [Test]
+    public void MutatedProtocol_WithMatchingReplacementSidecar_DoesNotPassCanonicalDigest()
+    {
+        var root = FindRepositoryRoot();
+        var protocol = Path.Combine(
+            root,
+            "tools",
+            "BlokeBot.DatabaseWorkloads",
+            "protocol",
+            "blokebot-database-workloads-v1.json"
+        );
+        var temporaryProtocol = Path.GetTempFileName();
+        var temporaryDigest = Path.GetTempFileName();
+        try
+        {
+            File.Copy(protocol, temporaryProtocol, overwrite: true);
+            File.AppendAllText(temporaryProtocol, " ");
+            File.WriteAllText(temporaryDigest, FrozenProtocol.Digest(temporaryProtocol));
+
+            _ = Should.Throw<ProtocolDriftException>(() =>
+                FrozenProtocol.Load(FrozenProtocolVersion.V1, temporaryProtocol, temporaryDigest)
+            );
+        }
+        finally
+        {
+            File.Delete(temporaryProtocol);
+            File.Delete(temporaryDigest);
         }
     }
 

@@ -2,8 +2,10 @@
 
 The executable protocol is
 `tools/BlokeBot.DatabaseWorkloads/protocol/blokebot-database-workloads-v1.json`. Its adjacent
-`.sha256` file freezes the exact bytes. The protocol separates deterministic inputs and logical
-outcomes from naturally variable provider timing.
+`.sha256` file records the exact bytes, and the executable independently binds
+`FrozenProtocolVersion.V1` to the same canonical SHA-256. Replacing both mutable files cannot
+redefine v1; a future protocol requires a new explicit version binding. The protocol separates
+deterministic inputs and logical outcomes from naturally variable provider timing.
 
 ## Execute
 
