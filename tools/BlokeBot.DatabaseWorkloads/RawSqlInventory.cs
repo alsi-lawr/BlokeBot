@@ -42,7 +42,7 @@ public static partial class RawSqlInventory
             ) ?? throw new InventoryDriftException("The raw SQL inventory is empty.");
         var valid =
             document.SchemaVersion == 1
-            && document.SourceCommit == "6e8af8ef6fc75df47bac7b15a283c851b2bfdc07"
+            && document.SourceCommit == "f32c4893fda9735a0080816f40959ac9064c7002"
             && document.Statements.Count > 0
             && document.Statements.Select(static entry => entry.Id).Distinct().Count()
                 == document.Statements.Count
@@ -174,7 +174,7 @@ public static partial class RawSqlInventory
         Whitespace().Replace(value, " ").Trim();
 
     [GeneratedRegex(
-        @"\.(ExecuteSql(?:Raw|Interpolated)(?:Async)?|FromSql(?:Raw|Interpolated)|SqlQuery(?:Raw|Interpolated)?)\s*\(|\b\w+\.CommandText\s*=",
+        @"\.(ExecuteSql(?:Raw|Interpolated)(?:Async)?|FromSql(?:Raw|Interpolated)|SqlQuery(?:Raw|Interpolated)?|InsertIgnoreAsync|ExecuteDialectAsync)\s*\(|\b\w+\.CommandText\s*=",
         RegexOptions.CultureInvariant
     )]
     private static partial Regex RawSqlApi();

@@ -4,9 +4,7 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Core.Features.Moments;
 
@@ -158,7 +156,10 @@ public sealed class MomentHubService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var host = await db.Hosts.SingleOrDefaultAsync(value => value.Id == hostId, ct);
         if (host is null)
         {
@@ -372,7 +373,10 @@ public sealed class MomentHubService(
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var candidates = await db
             .MomentCandidates.Include(value => value.Contributors)
             .Include(value => value.Suggestions)
@@ -560,7 +564,10 @@ public sealed class MomentHubService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var candidate = await LoadPublicCandidateAsync(db, hostId, publicId, ct);
         if (candidate is null)
         {
@@ -751,7 +758,10 @@ public sealed class MomentHubService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var existing = await db.MomentWeeklyFinalizations.SingleOrDefaultAsync(
             value => value.HostId == hostId && value.WeekStartsAtUtc == weekStart,
             ct
@@ -908,7 +918,10 @@ public sealed class MomentHubService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var candidate = await db
             .MomentCandidates.Include(value => value.Contributors)
             .Include(value => value.Suggestions)
@@ -1018,7 +1031,10 @@ public sealed class MomentHubService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var candidate = await db.MomentCandidates.SingleAsync(
             value => value.HostId == hostId && value.PublicId == publicId,
             ct
@@ -1452,20 +1468,7 @@ public sealed class MomentHubService(
         );
 
     private static bool IsPersistenceCollision(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private static MomentResult<T> Succeeded<T>(T value) => new MomentResult<T>.Succeeded(value);
 
@@ -1496,44 +1499,4 @@ public sealed class MomentHubService(
         MomentResult<ModeratorMomentView> Result,
         bool Changed = false
     );
-
-    private sealed class ImmediateTransaction(
-        SqliteTransaction providerTransaction,
-        IDbContextTransaction contextTransaction
-    ) : IAsyncDisposable
-    {
-        public static async Task<ImmediateTransaction> StartAsync(
-            BlokeBotDbContext db,
-            CancellationToken ct
-        )
-        {
-            await db.Database.OpenConnectionAsync(ct);
-            var connection =
-                db.Database.GetDbConnection() as SqliteConnection
-                ?? throw new InvalidOperationException("Moment persistence requires SQLite.");
-            var providerTransaction = connection.BeginTransaction(deferred: false);
-            try
-            {
-                var contextTransaction =
-                    await db.Database.UseTransactionAsync(providerTransaction, ct)
-                    ?? throw new InvalidOperationException(
-                        "The immediate SQLite transaction could not be attached."
-                    );
-                return new ImmediateTransaction(providerTransaction, contextTransaction);
-            }
-            catch
-            {
-                await providerTransaction.DisposeAsync();
-                throw;
-            }
-        }
-
-        public Task CommitAsync(CancellationToken ct) => contextTransaction.CommitAsync(ct);
-
-        public async ValueTask DisposeAsync()
-        {
-            await contextTransaction.DisposeAsync();
-            await providerTransaction.DisposeAsync();
-        }
-    }
 }

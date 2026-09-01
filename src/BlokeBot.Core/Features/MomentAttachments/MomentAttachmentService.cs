@@ -8,7 +8,6 @@ using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.MomentAttachments;
@@ -596,20 +595,7 @@ internal sealed class MomentAttachmentService(
     }
 
     private static bool IsPersistenceCollision(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private sealed record MutationDecision(
         MomentAttachmentMutationOutcome Outcome,

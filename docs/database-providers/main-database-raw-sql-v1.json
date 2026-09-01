@@ -1,167 +1,7 @@
 {
   "schema_version": 1,
-  "source_commit": "6e8af8ef6fc75df47bac7b15a283c851b2bfdc07",
+  "source_commit": "f32c4893fda9735a0080816f40959ac9064c7002",
   "statements": [
-    {
-      "id": "automation-dispatch-host-write-boundary",
-      "path": "src/BlokeBot.Core/Features/Automations/AutomationRuntimeService.cs",
-      "source_line": 175,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "UPDATE hosts SET EnabledFeatures = EnabledFeatures WHERE Id =",
-      "sql_verb": "UPDATE",
-      "purpose": "Acquire SQLite's write boundary before feature-generation checks and automation run admission.",
-      "dialect_dependency": "sqlite_noop_update_write_lock"
-    },
-    {
-      "id": "automation-flow-run-admission",
-      "path": "src/BlokeBot.Core/Features/Automations/AutomationRuntimeService.cs",
-      "source_line": 221,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO automation_flow_runs",
-      "sql_verb": "INSERT",
-      "purpose": "Admit one durable run for a unique flow, source node, and occurrence.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "twitch-event-host-write-boundary",
-      "path": "src/BlokeBot.Core/Features/Automations/TwitchEventAutomationRuntime.cs",
-      "source_line": 425,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "UPDATE hosts SET EnabledFeatures = EnabledFeatures WHERE Id =",
-      "sql_verb": "UPDATE",
-      "purpose": "Order EventSub receipt admission against the durable host feature transition.",
-      "dialect_dependency": "sqlite_noop_update_write_lock"
-    },
-    {
-      "id": "twitch-event-expired-receipt-cleanup",
-      "path": "src/BlokeBot.Core/Features/Automations/TwitchEventAutomationRuntime.cs",
-      "source_line": 449,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "DELETE FROM automation_event_receipts WHERE ExpiresAtUtc <=",
-      "sql_verb": "DELETE",
-      "purpose": "Remove expired deduplication receipts inside the receipt-admission transaction.",
-      "dialect_dependency": "provider_specific_raw_delete"
-    },
-    {
-      "id": "twitch-event-receipt-admission",
-      "path": "src/BlokeBot.Core/Features/Automations/TwitchEventAutomationRuntime.cs",
-      "source_line": 454,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO automation_event_receipts",
-      "sql_verb": "INSERT",
-      "purpose": "Claim one provider message within the bounded automation deduplication window.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "community-source-event-admission",
-      "path": "src/BlokeBot.Core/Features/CommunityProgression/CommunityProgressionService.cs",
-      "source_line": 559,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO community_source_event_receipts",
-      "sql_verb": "INSERT",
-      "purpose": "Claim one community source event before applying progress and rewards.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "custom-command-invocation-admission",
-      "path": "src/BlokeBot.Core/Features/CustomCommands/CustomCommandInvocationClaimStore.cs",
-      "source_line": 34,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO custom_command_invocation_claims",
-      "sql_verb": "INSERT",
-      "purpose": "Claim once-per-stream or once-per-user custom-command invocation authority.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "custom-command-expired-claim-cleanup",
-      "path": "src/BlokeBot.Core/Features/CustomCommands/CustomCommandInvocationClaimStore.cs",
-      "source_line": 55,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "DELETE FROM custom_command_invocation_claims WHERE Id IN",
-      "sql_verb": "DELETE",
-      "purpose": "Delete one ordered bounded batch of expired stream claims while retaining the current stream.",
-      "dialect_dependency": "sqlite_delete_subquery_order_limit"
-    },
-    {
-      "id": "raid-collaboration-event-admission",
-      "path": "src/BlokeBot.Core/Features/RaidCollaboration/RaidCollaborationService.cs",
-      "source_line": 436,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO raid_collaboration_history",
-      "sql_verb": "INSERT",
-      "purpose": "Atomically admit a raid only when the feature and event fence remain enabled.",
-      "dialect_dependency": "sqlite_insert_or_ignore_select_bitwise"
-    },
-    {
-      "id": "automatic-raid-expired-event-cleanup",
-      "path": "src/BlokeBot.Core/Features/TwitchOperations/Shoutouts/AutomaticRaids/AutomaticRaidShoutoutRunner.cs",
-      "source_line": 101,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "DELETE FROM automatic_raid_processed_events WHERE ExpiresAtUtc <",
-      "sql_verb": "DELETE",
-      "purpose": "Remove expired automatic-raid event claims before admission.",
-      "dialect_dependency": "provider_specific_raw_delete"
-    },
-    {
-      "id": "automatic-raid-event-admission",
-      "path": "src/BlokeBot.Core/Features/TwitchOperations/Shoutouts/AutomaticRaids/AutomaticRaidShoutoutRunner.cs",
-      "source_line": 106,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO automatic_raid_processed_events",
-      "sql_verb": "INSERT",
-      "purpose": "Claim one automatic-raid provider message inside the bounded contention transaction.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "viewer-passport-host-write-boundary",
-      "path": "src/BlokeBot.Core/Features/ViewerPassports/ViewerPassportService.cs",
-      "source_line": 399,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "UPDATE hosts SET EnabledFeatures = EnabledFeatures WHERE Id =",
-      "sql_verb": "UPDATE",
-      "purpose": "Acquire SQLite's write boundary before passport feature and continuity checks.",
-      "dialect_dependency": "sqlite_noop_update_write_lock"
-    },
-    {
-      "id": "viewer-passport-stream-session-admission",
-      "path": "src/BlokeBot.Core/Features/ViewerPassports/ViewerPassportService.cs",
-      "source_line": 420,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO viewer_passport_stream_sessions",
-      "sql_verb": "INSERT",
-      "purpose": "Create one stream session per host and Twitch stream identity.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "viewer-passport-stream-attendance-admission",
-      "path": "src/BlokeBot.Core/Features/ViewerPassports/ViewerPassportService.cs",
-      "source_line": 475,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO viewer_passport_stream_attendance",
-      "sql_verb": "INSERT",
-      "purpose": "Record one attendance row per passport, stream session, and continuity generation.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
-    {
-      "id": "plugin-owned-automation-flow-selection",
-      "path": "src/BlokeBot.Persistence/Plugins/EfPluginFeatureStore.cs",
-      "source_line": 78,
-      "api": "FromSqlInterpolated",
-      "source_marker": "SELECT DISTINCT flow.* FROM automation_flows AS flow",
-      "sql_verb": "SELECT",
-      "purpose": "Find main-database automation flows owned by a plugin before removing plugin feature records.",
-      "dialect_dependency": "sqlite_json_valid_and_extract"
-    },
-    {
-      "id": "viewer-passport-ambiguity-tombstone-admission",
-      "path": "src/BlokeBot.Persistence/Privacy/ViewerPassportAmbiguityTombstones.cs",
-      "source_line": 38,
-      "api": "ExecuteSqlInterpolatedAsync",
-      "source_marker": "INSERT OR IGNORE INTO \"viewer_passport_ambiguous_logins\"",
-      "sql_verb": "INSERT",
-      "purpose": "Retain the newest ambiguity tombstone for each host and normalized login during privacy work.",
-      "dialect_dependency": "sqlite_insert_or_ignore"
-    },
     {
       "id": "hetzner-baseline-history-creation",
       "path": "src/BlokeBot.Persistence/HetznerBaselineBridge.cs",
@@ -170,7 +10,7 @@
       "source_marker": "CREATE TABLE \"__EFMigrationsHistory\"",
       "sql_verb": "CREATE TABLE; INSERT",
       "purpose": "Create EF migration history and record the recognized legacy baseline in one SQLite transaction.",
-      "dialect_dependency": "sqlite_quoted_ddl_and_history_bootstrap"
+      "dialect_dependency": "sqlite_legacy_history_bootstrap"
     },
     {
       "id": "hetzner-baseline-history-detection",
@@ -179,8 +19,8 @@
       "api": "SqliteCommand.CommandText",
       "source_marker": "FROM sqlite_schema WHERE type = 'table' AND name = '__EFMigrationsHistory'",
       "sql_verb": "SELECT",
-      "purpose": "Detect the EF migration-history table through SQLite's schema catalog.",
-      "dialect_dependency": "sqlite_schema_catalog"
+      "purpose": "Detect the SQLite EF migration-history table.",
+      "dialect_dependency": "sqlite_legacy_schema_catalog"
     },
     {
       "id": "hetzner-existing-schema-detection",
@@ -189,8 +29,8 @@
       "api": "SqliteCommand.CommandText",
       "source_marker": "FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'",
       "sql_verb": "SELECT",
-      "purpose": "Detect any pre-existing application schema before deciding whether the legacy bridge applies.",
-      "dialect_dependency": "sqlite_schema_catalog"
+      "purpose": "Detect a pre-existing SQLite application schema before legacy bridging.",
+      "dialect_dependency": "sqlite_legacy_schema_catalog"
     },
     {
       "id": "hetzner-schema-signature-read",
@@ -199,8 +39,208 @@
       "api": "SqliteCommand.CommandText",
       "source_marker": "SELECT type, name, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'",
       "sql_verb": "SELECT",
-      "purpose": "Read ordered SQLite schema DDL to verify the exact supported legacy baseline signature.",
-      "dialect_dependency": "sqlite_schema_catalog_and_ddl_text"
+      "purpose": "Read ordered SQLite DDL for the exact supported legacy signature.",
+      "dialect_dependency": "sqlite_legacy_schema_catalog_and_ddl"
+    },
+    {
+      "id": "postgresql-claim-lock-timeout",
+      "path": "src/BlokeBot.Persistence/MainDatabaseCommandTimeout.cs",
+      "source_line": 35,
+      "api": "ExecuteSqlInterpolatedAsync",
+      "source_marker": "SELECT set_config('lock_timeout'",
+      "sql_verb": "SELECT",
+      "purpose": "Apply the bounded claim lock wait inside the feature-owned PostgreSQL transaction.",
+      "dialect_dependency": "postgresql_transaction_local_lock_timeout"
+    },
+    {
+      "id": "automation-flow-run-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Automations.cs",
+      "source_line": 28,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO automation_flow_runs",
+      "sql_verb": "INSERT",
+      "purpose": "Admit one durable automation run for a unique flow/source occurrence.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "automation-expired-receipt-cleanup",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Automations.cs",
+      "source_line": 63,
+      "api": "ExecuteDialectAsync",
+      "source_marker": "DELETE FROM automation_event_receipts WHERE",
+      "sql_verb": "DELETE",
+      "purpose": "Remove expired automation delivery receipts inside the feature-owned transaction.",
+      "dialect_dependency": "quoted_relational_sql"
+    },
+    {
+      "id": "automation-event-receipt-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Automations.cs",
+      "source_line": 79,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO automation_event_receipts",
+      "sql_verb": "INSERT",
+      "purpose": "Claim one automation provider message within its deduplication window.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "community-source-event-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Claims.cs",
+      "source_line": 31,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO community_source_event_receipts",
+      "sql_verb": "INSERT",
+      "purpose": "Claim one community source event before applying state and rewards.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "custom-command-invocation-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Claims.cs",
+      "source_line": 60,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO custom_command_invocation_claims",
+      "sql_verb": "INSERT",
+      "purpose": "Claim once-per-stream or once-per-user command authority.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "custom-command-expired-claim-cleanup",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Claims.cs",
+      "source_line": 83,
+      "api": "ExecuteDialectAsync",
+      "source_marker": "DELETE FROM custom_command_invocation_claims WHERE",
+      "sql_verb": "DELETE",
+      "purpose": "Delete one ordered bounded batch of expired stream claims.",
+      "dialect_dependency": "delete_subquery_order_limit_supported_by_both"
+    },
+    {
+      "id": "raid-collaboration-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Claims.cs",
+      "source_line": 117,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO raid_collaboration_history",
+      "sql_verb": "INSERT SELECT",
+      "purpose": "Admit a raid only while the feature and event fence remain enabled.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "plugin-flow-selection-sqlite",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Plugins.cs",
+      "source_line": 15,
+      "api": "FromSqlInterpolated",
+      "source_marker": "json_valid(node.\"PluginProvenanceJson\")",
+      "sql_verb": "SELECT",
+      "purpose": "Select plugin-owned automation flows on SQLite.",
+      "dialect_dependency": "sqlite_json_valid_and_extract"
+    },
+    {
+      "id": "plugin-flow-selection-postgresql",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Plugins.cs",
+      "source_line": 34,
+      "api": "FromSqlInterpolated",
+      "source_marker": "node.\"PluginProvenanceJson\"::jsonb",
+      "sql_verb": "SELECT",
+      "purpose": "Select plugin-owned automation flows on PostgreSQL.",
+      "dialect_dependency": "postgresql_jsonb_extract"
+    },
+    {
+      "id": "automatic-raid-expired-event-cleanup",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Raids.cs",
+      "source_line": 10,
+      "api": "ExecuteDialectAsync",
+      "source_marker": "DELETE FROM automatic_raid_processed_events WHERE",
+      "sql_verb": "DELETE",
+      "purpose": "Remove expired automatic-raid event claims before admission.",
+      "dialect_dependency": "quoted_relational_sql"
+    },
+    {
+      "id": "automatic-raid-event-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Raids.cs",
+      "source_line": 25,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO automatic_raid_processed_events",
+      "sql_verb": "INSERT",
+      "purpose": "Claim one automatic-raid provider message.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "viewer-passport-session-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.ViewerPassports.cs",
+      "source_line": 14,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO viewer_passport_stream_sessions",
+      "sql_verb": "INSERT",
+      "purpose": "Create one stream session per host and Twitch stream.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "viewer-passport-attendance-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.ViewerPassports.cs",
+      "source_line": 39,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO viewer_passport_stream_attendance",
+      "sql_verb": "INSERT",
+      "purpose": "Create one attendance row per passport/session/generation.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "viewer-passport-ambiguity-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.ViewerPassports.cs",
+      "source_line": 62,
+      "api": "InsertIgnoreAsync",
+      "source_marker": "INSERT OR IGNORE INTO viewer_passport_ambiguous_logins",
+      "sql_verb": "INSERT",
+      "purpose": "Create one ambiguity tombstone per host/login.",
+      "dialect_dependency": "sqlite_insert_or_ignore__postgresql_on_conflict_do_nothing"
+    },
+    {
+      "id": "host-write-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.cs",
+      "source_line": 12,
+      "api": "ExecuteDialectAsync",
+      "source_marker": "UPDATE hosts SET EnabledFeatures = EnabledFeatures",
+      "sql_verb": "UPDATE",
+      "purpose": "Order feature admission against durable host feature transitions.",
+      "dialect_dependency": "row_update_lock_supported_by_both"
+    },
+    {
+      "id": "provider-insert-ignore-dispatch",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.cs",
+      "source_line": 25,
+      "api": "ExecuteSqlInterpolatedAsync",
+      "source_marker": "BlokeBotDatabaseProvider.PostgreSql ? postgreSql : sqlite",
+      "sql_verb": "INSERT",
+      "purpose": "Execute the already-selected provider-specific idempotent insert within the caller transaction.",
+      "dialect_dependency": "closed_sqlite_postgresql_dispatch"
+    },
+    {
+      "id": "postgresql-bounded-write-admission",
+      "path": "src/BlokeBot.Persistence/MainDatabaseWriteTransaction.cs",
+      "source_line": 112,
+      "api": "ExecuteSqlInterpolatedAsync",
+      "source_marker": "SELECT set_config('lock_timeout'",
+      "sql_verb": "SELECT",
+      "purpose": "Bound PostgreSQL lock admission for the current serializable transaction.",
+      "dialect_dependency": "postgresql_transaction_local_lock_timeout"
+    },
+    {
+      "id": "postgresql-immediate-write-admission-lock",
+      "path": "src/BlokeBot.Persistence/MainDatabaseWriteTransaction.cs",
+      "source_line": 117,
+      "api": "ExecuteSqlInterpolatedAsync",
+      "source_marker": "SELECT pg_advisory_xact_lock(",
+      "sql_verb": "SELECT",
+      "purpose": "Acquire the stable transaction-scoped PostgreSQL lock for authorities that require immediate-write admission.",
+      "dialect_dependency": "postgresql_transaction_scoped_advisory_lock"
+    },
+    {
+      "id": "provider-relational-sql-dispatch",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.cs",
+      "source_line": 36,
+      "api": "ExecuteSqlInterpolatedAsync",
+      "source_marker": "BlokeBotDatabaseProvider.PostgreSql ? postgreSql : sqlite",
+      "sql_verb": "UPDATE; DELETE",
+      "purpose": "Execute the already-selected provider-specific host-lock or bounded-cleanup statement within the caller transaction.",
+      "dialect_dependency": "closed_sqlite_postgresql_dispatch"
     }
   ]
 }

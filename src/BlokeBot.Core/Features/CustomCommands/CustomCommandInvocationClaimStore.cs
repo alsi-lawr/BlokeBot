@@ -1,5 +1,4 @@
 using BlokeBot.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 
@@ -31,13 +30,13 @@ public sealed class CustomCommandInvocationClaimStore(TimeProvider clock)
             CustomCommandInvocationScope.OncePerStreamPerUser scope => scope.TwitchUserId,
             _ => null,
         };
-        var changed = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT OR IGNORE INTO custom_command_invocation_claims
-                (HostId, CustomCommandId, TwitchUserId, TwitchStreamId, ClaimedAtUtc)
-            VALUES
-                ({request.HostId}, {request.CommandId}, {viewerId}, {streamId}, {clock.GetUtcNow().UtcDateTime});
-            """,
+        var changed = await MainDatabaseStatements.TryClaimCustomCommandInvocationAsync(
+            db,
+            request.HostId,
+            request.CommandId,
+            viewerId,
+            streamId,
+            clock.GetUtcNow().UtcDateTime,
             ct
         );
         return changed == 1
@@ -52,19 +51,11 @@ public sealed class CustomCommandInvocationClaimStore(TimeProvider clock)
     )
     {
         var cutoff = clock.GetUtcNow().Subtract(StreamClaimRetention).UtcDateTime;
-        _ = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            DELETE FROM custom_command_invocation_claims
-            WHERE Id IN (
-                SELECT Id
-                FROM custom_command_invocation_claims
-                WHERE TwitchStreamId IS NOT NULL
-                  AND TwitchStreamId <> {currentStreamId}
-                  AND ClaimedAtUtc < {cutoff}
-                ORDER BY ClaimedAtUtc, Id
-                LIMIT {CleanupBatchSize}
-            );
-            """,
+        _ = await MainDatabaseStatements.DeleteExpiredCustomCommandClaimsAsync(
+            db,
+            currentStreamId,
+            cutoff,
+            CleanupBatchSize,
             ct
         );
     }

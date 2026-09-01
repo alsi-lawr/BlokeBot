@@ -74,25 +74,11 @@ public sealed partial class EfPluginFeatureStore(
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var flowIds = await db
-            .AutomationFlows.FromSqlInterpolated(
-                $"""
-                SELECT DISTINCT flow.*
-                FROM automation_flows AS flow
-                LEFT JOIN automation_flow_nodes AS node ON node.FlowId = flow.Id
-                WHERE (
-                    node.PluginProvenanceJson IS NOT NULL
-                    AND json_valid(node.PluginProvenanceJson)
-                    AND json_extract(node.PluginProvenanceJson, '$.pluginId') = {pluginId.Value}
-                ) OR EXISTS (
-                    SELECT 1
-                    FROM plugin_automation_instantiations AS ledger
-                    WHERE ledger.FlowId = flow.Id AND ledger.PluginId = {pluginId.Value}
-                )
-                """
-            )
-            .Select(static flow => flow.Id)
-            .ToArrayAsync(cancellationToken);
+        var flowIds = await MainDatabaseStatements.PluginAutomationFlowIdsAsync(
+            db,
+            pluginId.Value,
+            cancellationToken
+        );
         _ = await db
             .AutomationFlows.Where(flow => flowIds.Contains(flow.Id))
             .ExecuteDeleteAsync(cancellationToken);

@@ -35,13 +35,11 @@ public static class ViewerPassportAmbiguityTombstones
             .ToArray();
         foreach (var candidate in candidates)
         {
-            _ = await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT OR IGNORE INTO "viewer_passport_ambiguous_logins"
-                    ("HostId", "Login", "DetectedAtUtc")
-                VALUES
-                    ({candidate.HostId}, {candidate.Login}, {candidate.DetectedAtUtc});
-                """,
+            _ = await MainDatabaseStatements.TryRecordViewerPassportAmbiguityAsync(
+                db,
+                candidate.HostId,
+                candidate.Login,
+                candidate.DetectedAtUtc,
                 cancellationToken
             );
         }

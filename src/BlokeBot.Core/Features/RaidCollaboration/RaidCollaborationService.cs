@@ -424,30 +424,25 @@ public sealed class RaidCollaborationService(
             direction == RaidDirection.Incoming
                 ? incomingRaid.FromBroadcasterUserName
                 : incomingRaid.ToBroadcasterUserName;
-        var directionToken = PersistedEnumTokens<RaidDirection>.Format(direction);
-        var welcomeToken = PersistedEnumTokens<RaidWelcomeOutcome>.Format(
-            RaidWelcomeOutcome.NotConfigured
-        );
-        var shoutoutToken = PersistedEnumTokens<RaidShoutoutOutcome>.Format(
-            RaidShoutoutOutcome.NotConfigured
-        );
         var feature = (long)HostFeatureFlags.RaidCollaboration;
         await using var claim = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var changed = await claim.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT OR IGNORE INTO raid_collaboration_history
-                (HostId, ProviderMessageId, Direction, OtherTwitchUserId, OtherLogin,
-                 OtherDisplayName, ViewerCount, OccurredAtUtc, WelcomeOutcome,
-                 ShoutoutOutcome, RecordedAtUtc)
-            SELECT
-                 {host.Id}, {incomingRaid.MessageId}, {directionToken}, {otherId}, {otherLogin},
-                 {otherDisplayName}, {incomingRaid.ViewerCount}, {incomingRaid.MessageTimestamp.UtcDateTime},
-                 {welcomeToken}, {shoutoutToken}, {clock.GetUtcNow().UtcDateTime}
-            FROM hosts
-            WHERE Id = {host.Id}
-              AND (EnabledFeatures & {feature}) = {feature}
-              AND (RaidCollaborationAcceptEventsAfterUtc IS NULL OR RaidCollaborationAcceptEventsAfterUtc <= {incomingRaid.MessageTimestamp.UtcDateTime});
-            """,
+        var changed = await MainDatabaseStatements.TryRecordRaidCollaborationAsync(
+            claim,
+            new(
+                host.Id,
+                incomingRaid.MessageId,
+                direction,
+                otherId,
+                otherLogin,
+                otherDisplayName,
+                incomingRaid.ViewerCount,
+                incomingRaid.MessageTimestamp.UtcDateTime,
+                RaidWelcomeOutcome.NotConfigured,
+                RaidShoutoutOutcome.NotConfigured,
+                clock.GetUtcNow().UtcDateTime,
+                feature,
+                incomingRaid.MessageTimestamp.UtcDateTime
+            ),
             cancellationToken
         );
         if (changed != 1)

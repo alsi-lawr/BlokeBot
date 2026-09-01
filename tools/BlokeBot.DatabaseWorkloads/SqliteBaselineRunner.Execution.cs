@@ -1,10 +1,10 @@
+using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 
 namespace BlokeBot.DatabaseWorkloads;
 
-public sealed partial class SqliteBaselineRunner
+internal sealed partial class DatabaseBaselineRunner
 {
     private async Task RunPairedAsync(
         WorkloadId id,
@@ -66,8 +66,7 @@ public sealed partial class SqliteBaselineRunner
     }
 
     private async Task<ExecutionResult> ExecuteWithRetryAsync(
-        string connectionString,
-        Func<SqliteConnection, SqliteTransaction, CancellationToken, Task<OperationOutcome>> action,
+        Func<DbConnection, DbTransaction, CancellationToken, Task<OperationOutcome>> action,
         CancellationToken cancellationToken
     )
     {
@@ -78,9 +77,12 @@ public sealed partial class SqliteBaselineRunner
         {
             try
             {
-                await using var connection = await OpenAsync(connectionString, cancellationToken);
+                await using var connection = await database.OpenAsync(cancellationToken);
                 var admissionStarted = Stopwatch.GetTimestamp();
-                await using var transaction = connection.BeginTransaction(deferred: false);
+                await using var transaction = await database.BeginWriteAsync(
+                    connection,
+                    cancellationToken
+                );
                 var admissionWait = Stopwatch.GetElapsedTime(admissionStarted);
                 if (admissionWait >= TimeSpan.FromMilliseconds(1))
                 {
@@ -88,11 +90,11 @@ public sealed partial class SqliteBaselineRunner
                     busyWait += admissionWait;
                 }
                 var outcome = await action(connection, transaction, cancellationToken);
-                transaction.Commit();
+                await transaction.CommitAsync(cancellationToken);
                 return new(outcome, busyEvents, busyWait.TotalMilliseconds);
             }
-            catch (SqliteException exception)
-                when (exception.SqliteErrorCode is 5 or 6
+            catch (Exception exception)
+                when (database.IsRetryableContention(exception)
                     && attempt < protocol.Concurrency.MaxBusyRetries
                 )
             {
@@ -107,33 +109,9 @@ public sealed partial class SqliteBaselineRunner
         }
     }
 
-    private static async Task<SqliteConnection> OpenAsync(
-        string connectionString,
-        CancellationToken cancellationToken
-    )
-    {
-        var connection = new SqliteConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            "PRAGMA foreign_keys = ON; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 0;";
-        _ = await command.ExecuteNonQueryAsync(cancellationToken);
-        return connection;
-    }
-
-    private static async Task ConfigureDatabaseAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0;";
-        _ = await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    private static async Task<int> ExecuteAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+    private async Task<int> ExecuteAsync(
+        DbConnection connection,
+        DbTransaction transaction,
         string sql,
         CancellationToken cancellationToken,
         params (string Name, object? Value)[] parameters
@@ -141,17 +119,20 @@ public sealed partial class SqliteBaselineRunner
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = sql;
+        command.CommandText = database.CommandText(sql);
         foreach (var (name, value) in parameters)
         {
-            _ = command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = database.ParameterName(name);
+            parameter.Value = value ?? DBNull.Value;
+            _ = command.Parameters.Add(parameter);
         }
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<long?> ScalarLongAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        DbConnection connection,
+        DbTransaction transaction,
         string sql,
         CancellationToken cancellationToken
     )
@@ -166,8 +147,8 @@ public sealed partial class SqliteBaselineRunner
     }
 
     private static async Task<(Guid Id, long Revision)?> ReadPairAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        DbConnection connection,
+        DbTransaction transaction,
         string sql,
         CancellationToken cancellationToken
     )
@@ -176,13 +157,22 @@ public sealed partial class SqliteBaselineRunner
         command.Transaction = transaction;
         command.CommandText = sql;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? (reader.GetGuid(0), reader.GetInt64(1))
-            : null;
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+        var storedId = reader.GetValue(0);
+        var id = storedId is Guid guid
+            ? guid
+            : Guid.Parse(
+                Convert.ToString(storedId, CultureInfo.InvariantCulture)
+                    ?? throw new InvalidDataException("A configuration activation has no identity.")
+            );
+        return (id, reader.GetInt64(1));
     }
 
     private static async Task<string> ScalarStringAsync(
-        SqliteConnection connection,
+        DbConnection connection,
         string sql,
         CancellationToken cancellationToken
     )
@@ -195,25 +185,12 @@ public sealed partial class SqliteBaselineRunner
             ) ?? string.Empty;
     }
 
-    private static async Task CheckpointAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken
-    )
+    private async Task<long> ReadPluginRevisionAsync(CancellationToken cancellationToken)
     {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA wal_checkpoint(PASSIVE);";
-        _ = await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    private static async Task<long> ReadPluginRevisionAsync(
-        string connectionString,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var connection = await OpenAsync(connectionString, cancellationToken);
+        await using var connection = await database.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT Revision FROM plugin_feature_states WHERE PluginId = 'synthetic-plugin' AND FeatureId = 'synthetic-feature' AND HostId = 1;";
+            "SELECT \"Revision\" FROM plugin_feature_states WHERE \"PluginId\" = 'synthetic-plugin' AND \"FeatureId\" = 'synthetic-feature' AND \"HostId\" = 1;";
         return Convert.ToInt64(
             await command.ExecuteScalarAsync(cancellationToken),
             CultureInfo.InvariantCulture
@@ -227,7 +204,6 @@ public sealed partial class SqliteBaselineRunner
         try
         {
             _ = await ExecuteWithRetryAsync(
-                string.Empty,
                 static (_, _, _) => Task.FromResult(OperationOutcome.Committed),
                 cancellation.Token
             );

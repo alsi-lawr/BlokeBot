@@ -137,7 +137,7 @@ internal sealed partial class EfPublicChatOutbox(
         {
             throw;
         }
-        catch (Exception exception) when (IsSqliteContention(exception))
+        catch (Exception exception) when (IsDatabaseContention(exception))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new PublicChatEnqueueOutcome.SafePreEnqueueTransient(exception);

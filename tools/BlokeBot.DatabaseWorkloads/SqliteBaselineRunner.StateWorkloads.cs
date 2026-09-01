@@ -2,10 +2,9 @@ using System.Diagnostics;
 
 namespace BlokeBot.DatabaseWorkloads;
 
-public sealed partial class SqliteBaselineRunner
+internal sealed partial class DatabaseBaselineRunner
 {
     private async Task RunPointsCommunityAsync(
-        string connectionString,
         IReadOnlyDictionary<WorkloadId, WorkloadMeasurements> measurements,
         bool measured,
         CancellationToken cancellationToken
@@ -19,7 +18,6 @@ public sealed partial class SqliteBaselineRunner
             measured,
             async (index, worker, ct) =>
                 await ExecuteWithRetryAsync(
-                    connectionString,
                     async (connection, transaction, token) =>
                     {
                         var logical = (index * 2) + worker;
@@ -32,7 +30,10 @@ public sealed partial class SqliteBaselineRunner
                         var inserted = await ExecuteAsync(
                             connection,
                             transaction,
-                            "INSERT OR IGNORE INTO community_source_event_receipts (HostId, SourceKind, SourceEventId, ProcessedAtUtc) VALUES (1, 'ChatMessage', $event, $now);",
+                            database.InsertIgnore(
+                                "INSERT OR IGNORE INTO community_source_event_receipts (\"HostId\", \"SourceKind\", \"SourceEventId\", \"ProcessedAtUtc\") VALUES (1, 'ChatMessage', $event, $now);",
+                                "INSERT INTO community_source_event_receipts (\"HostId\", \"SourceKind\", \"SourceEventId\", \"ProcessedAtUtc\") VALUES (1, 'ChatMessage', $event, $now) ON CONFLICT DO NOTHING;"
+                            ),
                             token,
                             ("$event", $"synthetic-community-{operation:D8}"),
                             ("$now", _epoch.AddMilliseconds(logical))
@@ -46,7 +47,7 @@ public sealed partial class SqliteBaselineRunner
                         _ = await ExecuteAsync(
                             connection,
                             transaction,
-                            "UPDATE point_balances SET Amount = CAST(CAST(Amount AS INTEGER) + 1 AS TEXT), UpdatedAtUtc = $now WHERE HostId = 1 AND Login = $login; INSERT INTO point_ledger_entries (HostId, CreatedAtUtc, Kind, Login, Delta, BalanceAfter, Note, OperationKey) SELECT 1, $now, 'Add', $login, '1', Amount, '', $operation FROM point_balances WHERE HostId = 1 AND Login = $login; UPDATE community_progress SET Amount = Amount + 1, UpdatedAtUtc = $now WHERE HostId = 1 AND DefinitionId = 1 AND SubjectKey = $subject;",
+                            "UPDATE point_balances SET \"Amount\" = CAST(CAST(\"Amount\" AS INTEGER) + 1 AS TEXT), \"UpdatedAtUtc\" = $now WHERE \"HostId\" = 1 AND \"Login\" = $login; INSERT INTO point_ledger_entries (\"HostId\", \"CreatedAtUtc\", \"Kind\", \"Login\", \"Delta\", \"BalanceAfter\", \"Note\", \"OperationKey\") SELECT 1, $now, 'Add', $login, '1', \"Amount\", '', $operation FROM point_balances WHERE \"HostId\" = 1 AND \"Login\" = $login; UPDATE community_progress SET \"Amount\" = \"Amount\" + 1, \"UpdatedAtUtc\" = $now WHERE \"HostId\" = 1 AND \"DefinitionId\" = 1 AND \"SubjectKey\" = $subject;",
                             token,
                             ("$now", _epoch.AddMilliseconds(logical)),
                             ("$login", login),
@@ -62,7 +63,6 @@ public sealed partial class SqliteBaselineRunner
     }
 
     private async Task RunPluginStateAsync(
-        string connectionString,
         IReadOnlyDictionary<WorkloadId, WorkloadMeasurements> measurements,
         bool measured,
         CancellationToken cancellationToken
@@ -75,18 +75,17 @@ public sealed partial class SqliteBaselineRunner
             Math.Ceiling(definition.Operations / (double)protocol.Concurrency.Writers);
         for (var index = 0; index < rounds; index++)
         {
-            var expected = await ReadPluginRevisionAsync(connectionString, cancellationToken);
+            var expected = await ReadPluginRevisionAsync(cancellationToken);
             await RunRoundAsync(async worker =>
             {
                 var started = Stopwatch.GetTimestamp();
                 var execution = await ExecuteWithRetryAsync(
-                    connectionString,
                     async (connection, transaction, token) =>
                     {
                         var changed = await ExecuteAsync(
                             connection,
                             transaction,
-                            "UPDATE plugin_feature_states SET Revision = Revision + 1, FeatureGeneration = FeatureGeneration + 1, LifecycleOperationId = $operation WHERE PluginId = 'synthetic-plugin' AND FeatureId = 'synthetic-feature' AND HostId = 1 AND Revision = $expected;",
+                            "UPDATE plugin_feature_states SET \"Revision\" = \"Revision\" + 1, \"FeatureGeneration\" = \"FeatureGeneration\" + 1, \"LifecycleOperationId\" = $operation WHERE \"PluginId\" = 'synthetic-plugin' AND \"FeatureId\" = 'synthetic-feature' AND \"HostId\" = 1 AND \"Revision\" = $expected;",
                             token,
                             (
                                 "$operation",
@@ -119,7 +118,6 @@ public sealed partial class SqliteBaselineRunner
     }
 
     private async Task RunPublicReadsAsync(
-        string connectionString,
         IReadOnlyDictionary<WorkloadId, WorkloadMeasurements> measurements,
         bool measured,
         CancellationToken cancellationToken
@@ -140,13 +138,10 @@ public sealed partial class SqliteBaselineRunner
                 .Select(async reader =>
                 {
                     var started = Stopwatch.GetTimestamp();
-                    await using var connection = await OpenAsync(
-                        connectionString,
-                        cancellationToken
-                    );
+                    await using var connection = await database.OpenAsync(cancellationToken);
                     await using var command = connection.CreateCommand();
                     command.CommandText =
-                        "SELECT Login, CAST(Amount AS INTEGER) AS NumericAmount FROM point_balances WHERE HostId = 1 ORDER BY NumericAmount DESC, Login LIMIT 50;";
+                        "SELECT \"Login\", CAST(\"Amount\" AS INTEGER) AS \"NumericAmount\" FROM point_balances WHERE \"HostId\" = 1 ORDER BY \"NumericAmount\" DESC, \"Login\" LIMIT 50;";
                     await using var rows = await command.ExecuteReaderAsync(cancellationToken);
                     var count = 0;
                     while (await rows.ReadAsync(cancellationToken))

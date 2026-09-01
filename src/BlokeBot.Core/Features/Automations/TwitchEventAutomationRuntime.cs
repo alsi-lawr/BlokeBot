@@ -421,11 +421,7 @@ public sealed class TwitchEventAutomationRuntime(
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellation);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
-        // The write lock orders receipt admission against the durable host feature transition.
-        var hostExists = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE hosts SET EnabledFeatures = EnabledFeatures WHERE Id = {hostId};",
-            cancellation
-        );
+        var hostExists = await MainDatabaseStatements.LockHostAsync(db, hostId, cancellation);
         if (hostExists == 0)
         {
             await transaction.RollbackAsync(cancellation);
@@ -446,18 +442,19 @@ public sealed class TwitchEventAutomationRuntime(
         var now = receivedAtUtc.UtcDateTime;
         // A receipt at or past its expiry has no deduplication authority; remove dead rows before
         // claiming so a post-window redelivery is admitted as a new occurrence.
-        _ = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM automation_event_receipts WHERE ExpiresAtUtc <= {now};",
+        _ = await MainDatabaseStatements.DeleteExpiredAutomationEventReceiptsAsync(
+            db,
+            now,
             cancellation
         );
         var expiresAtUtc = now + ReceiptAuthorityWindow;
-        var claimed = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT OR IGNORE INTO automation_event_receipts
-                (HostId, SourceDefinitionId, ProviderMessageId, ClaimedAtUtc, ExpiresAtUtc)
-            VALUES
-                ({hostId}, {definitionId.Value}, {messageId}, {now}, {expiresAtUtc});
-            """,
+        var claimed = await MainDatabaseStatements.TryClaimAutomationEventReceiptAsync(
+            db,
+            hostId,
+            definitionId.Value,
+            messageId,
+            now,
+            expiresAtUtc,
             cancellation
         );
         await transaction.CommitAsync(cancellation);

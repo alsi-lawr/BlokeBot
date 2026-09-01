@@ -13,7 +13,7 @@ public sealed class SqliteBaselineSafetyTests
             var original = new byte[] { 1, 2, 3, 4 };
             File.WriteAllBytes(path, original);
 
-            _ = Should.Throw<IOException>(() => SqliteBaselineRunner.RefuseExisting(path));
+            _ = Should.Throw<IOException>(() => SqliteBaselineSafety.RefuseExisting(path));
 
             File.ReadAllBytes(path).ShouldBe(original);
         }

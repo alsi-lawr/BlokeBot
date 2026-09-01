@@ -6,9 +6,7 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Core.Features.Collectives;
 
@@ -224,7 +222,10 @@ public sealed class CollectiveService(
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var gate = await RequireAuthorityAsync(db, command.Authority, null, ct);
         if (gate is not null)
         {
@@ -311,7 +312,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var loaded = await LoadForCoordinatorMutationAsync(
             db,
             command.CollectiveId,
@@ -367,7 +371,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var loaded = await LoadForCoordinatorMutationAsync(
             db,
             command.CollectiveId,
@@ -446,7 +453,10 @@ public sealed class CollectiveService(
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var loaded = await LoadForCoordinatorMutationAsync(
             db,
             command.CollectiveId,
@@ -567,7 +577,10 @@ public sealed class CollectiveService(
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var loaded = await LoadForCoordinatorMutationAsync(
             db,
             command.CollectiveId,
@@ -658,7 +671,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var gate = await RequireAuthorityAsync(
             db,
             command.Authority,
@@ -739,7 +755,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var gate = await RequireAuthorityAsync(db, command.Authority, null, ct);
         if (gate is not null)
         {
@@ -1030,7 +1049,10 @@ public sealed class CollectiveService(
             _ => throw new UnreachableException(),
         };
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var loaded = await LoadForCoordinatorMutationAsync(
             db,
             command.CollectiveId,
@@ -1153,7 +1175,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var gate = await RequireAuthorityAsync(db, command.Authority, null, ct);
         if (gate is not null)
         {
@@ -1213,7 +1238,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var gate = await RequireAuthorityAsync(db, command.Authority, null, ct);
         if (gate is not null)
         {
@@ -1479,7 +1507,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var gate = await RequireAuthorityAsync(
             db,
             command.Authority,
@@ -1627,7 +1658,10 @@ public sealed class CollectiveService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         var relay = await db
             .CollectiveRaidRelays.Include(value => value.Collective)
                 .ThenInclude(value => value.Audits)
@@ -1960,44 +1994,4 @@ public sealed class CollectiveService(
         string TargetLogin,
         DateTime OccurredAtUtc
     );
-
-    private sealed class ImmediateTransaction(
-        SqliteTransaction providerTransaction,
-        IDbContextTransaction contextTransaction
-    ) : IAsyncDisposable
-    {
-        public static async Task<ImmediateTransaction> StartAsync(
-            BlokeBotDbContext db,
-            CancellationToken ct
-        )
-        {
-            await db.Database.OpenConnectionAsync(ct);
-            var connection =
-                db.Database.GetDbConnection() as SqliteConnection
-                ?? throw new InvalidOperationException("Collective persistence requires SQLite.");
-            var providerTransaction = connection.BeginTransaction(deferred: false);
-            try
-            {
-                var contextTransaction =
-                    await db.Database.UseTransactionAsync(providerTransaction, ct)
-                    ?? throw new InvalidOperationException(
-                        "The immediate SQLite transaction could not be attached."
-                    );
-                return new(providerTransaction, contextTransaction);
-            }
-            catch
-            {
-                await providerTransaction.DisposeAsync();
-                throw;
-            }
-        }
-
-        public Task CommitAsync(CancellationToken ct) => contextTransaction.CommitAsync(ct);
-
-        public async ValueTask DisposeAsync()
-        {
-            await contextTransaction.DisposeAsync();
-            await providerTransaction.DisposeAsync();
-        }
-    }
 }

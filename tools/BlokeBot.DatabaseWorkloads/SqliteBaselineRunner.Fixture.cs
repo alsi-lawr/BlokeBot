@@ -5,16 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.DatabaseWorkloads;
 
-public sealed partial class SqliteBaselineRunner
+internal sealed partial class DatabaseBaselineRunner
 {
-    private async Task CreateAndSeedAsync(
-        string connectionString,
-        CancellationToken cancellationToken
-    )
+    private async Task CreateAndSeedAsync(CancellationToken cancellationToken)
     {
-        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
-            .UseSqlite(connectionString)
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<BlokeBotDbContext>();
+        database.Configure(optionsBuilder);
+        var options = optionsBuilder.Options;
         await using var db = new BlokeBotDbContext(options);
         _ = await db.Database.EnsureCreatedAsync(cancellationToken);
         var flowId = DeterministicGuid(protocol.Seed, 1);
@@ -107,15 +104,15 @@ public sealed partial class SqliteBaselineRunner
         );
         _ = await db.SaveChangesAsync(cancellationToken);
 
-        await using var connection = await OpenAsync(connectionString, cancellationToken);
-        await using var transaction = connection.BeginTransaction(deferred: false);
+        await using var connection = await database.OpenAsync(cancellationToken);
+        await using var transaction = await database.BeginWriteAsync(connection, cancellationToken);
         for (var index = 0; index < protocol.Fixture.Viewers; index++)
         {
             var login = Identity(index);
             _ = await ExecuteAsync(
                 connection,
                 transaction,
-                "INSERT INTO point_balances (HostId, Login, Amount, UpdatedAtUtc) VALUES (1, $login, $amount, $now);",
+                "INSERT INTO point_balances (\"HostId\", \"Login\", \"Amount\", \"UpdatedAtUtc\") VALUES (1, $login, $amount, $now);",
                 cancellationToken,
                 ("$login", login),
                 ("$amount", (index % 1000).ToString(CultureInfo.InvariantCulture)),
@@ -124,7 +121,7 @@ public sealed partial class SqliteBaselineRunner
             _ = await ExecuteAsync(
                 connection,
                 transaction,
-                "INSERT INTO community_progress (HostId, SeasonId, DefinitionId, SubjectKey, ViewerTwitchUserId, ViewerLogin, ViewerDisplayName, Amount, CompletionCount, UpdatedAtUtc) VALUES (1, 1, 1, $subject, $viewerId, $login, $display, $amount, 0, $now);",
+                "INSERT INTO community_progress (\"HostId\", \"SeasonId\", \"DefinitionId\", \"SubjectKey\", \"ViewerTwitchUserId\", \"ViewerLogin\", \"ViewerDisplayName\", \"Amount\", \"CompletionCount\", \"UpdatedAtUtc\") VALUES (1, 1, 1, $subject, $viewerId, $login, $display, $amount, 0, $now);",
                 cancellationToken,
                 ("$subject", $"viewer:{index:D8}"),
                 ("$viewerId", $"synthetic-{index:D8}"),
@@ -139,7 +136,7 @@ public sealed partial class SqliteBaselineRunner
             _ = await ExecuteAsync(
                 connection,
                 transaction,
-                "INSERT INTO public_chat_outbox (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc, NextAttemptAtUtc, Status, AttemptCount, SafePreSendFailureCount) VALUES ('synthetic-host', $message, $key, $created, $expires, $created, 'Pending', 0, 0);",
+                "INSERT INTO public_chat_outbox (\"Channel\", \"Message\", \"DeduplicationKey\", \"CreatedAtUtc\", \"ExpiresAtUtc\", \"NextAttemptAtUtc\", \"Status\", \"AttemptCount\", \"SafePreSendFailureCount\") VALUES ('synthetic-host', $message, $key, $created, $expires, $created, 'Pending', 0, 0);",
                 cancellationToken,
                 ("$message", $"synthetic-message-{index:D8}"),
                 ("$key", new string('0', 56) + index.ToString("x8", CultureInfo.InvariantCulture)),
@@ -147,7 +144,7 @@ public sealed partial class SqliteBaselineRunner
                 ("$expires", _epoch.AddDays(1))
             );
         }
-        transaction.Commit();
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private static Guid DeterministicGuid(int seed, int index)

@@ -6,7 +6,6 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.RequestBoards;
@@ -1704,13 +1703,7 @@ public sealed class RequestBoardService(
     }
 
     private static bool IsRetryCollision(Exception exception) =>
-        exception switch
-        {
-            SqliteException { SqliteErrorCode: 5 or 6 } => true,
-            SqliteException { SqliteErrorCode: 19, SqliteExtendedErrorCode: 2067 } => true,
-            DbUpdateException { InnerException: { } inner } => IsRetryCollision(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private static RequestBoardResult<T> Succeeded<T>(T value) =>
         new RequestBoardResult<T>.Succeeded(value);

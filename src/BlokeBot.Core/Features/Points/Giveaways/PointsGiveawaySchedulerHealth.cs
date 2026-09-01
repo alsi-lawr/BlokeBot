@@ -1,7 +1,7 @@
 using System.Data.Common;
 using System.Diagnostics;
 using BlokeBot.Eventing;
-using Microsoft.Data.Sqlite;
+using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Points.Giveaways;
@@ -49,15 +49,12 @@ internal sealed class PointsGiveawaySchedulerUnhealthyException(
 internal static class PointsGiveawaySchedulerFailureClassifier
 {
     internal static bool IsTransient(Exception exception) =>
-        exception switch
-        {
-            SqliteException sqliteException => IsTransient(sqliteException),
-            DbUpdateException { InnerException: SqliteException sqliteException } => IsTransient(
-                sqliteException
-            ),
-            TimeoutException => true,
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.Classify(exception)
+            is MainDatabaseFailureKind.SerializationFailure
+                or MainDatabaseFailureKind.Deadlock
+                or MainDatabaseFailureKind.LockTimeout
+                or MainDatabaseFailureKind.QueryTimeout
+                or MainDatabaseFailureKind.TransientConnection;
 
     internal static bool IsNotificationFailure(Exception exception) =>
         IsTransient(exception)
@@ -83,7 +80,4 @@ internal static class PointsGiveawaySchedulerFailureClassifier
                 or PointsGiveawayExpirationPostCommitException
             ? PointsGiveawaySchedulerFailureClassification.Terminal
             : PointsGiveawaySchedulerFailureClassification.Unexpected;
-
-    private static bool IsTransient(SqliteException exception) =>
-        exception.SqliteErrorCode is SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED;
 }

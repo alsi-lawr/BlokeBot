@@ -1,7 +1,6 @@
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
@@ -29,10 +28,7 @@ internal sealed class AutomaticRaidShoutoutOutcomeAuthority(EventBus<AppEventKin
             try
             {
                 await using var transaction =
-                    await AutomaticRaidOutcomeImmediateTransaction.StartAsync(
-                        db,
-                        cancellationToken
-                    );
+                    await MainDatabaseWriteTransaction.StartImmediateAsync(db, cancellationToken);
                 var result = await ApplyCoreAsync(
                     db,
                     identity,
@@ -268,10 +264,5 @@ internal sealed class AutomaticRaidShoutoutOutcomeAuthority(EventBus<AppEventKin
     }
 
     private static bool IsContention(Exception exception) =>
-        exception switch
-        {
-            SqliteException { SqliteErrorCode: 5 or 6 } => true,
-            DbUpdateException { InnerException: { } inner } => IsContention(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsContention(exception);
 }

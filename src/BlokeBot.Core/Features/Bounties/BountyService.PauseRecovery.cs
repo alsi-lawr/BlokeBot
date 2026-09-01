@@ -38,10 +38,12 @@ internal sealed partial class BountyService
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartWithBoundedAdmissionAsync(
-            db,
-            ct
-        );
+        await using var transaction =
+            await MainDatabaseWriteTransaction.StartImmediateWithBoundedAdmissionAsync(
+                db,
+                TimeSpan.FromSeconds(_immediateTransactionAdmissionTimeoutSeconds),
+                ct
+            );
         var host = await db.Hosts.SingleOrDefaultAsync(value => value.Id == hostId, ct);
         if (host is null)
         {

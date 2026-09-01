@@ -10,7 +10,6 @@ using BlokeBot.Core.Identity;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Bingo;
@@ -1935,23 +1934,7 @@ public sealed class BingoService(
     }
 
     private static bool IsLifecyclePersistenceCollision(Exception exception) =>
-        exception switch
-        {
-            DbUpdateConcurrencyException => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsLifecyclePersistenceCollision(
-                inner
-            ),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private static string WinLabel(BingoWinLine line) =>
         line.Kind switch

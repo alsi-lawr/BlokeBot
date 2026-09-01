@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "protocol_id": "blokebot-database-workloads-v1",
+  "source_commit": "6e8af8ef6fc75df47bac7b15a283c851b2bfdc07",
+  "protocol_sha256": "b1901eb7d00a5a2c08650fd6619def775712f93db31c479559548414e4a180da",
+  "provider": "postgresql",
+  "provider_version": "17.11",
+  "environment": {
+    "runtime_version": "10.0.11",
+    "operating_system": "NixOS 26.11 (Zokor)",
+    "process_architecture": "x64",
+    "processor_count": 16
+  },
+  "seed": 140269,
+  "repetitions": 3,
+  "fixture": {
+    "hosts": 1,
+    "viewers": 1000,
+    "public_chat_backlog": 120
+  },
+  "workloads": [
+    {
+      "id": "automation_admission_checkpointing",
+      "attempted_operations": 363,
+      "committed_operations": 327,
+      "expected_conflicts": 33,
+      "cancellations": 3,
+      "median_latency_milliseconds": 11.068,
+      "p95_latency_milliseconds": 21.471,
+      "p99_latency_milliseconds": 22.268,
+      "throughput_per_second": 112.29246597717636,
+      "throughput_variation_percent": 1.42,
+      "busy_locked_events": 116,
+      "busy_locked_wait_milliseconds": 125.08410000000005
+    },
+    {
+      "id": "public_chat_outbox_claims",
+      "attempted_operations": 363,
+      "committed_operations": 360,
+      "expected_conflicts": 0,
+      "cancellations": 3,
+      "median_latency_milliseconds": 12.686,
+      "p95_latency_milliseconds": 24.496,
+      "p99_latency_milliseconds": 24.767,
+      "throughput_per_second": 83.87716022131266,
+      "throughput_variation_percent": 0.142,
+      "busy_locked_events": 180,
+      "busy_locked_wait_milliseconds": 194.3893999999999
+    },
+    {
+      "id": "configuration_activation",
+      "attempted_operations": 243,
+      "committed_operations": 240,
+      "expected_conflicts": 0,
+      "cancellations": 3,
+      "median_latency_milliseconds": 17.06,
+      "p95_latency_milliseconds": 23.709,
+      "p99_latency_milliseconds": 28.853,
+      "throughput_per_second": 86.24782709380617,
+      "throughput_variation_percent": 1.343,
+      "busy_locked_events": 120,
+      "busy_locked_wait_milliseconds": 130.6894
+    },
+    {
+      "id": "points_community_writes",
+      "attempted_operations": 603,
+      "committed_operations": 573,
+      "expected_conflicts": 27,
+      "cancellations": 3,
+      "median_latency_milliseconds": 13.149,
+      "p95_latency_milliseconds": 25.785,
+      "p99_latency_milliseconds": 27.075,
+      "throughput_per_second": 95.00488087575498,
+      "throughput_variation_percent": 23.806,
+      "busy_locked_events": 186,
+      "busy_locked_wait_milliseconds": 201.6819999999999
+    },
+    {
+      "id": "plugin_feature_state",
+      "attempted_operations": 243,
+      "committed_operations": 120,
+      "expected_conflicts": 120,
+      "cancellations": 3,
+      "median_latency_milliseconds": 10.063,
+      "p95_latency_milliseconds": 16.639,
+      "p99_latency_milliseconds": 17.267,
+      "throughput_per_second": 90.16441142306454,
+      "throughput_variation_percent": 0.281,
+      "busy_locked_events": 120,
+      "busy_locked_wait_milliseconds": 130.1536000000001
+    },
+    {
+      "id": "public_reads",
+      "attempted_operations": 183,
+      "committed_operations": 180,
+      "expected_conflicts": 0,
+      "cancellations": 3,
+      "median_latency_milliseconds": 6.449,
+      "p95_latency_milliseconds": 7.625,
+      "p99_latency_milliseconds": 8.084,
+      "throughput_per_second": 552.8561161243558,
+      "throughput_variation_percent": 0.683,
+      "busy_locked_events": 0,
+      "busy_locked_wait_milliseconds": 0
+    }
+  ],
+  "storage": {
+    "database_bytes": 6094848,
+    "wal_bytes": 0,
+    "total_bytes": 6094848
+  },
+  "query_plans": [
+    {
+      "workload": "public_chat_outbox_claims",
+      "steps": [
+        "Limit  (cost=0.14..8.16 rows=1 width=24)",
+        "  -\u003E  Index Only Scan using \u0022IX_public_chat_outbox_Status_NextAttemptAtUtc_CreatedAtUtc_Id\u0022 on public_chat_outbox  (cost=0.14..8.16 rows=1 width=24)",
+        "        Index Cond: (\u0022Status\u0022 = \u0027Pending\u0027::text)"
+      ]
+    },
+    {
+      "workload": "configuration_activation",
+      "steps": [
+        "Limit  (cost=11.38..11.39 rows=1 width=106)",
+        "  -\u003E  Sort  (cost=11.38..11.39 rows=1 width=106)",
+        "        Sort Key: \u0022UpdatedAtUtc\u0022, \u0022Id\u0022",
+        "        -\u003E  Seq Scan on configuration_activations  (cost=0.00..11.38 rows=1 width=106)",
+        "              Filter: ((\u0022Status\u0022)::text = \u0027Pending\u0027::text)"
+      ]
+    },
+    {
+      "workload": "public_reads",
+      "steps": [
+        "Limit  (cost=8.30..8.31 rows=1 width=278)",
+        "  -\u003E  Sort  (cost=8.30..8.31 rows=1 width=278)",
+        "        Sort Key: ((\u0022Amount\u0022)::integer) DESC, \u0022Login\u0022",
+        "        -\u003E  Index Scan using \u0022IX_point_balances_HostId_Login\u0022 on point_balances  (cost=0.27..8.29 rows=1 width=278)",
+        "              Index Cond: (\u0022HostId\u0022 = 1)"
+      ]
+    }
+  ],
+  "logical_outcomes": {
+    "automation_completed": 109,
+    "automation_receipts": 109,
+    "public_chat_expired": 120,
+    "configuration_complete": 80,
+    "point_ledger_rows": 191,
+    "point_balance_total": 499691,
+    "community_receipts": 191,
+    "community_progress_total": 49691,
+    "plugin_revision": 41
+  },
+  "redacted": true
+}

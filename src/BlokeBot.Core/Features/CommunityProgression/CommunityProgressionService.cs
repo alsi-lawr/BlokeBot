@@ -8,7 +8,6 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.CommunityProgression;
@@ -556,15 +555,12 @@ public sealed class CommunityProgressionService(
             return new CommunityOperationOutcome.Succeeded(true);
         }
         var now = clock.GetUtcNow().UtcDateTime;
-        var claimed = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT OR IGNORE INTO community_source_event_receipts
-                (HostId, SourceKind, SourceEventId, ProcessedAtUtc)
-            VALUES
-                ({hostId}, {PersistedEnumTokens<CommunityEventRuleKind>.Format(
-                sourceEvent.Kind
-            )}, {sourceEvent.SourceEventId}, {now});
-            """,
+        var claimed = await MainDatabaseStatements.TryClaimCommunitySourceEventAsync(
+            db,
+            hostId,
+            sourceEvent.Kind,
+            sourceEvent.SourceEventId,
+            now,
             ct
         );
         if (claimed == 0)
@@ -2320,18 +2316,5 @@ public sealed class CommunityProgressionService(
     }
 
     private static bool IsPersistenceCollision(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 }

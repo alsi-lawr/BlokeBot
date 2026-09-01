@@ -5,9 +5,7 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Core.Features.BlokeRaid;
 
@@ -303,7 +301,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
         {
             return new BlokeRaidConfigurationOutcome.FeatureDisabled();
@@ -367,7 +368,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
         {
             return new BlokeRaidCampaignOutcome.FeatureDisabled();
@@ -433,7 +437,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
         {
             return new BlokeRaidCampaignOutcome.FeatureDisabled();
@@ -485,7 +492,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
         {
             return new BlokeRaidCampaignOutcome.FeatureDisabled();
@@ -582,7 +592,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
         {
             return new BlokeRaidActionOutcome.FeatureDisabled();
@@ -783,7 +796,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         var host = await db.Hosts.SingleOrDefaultAsync(
             value => value.Id == hostId,
             cancellationToken
@@ -906,7 +922,10 @@ public sealed class BlokeRaidService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, cancellationToken);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            cancellationToken
+        );
         var host = await db.Hosts.SingleOrDefaultAsync(
             value => value.Id == hostId,
             cancellationToken
@@ -1600,61 +1619,7 @@ public sealed class BlokeRaidService(
     }
 
     private static bool IsPersistenceCollision(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private sealed record DueWorkOutcome(bool Changed, bool PointsChanged);
-
-    private sealed class ImmediateTransaction(
-        SqliteTransaction providerTransaction,
-        IDbContextTransaction contextTransaction
-    ) : IAsyncDisposable
-    {
-        public static async Task<ImmediateTransaction> StartAsync(
-            BlokeBotDbContext db,
-            CancellationToken cancellationToken
-        )
-        {
-            await db.Database.OpenConnectionAsync(cancellationToken);
-            var connection =
-                db.Database.GetDbConnection() as SqliteConnection
-                ?? throw new InvalidOperationException("BlokeRaid persistence requires SQLite.");
-            var providerTransaction = connection.BeginTransaction(deferred: false);
-            try
-            {
-                var contextTransaction =
-                    await db.Database.UseTransactionAsync(providerTransaction, cancellationToken)
-                    ?? throw new InvalidOperationException(
-                        "The immediate SQLite transaction could not be attached."
-                    );
-                return new(providerTransaction, contextTransaction);
-            }
-            catch
-            {
-                await providerTransaction.DisposeAsync();
-                throw;
-            }
-        }
-
-        public Task CommitAsync(CancellationToken cancellationToken) =>
-            contextTransaction.CommitAsync(cancellationToken);
-
-        public async ValueTask DisposeAsync()
-        {
-            await contextTransaction.DisposeAsync();
-            await providerTransaction.DisposeAsync();
-        }
-    }
 }

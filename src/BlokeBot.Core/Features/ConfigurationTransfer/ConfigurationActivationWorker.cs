@@ -3,7 +3,6 @@ using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
@@ -97,7 +96,7 @@ internal sealed class ConfigurationActivationWorker(
                     candidate.Revision + 1
                 );
         }
-        catch (Exception exception) when (IsSqliteContention(exception))
+        catch (Exception exception) when (IsDatabaseContention(exception))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return null;
@@ -187,13 +186,8 @@ internal sealed class ConfigurationActivationWorker(
             "Automatic feature activation was interrupted and will be retried."
         );
 
-    private static bool IsSqliteContention(Exception exception) =>
-        exception switch
-        {
-            SqliteException { SqliteErrorCode: 5 or 6 } => true,
-            DbUpdateException { InnerException: { } inner } => IsSqliteContention(inner),
-            _ => false,
-        };
+    private static bool IsDatabaseContention(Exception exception) =>
+        MainDatabaseFailureClassifier.IsContention(exception);
 
     private async Task SetOutcomeAsync(
         ActivationClaim claim,

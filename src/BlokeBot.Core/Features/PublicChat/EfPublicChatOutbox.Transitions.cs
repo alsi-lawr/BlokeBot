@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.PublicChat;
 
@@ -43,7 +41,7 @@ internal sealed partial class EfPublicChatOutbox
             await PublishCommittedAlertAsync(reportOperation, alertChange);
             return changed;
         }
-        catch (Exception exception) when (IsSqliteContention(exception))
+        catch (Exception exception) when (IsDatabaseContention(exception))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new PublicChatClaimUpdate.Contended();
@@ -53,21 +51,11 @@ internal sealed partial class EfPublicChatOutbox
     private static int? HttpStatusCode(PublicChatHttpStatus status) =>
         status.Match<int?>(static known => known.Value, static () => null);
 
-    private static bool IsSqliteContention(Exception exception) =>
-        exception switch
-        {
-            SqliteException { SqliteErrorCode: 5 or 6 } => true,
-            DbUpdateException { InnerException: { } inner } => IsSqliteContention(inner),
-            _ => false,
-        };
+    private static bool IsDatabaseContention(Exception exception) =>
+        MainDatabaseFailureClassifier.IsContention(exception);
 
     private static bool IsClaimSlotContention(Exception exception) =>
-        exception switch
-        {
-            SqliteException { SqliteErrorCode: 19, SqliteExtendedErrorCode: 2067 } => true,
-            DbUpdateException { InnerException: { } inner } => IsClaimSlotContention(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.Classify(exception) == MainDatabaseFailureKind.UniqueConflict;
 
     private static PublicChatClaimUpdate Changed(int rowCount) =>
         rowCount switch

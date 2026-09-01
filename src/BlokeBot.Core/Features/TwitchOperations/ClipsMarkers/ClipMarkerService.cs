@@ -2,7 +2,6 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
@@ -1105,7 +1104,7 @@ public sealed class ClipMarkerService(
             {
                 return await read();
             }
-            catch (Exception exception) when (attempt < 20 && IsBusy(exception))
+            catch (Exception exception) when (attempt < 20 && IsDatabaseContention(exception))
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), cancellationToken);
             }
@@ -1113,27 +1112,10 @@ public sealed class ClipMarkerService(
     }
 
     private static bool IsClaimCollision(Exception exception) =>
-        IsBusy(exception)
-        || exception
-            is SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            }
-        || (
-            exception is DbUpdateException { InnerException: { } inner } && IsClaimCollision(inner)
-        );
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
-    private static bool IsBusy(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsBusy(inner),
-            _ => false,
-        };
+    private static bool IsDatabaseContention(Exception exception) =>
+        MainDatabaseFailureClassifier.IsContention(exception);
 
     private static string ValidateAttemptKey(string value)
     {

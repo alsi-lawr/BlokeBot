@@ -1,5 +1,4 @@
 using System.Data;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -46,7 +45,7 @@ public static partial class ViewerPrivacyService
                 cancellationToken
             );
         }
-        catch (Exception exception) when (IsSqliteSerializationFailure(exception))
+        catch (Exception exception) when (IsSerializationFailure(exception))
         {
             RestoreTrackerSnapshot(db, trackerSnapshot);
             return safeResult();
@@ -64,7 +63,7 @@ public static partial class ViewerPrivacyService
             {
                 var rolledBack = await TryRollbackTransactionAsync(transaction);
                 RestoreTrackerSnapshot(db, trackerSnapshot);
-                if (rolledBack && IsSqliteSerializationFailure(exception))
+                if (rolledBack && IsSerializationFailure(exception))
                 {
                     return safeResult();
                 }
@@ -94,7 +93,7 @@ public static partial class ViewerPrivacyService
         {
             await transaction.CreateSavepointAsync(savepoint, cancellationToken);
         }
-        catch (Exception exception) when (IsSqliteSerializationFailure(exception))
+        catch (Exception exception) when (IsSerializationFailure(exception))
         {
             RestoreTrackerSnapshot(db, trackerSnapshot);
             return safeResult();
@@ -110,7 +109,7 @@ public static partial class ViewerPrivacyService
         {
             var rolledBack = await TryRollbackAndReleaseSavepointAsync(transaction, savepoint);
             RestoreTrackerSnapshot(db, trackerSnapshot);
-            if (rolledBack && IsSqliteSerializationFailure(exception))
+            if (rolledBack && IsSerializationFailure(exception))
             {
                 return safeResult();
             }
@@ -229,17 +228,6 @@ public static partial class ViewerPrivacyService
         }
     }
 
-    private static bool IsSqliteSerializationFailure(Exception exception) =>
-        exception
-            is SqliteException
-                {
-                    SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-                }
-                or DbUpdateException
-                {
-                    InnerException: SqliteException
-                    {
-                        SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-                    },
-                };
+    private static bool IsSerializationFailure(Exception exception) =>
+        MainDatabaseFailureClassifier.IsContention(exception);
 }

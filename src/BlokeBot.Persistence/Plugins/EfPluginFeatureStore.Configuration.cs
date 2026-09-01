@@ -1,5 +1,4 @@
 using BlokeBot.Plugins.Features;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Persistence.Plugins;
@@ -181,5 +180,5 @@ public sealed partial class EfPluginFeatureStore
     }
 
     private static bool UniqueConstraint(DbUpdateException exception) =>
-        exception.InnerException is SqliteException { SqliteErrorCode: 19 };
+        MainDatabaseFailureClassifier.Classify(exception) == MainDatabaseFailureKind.UniqueConflict;
 }

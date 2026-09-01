@@ -2,31 +2,30 @@ using System.Globalization;
 
 namespace BlokeBot.DatabaseWorkloads;
 
-public sealed partial class SqliteBaselineRunner
+internal sealed partial class DatabaseBaselineRunner
 {
-    private static async Task<Dictionary<string, long>> ReadLogicalOutcomesAsync(
-        string connectionString,
+    private async Task<Dictionary<string, long>> ReadLogicalOutcomesAsync(
         CancellationToken cancellationToken
     )
     {
-        await using var connection = await OpenAsync(connectionString, cancellationToken);
+        await using var connection = await database.OpenAsync(cancellationToken);
         var queries = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["automation_completed"] =
-                "SELECT COUNT(*) FROM automation_flow_runs WHERE Status = 'Completed';",
+                "SELECT COUNT(*) FROM automation_flow_runs WHERE \"Status\" = 'Completed';",
             ["automation_receipts"] = "SELECT COUNT(*) FROM automation_event_receipts;",
             ["public_chat_expired"] =
-                "SELECT COUNT(*) FROM public_chat_outbox WHERE Status = 'Expired';",
+                "SELECT COUNT(*) FROM public_chat_outbox WHERE \"Status\" = 'Expired';",
             ["configuration_complete"] =
-                "SELECT COUNT(*) FROM configuration_activations WHERE Status = 'Complete';",
+                "SELECT COUNT(*) FROM configuration_activations WHERE \"Status\" = 'Complete';",
             ["point_ledger_rows"] = "SELECT COUNT(*) FROM point_ledger_entries;",
             ["point_balance_total"] =
-                "SELECT COALESCE(SUM(CAST(Amount AS INTEGER)), 0) FROM point_balances;",
+                "SELECT COALESCE(SUM(CAST(\"Amount\" AS INTEGER)), 0) FROM point_balances;",
             ["community_receipts"] = "SELECT COUNT(*) FROM community_source_event_receipts;",
             ["community_progress_total"] =
-                "SELECT COALESCE(SUM(Amount), 0) FROM community_progress;",
+                "SELECT COALESCE(SUM(\"Amount\"), 0) FROM community_progress;",
             ["plugin_revision"] =
-                "SELECT Revision FROM plugin_feature_states WHERE PluginId = 'synthetic-plugin' AND FeatureId = 'synthetic-feature' AND HostId = 1;",
+                "SELECT \"Revision\" FROM plugin_feature_states WHERE \"PluginId\" = 'synthetic-plugin' AND \"FeatureId\" = 'synthetic-feature' AND \"HostId\" = 1;",
         };
         var outcomes = new Dictionary<string, long>(StringComparer.Ordinal);
         foreach (var (name, sql) in queries)
@@ -41,31 +40,30 @@ public sealed partial class SqliteBaselineRunner
         return outcomes;
     }
 
-    private static async Task<IReadOnlyList<QueryPlanResult>> ReadQueryPlansAsync(
-        string connectionString,
+    private async Task<IReadOnlyList<QueryPlanResult>> ReadQueryPlansAsync(
         CancellationToken cancellationToken
     )
     {
-        await using var connection = await OpenAsync(connectionString, cancellationToken);
+        await using var connection = await database.OpenAsync(cancellationToken);
         var queries = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["public_chat_outbox_claims"] =
-                "SELECT Id FROM public_chat_outbox WHERE Status = 'Pending' ORDER BY NextAttemptAtUtc, CreatedAtUtc, Id LIMIT 1;",
+                "SELECT \"Id\" FROM public_chat_outbox WHERE \"Status\" = 'Pending' ORDER BY \"NextAttemptAtUtc\", \"CreatedAtUtc\", \"Id\" LIMIT 1;",
             ["configuration_activation"] =
-                "SELECT Id, Revision FROM configuration_activations WHERE Status = 'Pending' ORDER BY UpdatedAtUtc, Id LIMIT 1;",
+                "SELECT \"Id\", \"Revision\" FROM configuration_activations WHERE \"Status\" = 'Pending' ORDER BY \"UpdatedAtUtc\", \"Id\" LIMIT 1;",
             ["public_reads"] =
-                "SELECT Login, CAST(Amount AS INTEGER) AS NumericAmount FROM point_balances WHERE HostId = 1 ORDER BY NumericAmount DESC, Login LIMIT 50;",
+                "SELECT \"Login\", CAST(\"Amount\" AS INTEGER) AS \"NumericAmount\" FROM point_balances WHERE \"HostId\" = 1 ORDER BY \"NumericAmount\" DESC, \"Login\" LIMIT 50;",
         };
         var results = new List<QueryPlanResult>();
         foreach (var (name, sql) in queries)
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = "EXPLAIN QUERY PLAN " + sql;
+            command.CommandText = database.Explain(sql);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             var steps = new List<string>();
             while (await reader.ReadAsync(cancellationToken))
             {
-                steps.Add(reader.GetString(3));
+                steps.Add(database.ReadPlanStep(reader));
             }
             results.Add(new(name, steps));
         }

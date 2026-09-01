@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "protocol_id": "blokebot-database-workloads-v1",
+  "source_commit": "6e8af8ef6fc75df47bac7b15a283c851b2bfdc07",
+  "protocol_sha256": "b1901eb7d00a5a2c08650fd6619def775712f93db31c479559548414e4a180da",
+  "provider": "sqlite",
+  "provider_version": "3.50.4",
+  "environment": {
+    "runtime_version": "10.0.11",
+    "operating_system": "NixOS 26.11 (Zokor)",
+    "process_architecture": "x64",
+    "processor_count": 16
+  },
+  "seed": 140269,
+  "repetitions": 3,
+  "fixture": {
+    "hosts": 1,
+    "viewers": 1000,
+    "public_chat_backlog": 120
+  },
+  "workloads": [
+    {
+      "id": "automation_admission_checkpointing",
+      "attempted_operations": 363,
+      "committed_operations": 327,
+      "expected_conflicts": 33,
+      "cancellations": 3,
+      "median_latency_milliseconds": 0.4,
+      "p95_latency_milliseconds": 150.496,
+      "p99_latency_milliseconds": 150.574,
+      "throughput_per_second": 16.680999738465093,
+      "throughput_variation_percent": 11.262,
+      "busy_locked_events": 144,
+      "busy_locked_wait_milliseconds": 21513.004999999997
+    },
+    {
+      "id": "public_chat_outbox_claims",
+      "attempted_operations": 363,
+      "committed_operations": 360,
+      "expected_conflicts": 0,
+      "cancellations": 3,
+      "median_latency_milliseconds": 0.68,
+      "p95_latency_milliseconds": 150.764,
+      "p99_latency_milliseconds": 150.993,
+      "throughput_per_second": 14.602589848001278,
+      "throughput_variation_percent": 4.613,
+      "busy_locked_events": 163,
+      "busy_locked_wait_milliseconds": 24475.232799999983
+    },
+    {
+      "id": "configuration_activation",
+      "attempted_operations": 243,
+      "committed_operations": 240,
+      "expected_conflicts": 0,
+      "cancellations": 3,
+      "median_latency_milliseconds": 0.331,
+      "p95_latency_milliseconds": 150.444,
+      "p99_latency_milliseconds": 150.542,
+      "throughput_per_second": 14.37139827309925,
+      "throughput_variation_percent": 2.211,
+      "busy_locked_events": 111,
+      "busy_locked_wait_milliseconds": 16663.3213
+    },
+    {
+      "id": "points_community_writes",
+      "attempted_operations": 603,
+      "committed_operations": 573,
+      "expected_conflicts": 27,
+      "cancellations": 3,
+      "median_latency_milliseconds": 0.448,
+      "p95_latency_milliseconds": 150.57,
+      "p99_latency_milliseconds": 153.752,
+      "throughput_per_second": 15.910760996583244,
+      "throughput_variation_percent": 1.997,
+      "busy_locked_events": 249,
+      "busy_locked_wait_milliseconds": 37384.902399999984
+    },
+    {
+      "id": "plugin_feature_state",
+      "attempted_operations": 243,
+      "committed_operations": 120,
+      "expected_conflicts": 120,
+      "cancellations": 3,
+      "median_latency_milliseconds": 0.184,
+      "p95_latency_milliseconds": 150.266,
+      "p99_latency_milliseconds": 150.334,
+      "throughput_per_second": 39.476413147441754,
+      "throughput_variation_percent": 9.265,
+      "busy_locked_events": 40,
+      "busy_locked_wait_milliseconds": 6004.1362
+    },
+    {
+      "id": "public_reads",
+      "attempted_operations": 183,
+      "committed_operations": 180,
+      "expected_conflicts": 0,
+      "cancellations": 3,
+      "median_latency_milliseconds": 0.303,
+      "p95_latency_milliseconds": 0.5,
+      "p99_latency_milliseconds": 0.63,
+      "throughput_per_second": 2931.868267901092,
+      "throughput_variation_percent": 1.927,
+      "busy_locked_events": 0,
+      "busy_locked_wait_milliseconds": 0
+    }
+  ],
+  "storage": {
+    "database_bytes": 2830336,
+    "wal_bytes": 4136512,
+    "total_bytes": 6966848
+  },
+  "query_plans": [
+    {
+      "workload": "public_chat_outbox_claims",
+      "steps": [
+        "SEARCH public_chat_outbox USING COVERING INDEX IX_public_chat_outbox_Status_NextAttemptAtUtc_CreatedAtUtc_Id (Status=?)"
+      ]
+    },
+    {
+      "workload": "configuration_activation",
+      "steps": [
+        "SCAN configuration_activations",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    },
+    {
+      "workload": "public_reads",
+      "steps": [
+        "SEARCH point_balances USING INDEX IX_point_balances_HostId_Login (HostId=?)",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    }
+  ],
+  "logical_outcomes": {
+    "automation_completed": 109,
+    "automation_receipts": 109,
+    "public_chat_expired": 120,
+    "configuration_complete": 80,
+    "point_ledger_rows": 191,
+    "point_balance_total": 499691,
+    "community_receipts": 191,
+    "community_progress_total": 49691,
+    "plugin_revision": 41
+  },
+  "redacted": true
+}

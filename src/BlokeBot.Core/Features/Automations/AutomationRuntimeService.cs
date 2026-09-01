@@ -172,12 +172,9 @@ public sealed partial class AutomationRuntimeService(
         await using var dispatchTransaction = await db.Database.BeginTransactionAsync(
             cancellationToken
         );
-        var hostExists = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            UPDATE hosts
-            SET EnabledFeatures = EnabledFeatures
-            WHERE Id = {context.HostId.Value};
-            """,
+        var hostExists = await MainDatabaseStatements.LockHostAsync(
+            db,
+            context.HostId.Value,
             cancellationToken
         );
         if (hostExists == 0)
@@ -218,25 +215,26 @@ public sealed partial class AutomationRuntimeService(
 
             var runId = Guid.NewGuid();
             var now = clock.GetUtcNow().UtcDateTime;
-            var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT OR IGNORE INTO automation_flow_runs
-                    (Id, FlowId, HostId, AutomationGeneration, RequiredFeatures,
-                     ContextSchemaVersion, SourceDefinitionId, SourceNodeId, SourceOccurrenceId, ContextJson,
-                     DefinitionJson, Status, StartedAtUtc, CompletedAtUtc, ExecutionLeaseId)
-                VALUES
-                    ({runId}, {flow.Id}, {flow.HostId}, {host.AutomationGeneration},
-                     {(long)requiredFeatures}, {AutomationContextSchema.CurrentVersion},
-                     {context.Event.SourceDefinitionId.Value},
-                     {source.Id},
-                     {context.Event.OccurrenceId},
-                     {AutomationRuntimeSerialization.SerializeContext(context)},
-                     {AutomationRuntimeSerialization.SerializeDefinition(
-                    flow,
-                    definitionId => CurrentPluginProvenance(flow.HostId, definitionId)
-                )},
-                     {"Running"}, {now}, NULL, NULL);
-                """,
+            var inserted = await MainDatabaseStatements.TryInsertAutomationFlowRunAsync(
+                db,
+                new(
+                    runId,
+                    flow.Id,
+                    flow.HostId,
+                    host.AutomationGeneration,
+                    requiredFeatures,
+                    AutomationContextSchema.CurrentVersion,
+                    context.Event.SourceDefinitionId.Value,
+                    source.Id,
+                    context.Event.OccurrenceId,
+                    AutomationRuntimeSerialization.SerializeContext(context),
+                    AutomationRuntimeSerialization.SerializeDefinition(
+                        flow,
+                        definitionId => CurrentPluginProvenance(flow.HostId, definitionId)
+                    ),
+                    AutomationFlowRunStatus.Running,
+                    now
+                ),
                 cancellationToken
             );
             if (inserted == 0)

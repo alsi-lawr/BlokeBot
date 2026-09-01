@@ -8,9 +8,7 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Core.Features.Bounties;
 
@@ -358,7 +356,10 @@ internal sealed partial class BountyService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, ct))
         {
             return Rejected<BountyView>(new BountyRejection.FeatureDisabled());
@@ -458,7 +459,10 @@ internal sealed partial class BountyService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, ct))
         {
             return Rejected<BountyPledgeView>(new BountyRejection.FeatureDisabled());
@@ -618,7 +622,10 @@ internal sealed partial class BountyService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, ct))
         {
             return Rejected<BountyView>(new BountyRejection.FeatureDisabled());
@@ -745,7 +752,10 @@ internal sealed partial class BountyService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
+            db,
+            ct
+        );
         if (!await FeatureIsEnabledAsync(db, hostId, ct))
         {
             return Rejected<BountyView>(new BountyRejection.FeatureDisabled());
@@ -1516,20 +1526,7 @@ internal sealed partial class BountyService(
     }
 
     private static bool IsPersistenceCollision(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
-            _ => false,
-        };
+        MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private static BountyResult<T> Succeeded<T>(T value) => new BountyResult<T>.Succeeded(value);
 
@@ -1538,75 +1535,4 @@ internal sealed partial class BountyService(
 
     private static HostFeatureFlags _requiredFeatures =>
         HostFeatureFlags.Bounties | HostFeatureFlags.Points;
-
-    private sealed class ImmediateTransaction(
-        SqliteTransaction providerTransaction,
-        IDbContextTransaction contextTransaction
-    ) : IAsyncDisposable
-    {
-        public static Task<ImmediateTransaction> StartAsync(
-            BlokeBotDbContext db,
-            CancellationToken ct
-        ) => StartAsync(db, ImmediateTransactionAdmission.Default, ct);
-
-        public static Task<ImmediateTransaction> StartWithBoundedAdmissionAsync(
-            BlokeBotDbContext db,
-            CancellationToken ct
-        ) => StartAsync(db, ImmediateTransactionAdmission.Bounded, ct);
-
-        private static async Task<ImmediateTransaction> StartAsync(
-            BlokeBotDbContext db,
-            ImmediateTransactionAdmission admission,
-            CancellationToken ct
-        )
-        {
-            await db.Database.OpenConnectionAsync(ct);
-            var connection =
-                db.Database.GetDbConnection() as SqliteConnection
-                ?? throw new InvalidOperationException("Bounty persistence requires SQLite.");
-            ct.ThrowIfCancellationRequested();
-            var defaultTimeout = connection.DefaultTimeout;
-            SqliteTransaction providerTransaction;
-            try
-            {
-                if (admission == ImmediateTransactionAdmission.Bounded)
-                {
-                    connection.DefaultTimeout = _immediateTransactionAdmissionTimeoutSeconds;
-                }
-                providerTransaction = connection.BeginTransaction(deferred: false);
-            }
-            finally
-            {
-                connection.DefaultTimeout = defaultTimeout;
-            }
-            try
-            {
-                var contextTransaction =
-                    await db.Database.UseTransactionAsync(providerTransaction, ct)
-                    ?? throw new InvalidOperationException(
-                        "The immediate SQLite transaction could not be attached."
-                    );
-                return new ImmediateTransaction(providerTransaction, contextTransaction);
-            }
-            catch
-            {
-                await providerTransaction.DisposeAsync();
-                throw;
-            }
-        }
-
-        public Task CommitAsync(CancellationToken ct) => contextTransaction.CommitAsync(ct);
-
-        public async ValueTask DisposeAsync()
-        {
-            await contextTransaction.DisposeAsync();
-            await providerTransaction.DisposeAsync();
-        }
-
-        private enum ImmediateTransactionAdmission
-        {
-            Default,
-            Bounded,
-        }
-    }
 }

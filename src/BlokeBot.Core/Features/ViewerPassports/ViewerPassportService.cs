@@ -395,15 +395,7 @@ public sealed class ViewerPassportService(
                 await using var transaction = await db.Database.BeginTransactionAsync(
                     cancellationToken
                 );
-                // Acquire SQLite's write boundary before reading the feature state and generation.
-                _ = await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    UPDATE hosts
-                    SET EnabledFeatures = EnabledFeatures
-                    WHERE Id = {hostId.Value};
-                    """,
-                    cancellationToken
-                );
+                _ = await MainDatabaseStatements.LockHostAsync(db, hostId.Value, cancellationToken);
                 var host = await db.Hosts.SingleOrDefaultAsync(
                     value =>
                         value.Id == hostId.Value
@@ -417,13 +409,13 @@ public sealed class ViewerPassportService(
                 }
 
                 var now = clock.GetUtcNow().UtcDateTime;
-                _ = await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    INSERT OR IGNORE INTO viewer_passport_stream_sessions
-                        ("HostId", "TwitchStreamId", "StartedAtUtc", "ContinuityGeneration", "RecordedAtUtc")
-                    VALUES
-                        ({host.Id}, {twitchStreamId}, {startedAtUtc}, {host.ViewerPassportContinuityGeneration}, {now})
-                    """,
+                _ = await MainDatabaseStatements.EnsureViewerPassportStreamSessionAsync(
+                    db,
+                    host.Id,
+                    twitchStreamId,
+                    startedAtUtc,
+                    host.ViewerPassportContinuityGeneration,
+                    now,
                     cancellationToken
                 );
                 var streamSession = await db.ViewerPassportStreamSessions.SingleAsync(
@@ -472,13 +464,13 @@ public sealed class ViewerPassportService(
                 await RememberLoginAsync(db, passport, identity.Login, now, cancellationToken);
                 _ = await db.SaveChangesAsync(cancellationToken);
 
-                var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    INSERT OR IGNORE INTO viewer_passport_stream_attendance
-                        ("HostId", "PassportId", "StreamSessionId", "ContinuityGeneration", "FirstSeenAtUtc")
-                    VALUES
-                        ({host.Id}, {passport.Id}, {streamSession.Id}, {host.ViewerPassportContinuityGeneration}, {occurredAtUtc.UtcDateTime})
-                    """,
+                var inserted = await MainDatabaseStatements.TryRecordViewerPassportAttendanceAsync(
+                    db,
+                    host.Id,
+                    passport.Id,
+                    streamSession.Id,
+                    host.ViewerPassportContinuityGeneration,
+                    occurredAtUtc.UtcDateTime,
                     cancellationToken
                 );
                 await transaction.CommitAsync(cancellationToken);

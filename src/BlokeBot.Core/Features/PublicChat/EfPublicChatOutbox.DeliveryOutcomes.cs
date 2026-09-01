@@ -150,7 +150,7 @@ internal sealed partial class EfPublicChatOutbox
             await _automaticRaidOutcomes.PublishCommittedAsync(automaticRaidChange);
             return new PublicChatClaimUpdate.Applied();
         }
-        catch (Exception exception) when (IsSqliteContention(exception))
+        catch (Exception exception) when (IsDatabaseContention(exception))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new PublicChatClaimUpdate.Contended();
@@ -346,7 +346,7 @@ internal sealed partial class EfPublicChatOutbox
             await PublishCommittedAlertAsync(reportOperation, alertChange);
             return update;
         }
-        catch (Exception exception) when (IsSqliteContention(exception))
+        catch (Exception exception) when (IsDatabaseContention(exception))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new PublicChatClaimUpdate.Contended();
@@ -665,7 +665,7 @@ internal sealed partial class EfPublicChatOutbox
             await PublishCommittedAlertAsync(reportOperation, alertChange);
             return new PublicChatClaimUpdate.Applied();
         }
-        catch (Exception exception) when (IsSqliteContention(exception))
+        catch (Exception exception) when (IsDatabaseContention(exception))
         {
             cancellationToken.ThrowIfCancellationRequested();
             return new PublicChatClaimUpdate.Contended();

@@ -1,8 +1,10 @@
-# PostgreSQL downstream capability baseline
+# PostgreSQL capability contract
 
-PostgreSQL is the selected first server provider. This document freezes the capabilities that
-BLOKEBOT-270 through BLOKEBOT-273 must supply. It does not implement PostgreSQL and contains no
-PostgreSQL application measurements.
+PostgreSQL is the selected first server provider. BLOKEBOT-270 supplies provider configuration and
+schema history. BLOKEBOT-271 supplies the SQL, transaction, failure, and workload authorities. The
+measured provider comparison is in
+`evidence/sqlite-postgresql-comparison-20260901.md`. BLOKEBOT-272 and BLOKEBOT-273 still own
+cutover, packaging, deployment configuration, CI, and operator procedures.
 
 ## EF provider and schema
 

@@ -1,6 +1,5 @@
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
@@ -92,24 +91,26 @@ public sealed class AutomaticRaidShoutoutRunner
             try
             {
                 await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-                ((SqliteConnection)db.Database.GetDbConnection()).DefaultTimeout =
-                    ClaimContentionCommandTimeoutSeconds;
-                db.Database.SetCommandTimeout(ClaimContentionCommandTimeoutSeconds);
                 await using var transaction = await db.Database.BeginTransactionAsync(
                     cancellationToken
                 );
-                _ = await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"DELETE FROM automatic_raid_processed_events WHERE ExpiresAtUtc < {now.UtcDateTime};",
+                await MainDatabaseCommandTimeout.ApplyClaimBoundAsync(
+                    db,
+                    TimeSpan.FromSeconds(ClaimContentionCommandTimeoutSeconds),
+                    cancellationToken
+                );
+                _ = await MainDatabaseStatements.DeleteExpiredAutomaticRaidEventsAsync(
+                    db,
+                    now.UtcDateTime,
                     cancellationToken
                 );
                 var expiry = incomingRaid.MessageTimestamp.Add(FreshnessWindow);
-                var changed = await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    INSERT OR IGNORE INTO automatic_raid_processed_events
-                        (HostId, ProviderMessageId, ClaimedAtUtc, ExpiresAtUtc)
-                    VALUES
-                        ({hostId}, {incomingRaid.MessageId}, {now.UtcDateTime}, {expiry.UtcDateTime});
-                    """,
+                var changed = await MainDatabaseStatements.TryClaimAutomaticRaidEventAsync(
+                    db,
+                    hostId,
+                    incomingRaid.MessageId,
+                    now.UtcDateTime,
+                    expiry.UtcDateTime,
                     cancellationToken
                 );
                 if (changed != 1)
@@ -136,7 +137,8 @@ public sealed class AutomaticRaidShoutoutRunner
                 return outcome.Id;
             }
             catch (Exception exception)
-                when (IsPersistenceContention(exception) && attempt < ClaimContentionMaximumAttempts
+                when (IsPersistenceContention(exception, cancellationToken)
+                    && attempt < ClaimContentionMaximumAttempts
                 )
             {
                 await Task.Delay(ClaimContentionRetryDelay, cancellationToken);
@@ -219,14 +221,12 @@ public sealed class AutomaticRaidShoutoutRunner
         && Login.Normalize(incomingRaid.ToBroadcasterUserLogin).Length <= 128
         && incomingRaid.ViewerCount >= 0;
 
-    private static bool IsPersistenceContention(Exception exception) =>
-        exception switch
-        {
-            SqliteException
-            {
-                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
-            } => true,
-            DbUpdateException { InnerException: { } inner } => IsPersistenceContention(inner),
-            _ => false,
-        };
+    private static bool IsPersistenceContention(
+        Exception exception,
+        CancellationToken cancellationToken
+    ) =>
+        MainDatabaseFailureClassifier.Classify(exception, cancellationToken)
+            is MainDatabaseFailureKind.SerializationFailure
+                or MainDatabaseFailureKind.Deadlock
+                or MainDatabaseFailureKind.LockTimeout;
 }

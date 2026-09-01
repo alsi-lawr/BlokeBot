@@ -31,6 +31,17 @@ public static class BaselineCli
                 Console.WriteLine(inventory.Statements.Count);
                 return 0;
             }
+            if (args[0] == "verify-postgresql-authorities")
+            {
+                var connectionString = File.ReadAllText(Required(options, "connection-string-file"))
+                    .Trim();
+                var outcomes = await PostgreSqlAuthorityVerifier.VerifyAsync(
+                    connectionString,
+                    CancellationToken.None
+                );
+                Console.WriteLine(JsonSerializer.Serialize(outcomes, _jsonOptions));
+                return 0;
+            }
             var protocolPath = Required(options, "protocol");
             var digestPath = Required(options, "digest");
             var protocol = FrozenProtocol.Load(FrozenProtocolVersion.V1, protocolPath, digestPath);
@@ -39,15 +50,24 @@ public static class BaselineCli
                 Console.WriteLine(FrozenProtocol.Digest(protocolPath));
                 return 0;
             }
-            if (args[0] != "run-sqlite")
+            if (args[0] is not ("run-sqlite" or "run-postgresql"))
             {
                 throw new ArgumentException($"Unknown command '{args[0]}'.");
             }
 
-            var databasePath = Required(options, "database");
             var outputPath = Required(options, "output");
-            var runner = new SqliteBaselineRunner(protocol, FrozenProtocol.Digest(protocolPath));
-            var result = await runner.RunAsync(databasePath, CancellationToken.None);
+            WorkloadDatabase database =
+                args[0] == "run-sqlite"
+                    ? new SqliteWorkloadDatabase(Required(options, "database"))
+                    : new PostgreSqlWorkloadDatabase(
+                        File.ReadAllText(Required(options, "connection-string-file")).Trim()
+                    );
+            await using var runner = new DatabaseBaselineRunner(
+                protocol,
+                FrozenProtocol.Digest(protocolPath),
+                database
+            );
+            var result = await runner.RunAsync(CancellationToken.None);
             var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
             if (outputDirectory is not null)
             {
@@ -105,9 +125,13 @@ public static class BaselineCli
 
             verify-protocol --protocol PATH --digest PATH
             verify-inventory --repo-root PATH --inventory PATH
+            verify-postgresql-authorities --connection-string-file PATH
             run-sqlite --protocol PATH --digest PATH --database NEW_PATH --output PATH
+            run-postgresql --protocol PATH --digest PATH --connection-string-file PATH --output PATH
 
             run-sqlite refuses an existing database path. It creates an offline synthetic database and
             writes only redacted aggregate evidence.
+            run-postgresql owns only a dedicated blokebot_workload_v1 schema, refuses an existing
+            schema, removes its schema after the run, and writes only redacted aggregate evidence.
             """;
 }
