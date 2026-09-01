@@ -89,19 +89,24 @@ internal static class BlokeBotStatePathResolver
         var stateDirectory = ExplicitPath(request.ExplicitStateDirectory);
         var databasePath = ExplicitPath(request.ExplicitDatabasePath);
         var tokenCachePath = ExplicitPath(request.ExplicitTokenCachePath);
+        var dataDirectory = ExplicitPath(request.DataDirectory);
         if (stateDirectory is null && databasePath is not null)
         {
             stateDirectory = Path.GetDirectoryName(Path.GetFullPath(databasePath));
         }
 
-        stateDirectory ??= ExplicitPath(request.DataDirectory);
+        stateDirectory ??= dataDirectory;
         if (stateDirectory is not null)
         {
             return Resolved(
                 stateDirectory,
                 databasePath ?? Combine(request.OperatingSystem, stateDirectory, _databaseFileName),
                 tokenCachePath
-                    ?? Combine(request.OperatingSystem, stateDirectory, _tokenCacheFileName)
+                    ?? Combine(
+                        request.OperatingSystem,
+                        dataDirectory ?? stateDirectory,
+                        _tokenCacheFileName
+                    )
             );
         }
 

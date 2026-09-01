@@ -23,7 +23,7 @@ public sealed class BlokeBotStatePathTests
         var paths = result.ShouldBeOfType<BlokeBotStatePathResolution.Resolved>().Paths;
         paths.StateDirectory.ShouldBe("/explicit");
         paths.DatabasePath.ShouldBe("/explicit/blokebot.sqlite");
-        paths.TokenCachePath.ShouldBe("/explicit/twitch.tokens.json");
+        paths.TokenCachePath.ShouldBe("/service/state/twitch.tokens.json");
     }
 
     [Test]
@@ -80,7 +80,7 @@ public sealed class BlokeBotStatePathTests
         var paths = result.ShouldBeOfType<BlokeBotStatePathResolution.Resolved>().Paths;
         paths.StateDirectory.ShouldBe("/explicit-state");
         paths.DatabasePath.ShouldBe("/legacy/blokebot.db");
-        paths.TokenCachePath.ShouldBe("/explicit-state/twitch.tokens.json");
+        paths.TokenCachePath.ShouldBe("/cli-state/twitch.tokens.json");
     }
 
     [Test]
