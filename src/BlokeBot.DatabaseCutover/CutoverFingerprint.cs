@@ -46,7 +46,7 @@ internal static class CutoverFingerprint
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT current_database(), oid::text FROM pg_database WHERE datname = current_database();";
+            "SELECT control.system_identifier::text, current_database(), database.oid::text FROM pg_control_system() AS control CROSS JOIN pg_database AS database WHERE database.datname = current_database();";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
@@ -55,6 +55,7 @@ internal static class CutoverFingerprint
 
         Append(hash, reader.GetString(0));
         Append(hash, reader.GetString(1));
+        Append(hash, reader.GetString(2));
         Append(hash, string.Join('\n', migrations));
         foreach (var table in tables)
         {

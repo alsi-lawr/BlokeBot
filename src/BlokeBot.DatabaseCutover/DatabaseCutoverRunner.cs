@@ -9,6 +9,15 @@ public sealed partial class DatabaseCutoverRunner
 {
     private const string _currentSqliteMigration = "20260826174307_v0.13.0";
     private const string _currentPostgreSqlMigration = "20260901145930_20260901_v0_14_0_Baseline";
+    private readonly Action<CutoverBatchCommit>? _batchCommitted;
+
+    public DatabaseCutoverRunner() { }
+
+    internal DatabaseCutoverRunner(Action<CutoverBatchCommit> batchCommitted)
+    {
+        ArgumentNullException.ThrowIfNull(batchCommitted);
+        _batchCommitted = batchCommitted;
+    }
 
     public async Task<DatabaseCutoverResult> RunAsync(
         DatabaseCutoverOptions options,

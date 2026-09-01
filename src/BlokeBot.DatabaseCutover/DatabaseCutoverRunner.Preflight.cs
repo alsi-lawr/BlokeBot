@@ -33,7 +33,16 @@ public sealed partial class DatabaseCutoverRunner
         );
         if (otherSessions == 0)
         {
-            return null;
+            await using var privilege = connection.CreateCommand();
+            privilege.CommandText =
+                "SELECT has_function_privilege(current_user, 'pg_control_system()', 'EXECUTE');";
+            if ((bool)(await privilege.ExecuteScalarAsync(cancellationToken) ?? false))
+            {
+                return null;
+            }
+
+            await ReleaseTargetOwnershipAsync(connection);
+            return "The PostgreSql cutover role needs EXECUTE on pg_control_system() to bind the receipt to this cluster. Grant only that function for cutover, then retry.";
         }
 
         await ReleaseTargetOwnershipAsync(connection);

@@ -13,7 +13,8 @@ internal static class CutoverProjection
         DbTransaction? transaction,
         CutoverTable table,
         long? rowLimit,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        bool stageSelfReferences = false
     )
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -28,8 +29,8 @@ internal static class CutoverProjection
             {
                 CutoverValues.AppendCanonical(
                     hash,
-                    reader.IsDBNull(reader.GetOrdinal(column.Name))
-                        ? null
+                    stageSelfReferences && table.SelfReferenceColumns.Contains(column.Name) ? null
+                        : reader.IsDBNull(reader.GetOrdinal(column.Name)) ? null
                         : reader.GetValue(reader.GetOrdinal(column.Name)),
                     column.TargetStoreType
                 );

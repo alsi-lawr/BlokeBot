@@ -11,7 +11,12 @@ internal enum CutoverPhase
     Complete,
 }
 
-internal sealed record CutoverTableCheckpoint(string Table, long RowsCopied, string PrefixHash);
+internal sealed record CutoverTableCheckpoint(
+    string Table,
+    long RowsCopied,
+    string PrefixHash,
+    bool SelfReferencesApplied
+);
 
 internal sealed record CutoverReceipt(
     int FormatVersion,
@@ -27,7 +32,7 @@ internal sealed record CutoverReceipt(
     DateTimeOffset? CompletedAtUtc
 )
 {
-    internal const int CurrentFormatVersion = 1;
+    internal const int CurrentFormatVersion = 2;
 
     internal CutoverReceipt WithPhase(CutoverPhase phase) =>
         this with
