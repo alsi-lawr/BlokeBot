@@ -1,4 +1,3 @@
-using BlokeBot.Announcements;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,67 +31,215 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAnnouncements(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<CustomAnnouncement>(static b =>
+        _ = modelBuilder.Entity<CustomAnnouncement>(b =>
         {
             _ = b.ToTable(
                 "custom_announcements",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceStatus",
-                        KindIn("OccurrenceStatus", _announcementOccurrenceStatuses)
+                        KindIn(modelBuilder, "OccurrenceStatus", _announcementOccurrenceStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_announcements_DeliveryType",
-                        KindIn("DeliveryType", _customAnnouncementDeliveryTypes)
+                        KindIn(modelBuilder, "DeliveryType", _customAnnouncementDeliveryTypes)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_announcements_AnnouncementColor",
-                        KindIn("AnnouncementColor", _twitchAnnouncementColors)
+                        KindIn(modelBuilder, "AnnouncementColor", _twitchAnnouncementColors)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_announcements_LatestDeliveryResult",
-                        KindIn("LatestDeliveryResult", _customAnnouncementLatestDeliveryResults)
+                        KindIn(
+                            modelBuilder,
+                            "LatestDeliveryResult",
+                            _customAnnouncementLatestDeliveryResults
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceState",
-                        "(OccurrenceStatus = 'None' AND OccurrenceDueAtUtc IS NULL "
-                            + "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL "
-                            + "AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount = 0 "
-                            + "AND OccurrenceMessage IS NULL) OR "
-                            + "(OccurrenceStatus = 'Pending' AND OccurrenceDueAtUtc IS NOT NULL "
-                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc IS NOT NULL "
-                            + "AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc "
-                            + "AND OccurrenceCompletedAtUtc IS NULL "
-                            + "AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR "
-                            + "(OccurrenceStatus = 'Attempting' AND OccurrenceDueAtUtc IS NOT NULL "
-                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NULL "
-                            + "AND OccurrenceAttemptCount > 0 AND length(OccurrenceMessage) > 0) OR "
-                            + "(OccurrenceStatus = 'RetryScheduled' AND OccurrenceDueAtUtc IS NOT NULL "
-                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc >= OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc "
-                            + "AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount > 0 "
-                            + "AND length(OccurrenceMessage) > 0) OR "
-                            + "(OccurrenceStatus IN ('Accepted', 'TerminalRejected', "
+                        ProviderSql(
+                            modelBuilder,
+                            "(OccurrenceStatus = 'None' AND OccurrenceDueAtUtc IS NULL ",
+                            "(\"OccurrenceStatus\" = 'None' AND \"OccurrenceDueAtUtc\" IS NULL "
+                        )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL ",
+                                "AND \"OccurrenceExpiresAtUtc\" IS NULL AND \"OccurrenceNextAttemptAtUtc\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount = 0 ",
+                                "AND \"OccurrenceCompletedAtUtc\" IS NULL AND \"OccurrenceAttemptCount\" = 0 "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceMessage IS NULL) OR ",
+                                "AND \"OccurrenceMessage\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus = 'Pending' AND OccurrenceDueAtUtc IS NOT NULL ",
+                                "(\"OccurrenceStatus\" = 'Pending' AND \"OccurrenceDueAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc IS NOT NULL ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" <= \"OccurrenceExpiresAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceCompletedAtUtc IS NULL ",
+                                "AND \"OccurrenceCompletedAtUtc\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR ",
+                                "AND \"OccurrenceAttemptCount\" = 0 AND \"OccurrenceMessage\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus = 'Attempting' AND OccurrenceDueAtUtc IS NOT NULL ",
+                                "(\"OccurrenceStatus\" = 'Attempting' AND \"OccurrenceDueAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NULL ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceAttemptCount > 0 AND length(OccurrenceMessage) > 0) OR ",
+                                "AND \"OccurrenceAttemptCount\" > 0 AND length(\"OccurrenceMessage\") > 0) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus = 'RetryScheduled' AND OccurrenceDueAtUtc IS NOT NULL ",
+                                "(\"OccurrenceStatus\" = 'RetryScheduled' AND \"OccurrenceDueAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc >= OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" >= \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" <= \"OccurrenceExpiresAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount > 0 ",
+                                "AND \"OccurrenceCompletedAtUtc\" IS NULL AND \"OccurrenceAttemptCount\" > 0 "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND length(OccurrenceMessage) > 0) OR ",
+                                "AND length(\"OccurrenceMessage\") > 0) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus IN ('Accepted', 'TerminalRejected', ",
+                                "(\"OccurrenceStatus\" IN ('Accepted', 'TerminalRejected', "
+                            )
                             + "'TerminalAmbiguous', 'TerminalUnexpected') "
-                            + "AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL "
-                            + "AND OccurrenceAttemptCount > 0 AND OccurrenceMessage IS NULL) OR "
-                            + "(OccurrenceStatus = 'SkippedExpired' AND OccurrenceDueAtUtc IS NOT NULL "
-                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL "
-                            + "AND OccurrenceAttemptCount >= 0 AND OccurrenceMessage IS NULL) OR "
-                            + "(OccurrenceStatus = 'TerminalMissingMessage' AND OccurrenceDueAtUtc IS NOT NULL "
-                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
-                            + "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL "
-                            + "AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR "
-                            + "(OccurrenceStatus = 'TerminalInvalidTimeZone' AND OccurrenceDueAtUtc IS NULL "
-                            + "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL "
-                            + "AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount = 0 "
-                            + "AND OccurrenceMessage IS NULL)"
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceAttemptCount > 0 AND OccurrenceMessage IS NULL) OR ",
+                                "AND \"OccurrenceAttemptCount\" > 0 AND \"OccurrenceMessage\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus = 'SkippedExpired' AND OccurrenceDueAtUtc IS NOT NULL ",
+                                "(\"OccurrenceStatus\" = 'SkippedExpired' AND \"OccurrenceDueAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceAttemptCount >= 0 AND OccurrenceMessage IS NULL) OR ",
+                                "AND \"OccurrenceAttemptCount\" >= 0 AND \"OccurrenceMessage\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus = 'TerminalMissingMessage' AND OccurrenceDueAtUtc IS NOT NULL ",
+                                "(\"OccurrenceStatus\" = 'TerminalMissingMessage' AND \"OccurrenceDueAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc ",
+                                "AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL ",
+                                "AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR ",
+                                "AND \"OccurrenceAttemptCount\" = 0 AND \"OccurrenceMessage\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(OccurrenceStatus = 'TerminalInvalidTimeZone' AND OccurrenceDueAtUtc IS NULL ",
+                                "(\"OccurrenceStatus\" = 'TerminalInvalidTimeZone' AND \"OccurrenceDueAtUtc\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL ",
+                                "AND \"OccurrenceExpiresAtUtc\" IS NULL AND \"OccurrenceNextAttemptAtUtc\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount = 0 ",
+                                "AND \"OccurrenceCompletedAtUtc\" IS NOT NULL AND \"OccurrenceAttemptCount\" = 0 "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND OccurrenceMessage IS NULL)",
+                                "AND \"OccurrenceMessage\" IS NULL)"
+                            )
                     );
                 }
             );
@@ -162,110 +309,6 @@ public sealed partial class BlokeBotDbContext
             _ = b.Navigation(static x => x.DeliveryPolicy).IsRequired();
         });
 
-        _ = modelBuilder.Entity<CustomAnnouncementDeliveryPolicy>(static b =>
-        {
-            _ = b.ToTable(
-                "custom_announcement_delivery_policies",
-                static t =>
-                {
-                    _ = t.HasCheckConstraint(
-                        "CK_custom_announcement_delivery_policies_PolicyType",
-                        KindIn("PolicyType", _customAnnouncementDeliveryPolicyTypes)
-                    );
-                    _ = t.HasCheckConstraint(
-                        "CK_custom_announcement_delivery_policies_Payload",
-                        "PolicyType = 'RetryUntilExpiredThenSkip' "
-                            + "AND RetryDelayTicks IS NOT NULL AND RetryDelayTicks > 0 "
-                            + "AND OccurrenceLifetimeTicks IS NOT NULL "
-                            + $"AND OccurrenceLifetimeTicks <= {TimeSpan.FromSeconds(60).Ticks} "
-                            + "AND RetryDelayTicks < OccurrenceLifetimeTicks"
-                    );
-                }
-            );
-            _ = b.HasKey(static x => x.Id);
-            _ = b.HasAlternateKey(static x => new { x.HostId, x.Id });
-            _ = b.HasOne<BotHost>()
-                .WithMany()
-                .HasForeignKey(static x => x.HostId)
-                .OnDelete(DeleteBehavior.Cascade);
-            _ = b.Property<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
-                .HasConversion<string>()
-                .HasMaxLength(48);
-            _ = b.HasDiscriminator<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
-                .HasValue<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(
-                    CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip
-                );
-        });
-
-        _ = modelBuilder.Entity<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(
-            static b =>
-            {
-                _ = b.Property(static x => x.RetryDelay)
-                    .HasConversion(
-                        static value => value.Value.Ticks,
-                        static value => new AnnouncementRetryDelay(TimeSpan.FromTicks(value))
-                    )
-                    .HasColumnName("RetryDelayTicks");
-                _ = b.Property(static x => x.OccurrenceLifetime)
-                    .HasConversion(
-                        static value => value.Value.Ticks,
-                        static value => new AnnouncementOccurrenceLifetime(
-                            TimeSpan.FromTicks(value)
-                        )
-                    )
-                    .HasColumnName("OccurrenceLifetimeTicks");
-            }
-        );
-
-        _ = modelBuilder.Entity<CustomAnnouncementSchedule>(static b =>
-        {
-            _ = b.ToTable(
-                "custom_announcement_schedules",
-                static t =>
-                {
-                    _ = t.HasCheckConstraint(
-                        "CK_custom_announcement_schedules_ScheduleType",
-                        KindIn("ScheduleType", _customAnnouncementScheduleTypes)
-                    );
-                    _ = t.HasCheckConstraint(
-                        "CK_custom_announcement_schedules_Payload",
-                        "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 "
-                            + "AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR "
-                            + "(ScheduleType = 'IntervalAfterChat' AND IntervalMinutes >= 1 "
-                            + "AND RequiredChatMessages >= 1 AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR "
-                            + "(ScheduleType = 'Weekly' AND IntervalMinutes IS NULL "
-                            + "AND RequiredChatMessages IS NULL AND WeeklyDay BETWEEN 0 AND 6 "
-                            + "AND WeeklyTime IS NOT NULL)"
-                    );
-                }
-            );
-            _ = b.HasKey(static x => x.CustomAnnouncementId);
-            _ = b.Property<string>("ScheduleType").HasMaxLength(32);
-            _ = b.HasDiscriminator<string>("ScheduleType")
-                .HasValue<IntervalCustomAnnouncementSchedule>(
-                    IntervalCustomAnnouncementSchedule.Discriminator
-                )
-                .HasValue<IntervalAfterChatCustomAnnouncementSchedule>(
-                    IntervalAfterChatCustomAnnouncementSchedule.Discriminator
-                )
-                .HasValue<WeeklyCustomAnnouncementSchedule>(
-                    WeeklyCustomAnnouncementSchedule.Discriminator
-                );
-        });
-
-        _ = modelBuilder.Entity<IntervalCustomAnnouncementSchedule>(static b =>
-            b.Property(static x => x.IntervalMinutes).HasColumnName("IntervalMinutes")
-        );
-        _ = modelBuilder.Entity<IntervalAfterChatCustomAnnouncementSchedule>(static b =>
-        {
-            _ = b.Property(static x => x.IntervalMinutes).HasColumnName("IntervalMinutes");
-            _ = b.Property(static x => x.RequiredChatMessages)
-                .HasColumnName("RequiredChatMessages");
-        });
-        _ = modelBuilder.Entity<WeeklyCustomAnnouncementSchedule>(static b =>
-        {
-            _ = b.Property(static x => x.Day).HasColumnName("WeeklyDay");
-            _ = b.Property(static x => x.Time).HasColumnName("WeeklyTime");
-        });
+        ConfigureAnnouncementSchedules(modelBuilder);
     }
 }

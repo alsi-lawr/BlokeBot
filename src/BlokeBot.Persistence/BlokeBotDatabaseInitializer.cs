@@ -7,11 +7,18 @@ public sealed class BlokeBotDatabaseInitializer(IDbContextFactory<BlokeBotDbCont
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await HetznerBaselineBridge.ApplyAsync(db, cancellationToken);
+        var provider = db.Database.Provider();
+        if (provider == BlokeBotDatabaseProvider.Sqlite)
+        {
+            await HetznerBaselineBridge.ApplyAsync(db, cancellationToken);
+        }
         await db.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            WeeklyAnnouncementMigrationInterceptor.Register(db.Database.GetDbConnection());
+            if (provider == BlokeBotDatabaseProvider.Sqlite)
+            {
+                WeeklyAnnouncementMigrationInterceptor.Register(db.Database.GetDbConnection());
+            }
             await db.Database.MigrateAsync(cancellationToken);
         }
         finally

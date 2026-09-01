@@ -10,7 +10,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureConfigurationTransfer(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<ConfigurationImportAudit>(static b =>
+        _ = modelBuilder.Entity<ConfigurationImportAudit>(b =>
         {
             _ = b.ToTable("configuration_import_audits");
             _ = b.HasKey(static x => x.Id);
@@ -26,14 +26,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ConfigurationActivation>(static b =>
+        _ = modelBuilder.Entity<ConfigurationActivation>(b =>
         {
             _ = b.ToTable(
                 "configuration_activations",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_configuration_activations_Status",
-                        KindIn("Status", _configurationActivationStatuses)
+                        KindIn(modelBuilder, "Status", _configurationActivationStatuses)
                     )
             );
             _ = b.HasKey(static x => x.Id);

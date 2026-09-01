@@ -18,14 +18,14 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureBlokeRaid(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<BlokeRaidConfiguration>(static builder =>
+        _ = modelBuilder.Entity<BlokeRaidConfiguration>(builder =>
         {
             _ = builder.ToTable(
                 "bloke_raid_configurations",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_bloke_raid_configurations_ResetPolicy",
-                        KindIn("ResetPolicy", _blokeRaidResetPolicies)
+                        KindIn(modelBuilder, "ResetPolicy", _blokeRaidResetPolicies)
                     )
             );
             _ = builder.HasKey(static value => value.Id);
@@ -53,19 +53,19 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BlokeRaidCampaign>(static builder =>
+        _ = modelBuilder.Entity<BlokeRaidCampaign>(builder =>
         {
             _ = builder.ToTable(
                 "bloke_raid_campaigns",
-                static table =>
+                table =>
                 {
                     _ = table.HasCheckConstraint(
                         "CK_bloke_raid_campaigns_Status",
-                        KindIn("Status", _blokeRaidCampaignStatuses)
+                        KindIn(modelBuilder, "Status", _blokeRaidCampaignStatuses)
                     );
                     _ = table.HasCheckConstraint(
                         "CK_bloke_raid_campaigns_ResetPolicy",
-                        KindIn("ResetPolicy", _blokeRaidResetPolicies)
+                        KindIn(modelBuilder, "ResetPolicy", _blokeRaidResetPolicies)
                     );
                 }
             );
@@ -105,19 +105,19 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BlokeRaidAction>(static builder =>
+        _ = modelBuilder.Entity<BlokeRaidAction>(builder =>
         {
             _ = builder.ToTable(
                 "bloke_raid_actions",
-                static table =>
+                table =>
                 {
                     _ = table.HasCheckConstraint(
                         "CK_bloke_raid_actions_Kind",
-                        KindIn("Kind", _blokeRaidActionKinds)
+                        KindIn(modelBuilder, "Kind", _blokeRaidActionKinds)
                     );
                     _ = table.HasCheckConstraint(
                         "CK_bloke_raid_actions_Source",
-                        KindIn("Source", _blokeRaidActionSources)
+                        KindIn(modelBuilder, "Source", _blokeRaidActionSources)
                     );
                 }
             );
@@ -162,7 +162,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BlokeRaidContribution>(static builder =>
+        _ = modelBuilder.Entity<BlokeRaidContribution>(builder =>
         {
             _ = builder.ToTable("bloke_raid_contributions");
             _ = builder.HasKey(static value => value.Id);
@@ -185,14 +185,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BlokeRaidDomainEvent>(static builder =>
+        _ = modelBuilder.Entity<BlokeRaidDomainEvent>(builder =>
         {
             _ = builder.ToTable(
                 "bloke_raid_events",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_bloke_raid_events_Kind",
-                        KindIn("Kind", _blokeRaidEventKinds)
+                        KindIn(modelBuilder, "Kind", _blokeRaidEventKinds)
                     )
             );
             _ = builder.HasKey(static value => value.Id);

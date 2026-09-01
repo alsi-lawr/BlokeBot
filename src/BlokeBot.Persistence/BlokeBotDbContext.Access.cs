@@ -10,20 +10,20 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAccess(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<SiteAccessSettings>(static b =>
+        _ = modelBuilder.Entity<SiteAccessSettings>(b =>
         {
             _ = b.ToTable("site_access_settings");
             _ = b.HasKey(static x => x.Id);
         });
 
-        _ = modelBuilder.Entity<SiteAccessEntry>(static b =>
+        _ = modelBuilder.Entity<SiteAccessEntry>(b =>
         {
             _ = b.ToTable(
                 "site_access_entries",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_site_access_entries_Kind",
-                        KindIn("Kind", _accessKinds)
+                        KindIn(modelBuilder, "Kind", _accessKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -37,7 +37,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.Kind, x.Login }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<HostModAccessSettings>(static b =>
+        _ = modelBuilder.Entity<HostModAccessSettings>(b =>
         {
             _ = b.ToTable("host_mod_access_settings");
             _ = b.HasKey(static x => x.Id);
@@ -49,14 +49,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<HostModAccessEntry>(static b =>
+        _ = modelBuilder.Entity<HostModAccessEntry>(b =>
         {
             _ = b.ToTable(
                 "host_mod_access_entries",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_host_mod_access_entries_Kind",
-                        KindIn("Kind", _accessKinds)
+                        KindIn(modelBuilder, "Kind", _accessKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

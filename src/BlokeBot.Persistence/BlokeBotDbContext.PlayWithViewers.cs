@@ -14,14 +14,14 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePlayWithViewers(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<PlayQueue>(static b =>
+        _ = modelBuilder.Entity<PlayQueue>(b =>
         {
             _ = b.ToTable(
                 "play_queues",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_play_queues_SelectionMode",
-                        KindIn("SelectionMode", _playQueueSelectionModes)
+                        KindIn(modelBuilder, "SelectionMode", _playQueueSelectionModes)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -53,7 +53,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PlayQueueField>(static b =>
+        _ = modelBuilder.Entity<PlayQueueField>(b =>
         {
             _ = b.ToTable("play_queue_fields");
             _ = b.HasKey(static x => x.Id);
@@ -64,7 +64,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.QueueId, x.Position }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<PlayQueueRoleRequirement>(static b =>
+        _ = modelBuilder.Entity<PlayQueueRoleRequirement>(b =>
         {
             _ = b.ToTable("play_queue_role_requirements");
             _ = b.HasKey(static x => x.Id);
@@ -72,14 +72,14 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.QueueId, x.Role }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<PlayQueueEntry>(static b =>
+        _ = modelBuilder.Entity<PlayQueueEntry>(b =>
         {
             _ = b.ToTable(
                 "play_queue_entries",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_play_queue_entries_Status",
-                        KindIn("Status", _playQueueEntryStatuses)
+                        KindIn(modelBuilder, "Status", _playQueueEntryStatuses)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -110,7 +110,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PlayQueueEntryValue>(static b =>
+        _ = modelBuilder.Entity<PlayQueueEntryValue>(b =>
         {
             _ = b.ToTable("play_queue_entry_values");
             _ = b.HasKey(static x => x.Id);
@@ -122,7 +122,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<PlayQueueParticipation>(static b =>
+        _ = modelBuilder.Entity<PlayQueueParticipation>(b =>
         {
             _ = b.ToTable("play_queue_participation");
             _ = b.HasKey(static x => x.Id);
@@ -143,7 +143,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PlayQueueExclusion>(static b =>
+        _ = modelBuilder.Entity<PlayQueueExclusion>(b =>
         {
             _ = b.ToTable("play_queue_exclusions");
             _ = b.HasKey(static x => x.Id);
@@ -165,14 +165,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PlayQueueDomainEvent>(static b =>
+        _ = modelBuilder.Entity<PlayQueueDomainEvent>(b =>
         {
             _ = b.ToTable(
                 "play_queue_events",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_play_queue_events_Kind",
-                        KindIn("Kind", _playQueueEventKinds)
+                        KindIn(modelBuilder, "Kind", _playQueueEventKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

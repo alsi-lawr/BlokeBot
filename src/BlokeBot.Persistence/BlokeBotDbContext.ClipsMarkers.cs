@@ -13,14 +13,14 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureClipsMarkers(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<TwitchClip>(static b =>
+        _ = modelBuilder.Entity<TwitchClip>(b =>
         {
             _ = b.ToTable(
                 "twitch_clips",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_twitch_clips_Status",
-                        KindIn("Status", _twitchClipStatusKinds)
+                        KindIn(modelBuilder, "Status", _twitchClipStatusKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -53,14 +53,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<TwitchStreamMarker>(static b =>
+        _ = modelBuilder.Entity<TwitchStreamMarker>(b =>
         {
             _ = b.ToTable(
                 "twitch_stream_markers",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_twitch_stream_markers_Status",
-                        KindIn("Status", _twitchStreamMarkerStatusKinds)
+                        KindIn(modelBuilder, "Status", _twitchStreamMarkerStatusKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

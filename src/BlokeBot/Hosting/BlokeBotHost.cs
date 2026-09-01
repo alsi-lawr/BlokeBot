@@ -79,11 +79,24 @@ internal static class BlokeBotHost
         );
         Configure(builder, options);
 
-        var statePaths = ResolveStatePaths(builder.Configuration, options.DataDirectory);
+        var databaseSettings = BlokeBotMainDatabaseSettings.FromConfiguration(
+            builder.Configuration
+        );
+        var statePaths = ResolveStatePaths(
+            builder.Configuration,
+            options.DataDirectory,
+            databaseSettings.Provider
+        );
+        var database = databaseSettings.CreateConfiguration(statePaths);
         _ = builder.Configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["BlokeBot:DatabasePath"] = statePaths.DatabasePath,
+                [BlokeBotMainDatabaseSettings.ProviderKey] = databaseSettings.Provider.ToString(),
+                [BlokeBotMainDatabaseSettings.StateDirectoryKey] = statePaths.StateDirectory,
+                [BlokeBotMainDatabaseSettings.DatabasePathKey] =
+                    databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
+                        ? statePaths.DatabasePath
+                        : null,
                 ["TwitchBot:Identity:TokenCachePath"] = statePaths.TokenCachePath,
             }
         );
@@ -97,7 +110,7 @@ internal static class BlokeBotHost
                     statePaths.StateDirectory
                 )
         );
-        _ = builder.Services.AddBlokeBotPersistence(statePaths.DatabasePath);
+        _ = builder.Services.AddBlokeBotPersistence(database);
         _ = builder.Services.AddBlokeBotPluginRuntime();
         ConfigureDataProtection(builder.Services, statePaths);
         var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
@@ -161,7 +174,8 @@ internal static class BlokeBotHost
 
     internal static BlokeBotStatePaths ResolveStatePaths(
         IConfiguration configuration,
-        string? dataDirectory
+        string? dataDirectory,
+        BlokeBotDatabaseProvider provider
     )
     {
         var (operatingSystem, platformEnvironment) = BlokeBotPlatformEnvironment.Current();
@@ -170,7 +184,8 @@ internal static class BlokeBotHost
                 operatingSystem,
                 platformEnvironment,
                 dataDirectory,
-                configuration["BlokeBot:DatabasePath"],
+                configuration[BlokeBotMainDatabaseSettings.StateDirectoryKey],
+                configuration[BlokeBotMainDatabaseSettings.DatabasePathKey],
                 configuration["TwitchBot:Identity:TokenCachePath"]
             )
         );
@@ -180,7 +195,10 @@ internal static class BlokeBotHost
         }
 
         var paths = ((BlokeBotStatePathResolution.Resolved)resolution).Paths;
-        var preparation = BlokeBotStatePathPreparer.Prepare(paths);
+        var preparation = BlokeBotStatePathPreparer.Prepare(
+            paths,
+            prepareDatabaseFile: provider == BlokeBotDatabaseProvider.Sqlite
+        );
         return preparation switch
         {
             BlokeBotStatePathPreparation.Prepared prepared => prepared.Paths,

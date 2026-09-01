@@ -14,14 +14,16 @@ public sealed class BlokeBotStatePathTests
                 BlokeBotOperatingSystem.Linux,
                 new("/home/alex", "/xdg", null),
                 "/service/state",
+                null,
                 "/explicit/blokebot.sqlite",
                 null
             )
         );
 
         var paths = result.ShouldBeOfType<BlokeBotStatePathResolution.Resolved>().Paths;
+        paths.StateDirectory.ShouldBe("/explicit");
         paths.DatabasePath.ShouldBe("/explicit/blokebot.sqlite");
-        paths.TokenCachePath.ShouldBe("/service/state/twitch.tokens.json");
+        paths.TokenCachePath.ShouldBe("/explicit/twitch.tokens.json");
     }
 
     [Test]
@@ -31,6 +33,7 @@ public sealed class BlokeBotStatePathTests
             new BlokeBotStatePathRequest(
                 BlokeBotOperatingSystem.Windows,
                 new(null, null, null),
+                null,
                 null,
                 @"D:\blokebot\database.db",
                 @"E:\blokebot\tokens.json"
@@ -51,12 +54,59 @@ public sealed class BlokeBotStatePathTests
                 new(null, null, null),
                 null,
                 null,
+                null,
                 null
             )
         );
 
         var failure = result.ShouldBeOfType<BlokeBotStatePathResolution.Failed>();
         failure.Message.ShouldContain("--data-dir PATH");
+    }
+
+    [Test]
+    public void ExplicitStateDirectory_Resolving_OwnsLocalStateWithoutMovingLegacyDatabase()
+    {
+        var result = BlokeBotStatePathResolver.Resolve(
+            new BlokeBotStatePathRequest(
+                BlokeBotOperatingSystem.Linux,
+                new(null, null, null),
+                "/cli-state",
+                "/explicit-state",
+                "/legacy/blokebot.db",
+                null
+            )
+        );
+
+        var paths = result.ShouldBeOfType<BlokeBotStatePathResolution.Resolved>().Paths;
+        paths.StateDirectory.ShouldBe("/explicit-state");
+        paths.DatabasePath.ShouldBe("/legacy/blokebot.db");
+        paths.TokenCachePath.ShouldBe("/explicit-state/twitch.tokens.json");
+    }
+
+    [Test]
+    public void ProviderNeutralState_Preparing_DoesNotRequireDatabaseFilePath()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"blokebot-path-test-{Guid.NewGuid():N}");
+        var blockingFile = Path.Combine(root, "not-a-directory");
+        _ = Directory.CreateDirectory(root);
+        File.WriteAllText(blockingFile, "blocked");
+        try
+        {
+            var result = BlokeBotStatePathPreparer.Prepare(
+                new BlokeBotStatePaths(
+                    root,
+                    Path.Combine(blockingFile, "unused.db"),
+                    Path.Combine(root, "twitch.tokens.json")
+                ),
+                prepareDatabaseFile: false
+            );
+
+            _ = result.ShouldBeOfType<BlokeBotStatePathPreparation.Prepared>();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Test]
@@ -70,9 +120,11 @@ public sealed class BlokeBotStatePathTests
         {
             var result = BlokeBotStatePathPreparer.Prepare(
                 new BlokeBotStatePaths(
+                    blockingFile,
                     Path.Combine(blockingFile, "blokebot.db"),
                     Path.Combine(blockingFile, "twitch.tokens.json")
-                )
+                ),
+                prepareDatabaseFile: true
             );
 
             var failure = result.ShouldBeOfType<BlokeBotStatePathPreparation.Failed>();

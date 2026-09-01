@@ -24,7 +24,7 @@ public sealed class HostLifecycleTests
             var databasePath = Path.Combine(stateDirectory, "blokebot.db");
             var documentId = Guid.NewGuid();
             var storageKey = new string('a', 32);
-            var documentDirectory = OverlayMediaDirectory.DocumentDirectory(databasePath);
+            var documentDirectory = OverlayMediaDirectory.DocumentDirectory(stateDirectory);
             _ = Directory.CreateDirectory(documentDirectory);
             var path = Path.Combine(documentDirectory, storageKey);
             await File.WriteAllBytesAsync(path, [1, 2, 3]);
@@ -74,8 +74,8 @@ public sealed class HostLifecycleTests
             var hostId = await SeedHostedChannelGraphAsync(dbFactory, "streamer");
             var siblingId = await SeedHostedChannelGraphAsync(dbFactory, "sibling");
             var databasePath = Path.Combine(stateDirectory, "blokebot.db");
-            var removedMedia = SeedMediaDirectory(databasePath, hostId);
-            var siblingMedia = SeedMediaDirectory(databasePath, siblingId);
+            var removedMedia = SeedMediaDirectory(stateDirectory, hostId);
+            var siblingMedia = SeedMediaDirectory(stateDirectory, siblingId);
             var events = TestEventBus.Create<AppEventKind>();
             var eventCount = 0;
             _ = events.Subscribe(
@@ -128,7 +128,7 @@ public sealed class HostLifecycleTests
         {
             await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
             var databasePath = Path.Combine(stateDirectory, "blokebot.db");
-            var leftover = SeedMediaDirectory(databasePath, 123);
+            var leftover = SeedMediaDirectory(stateDirectory, 123);
             var events = TestEventBus.Create<AppEventKind>();
             var eventCount = 0;
             _ = events.Subscribe(
@@ -172,7 +172,7 @@ public sealed class HostLifecycleTests
             await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
             var hostId = await SeedHostedChannelGraphAsync(dbFactory, "streamer");
             var databasePath = Path.Combine(stateDirectory, "blokebot.db");
-            var media = SeedMediaDirectory(databasePath, hostId);
+            var media = SeedMediaDirectory(stateDirectory, hostId);
             File.SetUnixFileMode(media, UnixFileMode.UserRead | UnixFileMode.UserExecute);
             var service = Service(dbFactory, TestEventBus.Create<AppEventKind>(), databasePath);
 
@@ -254,9 +254,9 @@ public sealed class HostLifecycleTests
         );
     }
 
-    private static string SeedMediaDirectory(string databasePath, int hostId)
+    private static string SeedMediaDirectory(string stateDirectory, int hostId)
     {
-        var directory = OverlayMediaDirectory.HostDirectory(databasePath, hostId);
+        var directory = OverlayMediaDirectory.HostDirectory(stateDirectory, hostId);
         _ = Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, "asset.bin"), "media");
         return directory;

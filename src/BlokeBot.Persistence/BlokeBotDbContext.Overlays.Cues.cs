@@ -5,33 +5,43 @@ namespace BlokeBot.Persistence;
 
 public sealed partial class BlokeBotDbContext
 {
-    private static void ConfigureOverlayCues(ModelBuilder modelBuilder) =>
-        _ = modelBuilder.Entity<OverlayCue>(static b =>
+    private void ConfigureOverlayCues(ModelBuilder modelBuilder)
+    {
+        var configurationJsonConstraint = VersionedJsonObjectConstraint("ConfigurationJson", 32768);
+        _ = modelBuilder.Entity<OverlayCue>(b =>
         {
             _ = b.ToTable(
                 "overlay_cues",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_cues_Name",
-                        "length(Name) BETWEEN 1 AND 128"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(Name) BETWEEN 1 AND 128",
+                            "length(\"Name\") BETWEEN 1 AND 128"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_cues_Duration",
-                        "DurationMilliseconds BETWEEN 100 AND 300000"
+                        ProviderSql(
+                            modelBuilder,
+                            "DurationMilliseconds BETWEEN 100 AND 300000",
+                            "\"DurationMilliseconds\" BETWEEN 100 AND 300000"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_cues_QueuePolicy",
-                        KindIn("QueuePolicy", _overlayCueQueuePolicies)
+                        KindIn(modelBuilder, "QueuePolicy", _overlayCueQueuePolicies)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_cues_ConfigurationJson",
-                        "length(ConfigurationJson) BETWEEN 1 AND 32768 "
-                            + "AND json_valid(ConfigurationJson) "
-                            + "AND json_type(ConfigurationJson, '$.schemaVersion') = 'integer' "
-                            + "AND json_extract(ConfigurationJson, '$.schemaVersion') = 1"
+                        configurationJsonConstraint
                     );
-                    _ = t.HasCheckConstraint("CK_overlay_cues_Revision", "Revision > 0");
+                    _ = t.HasCheckConstraint(
+                        "CK_overlay_cues_Revision",
+                        ProviderSql(modelBuilder, "Revision > 0", "\"Revision\" > 0")
+                    );
                 }
             );
             _ = b.HasKey(static x => x.Id);
@@ -58,4 +68,5 @@ public sealed partial class BlokeBotDbContext
                 .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
 }

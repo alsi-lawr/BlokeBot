@@ -17,8 +17,7 @@ public sealed class PluginScheduleFileStore : IPluginScheduleStore, IDisposable
 
     public PluginScheduleFileStore(IOptions<BlokeBotOptions> options)
     {
-        var databasePath = Path.GetFullPath(options.Value.DatabasePath);
-        var stateDirectory = Path.GetDirectoryName(databasePath) ?? Environment.CurrentDirectory;
+        var stateDirectory = BlokeBotLocalState.Directory(options.Value);
         _path = Path.Combine(stateDirectory, "plugin-schedules.json");
     }
 

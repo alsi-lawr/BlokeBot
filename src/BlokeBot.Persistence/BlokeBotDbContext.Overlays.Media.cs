@@ -7,19 +7,23 @@ public sealed partial class BlokeBotDbContext
 {
     private static void ConfigureOverlayMedia(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<OverlayMediaAsset>(static b =>
+        _ = modelBuilder.Entity<OverlayMediaAsset>(b =>
         {
             _ = b.ToTable(
                 "overlay_media_assets",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_assets_Name",
-                        "length(Name) BETWEEN 1 AND 128"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(Name) BETWEEN 1 AND 128",
+                            "length(\"Name\") BETWEEN 1 AND 128"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_assets_Length",
-                        "ContentRevision > 0"
+                        ProviderSql(modelBuilder, "ContentRevision > 0", "\"ContentRevision\" > 0")
                     );
                 }
             );
@@ -45,28 +49,43 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<OverlayMediaDocument>(static b =>
+        _ = modelBuilder.Entity<OverlayMediaDocument>(b =>
         {
             _ = b.ToTable(
                 "overlay_media_documents",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_documents_ContentType",
-                        "ContentType LIKE 'image/%' OR ContentType LIKE 'audio/%' OR ContentType LIKE 'video/%'"
+                        ProviderSql(
+                            modelBuilder,
+                            "ContentType LIKE 'image/%' OR ContentType LIKE 'audio/%' OR ContentType LIKE 'video/%'",
+                            "\"ContentType\" LIKE 'image/%' OR \"ContentType\" LIKE 'audio/%' OR \"ContentType\" LIKE 'video/%'"
+                        )
                     );
-                    _ = t.HasCheckConstraint("CK_overlay_media_documents_Length", "ByteLength > 0");
+                    _ = t.HasCheckConstraint(
+                        "CK_overlay_media_documents_Length",
+                        ProviderSql(modelBuilder, "ByteLength > 0", "\"ByteLength\" > 0")
+                    );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_documents_StorageKey",
-                        "length(StorageKey) = 32"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(StorageKey) = 32",
+                            "length(\"StorageKey\") = 32"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_documents_State",
-                        KindIn("State", _overlayMediaDocumentStates)
+                        KindIn(modelBuilder, "State", _overlayMediaDocumentStates)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_documents_Legacy",
-                        "(LegacyHostId IS NULL AND LegacyStorageKey IS NULL) OR (LegacyHostId IS NOT NULL AND length(LegacyStorageKey) = 32)"
+                        ProviderSql(
+                            modelBuilder,
+                            "(LegacyHostId IS NULL AND LegacyStorageKey IS NULL) OR (LegacyHostId IS NOT NULL AND length(LegacyStorageKey) = 32)",
+                            "(\"LegacyHostId\" IS NULL AND \"LegacyStorageKey\" IS NULL) OR (\"LegacyHostId\" IS NOT NULL AND length(\"LegacyStorageKey\") = 32)"
+                        )
                     );
                 }
             );
@@ -85,7 +104,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.State, x.UpdatedAtUtc });
         });
 
-        _ = modelBuilder.Entity<OverlayCueMediaAssetReference>(static b =>
+        _ = modelBuilder.Entity<OverlayCueMediaAssetReference>(b =>
         {
             _ = b.ToTable("overlay_cue_media_asset_references");
             _ = b.HasKey(static x => new { x.CueId, x.AssetId });

@@ -22,32 +22,39 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureBounties(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<Bounty>(static b =>
+        _ = modelBuilder.Entity<Bounty>(b =>
         {
             _ = b.ToTable(
                 "bounties",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_bounties_Status",
-                        KindIn("Status", _bountyStatuses)
+                        KindIn(modelBuilder, "Status", _bountyStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_bounties_Visibility",
-                        KindIn("Visibility", _bountyVisibilities)
+                        KindIn(modelBuilder, "Visibility", _bountyVisibilities)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_bounties_FailurePledgePolicy",
-                        KindIn("FailurePledgePolicy", _bountyFailurePledgePolicies)
+                        KindIn(modelBuilder, "FailurePledgePolicy", _bountyFailurePledgePolicies)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_bounties_RewardDistribution",
-                        KindIn("RewardDistribution", _bountyRewardDistributions)
+                        KindIn(modelBuilder, "RewardDistribution", _bountyRewardDistributions)
                     );
-                    _ = t.HasCheckConstraint("CK_bounties_Revision", "Revision > 0");
+                    _ = t.HasCheckConstraint(
+                        "CK_bounties_Revision",
+                        ProviderSql(modelBuilder, "Revision > 0", "\"Revision\" > 0")
+                    );
                     _ = t.HasCheckConstraint(
                         "CK_bounties_ContributorCount",
-                        "ContributorCount >= 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "ContributorCount >= 0",
+                            "\"ContributorCount\" >= 0"
+                        )
                     );
                 }
             );
@@ -99,14 +106,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BountyPledge>(static b =>
+        _ = modelBuilder.Entity<BountyPledge>(b =>
         {
             _ = b.ToTable(
                 "bounty_pledges",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_bounty_pledges_State",
-                        KindIn("State", _bountyPledgeStates)
+                        KindIn(modelBuilder, "State", _bountyPledgeStates)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -135,7 +142,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BountyContributorReward>(static b =>
+        _ = modelBuilder.Entity<BountyContributorReward>(b =>
         {
             _ = b.ToTable("bounty_contributor_rewards");
             _ = b.HasKey(static x => x.Id);
@@ -158,23 +165,23 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BountyModerationAudit>(static b =>
+        _ = modelBuilder.Entity<BountyModerationAudit>(b =>
         {
             _ = b.ToTable(
                 "bounty_moderation_audit",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_bounty_moderation_audit_Action",
-                        KindIn("Action", _bountyAuditActions)
+                        KindIn(modelBuilder, "Action", _bountyAuditActions)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_bounty_moderation_audit_FromStatus",
-                        KindIn("FromStatus", _bountyStatuses)
+                        KindIn(modelBuilder, "FromStatus", _bountyStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_bounty_moderation_audit_ToStatus",
-                        KindIn("ToStatus", _bountyStatuses)
+                        KindIn(modelBuilder, "ToStatus", _bountyStatuses)
                     );
                 }
             );
@@ -209,12 +216,15 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<BountyDomainEvent>(static b =>
+        _ = modelBuilder.Entity<BountyDomainEvent>(b =>
         {
             _ = b.ToTable(
                 "bounty_events",
-                static t =>
-                    t.HasCheckConstraint("CK_bounty_events_Kind", KindIn("Kind", _bountyEventKinds))
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_bounty_events_Kind",
+                        KindIn(modelBuilder, "Kind", _bountyEventKinds)
+                    )
             );
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.BountyPublicId).HasConversion<string>();

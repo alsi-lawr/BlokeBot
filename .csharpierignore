@@ -3,3 +3,4 @@
 src/BlokeBot.Persistence/Migrations/*_v0.3.0.cs
 src/BlokeBot.Persistence/Migrations/*_v0.3.0.Designer.cs
 src/BlokeBot.Persistence/Migrations/BlokeBotDbContextModelSnapshot.cs
+src/BlokeBot.Persistence.PostgreSql/Migrations/*.cs

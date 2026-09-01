@@ -18,14 +18,14 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureRequestBoards(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<RequestBoard>(static b =>
+        _ = modelBuilder.Entity<RequestBoard>(b =>
         {
             _ = b.ToTable(
                 "request_boards",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_request_boards_RefundPolicy",
-                        KindIn("RefundPolicy", _requestBoardRefundPolicies)
+                        KindIn(modelBuilder, "RefundPolicy", _requestBoardRefundPolicies)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -55,14 +55,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<RequestBoardField>(static b =>
+        _ = modelBuilder.Entity<RequestBoardField>(b =>
         {
             _ = b.ToTable(
                 "request_board_fields",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_request_board_fields_Kind",
-                        KindIn("Kind", _requestBoardFieldKinds)
+                        KindIn(modelBuilder, "Kind", _requestBoardFieldKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -79,19 +79,23 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.BoardId, x.Position }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<RequestSubmission>(static b =>
+        _ = modelBuilder.Entity<RequestSubmission>(b =>
         {
             _ = b.ToTable(
                 "request_submissions",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_request_submissions_Status",
-                        KindIn("Status", _requestSubmissionStatuses)
+                        KindIn(modelBuilder, "Status", _requestSubmissionStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_request_submissions_PointReservationState",
-                        KindIn("PointReservationState", _requestPointReservationStates)
+                        KindIn(
+                            modelBuilder,
+                            "PointReservationState",
+                            _requestPointReservationStates
+                        )
                     );
                 }
             );
@@ -147,7 +151,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<RequestSubmissionValue>(static b =>
+        _ = modelBuilder.Entity<RequestSubmissionValue>(b =>
         {
             _ = b.ToTable("request_submission_values");
             _ = b.HasKey(static x => x.Id);
@@ -159,7 +163,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<RequestSubmissionVote>(static b =>
+        _ = modelBuilder.Entity<RequestSubmissionVote>(b =>
         {
             _ = b.ToTable("request_submission_votes");
             _ = b.HasKey(static x => x.Id);
@@ -167,14 +171,14 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.SubmissionId, x.VoterLogin }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<RequestBoardDomainEvent>(static b =>
+        _ = modelBuilder.Entity<RequestBoardDomainEvent>(b =>
         {
             _ = b.ToTable(
                 "request_board_events",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_request_board_events_Kind",
-                        KindIn("Kind", _requestBoardEventKinds)
+                        KindIn(modelBuilder, "Kind", _requestBoardEventKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

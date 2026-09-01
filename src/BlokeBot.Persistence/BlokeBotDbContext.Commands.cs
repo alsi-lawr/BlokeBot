@@ -33,7 +33,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureCommands(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<BotReplySettings>(static b =>
+        _ = modelBuilder.Entity<BotReplySettings>(b =>
         {
             _ = b.ToTable("reply_settings");
             _ = b.HasKey(static x => x.Id);
@@ -43,14 +43,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<CommandAlias>(static b =>
+        _ = modelBuilder.Entity<CommandAlias>(b =>
         {
             _ = b.ToTable(
                 "command_aliases",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_command_aliases_Kind",
-                        KindIn("Kind", _commandAliasKinds)
+                        KindIn(modelBuilder, "Kind", _commandAliasKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -84,14 +84,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<CustomMessageLibraryEntry>(static b =>
+        _ = modelBuilder.Entity<CustomMessageLibraryEntry>(b =>
         {
             _ = b.ToTable(
                 "custom_message_library_entries",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_custom_message_library_entries_SelectionMode",
-                        KindIn("SelectionMode", _customMessageSelectionModes)
+                        KindIn(modelBuilder, "SelectionMode", _customMessageSelectionModes)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -114,7 +114,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<CustomMessageVariant>(static b =>
+        _ = modelBuilder.Entity<CustomMessageVariant>(b =>
         {
             _ = b.ToTable("custom_message_variants");
             _ = b.HasKey(static x => x.Id);
@@ -123,7 +123,7 @@ public sealed partial class BlokeBotDbContext
                 .IsUnique();
         });
 
-        _ = modelBuilder.Entity<CustomCounter>(static b =>
+        _ = modelBuilder.Entity<CustomCounter>(b =>
         {
             _ = b.ToTable("custom_counters");
             _ = b.HasKey(static x => x.Id);
@@ -136,19 +136,19 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<CustomCommand>(static b =>
+        _ = modelBuilder.Entity<CustomCommand>(b =>
         {
             _ = b.ToTable(
                 "custom_commands",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_custom_commands_CooldownScope",
-                        KindIn("CooldownScope", _customCommandCooldownScopes)
+                        KindIn(modelBuilder, "CooldownScope", _customCommandCooldownScopes)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_commands_InvocationLimit",
-                        KindIn("InvocationLimit", _customCommandInvocationLimits)
+                        KindIn(modelBuilder, "InvocationLimit", _customCommandInvocationLimits)
                     );
                 }
             );
@@ -181,7 +181,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<CustomCommandAllowedUser>(static b =>
+        _ = modelBuilder.Entity<CustomCommandAllowedUser>(b =>
         {
             _ = b.ToTable("custom_command_allowed_users");
             _ = b.HasKey(static x => new
@@ -200,35 +200,71 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<CustomCommandAction>(static b =>
+        _ = modelBuilder.Entity<CustomCommandAction>(b =>
         {
             _ = b.ToTable(
                 "custom_command_actions",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_custom_command_actions_ActionType",
-                        KindIn("ActionType", _customCommandActionTypes)
+                        KindIn(modelBuilder, "ActionType", _customCommandActionTypes)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_command_actions_QueuePolicy",
-                        KindInOrNull("QueuePolicy", _overlayCueQueuePolicies)
+                        KindInOrNull(modelBuilder, "QueuePolicy", _overlayCueQueuePolicies)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_command_actions_ReplyOrder",
-                        KindInOrNull("ReplyOrder", _overlayCueReplyOrders)
+                        KindInOrNull(modelBuilder, "ReplyOrder", _overlayCueReplyOrders)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_command_actions_Payload",
-                        "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL "
-                            + "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL "
-                            + "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR "
-                            + "(ActionType = 'Counter' AND CounterId IS NOT NULL "
-                            + "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL "
-                            + "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR "
-                            + "(ActionType = 'OverlayCue' AND CounterId IS NULL "
-                            + "AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL "
-                            + "AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)"
+                        ProviderSql(
+                            modelBuilder,
+                            "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL ",
+                            "(\"ActionType\" IN ('Message', 'Automation') AND \"CounterId\" IS NULL "
+                        )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL ",
+                                "AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR ",
+                                "AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(ActionType = 'Counter' AND CounterId IS NOT NULL ",
+                                "(\"ActionType\" = 'Counter' AND \"CounterId\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL ",
+                                "AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR ",
+                                "AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(ActionType = 'OverlayCue' AND CounterId IS NULL ",
+                                "(\"ActionType\" = 'OverlayCue' AND \"CounterId\" IS NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL ",
+                                "AND \"TargetOverlayPublicId\" IS NOT NULL AND \"CuePublicId\" IS NOT NULL "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)",
+                                "AND \"QueuePolicy\" IS NOT NULL AND \"ReplyOrder\" IS NOT NULL)"
+                            )
                     );
                 }
             );
@@ -260,7 +296,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<CounterCustomCommandAction>(static b =>
+        _ = modelBuilder.Entity<CounterCustomCommandAction>(b =>
             b.HasOne(static x => x.Counter)
                 .WithMany()
                 .HasForeignKey(static x => new { x.HostId, x.CounterId })
@@ -268,7 +304,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict)
         );
 
-        _ = modelBuilder.Entity<OverlayCueCustomCommandAction>(static b =>
+        _ = modelBuilder.Entity<OverlayCueCustomCommandAction>(b =>
         {
             _ = b.Property(static x => x.TargetOverlayPublicId).HasConversion<string>();
             _ = b.Property(static x => x.CuePublicId).HasConversion<string>();
@@ -286,100 +322,6 @@ public sealed partial class BlokeBotDbContext
                 .HasMaxLength(16);
         });
 
-        _ = modelBuilder.Entity<CustomCommandAlias>(static b =>
-        {
-            _ = b.ToTable("custom_command_aliases");
-            _ = b.HasKey(static x => x.Id);
-            _ = b.Property(static x => x.Alias).HasMaxLength(64);
-            _ = b.HasIndex(static x => new { x.HostId, x.Alias }).IsUnique();
-            _ = b.HasIndex(static x => new { x.CustomCommandId, x.SortOrder }).IsUnique();
-            _ = b.HasOne(static x => x.Command)
-                .WithMany(static x => x.Aliases)
-                .HasForeignKey(static x => new { x.HostId, x.CustomCommandId })
-                .HasPrincipalKey(static x => new { x.HostId, x.Id })
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        _ = modelBuilder.Entity<CustomCommandInvocationClaim>(static b =>
-        {
-            _ = b.ToTable(
-                "custom_command_invocation_claims",
-                static t =>
-                    t.HasCheckConstraint(
-                        "CK_custom_command_invocation_claims_Scope",
-                        "(TwitchUserId IS NULL AND TwitchStreamId IS NOT NULL) OR "
-                            + "(TwitchUserId IS NOT NULL AND TwitchStreamId IS NULL) OR "
-                            + "(TwitchUserId IS NOT NULL AND TwitchStreamId IS NOT NULL)"
-                    )
-            );
-            _ = b.HasKey(static x => x.Id);
-            _ = b.Property(static x => x.TwitchUserId).HasMaxLength(64);
-            _ = b.Property(static x => x.TwitchStreamId).HasMaxLength(64);
-            _ = b.HasIndex(static x => new
-                {
-                    x.HostId,
-                    x.CustomCommandId,
-                    x.TwitchStreamId,
-                })
-                .IsUnique()
-                .HasFilter("TwitchUserId IS NULL AND TwitchStreamId IS NOT NULL");
-            _ = b.HasIndex(static x => new
-                {
-                    x.HostId,
-                    x.CustomCommandId,
-                    x.TwitchUserId,
-                })
-                .IsUnique()
-                .HasFilter("TwitchUserId IS NOT NULL AND TwitchStreamId IS NULL");
-            _ = b.HasIndex(static x => new
-                {
-                    x.HostId,
-                    x.CustomCommandId,
-                    x.TwitchUserId,
-                    x.TwitchStreamId,
-                })
-                .IsUnique()
-                .HasFilter("TwitchUserId IS NOT NULL AND TwitchStreamId IS NOT NULL");
-            _ = b.HasOne(static x => x.Command)
-                .WithMany()
-                .HasForeignKey(static x => new { x.HostId, x.CustomCommandId })
-                .HasPrincipalKey(static x => new { x.HostId, x.Id })
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        _ = modelBuilder.Entity<CustomCommandInvocationResetAudit>(static b =>
-        {
-            _ = b.ToTable(
-                "custom_command_invocation_reset_audits",
-                static t =>
-                    t.HasCheckConstraint(
-                        "CK_custom_command_invocation_reset_audits_Scope",
-                        KindIn("Scope", _customCommandInvocationResetScopes)
-                    )
-            );
-            _ = b.HasKey(static x => x.Id);
-            _ = b.Property(static x => x.CommandName).HasMaxLength(128);
-            _ = b.Property(static x => x.ActorTwitchUserId).HasMaxLength(64);
-            _ = b.Property(static x => x.ActorLogin).HasMaxLength(64);
-            _ = b.Property(static x => x.TargetTwitchUserId).HasMaxLength(64);
-            _ = b.Property(static x => x.TargetLogin).HasMaxLength(64);
-            _ = b.Property(static x => x.Scope)
-                .HasConversion(
-                    static scope =>
-                        PersistedEnumTokens<CustomCommandInvocationResetScope>.Format(scope),
-                    static value =>
-                        PersistedEnumTokens<CustomCommandInvocationResetScope>.Parse(value)
-                )
-                .HasMaxLength(32);
-            _ = b.HasIndex(static x => new { x.HostId, x.ResetAtUtc });
-            _ = b.HasOne(static x => x.Command)
-                .WithMany()
-                .HasForeignKey(static x => x.CustomCommandId)
-                .OnDelete(DeleteBehavior.SetNull);
-            _ = b.HasOne<BotHost>()
-                .WithMany()
-                .HasForeignKey(static x => x.HostId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
+        ConfigureCommandInvocations(modelBuilder);
     }
 }

@@ -13,14 +13,14 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePoints(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<PointsSettings>(static b =>
+        _ = modelBuilder.Entity<PointsSettings>(b =>
         {
             _ = b.ToTable(
                 "points_settings",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_points_settings_GiveawayEligibility",
-                        KindIn("GiveawayEligibility", _pointsEligibilityKinds)
+                        KindIn(modelBuilder, "GiveawayEligibility", _pointsEligibilityKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -42,7 +42,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PointBalance>(static b =>
+        _ = modelBuilder.Entity<PointBalance>(b =>
         {
             _ = b.ToTable("point_balances");
             _ = b.HasKey(static x => x.Id);
@@ -55,14 +55,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PointLedgerEntry>(static b =>
+        _ = modelBuilder.Entity<PointLedgerEntry>(b =>
         {
             _ = b.ToTable(
                 "point_ledger_entries",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_point_ledger_entries_Kind",
-                        KindIn("Kind", PointLedgerKindPersistence.Tokens)
+                        KindIn(modelBuilder, "Kind", PointLedgerKindPersistence.Tokens)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -105,19 +105,19 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<PointsGiveaway>(static b =>
+        _ = modelBuilder.Entity<PointsGiveaway>(b =>
         {
             _ = b.ToTable(
                 "points_giveaways",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_points_giveaways_Status",
-                        KindIn("Status", _pointsGiveawayStatusKinds)
+                        KindIn(modelBuilder, "Status", _pointsGiveawayStatusKinds)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_points_giveaways_Eligibility",
-                        KindIn("Eligibility", _pointsEligibilityKinds)
+                        KindIn(modelBuilder, "Eligibility", _pointsEligibilityKinds)
                     );
                 }
             );
@@ -151,7 +151,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PointsGiveawayEntrant>(static b =>
+        _ = modelBuilder.Entity<PointsGiveawayEntrant>(b =>
         {
             _ = b.ToTable("points_giveaway_entrants");
             _ = b.HasKey(static x => x.Id);
@@ -159,7 +159,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.GiveawayId, x.Login }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<PointsGiveawayWinner>(static b =>
+        _ = modelBuilder.Entity<PointsGiveawayWinner>(b =>
         {
             _ = b.ToTable("points_giveaway_winners");
             _ = b.HasKey(static x => x.Id);

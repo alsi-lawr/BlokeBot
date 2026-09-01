@@ -55,16 +55,17 @@ internal sealed record BlokeBotStatePathRequest(
     BlokeBotOperatingSystem OperatingSystem,
     BlokeBotPlatformEnvironment Environment,
     string? DataDirectory,
+    string? ExplicitStateDirectory,
     string? ExplicitDatabasePath,
     string? ExplicitTokenCachePath
 );
 
-internal sealed record BlokeBotStatePaths(string DatabasePath, string TokenCachePath)
+internal sealed record BlokeBotStatePaths(
+    string StateDirectory,
+    string DatabasePath,
+    string TokenCachePath
+)
 {
-    internal string StateDirectory =>
-        Path.GetDirectoryName(DatabasePath)
-        ?? throw new InvalidOperationException("The database path has no parent directory.");
-
     internal string DataProtectionKeysDirectory =>
         Path.Combine(StateDirectory, "data-protection-keys");
 }
@@ -85,20 +86,22 @@ internal static class BlokeBotStatePathResolver
 
     internal static BlokeBotStatePathResolution Resolve(BlokeBotStatePathRequest request)
     {
+        var stateDirectory = ExplicitPath(request.ExplicitStateDirectory);
         var databasePath = ExplicitPath(request.ExplicitDatabasePath);
         var tokenCachePath = ExplicitPath(request.ExplicitTokenCachePath);
-        if (databasePath is not null && tokenCachePath is not null)
+        if (stateDirectory is null && databasePath is not null)
         {
-            return Resolved(databasePath, tokenCachePath);
+            stateDirectory = Path.GetDirectoryName(Path.GetFullPath(databasePath));
         }
 
-        var dataDirectory = ExplicitPath(request.DataDirectory);
-        if (dataDirectory is not null)
+        stateDirectory ??= ExplicitPath(request.DataDirectory);
+        if (stateDirectory is not null)
         {
             return Resolved(
-                databasePath ?? Combine(request.OperatingSystem, dataDirectory, _databaseFileName),
+                stateDirectory,
+                databasePath ?? Combine(request.OperatingSystem, stateDirectory, _databaseFileName),
                 tokenCachePath
-                    ?? Combine(request.OperatingSystem, dataDirectory, _tokenCacheFileName)
+                    ?? Combine(request.OperatingSystem, stateDirectory, _tokenCacheFileName)
             );
         }
 
@@ -106,7 +109,8 @@ internal static class BlokeBotStatePathResolver
         return defaultDirectory switch
         {
             BlokeBotDefaultStateDirectory.Resolved resolved => Resolved(
-                databasePath ?? Combine(request.OperatingSystem, resolved.Path, _databaseFileName),
+                resolved.Path,
+                Combine(request.OperatingSystem, resolved.Path, _databaseFileName),
                 tokenCachePath
                     ?? Combine(request.OperatingSystem, resolved.Path, _tokenCacheFileName)
             ),
@@ -175,9 +179,10 @@ internal static class BlokeBotStatePathResolver
             );
 
     private static BlokeBotStatePathResolution.Resolved Resolved(
+        string stateDirectory,
         string databasePath,
         string tokenCachePath
-    ) => new(new BlokeBotStatePaths(databasePath, tokenCachePath));
+    ) => new(new BlokeBotStatePaths(stateDirectory, databasePath, tokenCachePath));
 
     private static string? ExplicitPath(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -228,20 +233,28 @@ internal abstract record BlokeBotStatePathPreparation
 
 internal static class BlokeBotStatePathPreparer
 {
-    internal static BlokeBotStatePathPreparation Prepare(BlokeBotStatePaths paths)
+    internal static BlokeBotStatePathPreparation Prepare(
+        BlokeBotStatePaths paths,
+        bool prepareDatabaseFile
+    )
     {
         try
         {
             var prepared = new BlokeBotStatePaths(
+                Path.GetFullPath(paths.StateDirectory),
                 Path.GetFullPath(paths.DatabasePath),
                 Path.GetFullPath(paths.TokenCachePath)
             );
             var directories = new HashSet<string>(StringComparer.Ordinal)
             {
-                ParentDirectory(prepared.DatabasePath),
+                prepared.StateDirectory,
                 ParentDirectory(prepared.TokenCachePath),
                 prepared.DataProtectionKeysDirectory,
             };
+            if (prepareDatabaseFile)
+            {
+                _ = directories.Add(ParentDirectory(prepared.DatabasePath));
+            }
             foreach (var directory in directories)
             {
                 EnsureDirectoryWritable(directory);
@@ -249,14 +262,17 @@ internal static class BlokeBotStatePathPreparer
 
             EnsurePrivateDataProtectionDirectory(prepared.DataProtectionKeysDirectory);
 
-            EnsureExistingFileWritable(prepared.DatabasePath);
+            if (prepareDatabaseFile)
+            {
+                EnsureExistingFileWritable(prepared.DatabasePath);
+            }
             EnsureExistingFileWritable(prepared.TokenCachePath);
             return new BlokeBotStatePathPreparation.Prepared(prepared);
         }
         catch (Exception exception) when (IsPathFailure(exception))
         {
             return new BlokeBotStatePathPreparation.Failed(
-                "blokebot could not prepare its state files. Choose a writable directory with 'blokebot serve --data-dir PATH' or set BlokeBot__DatabasePath and TwitchBot__Identity__TokenCachePath explicitly."
+                "blokebot could not prepare its state files. Choose a writable directory with 'blokebot serve --data-dir PATH' or set BlokeBot__StateDirectory explicitly."
             );
         }
     }

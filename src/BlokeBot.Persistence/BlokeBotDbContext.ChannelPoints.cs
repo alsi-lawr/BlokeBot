@@ -10,7 +10,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureChannelPoints(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<TwitchCustomReward>(static b =>
+        _ = modelBuilder.Entity<TwitchCustomReward>(b =>
         {
             _ = b.ToTable("twitch_custom_rewards");
             _ = b.HasKey(static x => x.Id);
@@ -25,14 +25,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<TwitchRewardRedemption>(static b =>
+        _ = modelBuilder.Entity<TwitchRewardRedemption>(b =>
         {
             _ = b.ToTable(
                 "twitch_reward_redemptions",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_twitch_reward_redemptions_Status",
-                        KindIn("Status", _twitchRewardRedemptionStatusKinds)
+                        KindIn(modelBuilder, "Status", _twitchRewardRedemptionStatusKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

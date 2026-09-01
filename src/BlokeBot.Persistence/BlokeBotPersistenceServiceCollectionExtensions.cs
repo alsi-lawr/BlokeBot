@@ -1,7 +1,6 @@
 using BlokeBot.Persistence.Plugins;
 using BlokeBot.Plugins.Features;
 using BlokeBot.Plugins.Runtime;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,20 +11,17 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotPersistence(
         this IServiceCollection services,
         string databasePath
+    ) => services.AddBlokeBotPersistence(BlokeBotDatabaseConfiguration.Sqlite(databasePath));
+
+    public static IServiceCollection AddBlokeBotPersistence(
+        this IServiceCollection services,
+        BlokeBotDatabaseConfiguration configuration
     )
     {
-        var fullPath = Path.GetFullPath(databasePath);
-        var directory = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            _ = Directory.CreateDirectory(directory);
-        }
-
-        var connectionString = new SqliteConnectionStringBuilder
-        {
-            DataSource = fullPath,
-        }.ToString();
-        return services.AddBlokeBotPersistence(_ => connectionString);
+        ArgumentNullException.ThrowIfNull(configuration);
+        return services.AddBlokeBotPersistenceServices(
+            (provider, builder) => configuration.Configure(builder)
+        );
     }
 
     public static IServiceCollection AddBlokeBotPersistence(
@@ -35,9 +31,17 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionString);
 
-        _ = services.AddDbContextFactory<BlokeBotDbContext>(
-            (provider, db) => db.UseSqlite(connectionString(provider))
+        return services.AddBlokeBotPersistenceServices(
+            (provider, builder) => builder.UseSqlite(connectionString(provider))
         );
+    }
+
+    private static IServiceCollection AddBlokeBotPersistenceServices(
+        this IServiceCollection services,
+        Action<IServiceProvider, DbContextOptionsBuilder> configure
+    )
+    {
+        _ = services.AddDbContextFactory<BlokeBotDbContext>(configure);
         _ = services.AddSingleton<BlokeBotDatabaseInitializer>();
         _ = services.AddSingleton<IPluginLifecycleStore, EfPluginLifecycleStore>();
         _ = services.AddSingleton<EfPluginMarketplaceReceiptStore>();

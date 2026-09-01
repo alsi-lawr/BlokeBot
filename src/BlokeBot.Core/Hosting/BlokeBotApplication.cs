@@ -80,9 +80,12 @@ public static partial class BlokeBotApplication
             );
         }
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        var stateDirectory = builder.Configuration["BlokeBot:StateDirectory"];
         var databasePath = builder.Configuration["BlokeBot:DatabasePath"];
-        var writableStateRoot = !string.IsNullOrWhiteSpace(databasePath)
-            ? Path.GetDirectoryName(Path.GetFullPath(databasePath))!
+        var writableStateRoot =
+            !string.IsNullOrWhiteSpace(stateDirectory) ? Path.GetFullPath(stateDirectory)
+            : !string.IsNullOrWhiteSpace(databasePath)
+                ? Path.GetDirectoryName(Path.GetFullPath(databasePath))!
             : Path.Combine(builder.Environment.ContentRootPath, ".state");
         var pluginStateRoot = Path.Combine(writableStateRoot, "plugins");
         builder.Services.TryAddSingleton(new PluginPrivateDataOptions(pluginStateRoot));

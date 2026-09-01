@@ -5,36 +5,46 @@ namespace BlokeBot.Persistence;
 
 public sealed partial class BlokeBotDbContext
 {
-    private static void ConfigureOverlayInstances(ModelBuilder modelBuilder)
+    private void ConfigureOverlayInstances(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<OverlayInstance>(static b =>
+        var configurationJsonConstraint = VersionedJsonObjectConstraint("ConfigurationJson", 8192);
+        _ = modelBuilder.Entity<OverlayInstance>(b =>
         {
             _ = b.ToTable(
                 "overlay_instances",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_instances_Type",
-                        KindIn("Type", _overlayTypes)
+                        KindIn(modelBuilder, "Type", _overlayTypes)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_instances_Name",
-                        "length(Name) BETWEEN 1 AND 128"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(Name) BETWEEN 1 AND 128",
+                            "length(\"Name\") BETWEEN 1 AND 128"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_instances_ConfigurationJson",
-                        "length(ConfigurationJson) BETWEEN 1 AND 8192 "
-                            + "AND json_valid(ConfigurationJson) "
-                            + "AND json_type(ConfigurationJson, '$.schemaVersion') = 'integer' "
-                            + "AND json_extract(ConfigurationJson, '$.schemaVersion') = 1"
+                        configurationJsonConstraint
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_instances_AccessKeyDigest",
-                        "length(AccessKeyDigest) = 32"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(AccessKeyDigest) = 32",
+                            "length(\"AccessKeyDigest\") = 32"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_instances_Versions",
-                        "KeyVersion > 0 AND Revision > 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "KeyVersion > 0 AND Revision > 0",
+                            "\"KeyVersion\" > 0 AND \"Revision\" > 0"
+                        )
                     );
                 }
             );
@@ -64,14 +74,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<OverlayInstanceDomainEvent>(static b =>
+        _ = modelBuilder.Entity<OverlayInstanceDomainEvent>(b =>
         {
             _ = b.ToTable(
                 "overlay_instance_events",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_overlay_instance_events_Kind",
-                        KindIn("Kind", _overlayInstanceEventKinds)
+                        KindIn(modelBuilder, "Kind", _overlayInstanceEventKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

@@ -70,7 +70,10 @@ internal sealed class BotHostRemovalService(
 
     private HostMediaCleanup RemoveMedia(int hostId)
     {
-        var directory = OverlayMediaDirectory.HostDirectory(options.Value.DatabasePath, hostId);
+        var directory = OverlayMediaDirectory.HostDirectory(
+            BlokeBotLocalState.Directory(options.Value),
+            hostId
+        );
         if (!Directory.Exists(directory))
         {
             return new HostMediaCleanup.NotPresent();

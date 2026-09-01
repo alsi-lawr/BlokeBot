@@ -16,7 +16,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureShoutouts(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<ShoutoutHistoryEntry>(static b =>
+        _ = modelBuilder.Entity<ShoutoutHistoryEntry>(b =>
         {
             _ = b.ToTable("shoutout_history");
             _ = b.HasKey(static x => x.Id);
@@ -33,7 +33,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ShoutoutCooldownState>(static b =>
+        _ = modelBuilder.Entity<ShoutoutCooldownState>(b =>
         {
             _ = b.ToTable("shoutout_cooldowns");
             _ = b.HasKey(static x => x.Id);
@@ -46,31 +46,39 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<AutomaticRaidShoutoutSettings>(static b =>
+        _ = modelBuilder.Entity<AutomaticRaidShoutoutSettings>(b =>
         {
             _ = b.ToTable(
                 "automatic_raid_shoutout_settings",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_settings_MinimumViewerCount",
-                        "MinimumViewerCount >= 1"
+                        ProviderSql(
+                            modelBuilder,
+                            "MinimumViewerCount >= 1",
+                            "\"MinimumViewerCount\" >= 1"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_settings_Mechanism",
-                        KindIn("Mechanism", _automaticRaidMechanisms)
+                        KindIn(modelBuilder, "Mechanism", _automaticRaidMechanisms)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_settings_ChatPresentation",
-                        KindIn("ChatPresentation", _automaticRaidChatPresentations)
+                        KindIn(modelBuilder, "ChatPresentation", _automaticRaidChatPresentations)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_settings_AnnouncementColor",
-                        KindIn("AnnouncementColor", _twitchAnnouncementColors)
+                        KindIn(modelBuilder, "AnnouncementColor", _twitchAnnouncementColors)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_settings_PinDuration",
-                        "PinDurationSeconds IS NULL OR (PinDurationSeconds >= 30 AND PinDurationSeconds <= 1800)"
+                        ProviderSql(
+                            modelBuilder,
+                            "PinDurationSeconds IS NULL OR (PinDurationSeconds >= 30 AND PinDurationSeconds <= 1800)",
+                            "\"PinDurationSeconds\" IS NULL OR (\"PinDurationSeconds\" >= 30 AND \"PinDurationSeconds\" <= 1800)"
+                        )
                     );
                 }
             );
@@ -109,14 +117,18 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<AutomaticRaidProcessedEvent>(static b =>
+        _ = modelBuilder.Entity<AutomaticRaidProcessedEvent>(b =>
         {
             _ = b.ToTable(
                 "automatic_raid_processed_events",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_automatic_raid_processed_events_Expiry",
-                        "ExpiresAtUtc >= ClaimedAtUtc"
+                        ProviderSql(
+                            modelBuilder,
+                            "ExpiresAtUtc >= ClaimedAtUtc",
+                            "\"ExpiresAtUtc\" >= \"ClaimedAtUtc\""
+                        )
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -129,23 +141,27 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<AutomaticRaidShoutoutOutcome>(static b =>
+        _ = modelBuilder.Entity<AutomaticRaidShoutoutOutcome>(b =>
         {
             _ = b.ToTable(
                 "automatic_raid_shoutout_outcomes",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_outcomes_Status",
-                        KindIn("Status", _automaticRaidOutcomeStatuses)
+                        KindIn(modelBuilder, "Status", _automaticRaidOutcomeStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_outcomes_ResultCode",
-                        KindInOrNull("ResultCode", _automaticRaidResultCodes)
+                        KindInOrNull(modelBuilder, "ResultCode", _automaticRaidResultCodes)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_outcomes_State",
-                        "(Status = 'Processing' AND ResultCode IS NULL AND CompletedAtUtc IS NULL) OR (Status = 'Queued' AND ResultCode = 'Queued' AND CompletedAtUtc IS NULL) OR (Status = 'Delivered' AND ResultCode = 'Delivered' AND CompletedAtUtc IS NOT NULL) OR (Status = 'NotDelivered' AND ResultCode IS NOT NULL AND ResultCode NOT IN ('Queued', 'Delivered', 'Ambiguous') AND CompletedAtUtc IS NOT NULL) OR (Status = 'Ambiguous' AND ResultCode = 'Ambiguous' AND CompletedAtUtc IS NOT NULL)"
+                        ProviderSql(
+                            modelBuilder,
+                            "(Status = 'Processing' AND ResultCode IS NULL AND CompletedAtUtc IS NULL) OR (Status = 'Queued' AND ResultCode = 'Queued' AND CompletedAtUtc IS NULL) OR (Status = 'Delivered' AND ResultCode = 'Delivered' AND CompletedAtUtc IS NOT NULL) OR (Status = 'NotDelivered' AND ResultCode IS NOT NULL AND ResultCode NOT IN ('Queued', 'Delivered', 'Ambiguous') AND CompletedAtUtc IS NOT NULL) OR (Status = 'Ambiguous' AND ResultCode = 'Ambiguous' AND CompletedAtUtc IS NOT NULL)",
+                            "(\"Status\" = 'Processing' AND \"ResultCode\" IS NULL AND \"CompletedAtUtc\" IS NULL) OR (\"Status\" = 'Queued' AND \"ResultCode\" = 'Queued' AND \"CompletedAtUtc\" IS NULL) OR (\"Status\" = 'Delivered' AND \"ResultCode\" = 'Delivered' AND \"CompletedAtUtc\" IS NOT NULL) OR (\"Status\" = 'NotDelivered' AND \"ResultCode\" IS NOT NULL AND \"ResultCode\" NOT IN ('Queued', 'Delivered', 'Ambiguous') AND \"CompletedAtUtc\" IS NOT NULL) OR (\"Status\" = 'Ambiguous' AND \"ResultCode\" = 'Ambiguous' AND \"CompletedAtUtc\" IS NOT NULL)"
+                        )
                     );
                 }
             );

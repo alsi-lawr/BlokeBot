@@ -14,6 +14,8 @@ public sealed record BlokeBotOptions
 
     public string DatabasePath { get; init; } = "blokebot.db";
 
+    public string? StateDirectory { get; init; }
+
     /// <summary>
     /// Optional base address of the deployment's BlokeBot.Site guide. Page help adds one guide
     /// link when it resolves and omits the link otherwise; it is deliberately outside
@@ -26,6 +28,17 @@ public sealed record BlokeBotOptions
     /// origin of <c>TwitchBot:Identity:RedirectUri</c>.
     /// </summary>
     public string? PublicBaseUrl { get; init; }
+}
+
+internal static class BlokeBotLocalState
+{
+    internal static string Directory(BlokeBotOptions options) =>
+        !string.IsNullOrWhiteSpace(options.StateDirectory)
+            ? Path.GetFullPath(options.StateDirectory)
+            : Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath))
+                ?? throw new InvalidOperationException(
+                    "The database path has no parent directory."
+                );
 }
 
 public sealed record BlokeBotCustomCommandOptions

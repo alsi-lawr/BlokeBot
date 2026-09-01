@@ -235,3 +235,8 @@ charset = utf-8-bom
 # turn them into maintained warning-cleanup work.
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
+
+[src/BlokeBot.Persistence.PostgreSql/Migrations/*.cs]
+charset = utf-8-bom
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

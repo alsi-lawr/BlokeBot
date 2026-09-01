@@ -23,16 +23,36 @@ public sealed partial class BlokeBotDbContext
                 {
                     _ = t.HasCheckConstraint(
                         "CK_competitions_Capacity",
-                        "Capacity BETWEEN 2 AND 128"
+                        ProviderSql(
+                            modelBuilder,
+                            "Capacity BETWEEN 2 AND 128",
+                            "\"Capacity\" BETWEEN 2 AND 128"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_competitions_TeamSize",
-                        "TeamSize BETWEEN 1 AND 32"
+                        ProviderSql(
+                            modelBuilder,
+                            "TeamSize BETWEEN 1 AND 32",
+                            "\"TeamSize\" BETWEEN 1 AND 32"
+                        )
                     );
-                    _ = t.HasCheckConstraint("CK_competitions_Revision", "Revision > 0");
-                    _ = t.HasCheckConstraint("CK_competitions_WinPoints", "WinPoints >= 0");
-                    _ = t.HasCheckConstraint("CK_competitions_DrawPoints", "DrawPoints >= 0");
-                    _ = t.HasCheckConstraint("CK_competitions_LossPoints", "LossPoints >= 0");
+                    _ = t.HasCheckConstraint(
+                        "CK_competitions_Revision",
+                        ProviderSql(modelBuilder, "Revision > 0", "\"Revision\" > 0")
+                    );
+                    _ = t.HasCheckConstraint(
+                        "CK_competitions_WinPoints",
+                        ProviderSql(modelBuilder, "WinPoints >= 0", "\"WinPoints\" >= 0")
+                    );
+                    _ = t.HasCheckConstraint(
+                        "CK_competitions_DrawPoints",
+                        ProviderSql(modelBuilder, "DrawPoints >= 0", "\"DrawPoints\" >= 0")
+                    );
+                    _ = t.HasCheckConstraint(
+                        "CK_competitions_LossPoints",
+                        ProviderSql(modelBuilder, "LossPoints >= 0", "\"LossPoints\" >= 0")
+                    );
                 }
             );
             _ = b.HasKey(x => x.Id);
@@ -126,15 +146,29 @@ public sealed partial class BlokeBotDbContext
                 "competition_matches",
                 t =>
                 {
-                    _ = t.HasCheckConstraint("CK_competition_matches_Round", "Round > 0");
-                    _ = t.HasCheckConstraint("CK_competition_matches_Position", "Position >= 0");
+                    _ = t.HasCheckConstraint(
+                        "CK_competition_matches_Round",
+                        ProviderSql(modelBuilder, "Round > 0", "\"Round\" > 0")
+                    );
+                    _ = t.HasCheckConstraint(
+                        "CK_competition_matches_Position",
+                        ProviderSql(modelBuilder, "Position >= 0", "\"Position\" >= 0")
+                    );
                     _ = t.HasCheckConstraint(
                         "CK_competition_matches_ScoreA",
-                        "ScoreA IS NULL OR ScoreA >= 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "ScoreA IS NULL OR ScoreA >= 0",
+                            "\"ScoreA\" IS NULL OR \"ScoreA\" >= 0"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_competition_matches_ScoreB",
-                        "ScoreB IS NULL OR ScoreB >= 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "ScoreB IS NULL OR ScoreB >= 0",
+                            "\"ScoreB\" IS NULL OR \"ScoreB\" >= 0"
+                        )
                     );
                 }
             );
@@ -187,7 +221,7 @@ public sealed partial class BlokeBotDbContext
                 t =>
                     t.HasCheckConstraint(
                         "CK_competition_milestone_reward_rules_WinsRequired",
-                        "WinsRequired > 0"
+                        ProviderSql(modelBuilder, "WinsRequired > 0", "\"WinsRequired\" > 0")
                     )
             );
             _ = b.HasKey(x => x.Id);
@@ -247,11 +281,19 @@ public sealed partial class BlokeBotDbContext
                 {
                     _ = t.HasCheckConstraint(
                         "CK_competition_reward_receipts_Placement",
-                        "Placement IS NULL OR Placement > 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "Placement IS NULL OR Placement > 0",
+                            "\"Placement\" IS NULL OR \"Placement\" > 0"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_competition_reward_receipts_WinsRequired",
-                        "WinsRequired IS NULL OR WinsRequired > 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "WinsRequired IS NULL OR WinsRequired > 0",
+                            "\"WinsRequired\" IS NULL OR \"WinsRequired\" > 0"
+                        )
                     );
                 }
             );

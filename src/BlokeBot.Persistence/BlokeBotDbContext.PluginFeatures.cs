@@ -23,9 +23,13 @@ public sealed partial class BlokeBotDbContext
     public DbSet<PluginAutomationInstantiationRecord> PluginAutomationInstantiations =>
         Set<PluginAutomationInstantiationRecord>();
 
-    private static void ConfigurePluginFeatures(ModelBuilder modelBuilder)
+    private void ConfigurePluginFeatures(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<PluginInstallationConfigurationRecord>(static entity =>
+        var valuesJsonConstraint = JsonArrayConstraint(
+            "ValuesJson",
+            PluginContractLimits.MaximumOrdinarySettingsJsonBytes
+        );
+        _ = modelBuilder.Entity<PluginInstallationConfigurationRecord>(entity =>
         {
             _ = entity.ToTable(
                 "plugin_installation_configurations",
@@ -33,7 +37,7 @@ public sealed partial class BlokeBotDbContext
                 {
                     _ = table.HasCheckConstraint(
                         "CK_plugin_installation_configurations_ValuesJson",
-                        $"json_valid(\"ValuesJson\") AND json_type(\"ValuesJson\") = 'array' AND length(CAST(\"ValuesJson\" AS BLOB)) <= {PluginContractLimits.MaximumOrdinarySettingsJsonBytes}"
+                        valuesJsonConstraint
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_installation_configurations_Revision",
@@ -66,7 +70,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PluginFeatureConfigurationRecord>(static entity =>
+        _ = modelBuilder.Entity<PluginFeatureConfigurationRecord>(entity =>
         {
             _ = entity.ToTable(
                 "plugin_feature_configurations",
@@ -74,7 +78,7 @@ public sealed partial class BlokeBotDbContext
                 {
                     _ = table.HasCheckConstraint(
                         "CK_plugin_feature_configurations_ValuesJson",
-                        $"json_valid(\"ValuesJson\") AND json_type(\"ValuesJson\") = 'array' AND length(CAST(\"ValuesJson\" AS BLOB)) <= {PluginContractLimits.MaximumOrdinarySettingsJsonBytes}"
+                        valuesJsonConstraint
                     );
                     _ = table.HasCheckConstraint(
                         "CK_plugin_feature_configurations_Revision",

@@ -134,7 +134,10 @@ internal sealed class OverlayMediaMaintenanceService(
         )
         {
             var source = Path.Combine(
-                OverlayMediaDirectory.HostDirectory(options.Value.DatabasePath, hostId),
+                OverlayMediaDirectory.HostDirectory(
+                    BlokeBotLocalState.Directory(options.Value),
+                    hostId
+                ),
                 legacyStorageKey
             );
             if (File.Exists(source))
@@ -154,7 +157,9 @@ internal sealed class OverlayMediaMaintenanceService(
 
     private string DocumentDirectory()
     {
-        var directory = OverlayMediaDirectory.DocumentDirectory(options.Value.DatabasePath);
+        var directory = OverlayMediaDirectory.DocumentDirectory(
+            BlokeBotLocalState.Directory(options.Value)
+        );
         _ = Directory.CreateDirectory(directory);
         if (!OperatingSystem.IsWindows())
         {

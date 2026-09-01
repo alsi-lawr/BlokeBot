@@ -239,9 +239,52 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigurePluginFeatures(modelBuilder);
     }
 
-    private static string KindIn(string columnName, IEnumerable<string> values) =>
-        $"{columnName} IN ({string.Join(", ", values.Select(static value => $"'{value}'"))})";
+    private static string KindIn(
+        ModelBuilder modelBuilder,
+        string columnName,
+        IEnumerable<string> values
+    ) =>
+        ProviderSql(
+            modelBuilder,
+            $"{columnName} IN ({string.Join(", ", values.Select(static value => $"'{value}'"))})",
+            $"\"{columnName}\" IN ({string.Join(", ", values.Select(static value => $"'{value}'"))})"
+        );
 
-    private static string KindInOrNull(string columnName, IEnumerable<string> values) =>
-        $"{columnName} IS NULL OR {KindIn(columnName, values)}";
+    private static string KindInOrNull(
+        ModelBuilder modelBuilder,
+        string columnName,
+        IEnumerable<string> values
+    ) =>
+        ProviderSql(
+            modelBuilder,
+            $"{columnName} IS NULL OR {KindIn(modelBuilder, columnName, values)}",
+            $"\"{columnName}\" IS NULL OR {KindIn(modelBuilder, columnName, values)}"
+        );
+
+    private static string ProviderSql(
+        ModelBuilder modelBuilder,
+        string sqlite,
+        string postgreSql
+    ) =>
+        modelBuilder.Model.FindAnnotation("Relational:MaxIdentifierLength")?.Value is 63
+            ? postgreSql
+            : sqlite;
+
+    private bool _isPostgreSql => Database.Provider() == BlokeBotDatabaseProvider.PostgreSql;
+
+    private string JsonArrayConstraint(string columnName, int maximumUtf8Bytes) =>
+        _isPostgreSql
+            ? $"jsonb_typeof(\"{columnName}\"::jsonb) = 'array' AND octet_length(\"{columnName}\") <= {maximumUtf8Bytes}"
+            : $"json_valid(\"{columnName}\") AND json_type(\"{columnName}\") = 'array' AND length(CAST(\"{columnName}\" AS BLOB)) <= {maximumUtf8Bytes}";
+
+    private string VersionedJsonObjectConstraint(string columnName, int maximumCharacters) =>
+        _isPostgreSql
+            ? $"length(\"{columnName}\") BETWEEN 1 AND {maximumCharacters} "
+                + $"AND jsonb_typeof(\"{columnName}\"::jsonb) = 'object' "
+                + $"AND jsonb_typeof((\"{columnName}\"::jsonb)->'schemaVersion') = 'number' "
+                + $"AND (\"{columnName}\"::jsonb)->>'schemaVersion' = '1'"
+            : $"length({columnName}) BETWEEN 1 AND {maximumCharacters} "
+                + $"AND json_valid({columnName}) "
+                + $"AND json_type({columnName}, '$.schemaVersion') = 'integer' "
+                + $"AND json_extract({columnName}, '$.schemaVersion') = 1";
 }

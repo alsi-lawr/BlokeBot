@@ -32,11 +32,15 @@ public sealed partial class BlokeBotDbContext
                 {
                     _ = table.HasCheckConstraint(
                         "CK_bingo_template_revisions_Dimension",
-                        "Dimension IN (3, 4, 5)"
+                        ProviderSql(
+                            modelBuilder,
+                            "Dimension IN (3, 4, 5)",
+                            "\"Dimension\" IN (3, 4, 5)"
+                        )
                     );
                     _ = table.HasCheckConstraint(
                         "CK_bingo_template_revisions_Revision",
-                        "Revision > 0"
+                        ProviderSql(modelBuilder, "Revision > 0", "\"Revision\" > 0")
                     );
                 }
             );
@@ -81,7 +85,14 @@ public sealed partial class BlokeBotDbContext
             _ = entity.ToTable(
                 "bingo_games",
                 table =>
-                    table.HasCheckConstraint("CK_bingo_games_Dimension", "Dimension IN (3, 4, 5)")
+                    table.HasCheckConstraint(
+                        "CK_bingo_games_Dimension",
+                        ProviderSql(
+                            modelBuilder,
+                            "Dimension IN (3, 4, 5)",
+                            "\"Dimension\" IN (3, 4, 5)"
+                        )
+                    )
             );
             _ = entity.HasKey(value => value.Id);
             _ = entity.HasIndex(value => new { value.HostId, value.PublicId }).IsUnique();

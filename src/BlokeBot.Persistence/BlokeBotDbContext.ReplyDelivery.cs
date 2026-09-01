@@ -6,19 +6,19 @@ namespace BlokeBot.Persistence;
 public sealed partial class BlokeBotDbContext
 {
     private static void ConfigureReplyDelivery(ModelBuilder modelBuilder) =>
-        modelBuilder.Entity<ReplyDeliverySetting>(static b =>
+        modelBuilder.Entity<ReplyDeliverySetting>(b =>
         {
             _ = b.ToTable(
                 "reply_delivery_settings",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_reply_delivery_settings_Feature",
-                        KindIn("Feature", ReplyFeaturePersistence.Tokens)
+                        KindIn(modelBuilder, "Feature", ReplyFeaturePersistence.Tokens)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_reply_delivery_settings_Target",
-                        KindIn("Target", ReplyDeliveryTargetPersistence.Tokens)
+                        KindIn(modelBuilder, "Target", ReplyDeliveryTargetPersistence.Tokens)
                     );
                 }
             );

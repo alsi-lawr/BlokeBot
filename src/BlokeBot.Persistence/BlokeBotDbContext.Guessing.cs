@@ -8,16 +8,16 @@ public sealed partial class BlokeBotDbContext
     private static readonly string[] _guessRoundStatusKinds =
         PersistedEnumTokens<GuessRoundStatus>.Values.ToArray();
 
-    private static void ConfigureGuessing(ModelBuilder modelBuilder)
+    private void ConfigureGuessing(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<GuessOption>(static b =>
+        _ = modelBuilder.Entity<GuessOption>(b =>
         {
             _ = b.ToTable(
                 "guess_options",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_guess_options_ReplyTarget",
-                        KindIn("ReplyTarget", ReplyDeliveryTargetPersistence.Tokens)
+                        KindIn(modelBuilder, "ReplyTarget", ReplyDeliveryTargetPersistence.Tokens)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -37,7 +37,8 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<GuessRoundProfile>(static b =>
+        var isDefaultFilter = _isPostgreSql ? "\"IsDefault\"" : "\"IsDefault\" = 1";
+        _ = modelBuilder.Entity<GuessRoundProfile>(b =>
         {
             _ = b.ToTable("guess_round_profiles");
             _ = b.HasKey(static x => x.Id);
@@ -49,21 +50,21 @@ public sealed partial class BlokeBotDbContext
                 .HasMaxLength(128)
                 .HasDefaultValue("0");
             _ = b.HasIndex(static x => new { x.HostId, x.Slug }).IsUnique();
-            _ = b.HasIndex(static x => x.HostId).IsUnique().HasFilter("\"IsDefault\" = 1");
+            _ = b.HasIndex(static x => x.HostId).IsUnique().HasFilter(isDefaultFilter);
             _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<GuessRound>(static b =>
+        _ = modelBuilder.Entity<GuessRound>(b =>
         {
             _ = b.ToTable(
                 "guess_rounds",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_guess_rounds_Status",
-                        KindIn("Status", _guessRoundStatusKinds)
+                        KindIn(modelBuilder, "Status", _guessRoundStatusKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -91,7 +92,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<GuessVote>(static b =>
+        _ = modelBuilder.Entity<GuessVote>(b =>
         {
             _ = b.ToTable("guess_votes");
             _ = b.HasKey(static x => x.Id);

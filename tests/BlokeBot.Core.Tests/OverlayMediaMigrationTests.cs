@@ -24,7 +24,7 @@ public sealed class OverlayMediaMigrationTests
         {
             await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
             var (hostId, presentId, presentKey, missingId) = await SeedLegacyAsync(database);
-            var legacyDirectory = OverlayMediaDirectory.HostDirectory(databasePath, hostId);
+            var legacyDirectory = OverlayMediaDirectory.HostDirectory(root, hostId);
             _ = Directory.CreateDirectory(legacyDirectory);
             await File.WriteAllBytesAsync(Path.Combine(legacyDirectory, presentKey), [1, 2, 3]);
 
@@ -50,9 +50,7 @@ public sealed class OverlayMediaMigrationTests
             references
                 .Single(value => value.PublicId == missingId)
                 .Document.State.ShouldBe(OverlayMediaDocumentState.Unavailable);
-            File.Exists(
-                    Path.Combine(OverlayMediaDirectory.DocumentDirectory(databasePath), presentKey)
-                )
+            File.Exists(Path.Combine(OverlayMediaDirectory.DocumentDirectory(root), presentKey))
                 .ShouldBeTrue();
             File.Exists(Path.Combine(legacyDirectory, presentKey)).ShouldBeFalse();
         }

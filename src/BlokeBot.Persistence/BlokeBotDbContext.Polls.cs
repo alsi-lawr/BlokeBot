@@ -10,7 +10,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePolls(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<HostBroadcasterAuthorization>(static b =>
+        _ = modelBuilder.Entity<HostBroadcasterAuthorization>(b =>
         {
             _ = b.ToTable("host_broadcaster_authorizations");
             _ = b.HasKey(static x => x.Id);
@@ -24,7 +24,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<TwitchPollTemplate>(static b =>
+        _ = modelBuilder.Entity<TwitchPollTemplate>(b =>
         {
             _ = b.ToTable("twitch_poll_templates");
             _ = b.HasKey(static x => x.Id);
@@ -40,7 +40,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<TwitchPollTemplateChoice>(static b =>
+        _ = modelBuilder.Entity<TwitchPollTemplateChoice>(b =>
         {
             _ = b.ToTable("twitch_poll_template_choices");
             _ = b.HasKey(static x => x.Id);
@@ -48,14 +48,14 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.TwitchPollTemplateId, x.Position }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<TwitchPoll>(static b =>
+        _ = modelBuilder.Entity<TwitchPoll>(b =>
         {
             _ = b.ToTable(
                 "twitch_polls",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_twitch_polls_Status",
-                        KindIn("Status", _twitchPollStatusKinds)
+                        KindIn(modelBuilder, "Status", _twitchPollStatusKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

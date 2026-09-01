@@ -14,7 +14,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureRaidCollaboration(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<RaidCollaborationSettings>(static b =>
+        _ = modelBuilder.Entity<RaidCollaborationSettings>(b =>
         {
             _ = b.ToTable("raid_collaboration_settings");
             _ = b.HasKey(static x => x.Id);
@@ -34,7 +34,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ApprovedRaidChannel>(static b =>
+        _ = modelBuilder.Entity<ApprovedRaidChannel>(b =>
         {
             _ = b.ToTable("approved_raid_channels");
             _ = b.HasKey(static x => x.Id);
@@ -49,23 +49,23 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<RaidCollaborationHistoryEntry>(static b =>
+        _ = modelBuilder.Entity<RaidCollaborationHistoryEntry>(b =>
         {
             _ = b.ToTable(
                 "raid_collaboration_history",
-                static table =>
+                table =>
                 {
                     _ = table.HasCheckConstraint(
                         "CK_raid_collaboration_history_Direction",
-                        KindIn("Direction", _raidDirections)
+                        KindIn(modelBuilder, "Direction", _raidDirections)
                     );
                     _ = table.HasCheckConstraint(
                         "CK_raid_collaboration_history_WelcomeOutcome",
-                        KindIn("WelcomeOutcome", _raidWelcomeOutcomes)
+                        KindIn(modelBuilder, "WelcomeOutcome", _raidWelcomeOutcomes)
                     );
                     _ = table.HasCheckConstraint(
                         "CK_raid_collaboration_history_ShoutoutOutcome",
-                        KindIn("ShoutoutOutcome", _raidShoutoutOutcomes)
+                        KindIn(modelBuilder, "ShoutoutOutcome", _raidShoutoutOutcomes)
                     );
                 }
             );

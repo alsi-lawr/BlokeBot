@@ -6,35 +6,47 @@ namespace BlokeBot.Persistence;
 public sealed partial class BlokeBotDbContext
 {
     private static void ConfigureOverlayEventFeed(ModelBuilder modelBuilder) =>
-        _ = modelBuilder.Entity<OverlayEventFeedItem>(static b =>
+        _ = modelBuilder.Entity<OverlayEventFeedItem>(b =>
         {
             _ = b.ToTable(
                 "overlay_event_feed_items",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Kind",
-                        KindIn("Kind", _overlayEventFeedKinds)
+                        KindIn(modelBuilder, "Kind", _overlayEventFeedKinds)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Priority",
-                        KindIn("Priority", _overlayEventFeedPriorities)
+                        KindIn(modelBuilder, "Priority", _overlayEventFeedPriorities)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Lifecycle",
-                        KindIn("Lifecycle", _overlayEventFeedLifecycles)
+                        KindIn(modelBuilder, "Lifecycle", _overlayEventFeedLifecycles)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_SourceKey",
-                        "length(SourceKey) BETWEEN 1 AND 160"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(SourceKey) BETWEEN 1 AND 160",
+                            "length(\"SourceKey\") BETWEEN 1 AND 160"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Text",
-                        "length(Title) BETWEEN 1 AND 160 AND length(Body) >= 1"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(Title) BETWEEN 1 AND 160 AND length(Body) >= 1",
+                            "length(\"Title\") BETWEEN 1 AND 160 AND length(\"Body\") >= 1"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Duration",
-                        "DurationSeconds BETWEEN 1 AND 30"
+                        ProviderSql(
+                            modelBuilder,
+                            "DurationSeconds BETWEEN 1 AND 30",
+                            "\"DurationSeconds\" BETWEEN 1 AND 30"
+                        )
                     );
                 }
             );

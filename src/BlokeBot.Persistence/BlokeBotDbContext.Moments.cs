@@ -14,19 +14,23 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureMoments(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<MomentHubSettings>(static b =>
+        _ = modelBuilder.Entity<MomentHubSettings>(b =>
         {
             _ = b.ToTable(
                 "moment_hub_settings",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_moment_hub_settings_MergeWindowSeconds",
-                        "MergeWindowSeconds BETWEEN 15 AND 300"
+                        ProviderSql(
+                            modelBuilder,
+                            "MergeWindowSeconds BETWEEN 15 AND 300",
+                            "\"MergeWindowSeconds\" BETWEEN 15 AND 300"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_moment_hub_settings_RewardPolicy",
-                        KindIn("RewardPolicy", _momentRewardPolicies)
+                        KindIn(modelBuilder, "RewardPolicy", _momentRewardPolicies)
                     );
                 }
             );
@@ -45,14 +49,14 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentCandidate>(static b =>
+        _ = modelBuilder.Entity<MomentCandidate>(b =>
         {
             _ = b.ToTable(
                 "moment_candidates",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_moment_candidates_State",
-                        KindIn("State", _momentCandidateStates)
+                        KindIn(modelBuilder, "State", _momentCandidateStates)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -110,16 +114,28 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentAttachment>(static b =>
+        _ = modelBuilder.Entity<MomentAttachment>(b =>
         {
             _ = b.ToTable(
                 "moment_attachments",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_moment_attachments_OneDestination",
-                        "(BountyId IS NOT NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NULL) OR "
-                            + "(BountyId IS NULL AND CommunityDefinitionId IS NOT NULL AND CompetitionMatchId IS NULL) OR "
-                            + "(BountyId IS NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NOT NULL)"
+                        ProviderSql(
+                            modelBuilder,
+                            "(BountyId IS NOT NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NULL) OR ",
+                            "(\"BountyId\" IS NOT NULL AND \"CommunityDefinitionId\" IS NULL AND \"CompetitionMatchId\" IS NULL) OR "
+                        )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(BountyId IS NULL AND CommunityDefinitionId IS NOT NULL AND CompetitionMatchId IS NULL) OR ",
+                                "(\"BountyId\" IS NULL AND \"CommunityDefinitionId\" IS NOT NULL AND \"CompetitionMatchId\" IS NULL) OR "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(BountyId IS NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NOT NULL)",
+                                "(\"BountyId\" IS NULL AND \"CommunityDefinitionId\" IS NULL AND \"CompetitionMatchId\" IS NOT NULL)"
+                            )
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -169,7 +185,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentCaptureRequest>(static b =>
+        _ = modelBuilder.Entity<MomentCaptureRequest>(b =>
         {
             _ = b.ToTable("moment_capture_requests");
             _ = b.HasKey(static x => x.Id);
@@ -182,7 +198,7 @@ public sealed partial class BlokeBotDbContext
             });
         });
 
-        _ = modelBuilder.Entity<MomentContributor>(static b =>
+        _ = modelBuilder.Entity<MomentContributor>(b =>
         {
             _ = b.ToTable("moment_contributors");
             _ = b.HasKey(static x => x.Id);
@@ -200,7 +216,7 @@ public sealed partial class BlokeBotDbContext
             });
         });
 
-        _ = modelBuilder.Entity<MomentSuggestion>(static b =>
+        _ = modelBuilder.Entity<MomentSuggestion>(b =>
         {
             _ = b.ToTable("moment_suggestions");
             _ = b.HasKey(static x => x.Id);
@@ -215,7 +231,7 @@ public sealed partial class BlokeBotDbContext
             });
         });
 
-        _ = modelBuilder.Entity<MomentVote>(static b =>
+        _ = modelBuilder.Entity<MomentVote>(b =>
         {
             _ = b.ToTable("moment_votes");
             _ = b.HasKey(static x => x.Id);
@@ -226,7 +242,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<MomentModerationAudit>(static b =>
+        _ = modelBuilder.Entity<MomentModerationAudit>(b =>
         {
             _ = b.ToTable("moment_moderation_audit");
             _ = b.HasKey(static x => x.Id);
@@ -245,12 +261,15 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentDomainEvent>(static b =>
+        _ = modelBuilder.Entity<MomentDomainEvent>(b =>
         {
             _ = b.ToTable(
                 "moment_events",
-                static t =>
-                    t.HasCheckConstraint("CK_moment_events_Kind", KindIn("Kind", _momentEventKinds))
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_moment_events_Kind",
+                        KindIn(modelBuilder, "Kind", _momentEventKinds)
+                    )
             );
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.Kind)
@@ -276,7 +295,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentMerge>(static b =>
+        _ = modelBuilder.Entity<MomentMerge>(b =>
         {
             _ = b.ToTable("moment_merges");
             _ = b.HasKey(static x => x.Id);
@@ -299,7 +318,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<MomentWeeklyFinalization>(static b =>
+        _ = modelBuilder.Entity<MomentWeeklyFinalization>(b =>
         {
             _ = b.ToTable("moment_weekly_finalizations");
             _ = b.HasKey(static x => x.Id);

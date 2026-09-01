@@ -3,8 +3,6 @@ using System.Text.Json.Serialization;
 using BlokeBot.Cli;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Privacy;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using Spectre.Console;
 
 namespace BlokeBot.Hosting;
@@ -137,25 +135,43 @@ internal static class BlokeBotPrivacyActions
             builder,
             new BlokeBotServeOptions(null, null, options.DataDirectory, options.ConfigurationPath)
         );
+        BlokeBotMainDatabaseSettings databaseSettings;
+        try
+        {
+            databaseSettings = BlokeBotMainDatabaseSettings.FromConfiguration(
+                builder.Configuration
+            );
+        }
+        catch (BlokeBotHostStartupException exception)
+        {
+            console.WriteLine(exception.Summary);
+            return 1;
+        }
         var statePaths = BlokeBotHost.ResolveStatePaths(
             builder.Configuration,
-            options.DataDirectory
+            options.DataDirectory,
+            databaseSettings.Provider
         );
-        if (!File.Exists(statePaths.DatabasePath))
+        if (
+            databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
+            && !File.Exists(statePaths.DatabasePath)
+        )
         {
             console.WriteLine($"blokebot: no database found at {statePaths.DatabasePath}.");
             return 1;
         }
 
-        var contextOptions = new DbContextOptionsBuilder<BlokeBotDbContext>()
-            .UseSqlite(
-                new SqliteConnectionStringBuilder
-                {
-                    DataSource = Path.GetFullPath(statePaths.DatabasePath),
-                }.ToString()
-            )
-            .Options;
-        await using var db = new BlokeBotDbContext(contextOptions);
+        BlokeBotDatabaseConfiguration database;
+        try
+        {
+            database = databaseSettings.CreateConfiguration(statePaths);
+        }
+        catch (BlokeBotHostStartupException exception)
+        {
+            console.WriteLine(exception.Summary);
+            return 1;
+        }
+        await using var db = database.CreateDbContext();
         return await action(db, subject);
     }
 }

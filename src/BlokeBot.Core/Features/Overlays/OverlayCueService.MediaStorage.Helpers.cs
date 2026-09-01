@@ -64,7 +64,9 @@ internal sealed partial class OverlayCueService
 
     private string DocumentDirectory()
     {
-        var directory = OverlayMediaDirectory.DocumentDirectory(_options.DatabasePath);
+        var directory = OverlayMediaDirectory.DocumentDirectory(
+            BlokeBotLocalState.Directory(_options)
+        );
         _ = Directory.CreateDirectory(directory);
         if (!OperatingSystem.IsWindows())
         {

@@ -20,7 +20,7 @@ public sealed partial class BlokeBotDbContext
     private static readonly string[] _overlayMediaDocumentStates =
         PersistedEnumTokens<OverlayMediaDocumentState>.Values.ToArray();
 
-    private static void ConfigureOverlays(ModelBuilder modelBuilder)
+    private void ConfigureOverlays(ModelBuilder modelBuilder)
     {
         ConfigureOverlayInstances(modelBuilder);
         ConfigureOverlayCues(modelBuilder);

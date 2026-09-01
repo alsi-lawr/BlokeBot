@@ -10,7 +10,7 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePredictions(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<TwitchPredictionTemplate>(static b =>
+        _ = modelBuilder.Entity<TwitchPredictionTemplate>(b =>
         {
             _ = b.ToTable("twitch_prediction_templates");
             _ = b.HasKey(static x => x.Id);
@@ -25,21 +25,21 @@ public sealed partial class BlokeBotDbContext
                 .HasForeignKey(static x => x.TwitchPredictionTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-        _ = modelBuilder.Entity<TwitchPredictionTemplateOutcome>(static b =>
+        _ = modelBuilder.Entity<TwitchPredictionTemplateOutcome>(b =>
         {
             _ = b.ToTable("twitch_prediction_template_outcomes");
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.Title).HasMaxLength(25);
             _ = b.HasIndex(static x => new { x.TwitchPredictionTemplateId, x.Position }).IsUnique();
         });
-        _ = modelBuilder.Entity<TwitchPrediction>(static b =>
+        _ = modelBuilder.Entity<TwitchPrediction>(b =>
         {
             _ = b.ToTable(
                 "twitch_predictions",
-                static table =>
+                table =>
                     table.HasCheckConstraint(
                         "CK_twitch_predictions_Status",
-                        KindIn("Status", _twitchPredictionStatusKinds)
+                        KindIn(modelBuilder, "Status", _twitchPredictionStatusKinds)
                     )
             );
             _ = b.HasKey(static x => x.Id);

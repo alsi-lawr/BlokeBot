@@ -20,6 +20,7 @@
     <Project Path="src/BlokeBot.Eventing/BlokeBot.Eventing.csproj" />
     <Project Path="src/BlokeBot.Functional/BlokeBot.Functional.csproj" />
     <Project Path="src/BlokeBot.Persistence/BlokeBot.Persistence.csproj" />
+    <Project Path="src/BlokeBot.Persistence.PostgreSql/BlokeBot.Persistence.PostgreSql.csproj" />
     <Project Path="src/BlokeBot.Plugins.Contracts/BlokeBot.Plugins.Contracts.csproj" />
     <Project Path="src/BlokeBot.Plugins.Features/BlokeBot.Plugins.Features.csproj" />
     <Project Path="src/BlokeBot.Plugins.Runtime/BlokeBot.Plugins.Runtime.csproj" />

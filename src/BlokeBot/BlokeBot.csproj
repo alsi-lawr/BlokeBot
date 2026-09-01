@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\BlokeBot.Core\BlokeBot.Core.csproj" />
     <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference Include="..\BlokeBot.Persistence.PostgreSql\BlokeBot.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\BlokeBot.Plugins.Runtime\BlokeBot.Plugins.Runtime.csproj" />
     <ProjectReference
       Include="..\BlokeBot.PluginWorker\BlokeBot.PluginWorker.csproj"
@@ -16,6 +17,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <Content
       Update="appsettings.Development.json;*.tokens.json;*.db;*.db-shm;*.db-wal"
       CopyToPublishDirectory="Never"

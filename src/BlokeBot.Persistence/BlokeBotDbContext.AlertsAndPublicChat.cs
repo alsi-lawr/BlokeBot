@@ -22,14 +22,14 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAlertsAndPublicChat(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<DurableAlert>(static b =>
+        _ = modelBuilder.Entity<DurableAlert>(b =>
         {
             _ = b.ToTable(
                 "durable_alerts",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_durable_alerts_Severity",
-                        KindIn("Severity", _durableAlertSeverities)
+                        KindIn(modelBuilder, "Severity", _durableAlertSeverities)
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -61,122 +61,51 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PublicChatOutboxMessage>(static b =>
+        _ = modelBuilder.Entity<PublicChatOutboxMessage>(b =>
         {
             _ = b.ToTable(
                 "public_chat_outbox",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_Status",
-                        KindIn("Status", _publicChatOutboxStatuses)
+                        KindIn(modelBuilder, "Status", _publicChatOutboxStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_AttemptCount",
-                        "AttemptCount >= 0"
+                        ProviderSql(modelBuilder, "AttemptCount >= 0", "\"AttemptCount\" >= 0")
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_SafePreSendFailureCount",
-                        "SafePreSendFailureCount >= 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "SafePreSendFailureCount >= 0",
+                            "\"SafePreSendFailureCount\" >= 0"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_Channel",
-                        "length(trim(Channel)) > 0"
+                        ProviderSql(
+                            modelBuilder,
+                            "length(trim(Channel)) > 0",
+                            "length(trim(\"Channel\")) > 0"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_DeduplicationKey",
-                        "DeduplicationKey IS NULL OR length(DeduplicationKey) = 64"
+                        ProviderSql(
+                            modelBuilder,
+                            "DeduplicationKey IS NULL OR length(DeduplicationKey) = 64",
+                            "\"DeduplicationKey\" IS NULL OR length(\"DeduplicationKey\") = 64"
+                        )
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_FailurePhase",
-                        KindInOrNull("FailurePhase", _publicChatOutboxFailurePhases)
+                        KindInOrNull(modelBuilder, "FailurePhase", _publicChatOutboxFailurePhases)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_State",
-                        "(Status = 'Pending' AND length(Message) > 0 "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL "
-                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
-                            + "AND AttemptCount = 0 AND SafePreSendFailureCount = 0 "
-                            + "AND length(DeduplicationKey) = 64 "
-                            + "AND NextAttemptAtUtc IS NOT NULL "
-                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
-                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
-                            + "(Status = 'Claimed' AND length(Message) > 0 "
-                            + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
-                            + "AND ClaimExpiresAtUtc IS NOT NULL "
-                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
-                            + "AND AttemptCount = 0 AND length(DeduplicationKey) = 64 "
-                            + "AND NextAttemptAtUtc IS NOT NULL "
-                            + "AND ((SafePreSendFailureCount = 0 "
-                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
-                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
-                            + "(SafePreSendFailureCount > 0 "
-                            + "AND FailurePhase = 'Preparation' "
-                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL))) OR "
-                            + "(Status = 'Sending' AND length(Message) > 0 "
-                            + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
-                            + "AND ClaimExpiresAtUtc IS NOT NULL "
-                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NULL "
-                            + "AND AttemptCount > 0 AND length(DeduplicationKey) = 64 "
-                            + "AND NextAttemptAtUtc IS NOT NULL "
-                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
-                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
-                            + "(Status = 'SafePreSendTransient' AND length(Message) > 0 "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NULL AND AttemptCount = 0 "
-                            + "AND length(DeduplicationKey) = 64 "
-                            + "AND NextAttemptAtUtc IS NOT NULL "
-                            + "AND SafePreSendFailureCount > 0 "
-                            + "AND FailurePhase = 'Preparation' "
-                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
-                            + "(Status = 'SafePreSendExhausted' AND Message IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
-                            + "AND SafePreSendFailureCount > 0 "
-                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
-                            + "AND FailurePhase = 'Preparation' "
-                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
-                            + "(Status IN ('MissingChannel', 'MissingBot') AND Message IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
-                            + "AND SafePreSendFailureCount = 0 "
-                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
-                            + "AND FailurePhase = 'Preparation' "
-                            + "AND FailureType IS NULL AND HttpStatusCode IS NULL "
-                            + "AND RejectionCode IS NULL) OR "
-                            + "(Status = 'Rejected' AND Message IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' "
-                            + "AND AttemptCount > 0 "
-                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
-                            + "AND FailureType IS NULL AND HttpStatusCode IS NULL "
-                            + "AND (RejectionCode IS NULL OR length(RejectionCode) > 0)) OR "
-                            + "(Status = 'Ambiguous' AND Message IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' "
-                            + "AND AttemptCount > 0 "
-                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
-                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
-                            + "(Status = 'Unexpected' AND Message IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
-                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
-                            + "AND FailurePhase = 'Preparation' "
-                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
-                            + "(Status = 'Expired' AND Message IS NULL "
-                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NOT NULL "
-                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
-                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL)"
+                        PublicChatOutboxStateConstraint(modelBuilder)
                     );
                 }
             );
@@ -220,16 +149,28 @@ public sealed partial class BlokeBotDbContext
                 .HasFilter("\"ClaimSlot\" IS NOT NULL");
         });
 
-        _ = modelBuilder.Entity<PublicChatSendReceipt>(static b =>
+        _ = modelBuilder.Entity<PublicChatSendReceipt>(b =>
         {
             _ = b.ToTable(
                 "public_chat_send_receipts",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_public_chat_send_receipts_Delivery",
-                        "(DeliveredDeduplicationKey IS NULL AND DeliveredAtUtc IS NULL) OR "
-                            + "(length(DeliveredDeduplicationKey) = 64 "
-                            + "AND DeliveredAtUtc IS NOT NULL)"
+                        ProviderSql(
+                            modelBuilder,
+                            "(DeliveredDeduplicationKey IS NULL AND DeliveredAtUtc IS NULL) OR ",
+                            "(\"DeliveredDeduplicationKey\" IS NULL AND \"DeliveredAtUtc\" IS NULL) OR "
+                        )
+                            + ProviderSql(
+                                modelBuilder,
+                                "(length(DeliveredDeduplicationKey) = 64 ",
+                                "(length(\"DeliveredDeduplicationKey\") = 64 "
+                            )
+                            + ProviderSql(
+                                modelBuilder,
+                                "AND DeliveredAtUtc IS NOT NULL)",
+                                "AND \"DeliveredAtUtc\" IS NOT NULL)"
+                            )
                     )
             );
             _ = b.HasKey(static x => x.OutboxMessageId);
@@ -240,14 +181,18 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => x.DeliveredAtUtc);
         });
 
-        _ = modelBuilder.Entity<ReplyPinPolicy>(static b =>
+        _ = modelBuilder.Entity<ReplyPinPolicy>(b =>
         {
             _ = b.ToTable(
                 "reply_pin_policies",
-                static t =>
+                t =>
                     t.HasCheckConstraint(
                         "CK_reply_pin_policies_DurationSeconds",
-                        "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
+                        ProviderSql(
+                            modelBuilder,
+                            "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800",
+                            "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" BETWEEN 30 AND 1800"
+                        )
                     )
             );
             _ = b.HasKey(static x => x.Id);
@@ -266,23 +211,27 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PublicChatPinOperation>(static b =>
+        _ = modelBuilder.Entity<PublicChatPinOperation>(b =>
         {
             _ = b.ToTable(
                 "public_chat_pin_operations",
-                static t =>
+                t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_pin_operations_Kind",
-                        KindIn("Kind", _publicChatPinOperationKinds)
+                        KindIn(modelBuilder, "Kind", _publicChatPinOperationKinds)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_pin_operations_Status",
-                        KindIn("Status", _publicChatPinOperationStatuses)
+                        KindIn(modelBuilder, "Status", _publicChatPinOperationStatuses)
                     );
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_pin_operations_DurationSeconds",
-                        "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
+                        ProviderSql(
+                            modelBuilder,
+                            "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800",
+                            "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" BETWEEN 30 AND 1800"
+                        )
                     );
                 }
             );
@@ -324,7 +273,7 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ActivePublicChatPin>(static b =>
+        _ = modelBuilder.Entity<ActivePublicChatPin>(b =>
         {
             _ = b.ToTable("active_public_chat_pins");
             _ = b.HasKey(static x => x.Id);
