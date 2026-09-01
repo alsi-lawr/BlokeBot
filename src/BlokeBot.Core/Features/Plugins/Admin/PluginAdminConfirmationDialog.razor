@@ -21,7 +21,7 @@
             case PluginAdminConfirmation.Update update:
                 <h2 id="plugin-confirmation-title" class="text-lg font-bold text-slate-950">Update @update.Plugin.Name?</h2>
                 <div id="plugin-confirmation-description" class="mt-2 text-sm leading-6 text-slate-700">
-                    <p>Apply version @update.Release.DeclaredVersion.Value from mutable tag <span class="font-mono">@update.Release.Tag.Value</span>.</p>
+                    <p>Apply version @update.Release.DeclaredVersion.Value from tag <span class="font-mono">@update.Release.Tag.Value</span>.</p>
                 </div>
                 break;
             case PluginAdminConfirmation.Remove remove:

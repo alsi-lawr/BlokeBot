@@ -340,7 +340,7 @@ public sealed class PluginAdminTests
     }
 
     [Test]
-    public void CurrentMutableTagUpdate_RequiresConfirmationAndDelegatesTheExactRelease()
+    public void CurrentTagUpdate_RequiresConfirmationAndDelegatesTheExactRelease()
     {
         var plugin = InstalledPlugin();
         plugin = plugin with { UpdateRelease = plugin.Lifecycle.Installation.Release };
@@ -357,7 +357,7 @@ public sealed class PluginAdminTests
         panel
             .FindAll("[data-plugin-confirmation-dialog] #plugin-confirmation-description p")
             .ShouldHaveSingleItem()
-            .TextContent.ShouldBe("Apply version 1.0.0 from mutable tag release-v1.");
+            .TextContent.ShouldBe("Apply version 1.0.0 from tag release-v1.");
         service.Updates.ShouldBeEmpty();
 
         panel.Find("[data-plugin-confirmation-dialog] .btn-primary").Click();

@@ -80,7 +80,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new(
                             "Update",
-                            "For each manual update, BlokeBot downloads the current mutable tag again before it applies the update."
+                            "For each manual update, BlokeBot downloads the current tag again before it applies the update."
                         ),
                         new(
                             "Installation fault",

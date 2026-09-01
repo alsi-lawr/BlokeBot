@@ -74,7 +74,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Paragraphs =
                     [
-                        "An entry selects a compatible declared version and one mutable Git tag. Plugin identity never contains a commit SHA.",
+                        "An entry selects a compatible declared version and one Git tag. Plugin identity never contains a commit SHA.",
                         "The community link queue is a local reference example. Its catalogue entry and tag are not public.",
                     ],
                 },
@@ -95,10 +95,10 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Update the mutable tag",
+                    Heading = "Update the tag",
                     Paragraphs =
                     [
-                        "Update is always a manual administrator action. It downloads and validates the current package at the selected mutable tag.",
+                        "Update is always a manual administrator action. It downloads and validates the current package at the selected tag.",
                         "BlokeBot stops the current plugin work before it applies the update.",
                         "The old version stays active during non-durable preparation. If durable migration starts, the old code can never resume.",
                         "A validation, migration, or activation failure faults the selected installation. Correct the package or tag, then start a new administrator action.",

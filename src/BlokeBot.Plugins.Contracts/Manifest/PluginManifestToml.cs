@@ -202,7 +202,7 @@ internal sealed class PluginGitTagTomlConverter : TomlConverter<PluginGitTag>
     public override PluginGitTag Read(TomlReader reader) =>
         PluginGitTag.TryCreate(reader.GetString(), out var tag)
             ? tag
-            : throw reader.CreateException("Invalid mutable Git tag.");
+            : throw reader.CreateException("Invalid Git tag.");
 
     public override void Write(TomlWriter writer, PluginGitTag value) =>
         writer.WriteStringValue(value.Value);

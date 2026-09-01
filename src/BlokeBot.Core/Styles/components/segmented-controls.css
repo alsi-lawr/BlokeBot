@@ -27,6 +27,14 @@
         z-index: 0;
     }
 
+    html:not([data-theme="dark"]) .segmented-motion__indicator {
+        background: color-mix(
+            in srgb,
+            var(--app-primary-button-bg) 50%,
+            var(--app-control-border)
+        );
+    }
+
     .segmented-motion--shared {
         grid-template-columns: repeat(var(--segmented-count), minmax(5.5rem, 7.5rem));
         justify-self: start;

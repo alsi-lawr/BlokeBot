@@ -106,7 +106,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Set declaredVersion to the release semantic version.",
-                        "Set tag to the mutable Git tag for that release.",
+                        "Set tag to the Git tag for that release.",
                         "Verify that the package repository resolves the tag.",
                         "Run generate from the final package tree.",
                         "Run validate from the final package tree.",
@@ -114,7 +114,7 @@ internal static partial class SiteGuideCatalog
                         "Submit the package through the curated repository review process.",
                     ],
                     Note =
-                        "Do not put a commit SHA in plugin.toml. BlokeBot records the version, mutable tag, and a unique identity for each download.",
+                        "Do not put a commit SHA in plugin.toml. BlokeBot records the version, tag, and a unique identity for each download.",
                 },
                 new SiteGuideSection
                 {

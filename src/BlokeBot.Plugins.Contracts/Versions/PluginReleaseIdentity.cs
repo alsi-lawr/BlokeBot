@@ -92,7 +92,7 @@ internal sealed class PluginGitTagJsonConverter : JsonConverter<PluginGitTag>
         var candidate = reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
         return PluginGitTag.TryCreate(candidate, out var tag)
             ? tag
-            : throw new JsonException("Invalid mutable Git tag.");
+            : throw new JsonException("Invalid Git tag.");
     }
 
     public override void Write(

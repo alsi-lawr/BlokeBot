@@ -15,12 +15,12 @@ and host API contracts. KeraLua is preferred, but an engine name does not bypass
 ## Package identity
 
 A plugin has one stable plugin ID. A selected installation records the plugin's declared semantic
-version and one mutable Git tag. A tag must not be a commit hash. Manifests, derived marketplace
+version and one Git tag. A tag must not be a commit hash. Manifests, derived marketplace
 snapshots, and installation records do not have a commit-SHA identity field.
 
 The curated repository layout is `plugins/<plugin-id>/plugin.toml`. The directory name must exactly
 match the manifest ID. The manifest owns the author, search tags, optional presentation URLs,
-release targets, version, mutable tag, compatibility, and runtime declarations. There is no global
+release targets, version, tag, compatibility, and runtime declarations. There is no global
 catalogue or generated index. BlokeBot enumerates the fixed repository layout and transactionally
 replaces its local searchable snapshot only after every discovered manifest passes validation.
 

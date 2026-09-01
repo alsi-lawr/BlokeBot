@@ -19,7 +19,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Choose one stable plugin ID. Give the repository directory the same ID.",
-                        "Use a semantic version and a mutable Git tag. Do not identify the package with a commit SHA.",
+                        "Use a semantic version and a Git tag. Do not identify the package with a commit SHA.",
                     ],
                     Code = """
                         manifestVersion = 1

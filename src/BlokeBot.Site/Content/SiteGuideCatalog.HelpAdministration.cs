@@ -50,7 +50,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Marketplace unavailable: wait for one successful catalogue refresh. If Admin shows an older snapshot, search can still use it.",
-                        "Install or Update unavailable: confirm GitHub access and the mutable tag. An absent or moved tag needs a corrected catalogue entry or package release.",
+                        "Install or Update unavailable: confirm GitHub access and the tag. An absent or moved tag needs a corrected catalogue entry or package release.",
                         "Validation fault: correct the manifest, package declarations, target support, paths, links, collisions, or size limits.",
                         "Migration or activation fault: read the latest operation message. The old code cannot resume after durable migration starts.",
                         "Worker fault: BlokeBot tries one automatic restart. Correct the cause and select Restart after the next fault.",

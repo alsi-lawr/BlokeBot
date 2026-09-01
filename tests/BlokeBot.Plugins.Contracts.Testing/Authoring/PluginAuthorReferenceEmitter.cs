@@ -84,7 +84,7 @@ internal static class PluginAuthorReferenceEmitter
         _ = output.AppendLine();
         _ = output.AppendLine(
             CultureInfo.InvariantCulture,
-            $"A marketplace submission names the manifest's declared semantic version and one mutable Git tag. `PluginGitTagSyntaxContract.Current` accepts {tags.MinimumLength}-{tags.MaximumLength} characters and rejects all-hex values {tags.MinimumCommitShaLength}-{tags.MaximumCommitShaLength} characters long, so a commit SHA is never plugin identity."
+            $"A marketplace submission names the manifest's declared semantic version and one Git tag. `PluginGitTagSyntaxContract.Current` accepts {tags.MinimumLength}-{tags.MaximumLength} characters and rejects all-hex values {tags.MinimumCommitShaLength}-{tags.MaximumCommitShaLength} characters long, so a commit SHA is never plugin identity."
         );
         _ = output.AppendLine();
         _ = output.AppendLine(
@@ -536,7 +536,7 @@ internal static class PluginAuthorReferenceEmitter
 
         if (type == typeof(PluginGitTag))
         {
-            return "mutable Git tag string";
+            return "Git tag string";
         }
 
         if (typeof(PluginContractIdentifier).IsAssignableFrom(type))

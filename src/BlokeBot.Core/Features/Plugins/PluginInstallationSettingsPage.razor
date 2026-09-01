@@ -9,11 +9,12 @@
                Title="@_title"
                Description="Settings shared by every channel."
                LoadState="@_loadState"
-               SaveFeedback="@_saveFeedback"
                Width="DashboardPageWidth.Readable">
-    <SaveAction>
-        <SaveChangesButton Disabled="@(_editor is null)" Saving="@_saving" OnSave="SaveAsync" />
-    </SaveAction>
+    <Actions>
+        <StickySaveRegion Feedback="@_saveFeedback">
+            <SaveChangesButton Disabled="@(_editor is null)" Saving="@_saving" OnSave="SaveAsync" />
+        </StickySaveRegion>
+    </Actions>
     <ChildContent>
         @if (_editor is not null)
         {
