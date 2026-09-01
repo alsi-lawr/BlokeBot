@@ -20,6 +20,7 @@ COPY src/BlokeBot.Functional/ src/BlokeBot.Functional/
 COPY src/BlokeBot.Persistence/ src/BlokeBot.Persistence/
 COPY src/BlokeBot.PluginWorker/ src/BlokeBot.PluginWorker/
 COPY src/BlokeBot.Plugins.Contracts/ src/BlokeBot.Plugins.Contracts/
+COPY src/BlokeBot.Plugins.Features/ src/BlokeBot.Plugins.Features/
 COPY src/BlokeBot.Plugins.Runtime/ src/BlokeBot.Plugins.Runtime/
 COPY src/BlokeBot.Twitch.Auth/ src/BlokeBot.Twitch.Auth/
 COPY src/BlokeBot.Twitch.Runtime/ src/BlokeBot.Twitch.Runtime/
