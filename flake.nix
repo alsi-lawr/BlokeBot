@@ -42,6 +42,7 @@
               ./src/BlokeBot.Persistence
               ./src/BlokeBot.PluginWorker
               ./src/BlokeBot.Plugins.Contracts
+              ./src/BlokeBot.Plugins.Features
               ./src/BlokeBot.Plugins.Runtime
               ./src/BlokeBot.Twitch
               ./src/BlokeBot.Twitch.Auth

@@ -438,5 +438,10 @@
     "pname": "TimeZoneConverter",
     "version": "7.0.0",
     "hash": "sha256-CMEdkQxUYIQFloGHNxpu6MUZ+vpIv5sfphz/u+8DnL8="
+  },
+  {
+    "pname": "Tomlyn",
+    "version": "2.10.1",
+    "hash": "sha256-Dcceh+BjppBtDoSLydw7K8v5cEI9HGEIy2OEsosW2kM="
   }
 ]
