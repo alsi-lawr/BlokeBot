@@ -54,9 +54,22 @@ def _run_cli(executable: Path, command: str) -> str:
     return completed.stdout
 
 
+def _resolve_installed_executable(executable: Path) -> Path:
+    shim = executable.with_suffix(".shim")
+    if shim.is_file():
+        for line in shim.read_text(encoding="utf-8-sig").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key.strip().casefold() == "path":
+                target = Path(value.strip().strip("\"'"))
+                if not target.is_absolute():
+                    target = shim.parent / target
+                return target.resolve()
+    return executable.resolve()
+
+
 def _run_worker_probe(executable: Path, state_directory: Path) -> None:
     worker_name = "BlokeBot.PluginWorker.exe" if os.name == "nt" else "BlokeBot.PluginWorker"
-    worker = executable.parent / "plugin-worker" / worker_name
+    worker = _resolve_installed_executable(executable).parent / "plugin-worker" / worker_name
     completed = subprocess.run(
         [str(worker), "--deployment-probe", str(state_directory / "worker-probe")],
         check=False,

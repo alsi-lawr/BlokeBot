@@ -1,8 +1,49 @@
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import Mock
 
 import native_smoke
+
+
+class WorkerProbeTests(unittest.TestCase):
+    def test_worker_probe_follows_installed_executable_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            executable = root / "package" / "bin" / "blokebot"
+            executable.parent.mkdir(parents=True)
+            executable.write_text("", encoding="utf-8")
+            self._write_worker(executable.parent)
+            shim = root / "shims" / "blokebot"
+            shim.parent.mkdir()
+            shim.symlink_to(executable)
+
+            native_smoke._run_worker_probe(shim, root / "state")
+
+    def test_worker_probe_uses_scoop_shim_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            executable = root / "package" / "bin" / "blokebot.exe"
+            executable.parent.mkdir(parents=True)
+            executable.write_text("", encoding="utf-8")
+            self._write_worker(executable.parent)
+            shim = root / "shims" / "blokebot.exe"
+            shim.parent.mkdir()
+            shim.write_text("", encoding="utf-8")
+            shim.with_suffix(".shim").write_text(
+                f'path = "{executable}"\n',
+                encoding="utf-8",
+            )
+
+            native_smoke._run_worker_probe(shim, root / "state")
+
+    @staticmethod
+    def _write_worker(executable_directory: Path) -> None:
+        worker_directory = executable_directory / "plugin-worker"
+        worker_directory.mkdir()
+        worker = worker_directory / "BlokeBot.PluginWorker"
+        worker.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        worker.chmod(0o755)
 
 
 class RemoveDataDirectoryTests(unittest.TestCase):
