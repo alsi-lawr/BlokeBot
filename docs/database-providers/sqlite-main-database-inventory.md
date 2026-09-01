@@ -1,7 +1,7 @@
 # Main-database provider inventory
 
 This inventory was reconciled through BLOKEBOT-272 from commit
-`eb3ad37c828ccb56d33747d1960145d40df674eb`. SQLite remains the default main provider. PostgreSQL
+`57a60989da25bda9464025bfda7272a2d3dbdf90`. SQLite remains the default main provider. PostgreSQL
 is the first server provider. Plugin-private databases in `BlokeBot.Plugins.Features` remain
 separate SQLite stores.
 

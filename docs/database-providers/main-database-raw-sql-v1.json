@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_commit": "eb3ad37c828ccb56d33747d1960145d40df674eb",
+  "source_commit": "57a60989da25bda9464025bfda7272a2d3dbdf90",
   "statements": [
     {
       "id": "hetzner-baseline-history-creation",
