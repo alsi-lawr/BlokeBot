@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="protocol/**/*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -31,9 +31,11 @@
     <Project Path="src/BlokeBot/BlokeBot.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/BlokeBot.DatabaseWorkloads/BlokeBot.DatabaseWorkloads.csproj" />
     <Project Path="tools/BlokeBot.PluginHarness/BlokeBot.PluginHarness.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/BlokeBot.DatabaseWorkloads.Tests/BlokeBot.DatabaseWorkloads.Tests.csproj" />
     <Project Path="tests/BlokeBot.Commands.Tests/BlokeBot.Commands.Tests.csproj" />
     <Project Path="tests/BlokeBot.Eventing.Tests/BlokeBot.Eventing.Tests.csproj" />
     <Project Path="tests/BlokeBot.Functional.Tests/BlokeBot.Functional.Tests.csproj" />

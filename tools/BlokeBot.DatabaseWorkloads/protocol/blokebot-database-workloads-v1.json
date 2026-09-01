@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "protocol_id": "blokebot-database-workloads-v1",
+  "source_commit": "6e8af8ef6fc75df47bac7b15a283c851b2bfdc07",
+  "seed": 140269,
+  "repetitions": 3,
+  "warmup_repetitions": 1,
+  "fixture": {
+    "hosts": 1,
+    "viewers": 1000,
+    "public_chat_backlog": 120
+  },
+  "sqlite_execution": {
+    "journal_mode": "wal",
+    "synchronous": "normal",
+    "busy_timeout_milliseconds": 0,
+    "pooling": false,
+    "cache": "shared"
+  },
+  "concurrency": {
+    "schedule": "round_barrier",
+    "writers": 2,
+    "readers": 4,
+    "max_busy_retries": 200,
+    "busy_retry_delay_milliseconds": 1
+  },
+  "workloads": [
+    {
+      "id": "AutomationAdmissionCheckpointing",
+      "operations": 120,
+      "duplicate_every": 10,
+      "cancellation_point": "before_database_admission",
+      "invariants": [
+        "one event receipt admits at most one flow run",
+        "each admitted run has one completed node checkpoint",
+        "cancellation before admission writes no receipt or run"
+      ],
+      "metrics": ["latency", "throughput", "busy_locked_wait", "logical_outcome"]
+    },
+    {
+      "id": "PublicChatOutboxClaims",
+      "operations": 120,
+      "duplicate_every": 0,
+      "cancellation_point": "before_claim_transaction",
+      "invariants": [
+        "each queued message reaches one terminal outcome",
+        "the singleton claim slot is never owned twice",
+        "cancellation before claim leaves the backlog unchanged"
+      ],
+      "metrics": ["latency", "throughput", "busy_locked_wait", "logical_outcome"]
+    },
+    {
+      "id": "ConfigurationActivation",
+      "operations": 80,
+      "duplicate_every": 0,
+      "cancellation_point": "before_serializable_claim",
+      "invariants": [
+        "each activation is claimed and completed once",
+        "revision guarded claims do not overwrite a competing claim",
+        "cancellation before claim changes no activation"
+      ],
+      "metrics": ["latency", "throughput", "busy_locked_wait", "logical_outcome"]
+    },
+    {
+      "id": "PointsCommunityWrites",
+      "operations": 200,
+      "duplicate_every": 20,
+      "cancellation_point": "before_event_receipt",
+      "invariants": [
+        "one source receipt applies one points and community increment",
+        "ledger, balance, progress, and receipt commit atomically",
+        "cancellation before receipt changes no balance or progress"
+      ],
+      "metrics": ["latency", "throughput", "busy_locked_wait", "logical_outcome"]
+    },
+    {
+      "id": "PluginFeatureState",
+      "operations": 80,
+      "duplicate_every": 0,
+      "cancellation_point": "before_revision_guarded_write",
+      "invariants": [
+        "exactly one of two writes with the same expected revision succeeds",
+        "the losing writer reports a conflict without changing state",
+        "cancellation before the guarded write leaves the revision unchanged"
+      ],
+      "metrics": ["latency", "throughput", "busy_locked_wait", "logical_outcome"]
+    },
+    {
+      "id": "PublicReads",
+      "operations": 60,
+      "duplicate_every": 0,
+      "cancellation_point": "before_read_connection",
+      "invariants": [
+        "each leaderboard page contains the requested bounded row count",
+        "ordering is deterministic for equal balances",
+        "public results contain synthetic identities only"
+      ],
+      "metrics": ["latency", "throughput", "query_plan", "logical_outcome"]
+    }
+  ],
+  "result_fields": [
+    "protocol_sha256",
+    "source_commit",
+    "provider",
+    "provider_version",
+    "environment",
+    "fixture",
+    "workloads",
+    "storage",
+    "query_plans",
+    "logical_outcomes",
+    "redacted"
+  ],
+  "redaction": {
+    "identity_shape": "synthetic-seed-derived",
+    "include_sql_parameters": false,
+    "include_absolute_paths": false,
+    "include_connection_strings": false
+  }
+}
