@@ -1,8 +1,11 @@
 using System.Globalization;
+using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Polly;
 using Shouldly;
 
 namespace BlokeBot.Tests;
@@ -10,6 +13,7 @@ namespace BlokeBot.Tests;
 internal sealed partial class DatabaseCutoverIntegrationFixture
 {
     private int? _writtenHostId;
+    private int _pendingDeliveryCount;
 
     internal async Task<long> DomainRowCountAsync(DisposablePostgreSql target, string table)
     {
@@ -164,6 +168,92 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             .Sqlite(SqliteDatabasePath)
             .CreateDbContext();
         (await source.Hosts.CountAsync()).ShouldBe(1);
+    }
+
+    internal async Task DeliverTransferredPendingWorkOnceAsync()
+    {
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var now = new DateTimeOffset(SeedTime.AddDays(1), TimeSpan.Zero);
+        var outbox = Outbox(configuration);
+        var claimed = (
+            await outbox.TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<PublicChatClaimOutcome.Claimed>()
+            .Message;
+        claimed.Id.ShouldBe(PendingOutboxId);
+
+        _ = (
+            await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        _ = Interlocked.Increment(ref _pendingDeliveryCount);
+        _ = (
+            await outbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                new PublicChatDeliveryOutcome.Sent("cutover-delivery"),
+                now,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await AssertTransferredPendingWorkDoesNotReplayAsync();
+    }
+
+    internal async Task AssertTransferredPendingWorkDoesNotReplayAsync()
+    {
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var now = new DateTimeOffset(SeedTime.AddDays(1).AddMinutes(1), TimeSpan.Zero);
+        var afterRestart = await Outbox(configuration)
+            .TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.FromDays(7),
+                CancellationToken.None
+            );
+
+        afterRestart.ShouldNotBeOfType<PublicChatClaimOutcome.Claimed>();
+        Volatile.Read(ref _pendingDeliveryCount).ShouldBe(1);
+        await using var db = configuration.CreateDbContext();
+        (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
+        (
+            await db.PublicChatSendReceipts.CountAsync(receipt =>
+                receipt.OutboxMessageId == PendingOutboxId
+            )
+        ).ShouldBe(1);
+    }
+
+    private static EfPublicChatOutbox Outbox(BlokeBotDatabaseConfiguration configuration) =>
+        new(
+            new CutoverDbContextFactory(configuration),
+            new PublicChatRetryPolicy
+            {
+                AttemptLimit = 3,
+                Delay = TimeSpan.FromSeconds(1),
+                MaximumDelay = TimeSpan.FromSeconds(5),
+                DelayBackoffType = DelayBackoffType.Exponential,
+            },
+            new PublicChatDeliveryLifetimePolicy { MaximumAge = TimeSpan.FromSeconds(30) },
+            new PublicChatTerminalRetentionPolicy { Duration = TimeSpan.FromDays(7) }
+        );
+
+    private sealed class CutoverDbContextFactory(BlokeBotDatabaseConfiguration configuration)
+        : IDbContextFactory<BlokeBotDbContext>
+    {
+        public BlokeBotDbContext CreateDbContext() => configuration.CreateDbContext();
+
+        public Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(CreateDbContext());
+        }
     }
 
     private static async Task<PostgreSqlIdentity> IdentityAsync(DisposablePostgreSql target)

@@ -135,6 +135,24 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
               PublicBaseUrl BlokeBot__PublicBaseUrl; the public dashboard URL used in chat links.
                             If unset, BlokeBot uses the protocol, host, and port from RedirectUri.
 
+            Main database configuration:
+              BlokeBot__DatabaseProvider
+                            Sqlite or PostgreSql. Default: Sqlite.
+              BlokeBot__StateDirectory
+                            Local tokens, keys, media, schedules and plugin state.
+              BlokeBot__DatabasePath
+                            SQLite database path. Valid only with Sqlite.
+              BlokeBot__PostgreSqlConnectionStringFile
+                            Protected PostgreSQL connection-string file. Required with
+                            PostgreSql. Do not put the connection string in an environment
+                            value or command argument.
+
+              Configure one active instance per main database. BlokeBot does not enforce this
+              constraint with a process or database lease. PostgreSQL 17.x is supported. The
+              connection file can set Maximum Pool Size from 1 through 50, Timeout from 1
+              through 30 seconds and Command Timeout from 1 through 60 seconds. Defaults are
+              20 connections, 15 seconds and 30 seconds.
+
             Required privacy configuration for online mode:
               ControllerName BlokeBotPrivacy__ControllerName; who operates this deployment,
                              as named in its privacy notice.

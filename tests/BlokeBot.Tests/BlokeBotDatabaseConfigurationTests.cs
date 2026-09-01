@@ -1,6 +1,8 @@
 using BlokeBot.Hosting;
 using BlokeBot.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 using Shouldly;
 
 namespace BlokeBot.Tests;
@@ -85,6 +87,55 @@ public sealed class BlokeBotDatabaseConfigurationTests
         {
             File.Delete(file);
         }
+    }
+
+    [Test]
+    public void PostgreSqlConnectionBounds_DefaultOrRejectBeforeConnection()
+    {
+        var defaultFile = ConnectionFile("Host=localhost;Database=blokebot;Username=blokebot");
+        try
+        {
+            using var db = BlokeBotDatabaseConfiguration
+                .PostgreSqlFromFile(defaultFile)
+                .CreateDbContext();
+            var defaults = new NpgsqlConnectionStringBuilder(
+                db.Database.GetDbConnection().ConnectionString
+            );
+            defaults.MaxPoolSize.ShouldBe(20);
+            defaults.Timeout.ShouldBe(15);
+            defaults.CommandTimeout.ShouldBe(30);
+        }
+        finally
+        {
+            File.Delete(defaultFile);
+        }
+
+        foreach (
+            var setting in new[] { "Maximum Pool Size=51", "Timeout=31", "Command Timeout=61" }
+        )
+        {
+            var file = ConnectionFile(
+                $"Host=localhost;Database=blokebot;Username=blokebot;{setting}"
+            );
+            try
+            {
+                var exception = Should.Throw<BlokeBotDatabaseConfigurationException>(() =>
+                    BlokeBotDatabaseConfiguration.PostgreSqlFromFile(file)
+                );
+                exception.Message.ShouldContain("must be from");
+            }
+            finally
+            {
+                File.Delete(file);
+            }
+        }
+    }
+
+    private static string ConnectionFile(string connectionString)
+    {
+        var path = Path.GetTempFileName();
+        File.WriteAllText(path, connectionString);
+        return path;
     }
 
     private static IConfiguration Configuration(params (string Key, string? Value)[] values) =>

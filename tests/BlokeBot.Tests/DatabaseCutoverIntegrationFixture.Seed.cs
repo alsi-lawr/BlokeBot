@@ -179,7 +179,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 DeduplicationKey = PendingDeduplicationKey,
                 CreatedAtUtc = SeedTime,
                 ExpiresAtUtc = SeedTime.AddYears(10),
-                NextAttemptAtUtc = SeedTime.AddYears(10),
+                NextAttemptAtUtc = SeedTime,
                 Status = PublicChatOutboxStatus.Pending,
             }
         );

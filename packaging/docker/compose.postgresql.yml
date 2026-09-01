@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: blokebot
+      POSTGRES_USER: blokebot
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgresql-password
+    secrets:
+      - postgresql-password
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blokebot -d blokebot"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  blokebot:
+    build:
+      context: ../..
+      dockerfile: packaging/docker/blokebot.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BlokeBot__DatabasePath: ""
+      BlokeBot__DatabaseProvider: PostgreSql
+      BlokeBot__StateDirectory: /data
+      BlokeBot__PostgreSqlConnectionStringFile: /run/secrets/postgresql-connection
+    secrets:
+      - postgresql-connection
+    volumes:
+      - blokebot-state:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+
+secrets:
+  postgresql-connection:
+    # The runtime image reads this file as the non-root app account, UID 1654.
+    file: ./secrets/postgresql.connection
+  postgresql-password:
+    file: ./secrets/postgresql.password
+
+volumes:
+  blokebot-state:
+  postgresql-data:

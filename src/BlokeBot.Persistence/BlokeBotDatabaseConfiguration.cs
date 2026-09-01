@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -13,6 +14,12 @@ public enum BlokeBotDatabaseProvider
 public sealed class BlokeBotDatabaseConfiguration
 {
     internal const string PostgreSqlMigrationsAssembly = "BlokeBot.Persistence.PostgreSql";
+    internal const int PostgreSqlDefaultMaximumPoolSize = 20;
+    internal const int PostgreSqlMaximumPoolSizeLimit = 50;
+    internal const int PostgreSqlDefaultConnectionTimeoutSeconds = 15;
+    internal const int PostgreSqlMaximumConnectionTimeoutSeconds = 30;
+    internal const int PostgreSqlDefaultCommandTimeoutSeconds = 30;
+    internal const int PostgreSqlMaximumCommandTimeoutSeconds = 60;
     private readonly string _connectionString;
 
     private BlokeBotDatabaseConfiguration(
@@ -71,9 +78,14 @@ public sealed class BlokeBotDatabaseConfiguration
     internal static BlokeBotDatabaseConfiguration PostgreSql(string connectionString)
     {
         NpgsqlConnectionStringBuilder builder;
+        DbConnectionStringBuilder explicitSettings;
         try
         {
             builder = new NpgsqlConnectionStringBuilder(connectionString);
+            explicitSettings = new DbConnectionStringBuilder
+            {
+                ConnectionString = connectionString,
+            };
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException)
         {
@@ -82,15 +94,55 @@ public sealed class BlokeBotDatabaseConfiguration
             );
         }
 
-        return
+        if (
             string.IsNullOrWhiteSpace(builder.Host)
             || string.IsNullOrWhiteSpace(builder.Database)
             || string.IsNullOrWhiteSpace(builder.Username)
-            ? throw new BlokeBotDatabaseConfigurationException(
+        )
+        {
+            throw new BlokeBotDatabaseConfigurationException(
                 "The PostgreSql connection string must specify Host, Database, and Username."
+            );
+        }
+
+        if (builder.Pooling)
+        {
+            builder.MaxPoolSize = Explicit(explicitSettings, "Maximum Pool Size", "MaxPoolSize")
+                ? InRange(
+                    builder.MaxPoolSize,
+                    1,
+                    PostgreSqlMaximumPoolSizeLimit,
+                    "Maximum Pool Size"
+                )
+                : PostgreSqlDefaultMaximumPoolSize;
+        }
+        builder.Timeout = Explicit(explicitSettings, "Timeout", "Connection Timeout")
+            ? InRange(builder.Timeout, 1, PostgreSqlMaximumConnectionTimeoutSeconds, "Timeout")
+            : PostgreSqlDefaultConnectionTimeoutSeconds;
+        builder.CommandTimeout = Explicit(explicitSettings, "Command Timeout", "CommandTimeout")
+            ? InRange(
+                builder.CommandTimeout,
+                1,
+                PostgreSqlMaximumCommandTimeoutSeconds,
+                "Command Timeout"
             )
-            : new(BlokeBotDatabaseProvider.PostgreSql, builder.ConnectionString);
+            : PostgreSqlDefaultCommandTimeoutSeconds;
+
+        return new(BlokeBotDatabaseProvider.PostgreSql, builder.ConnectionString);
     }
+
+    private static bool Explicit(DbConnectionStringBuilder builder, params string[] names) =>
+        builder.Keys.Cast<string>().Select(Normalize).Intersect(names.Select(Normalize)).Any();
+
+    private static string Normalize(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    private static int InRange(int value, int minimum, int maximum, string setting) =>
+        value < minimum || value > maximum
+            ? throw new BlokeBotDatabaseConfigurationException(
+                $"The PostgreSql {setting} setting must be from {minimum} through {maximum}."
+            )
+            : value;
 
     internal void Configure(DbContextOptionsBuilder builder) =>
         _ = Provider switch

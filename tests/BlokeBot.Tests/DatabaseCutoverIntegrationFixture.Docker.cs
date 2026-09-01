@@ -93,7 +93,8 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
         }
     }
 
-    internal sealed class DisposablePostgreSql(string name, int port) : IAsyncDisposable
+    internal sealed class DisposablePostgreSql(string name, int port, string secretDirectory)
+        : IAsyncDisposable
     {
         internal string ConnectionString =>
             new NpgsqlConnectionStringBuilder
@@ -119,20 +120,41 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
         {
             var name = $"blokebot-cutover-test-{Guid.NewGuid():N}";
             var port = AvailablePort();
-            _ = await DockerAsync(
-                "run",
-                "--detach",
-                "--name",
-                name,
-                "--env",
-                $"POSTGRES_PASSWORD={_password}",
-                "--env",
-                $"POSTGRES_DB={_database}",
-                "--publish",
-                $"127.0.0.1:{port}:5432",
-                "postgres:17-alpine"
+            var secretDirectory = Path.Combine(
+                Path.GetTempPath(),
+                $"blokebot-postgresql-secret-{Guid.NewGuid():N}"
             );
-            var instance = new DisposablePostgreSql(name, port);
+            _ = Directory.CreateDirectory(secretDirectory);
+            var passwordFile = Path.Combine(secretDirectory, "password");
+            await File.WriteAllTextAsync(passwordFile, _password);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(passwordFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            try
+            {
+                _ = await DockerAsync(
+                    "run",
+                    "--detach",
+                    "--name",
+                    name,
+                    "--mount",
+                    $"type=bind,source={passwordFile},target=/run/secrets/postgres-password,readonly",
+                    "--env",
+                    "POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password",
+                    "--env",
+                    $"POSTGRES_DB={_database}",
+                    "--publish",
+                    $"127.0.0.1:{port}:5432",
+                    "postgres:17-alpine"
+                );
+            }
+            catch
+            {
+                Directory.Delete(secretDirectory, recursive: true);
+                throw;
+            }
+            var instance = new DisposablePostgreSql(name, port, secretDirectory);
             try
             {
                 await instance.PrepareAsync();
@@ -182,8 +204,20 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
             _ = await setup.ExecuteNonQueryAsync();
         }
 
-        public async ValueTask DisposeAsync() =>
-            _ = await DockerAsync("rm", "--force", "--volumes", name);
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                _ = await DockerAsync("rm", "--force", "--volumes", name);
+            }
+            finally
+            {
+                if (Directory.Exists(secretDirectory))
+                {
+                    Directory.Delete(secretDirectory, recursive: true);
+                }
+            }
+        }
 
         private static int AvailablePort()
         {

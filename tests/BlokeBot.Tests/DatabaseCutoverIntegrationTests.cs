@@ -113,6 +113,8 @@ public sealed class DatabaseCutoverIntegrationTests
         await fixture.AssertPendingWorkPreservedAsync();
         await fixture.StartPostgreSqlAndWriteAsync();
         await fixture.AssertPostgreSqlWriteAndSequenceAsync();
+        await fixture.DeliverTransferredPendingWorkOnceAsync();
+        await fixture.AssertTransferredPendingWorkDoesNotReplayAsync();
         fixture.AssertLocalStateUnchanged();
     }
 }

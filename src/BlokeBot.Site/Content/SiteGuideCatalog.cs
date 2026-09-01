@@ -30,6 +30,7 @@ internal static partial class SiteGuideCatalog
         .Concat(CreatePluginReleasePages())
         .Concat(CreatePluginTroubleshootingPages())
         .Concat(CreatePluginAdministrationPages())
+        .Concat(CreateDatabaseProviderPages())
         .Concat(CreateHelpAdministrationPages())
         .ToDictionary(static page => page.Route, StringComparer.Ordinal);
 
@@ -137,6 +138,7 @@ internal static partial class SiteGuideCatalog
                 GuideLink("Troubleshooting", "troubleshooting"),
                 GuideLink("Moderator access", "moderators"),
                 GuideLink("Plugin administration", "server-owners/plugins"),
+                GuideLink("Main database", "server-owners/database"),
                 GuideLink("Server owners", "server-owners"),
                 new SiteLink("Privacy notice", "privacy"),
             ]

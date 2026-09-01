@@ -56,6 +56,7 @@ internal static class SiteRoutes
         "/troubleshooting",
         "/moderators",
         "/server-owners/plugins",
+        "/server-owners/database",
         "/server-owners",
     ];
 

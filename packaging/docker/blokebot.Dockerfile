@@ -15,9 +15,11 @@ WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/BlokeBot.Commands/ src/BlokeBot.Commands/
 COPY src/BlokeBot.Core/ src/BlokeBot.Core/
+COPY src/BlokeBot.DatabaseCutover/ src/BlokeBot.DatabaseCutover/
 COPY src/BlokeBot.Eventing/ src/BlokeBot.Eventing/
 COPY src/BlokeBot.Functional/ src/BlokeBot.Functional/
 COPY src/BlokeBot.Persistence/ src/BlokeBot.Persistence/
+COPY src/BlokeBot.Persistence.PostgreSql/ src/BlokeBot.Persistence.PostgreSql/
 COPY src/BlokeBot.PluginWorker/ src/BlokeBot.PluginWorker/
 COPY src/BlokeBot.Plugins.Contracts/ src/BlokeBot.Plugins.Contracts/
 COPY src/BlokeBot.Plugins.Features/ src/BlokeBot.Plugins.Features/

@@ -50,3 +50,46 @@ jobs:
           --no-ansi
           --no-progress
           --output Normal
+
+  postgresql:
+    name: PostgreSQL provider and cutover
+    runs-on: ubuntu-26.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: blokebot
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: blokebot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U blokebot -d blokebot"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.301
+      - name: Restore local tools
+        run: dotnet tool restore
+      - name: Restore and build
+        run: |
+          dotnet restore BlokeBot.slnx --disable-parallel
+          dotnet build BlokeBot.slnx \
+            --configuration Release \
+            --no-restore \
+            --property:TreatWarningsAsErrors=true
+      - name: Run PostgreSQL matrix
+        env:
+          BLOKEBOT_POSTGRESQL_CONNECTION_STRING_FILE: ${{ runner.temp }}/postgresql.connection
+        run: |
+          umask 077
+          printf '%s\n' \
+            'Host=127.0.0.1;Port=5432;Database=blokebot;Username=blokebot;SSL Mode=Disable' \
+            > "$BLOKEBOT_POSTGRESQL_CONNECTION_STRING_FILE"
+          packaging/ci/postgresql-matrix.sh

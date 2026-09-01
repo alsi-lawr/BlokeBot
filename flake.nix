@@ -37,9 +37,11 @@
               ./src/BlokeBot
               ./src/BlokeBot.Commands
               ./src/BlokeBot.Core
+              ./src/BlokeBot.DatabaseCutover
               ./src/BlokeBot.Eventing
               ./src/BlokeBot.Functional
               ./src/BlokeBot.Persistence
+              ./src/BlokeBot.Persistence.PostgreSql
               ./src/BlokeBot.PluginWorker
               ./src/BlokeBot.Plugins.Contracts
               ./src/BlokeBot.Plugins.Features

@@ -162,6 +162,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Links =
                     [
+                        new SiteLink("Choose the main database", "server-owners/database"),
                         new SiteLink("Choose an installation route", "install"),
                         new SiteLink(
                             "Installation technical details on the wiki",
@@ -213,7 +214,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "4. Keep state private and backed up",
                     Paragraphs =
                     [
-                        "BlokeBot keeps its SQLite database, OAuth token cache and automatically managed Data Protection keys in private persistent application state. Restrict that state to the service account and back it up from a stopped service or one consistent snapshot.",
+                        "BlokeBot keeps local state beside its main database configuration. Restrict the state to the service account and back it up with the database.",
                     ],
                     Links =
                     [
@@ -229,7 +230,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Custom-bot encryption needs no operator configuration. ASP.NET Core manages Data Protection keys automatically in private persistent application state. Windows protects those keys with DPAPI LocalMachine.",
-                        "A copied SQLite database or SQL backup does not expose reusable custom-bot tokens. Theft or compromise of the full state directory or active host is outside that boundary.",
+                        "A database backup does not expose reusable custom-bot tokens. Theft of the full state directory or active host is outside that boundary.",
                         "If an upgrade finds old plaintext custom-bot credentials, it deletes them and disables that custom bot. It alerts the channel owner.",
                     ],
                     Links =

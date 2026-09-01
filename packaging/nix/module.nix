@@ -9,6 +9,34 @@ let
   botCfg = config.services.blokebot;
   siteCfg = config.services.blokebot-site;
   stateDir = "/var/lib/blokebot";
+  databaseLaunchScript = pkgs.writeShellScript "blokebot-database-launch" ''
+    set -eu
+
+    unset BlokeBot__DatabaseProvider
+    unset BlokeBot__DatabasePath
+    unset BlokeBot__StateDirectory
+    unset BlokeBot__PostgreSqlConnectionStringFile
+
+    export BlokeBot__DatabaseProvider=${lib.escapeShellArg botCfg.databaseProvider}
+    export BlokeBot__StateDirectory=${lib.escapeShellArg stateDir}
+    ${
+      if botCfg.databaseProvider == "Sqlite" then
+        ''
+          export BlokeBot__DatabasePath=${lib.escapeShellArg "${stateDir}/blokebot.db"}
+        ''
+      else
+        ''
+          if [ "$#" -lt 1 ]; then
+            echo "The PostgreSQL credential path is missing." >&2
+            exit 1
+          fi
+          export BlokeBot__PostgreSqlConnectionStringFile="$1"
+          shift
+        ''
+    }
+
+    exec "$@"
+  '';
 in
 {
   options.services.blokebot = {
@@ -34,6 +62,29 @@ in
     };
 
     openFirewall = lib.mkEnableOption "the BlokeBot dashboard port in the firewall";
+
+    databaseProvider = lib.mkOption {
+      type = lib.types.enum [
+        "Sqlite"
+        "PostgreSql"
+      ];
+      default = "Sqlite";
+      description = ''
+        Main database provider. Sqlite is the default. PostgreSql requires one
+        protected connection-string file. The operator must configure one
+        active BlokeBot service.
+      '';
+    };
+
+    postgresqlConnectionStringFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "/run/secrets/blokebot-postgresql.connection";
+      description = ''
+        Path to the PostgreSQL connection-string file. The module transfers
+        this file with systemd credentials. Do not use a Nix store path.
+      '';
+    };
 
     environment = lib.mkOption {
       type = lib.types.attrsOf (
@@ -139,6 +190,36 @@ in
 
   config = lib.mkMerge [
     (lib.mkIf botCfg.enable {
+      assertions = [
+        {
+          assertion =
+            botCfg.databaseProvider == "PostgreSql" -> botCfg.postgresqlConnectionStringFile != null;
+          message = "services.blokebot.postgresqlConnectionStringFile is required for PostgreSql.";
+        }
+        {
+          assertion = botCfg.databaseProvider == "Sqlite" -> botCfg.postgresqlConnectionStringFile == null;
+          message = "services.blokebot.postgresqlConnectionStringFile requires PostgreSql.";
+        }
+        {
+          assertion =
+            botCfg.postgresqlConnectionStringFile == null
+            || (
+              lib.hasPrefix "/" botCfg.postgresqlConnectionStringFile
+              && !lib.hasPrefix "/nix/store/" botCfg.postgresqlConnectionStringFile
+            );
+          message = "services.blokebot.postgresqlConnectionStringFile must be an absolute path outside the Nix store.";
+        }
+        {
+          assertion = lib.all (name: !(builtins.hasAttr name botCfg.environment)) [
+            "BlokeBot__DatabaseProvider"
+            "BlokeBot__DatabasePath"
+            "BlokeBot__StateDirectory"
+            "BlokeBot__PostgreSqlConnectionStringFile"
+          ];
+          message = "Use the typed services.blokebot database options instead of services.blokebot.environment.";
+        }
+      ];
+
       users.groups.blokebot = { };
       users.users.blokebot = {
         isSystemUser = true;
@@ -162,21 +243,24 @@ in
           ) botCfg.environment
           // {
             ASPNETCORE_ENVIRONMENT = "Production";
-            BlokeBot__DatabasePath = "${stateDir}/blokebot.db";
             TwitchBot__Identity__TokenCachePath = "${stateDir}/twitch.tokens.json";
           };
 
         serviceConfig = {
-          ExecStart = lib.escapeShellArgs [
-            (lib.getExe botCfg.package)
-            "serve"
-            "--host"
-            botCfg.listenAddress
-            "--port"
-            (toString botCfg.port)
-            "--data-dir"
-            stateDir
-          ];
+          ExecStart = lib.escapeShellArgs (
+            [ databaseLaunchScript ]
+            ++ lib.optional (botCfg.databaseProvider == "PostgreSql") "%d/blokebot-postgresql"
+            ++ [
+              (lib.getExe botCfg.package)
+              "serve"
+              "--host"
+              botCfg.listenAddress
+              "--port"
+              (toString botCfg.port)
+              "--data-dir"
+              stateDir
+            ]
+          );
           User = "blokebot";
           Group = "blokebot";
           WorkingDirectory = stateDir;
@@ -189,6 +273,11 @@ in
           ProtectHome = true;
           ProtectSystem = "strict";
           ReadWritePaths = [ stateDir ];
+        }
+        // lib.optionalAttrs (botCfg.databaseProvider == "PostgreSql") {
+          LoadCredential = [
+            "blokebot-postgresql:${botCfg.postgresqlConnectionStringFile}"
+          ];
         }
         // lib.optionalAttrs (botCfg.environmentFile != null) {
           EnvironmentFile = botCfg.environmentFile;
