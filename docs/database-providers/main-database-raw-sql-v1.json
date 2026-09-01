@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_commit": "2166d8209b316db64607bb8f92dc2e0d5772406c",
+  "source_commit": "eb3ad37c828ccb56d33747d1960145d40df674eb",
   "statements": [
     {
       "id": "hetzner-baseline-history-creation",
@@ -41,26 +41,6 @@
       "sql_verb": "SELECT",
       "purpose": "Read ordered SQLite DDL for the exact supported legacy signature.",
       "dialect_dependency": "sqlite_legacy_schema_catalog_and_ddl"
-    },
-    {
-      "id": "postgresql-runtime-shared-lock",
-      "path": "src/BlokeBot.Persistence/BlokeBotDatabaseRuntimeLease.cs",
-      "source_line": 36,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT pg_try_advisory_lock_shared(@lock_key)",
-      "sql_verb": "SELECT",
-      "purpose": "Acquire shared PostgreSQL runtime ownership while excluding an offline cutover operation.",
-      "dialect_dependency": "postgresql_advisory_shared_lock"
-    },
-    {
-      "id": "postgresql-runtime-shared-unlock",
-      "path": "src/BlokeBot.Persistence/BlokeBotDatabaseRuntimeLease.cs",
-      "source_line": 64,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT pg_advisory_unlock_shared(@lock_key)",
-      "sql_verb": "SELECT",
-      "purpose": "Release shared PostgreSQL runtime ownership during application shutdown.",
-      "dialect_dependency": "postgresql_advisory_shared_unlock"
     },
     {
       "id": "postgresql-claim-lock-timeout",
@@ -415,7 +395,7 @@
     {
       "id": "cutover-target-exclusive-lock",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 17,
+      "source_line": 19,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT pg_try_advisory_lock(@lock_key)",
       "sql_verb": "SELECT",
@@ -425,7 +405,7 @@
     {
       "id": "cutover-target-session-detection",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 28,
+      "source_line": 27,
       "api": "DbCommand.CommandText",
       "source_marker": "FROM pg_stat_activity WHERE datid =",
       "sql_verb": "SELECT",
@@ -435,7 +415,7 @@
     {
       "id": "cutover-cluster-identity-privilege-check",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 37,
+      "source_line": 36,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT has_function_privilege(current_user, 'pg_control_system()', 'EXECUTE')",
       "sql_verb": "SELECT",
@@ -445,7 +425,7 @@
     {
       "id": "cutover-target-exclusive-unlock",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 60,
+      "source_line": 59,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT pg_advisory_unlock(@lock_key)",
       "sql_verb": "SELECT",
@@ -455,7 +435,7 @@
     {
       "id": "cutover-sqlite-domain-catalog-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 114,
+      "source_line": 110,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT name FROM sqlite_schema WHERE type = 'table'",
       "sql_verb": "SELECT",
@@ -465,7 +445,7 @@
     {
       "id": "cutover-postgresql-domain-catalog-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 123,
+      "source_line": 119,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
       "sql_verb": "SELECT",

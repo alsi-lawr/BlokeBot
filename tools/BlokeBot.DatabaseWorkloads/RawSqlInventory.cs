@@ -42,7 +42,7 @@ public static partial class RawSqlInventory
             ) ?? throw new InventoryDriftException("The raw SQL inventory is empty.");
         var valid =
             document.SchemaVersion == 1
-            && document.SourceCommit == "2166d8209b316db64607bb8f92dc2e0d5772406c"
+            && document.SourceCommit == "eb3ad37c828ccb56d33747d1960145d40df674eb"
             && document.Statements.Count > 0
             && document.Statements.Select(static entry => entry.Id).Distinct().Count()
                 == document.Statements.Count
@@ -127,7 +127,7 @@ public static partial class RawSqlInventory
         [
             new(
                 "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-                115,
+                111,
                 "sqlite_schema"
             ),
             new("src/BlokeBot.Persistence/HetznerBaselineBridge.cs", 71, "sqlite_schema"),

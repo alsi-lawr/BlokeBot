@@ -19,7 +19,6 @@ internal static class LocalStateFingerprint
             Path.GetFullPath(sourceDatabasePath + "-shm"),
             Path.GetFullPath(sourceDatabasePath + "-wal"),
             Path.GetFullPath(sourceDatabasePath + "-journal"),
-            BlokeBotProcessLease.LockPath(root),
         };
         var receiptDirectory = Path.GetFullPath(receiptStore.DirectoryPath);
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

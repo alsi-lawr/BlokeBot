@@ -8,6 +8,8 @@ namespace BlokeBot.DatabaseCutover;
 
 public sealed partial class DatabaseCutoverRunner
 {
+    private const long _cutoverOwnershipLockKey = 0x424C4F4B45424F54;
+
     private static async Task<string?> AcquireTargetOwnershipAsync(
         NpgsqlConnection connection,
         CancellationToken cancellationToken
@@ -15,13 +17,10 @@ public sealed partial class DatabaseCutoverRunner
     {
         await using var lockCommand = connection.CreateCommand();
         lockCommand.CommandText = "SELECT pg_try_advisory_lock(@lock_key);";
-        _ = lockCommand.Parameters.AddWithValue(
-            "lock_key",
-            BlokeBotDatabaseRuntimeLease.OwnershipLockKey
-        );
+        _ = lockCommand.Parameters.AddWithValue("lock_key", _cutoverOwnershipLockKey);
         if (!(bool)(await lockCommand.ExecuteScalarAsync(cancellationToken) ?? false))
         {
-            return "The PostgreSql target is in use by BlokeBot or another cutover operation.";
+            return "The PostgreSql target is in use by another cutover operation.";
         }
 
         await using var sessions = connection.CreateCommand();
@@ -58,10 +57,7 @@ public sealed partial class DatabaseCutoverRunner
 
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT pg_advisory_unlock(@lock_key);";
-        _ = command.Parameters.AddWithValue(
-            "lock_key",
-            BlokeBotDatabaseRuntimeLease.OwnershipLockKey
-        );
+        _ = command.Parameters.AddWithValue("lock_key", _cutoverOwnershipLockKey);
         _ = await command.ExecuteScalarAsync();
     }
 

@@ -138,10 +138,6 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     internal async Task StartPostgreSqlAndWriteAsync()
     {
         var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
-        await using var lease = await BlokeBotDatabaseRuntimeLease.AcquireAsync(
-            configuration,
-            CancellationToken.None
-        );
         await InitializeDatabaseAsync(configuration);
         await using var db = configuration.CreateDbContext();
         var host = new BotHost

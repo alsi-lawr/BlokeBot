@@ -1,7 +1,7 @@
 # Main-database provider inventory
 
 This inventory was reconciled through BLOKEBOT-272 from commit
-`2166d8209b316db64607bb8f92dc2e0d5772406c`. SQLite remains the default main provider. PostgreSQL
+`eb3ad37c828ccb56d33747d1960145d40df674eb`. SQLite remains the default main provider. PostgreSQL
 is the first server provider. Plugin-private databases in `BlokeBot.Plugins.Features` remain
 separate SQLite stores.
 
@@ -24,14 +24,13 @@ adapter.
 
 ## Raw SQL register
 
-`main-database-raw-sql-v1.json` registers 47 execution sites:
+`main-database-raw-sql-v1.json` registers 45 execution sites:
 
 - four SQLite-only `HetznerBaselineBridge` catalog/history statements;
-- two PostgreSQL runtime shared-ownership statements;
 - nine named SQLite/PostgreSQL idempotent insert authorities;
 - host locking, two bounded cleanup statements, and automatic-raid cleanup;
 - separate SQLite and PostgreSQL plugin JSON queries;
-- the two closed provider SQL dispatch sites; and
+- the two closed provider SQL dispatch sites;
 - PostgreSQL's two transaction-local lock bounds and transaction-scoped immediate-write lock; and
 - 21 offline cutover statements: seven identity, ownership, session, privilege, and physical
   catalog reads; three SQLite exclusive-lease statements; three canonical copy statements; two

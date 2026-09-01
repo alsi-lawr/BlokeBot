@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlokeBot.Cli;
-using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Privacy;
 using Spectre.Console;
@@ -156,51 +155,26 @@ internal static class BlokeBotPrivacyActions
             options.DataDirectory,
             databaseSettings.Provider
         );
-        BlokeBotProcessLease processLease;
-        try
+        if (
+            databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
+            && !File.Exists(statePaths.DatabasePath)
+        )
         {
-            processLease = BlokeBotProcessLease.Acquire(statePaths.StateDirectory);
-        }
-        catch (BlokeBotProcessOwnershipException exception)
-        {
-            console.WriteLine($"blokebot: {exception.Message}");
+            console.WriteLine($"blokebot: no database found at {statePaths.DatabasePath}.");
             return 1;
         }
-        using (processLease)
-        {
-            if (
-                databaseSettings.Provider == BlokeBotDatabaseProvider.Sqlite
-                && !File.Exists(statePaths.DatabasePath)
-            )
-            {
-                console.WriteLine($"blokebot: no database found at {statePaths.DatabasePath}.");
-                return 1;
-            }
 
-            BlokeBotDatabaseConfiguration database;
-            try
-            {
-                database = databaseSettings.CreateConfiguration(statePaths);
-            }
-            catch (BlokeBotHostStartupException exception)
-            {
-                console.WriteLine(exception.Summary);
-                return 1;
-            }
-            await using var db = database.CreateDbContext();
-            try
-            {
-                await using var databaseLease = await BlokeBotDatabaseRuntimeLease.AcquireAsync(
-                    database,
-                    cancellationToken
-                );
-                return await action(db, subject);
-            }
-            catch (BlokeBotDatabaseOwnershipException exception)
-            {
-                console.WriteLine($"blokebot: {exception.Message}");
-                return 1;
-            }
+        BlokeBotDatabaseConfiguration database;
+        try
+        {
+            database = databaseSettings.CreateConfiguration(statePaths);
         }
+        catch (BlokeBotHostStartupException exception)
+        {
+            console.WriteLine(exception.Summary);
+            return 1;
+        }
+        await using var db = database.CreateDbContext();
+        return await action(db, subject);
     }
 }

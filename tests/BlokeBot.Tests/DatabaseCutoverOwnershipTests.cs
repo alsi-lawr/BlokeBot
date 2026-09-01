@@ -7,27 +7,6 @@ namespace BlokeBot.Tests;
 public sealed class DatabaseCutoverOwnershipTests
 {
     [Test]
-    public void ProcessLease_RejectsConcurrentBlokeBotAndReleasesOwnership()
-    {
-        var root = TemporaryDirectory();
-        try
-        {
-            using (var lease = BlokeBotProcessLease.Acquire(root))
-            {
-                _ = Should.Throw<BlokeBotProcessOwnershipException>(() =>
-                    BlokeBotProcessLease.Acquire(root)
-                );
-            }
-
-            using var reacquired = BlokeBotProcessLease.Acquire(root);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [Test]
     public async Task SqliteExclusiveLease_BlocksAnotherWriterAndReleasesOwnership()
     {
         var root = TemporaryDirectory();

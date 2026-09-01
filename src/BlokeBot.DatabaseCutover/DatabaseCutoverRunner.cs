@@ -34,7 +34,6 @@ public sealed partial class DatabaseCutoverRunner
         CutoverReceipt? receipt = null;
         try
         {
-            using var processLease = BlokeBotProcessLease.Acquire(options.StateDirectory);
             receiptStore = new CutoverReceiptStore(options.StateDirectory);
             receipt = await receiptStore.ReadAsync(cancellationToken);
 
@@ -209,13 +208,9 @@ public sealed partial class DatabaseCutoverRunner
                 "The database cutover was cancelled. Run the same operation again to resume."
             );
         }
-        catch (Exception exception)
-            when (exception
-                    is BlokeBotProcessOwnershipException
-                        or BlokeBotDatabaseConfigurationException
-            )
+        catch (Exception exception) when (exception is BlokeBotDatabaseConfigurationException)
         {
-            await RecordFailureAsync(receiptStore, receipt, "ownership-or-configuration");
+            await RecordFailureAsync(receiptStore, receipt, "configuration");
             return new DatabaseCutoverResult.Rejected(exception.Message);
         }
         catch (Exception)
