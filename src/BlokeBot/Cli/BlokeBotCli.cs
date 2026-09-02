@@ -148,7 +148,7 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
                             value or command argument.
 
               Configure one active instance per main database. BlokeBot does not enforce this
-              constraint with a process or database lease. PostgreSQL 17.x is supported. The
+              constraint with a process or database lease. PostgreSQL 18.x is supported. The
               connection file can set Maximum Pool Size from 1 through 50, Timeout from 1
               through 30 seconds and Command Timeout from 1 through 60 seconds. Defaults are
               20 connections, 15 seconds and 30 seconds.

@@ -8,6 +8,7 @@
 *.db-shm
 *.db-wal
 /overlay-media/
+/packaging/docker/secrets/
 
 # .NET outputs
 **/bin/

@@ -146,7 +146,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
                     $"POSTGRES_DB={_database}",
                     "--publish",
                     $"127.0.0.1:{port}:5432",
-                    "postgres:17-alpine"
+                    "postgres:18-alpine"
                 );
             }
             catch

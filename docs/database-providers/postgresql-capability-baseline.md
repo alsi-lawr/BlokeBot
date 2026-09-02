@@ -2,9 +2,10 @@
 
 PostgreSQL is the selected first server provider. BLOKEBOT-270 supplies provider configuration and
 schema history. BLOKEBOT-271 supplies the SQL, transaction, failure, and workload authorities. The
-measured provider comparison is in
-`evidence/sqlite-postgresql-comparison-20260901.md`. BLOKEBOT-272 and BLOKEBOT-273 still own
-cutover, packaging, deployment configuration, CI, and operator procedures.
+measured provider comparison is in `evidence/sqlite-postgresql-comparison-20260901.md`. That
+comparison records its historical PostgreSQL 17.11 environment. Current support, cutover,
+packaging, deployment configuration, CI, and operator procedures target PostgreSQL 18.x in
+`operations.md`.
 
 ## EF provider and schema
 
