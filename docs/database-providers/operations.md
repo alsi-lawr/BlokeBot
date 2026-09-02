@@ -209,13 +209,13 @@ Before deployment, complete these tasks:
 
 1. Install the current PostgreSQL 18 minor release.
 2. Configure trusted TLS and verify the server certificate.
-3. Create one database for BlokeBot.
-4. Create one login role for the active BlokeBot instance.
-5. Give that role ownership of the BlokeBot database.
-6. Restrict network access to the BlokeBot host.
-7. Configure encrypted backups and retention.
-8. Restore a backup into a disposable server.
-9. Verify that BlokeBot starts against the restored database.
+3. Create one login role for the active BlokeBot instance.
+4. Create one database that the role owns. For a SQLite cutover, the cutover command creates
+   this database.
+5. Restrict network access to the BlokeBot host.
+6. Configure encrypted backups and retention.
+7. Restore a backup into a disposable server.
+8. Verify that BlokeBot starts against the restored database.
 
 Do not give the application role superuser, replication, role-management, or database-creation privileges.
 
@@ -237,40 +237,51 @@ The disaster-recovery plan must contain the database backup, matching state back
 
 ## SQLite to PostgreSQL cutover
 
-Stop BlokeBot before the cutover. Keep the SQLite file and state directory unchanged.
+Stop BlokeBot before the cutover. Keep the active provider configuration on `Sqlite`.
 
-Keep the active provider configuration on `Sqlite`. Prepare an empty target with the current
-PostgreSQL v0.14 migration. Stop all other database sessions before the cutover.
+Back up the SQLite file and the state directory. The command updates the SQLite file to the current
+SQLite schema.
 
-The packaged cutover command does not create or migrate the PostgreSQL target schema.
+Start PostgreSQL 18 and create the application login. Do not create the application database. The
+command creates that database and its schema.
 
-From an administrator session for the target, grant only the extra function privilege that the
-cutover requires:
+Create two protected connection files:
 
-```sql
-GRANT EXECUTE ON FUNCTION pg_control_system() TO blokebot;
-```
+- The administrator connection must name an existing maintenance database and an administrator
+  login. That login must be a superuser, or it must have `CREATEDB`, `EXECUTE` on
+  `pg_control_system()`, and membership of the application login.
+- The application connection must name the new database and the existing application login.
 
-Run the offline transfer with a protected target connection file:
+Run the offline transfer with both protected connection files:
 
 ```text
 blokebot database cutover-postgresql \
-  --postgresql-connection-string-file /run/secrets/blokebot-postgresql.connection \
+  --postgresql-administrator-connection-string-file /run/secrets/blokebot-postgresql-admin.connection \
+  --postgresql-application-connection-string-file /run/secrets/blokebot-postgresql.connection \
   --data-dir /var/lib/blokebot
 ```
 
-The command verifies the PostgreSQL target. It does not change the active provider configuration.
+The command does these steps in order:
 
-After successful verification, revoke the temporary function privilege from an administrator
-session for the target:
+1. Apply the current SQLite migrations to the SQLite file.
+2. Write the external receipt to `database-cutover/` in the state directory.
+3. Create the application database with the application login as owner.
+4. Apply the current PostgreSQL migrations with the application login.
+5. Copy the SQLite data and verify the PostgreSQL database.
 
-```sql
-REVOKE EXECUTE ON FUNCTION pg_control_system() FROM blokebot;
-```
+The receipt binds the operation to the SQLite data, the PostgreSQL cluster, the database name, and
+the owner. It does not contain a credential.
 
-After successful verification, change the provider configuration and restart BlokeBot. Verify `/health/ready` before public traffic resumes.
+The command rejects an application database that exists without a matching receipt. Run the same
+command again to resume an interrupted operation. The command does not drop a database. If you
+abandon an operation, drop the application database and delete the receipt.
 
-Before the first PostgreSQL application write, you can retry the cutover or continue with the untouched SQLite deployment.
+The command does not change the active provider configuration. After successful verification,
+change the provider configuration and restart BlokeBot. Verify `/health/ready` before public
+traffic resumes.
+
+Before the first PostgreSQL application write, you can retry the cutover or continue with the
+migrated SQLite deployment.
 
 After the first PostgreSQL application write, do not return to SQLite. Repair or restore PostgreSQL and keep the PostgreSQL configuration.
 

@@ -210,35 +210,33 @@ internal static partial class SiteGuideCatalog
                         "Stop the SQLite BlokeBot instance.",
                         "Back up the SQLite file and the matching state directory.",
                         "Keep the active provider configuration on Sqlite.",
-                        "Prepare an empty target with the current PostgreSQL v0.14 migration.",
-                        "Stop all other sessions for the target database.",
-                        "Grant the target role EXECUTE on pg_control_system() for the cutover.",
+                        "Start PostgreSQL 18 and create the application login.",
+                        "Do not create the application database.",
+                        "Create a protected administrator connection file for an existing maintenance database.",
+                        "Create a protected application connection file for the new database and the application login.",
                     ],
-                    Code = """
-                        GRANT EXECUTE ON FUNCTION pg_control_system() TO blokebot;
-                        """,
                     Note =
-                        "The packaged cutover command does not create or migrate the PostgreSQL target schema.",
+                        "The administrator login must be a superuser, or it must have CREATEDB, EXECUTE on pg_control_system(), and membership of the application login.",
                 },
                 new SiteGuideSection
                 {
                     Heading = "SQLite cutover command",
                     Steps =
                     [
-                        "Run the offline transfer with the protected target connection file.",
-                        "Rerun the same command to resume a failed transfer.",
+                        "Run the offline transfer with both protected connection files.",
+                        "Rerun the same command to resume an interrupted transfer.",
                         "Reuse the operation ID if you set --operation-id.",
-                        "Revoke the pg_control_system() privilege after successful verification.",
                         "Change the provider to PostgreSql only after successful verification.",
                         "Start one BlokeBot instance and verify /health/ready.",
                     ],
                     Code = """
                         blokebot database cutover-postgresql \
-                          --postgresql-connection-string-file /etc/blokebot/postgresql.connection \
+                          --postgresql-administrator-connection-string-file /etc/blokebot/postgresql-admin.connection \
+                          --postgresql-application-connection-string-file /etc/blokebot/postgresql.connection \
                           --data-dir /var/lib/blokebot
                         """,
                     Note =
-                        "The command verifies the target. It does not change the active provider configuration.",
+                        "The command migrates SQLite first. It then creates the database, applies the PostgreSQL schema, and copies and verifies the data. It rejects a database that exists without a matching receipt. It does not drop a database or change the active provider configuration.",
                 },
                 new SiteGuideSection
                 {

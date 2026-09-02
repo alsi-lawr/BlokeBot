@@ -61,7 +61,9 @@ public sealed class BlokeBotCliTests
                 "cutover-postgresql",
                 "--data-dir",
                 root,
-                "--postgresql-connection-string-file",
+                "--postgresql-administrator-connection-string-file",
+                Path.Combine(root, "target-admin.connection"),
+                "--postgresql-application-connection-string-file",
                 Path.Combine(root, "target.connection"),
             ]);
 

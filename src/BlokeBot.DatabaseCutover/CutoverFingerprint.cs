@@ -38,6 +38,7 @@ internal static class CutoverFingerprint
 
     internal static async Task<string> TargetIdentityAsync(
         DbConnection connection,
+        string clusterIdentity,
         IReadOnlyList<string> migrations,
         IReadOnlyList<CutoverTable> tables,
         CancellationToken cancellationToken
@@ -46,16 +47,16 @@ internal static class CutoverFingerprint
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT control.system_identifier::text, current_database(), database.oid::text FROM pg_control_system() AS control CROSS JOIN pg_database AS database WHERE database.datname = current_database();";
+            "SELECT current_database(), database.oid::text FROM pg_database AS database WHERE database.datname = current_database();";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
             throw new InvalidOperationException("The PostgreSql database identity is unavailable.");
         }
 
+        Append(hash, clusterIdentity);
         Append(hash, reader.GetString(0));
         Append(hash, reader.GetString(1));
-        Append(hash, reader.GetString(2));
         Append(hash, string.Join('\n', migrations));
         foreach (var table in tables)
         {

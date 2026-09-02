@@ -1,8 +1,10 @@
 using System.Globalization;
 using BlokeBot.Core.Features.PublicChat;
+using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Polly;
@@ -15,6 +17,129 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     private int? _writtenHostId;
     private int _pendingDeliveryCount;
 
+    internal async Task<CutoverReceipt?> ReadReceiptAsync() =>
+        await new CutoverReceiptStore(StateDirectory).ReadAsync(CancellationToken.None);
+
+    internal async Task AssertReceiptRedactedAsync() =>
+        (await File.ReadAllTextAsync(ReceiptPath)).ShouldNotContain(_password);
+
+    internal async Task<IReadOnlyList<string>> SqliteMigrationsAsync()
+    {
+        await using var source = new SqliteConnection(
+            $"Data Source={SqliteDatabasePath};Pooling=False"
+        );
+        await source.OpenAsync();
+        await using var command = source.CreateCommand();
+        command.CommandText = "SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId;";
+        return await ReadStringsAsync(command);
+    }
+
+    internal async Task<IReadOnlyList<string>> TargetMigrationsAsync(DisposablePostgreSql target)
+    {
+        await using var connection = new NpgsqlConnection(target.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT \"MigrationId\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\";";
+        return await ReadStringsAsync(command);
+    }
+
+    internal async Task<IReadOnlyList<string>> TargetTablesAsync(DisposablePostgreSql target)
+    {
+        await using var connection = new NpgsqlConnection(target.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY tablename;";
+        return await ReadStringsAsync(command);
+    }
+
+    internal async Task<TargetDatabaseState?> TargetDatabaseStateAsync(
+        DisposablePostgreSql target,
+        string database = _database
+    )
+    {
+        await using var administrator = new NpgsqlConnection(target.AdminConnectionString);
+        await administrator.OpenAsync();
+        await using var command = administrator.CreateCommand();
+        command.CommandText =
+            "SELECT role.rolname, shobj_description(database.oid, 'pg_database') FROM pg_database AS database JOIN pg_roles AS role ON role.oid = database.datdba WHERE database.datname = @database;";
+        _ = command.Parameters.AddWithValue("database", database);
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new TargetDatabaseState(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1)
+            )
+            : null;
+    }
+
+    internal string ExpectedMarker => $"blokebot-cutover:{OperationId:D}";
+
+    internal Task CreateDatabaseByHandAsync(DisposablePostgreSql target) =>
+        ExecuteAsAdministratorAsync(target, $"CREATE DATABASE {_database} OWNER {_role};");
+
+    internal Task DropDatabaseByHandAsync(DisposablePostgreSql target) =>
+        ExecuteAsAdministratorAsync(target, $"DROP DATABASE {_database};");
+
+    internal Task ChangeOwnerByHandAsync(DisposablePostgreSql target, bool restore) =>
+        ExecuteAsAdministratorAsync(
+            target,
+            $"ALTER DATABASE {_database} OWNER TO {(restore ? _role : _otherRole)};"
+        );
+
+    internal Task CreateStrayTableAsync(DisposablePostgreSql target) =>
+        ExecuteInTargetAsync(target, "CREATE TABLE hosts (id integer);");
+
+    internal Task DropStrayTableAsync(DisposablePostgreSql target) =>
+        ExecuteInTargetAsync(target, "DROP TABLE hosts;");
+
+    private static async Task ExecuteAsAdministratorAsync(DisposablePostgreSql target, string sql)
+    {
+        await using var administrator = new NpgsqlConnection(target.AdminConnectionString);
+        await administrator.OpenAsync();
+        await using var command = administrator.CreateCommand();
+        command.CommandText = sql;
+        _ = await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ExecuteInTargetAsync(DisposablePostgreSql target, string sql)
+    {
+        await using var connection = new NpgsqlConnection(target.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        _ = await command.ExecuteNonQueryAsync();
+    }
+
+    internal async Task<int> InsertStrayHostAsync()
+    {
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
+        await using var db = CutoverDbContextFactory.CreateDbContext(configuration);
+        var host = new BotHost
+        {
+            Login = "stray_host",
+            DisplayName = "Stray host",
+            BotRuntimeState = BotChannelRuntimeState.Stopped,
+            TimeZoneId = "UTC",
+            CreatedAtUtc = SeedTime,
+        };
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        return host.Id;
+    }
+
+    internal async Task DeleteHostAsync(int id)
+    {
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
+        await using var db = CutoverDbContextFactory.CreateDbContext(configuration);
+        _ = await db.Hosts.Where(host => host.Id == id).ExecuteDeleteAsync();
+    }
+
     internal async Task<long> DomainRowCountAsync(DisposablePostgreSql target, string table)
     {
         await using var connection = new NpgsqlConnection(target.ConnectionString);
@@ -24,22 +149,28 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         return Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
     }
 
+    internal async Task AssertDomainTablesEmptyAsync(DisposablePostgreSql target)
+    {
+        foreach (var table in await TargetTablesAsync(target))
+        {
+            (await DomainRowCountAsync(target, table)).ShouldBe(0, table);
+        }
+    }
+
     internal async Task AssertTargetsHaveDistinctClusterIdentityAsync()
     {
         var primary = await IdentityAsync(Primary);
         var other = await IdentityAsync(Other);
-        primary.Database.ShouldBe(other.Database);
-        primary.DatabaseOid.ShouldBe(other.DatabaseOid);
         primary.SystemIdentifier.ShouldNotBe(other.SystemIdentifier);
         primary.IsSuperuser.ShouldBeFalse();
-        primary.CanReadControlIdentity.ShouldBeTrue();
         other.IsSuperuser.ShouldBeFalse();
-        other.CanReadControlIdentity.ShouldBeTrue();
     }
 
     internal async Task AssertTransferredStateAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         await using var db = configuration.CreateDbContext();
         var host = await db.Hosts.AsNoTracking().SingleAsync(host => host.Id == SeedHostId);
         host.Login.ShouldBe("cutover_seed");
@@ -77,39 +208,13 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 
     internal async Task AssertProviderMetadataWasNotCopiedAsync()
     {
-        var sourceMigrations = new List<string>();
-        await using (
-            var source = new Microsoft.Data.Sqlite.SqliteConnection(
-                $"Data Source={SqliteDatabasePath};Pooling=False"
-            )
-        )
-        {
-            await source.OpenAsync();
-            await using var command = source.CreateCommand();
-            command.CommandText =
-                "SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId;";
-            await using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                sourceMigrations.Add(reader.GetString(0));
-            }
-        }
+        var sourceMigrations = await SqliteMigrationsAsync();
+        var targetMigrations = await TargetMigrationsAsync(Primary);
+        targetMigrations.ShouldBe([CurrentPostgreSqlMigration]);
+        targetMigrations.Intersect(sourceMigrations, StringComparer.Ordinal).ShouldBeEmpty();
 
         await using var target = new NpgsqlConnection(Primary.ConnectionString);
         await target.OpenAsync();
-        await using (var migrations = target.CreateCommand())
-        {
-            migrations.CommandText =
-                "SELECT \"MigrationId\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\";";
-            var targetMigrations = new List<string>();
-            await using var reader = await migrations.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                targetMigrations.Add(reader.GetString(0));
-            }
-            targetMigrations.ShouldBe(["20260901145930_20260901_v0_14_0_Baseline"]);
-            targetMigrations.Intersect(sourceMigrations, StringComparer.Ordinal).ShouldBeEmpty();
-        }
         await using var metadata = target.CreateCommand();
         metadata.CommandText = "SELECT to_regclass('public.sqlite_sequence') IS NULL;";
         ((bool)(await metadata.ExecuteScalarAsync() ?? false)).ShouldBeTrue();
@@ -117,7 +222,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 
     internal async Task AssertPendingWorkPreservedAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         await using var db = configuration.CreateDbContext();
         var messages = await db
             .PublicChatOutboxMessages.AsNoTracking()
@@ -131,7 +238,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 
     internal async Task<long?> MergedSubmissionTargetAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         await using var db = configuration.CreateDbContext();
         return await db
             .RequestSubmissions.Where(submission => submission.Id == MergedSubmissionId)
@@ -141,7 +250,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 
     internal async Task StartPostgreSqlAndWriteAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         await InitializeDatabaseAsync(configuration);
         await using var db = configuration.CreateDbContext();
         var host = new BotHost
@@ -161,7 +272,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     {
         _ = _writtenHostId.ShouldNotBeNull();
         _writtenHostId.Value.ShouldBeGreaterThan(SeedHostId);
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         await using var target = configuration.CreateDbContext();
         (await target.Hosts.CountAsync()).ShouldBe(2);
         await using var source = BlokeBotDatabaseConfiguration
@@ -172,7 +285,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 
     internal async Task DeliverTransferredPendingWorkOnceAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         var now = new DateTimeOffset(SeedTime.AddDays(1), TimeSpan.Zero);
         var outbox = Outbox(configuration);
         var claimed = (
@@ -206,7 +321,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 
     internal async Task AssertTransferredPendingWorkDoesNotReplayAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile);
+        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+            ApplicationConnectionFile
+        );
         var now = new DateTimeOffset(SeedTime.AddDays(1).AddMinutes(1), TimeSpan.Zero);
         var afterRestart = await Outbox(configuration)
             .TryClaimNextAsync(
@@ -242,43 +359,38 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             new PublicChatTerminalRetentionPolicy { Duration = TimeSpan.FromDays(7) }
         );
 
-    private sealed class CutoverDbContextFactory(BlokeBotDatabaseConfiguration configuration)
-        : IDbContextFactory<BlokeBotDbContext>
+    private static async Task<IReadOnlyList<string>> ReadStringsAsync(
+        System.Data.Common.DbCommand command
+    )
     {
-        public BlokeBotDbContext CreateDbContext() => configuration.CreateDbContext();
-
-        public Task<BlokeBotDbContext> CreateDbContextAsync(
-            CancellationToken cancellationToken = default
-        )
+        var values = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(CreateDbContext());
+            values.Add(reader.GetString(0));
         }
+
+        return values;
     }
 
     private static async Task<PostgreSqlIdentity> IdentityAsync(DisposablePostgreSql target)
     {
-        await using var connection = new NpgsqlConnection(target.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            "SELECT control.system_identifier::text, current_database(), database.oid::text, role.rolsuper, has_function_privilege(current_user, 'pg_control_system()', 'EXECUTE') FROM pg_control_system() AS control CROSS JOIN pg_database AS database CROSS JOIN pg_roles AS role WHERE database.datname = current_database() AND role.rolname = current_user;";
-        await using var reader = await command.ExecuteReaderAsync();
-        _ = await reader.ReadAsync();
+        await using var administrator = new NpgsqlConnection(target.AdminConnectionString);
+        await administrator.OpenAsync();
+        await using var cluster = administrator.CreateCommand();
+        cluster.CommandText = "SELECT system_identifier::text FROM pg_control_system();";
+        var systemIdentifier = (string)(await cluster.ExecuteScalarAsync())!;
+
+        await using var command = administrator.CreateCommand();
+        command.CommandText = "SELECT rolsuper FROM pg_roles WHERE rolname = @role;";
+        _ = command.Parameters.AddWithValue("role", _role);
         return new PostgreSqlIdentity(
-            reader.GetString(0),
-            reader.GetString(1),
-            reader.GetString(2),
-            reader.GetBoolean(3),
-            reader.GetBoolean(4)
+            systemIdentifier,
+            (bool)(await command.ExecuteScalarAsync() ?? true)
         );
     }
 
-    private sealed record PostgreSqlIdentity(
-        string SystemIdentifier,
-        string Database,
-        string DatabaseOid,
-        bool IsSuperuser,
-        bool CanReadControlIdentity
-    );
+    internal sealed record TargetDatabaseState(string Owner, string? Comment);
+
+    private sealed record PostgreSqlIdentity(string SystemIdentifier, bool IsSuperuser);
 }

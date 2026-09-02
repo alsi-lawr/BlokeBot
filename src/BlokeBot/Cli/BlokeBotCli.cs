@@ -71,7 +71,7 @@ internal static class BlokeBotCli
                     _ = database
                         .AddCommand<BlokeBotDatabaseCutoverCommand>("cutover-postgresql")
                         .WithDescription(
-                            "Copy the stopped SQLite main database to an empty PostgreSql target."
+                            "Create a PostgreSql database and copy the stopped SQLite main database."
                         );
                 }
             );
@@ -100,7 +100,8 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
                                       [--output FILE] [--data-dir PATH] [--config PATH]
               blokebot privacy erase --confirm [--login LOGIN] [--user-id ID] [--host-id ID]
                                      [--data-dir PATH] [--config PATH]
-              blokebot database cutover-postgresql --postgresql-connection-string-file FILE
+              blokebot database cutover-postgresql --postgresql-administrator-connection-string-file FILE
+                                                    --postgresql-application-connection-string-file FILE
                                                     [--operation-id UUID] [--batch-size ROWS]
                                                     [--data-dir PATH] [--config PATH]
 
@@ -266,8 +267,11 @@ internal sealed class BlokeBotPrivacyEraseSettings : BlokeBotPrivacyCommandSetti
 
 internal sealed class BlokeBotDatabaseCutoverSettings : CommandSettings
 {
-    [CommandOption("--postgresql-connection-string-file <FILE>")]
-    public required string PostgreSqlConnectionStringFile { get; init; }
+    [CommandOption("--postgresql-administrator-connection-string-file <FILE>")]
+    public required string PostgreSqlAdministratorConnectionStringFile { get; init; }
+
+    [CommandOption("--postgresql-application-connection-string-file <FILE>")]
+    public required string PostgreSqlApplicationConnectionStringFile { get; init; }
 
     [CommandOption("--operation-id <UUID>")]
     public Guid? OperationId { get; init; }

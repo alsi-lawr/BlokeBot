@@ -10,6 +10,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
     private const string _database = "blokebot";
     private const string _password = "disposable-cutover-password";
     private const string _role = "cutover";
+    private const string _otherRole = "cutover_other";
     private readonly string _root;
     private readonly IReadOnlyDictionary<string, string> _localStateHashes;
 
@@ -31,7 +32,8 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
     internal Guid OperationId { get; } = Guid.Parse("20a286a6-6530-475e-b320-15ba24d32aed");
     internal string StateDirectory => Path.Combine(_root, "state");
     internal string SqliteDatabasePath => Path.Combine(StateDirectory, "blokebot.db");
-    internal string ConnectionFile => Path.Combine(_root, "target.connection");
+    internal string AdministratorConnectionFile => Path.Combine(_root, "target-admin.connection");
+    internal string ApplicationConnectionFile => Path.Combine(_root, "target-app.connection");
 
     internal static async Task<DatabaseCutoverIntegrationFixture> CreateAsync()
     {
@@ -76,10 +78,32 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
 
     internal async Task SelectTargetAsync(DisposablePostgreSql target)
     {
-        await File.WriteAllTextAsync(ConnectionFile, target.ConnectionString);
+        await WriteProtectedAsync(AdministratorConnectionFile, target.AdminConnectionString);
+        await SelectApplicationTargetAsync(target, _database, _role);
+    }
+
+    internal Task SelectOtherDatabaseAsync(DisposablePostgreSql target) =>
+        SelectApplicationTargetAsync(target, $"{_database}_other", _role);
+
+    internal Task SelectOtherOwnerAsync(DisposablePostgreSql target) =>
+        SelectApplicationTargetAsync(target, _database, _otherRole);
+
+    private Task SelectApplicationTargetAsync(
+        DisposablePostgreSql target,
+        string database,
+        string role
+    ) =>
+        WriteProtectedAsync(
+            ApplicationConnectionFile,
+            target.ApplicationConnectionString(database, role)
+        );
+
+    private static async Task WriteProtectedAsync(string path, string content)
+    {
+        await File.WriteAllTextAsync(path, content);
         if (!OperatingSystem.IsWindows())
         {
-            File.SetUnixFileMode(ConnectionFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         }
     }
 
@@ -96,24 +120,22 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
     internal sealed class DisposablePostgreSql(string name, int port, string secretDirectory)
         : IAsyncDisposable
     {
-        internal string ConnectionString =>
+        internal string ConnectionString => ApplicationConnectionString(_database, _role);
+
+        internal string AdminConnectionString =>
+            ApplicationConnectionString("postgres", "postgres");
+
+        internal string ApplicationConnectionString(string database, string role) =>
             new NpgsqlConnectionStringBuilder
             {
                 Host = IPAddress.Loopback.ToString(),
                 Port = port,
-                Database = _database,
-                Username = _role,
+                Database = database,
+                Username = role,
                 Password = _password,
                 Pooling = false,
                 Timeout = 3,
                 CommandTimeout = 30,
-            }.ConnectionString;
-
-        private string _adminConnectionString =>
-            new NpgsqlConnectionStringBuilder(ConnectionString)
-            {
-                Username = "postgres",
-                Password = _password,
             }.ConnectionString;
 
         internal static async Task<DisposablePostgreSql> StartAsync()
@@ -142,8 +164,6 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
                     $"type=bind,source={passwordFile},target=/run/secrets/postgres-password,readonly",
                     "--env",
                     "POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password",
-                    "--env",
-                    $"POSTGRES_DB={_database}",
                     "--publish",
                     $"127.0.0.1:{port}:5432",
                     "postgres:18-alpine"
@@ -174,7 +194,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
             {
                 try
                 {
-                    await using var connection = new NpgsqlConnection(_adminConnectionString);
+                    await using var connection = new NpgsqlConnection(AdminConnectionString);
                     await connection.OpenAsync();
                     await using var command = connection.CreateCommand();
                     command.CommandText = "SELECT 1;";
@@ -196,11 +216,11 @@ internal sealed partial class DatabaseCutoverIntegrationFixture : IAsyncDisposab
                 );
             }
 
-            await using var admin = new NpgsqlConnection(_adminConnectionString);
+            await using var admin = new NpgsqlConnection(AdminConnectionString);
             await admin.OpenAsync();
             await using var setup = admin.CreateCommand();
             setup.CommandText =
-                $"CREATE ROLE {_role} LOGIN PASSWORD '{_password}'; ALTER DATABASE {_database} OWNER TO {_role}; GRANT EXECUTE ON FUNCTION pg_control_system() TO {_role};";
+                $"CREATE ROLE {_role} LOGIN PASSWORD '{_password}'; CREATE ROLE {_otherRole} LOGIN PASSWORD '{_password}';";
             _ = await setup.ExecuteNonQueryAsync();
         }
 

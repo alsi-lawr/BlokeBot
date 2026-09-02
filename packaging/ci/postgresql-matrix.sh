@@ -194,7 +194,7 @@ BLOKEBOT_RUN_DATABASE_CUTOVER_INTEGRATION=1 \
     --configuration Release \
     --no-build \
     -- \
-    --treenode-filter '/*/*/*/Cutover_ResumesBoundedSelfReferenceRestorationWithPreservedState' \
+    --treenode-filter '/*/*/*/Cutover_PreparesTargetAndResumesAcrossInjectedFailures' \
     --no-ansi \
     --no-progress \
     --output Normal

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_commit": "57a60989da25bda9464025bfda7272a2d3dbdf90",
+  "source_commit": "4c980f702590116d021ede153c132af9c5ccac6e",
   "statements": [
     {
       "id": "hetzner-baseline-history-creation",
@@ -245,12 +245,12 @@
     {
       "id": "cutover-target-identity",
       "path": "src/BlokeBot.DatabaseCutover/CutoverFingerprint.cs",
-      "source_line": 48,
+      "source_line": 49,
       "api": "DbCommand.CommandText",
-      "source_marker": "SELECT control.system_identifier::text, current_database(), database.oid::text FROM pg_control_system()",
+      "source_marker": "SELECT current_database(), database.oid::text FROM pg_database AS database WHERE database.datname = current_database()",
       "sql_verb": "SELECT",
-      "purpose": "Bind an external receipt to the stable PostgreSQL cluster and database identity.",
-      "dialect_dependency": "postgresql_system_identifier_and_database_catalog"
+      "purpose": "Bind an external receipt to the stable PostgreSQL database identity under the administrator-read cluster identity.",
+      "dialect_dependency": "postgresql_database_catalog"
     },
     {
       "id": "cutover-sequence-advancement",
@@ -315,7 +315,7 @@
     {
       "id": "cutover-sqlite-exclusive-locking-mode",
       "path": "src/BlokeBot.DatabaseCutover/SqliteExclusiveLease.cs",
-      "source_line": 17,
+      "source_line": 24,
       "api": "DbCommand.CommandText",
       "source_marker": "PRAGMA locking_mode = EXCLUSIVE",
       "sql_verb": "PRAGMA",
@@ -325,7 +325,7 @@
     {
       "id": "cutover-sqlite-exclusive-transaction",
       "path": "src/BlokeBot.DatabaseCutover/SqliteExclusiveLease.cs",
-      "source_line": 28,
+      "source_line": 20,
       "api": "DbCommand.CommandText",
       "source_marker": "BEGIN EXCLUSIVE",
       "sql_verb": "BEGIN",
@@ -335,7 +335,7 @@
     {
       "id": "cutover-sqlite-exclusive-rollback",
       "path": "src/BlokeBot.DatabaseCutover/SqliteExclusiveLease.cs",
-      "source_line": 41,
+      "source_line": 42,
       "api": "DbCommand.CommandText",
       "source_marker": "ROLLBACK",
       "sql_verb": "ROLLBACK",
@@ -395,7 +395,7 @@
     {
       "id": "cutover-target-exclusive-lock",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 19,
+      "source_line": 20,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT pg_try_advisory_lock(@lock_key)",
       "sql_verb": "SELECT",
@@ -405,7 +405,7 @@
     {
       "id": "cutover-target-session-detection",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 27,
+      "source_line": 28,
       "api": "DbCommand.CommandText",
       "source_marker": "FROM pg_stat_activity WHERE datid =",
       "sql_verb": "SELECT",
@@ -413,19 +413,9 @@
       "dialect_dependency": "postgresql_session_catalog"
     },
     {
-      "id": "cutover-cluster-identity-privilege-check",
-      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 36,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT has_function_privilege(current_user, 'pg_control_system()', 'EXECUTE')",
-      "sql_verb": "SELECT",
-      "purpose": "Require the narrow PostgreSQL function privilege used for stable cluster identity.",
-      "dialect_dependency": "postgresql_function_privilege_catalog"
-    },
-    {
       "id": "cutover-target-exclusive-unlock",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 59,
+      "source_line": 51,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT pg_advisory_unlock(@lock_key)",
       "sql_verb": "SELECT",
@@ -435,7 +425,7 @@
     {
       "id": "cutover-sqlite-domain-catalog-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 110,
+      "source_line": 78,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT name FROM sqlite_schema WHERE type = 'table'",
       "sql_verb": "SELECT",
@@ -445,12 +435,82 @@
     {
       "id": "cutover-postgresql-domain-catalog-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Preflight.cs",
-      "source_line": 119,
+      "source_line": 92,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
       "sql_verb": "SELECT",
       "purpose": "Fail closed unless the PostgreSQL physical domain-table catalog matches the reviewed cutover catalog.",
       "dialect_dependency": "postgresql_table_catalog"
+    },
+    {
+      "id": "cutover-server-and-login-check",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 238,
+      "api": "DbCommand.CommandText",
+      "source_marker": "SELECT current_setting('server_version_num')::integer, EXISTS (SELECT 1 FROM pg_roles WHERE rolname = @role AND rolcanlogin)",
+      "sql_verb": "SELECT",
+      "purpose": "Require a PostgreSQL 18 server and an existing application login before any target mutation.",
+      "dialect_dependency": "postgresql_server_version_and_role_catalog"
+    },
+    {
+      "id": "cutover-cluster-identity-read",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 255,
+      "api": "DbCommand.CommandText",
+      "source_marker": "SELECT system_identifier::text FROM pg_control_system()",
+      "sql_verb": "SELECT",
+      "purpose": "Read the stable PostgreSQL cluster identity through the administrator connection.",
+      "dialect_dependency": "postgresql_system_identifier"
+    },
+    {
+      "id": "cutover-database-existence-check",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 266,
+      "api": "DbCommand.CommandText",
+      "source_marker": "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = @database)",
+      "sql_verb": "SELECT",
+      "purpose": "Detect an existing application database before the receipt decides whether to create it.",
+      "dialect_dependency": "postgresql_database_catalog"
+    },
+    {
+      "id": "cutover-database-creation",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 282,
+      "api": "DbCommand.CommandText",
+      "source_marker": "CREATE DATABASE {QuoteIdentifier(target.Database)} OWNER {QuoteIdentifier(target.Owner)}",
+      "sql_verb": "CREATE DATABASE",
+      "purpose": "Create the empty application database owned by the existing application login.",
+      "dialect_dependency": "postgresql_create_database_with_owner"
+    },
+    {
+      "id": "cutover-database-marker-write",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 289,
+      "api": "DbCommand.CommandText",
+      "source_marker": "COMMENT ON DATABASE {QuoteIdentifier(target.Database)} IS '{Marker(operationId)}'",
+      "sql_verb": "COMMENT",
+      "purpose": "Bind the created database to the cutover operation through its database comment.",
+      "dialect_dependency": "postgresql_database_comment"
+    },
+    {
+      "id": "cutover-database-owner-and-marker-read",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 302,
+      "api": "DbCommand.CommandText",
+      "source_marker": "SELECT role.rolname, shobj_description(database.oid, 'pg_database') FROM pg_database AS database JOIN pg_roles AS role ON role.oid = database.datdba",
+      "sql_verb": "SELECT",
+      "purpose": "Accept an existing database only when its owner and operation marker match the receipt.",
+      "dialect_dependency": "postgresql_database_owner_and_comment_catalog"
+    },
+    {
+      "id": "cutover-application-target-check",
+      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
+      "source_line": 327,
+      "api": "DbCommand.CommandText",
+      "source_marker": "SELECT current_database(), current_user, shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = current_database()",
+      "sql_verb": "SELECT",
+      "purpose": "Verify that the application connection reaches the prepared, operation-bound database.",
+      "dialect_dependency": "postgresql_current_database_and_comment_catalog"
     }
   ]
 }

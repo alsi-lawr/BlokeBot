@@ -3,6 +3,7 @@ using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -10,6 +11,10 @@ namespace BlokeBot.Tests;
 
 internal sealed partial class DatabaseCutoverIntegrationFixture
 {
+    internal const string PriorReleaseSqliteMigration =
+        "20260822192152_v0.12.0_GuessingSharedAliases";
+    internal const string CurrentSqliteMigration = "20260826174307_v0.13.0";
+    internal const string CurrentPostgreSqlMigration = "20260901145930_20260901_v0_14_0_Baseline";
     internal const int SeedHostId = 900;
     internal const long PendingOutboxId = 700;
     internal const string PendingDeduplicationKey =
@@ -21,19 +26,19 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     internal static readonly Guid FlowId = Guid.Parse("c0edc830-c63f-4ec9-92ad-27632794c855");
     internal static readonly DateTime SeedTime = new(2026, 8, 31, 19, 23, 41, DateTimeKind.Utc);
 
+    internal string ReceiptPath => new CutoverReceiptStore(StateDirectory).Path;
+
     private async Task InitializeAsync()
     {
-        await InitializeDatabaseAsync(BlokeBotDatabaseConfiguration.Sqlite(SqliteDatabasePath));
-        await SeedSqliteAsync();
+        await using (
+            var db = BlokeBotDatabaseConfiguration.Sqlite(SqliteDatabasePath).CreateDbContext()
+        )
+        {
+            await db.Database.MigrateAsync(PriorReleaseSqliteMigration);
+        }
+
+        await SeedPriorReleaseRowsAsync();
         await CreateLocalStateAsync();
-        await SelectTargetAsync(Primary);
-        await InitializeDatabaseAsync(
-            BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile)
-        );
-        await SelectTargetAsync(Other);
-        await InitializeDatabaseAsync(
-            BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ConnectionFile)
-        );
         await SelectTargetAsync(Primary);
     }
 
@@ -47,7 +52,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             .InitializeAsync(CancellationToken.None);
     }
 
-    private async Task SeedSqliteAsync()
+    // These tables are unchanged by the v0.13.0 migration, so the current model can write them
+    // into the prior-release file.
+    private async Task SeedPriorReleaseRowsAsync()
     {
         var configuration = BlokeBotDatabaseConfiguration.Sqlite(SqliteDatabasePath);
         await using var db = configuration.CreateDbContext();
@@ -141,6 +148,26 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         );
         db.AddRange(targetSubmission, mergedSubmission, targetCandidate, mergedCandidate);
         _ = db.Add(
+            new PublicChatOutboxMessage
+            {
+                Id = PendingOutboxId,
+                Channel = "cutover-channel",
+                Message = "pending once",
+                DeduplicationKey = PendingDeduplicationKey,
+                CreatedAtUtc = SeedTime,
+                ExpiresAtUtc = SeedTime.AddYears(10),
+                NextAttemptAtUtc = SeedTime,
+                Status = PublicChatOutboxStatus.Pending,
+            }
+        );
+        _ = await db.SaveChangesAsync();
+    }
+
+    internal async Task SeedCurrentReleaseRowsAsync()
+    {
+        var configuration = BlokeBotDatabaseConfiguration.Sqlite(SqliteDatabasePath);
+        await using var db = configuration.CreateDbContext();
+        _ = db.Add(
             new AutomationFlow
             {
                 Id = FlowId,
@@ -168,19 +195,6 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 PluginId = "example.cutover",
                 SettingId = "token",
                 ProtectedValue = [0x00, 0x7F, 0x80, 0xFF],
-            }
-        );
-        _ = db.Add(
-            new PublicChatOutboxMessage
-            {
-                Id = PendingOutboxId,
-                Channel = "cutover-channel",
-                Message = "pending once",
-                DeduplicationKey = PendingDeduplicationKey,
-                CreatedAtUtc = SeedTime,
-                ExpiresAtUtc = SeedTime.AddYears(10),
-                NextAttemptAtUtc = SeedTime,
-                Status = PublicChatOutboxStatus.Pending,
             }
         );
         _ = await db.SaveChangesAsync();
@@ -240,8 +254,8 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     {
         var protectedPaths = new[]
         {
-            SqliteDatabasePath,
-            ConnectionFile,
+            AdministratorConnectionFile,
+            ApplicationConnectionFile,
             Path.Combine(StateDirectory, "overlays", "scene.json"),
             Path.Combine(StateDirectory, "plugins", "example.cutover", "plugin.toml"),
             Path.Combine(StateDirectory, "plugins", "example.cutover", "private.db"),
@@ -264,5 +278,12 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     }
 
     internal DatabaseCutoverOptions Options() =>
-        new(StateDirectory, SqliteDatabasePath, ConnectionFile, OperationId, BatchSize: 1);
+        new(
+            StateDirectory,
+            SqliteDatabasePath,
+            AdministratorConnectionFile,
+            ApplicationConnectionFile,
+            OperationId,
+            BatchSize: 1
+        );
 }

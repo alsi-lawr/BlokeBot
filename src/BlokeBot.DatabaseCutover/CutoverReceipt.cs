@@ -2,13 +2,15 @@ namespace BlokeBot.DatabaseCutover;
 
 internal enum CutoverPhase
 {
+    DatabasePlanned,
+    DatabaseCreated,
+    SchemaReady,
     Prepared,
     Copying,
     RestoringSelfReferences,
     AdvancingSequences,
     Verifying,
     Verified,
-    Failed,
     Complete,
 }
 
@@ -24,8 +26,11 @@ internal sealed record CutoverReceipt(
     Guid OperationId,
     CutoverPhase Phase,
     string SourceFingerprint,
-    string TargetFingerprint,
+    string? TargetFingerprint,
     string LocalStateFingerprint,
+    string PostgreSqlClusterIdentity,
+    string PostgreSqlDatabase,
+    string PostgreSqlOwner,
     IReadOnlyList<CutoverTableCheckpoint> Checkpoints,
     string? VerificationFingerprint,
     string? FailureCode,
@@ -33,7 +38,7 @@ internal sealed record CutoverReceipt(
     DateTimeOffset? CompletedAtUtc
 )
 {
-    internal const int CurrentFormatVersion = 3;
+    internal const int CurrentFormatVersion = 4;
 
     internal CutoverReceipt WithPhase(CutoverPhase phase) =>
         this with
@@ -59,11 +64,20 @@ internal sealed record CutoverReceipt(
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
 
+    // The phase stays at the last durable step so that a retry resumes from it.
     internal CutoverReceipt Failed(string code) =>
         this with
         {
-            Phase = CutoverPhase.Failed,
             FailureCode = code,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        };
+
+    internal CutoverReceipt Prepared(string targetFingerprint) =>
+        this with
+        {
+            Phase = CutoverPhase.Prepared,
+            TargetFingerprint = targetFingerprint,
+            FailureCode = null,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
 

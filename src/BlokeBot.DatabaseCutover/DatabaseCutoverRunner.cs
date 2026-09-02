@@ -10,13 +10,17 @@ public sealed partial class DatabaseCutoverRunner
     private const string _currentSqliteMigration = "20260826174307_v0.13.0";
     private const string _currentPostgreSqlMigration = "20260901145930_20260901_v0_14_0_Baseline";
     private readonly Action<CutoverBatchCommit>? _batchCommitted;
+    private readonly Action<CutoverPreparationCheckpoint>? _preparationCheckpoint;
 
     public DatabaseCutoverRunner() { }
 
-    internal DatabaseCutoverRunner(Action<CutoverBatchCommit> batchCommitted)
+    internal DatabaseCutoverRunner(
+        Action<CutoverBatchCommit>? batchCommitted,
+        Action<CutoverPreparationCheckpoint>? preparationCheckpoint
+    )
     {
-        ArgumentNullException.ThrowIfNull(batchCommitted);
         _batchCommitted = batchCommitted;
+        _preparationCheckpoint = preparationCheckpoint;
     }
 
     public async Task<DatabaseCutoverResult> RunAsync(
@@ -36,26 +40,82 @@ public sealed partial class DatabaseCutoverRunner
         {
             receiptStore = new CutoverReceiptStore(options.StateDirectory);
             receipt = await receiptStore.ReadAsync(cancellationToken);
-
+            var administratorConfiguration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+                options.PostgreSqlAdministratorConnectionStringFile
+            );
+            var applicationConfiguration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
+                options.PostgreSqlApplicationConnectionStringFile
+            );
             var sourceConfiguration = BlokeBotDatabaseConfiguration.Sqlite(
                 options.SqliteDatabasePath
             );
-            var targetConfiguration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
-                options.PostgreSqlConnectionStringFile
-            );
-            await using var source = sourceConfiguration.CreateDbContext();
-            await using var target = targetConfiguration.CreateDbContext();
-            var sourceConnection = (SqliteConnection)source.Database.GetDbConnection();
-            sourceConnection.ConnectionString = new SqliteConnectionStringBuilder(
-                sourceConnection.ConnectionString
-            )
-            {
-                Pooling = false,
-            }.ToString();
-            var targetConnection = (NpgsqlConnection)target.Database.GetDbConnection();
-            await sourceConnection.OpenAsync(cancellationToken);
-            await targetConnection.OpenAsync(cancellationToken);
+            await InitializeAsync(sourceConfiguration, cancellationToken);
 
+            await using var source = CutoverDbContextFactory.CreateDbContext(sourceConfiguration);
+            await using var target = CutoverDbContextFactory.CreateDbContext(
+                applicationConfiguration
+            );
+            var sourceConnection = (SqliteConnection)source.Database.GetDbConnection();
+            await sourceConnection.OpenAsync(cancellationToken);
+            await using var sourceLease = await SqliteExclusiveLease.AcquireAsync(
+                sourceConnection,
+                cancellationToken
+            );
+            var sourceMigrations = await ReadMigrationHistoryAsync(
+                source,
+                _currentSqliteMigration,
+                cancellationToken
+            );
+            if (!sourceMigrations.IsCurrent)
+            {
+                return new DatabaseCutoverResult.Rejected(
+                    "The SQLite source did not reach the current supported schema."
+                );
+            }
+
+            var tables = CutoverCatalog.Load(source, target);
+            var sourceCatalogFailure = await ValidateSqlitePhysicalCatalogAsync(
+                sourceConnection,
+                tables,
+                cancellationToken
+            );
+            if (sourceCatalogFailure is not null)
+            {
+                return new DatabaseCutoverResult.Rejected(sourceCatalogFailure);
+            }
+
+            var sourceFingerprint = await CutoverFingerprint.SourceAsync(
+                sourceConnection,
+                null,
+                sourceMigrations.Applied,
+                tables,
+                cancellationToken
+            );
+            var localStateFingerprint = await LocalStateFingerprint.CalculateAsync(
+                options.StateDirectory,
+                options.SqliteDatabasePath,
+                receiptStore,
+                cancellationToken
+            );
+            var targetConnection = (NpgsqlConnection)target.Database.GetDbConnection();
+            var preparation = await PrepareTargetAsync(
+                administratorConfiguration,
+                applicationConfiguration,
+                targetConnection,
+                options.OperationId,
+                receiptStore,
+                receipt,
+                sourceFingerprint,
+                localStateFingerprint,
+                cancellationToken
+            );
+            if (preparation.Failure is not null)
+            {
+                return new DatabaseCutoverResult.Rejected(preparation.Failure);
+            }
+
+            receipt = preparation.Receipt!;
+            await targetConnection.OpenAsync(cancellationToken);
             var targetOwnershipFailure = await AcquireTargetOwnershipAsync(
                 targetConnection,
                 cancellationToken
@@ -67,15 +127,19 @@ public sealed partial class DatabaseCutoverRunner
 
             try
             {
-                var schema = await ValidateSchemaAsync(source, target, cancellationToken);
-                if (schema.Failure is not null)
+                var targetMigrations = await ReadMigrationHistoryAsync(
+                    target,
+                    _currentPostgreSqlMigration,
+                    cancellationToken
+                );
+                if (!targetMigrations.IsCurrent)
                 {
-                    return new DatabaseCutoverResult.Rejected(schema.Failure);
+                    return new DatabaseCutoverResult.Rejected(
+                        "The PostgreSql target did not reach the current compatible schema."
+                    );
                 }
 
-                var tables = CutoverCatalog.Load(source, target);
-                var catalogFailure = await ValidatePhysicalCatalogsAsync(
-                    sourceConnection,
+                var catalogFailure = await ValidatePostgreSqlPhysicalCatalogAsync(
                     targetConnection,
                     tables,
                     cancellationToken
@@ -85,37 +149,17 @@ public sealed partial class DatabaseCutoverRunner
                     return new DatabaseCutoverResult.Rejected(catalogFailure);
                 }
 
-                await using var sourceLease = await SqliteExclusiveLease.AcquireAsync(
-                    sourceConnection,
-                    cancellationToken
-                );
-                var sourceFingerprint = await CutoverFingerprint.SourceAsync(
-                    sourceConnection,
-                    null,
-                    schema.SourceMigrations,
-                    tables,
-                    cancellationToken
-                );
                 var targetFingerprint = await CutoverFingerprint.TargetIdentityAsync(
                     targetConnection,
-                    schema.TargetMigrations,
+                    receipt.PostgreSqlClusterIdentity,
+                    targetMigrations.Applied,
                     tables,
                     cancellationToken
                 );
-                var localStateFingerprint = await LocalStateFingerprint.CalculateAsync(
-                    options.StateDirectory,
-                    options.SqliteDatabasePath,
-                    receiptStore,
-                    cancellationToken
-                );
-
                 var receiptResult = await BindReceiptAsync(
                     receiptStore,
                     receipt,
-                    options.OperationId,
-                    sourceFingerprint,
                     targetFingerprint,
-                    localStateFingerprint,
                     targetConnection,
                     tables,
                     cancellationToken
@@ -135,6 +179,7 @@ public sealed partial class DatabaseCutoverRunner
                     );
                 }
 
+                Checkpoint(CutoverPreparationCheckpoint.TargetBound, cancellationToken);
                 var reconcile = await ReconcileTargetAsync(
                     receipt,
                     receiptStore,
@@ -179,7 +224,7 @@ public sealed partial class DatabaseCutoverRunner
                     sourceFingerprint,
                     localStateFingerprint,
                     options,
-                    schema.SourceMigrations,
+                    sourceMigrations.Applied,
                     cancellationToken
                 );
                 if (verification.Failure is not null)
@@ -225,8 +270,9 @@ public sealed partial class DatabaseCutoverRunner
     private static string? ValidateOptions(DatabaseCutoverOptions options) =>
         string.IsNullOrWhiteSpace(options.StateDirectory)
         || string.IsNullOrWhiteSpace(options.SqliteDatabasePath)
-        || string.IsNullOrWhiteSpace(options.PostgreSqlConnectionStringFile)
-            ? "StateDirectory, the SQLite database path, and the PostgreSql connection-string file are required."
+        || string.IsNullOrWhiteSpace(options.PostgreSqlAdministratorConnectionStringFile)
+        || string.IsNullOrWhiteSpace(options.PostgreSqlApplicationConnectionStringFile)
+            ? "StateDirectory, the SQLite database path, and both PostgreSql connection-string files are required."
         : options.BatchSize is < 1 or > 5000
             ? "The database cutover batch size must be between 1 and 5000."
         : null;
@@ -248,10 +294,6 @@ public sealed partial class DatabaseCutoverRunner
     }
 }
 
-internal sealed record CutoverSchemaValidation(
-    IReadOnlyList<string> SourceMigrations,
-    IReadOnlyList<string> TargetMigrations,
-    string? Failure
-);
+internal sealed record CutoverMigrationHistory(IReadOnlyList<string> Applied, bool IsCurrent);
 
 internal sealed record CutoverReceiptResult(CutoverReceipt? Receipt, string? Failure);

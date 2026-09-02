@@ -24,7 +24,7 @@ adapter.
 
 ## Raw SQL register
 
-`main-database-raw-sql-v1.json` registers 45 execution sites:
+`main-database-raw-sql-v1.json` registers 51 execution sites:
 
 - four SQLite-only `HetznerBaselineBridge` catalog/history statements;
 - nine named SQLite/PostgreSQL idempotent insert authorities;
@@ -32,9 +32,10 @@ adapter.
 - separate SQLite and PostgreSQL plugin JSON queries;
 - the two closed provider SQL dispatch sites;
 - PostgreSQL's two transaction-local lock bounds and transaction-scoped immediate-write lock; and
-- 21 offline cutover statements: seven identity, ownership, session, privilege, and physical
-  catalog reads; three SQLite exclusive-lease statements; three canonical copy statements; two
-  bounded self-reference statements; and six sequence or constraint verification statements.
+- 27 offline cutover statements: seven target preparation statements; six identity, ownership,
+  session, and physical catalog reads; three SQLite exclusive-lease statements; three canonical
+  copy statements; two bounded self-reference statements; and six sequence or constraint
+  verification statements.
 
 The register records the exact path, line, API, source marker, purpose, and dialect dependency. The
 verifier also requires the exact reviewed set of four `sqlite_schema` references: three in the

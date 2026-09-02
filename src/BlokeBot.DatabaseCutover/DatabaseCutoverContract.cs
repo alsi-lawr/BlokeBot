@@ -3,7 +3,8 @@ namespace BlokeBot.DatabaseCutover;
 public sealed record DatabaseCutoverOptions(
     string StateDirectory,
     string SqliteDatabasePath,
-    string PostgreSqlConnectionStringFile,
+    string PostgreSqlAdministratorConnectionStringFile,
+    string PostgreSqlApplicationConnectionStringFile,
     Guid? OperationId,
     int BatchSize = 500
 );

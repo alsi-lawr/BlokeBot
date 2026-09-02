@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using BlokeBot.Persistence;
 using Microsoft.Data.Sqlite;
@@ -32,16 +33,7 @@ public sealed partial class DatabaseCutoverRunner
         );
         if (otherSessions == 0)
         {
-            await using var privilege = connection.CreateCommand();
-            privilege.CommandText =
-                "SELECT has_function_privilege(current_user, 'pg_control_system()', 'EXECUTE');";
-            if ((bool)(await privilege.ExecuteScalarAsync(cancellationToken) ?? false))
-            {
-                return null;
-            }
-
-            await ReleaseTargetOwnershipAsync(connection);
-            return "The PostgreSql cutover role needs EXECUTE on pg_control_system() to bind the receipt to this cluster. Grant only that function for cutover, then retry.";
+            return null;
         }
 
         await ReleaseTargetOwnershipAsync(connection);
@@ -61,71 +53,62 @@ public sealed partial class DatabaseCutoverRunner
         _ = await command.ExecuteScalarAsync();
     }
 
-    private static async Task<CutoverSchemaValidation> ValidateSchemaAsync(
-        BlokeBotDbContext source,
-        BlokeBotDbContext target,
+    private static async Task<CutoverMigrationHistory> ReadMigrationHistoryAsync(
+        BlokeBotDbContext db,
+        string currentMigration,
         CancellationToken cancellationToken
     )
     {
-        var sourceAvailable = source.Database.GetMigrations().ToArray();
-        var sourceApplied = (
-            await source.Database.GetAppliedMigrationsAsync(cancellationToken)
-        ).ToArray();
-        if (
-            sourceAvailable.LastOrDefault() != _currentSqliteMigration
-            || !sourceAvailable.SequenceEqual(sourceApplied, StringComparer.Ordinal)
-        )
-        {
-            return new(
-                sourceApplied,
-                [],
-                "The SQLite source is not the supported released v0.13 schema. Start v0.13 first to finish its forward migrations."
-            );
-        }
-
-        var targetAvailable = target.Database.GetMigrations().ToArray();
-        var targetApplied = (
-            await target.Database.GetAppliedMigrationsAsync(cancellationToken)
-        ).ToArray();
-        return
-            targetAvailable.LastOrDefault() != _currentPostgreSqlMigration
-            || !targetAvailable.SequenceEqual(targetApplied, StringComparer.Ordinal)
-            ? new(
-                sourceApplied,
-                targetApplied,
-                "The PostgreSql target is not at the compatible v0.14 schema. Apply its forward migrations before cutover."
-            )
-            : new(sourceApplied, targetApplied, null);
+        var available = db.Database.GetMigrations().ToArray();
+        var applied = (await db.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
+        return new(
+            applied,
+            available.LastOrDefault() == currentMigration
+                && available.SequenceEqual(applied, StringComparer.Ordinal)
+        );
     }
 
-    private static async Task<string?> ValidatePhysicalCatalogsAsync(
+    private static async Task<string?> ValidateSqlitePhysicalCatalogAsync(
         SqliteConnection source,
+        IReadOnlyList<CutoverTable> tables,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var command = source.CreateCommand();
+        command.CommandText =
+            "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY name;";
+        return await MatchesCatalogAsync(command, tables, cancellationToken)
+            ? null
+            : "The SQLite physical domain table catalog does not match the reviewed cutover catalog.";
+    }
+
+    private static async Task<string?> ValidatePostgreSqlPhysicalCatalogAsync(
         NpgsqlConnection target,
         IReadOnlyList<CutoverTable> tables,
         CancellationToken cancellationToken
     )
     {
-        var expected = tables.Select(table => table.Name).Order(StringComparer.Ordinal).ToArray();
-        await using var sourceCommand = source.CreateCommand();
-        sourceCommand.CommandText =
-            "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY name;";
-        var sourceTables = await ReadStringsAsync(sourceCommand, cancellationToken);
-        if (!expected.SequenceEqual(sourceTables, StringComparer.Ordinal))
-        {
-            return "The SQLite physical domain table catalog does not match the reviewed cutover catalog.";
-        }
-
-        await using var targetCommand = target.CreateCommand();
-        targetCommand.CommandText =
+        await using var command = target.CreateCommand();
+        command.CommandText =
             "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('__EFMigrationsHistory', '__EFMigrationsLock') ORDER BY tablename;";
-        var targetTables = await ReadStringsAsync(targetCommand, cancellationToken);
-        return expected.SequenceEqual(targetTables, StringComparer.Ordinal)
+        return await MatchesCatalogAsync(command, tables, cancellationToken)
             ? null
             : "The PostgreSql physical domain table catalog does not match the reviewed cutover catalog.";
     }
 
+    private static async Task<bool> MatchesCatalogAsync(
+        DbCommand command,
+        IReadOnlyList<CutoverTable> tables,
+        CancellationToken cancellationToken
+    )
+    {
+        var expected = tables.Select(table => table.Name).Order(StringComparer.Ordinal);
+        var actual = await ReadStringsAsync(command, cancellationToken);
+        return expected.SequenceEqual(actual, StringComparer.Ordinal);
+    }
+
     private static async Task<string[]> ReadStringsAsync(
-        System.Data.Common.DbCommand command,
+        DbCommand command,
         CancellationToken cancellationToken
     )
     {

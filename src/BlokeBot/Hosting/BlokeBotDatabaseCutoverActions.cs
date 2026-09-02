@@ -64,7 +64,8 @@ internal static class BlokeBotDatabaseCutoverActions
             new DatabaseCutoverOptions(
                 statePaths.StateDirectory,
                 statePaths.DatabasePath,
-                settings.PostgreSqlConnectionStringFile,
+                settings.PostgreSqlAdministratorConnectionStringFile,
+                settings.PostgreSqlApplicationConnectionStringFile,
                 settings.OperationId,
                 settings.BatchSize
             ),
