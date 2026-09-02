@@ -28,6 +28,23 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Startup and health",
+                    Paragraphs =
+                    [
+                        "BlokeBot checks the database and applies migrations before it starts the HTTP listener. A connection refusal means that BlokeBot is not ready.",
+                    ],
+                    Bullets =
+                    [
+                        "BlokeBot retries provider unavailability five times. Each retry waits three seconds.",
+                        "/health/live confirms that the process listens. It does not access the database.",
+                        "/health/ready checks database access and the migration history within two seconds.",
+                        "A terminal startup failure stops BlokeBot with a redacted category and a nonzero exit status.",
+                    ],
+                    Note =
+                        "The health endpoints do not enforce the operator constraint for one active instance.",
+                },
+                new SiteGuideSection
+                {
                     Heading = "PostgreSQL responsibilities",
                     Bullets =
                     [

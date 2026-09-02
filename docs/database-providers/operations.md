@@ -66,6 +66,45 @@ Create the protected files before startup:
 
 Do not commit either secret file. The Compose example mounts both files read-only. UID `1654` is the non-root `app` account in the runtime image.
 
+## Startup and migrations
+
+BlokeBot checks the database connection and applies migrations before it starts the HTTP listener.
+
+Startup uses this order:
+
+1. BlokeBot checks the selected database connection.
+2. BlokeBot applies the migration history for the selected provider.
+3. BlokeBot starts HTTP and background services.
+4. The readiness endpoint reports `ready`.
+
+BlokeBot retries `provider-unavailable` failures five times. BlokeBot waits three seconds before each retry.
+
+Only `provider-unavailable` causes a startup retry. BlokeBot treats all other startup categories as terminal.
+
+The HTTP listener is absent during startup and migration. A connection refusal during this interval means that BlokeBot is not ready.
+
+A terminal database failure stops BlokeBot with a nonzero exit status. The terminal startup message and its structured event use a redacted category.
+
+## Health endpoints
+
+`GET /health/live` confirms that the process listens. It does not access the database.
+
+`GET /health/ready` checks database access and the migration history. The probe stops after two seconds.
+
+A ready response contains the selected provider and `ready`. A failed response uses HTTP 503 and one redacted category:
+
+- `provider-unavailable`
+- `authentication-failure`
+- `migration-failure`
+- `pool-exhaustion`
+- `command-timeout`
+- `retryable-concurrency-conflict`
+- `terminal-application-conflict`
+
+The response does not contain host names, database names, user names, connection strings, SQL statements, or exception messages.
+
+These endpoints exist only after the HTTP listener starts. They do not replace the operator constraint for one active instance.
+
 ## PostgreSQL ownership
 
 The operator owns the PostgreSQL service. BlokeBot does not create a server, database, role, TLS certificate, backup, or replica.
@@ -92,7 +131,7 @@ The state backup must include tokens, data-protection keys, overlay media, sched
 
 For a restore, restore PostgreSQL first. Restore the matching state directory before BlokeBot starts.
 
-Test the restored database with one BlokeBot instance. Verify the admin page before public traffic reaches the service.
+Test the restored database with one BlokeBot instance. Verify `/health/ready` before public traffic reaches the service.
 
 For a PostgreSQL upgrade, back up and test a restore first. Upgrade PostgreSQL before the BlokeBot application release.
 
@@ -114,7 +153,7 @@ blokebot database cutover-postgresql \
 
 The command verifies the PostgreSQL target. It does not change the active provider configuration.
 
-After successful verification, change the provider configuration and restart BlokeBot. Verify the admin page before public traffic resumes.
+After successful verification, change the provider configuration and restart BlokeBot. Verify `/health/ready` before public traffic resumes.
 
 Before the first PostgreSQL application write, you can retry the cutover or continue with the untouched SQLite deployment.
 

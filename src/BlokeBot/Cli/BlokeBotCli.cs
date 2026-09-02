@@ -153,6 +153,14 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
               through 30 seconds and Command Timeout from 1 through 60 seconds. Defaults are
               20 connections, 15 seconds and 30 seconds.
 
+            Health endpoints:
+              /health/live   The process listens. This endpoint does not access the database.
+              /health/ready  The main database is available and the schema is current.
+
+              BlokeBot listens only after startup migrations finish. It retries database
+              unavailability five times and waits three seconds before each retry. A terminal
+              database failure stops the process with a redacted category.
+
             Required privacy configuration for online mode:
               ControllerName BlokeBotPrivacy__ControllerName; who operates this deployment,
                              as named in its privacy notice.

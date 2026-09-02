@@ -15,6 +15,8 @@ digest="$root/tools/BlokeBot.DatabaseWorkloads/protocol/blokebot-database-worklo
 sqlite_result="$scratch/sqlite-workload.json"
 postgresql_result="$scratch/postgresql-workload.json"
 surface="$scratch/blokebot-surface.html"
+live="$scratch/blokebot-live.json"
+readiness="$scratch/blokebot-readiness.json"
 host_pid=""
 
 mkdir -p "$state"
@@ -75,6 +77,36 @@ start_and_check_host() {
 
   grep --fixed-strings "Twitch connection unavailable" "$surface" >/dev/null
   grep --fixed-strings "This Twitch connection is not available yet." "$surface" >/dev/null
+
+  live_status="$(
+    curl \
+      --silent \
+      --output "$live" \
+      --write-out '%{http_code}' \
+      http://127.0.0.1:18080/health/live
+  )"
+  readiness_status="$(
+    curl \
+      --silent \
+      --output "$readiness" \
+      --write-out '%{http_code}' \
+      http://127.0.0.1:18080/health/ready
+  )"
+  [[ "$live_status" == "200" ]]
+  [[ "$readiness_status" == "200" ]]
+  LIVE="$live" READINESS="$readiness" python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+live = json.loads(Path(os.environ["LIVE"]).read_text())
+readiness = json.loads(Path(os.environ["READINESS"]).read_text())
+assert live == {"status": "live"}
+assert readiness == {
+    "status": "ready",
+    "database": {"provider": "PostgreSql", "category": "ready"},
+}
+PY
 
   if grep --fixed-strings --file "$BLOKEBOT_POSTGRESQL_CONNECTION_STRING_FILE" "$log"; then
     echo "The connection string appeared in the host log." >&2

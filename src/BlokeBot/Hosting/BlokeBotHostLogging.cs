@@ -62,4 +62,19 @@ internal static class BlokeBotHostLogging
         logger
             .ForContext("ErrorType", exception.GetType().FullName)
             .Error("BlokeBot host terminated unexpectedly");
+
+    internal static void DatabaseFailure(
+        BlokeBotDatabaseHealthCategory category,
+        BlokeBotDatabaseStartupException exception
+    ) => DatabaseFailure(Log.Logger, category, exception);
+
+    internal static void DatabaseFailure(
+        Serilog.ILogger logger,
+        BlokeBotDatabaseHealthCategory category,
+        BlokeBotDatabaseStartupException exception
+    ) =>
+        logger
+            .ForContext("DatabaseHealthCategory", category.Token())
+            .ForContext("ErrorType", exception.InnerException?.GetType().FullName)
+            .Error("BlokeBot database startup failed");
 }

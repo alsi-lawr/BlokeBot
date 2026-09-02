@@ -23,7 +23,7 @@ internal static class BlokeBotHost
         try
         {
             await using var composition = Create(options);
-            await composition.App.InitializeBlokeBotPersistenceAsync(cancellationToken);
+            await BlokeBotDatabaseStartup.InitializeAsync(composition.App, cancellationToken);
             await composition.App.StartAsync(cancellationToken);
 
             if (composition.Twitch.Mode == BlokeBotRuntimeMode.Offline)
@@ -48,6 +48,12 @@ internal static class BlokeBotHost
         catch (BlokeBotHostStartupException exception)
         {
             BlokeBotHostLogging.HostFailure(exception);
+            console.WriteLine(exception.Summary);
+            return 1;
+        }
+        catch (BlokeBotDatabaseStartupException exception)
+        {
+            BlokeBotHostLogging.DatabaseFailure(exception.Category, exception);
             console.WriteLine(exception.Summary);
             return 1;
         }
@@ -111,6 +117,8 @@ internal static class BlokeBotHost
                 )
         );
         _ = builder.Services.AddBlokeBotPersistence(database);
+        _ = builder.Services.AddSingleton(database);
+        _ = builder.Services.AddSingleton<BlokeBotDatabaseHealthProbe>();
         _ = builder.Services.AddBlokeBotPluginRuntime();
         ConfigureDataProtection(builder.Services, statePaths);
         var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
@@ -118,6 +126,7 @@ internal static class BlokeBotHost
 
         var app = builder.Build();
         _ = app.UseSerilogRequestLogging();
+        MapDatabaseHealthEndpoints(app);
         _ = app.UseBlokeBotCore(twitch.Mode);
         return new BlokeBotHostComposition(app, twitch, statePaths);
     }
@@ -222,6 +231,44 @@ internal static class BlokeBotHost
         {
             _ = dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
         }
+    }
+
+    private static void MapDatabaseHealthEndpoints(WebApplication app)
+    {
+        _ = app.MapGet(
+            "/health/live",
+            static (HttpContext context) =>
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                return Results.Json(new { status = "live" });
+            }
+        );
+        _ = app.MapGet(
+            "/health/ready",
+            static async (
+                BlokeBotDatabaseHealthProbe probe,
+                HttpContext context,
+                CancellationToken cancellationToken
+            ) =>
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                var result = await probe.ProbeAsync(cancellationToken);
+                return Results.Json(
+                    new
+                    {
+                        status = result.IsReady ? "ready" : "not-ready",
+                        database = new
+                        {
+                            provider = result.Provider.ToString(),
+                            category = result.Category.Token(),
+                        },
+                    },
+                    statusCode: result.IsReady
+                        ? StatusCodes.Status200OK
+                        : StatusCodes.Status503ServiceUnavailable
+                );
+            }
+        );
     }
 }
 

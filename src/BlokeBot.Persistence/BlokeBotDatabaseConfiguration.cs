@@ -105,16 +105,18 @@ public sealed class BlokeBotDatabaseConfiguration
             );
         }
 
-        if (builder.Pooling)
+        if (Explicit(explicitSettings, "Maximum Pool Size", "MaxPoolSize"))
         {
-            builder.MaxPoolSize = Explicit(explicitSettings, "Maximum Pool Size", "MaxPoolSize")
-                ? InRange(
-                    builder.MaxPoolSize,
-                    1,
-                    PostgreSqlMaximumPoolSizeLimit,
-                    "Maximum Pool Size"
-                )
-                : PostgreSqlDefaultMaximumPoolSize;
+            builder.MaxPoolSize = InRange(
+                builder.MaxPoolSize,
+                1,
+                PostgreSqlMaximumPoolSizeLimit,
+                "Maximum Pool Size"
+            );
+        }
+        else if (builder.Pooling)
+        {
+            builder.MaxPoolSize = PostgreSqlDefaultMaximumPoolSize;
         }
         builder.Timeout = Explicit(explicitSettings, "Timeout", "Connection Timeout")
             ? InRange(builder.Timeout, 1, PostgreSqlMaximumConnectionTimeoutSeconds, "Timeout")

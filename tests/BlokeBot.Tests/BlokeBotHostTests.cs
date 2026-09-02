@@ -1,9 +1,12 @@
+using System.Text.Json;
 using BlokeBot.Cli;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Hosting;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -102,6 +105,49 @@ public sealed class BlokeBotHostTests
         }
         finally
         {
+            await Log.CloseAndFlushAsync();
+            Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task StartedHost_ReportsBoundedLiveAndDatabaseReadinessWithoutAuthentication()
+    {
+        var dataDirectory = TemporaryDirectory();
+        var composition = BlokeBotHost.Create(
+            new BlokeBotServeOptions("127.0.0.1", 0, dataDirectory, null)
+        );
+        try
+        {
+            await BlokeBotDatabaseStartup.InitializeAsync(composition.App, CancellationToken.None);
+            await composition.App.StartAsync();
+            var address = composition
+                .App.Services.GetRequiredService<IServer>()
+                .Features.Get<IServerAddressesFeature>()!
+                .Addresses.Single();
+            using var client = new HttpClient { BaseAddress = new Uri(address) };
+
+            using var liveResponse = await client.GetAsync("/health/live");
+            _ = liveResponse.EnsureSuccessStatusCode();
+            liveResponse.Headers.CacheControl!.NoStore.ShouldBeTrue();
+            var liveBody = await liveResponse.Content.ReadAsStringAsync();
+            using var live = JsonDocument.Parse(liveBody);
+            live.RootElement.GetProperty("status").GetString().ShouldBe("live");
+
+            using var readyResponse = await client.GetAsync("/health/ready");
+            _ = readyResponse.EnsureSuccessStatusCode();
+            readyResponse.Headers.CacheControl!.NoStore.ShouldBeTrue();
+            var readyBody = await readyResponse.Content.ReadAsStringAsync();
+            using var ready = JsonDocument.Parse(readyBody);
+            ready.RootElement.GetProperty("status").GetString().ShouldBe("ready");
+            var database = ready.RootElement.GetProperty("database");
+            database.GetProperty("provider").GetString().ShouldBe("Sqlite");
+            database.GetProperty("category").GetString().ShouldBe("ready");
+            readyBody.ShouldNotContain(dataDirectory);
+        }
+        finally
+        {
+            await composition.DisposeAsync();
             await Log.CloseAndFlushAsync();
             Directory.Delete(dataDirectory, recursive: true);
         }

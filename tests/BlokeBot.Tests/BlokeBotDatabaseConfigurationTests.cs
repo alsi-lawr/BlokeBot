@@ -90,7 +90,7 @@ public sealed class BlokeBotDatabaseConfigurationTests
     }
 
     [Test]
-    public void PostgreSqlConnectionBounds_DefaultOrRejectBeforeConnection()
+    public void PostgreSqlConnectionBounds_DefaultsAcceptLimitsAndRejectsOutsideThem()
     {
         var defaultFile = ConnectionFile("Host=localhost;Database=blokebot;Username=blokebot");
         try
@@ -110,8 +110,30 @@ public sealed class BlokeBotDatabaseConfigurationTests
             File.Delete(defaultFile);
         }
 
+        AssertConnectionBounds(
+            "Maximum Pool Size=1;Timeout=1;Command Timeout=1",
+            maximumPoolSize: 1,
+            connectionTimeout: 1,
+            commandTimeout: 1
+        );
+        AssertConnectionBounds(
+            "Maximum Pool Size=50;Timeout=30;Command Timeout=60",
+            maximumPoolSize: 50,
+            connectionTimeout: 30,
+            commandTimeout: 60
+        );
+
         foreach (
-            var setting in new[] { "Maximum Pool Size=51", "Timeout=31", "Command Timeout=61" }
+            var setting in new[]
+            {
+                "Maximum Pool Size=0",
+                "Maximum Pool Size=51",
+                "Pooling=false;Maximum Pool Size=51",
+                "Timeout=0",
+                "Timeout=31",
+                "Command Timeout=0",
+                "Command Timeout=61",
+            }
         )
         {
             var file = ConnectionFile(
@@ -128,6 +150,30 @@ public sealed class BlokeBotDatabaseConfigurationTests
             {
                 File.Delete(file);
             }
+        }
+    }
+
+    private static void AssertConnectionBounds(
+        string settings,
+        int maximumPoolSize,
+        int connectionTimeout,
+        int commandTimeout
+    )
+    {
+        var file = ConnectionFile($"Host=localhost;Database=blokebot;Username=blokebot;{settings}");
+        try
+        {
+            using var db = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(file).CreateDbContext();
+            var actual = new NpgsqlConnectionStringBuilder(
+                db.Database.GetDbConnection().ConnectionString
+            );
+            actual.MaxPoolSize.ShouldBe(maximumPoolSize);
+            actual.Timeout.ShouldBe(connectionTimeout);
+            actual.CommandTimeout.ShouldBe(commandTimeout);
+        }
+        finally
+        {
+            File.Delete(file);
         }
     }
 
