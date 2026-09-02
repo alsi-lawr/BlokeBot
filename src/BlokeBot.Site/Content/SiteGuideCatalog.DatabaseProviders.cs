@@ -114,8 +114,8 @@ internal static partial class SiteGuideCatalog
                         };
 
                         systemd.services.blokebot = {
-                          after = [ "postgresql.service" ];
-                          requires = [ "postgresql.service" ];
+                          after = [ "postgresql.target" ];
+                          requires = [ "postgresql.target" ];
                         };
                         """,
                 },

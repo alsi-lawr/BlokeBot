@@ -74,8 +74,8 @@ services.blokebot = {
 };
 
 systemd.services.blokebot = {
-  after = [ "postgresql.service" ];
-  requires = [ "postgresql.service" ];
+  after = [ "postgresql.target" ];
+  requires = [ "postgresql.target" ];
 };
 ```
 

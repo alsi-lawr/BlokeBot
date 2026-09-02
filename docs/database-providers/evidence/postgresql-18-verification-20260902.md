@@ -26,7 +26,7 @@ the volume mounted at `/var/lib/postgresql`. The Compose logs did not contain th
 database password.
 
 The Nix packages for BlokeBot and the Site built. The PostgreSQL NixOS module example evaluated
-with `pkgs.postgresql_18`, the protected systemd credential, and the PostgreSQL service dependency.
+with `pkgs.postgresql_18`, the protected systemd credential, and the `postgresql.target` dependency.
 The Nix BlokeBot package returned `ready` against PostgreSQL 18.6. The Nix Site package served the
 database installation and cutover procedures.
 
