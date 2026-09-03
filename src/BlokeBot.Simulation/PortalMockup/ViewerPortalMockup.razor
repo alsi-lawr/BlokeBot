@@ -1,0 +1,221 @@
+<div class="portal">
+    <header class="portal__topbar">
+        <div class="portal__topbar-inner">
+            <a class="portal__brand" href="/" aria-label="BlokeBot home">
+                <img class="portal__brand-mark" src="/blokebot-mark.svg" alt="" />
+                <span class="portal__brand-text">BlokeBot</span>
+            </a>
+            <div class="portal__topbar-utility">
+                <ThemeToggle />
+                @switch (Page.Viewer)
+                {
+                    case ViewerPortalMockupViewer.Authenticated when Page.Identity is { } identity:
+                        <div class="portal__account control-surface">
+                            <span class="portal__avatar" aria-hidden="true">@Initial(identity.DisplayName)</span>
+                            <span class="portal__account-name" title="@identity.DisplayName">@identity.DisplayName</span>
+                            <a class="portal__account-signout" href="@_signOutHref">Sign out</a>
+                        </div>
+                        break;
+                    case ViewerPortalMockupViewer.Unavailable:
+                        <span class="portal__auth portal__auth--unavailable" aria-disabled="true">Sign-in unavailable</span>
+                        break;
+                    default:
+                        <a class="portal__auth auth-action" href="@_signInHref">Sign in with Twitch</a>
+                        break;
+                }
+            </div>
+        </div>
+    </header>
+
+    <main class="portal__main" id="main">
+        @if (Page.Channel is null)
+        {
+            <PageHeader Kicker="Channel"
+                        Title="Channel not found"
+                        Description="@($"No BlokeBot channel is called @{Page.RequestedLogin}. Check the link you were given.")" />
+            <PageState Kind="PageStateKind.Empty"
+                       Title="Nothing to show"
+                       Description="Channel pages open from a link the channel shares. BlokeBot does not list channels." />
+        }
+        else
+        {
+            <header class="portal__channel card" aria-labelledby="portal-channel-name">
+                <div class="portal__channel-avatar" aria-hidden="true">@Initials(Page.Channel.DisplayName)</div>
+                <div class="portal__channel-body">
+                    <div class="page-kicker portal__kicker">Channel</div>
+                    <h1 id="portal-channel-name" class="page-header__title">@Page.Channel.DisplayName</h1>
+                    <p class="portal__channel-login">@($"@{Page.Channel.Login}")</p>
+                    <div class="portal__channel-status">
+                        <span class="@(Page.Channel.IsLive ? "status-pill status-pill--green" : "status-pill status-pill--slate")">
+                            <span class="status-pill__dot"></span>
+                            <span class="status-pill__label">@Page.Channel.LiveLine</span>
+                        </span>
+                        <a class="portal__external" href="@($"https://twitch.tv/{Page.Channel.Login}")" rel="noreferrer">Watch on Twitch</a>
+                    </div>
+                </div>
+            </header>
+
+            @if (Page.Features.Count == 0)
+            {
+                <PageState Kind="PageStateKind.Empty"
+                           Title="No public activities right now"
+                           Description="@($"{Page.Channel.DisplayName} has not opened any activities to viewers yet. Check back after the next stream.")" />
+            }
+            else
+            {
+                <nav class="portal__nav" aria-label="Activities">
+                    <ul class="portal__chips">
+                        @foreach (var feature in Page.Features)
+                        {
+                            <li>
+                                <a class="portal__chip control-surface" href="@feature.Href">
+                                    @feature.Label
+                                    @if (feature.State is ViewerPortalMockupFeatureState.Active)
+                                    {
+                                        <span class="portal__chip-dot" aria-hidden="true"></span>
+                                        <span class="portal__sr">, live</span>
+                                    }
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+
+                <div class="portal__grid">
+                    <section class="portal__section portal__section--now" aria-labelledby="portal-now">
+                        <h2 id="portal-now" class="portal__heading">Happening now</h2>
+                        <div class="portal__cards">
+                            @if (Page.State is ViewerPortalMockupState.Loading)
+                            {
+                                foreach (var feature in Page.Features.Take(4))
+                                {
+                                    <div class="card portal__card portal__card--muted" role="status">
+                                        <p class="portal__card-title">@feature.Label</p>
+                                        <p>Loading…</p>
+                                    </div>
+                                }
+                            }
+                            else if (_highlighted.Count == 0)
+                            {
+                                <div class="card portal__card portal__card--muted">
+                                    <p>Nothing is running right now. The activities above stay open, and this page fills in when the stream is live.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                foreach (var feature in _highlighted)
+                                {
+                                    if (feature.State is ViewerPortalMockupFeatureState.Failed)
+                                    {
+                                        <div class="card portal__card portal__card--failed" role="status">
+                                            <p class="portal__card-title">@feature.Label</p>
+                                            <p class="portal__card-headline">@feature.Label could not be loaded</p>
+                                            <p class="portal__card-detail">Everything else on this page is current. Open @feature.Label directly to try again.</p>
+                                            <a class="btn-secondary portal__card-action" href="@feature.Href">@feature.Action</a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <article class="card portal__card" aria-labelledby="@($"portal-card-{feature.Key}")">
+                                            <div class="portal__card-head">
+                                                <h3 id="@($"portal-card-{feature.Key}")" class="portal__card-title">@feature.Label</h3>
+                                                <span class="@PillClass(feature.Tone)">
+                                                    <span class="status-pill__dot"></span>
+                                                    <span class="status-pill__label">@feature.Status</span>
+                                                </span>
+                                            </div>
+                                            <p class="portal__card-headline">@feature.Headline</p>
+                                            <p class="portal__card-detail">@feature.Detail</p>
+                                            <a class="btn-secondary portal__card-action" href="@feature.Href">@feature.Action</a>
+                                        </article>
+                                    }
+                                }
+                            }
+                        </div>
+                    </section>
+
+                    <section class="portal__section portal__section--you" aria-labelledby="portal-you">
+                        <h2 id="portal-you" class="portal__heading">You</h2>
+                        @switch (Page.Viewer)
+                        {
+                            case ViewerPortalMockupViewer.Authenticated when Page.Identity is { } identity:
+                                <div class="card portal__card">
+                                    <p class="portal__you-identity">
+                                        Signed in as <strong>@identity.DisplayName</strong>
+                                        <span class="portal__you-login">@($"@{identity.Login}")</span>
+                                    </p>
+                                    @if (Page.State is ViewerPortalMockupState.Loading)
+                                    {
+                                        <p class="portal__card-detail" role="status">Loading your details…</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="portal__you-list">
+                                            @foreach (var item in Page.Personal)
+                                            {
+                                                <li class="portal__you-item">
+                                                    <span class="portal__you-label">@item.Label</span>
+                                                    <span class="portal__you-value">
+                                                        @item.Value
+                                                        @if (item.Rank is { } rank)
+                                                        {
+                                                            <RankIndicator Rank="rank" />
+                                                        }
+                                                    </span>
+                                                    <span class="portal__you-detail">@item.Detail</span>
+                                                    <a class="portal__you-link" href="@item.Href">@item.LinkText</a>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                                break;
+                            case ViewerPortalMockupViewer.Unavailable:
+                                <div class="card portal__card portal__card--muted" role="status">
+                                    <p>Sign-in is not available right now. Everything public on this page still works; try signing in again later.</p>
+                                </div>
+                                break;
+                            default:
+                                <div class="card portal__card">
+                                    <p class="portal__card-detail">Your points, passport and queue place on @Page.Channel.DisplayName appear here when you sign in with Twitch. Nothing about you is shown to anyone else.</p>
+                                    <a class="portal__auth auth-action portal__card-action" href="@_signInHref">Sign in with Twitch</a>
+                                </div>
+                                break;
+                        }
+                    </section>
+
+                    <section class="portal__section portal__section--recent" aria-labelledby="portal-recent">
+                        <h2 id="portal-recent" class="portal__heading">Recent activity</h2>
+                        <div class="card portal__card">
+                            @if (Page.State is ViewerPortalMockupState.Loading)
+                            {
+                                <p class="portal__card-detail" role="status">Loading…</p>
+                            }
+                            else if (Page.Recent.Count == 0)
+                            {
+                                <p class="portal__card-detail">No public activity yet.</p>
+                            }
+                            else
+                            {
+                                <ol class="portal__events">
+                                    @foreach (var item in Page.Recent)
+                                    {
+                                        <li class="portal__event">
+                                            <span class="portal__event-when">@item.When</span>
+                                            <span class="portal__event-feature">@item.Feature</span>
+                                            <span class="portal__event-text">@item.Text</span>
+                                        </li>
+                                    }
+                                </ol>
+                            }
+                        </div>
+                    </section>
+                </div>
+            }
+        }
+    </main>
+
+    <footer class="portal__footer">
+        <p>Public channel page by BlokeBot. Only what the channel has opened to viewers is shown here.</p>
+    </footer>
+</div>

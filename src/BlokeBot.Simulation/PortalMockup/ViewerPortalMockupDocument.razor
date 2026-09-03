@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="@Page.Theme" style="color-scheme: @Page.Theme">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Page.Title</title>
+    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/BlokeBot.Simulation.styles.css" />
+    <link rel="icon" type="image/svg+xml" href="/blokebot-mark.svg" />
+</head>
+<body>
+    <ViewerPortalMockup Page="Page" />
+</body>
+</html>
+
+@code {
+    [Parameter, EditorRequired]
+    public required ViewerPortalMockupPage Page { get; set; }
+}

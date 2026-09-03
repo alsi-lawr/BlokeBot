@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Simulation.PortalMockup;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Simulation;
@@ -12,6 +13,7 @@ internal static class SimulationEndpoints
 {
     public static void MapSimulationEndpoints(this WebApplication app)
     {
+        app.MapViewerPortalMockup();
         _ = app.MapGet(
                 "/simulation/ready",
                 static (SimulationReadiness readiness) =>

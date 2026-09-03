@@ -55,6 +55,19 @@ Files go to an area subdirectory of `../src/BlokeBot.Site/wwwroot/media`: `dashb
 
 Laptop frames are 1920x1080 and phone frames 495x1100, both before Viset's device chrome.
 
+## Design evidence
+
+`viewer-portal-mockup.lua` and `viewer-portal-mockup-phone-lower.lua` photograph the
+Simulation-only viewer portal mockup at `/simulation/portal-mockup` for the BLOKEBOT-274 design
+gate. They write into the planning store
+(`agent-planning/.../20260901-milestone-015-v0.15.0-viewer-portal/evidence/BLOKEBOT-274/captures`),
+not into help media, so `capture-all.sh` does not list them. Run them directly:
+
+```sh
+BLOKEBOT_CAPTURE_PORT=5610 nix run ../../Viset -- capture viewer-portal-mockup.lua --force
+BLOKEBOT_CAPTURE_PORT=5610 nix run ../../Viset -- capture viewer-portal-mockup-phone-lower.lua --force
+```
+
 ## Editor support
 
 `.luarc.json` loads `.viset/viset.d.lua` for Viset API completion and diagnostics in Lua Language
