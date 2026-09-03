@@ -371,7 +371,9 @@ public sealed class ViewerPortalAccessTests
         var forViewer = await ResolveAsync(access, "channel");
         var scope = PortalCacheScope.For(forAnonymous.Host, new PortalIdentity.Anonymous());
 
-        forViewer.ShouldBe(forAnonymous);
+        forViewer.Host.ShouldBe(forAnonymous.Host);
+        forViewer.DisplayName.ShouldBe(forAnonymous.DisplayName);
+        forViewer.PublicFeatures.ShouldBe(forAnonymous.PublicFeatures);
         forAnonymous.PublicFeatures.ShouldBe([
             HostFeatureFlags.Points,
             HostFeatureFlags.ViewerPassports,

@@ -11,13 +11,8 @@ public readonly record struct PortalHostKey(int Id, string Login);
 public sealed record PortalChannel(
     PortalHostKey Host,
     string DisplayName,
-    HostFeatureFlags EnabledFeatures
-)
-{
-    /// <summary>The enabled features with a public surface, in catalogue order.</summary>
-    public IReadOnlyList<HostFeatureFlags> PublicFeatures =>
-        ViewerPortalFeatures.PublicFeatures(EnabledFeatures);
-}
+    IReadOnlyList<HostFeatureFlags> PublicFeatures
+);
 
 /// <summary>The outcome of resolving a portal route login.</summary>
 public abstract record PortalChannelOutcome
