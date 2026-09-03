@@ -141,6 +141,7 @@ public static partial class BlokeBotApplication
             .AddBlokeBotBounties()
             .AddBlokeBotCommunityProgression()
             .AddBlokeBotViewerPassports()
+            .AddBlokeBotViewerPortal()
             .AddBlokeBotBingo()
             .AddBlokeBotBlokeRaid()
             .AddBlokeBotCompetitions()
