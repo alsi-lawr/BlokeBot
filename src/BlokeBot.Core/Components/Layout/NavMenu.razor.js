@@ -2,6 +2,7 @@ const attributesByKey = new Map([
     ["blokebot.sidebar.guessing.open", "navGuessingOpen"],
     ["blokebot.sidebar.points.open", "navPointsOpen"],
     ["blokebot.sidebar.customcommands.open", "navCustomCommandsOpen"],
+    ["blokebot.sidebar.automations.open", "navAutomationsOpen"],
     ["blokebot.sidebar.nativetwitch.open", "navNativeTwitchOpen"],
 ]);
 const routeHelpCleanups = new Map();
