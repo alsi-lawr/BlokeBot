@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_commit": "4c980f702590116d021ede153c132af9c5ccac6e",
+  "source_commit": "5f2028f1590df403c086deda820fb7276686a393",
   "statements": [
     {
       "id": "hetzner-baseline-history-creation",
@@ -313,19 +313,9 @@
       "dialect_dependency": "postgresql_bigint_identity_maximum"
     },
     {
-      "id": "cutover-sqlite-exclusive-locking-mode",
-      "path": "src/BlokeBot.DatabaseCutover/SqliteExclusiveLease.cs",
-      "source_line": 24,
-      "api": "DbCommand.CommandText",
-      "source_marker": "PRAGMA locking_mode = EXCLUSIVE",
-      "sql_verb": "PRAGMA",
-      "purpose": "Put the stopped SQLite source connection into exclusive locking mode for the offline cutover.",
-      "dialect_dependency": "sqlite_exclusive_locking_mode"
-    },
-    {
       "id": "cutover-sqlite-exclusive-transaction",
       "path": "src/BlokeBot.DatabaseCutover/SqliteExclusiveLease.cs",
-      "source_line": 20,
+      "source_line": 22,
       "api": "DbCommand.CommandText",
       "source_marker": "BEGIN EXCLUSIVE",
       "sql_verb": "BEGIN",
@@ -335,7 +325,7 @@
     {
       "id": "cutover-sqlite-exclusive-rollback",
       "path": "src/BlokeBot.DatabaseCutover/SqliteExclusiveLease.cs",
-      "source_line": 42,
+      "source_line": 35,
       "api": "DbCommand.CommandText",
       "source_marker": "ROLLBACK",
       "sql_verb": "ROLLBACK",

@@ -8,9 +8,11 @@ internal sealed class SqliteExclusiveLease : IAsyncDisposable
 
     private SqliteExclusiveLease(SqliteConnection connection) => _connection = connection;
 
-    // The exclusive transaction must begin before the locking mode changes: once the mode is
-    // EXCLUSIVE, the lock cannot be taken while another same-process connection that has read
-    // the file stays open, such as a pooled connection.
+    // The exclusive transaction is the lease: it holds the SQLite write lock until DisposeAsync
+    // rolls back and closes the connection, so no other connection can write during the cutover.
+    // Do not set locking_mode = EXCLUSIVE before it. In WAL mode that mode escalates the next
+    // write-transaction start to an EXCLUSIVE file lock, which fails while any connection that
+    // has opened the WAL, in this process or another, still holds its SHARED lock.
     internal static async Task<SqliteExclusiveLease> AcquireAsync(
         SqliteConnection connection,
         CancellationToken cancellationToken
@@ -19,16 +21,7 @@ internal sealed class SqliteExclusiveLease : IAsyncDisposable
         await using var begin = connection.CreateCommand();
         begin.CommandText = "BEGIN EXCLUSIVE;";
         _ = await begin.ExecuteNonQueryAsync(cancellationToken);
-
-        await using var lockingMode = connection.CreateCommand();
-        lockingMode.CommandText = "PRAGMA locking_mode = EXCLUSIVE;";
-        var mode = Convert.ToString(
-            await lockingMode.ExecuteScalarAsync(cancellationToken),
-            System.Globalization.CultureInfo.InvariantCulture
-        );
-        return StringComparer.OrdinalIgnoreCase.Equals(mode, "exclusive")
-            ? new(connection)
-            : throw new InvalidOperationException("SQLite refused exclusive locking mode.");
+        return new(connection);
     }
 
     public async ValueTask DisposeAsync()
