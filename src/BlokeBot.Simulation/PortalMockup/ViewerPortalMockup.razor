@@ -17,7 +17,7 @@
                         </div>
                         break;
                     case ViewerPortalMockupViewer.Unavailable:
-                        <span class="portal__auth portal__auth--unavailable" aria-disabled="true">Sign-in unavailable</span>
+                        <span class="portal__auth portal__auth--unavailable" aria-disabled="true">Sign-in not available</span>
                         break;
                     default:
                         <a class="portal__auth auth-action" href="@_signInHref">Sign in with Twitch</a>
@@ -32,10 +32,7 @@
         {
             <PageHeader Kicker="Channel"
                         Title="Channel not found"
-                        Description="@($"No BlokeBot channel is called @{Page.RequestedLogin}. Check the link you were given.")" />
-            <PageState Kind="PageStateKind.Empty"
-                       Title="Nothing to show"
-                       Description="Channel pages open from a link the channel shares. BlokeBot does not list channels." />
+                        Description="@($"There is no BlokeBot channel named @{Page.RequestedLogin}. Check the link.")" />
         }
         else
         {
@@ -58,8 +55,7 @@
             @if (Page.Features.Count == 0)
             {
                 <PageState Kind="PageStateKind.Empty"
-                           Title="No public activities right now"
-                           Description="@($"{Page.Channel.DisplayName} has not opened any activities to viewers yet. Check back after the next stream.")" />
+                           Title="No public activities" />
             }
             else
             {
@@ -91,14 +87,14 @@
                                 {
                                     <div class="card portal__card portal__card--muted" role="status">
                                         <p class="portal__card-title">@feature.Label</p>
-                                        <p>Loading…</p>
+                                        <p>Loading</p>
                                     </div>
                                 }
                             }
                             else if (_highlighted.Count == 0)
                             {
                                 <div class="card portal__card portal__card--muted">
-                                    <p>Nothing is running right now. The activities above stay open, and this page fills in when the stream is live.</p>
+                                    <p>No activity is live.</p>
                                 </div>
                             }
                             else
@@ -109,8 +105,7 @@
                                     {
                                         <div class="card portal__card portal__card--failed" role="status">
                                             <p class="portal__card-title">@feature.Label</p>
-                                            <p class="portal__card-headline">@feature.Label could not be loaded</p>
-                                            <p class="portal__card-detail">Everything else on this page is current. Open @feature.Label directly to try again.</p>
+                                            <p class="portal__card-headline">@feature.Label did not load.</p>
                                             <a class="btn-secondary portal__card-action" href="@feature.Href">@feature.Action</a>
                                         </div>
                                     }
@@ -146,7 +141,7 @@
                                     </p>
                                     @if (Page.State is ViewerPortalMockupState.Loading)
                                     {
-                                        <p class="portal__card-detail" role="status">Loading your details…</p>
+                                        <p class="portal__card-detail" role="status">Loading</p>
                                     }
                                     else
                                     {
@@ -172,12 +167,12 @@
                                 break;
                             case ViewerPortalMockupViewer.Unavailable:
                                 <div class="card portal__card portal__card--muted" role="status">
-                                    <p>Sign-in is not available right now. Everything public on this page still works; try signing in again later.</p>
+                                    <p>Sign-in is not available. Try again later.</p>
                                 </div>
                                 break;
                             default:
                                 <div class="card portal__card">
-                                    <p class="portal__card-detail">Your points, passport and queue place on @Page.Channel.DisplayName appear here when you sign in with Twitch. Nothing about you is shown to anyone else.</p>
+                                    <p class="portal__card-detail">Sign in to see your points, passport and queue place.</p>
                                     <a class="portal__auth auth-action portal__card-action" href="@_signInHref">Sign in with Twitch</a>
                                 </div>
                                 break;
@@ -189,11 +184,11 @@
                         <div class="card portal__card">
                             @if (Page.State is ViewerPortalMockupState.Loading)
                             {
-                                <p class="portal__card-detail" role="status">Loading…</p>
+                                <p class="portal__card-detail" role="status">Loading</p>
                             }
                             else if (Page.Recent.Count == 0)
                             {
-                                <p class="portal__card-detail">No public activity yet.</p>
+                                <p class="portal__card-detail">No public activity.</p>
                             }
                             else
                             {
@@ -216,6 +211,6 @@
     </main>
 
     <footer class="portal__footer">
-        <p>Public channel page by BlokeBot. Only what the channel has opened to viewers is shown here.</p>
+        <p>Public channel page by BlokeBot.</p>
     </footer>
 </div>
