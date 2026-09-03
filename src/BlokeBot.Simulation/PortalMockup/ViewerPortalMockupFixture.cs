@@ -128,7 +128,7 @@ internal static class ViewerPortalMockupFixture
                 "Live",
                 "green",
                 "Tonight's stream moments",
-                "Teams · 4×4 · 1 row win so far",
+                "Teams · 4×4 · 1 row win",
                 "Open Bingo"
             ),
             new(
@@ -151,7 +151,7 @@ internal static class ViewerPortalMockupFixture
                 "amber",
                 "Community speedrun challenge",
                 "1,250 of 2,000 points pledged",
-                "See bounties"
+                "Open bounties"
             ),
             new(
                 "raid",
@@ -161,7 +161,7 @@ internal static class ViewerPortalMockupFixture
                 "Boss fight",
                 "violet",
                 "The Null Wyrm",
-                "Boss at 62% health · 4 raiders in",
+                "Boss at 62% health · 4 raiders",
                 "Open BlokeRaid"
             ),
             new(
@@ -172,8 +172,8 @@ internal static class ViewerPortalMockupFixture
                 "Quarter-finals",
                 "blue",
                 "Summer Cup",
-                "Next matches when the stream is live",
-                "See the bracket"
+                "Quarter-finals in progress",
+                "Open the bracket"
             ),
             new(
                 "community",
@@ -184,7 +184,7 @@ internal static class ViewerPortalMockupFixture
                 "blue",
                 "Summer community climb",
                 "12 quests · 8 achievements",
-                "See the season"
+                "Open the season"
             ),
             new(
                 "requests",
@@ -205,8 +205,8 @@ internal static class ViewerPortalMockupFixture
                 "5 this week",
                 "slate",
                 "Weekly recap",
-                "Vote on this week's moments",
-                "See moments"
+                "5 moments this week",
+                "Open moments"
             ),
             new(
                 "points",
@@ -217,7 +217,7 @@ internal static class ViewerPortalMockupFixture
                 "slate",
                 "NightOwl leads with 4,820",
                 "Top 25 shown",
-                "See standings"
+                "Open standings"
             ),
             new(
                 "guessing",
@@ -228,7 +228,7 @@ internal static class ViewerPortalMockupFixture
                 "slate",
                 "PixelPilot leads",
                 "18 rounds this season",
-                "See standings"
+                "Open standings"
             ),
             new(
                 "collectives",
@@ -252,8 +252,8 @@ internal static class ViewerPortalMockupFixture
                 ViewerPortalMockupFeatureState.Quiet,
                 "No live game",
                 "slate",
-                "No Bingo card is live",
-                "Past games stay in the archive",
+                "No live game",
+                "Archive only",
                 "Open Bingo"
             ),
             new(
@@ -264,7 +264,7 @@ internal static class ViewerPortalMockupFixture
                 "Closed",
                 "slate",
                 "Community night",
-                "Opens when the stream is live",
+                "Closed",
                 "Open the queue"
             ),
             new(
@@ -276,7 +276,7 @@ internal static class ViewerPortalMockupFixture
                 "slate",
                 "ChatRegular leads with 640",
                 "Top 25 shown",
-                "See standings"
+                "Open standings"
             ),
             new(
                 "guessing",
@@ -285,9 +285,9 @@ internal static class ViewerPortalMockupFixture
                 ViewerPortalMockupFeatureState.Quiet,
                 "Standings",
                 "slate",
-                "No rounds yet",
-                "Standings appear after the first round",
-                "See standings"
+                "No rounds",
+                "No standings",
+                "Open standings"
             ),
         ];
 
@@ -298,7 +298,7 @@ internal static class ViewerPortalMockupFixture
                 "4,820",
                 "First on the leaderboard",
                 $"/points/leaderboard/{_channelLogin}",
-                "See standings",
+                "Open standings",
                 1
             ),
             new(
@@ -312,7 +312,7 @@ internal static class ViewerPortalMockupFixture
             new(
                 "Play queue",
                 "#2 of 3",
-                "Community night · ready check soon",
+                "Community night",
                 $"/queues/{_channelLogin}/main",
                 "Open the queue",
                 null
@@ -342,13 +342,13 @@ internal static class ViewerPortalMockupFixture
                 "120",
                 "14th on the leaderboard",
                 $"/points/leaderboard/{_channelLogin}",
-                "See standings",
+                "Open standings",
                 14
             ),
             new(
                 "Passport",
                 "Not set up",
-                "Choose what this channel can show about you",
+                "No passport",
                 $"/passports/{_channelLogin}/me",
                 "Set up passport",
                 null
@@ -366,9 +366,9 @@ internal static class ViewerPortalMockupFixture
     private static ViewerPortalMockupEvent[] PopulatedRecent() =>
         [
             new("20 min ago", "Bingo", "Team Aurora completed a row on Tonight's stream moments"),
-            new("1 h ago", "Bounties", "Zero-health comeback was completed and paid out"),
-            new("Yesterday", "Moments", "Community clutch save was published to the weekly recap"),
+            new("1 h ago", "Bounties", "Zero-health comeback completed"),
+            new("Yesterday", "Moments", "Community clutch save in the weekly recap"),
             new("Yesterday", "Community", "PixelPilot unlocked Daily regular"),
-            new("2 days ago", "Tournaments", "Summer Cup quarter-finals were drawn"),
+            new("2 days ago", "Tournaments", "Summer Cup quarter-finals draw"),
         ];
 }
