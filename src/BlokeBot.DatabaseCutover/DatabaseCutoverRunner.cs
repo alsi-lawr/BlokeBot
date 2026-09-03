@@ -36,6 +36,7 @@ public sealed partial class DatabaseCutoverRunner
 
         CutoverReceiptStore? receiptStore = null;
         CutoverReceipt? receipt = null;
+        var secrets = new List<string>();
         try
         {
             receiptStore = new CutoverReceiptStore(options.StateDirectory);
@@ -52,9 +53,17 @@ public sealed partial class DatabaseCutoverRunner
             await InitializeAsync(sourceConfiguration, cancellationToken);
 
             await using var source = CutoverDbContextFactory.CreateDbContext(sourceConfiguration);
+            await using var administrator = CutoverDbContextFactory.CreateDbContext(
+                administratorConfiguration
+            );
             await using var target = CutoverDbContextFactory.CreateDbContext(
                 applicationConfiguration
             );
+            var administratorConnection = (NpgsqlConnection)
+                administrator.Database.GetDbConnection();
+            var targetConnection = (NpgsqlConnection)target.Database.GetDbConnection();
+            secrets.AddRange(ConnectionSecrets(administratorConnection.ConnectionString));
+            secrets.AddRange(ConnectionSecrets(targetConnection.ConnectionString));
             var sourceConnection = (SqliteConnection)source.Database.GetDbConnection();
             await sourceConnection.OpenAsync(cancellationToken);
             await using var sourceLease = await SqliteExclusiveLease.AcquireAsync(
@@ -84,10 +93,8 @@ public sealed partial class DatabaseCutoverRunner
                 return new DatabaseCutoverResult.Rejected(sourceCatalogFailure);
             }
 
-            var sourceFingerprint = await CutoverFingerprint.SourceAsync(
+            var sourceRows = await CutoverSql.CountAllAsync(
                 sourceConnection,
-                null,
-                sourceMigrations.Applied,
                 tables,
                 cancellationToken
             );
@@ -97,15 +104,15 @@ public sealed partial class DatabaseCutoverRunner
                 receiptStore,
                 cancellationToken
             );
-            var targetConnection = (NpgsqlConnection)target.Database.GetDbConnection();
+            await administratorConnection.OpenAsync(cancellationToken);
             var preparation = await PrepareTargetAsync(
-                administratorConfiguration,
+                administratorConnection,
                 applicationConfiguration,
                 targetConnection,
                 options.OperationId,
                 receiptStore,
                 receipt,
-                sourceFingerprint,
+                sourceRows,
                 localStateFingerprint,
                 cancellationToken
             );
@@ -149,17 +156,9 @@ public sealed partial class DatabaseCutoverRunner
                     return new DatabaseCutoverResult.Rejected(catalogFailure);
                 }
 
-                var targetFingerprint = await CutoverFingerprint.TargetIdentityAsync(
-                    targetConnection,
-                    receipt.PostgreSqlClusterIdentity,
-                    targetMigrations.Applied,
-                    tables,
-                    cancellationToken
-                );
                 var receiptResult = await BindReceiptAsync(
                     receiptStore,
                     receipt,
-                    targetFingerprint,
                     targetConnection,
                     tables,
                     cancellationToken
@@ -183,16 +182,19 @@ public sealed partial class DatabaseCutoverRunner
                 var reconcile = await ReconcileTargetAsync(
                     receipt,
                     receiptStore,
-                    sourceConnection,
-                    null,
                     targetConnection,
                     tables,
-                    options.BatchSize,
+                    sourceRows,
                     cancellationToken
                 );
                 if (reconcile.Failure is not null)
                 {
-                    await RecordFailureAsync(receiptStore, receipt, "target-reconciliation-failed");
+                    await RecordFailureAsync(
+                        receiptStore,
+                        receipt,
+                        "target-reconciliation-failed",
+                        reconcile.Failure
+                    );
                     return new DatabaseCutoverResult.Rejected(reconcile.Failure);
                 }
 
@@ -201,9 +203,9 @@ public sealed partial class DatabaseCutoverRunner
                     receipt,
                     receiptStore,
                     sourceConnection,
-                    null,
                     targetConnection,
                     tables,
+                    sourceRows,
                     options.BatchSize,
                     cancellationToken
                 );
@@ -218,18 +220,21 @@ public sealed partial class DatabaseCutoverRunner
                     receipt,
                     receiptStore,
                     sourceConnection,
-                    null,
+                    target,
                     targetConnection,
                     tables,
-                    sourceFingerprint,
                     localStateFingerprint,
                     options,
-                    sourceMigrations.Applied,
                     cancellationToken
                 );
                 if (verification.Failure is not null)
                 {
-                    await RecordFailureAsync(receiptStore, receipt, "verification-failed");
+                    await RecordFailureAsync(
+                        receiptStore,
+                        receipt,
+                        "verification-failed",
+                        verification.Failure
+                    );
                     return new DatabaseCutoverResult.Failed(verification.Failure);
                 }
 
@@ -248,23 +253,41 @@ public sealed partial class DatabaseCutoverRunner
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await RecordFailureAsync(receiptStore, receipt, "cancelled");
+            await RecordFailureAsync(receiptStore, receipt, "cancelled", null);
             return new DatabaseCutoverResult.Failed(
                 "The database cutover was cancelled. Run the same operation again to resume."
             );
         }
         catch (Exception exception) when (exception is BlokeBotDatabaseConfigurationException)
         {
-            await RecordFailureAsync(receiptStore, receipt, "configuration");
+            await RecordFailureAsync(receiptStore, receipt, "configuration", exception.Message);
             return new DatabaseCutoverResult.Rejected(exception.Message);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            await RecordFailureAsync(receiptStore, receipt, "unexpected-failure");
+            var reason = FailureReason(exception, secrets);
+            await RecordFailureAsync(receiptStore, receipt, "unexpected-failure", reason);
             return new DatabaseCutoverResult.Failed(
-                "The database cutover failed. The external receipt can resume the same operation."
+                $"The database cutover failed. The external receipt can resume the same operation. {reason}"
             );
         }
+    }
+
+    private static IEnumerable<string> ConnectionSecrets(string connectionString)
+    {
+        var settings = new NpgsqlConnectionStringBuilder(connectionString);
+        return new[] { connectionString, settings.Password ?? string.Empty }.Where(secret =>
+            secret.Length > 0
+        );
+    }
+
+    // The reason is short enough to print and never carries a connection string or password.
+    private static string FailureReason(Exception exception, IReadOnlyList<string> secrets)
+    {
+        var reason = $"{exception.GetType().Name}: {exception.Message}";
+        return secrets.Any(secret => reason.Contains(secret, StringComparison.Ordinal))
+            ? $"{exception.GetType().Name}: the message is withheld because it contains a connection secret."
+            : reason;
     }
 
     private static string? ValidateOptions(DatabaseCutoverOptions options) =>
@@ -280,7 +303,8 @@ public sealed partial class DatabaseCutoverRunner
     private static async Task RecordFailureAsync(
         CutoverReceiptStore? store,
         CutoverReceipt? receipt,
-        string code
+        string code,
+        string? reason
     )
     {
         if (store is not null)
@@ -288,7 +312,7 @@ public sealed partial class DatabaseCutoverRunner
             var latest = await store.ReadAsync(CancellationToken.None) ?? receipt;
             if (latest is not null)
             {
-                await store.WriteAsync(latest.Failed(code), CancellationToken.None);
+                await store.WriteAsync(latest.Failed(code, reason), CancellationToken.None);
             }
         }
     }

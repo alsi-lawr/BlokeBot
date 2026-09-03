@@ -7,35 +7,25 @@ public sealed partial class DatabaseCutoverRunner
     private static async Task<CutoverReceiptResult> BindReceiptAsync(
         CutoverReceiptStore store,
         CutoverReceipt receipt,
-        string targetFingerprint,
         NpgsqlConnection target,
         IReadOnlyList<CutoverTable> tables,
         CancellationToken cancellationToken
     )
     {
-        if (receipt.TargetFingerprint is not null)
+        if (receipt.Phase != CutoverPhase.SchemaReady)
         {
-            return StringComparer.Ordinal.Equals(receipt.TargetFingerprint, targetFingerprint)
-                ? new(receipt, null)
-                : new(null, "The PostgreSql target does not match the external cutover receipt.");
+            return new(receipt, null);
         }
 
         foreach (var table in tables)
         {
-            var projection = await CutoverProjection.ReadAsync(
-                target,
-                null,
-                table,
-                null,
-                cancellationToken
-            );
-            if (projection.Count != 0)
+            if (await CutoverSql.CountAsync(target, table, cancellationToken) != 0)
             {
                 return new(null, "The PostgreSql target contains data before the copy phase.");
             }
         }
 
-        var bound = receipt.Prepared(targetFingerprint);
+        var bound = receipt.WithPhase(CutoverPhase.Prepared);
         await store.WriteAsync(bound, cancellationToken);
         return new(bound, null);
     }

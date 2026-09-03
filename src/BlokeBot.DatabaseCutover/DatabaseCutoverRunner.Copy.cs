@@ -9,11 +9,9 @@ public sealed partial class DatabaseCutoverRunner
     private static async Task<CutoverReceiptResult> ReconcileTargetAsync(
         CutoverReceipt receipt,
         CutoverReceiptStore store,
-        SqliteConnection source,
-        SqliteTransaction? sourceTransaction,
         NpgsqlConnection target,
         IReadOnlyList<CutoverTable> tables,
-        int batchSize,
+        IReadOnlyList<CutoverTableRows> sourceRows,
         CancellationToken cancellationToken
     )
     {
@@ -29,54 +27,50 @@ public sealed partial class DatabaseCutoverRunner
 
         foreach (var table in tables)
         {
-            var sourceProjection = await CutoverProjection.ReadAsync(
-                source,
-                sourceTransaction,
-                table,
-                null,
-                cancellationToken
-            );
+            var sourceCount = SourceCount(sourceRows, table);
             var checkpoint = receipt.Checkpoints.SingleOrDefault(item =>
                 StringComparer.Ordinal.Equals(item.Table, table.Name)
             );
-            var targetState = await ReconcileTableAsync(
-                source,
-                sourceTransaction,
-                target,
-                table,
-                sourceProjection,
-                checkpoint,
-                batchSize,
-                cancellationToken
-            );
-            if (targetState.Failure is not null)
+            var copied = await CutoverSql.CountAsync(target, table, cancellationToken);
+            if (copied > sourceCount)
             {
-                return new(null, targetState.Failure);
+                return new(
+                    null,
+                    $"The PostgreSql target contains unrelated data in table {table.Name}."
+                );
             }
 
-            if (targetState.Projection!.Count == 0 && checkpoint is null)
+            if (
+                checkpoint is not null
+                && (
+                    copied < checkpoint.RowsCopied
+                    || !ValidSelfReferenceProgress(table, checkpoint, sourceCount)
+                )
+            )
+            {
+                return new(
+                    null,
+                    $"The PostgreSql target does not match checkpointed table {table.Name}."
+                );
+            }
+
+            if (copied == 0 && checkpoint is null)
             {
                 continue;
             }
 
-            if (
-                checkpoint is null
-                || checkpoint.RowsCopied != targetState.Projection.Count
-                || checkpoint.SelfReferenceRowsRestored != targetState.SelfReferenceRowsRestored
-                || !StringComparer.Ordinal.Equals(
-                    checkpoint.PrefixHash,
-                    targetState.Projection.Hash
-                )
-            )
+            // Rows committed without a checkpoint are adopted; self references are restored
+            // only from the checkpointed position, and the update is idempotent.
+            var reconciled = new CutoverTableCheckpoint(
+                table.Name,
+                copied,
+                table.SelfReferences.Count == 0
+                    ? copied
+                    : checkpoint?.SelfReferenceRowsRestored ?? 0
+            );
+            if (reconciled != checkpoint)
             {
-                receipt = receipt.WithCheckpoint(
-                    new CutoverTableCheckpoint(
-                        table.Name,
-                        targetState.Projection.Count,
-                        targetState.Projection.Hash,
-                        targetState.SelfReferenceRowsRestored
-                    )
-                );
+                receipt = receipt.WithCheckpoint(reconciled);
                 await store.WriteAsync(receipt, cancellationToken);
             }
         }
@@ -84,13 +78,32 @@ public sealed partial class DatabaseCutoverRunner
         return new(receipt, null);
     }
 
+    private static bool ValidSelfReferenceProgress(
+        CutoverTable table,
+        CutoverTableCheckpoint checkpoint,
+        long sourceRows
+    ) =>
+        checkpoint.RowsCopied >= 0
+        && checkpoint.SelfReferenceRowsRestored >= 0
+        && checkpoint.SelfReferenceRowsRestored <= checkpoint.RowsCopied
+        && (
+            table.SelfReferences.Count == 0
+                ? checkpoint.SelfReferenceRowsRestored == checkpoint.RowsCopied
+                : checkpoint.SelfReferenceRowsRestored == 0 || checkpoint.RowsCopied == sourceRows
+        );
+
+    private static long SourceCount(
+        IReadOnlyList<CutoverTableRows> sourceRows,
+        CutoverTable table
+    ) => sourceRows.Single(item => StringComparer.Ordinal.Equals(item.Table, table.Name)).Rows;
+
     private async Task<CutoverReceipt> CopyAsync(
         CutoverReceipt receipt,
         CutoverReceiptStore store,
         SqliteConnection source,
-        SqliteTransaction? sourceTransaction,
         NpgsqlConnection target,
         IReadOnlyList<CutoverTable> tables,
+        IReadOnlyList<CutoverTableRows> sourceRows,
         int batchSize,
         CancellationToken cancellationToken
     )
@@ -98,13 +111,7 @@ public sealed partial class DatabaseCutoverRunner
         foreach (var table in tables)
         {
             var stageSelfReferences = table.SelfReferences.Count > 0;
-            var sourceProjection = await CutoverProjection.ReadAsync(
-                source,
-                sourceTransaction,
-                table,
-                null,
-                cancellationToken
-            );
+            var sourceCount = SourceCount(sourceRows, table);
             var copied =
                 receipt
                     .Checkpoints.SingleOrDefault(item =>
@@ -112,65 +119,37 @@ public sealed partial class DatabaseCutoverRunner
                     )
                     ?.RowsCopied
                 ?? 0;
-            while (copied < sourceProjection.Count)
+            while (copied < sourceCount)
             {
                 var rows = await ReadSourceBatchAsync(
                     source,
-                    sourceTransaction,
                     table,
                     copied,
-                    Math.Min(batchSize, sourceProjection.Count - copied),
+                    Math.Min(batchSize, sourceCount - copied),
                     cancellationToken
                 );
-                await InsertTargetBatchAsync(target, table, rows, cancellationToken);
-                copied += rows.Count;
-                var sourcePrefix = await CutoverProjection.ReadAsync(
-                    source,
-                    sourceTransaction,
-                    table,
-                    copied,
-                    cancellationToken,
-                    stageSelfReferences
-                );
-                var targetPrefix = await CutoverProjection.ReadAsync(
-                    target,
-                    null,
-                    table,
-                    copied,
-                    cancellationToken,
-                    stageSelfReferences
-                );
-                if (
-                    sourcePrefix.Count != targetPrefix.Count
-                    || !StringComparer.Ordinal.Equals(sourcePrefix.Hash, targetPrefix.Hash)
-                )
+                if (rows.Count == 0)
                 {
                     throw new InvalidOperationException(
-                        $"PostgreSql changed values while copying table {table.Name}."
+                        $"SQLite ended while copying table {table.Name}."
                     );
                 }
 
+                await InsertTargetBatchAsync(target, table, rows, cancellationToken);
+                copied += rows.Count;
                 receipt = receipt.WithCheckpoint(
                     new CutoverTableCheckpoint(
                         table.Name,
                         copied,
-                        sourcePrefix.Hash,
                         SelfReferenceRowsRestored: stageSelfReferences ? 0 : copied
                     )
                 );
                 await store.WriteAsync(receipt, cancellationToken);
             }
 
-            if (sourceProjection.Count == 0 && copied == 0)
+            if (sourceCount == 0 && copied == 0)
             {
-                receipt = receipt.WithCheckpoint(
-                    new CutoverTableCheckpoint(
-                        table.Name,
-                        0,
-                        sourceProjection.Hash,
-                        SelfReferenceRowsRestored: 0
-                    )
-                );
+                receipt = receipt.WithCheckpoint(new CutoverTableCheckpoint(table.Name, 0, 0));
                 await store.WriteAsync(receipt, cancellationToken);
             }
 
@@ -183,11 +162,9 @@ public sealed partial class DatabaseCutoverRunner
                     receipt,
                     store,
                     source,
-                    sourceTransaction,
                     target,
                     table,
                     checkpoint,
-                    sourceProjection,
                     batchSize,
                     cancellationToken
                 );
@@ -199,7 +176,6 @@ public sealed partial class DatabaseCutoverRunner
 
     private static async Task<IReadOnlyList<object?[]>> ReadSourceBatchAsync(
         SqliteConnection source,
-        SqliteTransaction? transaction,
         CutoverTable table,
         long offset,
         long limit,
@@ -207,13 +183,12 @@ public sealed partial class DatabaseCutoverRunner
     )
     {
         await using var command = source.CreateCommand();
-        command.Transaction = transaction;
         var columns = string.Join(
             ", ",
-            table.Columns.Select(column => CutoverProjection.Quote(column.Name))
+            table.Columns.Select(column => CutoverSql.Quote(column.Name))
         );
         command.CommandText =
-            $"SELECT {columns} FROM {CutoverProjection.Quote(table.Name)} ORDER BY {CutoverProjection.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset;";
+            $"SELECT {columns} FROM {CutoverSql.Quote(table.Name)} ORDER BY {CutoverSql.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset;";
         _ = command.Parameters.AddWithValue("$limit", limit);
         _ = command.Parameters.AddWithValue("$offset", offset);
         var rows = new List<object?[]>((int)limit);
@@ -242,7 +217,7 @@ public sealed partial class DatabaseCutoverRunner
         await using var transaction = await target.BeginTransactionAsync(cancellationToken);
         var columns = string.Join(
             ", ",
-            table.Columns.Select(column => CutoverProjection.Quote(column.Name))
+            table.Columns.Select(column => CutoverSql.Quote(column.Name))
         );
         var parameters = string.Join(", ", table.Columns.Select((_, index) => $"@p{index}"));
         foreach (var row in rows)
@@ -250,7 +225,7 @@ public sealed partial class DatabaseCutoverRunner
             await using var command = target.CreateCommand();
             command.Transaction = transaction;
             command.CommandText =
-                $"INSERT INTO {CutoverProjection.Quote(table.Name)} ({columns}) VALUES ({parameters}) ON CONFLICT DO NOTHING;";
+                $"INSERT INTO {CutoverSql.Quote(table.Name)} ({columns}) VALUES ({parameters}) ON CONFLICT DO NOTHING;";
             for (var index = 0; index < table.Columns.Count; index++)
             {
                 var column = table.Columns[index];

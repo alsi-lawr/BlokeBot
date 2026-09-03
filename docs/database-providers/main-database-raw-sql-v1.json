@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_commit": "5f2028f1590df403c086deda820fb7276686a393",
+  "source_commit": "f70580d5f589ae4dda15e2056a605d8bc456b14d",
   "statements": [
     {
       "id": "hetzner-baseline-history-creation",
@@ -243,29 +243,19 @@
       "dialect_dependency": "closed_sqlite_postgresql_dispatch"
     },
     {
-      "id": "cutover-target-identity",
-      "path": "src/BlokeBot.DatabaseCutover/CutoverFingerprint.cs",
-      "source_line": 49,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT current_database(), database.oid::text FROM pg_database AS database WHERE database.datname = current_database()",
-      "sql_verb": "SELECT",
-      "purpose": "Bind an external receipt to the stable PostgreSQL database identity under the administrator-read cluster identity.",
-      "dialect_dependency": "postgresql_database_catalog"
-    },
-    {
       "id": "cutover-sequence-advancement",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Verify.cs",
-      "source_line": 45,
+      "source_line": 28,
       "api": "DbCommand.CommandText",
-      "source_marker": "SELECT setval(CAST(@sequence AS regclass), @value, @is_called)",
+      "source_marker": "SELECT setval(pg_get_serial_sequence(@table_name, @column_name)::regclass, COALESCE(MAX(",
       "sql_verb": "SELECT",
-      "purpose": "Advance one generated numeric PostgreSQL identity sequence after copied values are committed.",
-      "dialect_dependency": "postgresql_sequence_setval"
+      "purpose": "Advance one integer PostgreSQL identity sequence to the copied maximum when the column owns a sequence.",
+      "dialect_dependency": "postgresql_serial_sequence_setval"
     },
     {
       "id": "cutover-constraint-enforcement",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Verify.cs",
-      "source_line": 151,
+      "source_line": 119,
       "api": "DbCommand.CommandText",
       "source_marker": "SET CONSTRAINTS ALL IMMEDIATE",
       "sql_verb": "SET CONSTRAINTS",
@@ -275,42 +265,12 @@
     {
       "id": "cutover-unvalidated-constraint-detection",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Verify.cs",
-      "source_line": 157,
+      "source_line": 125,
       "api": "DbCommand.CommandText",
       "source_marker": "FROM pg_constraint WHERE connamespace = 'public'::regnamespace",
       "sql_verb": "SELECT",
       "purpose": "Reject a target with an unvalidated public-schema foreign-key constraint.",
       "dialect_dependency": "postgresql_constraint_catalog"
-    },
-    {
-      "id": "cutover-sequence-last-value-read",
-      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Verify.cs",
-      "source_line": 201,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT pg_sequence_last_value(CAST(@sequence AS regclass))",
-      "sql_verb": "SELECT",
-      "purpose": "Verify that a generated numeric PostgreSQL identity sequence reached the copied maximum.",
-      "dialect_dependency": "postgresql_sequence_last_value"
-    },
-    {
-      "id": "cutover-serial-sequence-resolution",
-      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Verify.cs",
-      "source_line": 231,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT pg_get_serial_sequence(@table_name, @column_name)",
-      "sql_verb": "SELECT",
-      "purpose": "Resolve the PostgreSQL sequence owned by one generated numeric identity column.",
-      "dialect_dependency": "postgresql_serial_sequence_catalog"
-    },
-    {
-      "id": "cutover-identity-maximum-read",
-      "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Verify.cs",
-      "source_line": 247,
-      "api": "DbCommand.CommandText",
-      "source_marker": "SELECT MAX({CutoverProjection.Quote(identity.Column)})::bigint",
-      "sql_verb": "SELECT",
-      "purpose": "Read one copied PostgreSQL numeric identity maximum for sequence advancement and verification.",
-      "dialect_dependency": "postgresql_bigint_identity_maximum"
     },
     {
       "id": "cutover-sqlite-exclusive-transaction",
@@ -319,7 +279,7 @@
       "api": "DbCommand.CommandText",
       "source_marker": "BEGIN EXCLUSIVE",
       "sql_verb": "BEGIN",
-      "purpose": "Acquire the stopped SQLite source exclusive transaction before fingerprinting and copying.",
+      "purpose": "Acquire the stopped SQLite source exclusive transaction before counting and copying.",
       "dialect_dependency": "sqlite_exclusive_transaction"
     },
     {
@@ -333,21 +293,21 @@
       "dialect_dependency": "sqlite_transaction_rollback"
     },
     {
-      "id": "cutover-canonical-projection-read",
-      "path": "src/BlokeBot.DatabaseCutover/CutoverProjection.cs",
-      "source_line": 23,
+      "id": "cutover-table-row-count",
+      "path": "src/BlokeBot.DatabaseCutover/CutoverSql.cs",
+      "source_line": 37,
       "api": "DbCommand.CommandText",
-      "source_marker": "command.CommandText = SelectSql(table, connection is NpgsqlConnection, rowLimit)",
+      "source_marker": "SELECT COUNT(*) FROM {Quote(table.Name)}",
       "sql_verb": "SELECT",
-      "purpose": "Read a canonical ordered table projection from the selected SQLite or PostgreSQL provider.",
-      "dialect_dependency": "closed_sqlite_postgresql_projection_dispatch"
+      "purpose": "Count one domain table in SQLite or PostgreSQL for receipt binding, resume, and verification.",
+      "dialect_dependency": "closed_sqlite_postgresql_row_count"
     },
     {
       "id": "cutover-sqlite-source-batch-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Copy.cs",
-      "source_line": 215,
+      "source_line": 190,
       "api": "DbCommand.CommandText",
-      "source_marker": "ORDER BY {CutoverProjection.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset",
+      "source_marker": "ORDER BY {CutoverSql.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset",
       "sql_verb": "SELECT",
       "purpose": "Read one dependency-ordered bounded batch from the exclusive SQLite source.",
       "dialect_dependency": "sqlite_ordered_bounded_source_read"
@@ -355,9 +315,9 @@
     {
       "id": "cutover-postgresql-target-batch-insert",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Copy.cs",
-      "source_line": 252,
+      "source_line": 227,
       "api": "DbCommand.CommandText",
-      "source_marker": "INSERT INTO {CutoverProjection.Quote(table.Name)} ({columns}) VALUES ({parameters}) ON CONFLICT DO NOTHING",
+      "source_marker": "INSERT INTO {CutoverSql.Quote(table.Name)} ({columns}) VALUES ({parameters}) ON CONFLICT DO NOTHING",
       "sql_verb": "INSERT",
       "purpose": "Insert one bounded copied domain batch into the operation-bound PostgreSQL target.",
       "dialect_dependency": "postgresql_idempotent_target_insert"
@@ -365,19 +325,19 @@
     {
       "id": "cutover-self-reference-batch-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.SelfReferenceBatches.cs",
-      "source_line": 157,
+      "source_line": 83,
       "api": "DbCommand.CommandText",
-      "source_marker": "ORDER BY {CutoverProjection.OrderBy(table, postgreSql)} LIMIT @limit OFFSET @offset",
+      "source_marker": "ORDER BY {CutoverSql.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset",
       "sql_verb": "SELECT",
-      "purpose": "Read one canonical bounded self-reference batch from SQLite or PostgreSQL for restoration and reconciliation.",
-      "dialect_dependency": "closed_sqlite_postgresql_ordered_bounded_read"
+      "purpose": "Read one dependency-ordered bounded self-reference batch from the exclusive SQLite source for restoration.",
+      "dialect_dependency": "sqlite_ordered_bounded_source_read"
     },
     {
       "id": "cutover-self-reference-batch-update",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.SelfReferenceBatches.cs",
-      "source_line": 222,
+      "source_line": 118,
       "api": "DbCommand.CommandText",
-      "source_marker": "UPDATE {CutoverProjection.Quote(table.Name)} SET",
+      "source_marker": "UPDATE {CutoverSql.Quote(table.Name)} SET",
       "sql_verb": "UPDATE",
       "purpose": "Restore the reviewed nullable self-reference columns for one copied PostgreSQL row.",
       "dialect_dependency": "postgresql_self_reference_update"
@@ -435,7 +395,7 @@
     {
       "id": "cutover-server-and-login-check",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 238,
+      "source_line": 233,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT current_setting('server_version_num')::integer, EXISTS (SELECT 1 FROM pg_roles WHERE rolname = @role AND rolcanlogin)",
       "sql_verb": "SELECT",
@@ -445,7 +405,7 @@
     {
       "id": "cutover-cluster-identity-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 255,
+      "source_line": 250,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT system_identifier::text FROM pg_control_system()",
       "sql_verb": "SELECT",
@@ -455,7 +415,7 @@
     {
       "id": "cutover-database-existence-check",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 266,
+      "source_line": 261,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = @database)",
       "sql_verb": "SELECT",
@@ -465,7 +425,7 @@
     {
       "id": "cutover-database-creation",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 282,
+      "source_line": 277,
       "api": "DbCommand.CommandText",
       "source_marker": "CREATE DATABASE {QuoteIdentifier(target.Database)} OWNER {QuoteIdentifier(target.Owner)}",
       "sql_verb": "CREATE DATABASE",
@@ -475,7 +435,7 @@
     {
       "id": "cutover-database-marker-write",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 289,
+      "source_line": 284,
       "api": "DbCommand.CommandText",
       "source_marker": "COMMENT ON DATABASE {QuoteIdentifier(target.Database)} IS '{Marker(operationId)}'",
       "sql_verb": "COMMENT",
@@ -485,7 +445,7 @@
     {
       "id": "cutover-database-owner-and-marker-read",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 302,
+      "source_line": 297,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT role.rolname, shobj_description(database.oid, 'pg_database') FROM pg_database AS database JOIN pg_roles AS role ON role.oid = database.datdba",
       "sql_verb": "SELECT",
@@ -495,7 +455,7 @@
     {
       "id": "cutover-application-target-check",
       "path": "src/BlokeBot.DatabaseCutover/DatabaseCutoverRunner.Prepare.cs",
-      "source_line": 327,
+      "source_line": 322,
       "api": "DbCommand.CommandText",
       "source_marker": "SELECT current_database(), current_user, shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = current_database()",
       "sql_verb": "SELECT",

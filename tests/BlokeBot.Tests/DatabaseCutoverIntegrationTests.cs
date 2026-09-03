@@ -70,7 +70,7 @@ public sealed class DatabaseCutoverIntegrationTests
             "cancelled"
         );
         receipt.OperationId.ShouldBe(fixture.OperationId);
-        receipt.TargetFingerprint.ShouldBeNull();
+        receipt.SourceRows.ShouldContain(rows => rows.Table == "hosts" && rows.Rows == 1);
         await fixture.AssertReceiptRedactedAsync();
         (await fixture.TargetDatabaseStateAsync(fixture.Primary)).ShouldBeNull();
 
@@ -161,7 +161,9 @@ public sealed class DatabaseCutoverIntegrationTests
         ]);
         await fixture.AssertDomainTablesEmptyAsync(fixture.Primary);
 
-        var strayHost = await fixture.InsertStrayHostAsync();
+        var strayHost = await DatabaseCutoverIntegrationFixture.InsertHostAsync(
+            fixture.TargetConfiguration
+        );
         var unrelatedData = await new DatabaseCutoverRunner().RunAsync(
             options,
             CancellationToken.None
@@ -169,7 +171,10 @@ public sealed class DatabaseCutoverIntegrationTests
         unrelatedData
             .ShouldBeOfType<DatabaseCutoverResult.Rejected>()
             .Message.ShouldContain("contains data before the copy phase");
-        await fixture.DeleteHostAsync(strayHost);
+        await DatabaseCutoverIntegrationFixture.DeleteHostAsync(
+            fixture.TargetConfiguration,
+            strayHost
+        );
 
         var afterBinding = await RunUntilAsync(options, CutoverPreparationCheckpoint.TargetBound);
         _ = afterBinding.ShouldBeOfType<DatabaseCutoverResult.Failed>();
@@ -178,7 +183,6 @@ public sealed class DatabaseCutoverIntegrationTests
             CutoverPhase.Prepared,
             "cancelled"
         );
-        _ = prepared.TargetFingerprint.ShouldNotBeNull();
         prepared.Checkpoints.ShouldBeEmpty();
         await fixture.AssertDomainTablesEmptyAsync(fixture.Primary);
         await fixture.AssertReceiptRedactedAsync();
@@ -205,6 +209,45 @@ public sealed class DatabaseCutoverIntegrationTests
             ?? 0;
         (await fixture.DomainRowCountAsync(fixture.Primary, "hosts")).ShouldBeGreaterThan(
             checkpointedHosts
+        );
+
+        var strayTargetHost = await DatabaseCutoverIntegrationFixture.InsertHostAsync(
+            fixture.TargetConfiguration
+        );
+        var strayRejected = await new DatabaseCutoverRunner().RunAsync(
+            options,
+            CancellationToken.None
+        );
+
+        strayRejected
+            .ShouldBeOfType<DatabaseCutoverResult.Rejected>()
+            .Message.ShouldBe("The PostgreSql target contains unrelated data in table hosts.");
+        _ = AssertReceipt(
+            await fixture.ReadReceiptAsync(),
+            CutoverPhase.Copying,
+            "target-reconciliation-failed"
+        );
+        await DatabaseCutoverIntegrationFixture.DeleteHostAsync(
+            fixture.TargetConfiguration,
+            strayTargetHost
+        );
+
+        var changedSourceHost = await DatabaseCutoverIntegrationFixture.InsertHostAsync(
+            fixture.SourceConfiguration
+        );
+        var changedSourceRejected = await new DatabaseCutoverRunner().RunAsync(
+            options,
+            CancellationToken.None
+        );
+
+        changedSourceRejected
+            .ShouldBeOfType<DatabaseCutoverResult.Rejected>()
+            .Message.ShouldBe(
+                "The source, target, or local state does not match the external cutover receipt."
+            );
+        await DatabaseCutoverIntegrationFixture.DeleteHostAsync(
+            fixture.SourceConfiguration,
+            changedSourceHost
         );
 
         var selfReferenceFailure = await RunUntilBatchAsync(
@@ -236,7 +279,7 @@ public sealed class DatabaseCutoverIntegrationTests
         completedRequestCheckpoint.SelfReferenceRowsRestored.ShouldBe(
             completedRequestCheckpoint.RowsCopied
         );
-        await fixture.AssertTransferredStateAsync();
+        await fixture.AssertSelfReferencesRestoredAsync();
         await fixture.AssertProviderMetadataWasNotCopiedAsync();
         fixture.AssertLocalStateUnchanged();
         await fixture.AssertReceiptRedactedAsync();

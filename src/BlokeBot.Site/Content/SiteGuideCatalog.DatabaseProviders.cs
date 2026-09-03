@@ -236,7 +236,7 @@ internal static partial class SiteGuideCatalog
                           --data-dir /var/lib/blokebot
                         """,
                     Note =
-                        "The command migrates SQLite first. It then creates the database, applies the PostgreSQL schema, and copies and verifies the data. It rejects a database that exists without a matching receipt. It does not drop a database or change the active provider configuration.",
+                        "The command migrates SQLite first. It then creates the database, applies the PostgreSQL schema, copies the data, and verifies the row count of each domain table. It rejects a database that exists without a matching receipt. It does not drop a database or change the active provider configuration.",
                 },
                 new SiteGuideSection
                 {

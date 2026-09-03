@@ -1,5 +1,4 @@
 using BlokeBot.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace BlokeBot.DatabaseCutover;
@@ -15,23 +14,18 @@ public sealed partial class DatabaseCutoverRunner
         ).InitializeAsync(cancellationToken);
 
     private async Task<CutoverReceiptResult> PrepareTargetAsync(
-        BlokeBotDatabaseConfiguration administratorConfiguration,
+        NpgsqlConnection administrator,
         BlokeBotDatabaseConfiguration applicationConfiguration,
         NpgsqlConnection application,
         Guid? requestedOperationId,
         CutoverReceiptStore store,
         CutoverReceipt? existing,
-        string sourceFingerprint,
+        IReadOnlyList<CutoverTableRows> sourceRows,
         string localStateFingerprint,
         CancellationToken cancellationToken
     )
     {
         var applicationSettings = new NpgsqlConnectionStringBuilder(application.ConnectionString);
-        await using var administratorContext = CutoverDbContextFactory.CreateDbContext(
-            administratorConfiguration
-        );
-        var administrator = (NpgsqlConnection)administratorContext.Database.GetDbConnection();
-        await administrator.OpenAsync(cancellationToken);
         var serverFailure = await ValidatePostgreSqlServerAsync(
             administrator,
             applicationSettings.Username!,
@@ -55,7 +49,7 @@ public sealed partial class DatabaseCutoverRunner
         var bindingFailure = ValidatePreparationBinding(
             existing,
             requestedOperationId,
-            sourceFingerprint,
+            sourceRows,
             localStateFingerprint,
             target,
             databaseExists
@@ -70,7 +64,7 @@ public sealed partial class DatabaseCutoverRunner
             ?? await WriteNewReceiptAsync(
                 store,
                 requestedOperationId,
-                sourceFingerprint,
+                sourceRows,
                 localStateFingerprint,
                 target,
                 cancellationToken
@@ -159,7 +153,7 @@ public sealed partial class DatabaseCutoverRunner
     private async Task<CutoverReceipt> WriteNewReceiptAsync(
         CutoverReceiptStore store,
         Guid? requestedOperationId,
-        string sourceFingerprint,
+        IReadOnlyList<CutoverTableRows> sourceRows,
         string localStateFingerprint,
         CutoverTargetIdentity target,
         CancellationToken cancellationToken
@@ -170,8 +164,8 @@ public sealed partial class DatabaseCutoverRunner
             CutoverReceipt.CurrentFormatVersion,
             requestedOperationId ?? Guid.NewGuid(),
             CutoverPhase.DatabasePlanned,
-            sourceFingerprint,
-            null,
+            _currentSqliteMigration,
+            sourceRows,
             localStateFingerprint,
             target.ClusterIdentity,
             target.Database,
@@ -190,7 +184,7 @@ public sealed partial class DatabaseCutoverRunner
     private static string? ValidatePreparationBinding(
         CutoverReceipt? receipt,
         Guid? requestedOperationId,
-        string sourceFingerprint,
+        IReadOnlyList<CutoverTableRows> sourceRows,
         string localStateFingerprint,
         CutoverTargetIdentity target,
         bool databaseExists
@@ -209,7 +203,8 @@ public sealed partial class DatabaseCutoverRunner
         }
 
         var matches =
-            StringComparer.Ordinal.Equals(receipt.SourceFingerprint, sourceFingerprint)
+            StringComparer.Ordinal.Equals(receipt.SqliteMigration, _currentSqliteMigration)
+            && receipt.SourceRows.SequenceEqual(sourceRows)
             && StringComparer.Ordinal.Equals(receipt.LocalStateFingerprint, localStateFingerprint)
             && StringComparer.Ordinal.Equals(
                 receipt.PostgreSqlClusterIdentity,

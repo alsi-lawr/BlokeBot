@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace BlokeBot.DatabaseCutover;
 
@@ -19,44 +17,6 @@ internal static class CutoverValues
             "bytea" => (byte[])value,
             _ => InvariantString(value),
         };
-
-    internal static void AppendCanonical(IncrementalHash hash, object? value, string storeType)
-    {
-        if (value is null or DBNull)
-        {
-            hash.AppendData([0]);
-            return;
-        }
-
-        hash.AppendData([1]);
-        if (storeType == "bytea")
-        {
-            AppendBytes(hash, (byte[])value);
-            return;
-        }
-
-        var target = ForTarget(value, storeType);
-        var canonical = target switch
-        {
-            bool boolean => boolean ? "true" : "false",
-            DateTime dateTime => dateTime
-                .ToUniversalTime()
-                .ToString("O", CultureInfo.InvariantCulture),
-            TimeOnly time => time.ToString("O", CultureInfo.InvariantCulture),
-            decimal number => number.ToString("G29", CultureInfo.InvariantCulture),
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-            _ => target.ToString()!,
-        };
-        AppendBytes(hash, Encoding.UTF8.GetBytes(canonical));
-    }
-
-    private static void AppendBytes(IncrementalHash hash, byte[] bytes)
-    {
-        Span<byte> length = stackalloc byte[sizeof(int)];
-        _ = BitConverter.TryWriteBytes(length, bytes.Length);
-        hash.AppendData(length);
-        hash.AppendData(bytes);
-    }
 
     private static DateTime UtcDateTime(object value) =>
         value is DateTime dateTime

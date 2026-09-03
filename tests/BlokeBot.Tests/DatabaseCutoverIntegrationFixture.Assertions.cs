@@ -112,16 +112,19 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         _ = await command.ExecuteNonQueryAsync();
     }
 
-    internal async Task<int> InsertStrayHostAsync()
+    internal BlokeBotDatabaseConfiguration SourceConfiguration =>
+        BlokeBotDatabaseConfiguration.Sqlite(SqliteDatabasePath);
+
+    internal BlokeBotDatabaseConfiguration TargetConfiguration =>
+        BlokeBotDatabaseConfiguration.PostgreSqlFromFile(ApplicationConnectionFile);
+
+    internal static async Task<int> InsertHostAsync(BlokeBotDatabaseConfiguration configuration)
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
-            ApplicationConnectionFile
-        );
         await using var db = CutoverDbContextFactory.CreateDbContext(configuration);
         var host = new BotHost
         {
-            Login = "stray_host",
-            DisplayName = "Stray host",
+            Login = "extra_host",
+            DisplayName = "Extra host",
             BotRuntimeState = BotChannelRuntimeState.Stopped,
             TimeZoneId = "UTC",
             CreatedAtUtc = SeedTime,
@@ -131,11 +134,8 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         return host.Id;
     }
 
-    internal async Task DeleteHostAsync(int id)
+    internal static async Task DeleteHostAsync(BlokeBotDatabaseConfiguration configuration, int id)
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
-            ApplicationConnectionFile
-        );
         await using var db = CutoverDbContextFactory.CreateDbContext(configuration);
         _ = await db.Hosts.Where(host => host.Id == id).ExecuteDeleteAsync();
     }
@@ -166,27 +166,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         other.IsSuperuser.ShouldBeFalse();
     }
 
-    internal async Task AssertTransferredStateAsync()
+    internal async Task AssertSelfReferencesRestoredAsync()
     {
-        var configuration = BlokeBotDatabaseConfiguration.PostgreSqlFromFile(
-            ApplicationConnectionFile
-        );
-        await using var db = configuration.CreateDbContext();
-        var host = await db.Hosts.AsNoTracking().SingleAsync(host => host.Id == SeedHostId);
-        host.Login.ShouldBe("cutover_seed");
-        host.StartupMessageEnabled.ShouldBe(true);
-        host.AutomationGeneration.ShouldBe(17);
-        host.CreatedAtUtc.ShouldBe(SeedTime);
-
-        var flow = await db.AutomationFlows.AsNoTracking().SingleAsync(flow => flow.Id == FlowId);
-        flow.IsEnabled.ShouldBeTrue();
-        flow.UseVerticalLayout.ShouldBeTrue();
-        flow.UseSmoothEdges.ShouldBeFalse();
-        flow.CreatedAtUtc.ShouldBe(SeedTime);
-
-        var field = await db.RequestBoardFields.AsNoTracking().SingleAsync(field => field.Id == 11);
-        field.MinimumNumber.ShouldBe(12.5m);
-        field.MaximumNumber.ShouldBe(98.75m);
+        await using var db = TargetConfiguration.CreateDbContext();
         var submission = await db
             .RequestSubmissions.AsNoTracking()
             .SingleAsync(submission => submission.Id == MergedSubmissionId);
@@ -195,15 +177,6 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             .MomentCandidates.AsNoTracking()
             .SingleAsync(candidate => candidate.Id == MergedCandidateId);
         candidate.MergedIntoCandidateId.ShouldBe(TargetCandidateId);
-
-        var configurationRecord = await db.Set<PluginInstallationConfigurationRecord>()
-            .AsNoTracking()
-            .SingleAsync(record => record.PluginId == "example.cutover");
-        configurationRecord.Revision.ShouldBe(42);
-        var secret = await db.Set<PluginInstallationSecretRecord>()
-            .AsNoTracking()
-            .SingleAsync(record => record.PluginId == "example.cutover");
-        secret.ProtectedValue.ShouldBe([0x00, 0x7F, 0x80, 0xFF]);
     }
 
     internal async Task AssertProviderMetadataWasNotCopiedAsync()

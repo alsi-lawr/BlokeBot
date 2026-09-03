@@ -42,7 +42,7 @@ public static partial class RawSqlInventory
             ) ?? throw new InventoryDriftException("The raw SQL inventory is empty.");
         var valid =
             document.SchemaVersion == 1
-            && document.SourceCommit == "5f2028f1590df403c086deda820fb7276686a393"
+            && document.SourceCommit == "f70580d5f589ae4dda15e2056a605d8bc456b14d"
             && document.Statements.Count > 0
             && document.Statements.Select(static entry => entry.Id).Distinct().Count()
                 == document.Statements.Count

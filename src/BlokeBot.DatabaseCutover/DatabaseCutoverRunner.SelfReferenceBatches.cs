@@ -1,5 +1,3 @@
-using System.Data.Common;
-using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 using Npgsql;
 
@@ -11,33 +9,21 @@ public sealed partial class DatabaseCutoverRunner
         CutoverReceipt receipt,
         CutoverReceiptStore store,
         SqliteConnection source,
-        SqliteTransaction? sourceTransaction,
         NpgsqlConnection target,
         CutoverTable table,
         CutoverTableCheckpoint checkpoint,
-        TableProjection sourceFinal,
         int batchSize,
         CancellationToken cancellationToken
     )
     {
-        var sourceStaged = await CutoverProjection.ReadAsync(
-            source,
-            sourceTransaction,
-            table,
-            null,
-            cancellationToken,
-            stageSelfReferences: true
-        );
         var restored = checkpoint.SelfReferenceRowsRestored;
         while (restored < checkpoint.RowsCopied)
         {
             var rows = await ReadSelfReferenceBatchAsync(
                 source,
-                sourceTransaction,
                 table,
                 restored,
                 (int)Math.Min(batchSize, checkpoint.RowsCopied - restored),
-                postgreSql: false,
                 cancellationToken
             );
             if (rows.Count == 0)
@@ -70,36 +56,9 @@ public sealed partial class DatabaseCutoverRunner
                     CutoverBatchPhase.SelfReferenceRestoration
                 )
             );
-            await VerifyRestoredBatchAsync(target, table, restored, rows, cancellationToken);
             restored += rows.Count;
-
-            var prefix = sourceStaged;
-            if (restored == checkpoint.RowsCopied)
-            {
-                var targetFinal = await CutoverProjection.ReadAsync(
-                    target,
-                    null,
-                    table,
-                    null,
-                    cancellationToken
-                );
-                if (!StringComparer.Ordinal.Equals(sourceFinal.Hash, targetFinal.Hash))
-                {
-                    throw new InvalidOperationException(
-                        $"PostgreSql changed self references while copying table {table.Name}."
-                    );
-                }
-
-                prefix = sourceFinal;
-            }
-
             receipt = receipt.WithCheckpoint(
-                new CutoverTableCheckpoint(
-                    table.Name,
-                    checkpoint.RowsCopied,
-                    prefix.Hash,
-                    restored
-                ),
+                new CutoverTableCheckpoint(table.Name, checkpoint.RowsCopied, restored),
                 CutoverPhase.RestoringSelfReferences
             );
             await store.WriteAsync(receipt, cancellationToken);
@@ -108,43 +67,11 @@ public sealed partial class DatabaseCutoverRunner
         return receipt;
     }
 
-    private static async Task VerifyRestoredBatchAsync(
-        NpgsqlConnection target,
-        CutoverTable table,
-        long offset,
-        IReadOnlyList<CutoverSelfReferenceRow> sourceRows,
-        CancellationToken cancellationToken
-    )
-    {
-        var targetRows = await ReadSelfReferenceBatchAsync(
-            target,
-            null,
-            table,
-            offset,
-            sourceRows.Count,
-            postgreSql: true,
-            cancellationToken
-        );
-        if (
-            sourceRows.Count != targetRows.Count
-            || sourceRows
-                .Where((row, index) => !SelfReferencesMatch(table, row, targetRows[index]))
-                .Any()
-        )
-        {
-            throw new InvalidOperationException(
-                $"PostgreSql changed one self-reference batch in table {table.Name}."
-            );
-        }
-    }
-
     private static async Task<IReadOnlyList<CutoverSelfReferenceRow>> ReadSelfReferenceBatchAsync(
-        DbConnection connection,
-        DbTransaction? transaction,
+        SqliteConnection source,
         CutoverTable table,
         long offset,
         int limit,
-        bool postgreSql,
         CancellationToken cancellationToken
     )
     {
@@ -152,12 +79,11 @@ public sealed partial class DatabaseCutoverRunner
             .KeyColumns.Concat(table.SelfReferenceColumns)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        await using var command = source.CreateCommand();
         command.CommandText =
-            $"SELECT {string.Join(", ", columns.Select(CutoverProjection.Quote))} FROM {CutoverProjection.Quote(table.Name)} ORDER BY {CutoverProjection.OrderBy(table, postgreSql)} LIMIT @limit OFFSET @offset;";
-        AddParameter(command, "limit", limit);
-        AddParameter(command, "offset", offset);
+            $"SELECT {string.Join(", ", columns.Select(CutoverSql.Quote))} FROM {CutoverSql.Quote(table.Name)} ORDER BY {CutoverSql.OrderBy(table, postgreSql: false)} LIMIT $limit OFFSET $offset;";
+        _ = command.Parameters.AddWithValue("$limit", limit);
+        _ = command.Parameters.AddWithValue("$offset", offset);
         var rows = new List<CutoverSelfReferenceRow>(limit);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -179,36 +105,6 @@ public sealed partial class DatabaseCutoverRunner
         return rows;
     }
 
-    private static void AddParameter(DbCommand command, string name, object value)
-    {
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = name;
-        parameter.Value = value;
-        _ = command.Parameters.Add(parameter);
-    }
-
-    private static bool SelfReferencesMatch(
-        CutoverTable table,
-        CutoverSelfReferenceRow source,
-        CutoverSelfReferenceRow target
-    ) =>
-        StringComparer.Ordinal.Equals(
-            SelfReferenceHash(table, source),
-            SelfReferenceHash(table, target)
-        );
-
-    private static string SelfReferenceHash(CutoverTable table, CutoverSelfReferenceRow row)
-    {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var column in table.SelfReferenceColumns.Order(StringComparer.Ordinal))
-        {
-            var definition = table.Columns.Single(candidate => candidate.Name == column);
-            CutoverValues.AppendCanonical(hash, row.Value(column), definition.TargetStoreType);
-        }
-
-        return Convert.ToHexString(hash.GetHashAndReset());
-    }
-
     private static async Task UpdateSelfReferencesAsync(
         NpgsqlConnection target,
         NpgsqlTransaction transaction,
@@ -220,7 +116,7 @@ public sealed partial class DatabaseCutoverRunner
         await using var command = target.CreateCommand();
         command.Transaction = transaction;
         command.CommandText =
-            $"UPDATE {CutoverProjection.Quote(table.Name)} SET {string.Join(", ", table.SelfReferenceColumns.Select((column, index) => $"{CutoverProjection.Quote(column)} = @self{index}"))} WHERE {string.Join(" AND ", table.KeyColumns.Select((column, index) => $"{CutoverProjection.Quote(column)} = @key{index}"))};";
+            $"UPDATE {CutoverSql.Quote(table.Name)} SET {string.Join(", ", table.SelfReferenceColumns.Select((column, index) => $"{CutoverSql.Quote(column)} = @self{index}"))} WHERE {string.Join(" AND ", table.KeyColumns.Select((column, index) => $"{CutoverSql.Quote(column)} = @key{index}"))};";
         AddValues(command, "self", table, table.SelfReferenceColumns, row);
         AddValues(command, "key", table, table.KeyColumns, row);
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
@@ -254,4 +150,12 @@ public sealed partial class DatabaseCutoverRunner
             );
         }
     }
+}
+
+internal sealed record CutoverSelfReferenceRow(string[] Columns, object?[] Values)
+{
+    internal object? Value(string column) => Values[Array.IndexOf(Columns, column)];
+
+    internal bool HasReference(CutoverTable table) =>
+        table.SelfReferenceColumns.Any(column => Value(column) is not null);
 }

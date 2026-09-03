@@ -6,8 +6,6 @@ namespace BlokeBot.DatabaseCutover;
 
 internal sealed record CutoverColumn(string Name, string TargetStoreType);
 
-internal sealed record CutoverIdentity(string Column, string TargetStoreType);
-
 internal sealed record CutoverSelfReference(
     IReadOnlyList<string> DependentColumns,
     IReadOnlyList<string> PrincipalColumns
@@ -17,7 +15,7 @@ internal sealed record CutoverTable(
     string Name,
     IReadOnlyList<CutoverColumn> Columns,
     IReadOnlyList<string> KeyColumns,
-    IReadOnlyList<CutoverIdentity> Identities,
+    IReadOnlyList<string> Identities,
     IReadOnlyList<CutoverSelfReference> SelfReferences
 )
 {
@@ -81,8 +79,8 @@ internal static class CutoverCatalog
         }
 
         var identities = target
-            .Columns.Where(IsGeneratedNumericIdentity)
-            .Select(column => new CutoverIdentity(column.Name, column.StoreType))
+            .Columns.Where(IsGeneratedIntegerIdentity)
+            .Select(column => column.Name)
             .ToArray();
         var sourceSelfReferences = SelfReferences(sourceModel, name);
         var targetSelfReferences = SelfReferences(targetModel, name);
@@ -156,19 +154,11 @@ internal static class CutoverCatalog
     private static string SelfReferenceIdentity(CutoverSelfReference reference) =>
         $"{string.Join(',', reference.DependentColumns)}->{string.Join(',', reference.PrincipalColumns)}";
 
-    private static bool IsGeneratedNumericIdentity(IColumn column) =>
-        column.PropertyMappings.Any(mapping =>
+    // Selected by store type, not CLR type: a text enum column with a default is not an identity.
+    private static bool IsGeneratedIntegerIdentity(IColumn column) =>
+        column.StoreType is "smallint" or "integer" or "bigint"
+        && column.PropertyMappings.Any(mapping =>
             mapping.Property.ValueGenerated == ValueGenerated.OnAdd
-            && Type.GetTypeCode(
-                Nullable.GetUnderlyingType(mapping.Property.ClrType) ?? mapping.Property.ClrType
-            )
-                is TypeCode.Byte
-                    or TypeCode.Int16
-                    or TypeCode.Int32
-                    or TypeCode.Int64
-                    or TypeCode.UInt16
-                    or TypeCode.UInt32
-                    or TypeCode.UInt64
         );
 
     private static Dictionary<string, ITable> ModelTables(BlokeBotDbContext db) =>

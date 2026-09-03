@@ -267,10 +267,16 @@ The command does these steps in order:
 2. Write the external receipt to `database-cutover/` in the state directory.
 3. Create the application database with the application login as owner.
 4. Apply the current PostgreSQL migrations with the application login.
-5. Copy the SQLite data and verify the PostgreSQL database.
+5. Copy the SQLite data.
+6. Verify the PostgreSQL database by row counts.
 
-The receipt binds the operation to the SQLite data, the PostgreSQL cluster, the database name, and
-the owner. It does not contain a credential.
+Verification compares the row count of each domain table with the SQLite row count. It also
+confirms the PostgreSQL migration history and the table list. The command does not compare column
+values. A failed verification names the table.
+
+The receipt binds the operation to the SQLite migration, the SQLite row counts, the PostgreSQL
+cluster, the database name, and the owner. It does not contain a credential. A failed run records
+a short failure reason in the receipt and prints it.
 
 The command rejects an application database that exists without a matching receipt. Run the same
 command again to resume an interrupted operation. The command does not drop a database. If you

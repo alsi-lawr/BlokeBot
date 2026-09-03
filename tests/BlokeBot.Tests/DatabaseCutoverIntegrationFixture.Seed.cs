@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using BlokeBot.Announcements;
 using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -24,7 +25,17 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     internal const long MergedCandidateId = 300;
     internal const long TargetCandidateId = 400;
     internal static readonly Guid FlowId = Guid.Parse("c0edc830-c63f-4ec9-92ad-27632794c855");
-    internal static readonly DateTime SeedTime = new(2026, 8, 31, 19, 23, 41, DateTimeKind.Utc);
+
+    // Real rows carry 100 ns ticks that PostgreSQL truncates to microseconds.
+    internal static readonly DateTime SeedTime = new DateTime(
+        2026,
+        8,
+        31,
+        19,
+        23,
+        41,
+        DateTimeKind.Utc
+    ).AddTicks(1234567);
 
     internal string ReceiptPath => new CutoverReceiptStore(StateDirectory).Path;
 
@@ -147,6 +158,36 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             }
         );
         db.AddRange(targetSubmission, mergedSubmission, targetCandidate, mergedCandidate);
+        // Both announcement rows leave AnnouncementColor at its database default.
+        _ = db.Add(
+            new AutomaticRaidShoutoutSettings { HostId = SeedHostId, UpdatedAtUtc = SeedTime }
+        );
+        _ = db.Add(
+            new CustomAnnouncement
+            {
+                HostId = SeedHostId,
+                Name = "Cutover announcement",
+                MessageLibraryEntry = new CustomMessageLibraryEntry
+                {
+                    HostId = SeedHostId,
+                    Name = "Cutover library entry",
+                    Variants = [new CustomMessageVariant { SortOrder = 0, Text = "Announced" }],
+                    CreatedAtUtc = SeedTime,
+                    UpdatedAtUtc = SeedTime,
+                },
+                DeliveryPolicy = new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+                {
+                    HostId = SeedHostId,
+                    RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(30)),
+                    OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
+                        TimeSpan.FromSeconds(45)
+                    ),
+                },
+                Schedule = new IntervalCustomAnnouncementSchedule { HostId = SeedHostId },
+                CreatedAtUtc = SeedTime,
+                UpdatedAtUtc = SeedTime,
+            }
+        );
         _ = db.Add(
             new PublicChatOutboxMessage
             {

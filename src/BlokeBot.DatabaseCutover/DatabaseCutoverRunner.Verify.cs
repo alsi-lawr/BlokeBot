@@ -1,4 +1,5 @@
 using System.Globalization;
+using BlokeBot.Persistence;
 using Microsoft.Data.Sqlite;
 using Npgsql;
 
@@ -21,31 +22,13 @@ public sealed partial class DatabaseCutoverRunner
         {
             foreach (var identity in table.Identities)
             {
-                var sequence = await SequenceNameAsync(
-                    target,
-                    transaction,
-                    table,
-                    identity,
-                    cancellationToken
-                );
-                if (sequence is null)
-                {
-                    continue;
-                }
-
-                var maximum = await MaximumIdentityAsync(
-                    target,
-                    transaction,
-                    table,
-                    identity,
-                    cancellationToken
-                );
+                // setval is strict, so a column without a sequence yields NULL and advances nothing.
                 await using var set = target.CreateCommand();
                 set.Transaction = transaction;
-                set.CommandText = "SELECT setval(CAST(@sequence AS regclass), @value, @is_called);";
-                _ = set.Parameters.AddWithValue("sequence", sequence);
-                _ = set.Parameters.AddWithValue("value", maximum is > 0 ? maximum.Value : 1L);
-                _ = set.Parameters.AddWithValue("is_called", maximum is > 0);
+                set.CommandText =
+                    $"SELECT setval(pg_get_serial_sequence(@table_name, @column_name)::regclass, COALESCE(MAX({CutoverSql.Quote(identity)})::bigint, 1), MAX({CutoverSql.Quote(identity)}) IS NOT NULL) FROM {CutoverSql.Quote(table.Name)};";
+                _ = set.Parameters.AddWithValue("table_name", $"public.{table.Name}");
+                _ = set.Parameters.AddWithValue("column_name", identity);
                 _ = await set.ExecuteScalarAsync(cancellationToken);
             }
         }
@@ -58,69 +41,54 @@ public sealed partial class DatabaseCutoverRunner
         CutoverReceipt receipt,
         CutoverReceiptStore store,
         SqliteConnection source,
-        SqliteTransaction? sourceTransaction,
+        BlokeBotDbContext targetContext,
         NpgsqlConnection target,
         IReadOnlyList<CutoverTable> tables,
-        string sourceFingerprint,
         string localStateFingerprint,
         DatabaseCutoverOptions options,
-        IReadOnlyList<string> sourceMigrations,
         CancellationToken cancellationToken
     )
     {
         receipt = receipt.WithPhase(CutoverPhase.Verifying);
         await store.WriteAsync(receipt, cancellationToken);
 
-        var currentSourceFingerprint = await CutoverFingerprint.SourceAsync(
-            source,
-            sourceTransaction,
-            sourceMigrations,
+        foreach (var table in tables)
+        {
+            var sourceRows = await CutoverSql.CountAsync(source, table, cancellationToken);
+            var targetRows = await CutoverSql.CountAsync(target, table, cancellationToken);
+            if (sourceRows != targetRows)
+            {
+                return new(
+                    null,
+                    $"Verification failed for domain table {table.Name}: SQLite has {sourceRows} rows and PostgreSql has {targetRows}."
+                );
+            }
+        }
+
+        var migrations = await ReadMigrationHistoryAsync(
+            targetContext,
+            _currentPostgreSqlMigration,
+            cancellationToken
+        );
+        if (!migrations.IsCurrent)
+        {
+            return new(null, "The PostgreSql migration history is not at the current baseline.");
+        }
+
+        var catalogFailure = await ValidatePostgreSqlPhysicalCatalogAsync(
+            target,
             tables,
             cancellationToken
         );
-        if (!StringComparer.Ordinal.Equals(sourceFingerprint, currentSourceFingerprint))
+        if (catalogFailure is not null)
         {
-            return new(null, "The SQLite source changed during cutover verification.");
-        }
-
-        var targetProjections = new List<(string Table, TableProjection Projection)>(tables.Count);
-        foreach (var table in tables)
-        {
-            var sourceProjection = await CutoverProjection.ReadAsync(
-                source,
-                sourceTransaction,
-                table,
-                null,
-                cancellationToken
-            );
-            var targetProjection = await CutoverProjection.ReadAsync(
-                target,
-                null,
-                table,
-                null,
-                cancellationToken
-            );
-            if (
-                sourceProjection.Count != targetProjection.Count
-                || !StringComparer.Ordinal.Equals(sourceProjection.Hash, targetProjection.Hash)
-            )
-            {
-                return new(null, $"Verification failed for domain table {table.Name}.");
-            }
-
-            targetProjections.Add((table.Name, targetProjection));
+            return new(null, catalogFailure);
         }
 
         var constraintFailure = await ValidateTargetConstraintsAsync(target, cancellationToken);
         if (constraintFailure is not null)
         {
             return new(null, constraintFailure);
-        }
-
-        var sequenceFailure = await ValidateSequencesAsync(target, tables, cancellationToken);
-        if (sequenceFailure is not null)
-        {
-            return new(null, sequenceFailure);
         }
 
         var currentLocalStateFingerprint = await LocalStateFingerprint.CalculateAsync(
@@ -134,7 +102,7 @@ public sealed partial class DatabaseCutoverRunner
             return new(null, "A provider-neutral local state asset changed during cutover.");
         }
 
-        receipt = receipt.Verified(CutoverFingerprint.Verification(targetProjections));
+        receipt = receipt.WithPhase(CutoverPhase.Verified);
         await store.WriteAsync(receipt, cancellationToken);
         return new(receipt, null);
     }
@@ -164,91 +132,5 @@ public sealed partial class DatabaseCutoverRunner
         return unvalidated == 0
             ? null
             : "The PostgreSql target contains an unvalidated foreign-key constraint.";
-    }
-
-    private static async Task<string?> ValidateSequencesAsync(
-        NpgsqlConnection target,
-        IReadOnlyList<CutoverTable> tables,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var transaction = await target.BeginTransactionAsync(cancellationToken);
-        foreach (var table in tables)
-        {
-            foreach (var identity in table.Identities)
-            {
-                var sequence = await SequenceNameAsync(
-                    target,
-                    transaction,
-                    table,
-                    identity,
-                    cancellationToken
-                );
-                var maximum = await MaximumIdentityAsync(
-                    target,
-                    transaction,
-                    table,
-                    identity,
-                    cancellationToken
-                );
-                if (sequence is null || maximum is null)
-                {
-                    continue;
-                }
-
-                await using var command = target.CreateCommand();
-                command.Transaction = transaction;
-                command.CommandText = "SELECT pg_sequence_last_value(CAST(@sequence AS regclass));";
-                _ = command.Parameters.AddWithValue("sequence", sequence);
-                var lastValue = await command.ExecuteScalarAsync(cancellationToken);
-                if (
-                    maximum > 0
-                    && (
-                        lastValue is null or DBNull
-                        || Convert.ToInt64(lastValue, CultureInfo.InvariantCulture) < maximum
-                    )
-                )
-                {
-                    return $"The PostgreSql identity sequence for {table.Name} was not advanced.";
-                }
-            }
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-        return null;
-    }
-
-    private static async Task<string?> SequenceNameAsync(
-        NpgsqlConnection target,
-        NpgsqlTransaction transaction,
-        CutoverTable table,
-        CutoverIdentity identity,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var command = target.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT pg_get_serial_sequence(@table_name, @column_name);";
-        _ = command.Parameters.AddWithValue("table_name", $"public.{table.Name}");
-        _ = command.Parameters.AddWithValue("column_name", identity.Column);
-        return await command.ExecuteScalarAsync(cancellationToken) as string;
-    }
-
-    private static async Task<long?> MaximumIdentityAsync(
-        NpgsqlConnection target,
-        NpgsqlTransaction transaction,
-        CutoverTable table,
-        CutoverIdentity identity,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var command = target.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText =
-            $"SELECT MAX({CutoverProjection.Quote(identity.Column)})::bigint FROM {CutoverProjection.Quote(table.Name)};";
-        var value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is null or DBNull
-            ? null
-            : Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 }

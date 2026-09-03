@@ -116,7 +116,7 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
                               one channel with --host-id. Safe to re-run.
               database cutover-postgresql
                               Copy the stopped SQLite main database to PostgreSql and
-                              verify it without changing active configuration.
+                              verify its row counts without changing active configuration.
 
             Serve options:
               --host HOST      Dashboard host. Default: 127.0.0.1.
