@@ -16,6 +16,53 @@ public sealed class ViewerPassportServiceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task DraftStatistics_ExcludeKnownOtherIdentityClaimsWithoutMutatingOrHidingSafeDrafts()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var alpha = await SeedHostAsync(database, "alpha", HostFeatureFlags.ViewerPassports);
+        var beta = await SeedHostAsync(database, "beta", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        _ = Success(await service.SaveAsync(Save(alpha, "owner-id", "old_name"), default));
+        _ = Success(await service.SaveAsync(Save(alpha, "owner-id", "current_name"), default));
+        await SeedLegacyActivityAsync(database, alpha, "old_name", "90");
+        await SeedLegacyActivityAsync(database, alpha, "current_name", "30");
+        await SeedLegacyActivityAsync(database, alpha, "unclaimed", "12");
+        await SeedLegacyActivityAsync(database, beta, "old_name", "7");
+        var history = (await service.GetSelfAsync(alpha, new("new-id", "old_name", "New"), default))
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        var current = (
+            await service.GetSelfAsync(alpha, new("new-id", "current_name", "New"), default)
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        history.Statistics.Points.ShouldBe("0");
+        history.Statistics.PointsRank.ShouldBeNull();
+        history.Statistics.GuessRounds.ShouldBe(0);
+        current.Statistics.Points.ShouldBe("0");
+        var owner = (
+            await service.GetSelfAsync(alpha, new("owner-id", "renamed_again", "Owner"), default)
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        owner.Statistics.Points.ShouldBe("120");
+        var safe = (
+            await service.GetSelfAsync(alpha, new("draft-id", "unclaimed", "Draft"), default)
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        safe.Statistics.Points.ShouldBe("12");
+        var isolated = (await service.GetSelfAsync(beta, new("new-id", "old_name", "New"), default))
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        isolated.Statistics.Points.ShouldBe("7");
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.ViewerPassports.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportLogins.CountAsync()).ShouldBe(2);
+        (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task Save_UsesTwitchIdentityAcrossRenamesAndRejectsUnearnedRewards()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

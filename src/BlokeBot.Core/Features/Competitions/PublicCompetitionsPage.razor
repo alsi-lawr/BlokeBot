@@ -1,3 +1,4 @@
+@layout PublicPortalLayout
 @page "/competitions/{Channel}"
 @using BlokeBot.Core.Features.MomentAttachments
 @using BlokeBot.Persistence.Models
@@ -5,6 +6,7 @@
 @attribute [AllowAnonymous]
 @inject CompetitionService _service
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | Competitions</PageTitle>
 
 <div class="mx-auto max-w-6xl space-y-6" data-public-competitions>

@@ -1,12 +1,14 @@
+@layout PublicPortalLayout
 @page "/queues/{Channel}/{QueueSlug}"
 @using BlokeBot.Core.Auth.Sessions
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject PlayQueueService _queues
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | @(_page?.Queue.Name ?? "Play queue")</PageTitle>
 
-<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+<div class="bg-background px-4 py-8 text-foreground sm:px-6">
     <div class="mx-auto max-w-5xl space-y-6">
         @if (_loading)
         {
@@ -125,4 +127,4 @@
             </ApplicationCardCollection>
         }
     </div>
-</main>
+</div>

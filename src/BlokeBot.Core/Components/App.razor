@@ -258,6 +258,9 @@
 @code {
     private IComponentRenderMode _renderMode =>
         HttpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true
+        && HttpContextAccessor.HttpContext?.GetEndpoint()?.Metadata
+            .GetMetadata<Microsoft.AspNetCore.Components.Endpoints.ComponentTypeMetadata>()?.Type
+            != typeof(BlokeBot.Core.Features.ViewerPortal.ViewerPortalPage)
             ? new InteractiveServerRenderMode(prerender: false)
             : InteractiveServer;
 }

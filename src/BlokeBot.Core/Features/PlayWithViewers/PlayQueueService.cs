@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
 
-public sealed class PlayQueueService(
+public sealed partial class PlayQueueService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,

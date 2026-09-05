@@ -1,12 +1,14 @@
+@layout PublicPortalLayout
 @page "/passport/{Channel}/{Viewer}"
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject ViewerPassportService _passports
 @inject BlokeBotPageContextAccessor _pageContexts
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | Viewer passport</PageTitle>
 
-<main class="mx-auto grid max-w-4xl gap-5 px-4 py-8 sm:px-6">
+<div class="mx-auto grid max-w-4xl gap-5 px-4 py-8 sm:px-6">
     <PageHeader Kicker="Channel community"
                 Title="Viewer passport"
                 Description="A viewer-selected snapshot of channel participation." />
@@ -34,7 +36,7 @@
                         {
                             <span class="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">✦ @title.Name</span>
                         }
-                        <h1 class="truncate text-2xl font-bold text-[var(--app-text-strong)]">@_passport.DisplayName</h1>
+                        <h2 class="truncate text-2xl font-bold text-[var(--app-text-strong)]">@_passport.DisplayName</h2>
                         <p class="text-xs text-muted-foreground">@($"@{_passport.Login}") · @_passport.HostDisplayName</p>
                     </div>
                 </div>
@@ -69,4 +71,4 @@
             </div>
         </article>
     }
-</main>
+</div>

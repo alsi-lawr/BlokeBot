@@ -1,12 +1,14 @@
+@layout PublicPortalLayout
 @page "/raid/{Channel}"
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject BlokeRaidService _raids
 @inject TimeProvider _clock
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | BlokeRaid</PageTitle>
 
-<main class="public-raid-page">
+<div class="public-raid-page">
     @if (!_loaded)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading BlokeRaid…</div>
@@ -32,4 +34,4 @@
             <section class="card public-raid-recap"><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span><div><h2>Latest recap · @recap.BossName</h2><p>@recap.Contributions.Count contributors recorded @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage. @(recap.CompletedAtUtc is { } completedAtUtc ? "Completed " + completedAtUtc.ToString("d MMM yyyy, HH:mm") + " UTC." : "Completion time was not recorded.")</p></div></section>
         }
     }
-</main>
+</div>

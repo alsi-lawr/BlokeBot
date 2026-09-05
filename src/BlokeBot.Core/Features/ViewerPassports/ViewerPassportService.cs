@@ -650,6 +650,14 @@ public sealed class ViewerPassportService(
             .Select(value => value.Login)
             .ToArrayAsync(cancellationToken);
         logins.ExceptWith(ambiguousLogins);
+        var otherIdentityLogins = await OtherIdentityLogins(
+                db,
+                passport.HostId,
+                passport.TwitchUserId
+            )
+            .Where(value => logins.Contains(value))
+            .ToArrayAsync(cancellationToken);
+        logins.ExceptWith(otherIdentityLogins);
         var leaderboard = await balances.GetLeaderboardAsync(
             passport.HostId,
             int.MaxValue,
@@ -886,6 +894,24 @@ public sealed class ViewerPassportService(
         }
     }
 
+    private static IQueryable<string> OtherIdentityLogins(
+        BlokeBotDbContext db,
+        int hostId,
+        string twitchUserId
+    )
+    {
+        var others = db
+            .ViewerPassports.AsNoTracking()
+            .Where(value => value.HostId == hostId && value.TwitchUserId != twitchUserId);
+        return others
+            .Select(value => value.Login)
+            .Union(
+                from alias in db.ViewerPassportLogins.AsNoTracking()
+                join passport in others on alias.PassportId equals passport.Id
+                select alias.Login
+            );
+    }
+
     private static async Task ClaimLoginAsync(
         BlokeBotDbContext db,
         int hostId,
@@ -904,20 +930,8 @@ public sealed class ViewerPassportService(
         {
             return;
         }
-        var reused = await db
-            .ViewerPassports.AsNoTracking()
-            .AnyAsync(
-                value =>
-                    value.HostId == hostId
-                    && value.TwitchUserId != twitchUserId
-                    && (
-                        value.Login == login
-                        || db.ViewerPassportLogins.Any(alias =>
-                            alias.PassportId == value.Id && alias.Login == login
-                        )
-                    ),
-                cancellationToken
-            );
+        var reused = await OtherIdentityLogins(db, hostId, twitchUserId)
+            .AnyAsync(value => value == login, cancellationToken);
         if (reused)
         {
             _ = db.ViewerPassportAmbiguousLogins.Add(

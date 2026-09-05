@@ -13,6 +13,11 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<PortalPersonalProjectors>();
         _ = services.AddSingleton<PortalProjectors>();
         _ = services.AddSingleton<ViewerPortalCatalogueService>();
+        _ = services.AddSingleton<PortalPersonalReader>();
+        _ = services.AddScoped<PortalCircuitConnection>();
+        _ = services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler>(
+            provider => provider.GetRequiredService<PortalCircuitConnection>()
+        );
         return services;
     }
 }

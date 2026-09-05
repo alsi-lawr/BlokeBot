@@ -1,9 +1,11 @@
+@layout PublicPortalLayout
 @page "/collectives/{HostLogin}/{CollectivePublicId:guid}"
 @using BlokeBot.Core.Components.Layout
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject CollectiveService _service
 
+<ChannelReturnLink Channel="@HostLogin" />
 <PageTitle>BlokeBot | Collective</PageTitle>
 
 <DashboardPage Kicker="Community"

@@ -1,3 +1,4 @@
+@layout PublicPortalLayout
 @page "/bounties/{Channel}"
 @using BlokeBot.Core.Auth.Sessions
 @using BlokeBot.Core.Features.MomentAttachments
@@ -8,9 +9,10 @@
 @inject BountyService _bounties
 @inject TimeProvider _clock
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | Bounty board</PageTitle>
 
-<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+<div class="bg-background px-4 py-8 text-foreground sm:px-6">
     <div class="mx-auto max-w-5xl space-y-6">
         <PageHeader Kicker="Community progression"
                     Title="Bounty board"
@@ -177,4 +179,4 @@
             </section>
         }
     </div>
-</main>
+</div>

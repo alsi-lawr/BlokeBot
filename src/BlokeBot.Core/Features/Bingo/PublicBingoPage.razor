@@ -1,9 +1,11 @@
+@layout PublicPortalLayout
 @page "/bingo/{Channel}"
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject BingoService _bingo
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | Bingo</PageTitle>
 
 <div class="mx-auto max-w-6xl space-y-6" data-public-bingo>

@@ -1,3 +1,4 @@
+@layout PublicPortalLayout
 @page "/community/{Channel}"
 @using BlokeBot.Core.Features.MomentAttachments
 @using BlokeBot.Persistence.Models
@@ -6,9 +7,10 @@
 @inject CommunityProgressionService _progression
 @inject TimeProvider _clock
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | Community progression</PageTitle>
 
-<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+<div class="bg-background px-4 py-8 text-foreground sm:px-6">
     <div class="mx-auto max-w-6xl space-y-6">
         <PageHeader Kicker="Community" Title="Season progression" Description="Public standings, quests, achievements, and persistent rewards." />
         @if (!_loaded)
@@ -155,4 +157,4 @@
             }
         }
     </div>
-</main>
+</div>
