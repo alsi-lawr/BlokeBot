@@ -1,3 +1,4 @@
+@using BlokeBot.Core.Features.ViewerPortal.Boundary
 @inject IWebHostEnvironment Environment
 @inject IHttpContextAccessor HttpContextAccessor
 
@@ -10,7 +11,7 @@
     <base href="/" />
     @if (Environment.EnvironmentName == "Simulation")
     {
-        <script>
+        <script nonce="@_bootstrap.Document.Nonce">
             try {
                 const requestedTheme = new URLSearchParams(window.location.search).get("simulationTheme");
                 const simulationTheme = requestedTheme === "dark" ? "dark" : "light";
@@ -24,7 +25,7 @@
             }
         </style>
     }
-    <script>
+    <script nonce="@_bootstrap.Document.Nonce">
         (() => {
             const flagKey = "blokebot.preferences.disabled";
             const preferenceKeys = [
@@ -67,7 +68,7 @@
             window.blokeBotPreferences = { enabled, disable, enable };
         })();
     </script>
-    <script>
+    <script nonce="@_bootstrap.Document.Nonce">
         (() => {
             const storageKey = "blokebot.theme";
             const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -130,7 +131,7 @@
             };
         })();
     </script>
-    <script>
+    <script nonce="@_bootstrap.Document.Nonce">
         (() => {
             const states = [
                 ["blokebot.sidebar.guessing.open", "navGuessingOpen"],
@@ -225,16 +226,17 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets[$"{Environment.ApplicationName}.styles.css"]" />
-    <ImportMap />
+    <ImportMap nonce="@_bootstrap.Document.Nonce" />
     <HeadOutlet @rendermode="_renderMode" />
     <link rel="icon" type="image/svg+xml" href="blokebot-mark.svg" />
 </head>
 
 <body>
-    <Routes @rendermode="_renderMode" />
+    <Routes @rendermode="_renderMode" PublicDocument="@_bootstrap.Document.IsPublic" DocumentNonce="@_bootstrap.Document.Nonce" />
     <ReconnectModal />
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
-    <script>
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script src="@Assets["public-document.js"]" data-document="@_bootstrap.Marker" data-public-document="@(_bootstrap.Document.IsPublic ? "true" : "false")"></script>
+    <script nonce="@_bootstrap.Document.Nonce">
         (() => {
             const register = () => {
                 if (!window.Blazor || !window.blokeBotTheme) {
@@ -256,6 +258,11 @@
 </html>
 
 @code {
+    private PublicDocumentBootstrap _bootstrap = null!;
+
+    protected override void OnInitialized() =>
+        _bootstrap = (PublicDocumentBootstrap)HttpContextAccessor.HttpContext!.Items[PublicDocumentProtector.BootstrapKey]!;
+
     private IComponentRenderMode _renderMode =>
         HttpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true
         && HttpContextAccessor.HttpContext?.GetEndpoint()?.Metadata

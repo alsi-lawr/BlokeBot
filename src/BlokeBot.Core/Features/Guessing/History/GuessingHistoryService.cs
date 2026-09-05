@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Guessing.History;
 
-public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> dbFactory)
+public sealed partial class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
     public async Task<ImmutableArray<GuessRoundHistoryEntry>> LoadRecentCompletedRoundsAsync(
         int hostId,

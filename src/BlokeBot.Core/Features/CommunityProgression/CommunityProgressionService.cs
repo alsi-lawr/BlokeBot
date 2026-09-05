@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.CommunityProgression;
 
-public sealed class CommunityProgressionService(
+public sealed partial class CommunityProgressionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider clock,

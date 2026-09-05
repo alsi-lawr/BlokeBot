@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\BlokeBot.Core\BlokeBot.Core.csproj" />
     <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference Include="..\BlokeBot.Persistence.PostgreSql\BlokeBot.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\BlokeBot.Plugins.Features\BlokeBot.Plugins.Features.csproj" />
     <ProjectReference Include="..\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />
   </ItemGroup>

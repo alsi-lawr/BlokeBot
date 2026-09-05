@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.BlokeRaid;
 using BlokeBot.Core.Features.Bounties;
@@ -19,6 +20,7 @@ using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -53,6 +55,11 @@ internal sealed class ViewerPortalTestContext
             Moments,
             Clock
         );
+        Telemetry = new(
+            Clock,
+            new DurableAlertService(database, Clock, events),
+            NullLogger<PortalReadTelemetry>.Instance
+        );
         Catalogue = new(
             Access,
             new PortalProjectors(
@@ -61,15 +68,18 @@ internal sealed class ViewerPortalTestContext
                 new PortalPersonalProjectors(
                     points,
                     new GuessingHistoryService(database),
-                    new ViewerPassportPublicIdentityPolicy(database),
                     Passports,
                     Access
                 )
-            )
+            ),
+            Scheduler,
+            new PortalProjectionRunner(Telemetry)
         );
     }
 
     internal BlokeBot.Eventing.EventBus<AppEventKind> Events { get; }
+    internal PortalReadTelemetry Telemetry { get; }
+    internal PortalReadScheduler Scheduler { get; } = new();
     internal BingoService Bingo { get; }
     internal SqliteBlokeBotDbFactory Database { get; }
     internal PortalClock Clock { get; } =

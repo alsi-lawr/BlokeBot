@@ -51,17 +51,20 @@ public sealed partial class RequestBoardService
             value => activeStatuses.Contains(value.Status),
             ct
         );
-        var withdrawable = await ownSubmissions
-            .Where(value =>
-                visibleIds.Contains(value.Id)
-                && (
-                    value.Status == RequestSubmissionStatus.Pending
-                    || value.Status == RequestSubmissionStatus.Approved
-                    || value.Status == RequestSubmissionStatus.Queued
-                )
-            )
-            .Select(value => value.Id)
-            .ToListAsync(ct);
+        var withdrawable =
+            visibleIds.Length == 0
+                ? []
+                : await ownSubmissions
+                    .Where(value =>
+                        visibleIds.Contains(value.Id)
+                        && (
+                            value.Status == RequestSubmissionStatus.Pending
+                            || value.Status == RequestSubmissionStatus.Approved
+                            || value.Status == RequestSubmissionStatus.Queued
+                        )
+                    )
+                    .Select(value => value.Id)
+                    .ToListAsync(ct);
         var ownVotes = db
             .RequestSubmissionVotes.AsNoTracking()
             .Where(value =>
@@ -70,10 +73,13 @@ public sealed partial class RequestBoardService
                 && value.VoterTwitchUserId == actor.TwitchUserId
             );
         var votesUsed = await ownVotes.CountAsync(ct);
-        var votedIds = await ownVotes
-            .Where(value => visibleIds.Contains(value.SubmissionId))
-            .Select(value => value.SubmissionId)
-            .ToListAsync(ct);
+        var votedIds =
+            visibleIds.Length == 0
+                ? []
+                : await ownVotes
+                    .Where(value => visibleIds.Contains(value.SubmissionId))
+                    .Select(value => value.SubmissionId)
+                    .ToListAsync(ct);
         return new RequestBoardSelfView(
             activeCount,
             votesUsed,

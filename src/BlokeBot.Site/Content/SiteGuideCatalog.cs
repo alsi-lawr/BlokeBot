@@ -7,6 +7,7 @@ internal static partial class SiteGuideCatalog
         .Concat(CreateConfigurationTransferPages())
         .Concat(CreateStreamOverlayPages())
         .Concat(CreateStreamMediaPages())
+        .Concat(CreateViewerPortalPages())
         .Concat(CreateCommunityInteractionPages())
         .Concat(CreateCommunityIdentityPages())
         .Concat(CreateCommunityProgressionPages())
@@ -81,6 +82,7 @@ internal static partial class SiteGuideCatalog
         new(
             "Community interaction",
             [
+                GuideLink("Channel viewer page", "community/viewer-portal"),
                 GuideLink("Request boards", "community/request-boards"),
                 GuideLink("Play with viewers", "community/play-with-viewers"),
                 GuideLink("Moments", "community/moments"),

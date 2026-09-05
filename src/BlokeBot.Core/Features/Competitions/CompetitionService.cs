@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Competitions;
 
-public sealed class CompetitionService(
+public sealed partial class CompetitionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     ICommunityAchievementGrantService achievements,

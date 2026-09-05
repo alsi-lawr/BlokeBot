@@ -17,7 +17,7 @@ using PointMutationResult = BlokeBot.Functional.Result<
 
 namespace BlokeBot.Core.Features.Points.Balances;
 
-public sealed class PointBalanceService(
+public sealed partial class PointBalanceService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IEnumerable<IOverlayEventPresenter> eventPresenters
 )

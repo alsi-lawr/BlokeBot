@@ -24,7 +24,9 @@ internal static class SimulationApplication
 
     internal static async Task<SimulationApplicationHost> BuildAsync(
         string[] arguments,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        BlokeBotDatabaseConfiguration? databaseConfiguration = null,
+        Action<IServiceCollection>? configureServices = null
     )
     {
         var scenario = SimulationMode.SelectScenario(arguments);
@@ -85,14 +87,22 @@ internal static class SimulationApplication
                 }
             );
 
-            _ = builder.Services.AddSingleton<SimulationDatabaseKeeper>();
-            _ = builder.Services.AddBlokeBotPersistence(static services =>
-                services.GetRequiredService<SimulationDatabaseKeeper>().ConnectionString
-            );
+            if (databaseConfiguration is null)
+            {
+                _ = builder.Services.AddSingleton<SimulationDatabaseKeeper>();
+                _ = builder.Services.AddBlokeBotPersistence(static services =>
+                    services.GetRequiredService<SimulationDatabaseKeeper>().ConnectionString
+                );
+            }
+            else
+            {
+                _ = builder.Services.AddBlokeBotPersistence(databaseConfiguration);
+            }
             _ = builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
             _ = builder.Services.AddFakeTwitch(fakeTwitch.Authority);
             _ = builder.AddBlokeBotCore(BlokeBotRuntimeMode.Online);
             _ = builder.Services.AddBlokeBotSimulation();
+            configureServices?.Invoke(builder.Services);
 
             var app = builder.Build();
             _ = app.UseSerilogRequestLogging();

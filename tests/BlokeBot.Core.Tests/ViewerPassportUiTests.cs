@@ -30,6 +30,7 @@ public sealed class ViewerPassportUiTests
         _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
 
+        context.AddPublicViewerBoundary(database);
         var cut = context.Render<ViewerPassportsPage>();
 
         cut.WaitForAssertion(() =>
@@ -58,6 +59,7 @@ public sealed class ViewerPassportUiTests
         _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
         _ = context.AddAuthorization().SetNotAuthorized();
 
+        context.AddPublicViewerBoundary(database);
         var cut = context.Render<PublicViewerPassportPage>(parameters =>
             parameters.Add(page => page.Channel, "streamer").Add(page => page.Viewer, "streamer")
         );
@@ -88,6 +90,7 @@ public sealed class ViewerPassportUiTests
         _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
         _ = context.AddAuthorization().SetNotAuthorized();
 
+        context.AddPublicViewerBoundary(database);
         var cut = context.Render<PublicViewerPassportPage>(parameters =>
             parameters.Add(page => page.Channel, "streamer").Add(page => page.Viewer, "streamer")
         );
@@ -114,6 +117,7 @@ public sealed class ViewerPassportUiTests
         _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
 
+        context.AddPublicViewerBoundary(database);
         var cut = context.Render<ViewerPassportsPage>();
 
         cut.WaitForAssertion(() =>

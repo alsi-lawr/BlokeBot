@@ -168,6 +168,7 @@ public sealed class CompetitionUiTests
         UiTestContextFactory.AddMomentAttachmentServices(context, database);
         _ = context.Services.AddSingleton(service);
         _ = context.AddAuthorization().SetNotAuthorized();
+        context.AddPublicViewerBoundary(database);
         var cut = context.Render<PublicCompetitionsPage>(parameters =>
             parameters.Add(page => page.Channel, "streamer")
         );

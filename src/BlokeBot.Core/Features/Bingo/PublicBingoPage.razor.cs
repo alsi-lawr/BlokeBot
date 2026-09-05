@@ -5,6 +5,10 @@ namespace BlokeBot.Core.Features.Bingo;
 
 public partial class PublicBingoPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     private const string _archiveKey = "archive";
 
     /// <summary>Sections default to open, so only what a reader has closed is tracked.</summary>
@@ -18,6 +22,12 @@ public partial class PublicBingoPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _view = null;
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            _loaded = true;
+            return;
+        }
         if (!string.Equals(_loadedChannel, Channel, StringComparison.OrdinalIgnoreCase))
         {
             _closed.Clear();

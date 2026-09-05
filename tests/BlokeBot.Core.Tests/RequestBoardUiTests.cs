@@ -140,7 +140,9 @@ public sealed partial class RequestBoardUiTests
         );
         using var context = new BunitContext();
         _ = context.Services.AddSingleton(service);
+        _ = context.AddAuthorization().SetNotAuthorized();
 
+        context.AddPublicViewerBoundary(database);
         var page = context.Render<PublicRequestBoardPage>(parameters =>
             parameters
                 .Add(component => component.Channel, "streamer")

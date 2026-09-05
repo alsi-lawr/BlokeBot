@@ -6,6 +6,10 @@ namespace BlokeBot.Core.Features.Moments;
 
 public partial class PublicMomentRecapPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     [CascadingParameter]
     private Task<AuthenticationState> _authenticationState { get; set; } =
         Task.FromResult(new AuthenticationState(new()));
@@ -25,16 +29,23 @@ public partial class PublicMomentRecapPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _page = null;
         _loading = true;
         _session = AuthenticatedSession.FromPrincipal((await _authenticationState).User);
         await ReloadAsync();
         _loading = false;
     }
 
-    private async Task ReloadAsync() =>
+    private async Task ReloadAsync()
+    {
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            return;
+        }
         _page = string.IsNullOrWhiteSpace(StreamIdentity)
             ? await _moments.GetWeeklyRecapAsync(Channel, DateTime.UtcNow, CancellationToken.None)
             : await _moments.GetStreamRecapAsync(Channel, StreamIdentity, CancellationToken.None);
+    }
 
     private MomentViewerIdentity Identity() =>
         _session.IsAuthenticated
@@ -44,6 +55,10 @@ public partial class PublicMomentRecapPage
     private async Task VoteAsync(Guid publicId)
     {
         if (_page is null || _page.Moments.Count == 0)
+        {
+            return;
+        }
+        if (!await _publicGate.TryActionAsync(_page.Moments[0].HostId))
         {
             return;
         }

@@ -28,8 +28,10 @@ using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Core.Features.ViewerPortal.Boundary;
 using BlokeBot.Eventing;
 using BlokeBot.Plugins.Features;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;
@@ -42,7 +44,17 @@ public static partial class BlokeBotApplication
     )
     {
         BlokeBotLogging.Configure(builder.Logging);
-        _ = builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        PublicViewerForwarding.Configure(builder.Services, builder.Configuration);
+        _ = builder
+            .Services.AddRazorComponents()
+            .AddInteractiveServerComponents()
+            .AddHubOptions(options => options.AddFilter<PublicHubAdmissionFilter>());
+        _ = builder.Services.Replace(
+            ServiceDescriptor.Singleton(
+                typeof(HubConnectionHandler<>),
+                typeof(PublicHubConnectionHandler<>)
+            )
+        );
         _ = builder.Services.AddCascadingAuthenticationState();
         _ = builder.Services.AddHttpContextAccessor();
         _ = builder.Services.AddSingleton(BlokeBotBuildIdentity.Current);

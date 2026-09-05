@@ -7,6 +7,7 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Core.Features.ViewerPortal.Boundary;
 using BlokeBot.Persistence;
 using Microsoft.AspNetCore.Authorization;
 
@@ -33,6 +34,7 @@ public static partial class BlokeBotApplication
     )
     {
         app.UseOverlayAccessLogRedaction();
+        _ = app.UseWhen(PublicViewerForwarding.Applies, branch => branch.UseForwardedHeaders());
 
         if (!app.Environment.IsDevelopment())
         {
@@ -44,6 +46,7 @@ public static partial class BlokeBotApplication
         _ = app.UseHttpsRedirection();
         _ = app.UseAntiforgery();
         _ = app.UseAuthentication();
+        _ = app.UseMiddleware<PublicDocumentMiddleware>();
         _ = app.UseAuthorization();
 
         app.MapOverlayBrowserSourceEndpoints();

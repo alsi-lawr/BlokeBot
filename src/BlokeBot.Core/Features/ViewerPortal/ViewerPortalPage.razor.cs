@@ -12,6 +12,10 @@ namespace BlokeBot.Core.Features.ViewerPortal;
 
 public partial class ViewerPortalPage : IDisposable
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     [Parameter]
     public string Login { get; set; } = string.Empty;
 
@@ -140,7 +144,10 @@ public partial class ViewerPortalPage : IDisposable
                 var ct = _route.Token;
                 try
                 {
-                    await ReadPersonalAsync(_allSelfOwners, ct);
+                    if (await _publicGate.TryReadResolvedAsync(_channel.Host.Id))
+                    {
+                        await ReadPersonalAsync(_allSelfOwners, ct);
+                    }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             }
@@ -148,10 +155,16 @@ public partial class ViewerPortalPage : IDisposable
         }
         _route.Cancel();
         _route.Dispose();
-        _route = CancellationTokenSource.CreateLinkedTokenSource(_refresh.ConnectionToken);
+        _route = CancellationTokenSource.CreateLinkedTokenSource(
+            _refresh.ConnectionToken,
+            _httpContext?.RequestAborted ?? CancellationToken.None
+        );
         _routeLogin = _normalizedLogin;
         _channel = null;
+        _live = false;
+        _liveness = "Not available";
         _notFound = false;
+        _personalPending = false;
         _projections.Clear();
         _personal.Clear();
         DisposeSubscriptions();
@@ -202,6 +215,10 @@ public partial class ViewerPortalPage : IDisposable
         CancellationToken ct
     )
     {
+        if (_channel is not null && !await _publicGate.TryReadResolvedAsync(_channel.Host.Id))
+        {
+            return;
+        }
         await _readGate.WaitAsync(ct);
         try
         {

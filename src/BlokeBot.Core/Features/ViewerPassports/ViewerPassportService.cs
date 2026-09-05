@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ViewerPassports;
 
-public sealed class ViewerPassportService(
+public sealed partial class ViewerPassportService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
     IHostStreamLivenessProvider streamLiveness,

@@ -72,7 +72,9 @@ public sealed class MomentUiTests
         );
         using var context = new BunitContext();
         _ = context.Services.AddSingleton(service);
+        _ = context.AddAuthorization().SetNotAuthorized();
 
+        context.AddPublicViewerBoundary(database);
         var page = context.Render<PublicMomentRecapPage>(parameters =>
             parameters.Add(component => component.Channel, "streamer")
         );
@@ -153,6 +155,7 @@ public sealed class MomentUiTests
                 new Claim(ClaimTypes.Name, "OAuth Viewer"),
                 new Claim(AuthClaims.Login, "oauth_viewer")
             );
+            authenticated.AddPublicViewerBoundary(database);
             var page = authenticated.Render<PublicMomentRecapPage>(parameters =>
                 parameters.Add(component => component.Channel, "streamer")
             );
@@ -160,10 +163,31 @@ public sealed class MomentUiTests
             await page.Find("button.btn-secondary").ClickAsync(new());
         }
 
+        using (var reclaimed = new BunitContext())
+        {
+            _ = reclaimed.Services.AddSingleton(service);
+            var authorization = reclaimed.AddAuthorization();
+            _ = authorization.SetAuthorized("Reclaimed login");
+            _ = authorization.SetClaims(
+                new Claim(ClaimTypes.NameIdentifier, "other-known-id"),
+                new Claim(AuthClaims.Login, "oauth_viewer")
+            );
+            reclaimed.AddPublicViewerBoundary(database);
+            var page = reclaimed.Render<PublicMomentRecapPage>(parameters =>
+                parameters.Add(component => component.Channel, "streamer")
+            );
+            _ = page.WaitForElement("button.btn-secondary");
+            await page.Find("button.btn-secondary").ClickAsync(new());
+            await using var unchanged = await database.CreateDbContextAsync();
+            (await unchanged.MomentVotes.SingleAsync()).TwitchUserId.ShouldBe("oauth-viewer-id");
+            _ = page.Find("[role='status'][data-error='true']").ShouldNotBeNull();
+        }
+
         using (var anonymous = new BunitContext())
         {
             _ = anonymous.Services.AddSingleton(service);
             _ = anonymous.AddAuthorization();
+            anonymous.AddPublicViewerBoundary(database);
             var page = anonymous.Render<PublicMomentRecapPage>(parameters =>
                 parameters.Add(component => component.Channel, "streamer")
             );

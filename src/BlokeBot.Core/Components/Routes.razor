@@ -1,5 +1,10 @@
+@using BlokeBot.Core.Features.ViewerPortal.Boundary
+@inject PublicViewerCircuit PublicCircuit
+
 <Router AppAssembly="typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
+        @if (PublicDocument == PublicDocumentProtector.IsPublicPage(routeData.PageType, routeData.RouteValues.Keys))
+        {
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized Context="routeAuth">
                 <AuthorizeView>
@@ -28,5 +33,23 @@
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        }
+        else
+        {
+            <PublicDocumentReload />
+        }
     </Found>
 </Router>
+
+@code {
+    [Parameter] public bool PublicDocument { get; set; }
+    [Parameter] public string DocumentNonce { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (RendererInfo.IsInteractive)
+        {
+            PublicCircuit.Enter(PublicDocument, DocumentNonce);
+        }
+    }
+}

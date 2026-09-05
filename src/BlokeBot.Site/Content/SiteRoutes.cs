@@ -19,6 +19,7 @@ internal static class SiteRoutes
         "/overlays",
         "/overlays/cues",
         "/overlays/media",
+        "/community/viewer-portal",
         "/community/request-boards",
         "/community/play-with-viewers",
         "/community/moments",

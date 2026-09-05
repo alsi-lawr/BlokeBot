@@ -46,7 +46,9 @@ public sealed partial class RequestBoardUiTests
             ),
             CancellationToken.None
         );
-        using (var original = AuthorizedContext(service, "verified-session-id", "original"))
+        using (
+            var original = AuthorizedContext(database, service, "verified-session-id", "original")
+        )
         {
             var page = RenderBoard(original);
             _ = page.WaitForElement("#request-board-title");
@@ -62,13 +64,13 @@ public sealed partial class RequestBoardUiTests
             submission.SubmitterTwitchUserId.ShouldBe("verified-session-id");
             submission.SubmitterLogin.ShouldBe("original");
         }
-        using (var reclaimed = AuthorizedContext(service, "different-id", "original"))
+        using (var reclaimed = AuthorizedContext(database, service, "different-id", "original"))
         {
             var page = RenderBoard(reclaimed);
             _ = page.WaitForElement("article h3");
             page.FindAll("button").Any(button => button.TextContent == "Withdraw").ShouldBeFalse();
         }
-        using (var missingId = AuthorizedContext(service, "", "original"))
+        using (var missingId = AuthorizedContext(database, service, "", "original"))
         {
             var page = RenderBoard(missingId);
             _ = page.WaitForElement("article h3");
@@ -76,7 +78,7 @@ public sealed partial class RequestBoardUiTests
                 .Any(button => button.TextContent is "Withdraw" or "Submit request" or "Vote")
                 .ShouldBeFalse();
         }
-        using (var renamed = AuthorizedContext(service, "verified-session-id", "renamed"))
+        using (var renamed = AuthorizedContext(database, service, "verified-session-id", "renamed"))
         {
             var page = RenderBoard(renamed);
             page.WaitForAssertion(() =>
@@ -101,6 +103,7 @@ public sealed partial class RequestBoardUiTests
     }
 
     private static BunitContext AuthorizedContext(
+        SqliteBlokeBotDbFactory database,
         RequestBoardService service,
         string userId,
         string login
@@ -114,6 +117,7 @@ public sealed partial class RequestBoardUiTests
             new Claim(ClaimTypes.NameIdentifier, userId),
             new Claim(AuthClaims.Login, login)
         );
+        context.AddPublicViewerBoundary(database);
         return context;
     }
 

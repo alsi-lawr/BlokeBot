@@ -461,6 +461,26 @@
       "sql_verb": "SELECT",
       "purpose": "Verify that the application connection reaches the prepared, operation-bound database.",
       "dialect_dependency": "postgresql_current_database_and_comment_catalog"
+    },
+    {
+      "id": "portal-simulation-sqlite-wal",
+      "path": "src/BlokeBot.Simulation/Workloads/PortalWorkloadFixture.cs",
+      "source_line": 20,
+      "api": "ExecuteSqlRawAsync",
+      "source_marker": "PRAGMA journal_mode=WAL;",
+      "sql_verb": "PRAGMA",
+      "purpose": "Use WAL for the disposable SQLite portal measurement fixture only, guarded by IsSqlite.",
+      "dialect_dependency": "sqlite_workload_fixture_journal_mode"
+    },
+    {
+      "id": "portal-simulation-sqlite-synchronous",
+      "path": "src/BlokeBot.Simulation/Workloads/PortalWorkloadFixture.cs",
+      "source_line": 21,
+      "api": "ExecuteSqlRawAsync",
+      "source_marker": "PRAGMA synchronous=NORMAL;",
+      "sql_verb": "PRAGMA",
+      "purpose": "Use NORMAL synchronous mode for the disposable SQLite portal measurement fixture only, guarded by IsSqlite.",
+      "dialect_dependency": "sqlite_workload_fixture_synchronous"
     }
   ]
 }

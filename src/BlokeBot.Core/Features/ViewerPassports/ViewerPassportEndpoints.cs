@@ -1,4 +1,6 @@
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.ViewerPortal.Boundary;
+using Microsoft.AspNetCore.Diagnostics;
 
 namespace BlokeBot.Core.Features.ViewerPassports;
 
@@ -11,6 +13,7 @@ internal static class ViewerPassportEndpoints
                     HttpContext context,
                     string channel,
                     ViewerPassportService passports,
+                    PublicViewerGate publicGate,
                     TimeProvider clock,
                     CancellationToken cancellationToken
                 ) =>
@@ -23,6 +26,15 @@ internal static class ViewerPassportEndpoints
                     )
                     {
                         return Results.Unauthorized();
+                    }
+                    if (!await publicGate.TryReadAsync(channel, cancellationToken))
+                    {
+                        if (context.Features.Get<IStatusCodePagesFeature>() is { } statusPages)
+                        {
+                            statusPages.Enabled = false;
+                        }
+                        context.Response.Headers.RetryAfter = "60";
+                        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
                     }
                     var identity = new ViewerPassportIdentity(
                         session.UserId,
@@ -56,5 +68,6 @@ internal static class ViewerPassportEndpoints
                     );
                 }
             )
+            .WithMetadata(new PublicViewerPrivateEndpoint())
             .RequireAuthorization();
 }

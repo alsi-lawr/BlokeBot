@@ -48,6 +48,7 @@ public sealed partial class BountyUiTests
         _ = context.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(_now));
         _ = context.AddAuthorization().SetNotAuthorized();
 
+        context.AddPublicViewerBoundary(database);
         var cut = context.Render<PublicBountyBoardPage>(parameters =>
             parameters.Add(page => page.Channel, "streamer")
         );

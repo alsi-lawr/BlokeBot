@@ -7,6 +7,10 @@ namespace BlokeBot.Core.Features.PublicLeaderboards;
 
 public partial class PublicPointsLeaderboardPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     private const int _publicLeaderboardSize = 50;
 
     private PublicLeaderboardHost? _host;
@@ -27,6 +31,12 @@ public partial class PublicPointsLeaderboardPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _leaderboard = null;
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            _loaded = true;
+            return;
+        }
         _loaded = false;
         _leaderboard = null;
         var host = await _hosts.Find(Channel).ExecuteAsync(CancellationToken.None);

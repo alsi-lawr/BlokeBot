@@ -5,6 +5,10 @@ namespace BlokeBot.Core.Features.CommunityProgression;
 
 public partial class PublicCommunityProgressionPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     [Parameter]
     public string Channel { get; set; } = string.Empty;
 
@@ -15,6 +19,12 @@ public partial class PublicCommunityProgressionPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _view = null;
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            _loaded = true;
+            return;
+        }
         _view = await _progression.GetPublicAsync(Channel, CancellationToken.None);
         _loaded = true;
     }

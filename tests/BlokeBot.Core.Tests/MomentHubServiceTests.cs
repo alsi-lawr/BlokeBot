@@ -9,6 +9,57 @@ namespace BlokeBot.Core.Tests;
 public sealed class MomentHubServiceTests
 {
     [Test]
+    public async Task Votes_ExactIdWinsAcrossRenameAndKnownLoginCollisionIsNotClaimed()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var alpha = await SeedHostAsync(database, "alpha");
+        var beta = await SeedHostAsync(database, "beta");
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 9, 5, 12, 0, 0, TimeSpan.Zero));
+        var service = CreateService(database, new FakeMomentProvider(database), clock);
+        var moment = await CaptureAndApproveAsync(service, alpha, "stream", "contributor", clock);
+        _ = Success(
+            await service.VoteAsync(alpha, moment.PublicId, new("oldlogin", "owner-id"), default)
+        );
+        _ = Success(
+            await service.VoteAsync(alpha, moment.PublicId, new("reclaimed", "other-id"), default)
+        );
+        Success(
+            await service.VoteAsync(alpha, moment.PublicId, new("reclaimed", "owner-id"), default)
+        )
+            .WasIdempotent.ShouldBeTrue();
+        var collision = await service.VoteAsync(
+            alpha,
+            moment.PublicId,
+            new("reclaimed", "stranger-id"),
+            default
+        );
+        collision
+            .Match(_ => false, value => value.Reason is MomentRejection.Conflict)
+            .ShouldBeTrue();
+        (await service.VoteAsync(beta, moment.PublicId, new("reclaimed", "owner-id"), default))
+            .Match(_ => false, value => value.Reason is MomentRejection.NotFound)
+            .ShouldBeTrue();
+        Success(await service.VoteAsync(alpha, moment.PublicId, new("reclaimed"), default))
+            .WasIdempotent.ShouldBeTrue();
+        _ = Success(await service.VoteAsync(alpha, moment.PublicId, new("legacy"), default));
+        Success(
+            await service.VoteAsync(alpha, moment.PublicId, new("legacy", "adopted-id"), default)
+        )
+            .WasIdempotent.ShouldBeTrue();
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.MomentVotes.CountAsync()).ShouldBe(3);
+        (
+            await verify.MomentVotes.SingleAsync(value => value.NormalizedLogin == "oldlogin")
+        ).TwitchUserId.ShouldBe("owner-id");
+        (
+            await verify.MomentVotes.SingleAsync(value => value.NormalizedLogin == "reclaimed")
+        ).TwitchUserId.ShouldBe("other-id");
+        (
+            await verify.MomentVotes.SingleAsync(value => value.NormalizedLogin == "legacy")
+        ).TwitchUserId.ShouldBe("adopted-id");
+    }
+
+    [Test]
     public async Task DisabledSwitch_RetainsSettingsBlocksProviderAndDoesNotReplayOnReenable()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

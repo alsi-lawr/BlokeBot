@@ -211,13 +211,16 @@ public sealed class ViewerPortalPageTests
                 services.Passports,
                 services.Queues,
                 services.Requests,
-                services.Bingo
+                services.Bingo,
+                services.Scheduler,
+                services.Telemetry
             )
         );
         _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStream());
         _ = context.Services.AddSingleton(services.Events);
         _ = context.Services.AddSingleton<TimeProvider>(services.Clock);
         _ = context.Services.AddSingleton<PortalCircuitConnection>();
+        context.AddPublicViewerBoundary(services.Database);
         return context;
     }
 

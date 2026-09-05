@@ -6,6 +6,10 @@ namespace BlokeBot.Core.Features.PlayWithViewers;
 
 public partial class PublicPlayQueuePage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     [CascadingParameter]
     private Task<AuthenticationState> _authenticationState { get; set; } =
         Task.FromResult(new AuthenticationState(new()));
@@ -28,10 +32,11 @@ public partial class PublicPlayQueuePage
 
     protected override async Task OnParametersSetAsync()
     {
+        _page = null;
         _loading = true;
         var authentication = await _authenticationState;
         _session = AuthenticatedSession.FromPrincipal(authentication.User);
-        _page = await _queues.GetPublicPageAsync(Channel, QueueSlug, CancellationToken.None);
+        await ReloadAsync();
         _loading = false;
     }
 
@@ -48,6 +53,10 @@ public partial class PublicPlayQueuePage
     private async Task JoinAsync()
     {
         if (_page is null || !_session.IsAuthenticated)
+        {
+            return;
+        }
+        if (!await _publicGate.TryActionAsync(_page.Queue.HostId))
         {
             return;
         }
@@ -105,6 +114,10 @@ public partial class PublicPlayQueuePage
         {
             return;
         }
+        if (!await _publicGate.TryActionAsync(_page.Queue.HostId))
+        {
+            return;
+        }
         var result = await mutation(_page.Queue.HostId, _page.Queue.Slug, Identity());
         _feedback = result.Match(
             succeeded => message?.Invoke(succeeded.Value) ?? success,
@@ -114,6 +127,11 @@ public partial class PublicPlayQueuePage
         await ReloadAsync();
     }
 
-    private async Task ReloadAsync() =>
-        _page = await _queues.GetPublicPageAsync(Channel, QueueSlug, CancellationToken.None);
+    private async Task ReloadAsync()
+    {
+        if (await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            _page = await _queues.GetPublicPageAsync(Channel, QueueSlug, CancellationToken.None);
+        }
+    }
 }

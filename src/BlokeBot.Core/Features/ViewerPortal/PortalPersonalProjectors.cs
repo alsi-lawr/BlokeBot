@@ -7,7 +7,6 @@ namespace BlokeBot.Core.Features.ViewerPortal;
 internal sealed class PortalPersonalProjectors(
     PointBalanceService points,
     GuessingHistoryService guessing,
-    ViewerPassportPublicIdentityPolicy privacy,
     ViewerPassportService passports,
     ViewerPortalAccess access
 )
@@ -18,13 +17,11 @@ internal sealed class PortalPersonalProjectors(
         CancellationToken ct
     )
     {
-        var exclusions = await privacy.ExclusionsAsync(channel.Host.Id, ct);
-        var board = await points.GetPublicLeaderboardAsync(
-            channel.Host.Id,
-            PortalSummaryBounds.Items,
-            exclusions.Logins,
-            ct
-        );
+        var board = await points.GetBoundedLeaderboardAsync(channel.Host.Id, publicOnly: true, ct);
+        if (board is null)
+        {
+            return new PortalSummaryOutcome.Unavailable();
+        }
         var leader = board.FirstOrDefault();
         var link = PortalSummaryBounds.Link("Open points leaderboard", route);
         return leader is null
@@ -42,14 +39,7 @@ internal sealed class PortalPersonalProjectors(
         CancellationToken ct
     )
     {
-        var exclusions = await privacy.ExclusionsAsync(channel.Host.Id, ct);
-        var board = await guessing.LoadPublicLeaderboardAsync(
-            channel.Host.Id,
-            new GuessHistoryQuery { Page = 1, PageSize = 10 },
-            exclusions.Logins,
-            ct
-        );
-        var leader = board.Entries.FirstOrDefault();
+        var leader = await guessing.LoadPublicLeaderAsync(channel.Host.Id, ct);
         var link = PortalSummaryBounds.Link("Open guessing leaderboard", route);
         return leader is null
             ? new PortalSummaryOutcome.Empty(
@@ -89,30 +79,22 @@ internal sealed class PortalPersonalProjectors(
         CancellationToken ct
     )
     {
-        var result = await passports.GetSelfAsync(
+        var result = await passports.GetSelfSummaryAsync(
             viewer.Host.Id,
             new ViewerPassportIdentity(viewer.TwitchUserId, viewer.Login, viewer.DisplayName),
             ct
         );
-        return result switch
-        {
-            ViewerPassportQueryOutcome.Available available
-                when available.Passport.HostId == viewer.Host.Id
-                    && available.Passport.TwitchUserId == viewer.TwitchUserId =>
-                new PortalSummaryOutcome.Available(
-                    PortalSummaryBounds.Create(
-                        "Your passport",
-                        available.Passport.ProfileLine,
-                        false,
-                        [PortalSummaryBounds.Link("Open your passport", route)]
-                    )
-                ),
-            ViewerPassportQueryOutcome.Available => new PortalSummaryOutcome.Unauthorized(),
-            ViewerPassportQueryOutcome.FeatureDisabled => new PortalSummaryOutcome.Disabled(),
-            ViewerPassportQueryOutcome.Forbidden => new PortalSummaryOutcome.Unauthorized(),
-            ViewerPassportQueryOutcome.NotFound => new PortalSummaryOutcome.Unauthorized(),
-            _ => throw new ArgumentOutOfRangeException(nameof(result)),
-        };
+        return result is null ? new PortalSummaryOutcome.Unavailable()
+            : result.HostId != viewer.Host.Id || result.TwitchUserId != viewer.TwitchUserId
+                ? new PortalSummaryOutcome.Unauthorized()
+            : new PortalSummaryOutcome.Available(
+                PortalSummaryBounds.Create(
+                    "Your passport",
+                    result.ProfileLine,
+                    false,
+                    [PortalSummaryBounds.Link("Open your passport", route)]
+                )
+            );
     }
 
     private static Task<PortalSummaryOutcome> Unauthorized() =>

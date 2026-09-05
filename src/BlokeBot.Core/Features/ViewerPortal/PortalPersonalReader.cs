@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Text.Json;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.PlayWithViewers;
@@ -40,7 +42,9 @@ internal sealed class PortalPersonalReader(
     ViewerPassportService passports,
     PlayQueueService queues,
     RequestBoardService requests,
-    BingoService bingo
+    BingoService bingo,
+    PortalReadScheduler scheduler,
+    PortalReadTelemetry telemetry
 )
 {
     internal async Task<PortalPersonalProjection> ReadAsync(
@@ -50,19 +54,53 @@ internal sealed class PortalPersonalReader(
         CancellationToken ct
     )
     {
+        var icon = owner switch
+        {
+            PortalSelfOwner.Passport => PortalIcon.Passport,
+            PortalSelfOwner.Queue => PortalIcon.Queue,
+            PortalSelfOwner.Requests => PortalIcon.Request,
+            PortalSelfOwner.Bingo => PortalIcon.Bingo,
+        };
+        var started = Stopwatch.GetTimestamp();
+        using var activity = telemetry.Start(icon, PortalAudience.Self);
+        var outcome = PortalReadOutcome.Unavailable;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            var items = await ReadBoundAsync(channel, session, owner, timeout.Token)
+            var items = await scheduler
+                .ReadAsync(token => ReadBoundAsync(channel, session, owner, token), timeout.Token)
                 .WaitAsync(timeout.Token);
             ct.ThrowIfCancellationRequested();
+            if (
+                JsonSerializer.SerializeToUtf8Bytes(items).Length
+                > PortalProjectionRunner.MaximumSummaryBytes
+            )
+            {
+                outcome = PortalReadOutcome.BudgetExceeded;
+                return new(PortalReadState.Unavailable, []);
+            }
+            outcome = PortalReadOutcome.Available;
             return new(PortalReadState.Ready, items);
         }
         catch (Exception)
         {
+            outcome = ct.IsCancellationRequested
+                ? PortalReadOutcome.Cancelled
+                : PortalReadOutcome.Unavailable;
             ct.ThrowIfCancellationRequested();
             return new(PortalReadState.Unavailable, []);
+        }
+        finally
+        {
+            _ = activity?.SetTag("portal.outcome", outcome.ToString());
+            await telemetry.ObserveAsync(
+                channel.Host.Id,
+                icon,
+                PortalAudience.Self,
+                outcome,
+                Stopwatch.GetElapsedTime(started)
+            );
         }
     }
 
@@ -105,30 +143,29 @@ internal sealed class PortalPersonalReader(
         {
             return [];
         }
-        var result = await passports.GetSelfAsync(
+        var passport = await passports.GetSelfSummaryAsync(
             viewer.Host.Id,
             new ViewerPassportIdentity(viewer.TwitchUserId, viewer.Login, viewer.DisplayName),
             ct
         );
         if (
-            result is not ViewerPassportQueryOutcome.Available available
-            || available.Passport.HostId != viewer.Host.Id
-            || available.Passport.TwitchUserId != viewer.TwitchUserId
+            passport is null
+            || passport.HostId != viewer.Host.Id
+            || passport.TwitchUserId != viewer.TwitchUserId
         )
         {
-            return [];
+            throw new InvalidOperationException("The passport summary is unavailable.");
         }
-        var passport = available.Passport;
         var items = ImmutableArray.CreateBuilder<PortalPersonalItem>();
         if (channel.PublicFeatures.Contains(HostFeatureFlags.Points))
         {
             items.Add(
                 new(
                     "Points",
-                    passport.Statistics.Points,
+                    passport.Points,
                     "Your channel points",
                     new("Open standings", Route("points/leaderboard", channel)),
-                    passport.Statistics.PointsRank
+                    passport.PointsRank
                 )
             );
         }
@@ -153,11 +190,11 @@ internal sealed class PortalPersonalReader(
         {
             return [];
         }
-        var candidates = (await queues.GetQueuesForHostAsync(channel.Host.Id, ct))
-            .Where(value => value.IsOpen)
-            .OrderBy(value => value.Name, StringComparer.Ordinal)
-            .ThenBy(value => value.Slug, StringComparer.Ordinal)
-            .Take(PortalSummaryBounds.Items);
+        var candidates = await queues.GetPublicDestinationsAsync(
+            channel.Host.Id,
+            PortalSummaryBounds.Items,
+            ct
+        );
         var items = ImmutableArray.CreateBuilder<PortalPersonalItem>();
         foreach (var queue in candidates)
         {
@@ -204,11 +241,11 @@ internal sealed class PortalPersonalReader(
         {
             return [];
         }
-        var candidates = (await requests.GetBoardsForHostAsync(channel.Host.Id, ct))
-            .Where(value => value.IsOpen)
-            .OrderBy(value => value.Title, StringComparer.Ordinal)
-            .ThenBy(value => value.Slug, StringComparer.Ordinal)
-            .Take(PortalSummaryBounds.Items);
+        var candidates = await requests.GetPublicDestinationsAsync(
+            channel.Host.Id,
+            PortalSummaryBounds.Items,
+            ct
+        );
         var items = ImmutableArray.CreateBuilder<PortalPersonalItem>();
         foreach (var board in candidates)
         {

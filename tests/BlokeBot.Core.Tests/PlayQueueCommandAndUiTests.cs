@@ -167,6 +167,7 @@ public sealed class PlayQueueCommandAndUiTests
         );
         using var context = new BunitContext();
         _ = context.Services.AddSingleton(service);
+        context.AddPublicViewerBoundary(database);
         var authorization = context.AddAuthorization();
         _ = authorization.SetAuthorized("OAuth Display");
         _ = authorization.SetClaims(
@@ -195,6 +196,29 @@ public sealed class PlayQueueCommandAndUiTests
 
         await FindButton(page, "Check position").ClickAsync(new());
         page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1 (Waiting)."));
+
+        using (var reclaimed = new BunitContext())
+        {
+            _ = reclaimed.Services.AddSingleton(service);
+            var otherAuthorization = reclaimed.AddAuthorization();
+            _ = otherAuthorization.SetAuthorized("Reclaimed login");
+            _ = otherAuthorization.SetClaims(
+                new Claim(ClaimTypes.NameIdentifier, "other-known-id"),
+                new Claim(AuthClaims.Login, "oauth_viewer")
+            );
+            reclaimed.AddPublicViewerBoundary(database);
+            var otherPage = RenderPublicPage(reclaimed);
+            _ = otherPage.WaitForElement("button.btn-primary");
+            await FindButton(otherPage, "Leave").ClickAsync(new());
+            await AssertIdentityAsync(
+                database,
+                "id:oauth-user-id",
+                "oauth-user-id",
+                "oauth_viewer",
+                "OAuth Display",
+                PlayQueueEntryStatus.Waiting
+            );
+        }
 
         var readyCheck = await service.StartReadyCheckAsync(
             host,
@@ -254,13 +278,17 @@ public sealed class PlayQueueCommandAndUiTests
         );
         using var context = new BunitContext();
         _ = context.Services.AddSingleton(service);
+        _ = context.AddAuthorization().SetNotAuthorized();
+        context.AddPublicViewerBoundary(database);
 
         var page = RenderPublicPage(context);
 
         page.WaitForAssertion(() => page.Markup.ShouldContain("Sign in with Twitch to join"));
         page.FindAll("#queue-viewer-login").ShouldBeEmpty();
         page.FindAll("button").ShouldAllBe(button => button.HasAttribute("disabled"));
-        page.Find("a").GetAttribute("href")!.ShouldContain("/auth/login?start=true");
+        page.Find("a[href^='/auth/login?start=true']")
+            .GetAttribute("href")!
+            .ShouldContain("/auth/login?start=true");
         await page.Find("button.btn-primary").ClickAsync(new());
         await using var verify = await database.CreateDbContextAsync();
         (await verify.PlayQueueEntries.CountAsync()).ShouldBe(0);
@@ -293,7 +321,9 @@ public sealed class PlayQueueCommandAndUiTests
         );
         using var context = new BunitContext();
         _ = context.Services.AddSingleton(service);
+        _ = context.AddAuthorization().SetNotAuthorized();
 
+        context.AddPublicViewerBoundary(database);
         var page = context.Render<PublicPlayQueuePage>(parameters =>
             parameters
                 .Add(value => value.Channel, "streamer")
