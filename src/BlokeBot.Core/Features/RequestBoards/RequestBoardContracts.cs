@@ -39,7 +39,7 @@ public sealed record ConfigureRequestBoardCommand(
 
 public sealed record SubmitRequestCommand(
     Guid OperationId,
-    string SubmitterLogin,
+    RequestActor Actor,
     string Title,
     string Category,
     IReadOnlyList<string> Tags,

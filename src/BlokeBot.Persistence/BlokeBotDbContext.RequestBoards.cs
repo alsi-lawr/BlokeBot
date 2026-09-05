@@ -100,6 +100,13 @@ public sealed partial class BlokeBotDbContext
                 }
             );
             _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.SubmitterTwitchUserId).HasMaxLength(128);
+            _ = b.HasIndex(static x => new
+            {
+                x.HostId,
+                x.BoardId,
+                x.SubmitterTwitchUserId,
+            });
             _ = b.Property(static x => x.SubmitterLogin).HasMaxLength(128);
             _ = b.Property(static x => x.Title).HasMaxLength(200);
             _ = b.Property(static x => x.NormalizedTitle).HasMaxLength(200);
@@ -167,8 +174,9 @@ public sealed partial class BlokeBotDbContext
         {
             _ = b.ToTable("request_submission_votes");
             _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.VoterTwitchUserId).HasMaxLength(128);
             _ = b.Property(static x => x.VoterLogin).HasMaxLength(128);
-            _ = b.HasIndex(static x => new { x.SubmissionId, x.VoterLogin }).IsUnique();
+            _ = b.HasIndex(static x => new { x.SubmissionId, x.VoterTwitchUserId }).IsUnique();
         });
 
         _ = modelBuilder.Entity<RequestBoardDomainEvent>(b =>

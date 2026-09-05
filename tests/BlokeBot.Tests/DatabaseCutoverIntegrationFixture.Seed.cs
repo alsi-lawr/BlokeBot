@@ -14,8 +14,13 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 {
     internal const string PriorReleaseSqliteMigration =
         "20260822192152_v0.12.0_GuessingSharedAliases";
-    internal const string CurrentSqliteMigration = "20260826174307_v0.13.0";
-    internal const string CurrentPostgreSqlMigration = "20260901145930_20260901_v0_14_0_Baseline";
+    internal const string CurrentSqliteMigration = "20260905033522_RequestsStableIdentity";
+    internal const string CurrentPostgreSqlMigration = "20260905033659_RequestsStableIdentity";
+    internal static readonly string[] CurrentPostgreSqlMigrations =
+    [
+        "20260901145930_20260901_v0_14_0_Baseline",
+        CurrentPostgreSqlMigration,
+    ];
     internal const int SeedHostId = 900;
     internal const long PendingOutboxId = 700;
     internal const string PendingDeduplicationKey =
@@ -63,8 +68,6 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             .InitializeAsync(CancellationToken.None);
     }
 
-    // These tables are unchanged by the v0.13.0 migration, so the current model can write them
-    // into the prior-release file.
     private async Task SeedPriorReleaseRowsAsync()
     {
         var configuration = BlokeBotDatabaseConfiguration.Sqlite(SqliteDatabasePath);
@@ -95,36 +98,6 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             RefundPolicy = RequestBoardRefundPolicy.RejectedOrWithdrawn,
             CreatedAtUtc = SeedTime,
             UpdatedAtUtc = SeedTime.AddMinutes(1),
-        };
-        var targetSubmission = new RequestSubmission
-        {
-            Id = TargetSubmissionId,
-            HostId = SeedHostId,
-            BoardId = board.Id,
-            Board = board,
-            OperationId = Guid.Parse("25f76bd0-e548-483d-9585-f0e4f995d322"),
-            SubmitterLogin = "target",
-            Title = "Target request",
-            NormalizedTitle = "target request",
-            Status = RequestSubmissionStatus.Approved,
-            CreatedAtUtc = SeedTime,
-            UpdatedAtUtc = SeedTime,
-        };
-        var mergedSubmission = new RequestSubmission
-        {
-            Id = MergedSubmissionId,
-            HostId = SeedHostId,
-            BoardId = board.Id,
-            Board = board,
-            OperationId = Guid.Parse("407ec677-8e17-478a-9a4a-cec0b5cc2b70"),
-            SubmitterLogin = "merged",
-            Title = "Merged request",
-            NormalizedTitle = "merged request",
-            Status = RequestSubmissionStatus.Merged,
-            MergedIntoSubmissionId = TargetSubmissionId,
-            MergedIntoSubmission = targetSubmission,
-            CreatedAtUtc = SeedTime.AddMinutes(2),
-            UpdatedAtUtc = SeedTime.AddMinutes(3),
         };
         var targetCandidate = Candidate(
             TargetCandidateId,
@@ -157,7 +130,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 MaximumNumber = 98.75m,
             }
         );
-        db.AddRange(targetSubmission, mergedSubmission, targetCandidate, mergedCandidate);
+        db.AddRange(targetCandidate, mergedCandidate);
         // Both announcement rows leave AnnouncementColor at its database default.
         _ = db.Add(
             new AutomaticRaidShoutoutSettings { HostId = SeedHostId, UpdatedAtUtc = SeedTime }
@@ -202,6 +175,27 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             }
         );
         _ = await db.SaveChangesAsync();
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO request_submissions (
+                "Id", "HostId", "BoardId", "OperationId", "SubmitterLogin", "Title", "NormalizedTitle", "Status",
+                "Category", "Tags", "Priority", "QueuePosition", "VoteCount", "PublicNote", "PrivateModeratorNote",
+                "PrivateRejectionReason", "PointReservationState", "CreatedAtUtc", "UpdatedAtUtc", "MergedIntoSubmissionId"
+            ) VALUES (
+                {TargetSubmissionId}, {SeedHostId}, {board.Id}, {Guid.Parse(
+                "25f76bd0-e548-483d-9585-f0e4f995d322"
+            )},
+                'target', 'Target request', 'target request', 'Approved', '', '', 0, 0, 0, '', '', '', 'None',
+                {SeedTime}, {SeedTime}, NULL
+            ), (
+                {MergedSubmissionId}, {SeedHostId}, {board.Id}, {Guid.Parse(
+                "407ec677-8e17-478a-9a4a-cec0b5cc2b70"
+            )},
+                'merged', 'Merged request', 'merged request', 'Merged', '', '', 0, 0, 0, '', '', '', 'None',
+                {SeedTime.AddMinutes(2)}, {SeedTime.AddMinutes(3)}, {TargetSubmissionId}
+            )
+            """
+        );
     }
 
     internal async Task SeedCurrentReleaseRowsAsync()

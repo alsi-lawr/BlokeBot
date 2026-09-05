@@ -156,9 +156,9 @@ public sealed class DatabaseCutoverIntegrationTests
             CutoverPhase.DatabaseCreated,
             "cancelled"
         );
-        (await fixture.TargetMigrationsAsync(fixture.Primary)).ShouldBe([
-            DatabaseCutoverIntegrationFixture.CurrentPostgreSqlMigration,
-        ]);
+        (await fixture.TargetMigrationsAsync(fixture.Primary)).ShouldBe(
+            DatabaseCutoverIntegrationFixture.CurrentPostgreSqlMigrations
+        );
         await fixture.AssertDomainTablesEmptyAsync(fixture.Primary);
 
         var strayHost = await DatabaseCutoverIntegrationFixture.InsertHostAsync(

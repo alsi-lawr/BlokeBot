@@ -7,8 +7,8 @@ namespace BlokeBot.DatabaseCutover;
 
 public sealed partial class DatabaseCutoverRunner
 {
-    private const string _currentSqliteMigration = "20260826174307_v0.13.0";
-    private const string _currentPostgreSqlMigration = "20260901145930_20260901_v0_14_0_Baseline";
+    private const string _currentSqliteMigration = "20260905033522_RequestsStableIdentity";
+    private const string _currentPostgreSqlMigration = "20260905033659_RequestsStableIdentity";
     private readonly Action<CutoverBatchCommit>? _batchCommitted;
     private readonly Action<CutoverPreparationCheckpoint>? _preparationCheckpoint;
 

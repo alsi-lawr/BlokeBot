@@ -5,7 +5,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class RequestBoardServiceTests
+public sealed partial class RequestBoardServiceTests
 {
     [Test]
     public async Task DisabledSwitch_RetainsBoardsBlocksEffectsAndDoesNotReplayOnReenable()
@@ -125,13 +125,18 @@ public sealed class RequestBoardServiceTests
         var first = submissions.Single(value => !value.WasIdempotent);
         var retry = submissions.Single(value => value.WasIdempotent);
         var withdrawal = Success(
-            await service.WithdrawAsync(hostId, first.Value.Id, "viewer", CancellationToken.None)
+            await service.WithdrawAsync(
+                hostId,
+                first.Value.Id,
+                RequestBoardTestActor.ForLogin("viewer"),
+                CancellationToken.None
+            )
         );
         var withdrawalRetry = Success(
             await concurrentService.WithdrawAsync(
                 hostId,
                 first.Value.Id,
-                "viewer",
+                RequestBoardTestActor.ForLogin("viewer"),
                 CancellationToken.None
             )
         );
@@ -390,13 +395,28 @@ public sealed class RequestBoardServiceTests
         await ApproveAsync(service, hostId, target.Id);
         await ApproveAsync(service, hostId, duplicate.Id);
         _ = Success(
-            await service.VoteAsync(hostId, target.Id, "voter_one", CancellationToken.None)
+            await service.VoteAsync(
+                hostId,
+                target.Id,
+                RequestBoardTestActor.ForLogin("voter_one"),
+                CancellationToken.None
+            )
         );
         _ = Success(
-            await service.VoteAsync(hostId, duplicate.Id, "voter_one", CancellationToken.None)
+            await service.VoteAsync(
+                hostId,
+                duplicate.Id,
+                RequestBoardTestActor.ForLogin("voter_one"),
+                CancellationToken.None
+            )
         );
         _ = Success(
-            await service.VoteAsync(hostId, duplicate.Id, "voter_two", CancellationToken.None)
+            await service.VoteAsync(
+                hostId,
+                duplicate.Id,
+                RequestBoardTestActor.ForLogin("voter_two"),
+                CancellationToken.None
+            )
         );
 
         var beforeMerge = await service.GetModeratorSubmissionAsync(
@@ -454,7 +474,12 @@ public sealed class RequestBoardServiceTests
         ).Value;
 
         _ = Rejection(
-                await service.VoteAsync(secondHost, submission.Id, "other", CancellationToken.None)
+                await service.VoteAsync(
+                    secondHost,
+                    submission.Id,
+                    RequestBoardTestActor.ForLogin("other"),
+                    CancellationToken.None
+                )
             )
             .ShouldBeOfType<RequestBoardRejection.NotFound>();
         _ = Rejection(
@@ -527,15 +552,31 @@ public sealed class RequestBoardServiceTests
         await ApproveAsync(service, hostId, second.Id, priority: 10);
         var votes = (
             await Task.WhenAll(
-                service.VoteAsync(hostId, first.Id, "voter", CancellationToken.None),
-                CreateService(database).VoteAsync(hostId, first.Id, "voter", CancellationToken.None)
+                service.VoteAsync(
+                    hostId,
+                    first.Id,
+                    RequestBoardTestActor.ForLogin("voter"),
+                    CancellationToken.None
+                ),
+                CreateService(database)
+                    .VoteAsync(
+                        hostId,
+                        first.Id,
+                        RequestBoardTestActor.ForLogin("voter"),
+                        CancellationToken.None
+                    )
             )
         )
             .Select(Success)
             .ToArray();
         var voteRetry = votes.Single(value => value.WasIdempotent);
         var voteLimit = Rejection(
-            await service.VoteAsync(hostId, second.Id, "voter", CancellationToken.None)
+            await service.VoteAsync(
+                hostId,
+                second.Id,
+                RequestBoardTestActor.ForLogin("voter"),
+                CancellationToken.None
+            )
         );
 
         _ = cooldown.ShouldBeOfType<RequestBoardRejection.Cooldown>();
@@ -620,7 +661,7 @@ public sealed class RequestBoardServiceTests
     ) =>
         new SubmitRequestCommand(
             operationId,
-            login,
+            RequestBoardTestActor.ForLogin(login),
             title,
             "Games",
             ["community"],

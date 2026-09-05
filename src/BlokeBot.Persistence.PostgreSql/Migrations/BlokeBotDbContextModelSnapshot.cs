@@ -8023,6 +8023,10 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("SubmitterTwitchUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("Tags")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -8049,6 +8053,8 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.HasIndex("HostId", "OperationId")
                         .IsUnique();
+
+                    b.HasIndex("HostId", "BoardId", "SubmitterTwitchUserId");
 
                     b.HasIndex("HostId", "SubmitterLogin", "PointReservationState");
 
@@ -8110,9 +8116,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("VoterTwitchUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("SubmissionId", "VoterLogin")
+                    b.HasIndex("SubmissionId", "VoterTwitchUserId")
                         .IsUnique();
 
                     b.ToTable("request_submission_votes", (string)null);
