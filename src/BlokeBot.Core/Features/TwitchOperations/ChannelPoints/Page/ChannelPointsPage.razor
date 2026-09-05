@@ -21,7 +21,7 @@
 
     @if (LoadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Rewards could not load" Description="Try again. Your rewards and viewer requests have not changed.">
+        <PageState Kind="PageStateKind.Failure" Title="Rewards could not load" >
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }

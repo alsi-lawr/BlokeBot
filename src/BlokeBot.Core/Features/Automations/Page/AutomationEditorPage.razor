@@ -24,22 +24,19 @@
 
 <DashboardPage Kicker="Automation"
                Title="Visual automations"
-               Description="Connect events, data, conditions, and actions. Validate the flow before you enable it."
                Width="DashboardPageWidth.Wide"
                data-automation-editor-page>
     @if (_loadFailed)
     {
         <PageState Kind="PageStateKind.Failure"
-                   Title="BlokeBot cannot load automations"
-                   Description="Your saved flows and run history did not change.">
+                   Title="BlokeBot cannot load automations">
             <Actions><button class="btn-primary" type="button" @onclick="LoadAsync"><AutomationIcon Name="history" />Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
     {
         <PageState Kind="PageStateKind.Loading"
-                   Title="Loading visual automations"
-                   Description="BlokeBot loads the flows and the node library." />
+                   Title="Loading visual automations" />
     }
     else if (Host is null)
     {
@@ -50,8 +47,7 @@
     else if (!_featureEnabled)
     {
         <PageState Kind="PageStateKind.Unavailable"
-                   Title="Automations are off"
-                   Description="Saved flows and run history remain. Turn on Automations to edit, validate, test, or enable a flow.">
+                   Title="Automations are off">
             <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
         </PageState>
         @if (!_recentRuns.IsEmpty)
@@ -91,7 +87,6 @@
             <section class="automation-empty card">
                 <span class="automation-empty-icon" aria-hidden="true">⌘</span>
                 <h2>Create your first visual automation</h2>
-                <p>Add a trigger. Then, connect an action and validate the flow.</p>
                 <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" />Create flow</button>
             </section>
         }

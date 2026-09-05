@@ -70,7 +70,6 @@
                                     {
                                         <a class="mt-1 inline-flex font-semibold text-blue-700" href="/host">Open Channel setup</a>
                                     }
-                                    <p class="mt-1 text-xs text-slate-500">Twitch announcements use the selected reply; every reply message must be no longer than 500 characters.</p>
                                 </div>
                             }
                             <div class="studio-span-6 space-y-2">
@@ -172,8 +171,6 @@
                                     </div>
                                 </CollapsibleSection>
                             </div>
-                            <p id="@($"announcement-{Announcement.Id}-delivery-timing-help")"
-                               class="studio-span-12 text-xs font-medium text-slate-500">These timings apply only when a scheduled send cannot happen.</p>
                             <div class="studio-span-12" data-announcement-secondary="delivery-history">
                                 <CollapsibleSection ContentId="custom-announcement-delivery-history"
                                                     Title="Delivery history"
@@ -231,8 +228,7 @@
                 Announcement.Id,
                 CustomCommandValidationFieldKind.RetryDelay
             )
-        )
-        >= Context.Validation.FocusRequest(
+        )>= Context.Validation.FocusRequest(
             CustomCommandEditorIds.AnnouncementTarget(
                 Announcement.Id,
                 CustomCommandValidationFieldKind.OccurrenceLifetime

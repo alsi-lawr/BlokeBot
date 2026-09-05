@@ -31,7 +31,7 @@
     {
         <ApplicationCardCollection Owner="dashboard-page-cards">
             <div class="card p-8 text-sm text-muted-foreground">
-                Play with viewers is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved queues and entries are retained.
+                Play with viewers is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
             </div>
         </ApplicationCardCollection>
     }
@@ -44,7 +44,6 @@
                             type="button"
                             data-action="new-queue"
                             disabled="@_isCreating"
-                            aria-describedby="@(_isCreating ? "queue-create-guidance" : null)"
                             @onclick="NewQueue">+ New queue</button>
                 </Footer>
             </StudioRail>
@@ -84,12 +83,6 @@
                      role="@(_moderatorPage is null ? null : "tabpanel")"
                      aria-labelledby="@(_moderatorPage is null ? null : SegmentedTabs.TabId(_paneTabsId, _paneKey))"
                      tabindex="@(_moderatorPage is null ? null : "0")">
-                    @if (_isCreating)
-                    {
-                        <p id="queue-create-guidance" class="text-sm text-muted-foreground">
-                            Complete the queue details, then select Create queue. The viewer-page link is available after creation.
-                        </p>
-                    }
                     @if (!string.IsNullOrWhiteSpace(_feedback))
                     {
                         <p class="text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
@@ -140,9 +133,6 @@
                                                 disabled="@(string.IsNullOrWhiteSpace(_lobbyCode) || moderation.CurrentParty.Count == 0)"
                                                 @onclick="DeliverLobbyAsync">Whisper party</button>
                                     </div>
-                                    <div class="studio-span-12">
-                                        <p class="text-xs text-muted-foreground">Sent as private Twitch whispers to the selected party only, never posted in chat. You are told exactly who could not be reached.</p>
-                                    </div>
                                 </div>
                             </article>
 
@@ -155,7 +145,6 @@
                                     <span class="flex-1"></span>
                                     <button class="btn-secondary" type="button" @onclick="ToggleOpenAsync">@(moderation.Queue.IsOpen ? "Close queue" : "Open queue")</button>
                                 </div>
-                                <p class="mt-1 mb-3 text-sm text-muted-foreground">@FairOrderProse(moderation.Queue.SelectionMode)</p>
                                 <div class="grid gap-[0.55rem]">
                                     @foreach (var entry in moderation.Waiting)
                                     {
@@ -233,7 +222,6 @@
                                 </div>
                                 <div class="studio-span-12">
                                     <StudioChatPreview Lines="ChatPreviewLines()" />
-                                    <p class="mt-1 text-xs text-muted-foreground">There is also a sign-in viewer page at <span class="font-mono">@_viewerPagePath</span> with a join form, live waiting list and current party, plus <span class="font-mono">!queue</span>, <span class="font-mono">!leave</span> and <span class="font-mono">!ready</span> in chat.</p>
                                 </div>
                             </div>
                         </StudioStage>
@@ -289,7 +277,6 @@
                                                @onkeydown="AddRoleOnEnter"
                                                @onblur="AddRole" />
                                     </div>
-                                    <p class="mt-1 text-xs text-muted-foreground">Best effort: the picker aims for these counts using the role answer below. Type a role, or <span class="font-mono">role=2</span> for more than one seat. Viewers who leave role blank stay eligible.</p>
                                 </div>
                             </div>
                         </StudioStage>
@@ -301,8 +288,7 @@
                                      Open="@_openStages.IsOpen(PlayQueueStage.Questions)"
                                      OpenChanged="@(open => _openStages.Set(PlayQueueStage.Questions, open))">
                             <p id="queue-field-limit" class="mb-3 text-xs text-muted-foreground">
-                                Every answer is optional and appears on the viewer page and Viewer Queue overlay.
-                                <b>@_draft.Fields.Count of @PlayQueueLimits.MaximumFields</b> questions used. Remove them all and viewers just join with their name.
+                                <b>@_draft.Fields.Count of @PlayQueueLimits.MaximumFields</b> questions used.
                                 @if (_draft.Fields.Count >= PlayQueueLimits.MaximumFields)
                                 {
                                     <span>Maximum of @PlayQueueLimits.MaximumFields questions reached.</span>
@@ -342,14 +328,12 @@
                                         <div class="studio-grid">
                                             <div class="studio-span-8">
                                                 <Field Id="@($"queue-field-label-{field.Identity:N}")" Label="Question" @bind-Value="field.Label" />
-                                                <p class="mt-1 text-xs text-muted-foreground">What viewers see next to the answer box.</p>
                                             </div>
                                             <div class="studio-span-4">
                                                 <Field Id="@($"queue-field-key-{field.Identity:N}")"
                                                        Label="Short name"
                                                        FocusRequest="@FieldFocusRequest(field)"
                                                        @bind-Value="field.Key" />
-                                                <p class="mt-1 text-xs text-muted-foreground">Used in chat: <span class="font-mono">@(KeyOrExample(field))=…</span></p>
                                             </div>
                                             <div class="studio-span-12 space-y-2">
                                                 <label class="label" for="@($"queue-field-choices-{field.Identity:N}")">
@@ -383,7 +367,7 @@
                                 <p class="mb-2 text-[0.72rem] font-bold tracking-[0.07em] uppercase text-[var(--app-text-muted)]">The viewer join form</p>
                                 @if (_draft.Fields.Count == 0)
                                 {
-                                    <p class="text-sm text-muted-foreground">No questions. Viewers just join with their name.</p>
+                                    <p class="text-sm text-muted-foreground">No questions.</p>
                                 }
                                 else
                                 {
@@ -409,15 +393,12 @@
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="queue-ready-expiry" Label="Time to answer a ready check (seconds)" @bind-Value="_draft.ReadinessTimeout" />
-                                    <p class="mt-1 text-xs text-muted-foreground">After this, the viewer counts as a no-show.</p>
                                 </div>
                                 <div class="studio-span-4">
                                     <Field Id="queue-exclusion" Label="Sit-out after skip or no-show (minutes)" @bind-Value="_draft.SkipExclusion" />
-                                    <p class="mt-1 text-xs text-muted-foreground">They cannot rejoin until it passes.</p>
                                 </div>
                                 <div class="studio-span-4">
                                     <Field Id="queue-history" Label="Keep play history (days)" @bind-Value="_draft.HistoryRetention" />
-                                    <p class="mt-1 text-xs text-muted-foreground">Powers “least recently played” fairness.</p>
                                 </div>
                                 <div class="studio-span-12 flex flex-wrap items-center gap-3">
                                     <button type="button"
@@ -428,7 +409,6 @@
                                             aria-label="Show participant names publicly"
                                             @onclick="() => _draft.ShowNames = !_draft.ShowNames"></button>
                                     <span class="text-sm font-semibold text-[var(--app-text-strong)]">Show participant names publicly</span>
-                                    <span class="text-xs text-muted-foreground">Off means the viewer page and overlay show positions and answers, not names.</span>
                                 </div>
                             </div>
                         </StudioStage>

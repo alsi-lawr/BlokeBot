@@ -32,7 +32,7 @@
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground" data-raid-disabled>
-                    Cooperative game is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved configuration, campaigns, contributions, and history are retained; re-enabling resumes the current campaign without repeating missed commands, guessing results, resets, rewards, or events.
+                    Cooperative game is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
                 </div>
             </ApplicationCardCollection>
         }
@@ -86,7 +86,6 @@
                                 <h2>Campaign control</h2>
                                 <dl><div><dt>Status</dt><dd><span class="status-pill status-pill--emerald"><span class="status-pill__dot"></span><span class="status-pill__label">Active</span></span></dd></div><div><dt>Ends</dt><dd>@campaign.EndsAtUtc.ToString("ddd d MMM · HH:mm") UTC</dd></div><div><dt>Reset policy</dt><dd>@ResetSummary()</dd></div><div><dt>Victory reward</dt><dd>@campaign.VictoryPointReward.ToDisplayString() points each</dd></div></dl>
                                 <div class="raid-control__actions"><button class="btn-danger" type="button" @onclick="EndAsync">End campaign</button><button class="btn-secondary" type="button" @onclick="ResetAsync">Reset now</button></div>
-                                <p>Lifecycle controls act immediately and are never sticky. Reset starts a fresh recorded campaign without deleting history.</p>
                             </aside>
                         </section>
 
@@ -97,12 +96,12 @@
                     }
                     else
                     {
-                        <section class="card raid-empty-campaign"><div><span class="raid-boss__icon" aria-hidden="true">♜</span><div><h2>No active boss</h2><p>Start one host-scoped BlokeRaid campaign from the saved configuration.</p></div></div><button class="btn-primary" type="button" @onclick="StartAsync">Start campaign</button></section>
+                        <section class="card raid-empty-campaign"><div><span class="raid-boss__icon" aria-hidden="true">♜</span><div><h2>No active boss</h2></div></div><button class="btn-primary" type="button" @onclick="StartAsync">Start campaign</button></section>
                     }
 
                     @if (_view.History.Count > 0)
                     {
-                        <details class="card raid-recaps" open><summary><div><h2>Completed campaign recap</h2><p>Victory, expiry, ended and reset campaigns stay reviewable after restart.</p></div><span aria-hidden="true">›</span></summary><div class="raid-recaps__body">@foreach (var recap in _view.History.Take(8)){<article><div><strong>@recap.BossName</strong><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span></div><p>@recap.Contributions.Count contributors · @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage · @recap.StartedAtUtc.ToString("d MMM")–@(recap.CompletedAtUtc?.ToString("d MMM yyyy") ?? "current")</p></article>}</div></details>
+                        <details class="card raid-recaps" open><summary><div><h2>Completed campaign recap</h2></div><span aria-hidden="true">›</span></summary><div class="raid-recaps__body">@foreach (var recap in _view.History.Take(8)){<article><div><strong>@recap.BossName</strong><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span></div><p>@recap.Contributions.Count contributors · @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage · @recap.StartedAtUtc.ToString("d MMM")–@(recap.CompletedAtUtc?.ToString("d MMM yyyy") ?? "current")</p></article>}</div></details>
                     }
                 }
                 else
@@ -113,7 +112,6 @@
                                 <span class="raid-section__step" aria-hidden="true">1</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Campaign basics</h2>
-                                    <p class="raid-section__description">Name the boss and set the campaign limits.</p>
                                 </div>
                             </header>
                             <div class="raid-section__body">
@@ -142,10 +140,8 @@
                                     </div>
                                     <div class="raid-field">
                                         <Field Id="raid-victory-reward" Label="Victory reward" @bind-Value="_editor.VictoryPointReward" />
-                                        <p class="form-help">Points granted to every contributor when the boss falls.</p>
                                     </div>
                                 </div>
-                                <p class="raid-section__note">A campaign copies the boss name, health, ward, duration and victory reward when it starts, so these edits reach the next campaign.</p>
                             </div>
                         </section>
 
@@ -154,7 +150,6 @@
                                 <span class="raid-section__step" aria-hidden="true">2</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Viewer actions</h2>
-                                    <p class="raid-section__description">Damage, cooldown and per-stream limits.</p>
                                 </div>
                             </header>
                             <div class="raid-section__body">
@@ -245,12 +240,10 @@
                                     <div class="raid-field">
                                         <div class="field">
                                             <label class="field__label" for="raid-guess-damage">Damage per correct guess</label>
-                                            <input id="raid-guess-damage" class="field__input" type="number" min="1" aria-describedby="raid-guess-damage-hint" @bind="_editor.CorrectGuessDamage" />
+                                            <input id="raid-guess-damage" class="field__input" type="number" min="1" @bind="_editor.CorrectGuessDamage" />
                                         </div>
-                                        <p id="raid-guess-damage-hint" class="form-help">Every viewer who guesses correctly in a guessing round strikes the boss for this much.</p>
                                     </div>
                                 </div>
-                                <p class="raid-section__note">Saved action rules apply from the next chat action. Recorded outcomes keep the values they were resolved with.</p>
                             </div>
                         </section>
 
@@ -259,7 +252,6 @@
                                 <span class="raid-section__step" aria-hidden="true">3</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Phases and messages</h2>
-                                    <p class="raid-section__description">Pair each threshold with the message chat sees.</p>
                                 </div>
                             </header>
                             <div class="raid-section__body">
@@ -269,7 +261,6 @@
                                             <h3>Phase 1</h3>
                                             <span class="status-pill status-pill--green"><span class="status-pill__label">@PhaseOneBand()</span></span>
                                         </header>
-                                        <p class="raid-rule-card__hint">A campaign opens in phase 1 at full boss health.</p>
                                         <TextAreaField Id="raid-phase-one-response" Label="Phase 1 response" @bind-Value="_editor.PhaseOneResponse" />
                                     </article>
 
@@ -302,18 +293,15 @@
                                         <header class="raid-rule-card__head">
                                             <h3>Victory</h3>
                                         </header>
-                                        <p class="raid-rule-card__hint">Sent once the boss reaches zero health and every contributor is paid the victory reward.</p>
                                         <TextAreaField Id="raid-victory-response" Label="Victory response" @bind-Value="_editor.VictoryResponse" />
                                     </article>
                                     <article class="raid-rule-card">
                                         <header class="raid-rule-card__head">
                                             <h3>Expiry</h3>
                                         </header>
-                                        <p class="raid-rule-card__hint">Sent when the campaign reaches its end time with the boss still standing.</p>
                                         <TextAreaField Id="raid-expiry-response" Label="Expiry response" @bind-Value="_editor.ExpiryResponse" />
                                     </article>
                                 </div>
-                                <p class="raid-section__note">Phase thresholds read from the saved configuration on every action, and a campaign only ever moves forward through the phases.</p>
                             </div>
                         </section>
 
@@ -322,7 +310,6 @@
                                 <span class="raid-section__step" aria-hidden="true">4</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Reset schedule</h2>
-                                    <p class="raid-section__description">Choose when a fresh campaign can begin.</p>
                                 </div>
                             </header>
                             <div class="raid-section__body">
@@ -364,7 +351,6 @@
                                         </div>
                                     </div>
                                 }
-                                <p class="raid-section__note">Every completed campaign stays in the recap with its contributions and recorded outcomes.</p>
                             </div>
                         </section>
 

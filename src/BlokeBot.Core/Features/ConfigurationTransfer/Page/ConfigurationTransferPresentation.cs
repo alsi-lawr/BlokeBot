@@ -93,8 +93,7 @@ internal static class ConfigurationTransferPresentation
         {
             ConfigurationActivationStatus.Pending or ConfigurationActivationStatus.Processing =>
                 "The configuration is saved. Automatic feature activation is still running.",
-            ConfigurationActivationStatus.Complete =>
-                "Selected features are operational. Suppressed work was not replayed.",
+            ConfigurationActivationStatus.Complete => "Selected features are operational.",
             ConfigurationActivationStatus.Failed =>
                 "The configuration remains saved. Retry only automatic feature activation.",
             ConfigurationActivationStatus.ManualFollowUp =>

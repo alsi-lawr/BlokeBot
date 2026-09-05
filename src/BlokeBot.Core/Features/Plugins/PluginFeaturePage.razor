@@ -26,7 +26,7 @@
         }
         else if (_embeddedUrl is not null)
         {
-            <TaskPanel Title="Plugin content" Description="This page is kept inside a contained frame. Plugin pages are trusted extensions, not a security sandbox.">
+            <TaskPanel Title="Plugin content" >
                 <iframe @ref="_iframe"
                         class="min-h-[34rem] w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)]"
                         title="@_title"

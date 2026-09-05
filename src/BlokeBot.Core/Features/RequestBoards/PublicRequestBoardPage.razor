@@ -27,7 +27,7 @@
         <ApplicationCardCollection Owner="public-request-page-cards">
         <section class="card p-5" aria-labelledby="request-board-rules">
             <h2 id="request-board-rules" class="text-lg font-semibold text-slate-950">Board rules</h2>
-            <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                     <dt class="font-semibold text-slate-950">Submissions</dt>
                     <dd class="text-muted-foreground">@(_page.Board.IsOpen ? "Open" : "Closed") · @_page.Board.SubmissionLimitPerUser active per viewer</dd>
@@ -39,10 +39,6 @@
                 <div>
                     <dt class="font-semibold text-slate-950">Voting</dt>
                     <dd class="text-muted-foreground">@(_page.Board.VotingEnabled ? $"Up to {_page.Board.VoteLimitPerUser} votes per viewer" : "Voting is off")</dd>
-                </div>
-                <div>
-                    <dt class="font-semibold text-slate-950">Queue order</dt>
-                    <dd class="text-muted-foreground">@_page.Board.OrderingDescription</dd>
                 </div>
             </dl>
         </section>

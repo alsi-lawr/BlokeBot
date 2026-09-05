@@ -239,13 +239,6 @@
         font-weight: 700;
     }
 
-    .passport-attendance__copy {
-        color: var(--app-text-muted);
-        display: block;
-        font-size: 0.75rem;
-        line-height: 1.4;
-    }
-
     .passport-data-actions {
         display: flex;
         flex-wrap: wrap;
@@ -379,16 +372,6 @@
         color: var(--app-text-muted);
         font-size: 0.7rem;
         line-height: 1.4;
-    }
-
-    .passport-preview__notice {
-        background: var(--tone-amber-bg);
-        border-radius: 0.55rem;
-        color: var(--tone-amber-fg);
-        font-size: 0.72rem;
-        line-height: 1.4;
-        margin-top: 0.75rem;
-        padding: 0.65rem;
     }
 
     @media (max-width: 64rem) {

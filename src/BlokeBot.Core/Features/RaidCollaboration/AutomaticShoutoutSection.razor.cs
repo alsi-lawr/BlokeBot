@@ -44,7 +44,6 @@ public partial class AutomaticShoutoutSection
     ];
 
     private int _retainedPinDurationSeconds = 300;
-    private bool _previewUsesFallback;
     private int? _authoredCharacters;
     private string? _previewError;
     private string? _preview;
@@ -78,26 +77,6 @@ public partial class AutomaticShoutoutSection
             PersistedAnnouncementColor.Orange => "Orange",
             PersistedAnnouncementColor.Purple => "Purple",
             _ => throw new UnreachableException("Unknown Twitch announcement color."),
-        };
-
-    private string _readinessText =>
-        Value.Enabled switch
-        {
-            false =>
-                "Off. Your settings are saved, but incoming raids will not trigger a shoutout.",
-            true => Value.Mechanism switch
-            {
-                AutomaticRaidShoutoutMechanism.Native =>
-                    "Keep the bot account connected to Twitch. If Twitch’s shoutout cooldown is still active, this raid is skipped rather than sent as a chat message.",
-                _ => Value.ChatPresentation switch
-                {
-                    AutomaticRaidChatPresentation.Announcement =>
-                        "Keep public chat connected and allow the bot to send announcements. If the announcement fails, BlokeBot does not send a regular message instead.",
-                    AutomaticRaidChatPresentation.Pinned =>
-                        "Keep public chat connected and allow the bot to pin messages. The message may appear even if Twitch cannot pin it afterwards.",
-                    _ => "Keep public chat connected so BlokeBot can send the message once.",
-                },
-            },
         };
 
     protected override void OnParametersSet()
@@ -189,7 +168,6 @@ public partial class AutomaticShoutoutSection
     {
         _preview = null;
         _previewError = null;
-        _previewUsesFallback = false;
         _authoredCharacters = null;
         if (Value.Mechanism != AutomaticRaidShoutoutMechanism.Chat)
         {
@@ -207,9 +185,6 @@ public partial class AutomaticShoutoutSection
                 {
                     case AutomaticRaidTemplateRenderOutcome.Rendered rendered:
                         _preview = rendered.Message;
-                        _previewUsesFallback =
-                            Value.MessageTemplate.Contains("{last_game|", StringComparison.Ordinal)
-                            && !string.IsNullOrWhiteSpace(rendered.Message);
                         break;
                     case AutomaticRaidTemplateRenderOutcome.TooLong tooLong:
                         _previewError =

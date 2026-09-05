@@ -69,7 +69,7 @@ public partial class HostConfigPage
                     await LoadCoreAsync();
                     _ = _toasts.Publish(
                         ToastRequest<PositiveStatusToastStrategy>.WithTitle(
-                            "The change will apply the next time the bot joins or reconnects. The active bot was not restarted.",
+                            "Startup message saved.",
                             "Startup message saved"
                         )
                     );

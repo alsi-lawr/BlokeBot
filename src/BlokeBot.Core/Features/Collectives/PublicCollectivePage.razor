@@ -11,7 +11,6 @@
 
 <DashboardPage Kicker="Community"
                Title="@(_projection?.Name ?? "Collective")"
-               Description="Bounded shared tournament, relay, and goal state from explicitly participating hosts."
                Width="DashboardPageWidth.Wide"
                data-public-collective-page="true">
     <ChildContent>
@@ -21,7 +20,7 @@
         }
         else
         {
-            <section class="collective-public-summary"><span>Explicit participating hosts</span><strong>@string.Join(" · ", _projection.ParticipatingHosts)</strong><small>Server-owned allowlist · no implied Twitch trust</small></section>
+            <section class="collective-public-summary"><span>Explicit participating hosts</span><strong>@string.Join(" · ", _projection.ParticipatingHosts)</strong></section>
             <div class="collective-public-grid">
                 @if (_projection.Tournament is { } tournament)
                 {

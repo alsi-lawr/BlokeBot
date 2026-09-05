@@ -10,8 +10,7 @@
 
 <div class="mx-auto max-w-6xl space-y-6" data-public-bingo>
     <PageHeader Kicker="Community progression"
-                Title="@(_view is null ? "Stream-event Bingo" : $"@{_view.HostLogin} Bingo")"
-                Description="Live cards, public evidence, wins, and archived games. Private moderator notes are never published." />
+                Title="@(_view is null ? "Stream-event Bingo" : $"@{_view.HostLogin} Bingo")" />
 
     @if (!_loaded)
     {
@@ -54,12 +53,10 @@
                             <div class="live-round-summary__metric">
                                 <p class="live-round-summary__label">Revision</p>
                                 <p class="live-round-summary__value">rev @live.TemplateRevision</p>
-                                <p class="live-round-summary__detail">frozen at issue</p>
                             </div>
                             <div class="live-round-summary__metric">
                                 <p class="live-round-summary__label">Seed</p>
                                 <p class="live-round-summary__value font-mono">@live.Seed</p>
-                                <p class="live-round-summary__detail">recorded</p>
                             </div>
                             <div class="live-round-summary__metric">
                                 <p class="live-round-summary__label">Wins</p>
@@ -102,7 +99,6 @@
                                  OpenChanged="value => SetOpen(_archiveKey, value)">
                     <Header>
                         <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Archive</h2>
-                        <p class="text-sm text-muted-foreground">Completed games with their final cards, wins, and evidence.</p>
                     </Header>
                     <ChildContent>
                         @foreach (var game in _view.Archive)

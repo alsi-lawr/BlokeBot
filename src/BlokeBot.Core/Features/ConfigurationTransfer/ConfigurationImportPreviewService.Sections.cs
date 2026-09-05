@@ -88,7 +88,7 @@ public sealed partial class ConfigurationImportPreviewService
                     .. preview.Issues,
                     new(
                         $"sections.{CanonicalId(selection.Section)}",
-                        $"{FeatureName(feature)} is off for this channel. Enable {FeatureName(feature)} in Channel setup before the imported configuration can be used. Importing configuration will not enable it.",
+                        $"{FeatureName(feature)} is off for this channel. Enable {FeatureName(feature)} in Channel setup before the imported configuration can be used.",
                         BlocksApply: false
                     ),
                 ],

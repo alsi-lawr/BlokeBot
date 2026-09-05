@@ -12,7 +12,6 @@
 
 <DashboardPage Kicker="Community"
                Title="Collectives"
-               Description="Coordinate bounded shared work across hosts who explicitly choose to participate."
                Width="DashboardPageWidth.Wide"
                data-collectives-page="true">
     <Actions>
@@ -35,12 +34,7 @@
                 <div class="collective-disabled__icon" aria-hidden="true">Ⅱ</div>
                 <div>
                     <h2>Collectives is off for @Host.DisplayName</h2>
-                    <p>This signed-in direct route is retained so you can recover the feature. Turn on the single <strong>Collectives</strong> switch in Channel setup; there is no separate switch on this page.</p>
                     <div class="collective-disabled__actions"><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></div>
-                    <div class="collective-disabled__retained">
-                        <div><strong>Saved state stays intact</strong><span>Collectives, membership consent, workflow configuration, bounded history, and audits remain retained.</span></div>
-                        <div><strong>Nothing missed is repeated</strong><span>Re-enable resumes the retained state. Missed invitations, events, timers, retries, relays, and Twitch actions are never repeated.</span></div>
-                    </div>
                 </div>
             </section>
         }
@@ -62,10 +56,10 @@
             {
                 var selected = _selected;
                 <section class="collective-summary" aria-label="Collective summary">
-                    <label><span>Collective</span><select class="collective-summary__select" value="@selected.Id.Value" @onchange="SelectCollectiveAsync">@foreach (var item in _workspace.Collectives){<option value="@item.Id.Value">@item.Name</option>}</select><small>This BlokeBot server · explicit hosts only</small></label>
+                    <label><span>Collective</span><select class="collective-summary__select" value="@selected.Id.Value" @onchange="SelectCollectiveAsync">@foreach (var item in _workspace.Collectives){<option value="@item.Id.Value">@item.Name</option>}</select></label>
                     <div><span>Membership</span><strong>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Active) participating</strong><small>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Pending) invitation awaiting host</small></div>
-                    <div><span>Your authority</span><strong>@Host.DisplayName</strong><small>Manage this host only</small></div>
-                    <div><span>Shared activity</span><strong>@WorkflowCount(selected) workflows</strong><small>Shared summaries only</small></div>
+                    <div><span>Your authority</span><strong>@Host.DisplayName</strong></div>
+                    <div><span>Shared activity</span><strong>@WorkflowCount(selected) workflows</strong></div>
                 </section>
 
                 <SegmentedTabs Id="@_workspaceTabsId"
@@ -77,13 +71,13 @@
 
                 <section class="collective-workspace" data-collective-workspace>
                     <aside class="collective-members" aria-label="Participating hosts">
-                        <header><div><h2>Participating hosts</h2><p>Consent and authority</p></div><button class="btn-secondary" type="button" aria-label="Invite host" @onclick="ShowInvite">+</button></header>
+                        <header><div><h2>Participating hosts</h2></div><button class="btn-secondary" type="button" aria-label="Invite host" @onclick="ShowInvite">+</button></header>
                         <div class="collective-members__list">
                             @foreach (var member in selected.Members)
                             {
                                 <article class="collective-member @(member.HostId == HostId ? "collective-member--selected" : null)" @key="member.HostId">
                                     <span class="collective-avatar" aria-hidden="true">@Initials(member.DisplayName)</span>
-                                    <div><strong>@member.DisplayName</strong><span>@MembershipLabel(member)</span><small>@(member.CanActForHost ? "You can act for this host" : "Own authority retained")</small></div>
+                                    <div><strong>@member.DisplayName</strong><span>@MembershipLabel(member)</span><small>@(member.CanActForHost ? "You can act for this host" : "Read-only")</small></div>
                                     @if (member.HostId == HostId && member.Status == CollectiveMembershipStatus.Pending)
                                     {
                                         <div class="collective-member__actions"><button class="btn-secondary" type="button" @onclick="AcceptAsync">Accept</button><button class="btn-secondary" type="button" @onclick="DeclineAsync">Decline</button></div>
@@ -103,11 +97,10 @@
                                 </article>
                             }
                         </div>
-                        <p class="collective-members__note">Membership is an explicit server-owned allowlist. Twitch relationships never imply trust.</p>
                     </aside>
 
                     <section id="@SegmentedTabs.PanelId(_workspaceTabsId, _workflow)" class="collective-stage" role="tabpanel" aria-labelledby="@SegmentedTabs.TabId(_workspaceTabsId, _workflow)">
-                        <header><div><h2>@_workflowTitle</h2><p>@_workflowSubtitle</p></div><div class="collective-stage__actions">@if (_workflow == "tournament" && selected.Tournament is not null){<a class="collective-quiet-link" href="/competitions">Open tournament ↗</a>}else if (_workflow == "raid"){<a class="collective-quiet-link" href="/raid-collaboration">Open raid hub ↗</a>}else if (_workflow == "goal"){<a class="collective-quiet-link" href="@PublicUrl(selected.Id)" target="_blank" rel="noopener">Open public summary ↗</a>}@if(selected.CanCoordinate){<button class="btn-secondary" type="button" @onclick="ShowWorkflowEditor">Edit</button>}</div></header>
+                        <header><div><h2>@_workflowTitle</h2></div><div class="collective-stage__actions">@if (_workflow == "tournament" && selected.Tournament is not null){<a class="collective-quiet-link" href="/competitions">Open tournament ↗</a>}else if (_workflow == "raid"){<a class="collective-quiet-link" href="/raid-collaboration">Open raid hub ↗</a>}else if (_workflow == "goal"){<a class="collective-quiet-link" href="@PublicUrl(selected.Id)" target="_blank" rel="noopener">Open public summary ↗</a>}@if(selected.CanCoordinate){<button class="btn-secondary" type="button" @onclick="ShowWorkflowEditor">Edit</button>}</div></header>
                         <div class="collective-stage__body">
                             @if (_showWorkflowEditor)
                             {
@@ -130,16 +123,14 @@
                                         <label><span>Target</span><input class="input" type="number" min="1" @bind="_goalTarget" /></label>
                                         <label><span>Deadline (UTC)</span><input class="input" type="datetime-local" @bind="_goalDeadlineUtc" /></label>
                                     }
-                                    <p>Workflow definitions are collective-scoped. Private host source mappings and Twitch access are not edited here.</p>
                                     <div class="collective-workflow-editor__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="SaveWorkflowAsync">Save workflow</button></div>
                                 </section>
                             }
-                            <div class="collective-boundary"><span aria-hidden="true">◇</span><p><strong>Shared boundary.</strong> Participating hosts receive only this workflow’s shared summary and events. Private lobby details, source mappings, Twitch access, moderator notes, rewards, and viewer data stay with their owning host.</p></div>
                             @if (_workflow == "tournament")
                             {
                                 @if (selected.Tournament is { } tournament)
                                 {
-                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@tournament.Name</h3><p>Owned by @tournament.OwnerLogin · shared reference <code>@ShortId(tournament.CompetitionPublicId)</code></p></div><span class="status-pill"><span class="status-pill__dot"></span>@tournament.Status</span></div><div class="collective-metrics"><div><span>Format</span><strong>@tournament.Format.Label()</strong><small>@tournament.EntrantCount entrants</small></div><div><span>Round</span><strong>@tournament.Round</strong><small>@tournament.ConfirmedResultCount results confirmed</small></div><div><span>Participants</span><strong>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Active) hosts</strong><small>Read-only summary</small></div></div><div class="collective-events"><div><span>✓</span><p><strong>Reference updated from the current tournament</strong><small>The reference changed; no host-owned competition state was copied.</small></p><time>@Relative(tournament.UpdatedAtUtc)</time></div></div></article>
+                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@tournament.Name</h3><p>Owned by @tournament.OwnerLogin · shared reference <code>@ShortId(tournament.CompetitionPublicId)</code></p></div><span class="status-pill"><span class="status-pill__dot"></span>@tournament.Status</span></div><div class="collective-metrics"><div><span>Format</span><strong>@tournament.Format.Label()</strong><small>@tournament.EntrantCount entrants</small></div><div><span>Round</span><strong>@tournament.Round</strong><small>@tournament.ConfirmedResultCount results confirmed</small></div><div><span>Participants</span><strong>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Active) hosts</strong></div></div><div class="collective-events"><div><span>✓</span><p><strong>Reference updated from the current tournament</strong></p><time>@Relative(tournament.UpdatedAtUtc)</time></div></div></article>
                                 }
                                 else { <p class="collective-empty">No tournament reference is configured.</p> }
                             }
@@ -149,7 +140,7 @@
                                 {
                                     var pendingHost = selected.Members.FirstOrDefault(x => x.Status == CollectiveMembershipStatus.Pending);
                                     var latestHandoff = relay.History.FirstOrDefault();
-                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@relay.Name</h3><p>One hand-off at a time · each host confirms its own outgoing raid</p></div><span class="status-pill">@(relay.Status == CollectiveWorkflowStatus.Completed ? "✓ Complete" : "◷ Awaiting host")</span></div><div class="collective-relay">@if(latestHandoff is not null){<div><strong>1 · @latestHandoff.FromHostLogin</strong><span>Incoming raid received · @latestHandoff.AggregateViewerCount aggregate viewers</span></div>}<div><strong>2 · @relay.CurrentHostLogin</strong><span>Accepted relay state · ready for its own confirmation</span></div>@if(relay.NextHostLogin is { } next){<div><strong>3 · @next</strong><span>Ready for its own confirmation</span></div>}else if(pendingHost is not null){<div class="collective-relay__pending"><strong>3 · @pendingHost.DisplayName</strong><span>Invitation not accepted · excluded from relay</span></div>}</div><div class="collective-metrics"><div><span>Current host</span><strong>@relay.CurrentHostLogin</strong><small>Own authority</small></div><div><span>Bounded count</span><strong>@relay.AggregateViewerCount viewers</strong><small>No viewer identities</small></div><div><span>Next action</span><strong>Host confirms</strong><small>Never automatic</small></div></div>@if(relay.CurrentHostLogin == HostLogin && relay.NextHostLogin is not null){<button class="btn-primary" type="button" @onclick="ConfirmHandoffAsync">Confirm my outgoing raid</button>}<div class="collective-events">@foreach(var handoff in relay.History){<div><span>@(handoff.Status == CollectiveRaidHandoffStatus.Confirmed ? "✓" : "→")</span><p><strong>@handoff.FromHostLogin → @handoff.ToHostLogin</strong><small>@handoff.Status · operation @handoff.OperationReference</small></p><time>@Relative(handoff.OccurredAtUtc)</time></div>}</div></article>
+                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@relay.Name</h3></div><span class="status-pill">@(relay.Status == CollectiveWorkflowStatus.Completed ? "✓ Complete" : "◷ Awaiting host")</span></div><div class="collective-relay">@if(latestHandoff is not null){<div><strong>1 · @latestHandoff.FromHostLogin</strong><span>Incoming raid received · @latestHandoff.AggregateViewerCount aggregate viewers</span></div>}<div><strong>2 · @relay.CurrentHostLogin</strong><span>Accepted relay state · ready for its own confirmation</span></div>@if(relay.NextHostLogin is { } next){<div><strong>3 · @next</strong><span>Ready for its own confirmation</span></div>}else if(pendingHost is not null){<div class="collective-relay__pending"><strong>3 · @pendingHost.DisplayName</strong><span>Invitation not accepted · excluded from relay</span></div>}</div><div class="collective-metrics"><div><span>Current host</span><strong>@relay.CurrentHostLogin</strong></div><div><span>Bounded count</span><strong>@relay.AggregateViewerCount viewers</strong></div><div><span>Next action</span><strong>Host confirms</strong></div></div>@if(relay.CurrentHostLogin == HostLogin && relay.NextHostLogin is not null){<button class="btn-primary" type="button" @onclick="ConfirmHandoffAsync">Confirm my outgoing raid</button>}<div class="collective-events">@foreach(var handoff in relay.History){<div><span>@(handoff.Status == CollectiveRaidHandoffStatus.Confirmed ? "✓" : "→")</span><p><strong>@handoff.FromHostLogin → @handoff.ToHostLogin</strong><small>@handoff.Status · operation @handoff.OperationReference</small></p><time>@Relative(handoff.OccurredAtUtc)</time></div>}</div></article>
                                 }
                                 else { <p class="collective-empty">No raid relay is configured.</p> }
                             }
@@ -157,7 +148,7 @@
                             {
                                 @if (selected.Goal is { } goal)
                                 {
-                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@goal.Name</h3><p>Cross-channel goal · closes @goal.DeadlineUtc.ToString("dd MMM, HH:mm 'UTC'")</p></div><span class="status-pill"><span class="status-pill__dot"></span>@(goal.Status == CollectiveWorkflowStatus.Active ? "In progress" : "Complete")</span></div><div class="collective-metrics collective-metrics--goal"><div><span>Shared progress</span><strong>@goal.Current / @goal.Target @Plural(goal.UnitName, goal.Target)</strong><small>@Percent(goal.Current, goal.Target)% complete</small></div><div><span>Participating</span><strong>@goal.HostTotals.Count hosts</strong><small>Explicitly accepted</small></div></div><div class="collective-progress" role="progressbar" aria-label="Collective goal progress" aria-valuemin="0" aria-valuemax="@goal.Target" aria-valuenow="@goal.Current"><span style="@ProgressStyle(goal.Current, goal.Target)"></span></div><div class="collective-host-progress">@foreach(var total in goal.HostTotals){<div><strong>@total.HostDisplayName</strong><span>@total.Total @Plural(goal.UnitName, total.Total)</span></div>}</div><div class="collective-events"><div><span>＋</span><p><strong>Bounded member totals updated</strong><small>No contributor identity, reward, or private source mapping entered collective state.</small></p><time>current</time></div></div></article>
+                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@goal.Name</h3><p>Cross-channel goal · closes @goal.DeadlineUtc.ToString("dd MMM, HH:mm 'UTC'")</p></div><span class="status-pill"><span class="status-pill__dot"></span>@(goal.Status == CollectiveWorkflowStatus.Active ? "In progress" : "Complete")</span></div><div class="collective-metrics collective-metrics--goal"><div><span>Shared progress</span><strong>@goal.Current / @goal.Target @Plural(goal.UnitName, goal.Target)</strong><small>@Percent(goal.Current, goal.Target)% complete</small></div><div><span>Participating</span><strong>@goal.HostTotals.Count hosts</strong></div></div><div class="collective-progress" role="progressbar" aria-label="Collective goal progress" aria-valuemin="0" aria-valuemax="@goal.Target" aria-valuenow="@goal.Current"><span style="@ProgressStyle(goal.Current, goal.Target)"></span></div><div class="collective-host-progress">@foreach(var total in goal.HostTotals){<div><strong>@total.HostDisplayName</strong><span>@total.Total @Plural(goal.UnitName, total.Total)</span></div>}</div><div class="collective-events"><div><span>＋</span><p><strong>Bounded member totals updated</strong></p><time>current</time></div></div></article>
                                 }
                                 else { <p class="collective-empty">No shared goal is configured.</p> }
                             }
@@ -168,9 +159,6 @@
                         <header><div><h2>Details</h2><p>Context for @Host.DisplayName</p></div><span class="status-pill">Host-scoped</span></header>
                         <div class="collective-sidecar__body" data-sticky-save-scope>
                             <section class="collective-sidecar__authority">
-                                <span class="collective-sidecar__label">Authority</span>
-                                <h3>Only @Host.DisplayName can change these settings</h3>
-                                <div class="collective-private"><span aria-hidden="true">▣</span><div><strong>Private to this host</strong><p>@_privateDetail</p></div></div>
                                 <div class="collective-local-settings" data-collective-local-settings>
                                     <div class="collective-local-settings__head"><span class="collective-local-settings__icon" aria-hidden="true">⚙</span><div><h3>Local settings</h3><p>Settings for @Host.DisplayName.</p></div></div>
                                     @if (_workflow == "goal" && selected.Goal is not null)
@@ -187,7 +175,6 @@
                                     </div>
                                 </div>
                             </section>
-                            <section class="collective-sidecar__shared"><span class="collective-sidecar__label">Shared output</span><h3>@_sharedOutputTitle</h3><p>@_sharedOutputDetail</p></section>
                             <section class="collective-sidecar__audit"><span class="collective-sidecar__label">Recent audit</span><ul class="collective-audit">@foreach(var audit in selected.Audit.Take(4)){<li><strong>@AuditLabel(audit.Action)</strong><span>@audit.ActingHostLogin · @audit.OperationReference · @Relative(audit.OccurredAtUtc)</span></li>}</ul></section>
                             <StickySaveRegion Scope="StickySaveScope.Editor" Active="@_localSettingsChanged"><button class="btn-primary" type="button" disabled="@(!_localSettingsChanged)" @onclick="SaveLocalSettingsAsync">Save local settings</button></StickySaveRegion>
                         </div>
@@ -222,7 +209,6 @@
                         <label class="field__label" for="collective-invite-host">Known host</label>
                         <select id="collective-invite-host" class="field__input" @bind="_inviteHostId"><option value="0">Choose a host</option>@foreach (var host in _knownHosts){<option value="@host.HostId">@host.DisplayName</option>}</select>
                     </div>
-                    <p class="text-xs text-muted-foreground">The selected host must accept for itself. Twitch raids, follows, moderators, and relationships never add trust.</p>
                     <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="InviteAsync">Send invitation</button></div>
                 </section>
             }

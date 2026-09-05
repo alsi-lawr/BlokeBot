@@ -1,6 +1,5 @@
 @layer components {
-    .home-info-card,
-    .home-note {
+    .home-info-card {
         background: var(--app-surface);
         border: 1px solid var(--app-border);
         box-shadow: var(--app-shadow-sm);

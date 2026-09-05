@@ -50,7 +50,6 @@
                 <div class="studio-grid">
                     <div class="studio-span-6">
                         <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
-                        <p class="mt-1 text-xs text-muted-foreground">Used in every bot message via {label}. Blank falls back to "points".</p>
                     </div>
                     <div class="studio-span-12">
                         <StudioChatPreview Lines="BalancePreviewLines()" />
@@ -232,7 +231,6 @@
                             </div>
                         </div>
                     }
-                    <p class="studio-span-12 text-xs text-muted-foreground">Each command word can only be used once in this channel. Type a word and press Enter to add it.</p>
                 </div>
             </StudioStage>
 
@@ -242,10 +240,9 @@
                          Summary="@RepliesSummary()"
                          Open="@_openStages.IsOpen(PointsStage.Replies)"
                          OpenChanged="@(open => _openStages.Set(PointsStage.Replies, open))">
-                <p class="mb-3 text-xs text-muted-foreground">Every message the bot can send, grouped by what it is about. Open a row to change its wording or, where private delivery is possible, send it as a whisper instead.</p>
                 @if (!_config.WhisperResponsesEnabled)
                 {
-                    <p id="reply-delivery-whisper-recovery" class="mb-3 text-sm font-medium text-muted-foreground">Private replies need a connected custom bot. <a class="font-semibold text-primary underline" href="/host#custom-bot">Open Channel setup to connect one.</a></p>
+                    <p id="reply-delivery-whisper-recovery" class="mb-3 text-sm font-medium text-muted-foreground">Custom bot is not connected. <a class="font-semibold text-primary underline" href="/host#custom-bot">Open Channel setup to connect one.</a></p>
                 }
                 @foreach (var group in _replyGroups)
                 {

@@ -29,21 +29,20 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Play with viewers</p>
                 <h1 class="mt-2 text-3xl font-bold">@_page.Queue.Name</h1>
                 <p class="mt-2 text-muted-foreground">@_page.Queue.ActivityName · @(_page.Queue.IsOpen ? "Open" : "Closed")</p>
-                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                     <div><dt class="font-semibold">Waiting</dt><dd>@_page.Waiting.Count</dd></div>
                     <div><dt class="font-semibold">Party size</dt><dd>@_page.Queue.Capacity</dd></div>
-                    <div><dt class="font-semibold">Fair selection</dt><dd>@_page.Queue.PriorityDescription</dd></div>
                 </dl>
             </header>
 
             <section class="card p-6" aria-labelledby="join-heading">
                 <h2 id="join-heading" class="text-xl font-semibold">Join the queue</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Entry fields are optional and public. Public names are @(_page.Queue.ShowParticipantNames ? "enabled" : "hidden").</p>
+                <p class="mt-1 text-sm text-muted-foreground">Public names are @(_page.Queue.ShowParticipantNames ? "enabled" : "hidden").</p>
                 @if (_session.IsAuthenticated)
                 {
                     <p class="mt-2 text-sm text-muted-foreground">
                         Signed in with Twitch as <strong class="text-foreground">@_session.DisplayText</strong>
-                        (@($"@{_session.Login}")). Queue actions use this signed-in Twitch identity.
+                        (@($"@{_session.Login}")).
                     </p>
                 }
                 else

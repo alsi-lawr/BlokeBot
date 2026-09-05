@@ -17,9 +17,9 @@ public partial class AutomationEditorPage
             );
 
     private string _flowSubtitle =>
-        _editor?.Id is null ? "Not saved · changes stay private"
-        : _editor.IsEnabled ? "Enabled · saved changes update the live flow"
-        : "Saved · changes stay private until enabled";
+        _editor?.Id is null ? "Not saved"
+        : _editor.IsEnabled ? "Enabled"
+        : "Saved";
 
     private string _validationLabel =>
         _validated

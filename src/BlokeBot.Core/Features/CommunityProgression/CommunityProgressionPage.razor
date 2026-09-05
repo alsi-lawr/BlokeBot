@@ -32,7 +32,7 @@
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground">
-                    Community progression is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved seasons, progress, rewards, and history are retained; re-enabling does not repeat missed events or reset periods.
+                    Community progression is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
                 </div>
             </ApplicationCardCollection>
         }
@@ -47,7 +47,6 @@
                 <summary>
                     <div class="grid min-w-0 gap-1">
                         <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">New season</h2>
-                        <p class="text-sm text-muted-foreground">Draft a season, then open it once its rewards and definitions are ready.</p>
                     </div>
                     <span class="progression-chevron" aria-hidden="true">›</span>
                 </summary>
@@ -210,7 +209,6 @@
                                                 }
                                             </div>
                                         }
-                                        <p class="text-xs text-muted-foreground">Badges and accents pick a supported presentation token. Titles use bounded text, never CSS.</p>
                                     </div>
                                 </div>
                             </StudioStage>
@@ -346,7 +344,6 @@
                                             @if (definition.Schedule.Cadence != CommunityResetCadence.None)
                                             {
                                                 <p class="progression-row__meta">@DefinitionCadence(definition)</p>
-                                                <p class="progression-row__meta">DST gaps move to the first valid instant; overlaps use the first occurrence only. After downtime BlokeBot rolls into the current period and never replays missed periods.</p>
                                             }
                                             @if (season.Status == CommunitySeasonStatus.Open && definition.CompletionMode == CommunityCompletionMode.Repeatable)
                                             {
@@ -383,7 +380,7 @@
                                                         </div>
                                                         <div class="studio-span-12">
                                                             <div class="progression-warning">
-                                                                <span>Saving closes the current period immediately and resets active repeatable progress. One audited rollover in @definition.TimeZoneId, and missed periods are never replayed.</span>
+                                                                <span>Saving closes the current period immediately and resets active repeatable progress.</span>
                                                                 <span class="progression-confirm">
                                                                     <span id="@($"schedule-confirm-label-{definition.Id.Value:N}")">I understand, reset active progress now</span>
                                                                     <button id="@($"schedule-confirm-{definition.Id.Value:N}")"

@@ -30,7 +30,7 @@
         {
             <ApplicationCardCollection Owner="viewer-passport-cards">
                 <div class="card p-8 text-sm text-muted-foreground">
-                    Viewer passports is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. BlokeBot keeps saved profiles and attendance. It does not record or replay activity while the feature is off.
+                    Viewer passports is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
                 </div>
             </ApplicationCardCollection>
         }
@@ -56,7 +56,6 @@
                             <span class="passport-editor__chevron" aria-hidden="true">›</span>
                         </summary>
                         <div class="passport-editor__section-body">
-                            <p class="mb-4 text-sm text-muted-foreground">Your Twitch user ID keeps this passport together if your login changes.</p>
                             <div class="passport-editor__fields">
                                 <div class="passport-editor__field--wide" data-field>
                                     <div class="field">
@@ -68,7 +67,6 @@
                                                   @bind:event="oninput"></textarea>
                                     </div>
                                     <p class="passport-editor__hint">
-                                        <span>Channel moderation rules apply. Displayed as plain text.</span>
                                         <span>@_profileLine.Length / @ViewerPassportLimits.ProfileLineMaximumLength</span>
                                     </p>
                                 </div>
@@ -107,7 +105,6 @@
                             <span class="passport-editor__chevron" aria-hidden="true">›</span>
                         </summary>
                         <div class="passport-editor__section-body">
-                            <p class="mb-4 text-sm text-muted-foreground">Public presentation is opt-in. Saved activity stays private until you choose otherwise.</p>
                             <fieldset class="passport-visibility">
                                 <legend class="passport-visibility__legend">Who can open this passport</legend>
                                 <div class="passport-visibility-options">
@@ -157,7 +154,6 @@
                             <div class="passport-attendance">
                                 <span>
                                     <span class="passport-attendance__label" id="passport-attendance-label">Show attendance streak</span>
-                                    <span class="passport-attendance__copy">Counts consecutive recorded streams in which you chatted.</span>
                                 </span>
                                 <button type="button"
                                         class="studio-toggle"
@@ -238,7 +234,6 @@
                         @Stat($"{_passport.Statistics.GamesWon} / {_passport.Statistics.GiveawaysWon}", "games / giveaways won")
                         @Stat($"{_passport.Statistics.BountiesSupported} / {_passport.Statistics.ApprovedMoments}", "bounties / moments")
                     </div>
-                    <p class="passport-preview__notice">Preview shows only fields allowed by your current visibility choices.</p>
                 </aside>
             </div>
         }

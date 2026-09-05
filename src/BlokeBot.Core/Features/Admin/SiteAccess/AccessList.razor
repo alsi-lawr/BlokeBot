@@ -1,9 +1,5 @@
 <div class="surface-muted rounded-lg p-4 h-full" aria-disabled="@Disabled">
     <h3 class="text-sm font-semibold text-foreground">@Title</h3>
-    @if (Disabled && !string.IsNullOrWhiteSpace(DisabledText))
-    {
-        <p class="mt-1 text-xs text-muted-foreground">@DisabledText</p>
-    }
     <div class="studio-chips flex flex-wrap items-center gap-[0.45rem] mt-3">
         @if (Entries.Count == 0)
         {

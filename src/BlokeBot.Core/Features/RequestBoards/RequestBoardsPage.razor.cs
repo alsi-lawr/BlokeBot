@@ -214,9 +214,6 @@ public partial class RequestBoardsPage
     private static string SubmittedStamp(DateTime value) =>
         value.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
 
-    private static string KeyOrExample(BoardFieldDraft field) =>
-        string.IsNullOrWhiteSpace(field.Key) ? "genre" : field.Key;
-
     private static string FieldPreviewPlaceholder(BoardFieldDraft field) =>
         field.Kind switch
         {

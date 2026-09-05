@@ -33,14 +33,14 @@
                                             {
                                                 <p class="text-sm font-semibold text-slate-900">Connected visual automations</p>
                                                 <p class="text-sm text-muted-foreground">
-                                                    This Command starts every enabled flow whose Custom Command event selects it. Build and inspect those connections in <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a>.
+                                                    <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a>.
                                                 </p>
                                             }
                                             else
                                             {
                                                 <p class="text-sm font-semibold text-slate-900">Automations are off</p>
                                                 <p class="text-sm text-muted-foreground" role="status">
-                                                    This action is retained, but flow starts and downstream actions stay paused. Turn Automations on in <a class="font-semibold text-blue-700 underline" href="/host#chat-tools">Channel setup</a>.
+                                                    <a class="font-semibold text-blue-700 underline" href="/host#chat-tools">Channel setup</a>.
                                                 </p>
                                             }
                                         </div>
@@ -68,23 +68,13 @@
                                                 @(Context.Validation.MessageFor(CustomCommandEditorIds.CommandReply(Command, route.Arguments), CustomCommandEditorIds.CommandTarget(Command.Id, route.Field)))
                                             </div>
                                         }
-                                        <p class="studio-span-12 text-xs text-muted-foreground">
-                                            @if (Command.Action is OverlayCueCustomCommandActionEditor)
-                                            {
-                                                <text>Replies are optional for overlay cues. Unmapped counts still play the cue without a response.</text>
-                                            }
-                                            else
-                                            {
-                                                <text>Choose at least one reply. Unmapped counts and commands with more than two arguments are ignored without a response.</text>
-                                            }
-                                        </p>
                                     }
                                     @if (Command.Action is OverlayCueCustomCommandActionEditor cueAction)
                                     {
                                         @if (!Context.OverlaysEnabled)
                                         {
                                             <p class="studio-span-12 text-sm text-muted-foreground" role="status">
-                                                Overlays are off. This setup is retained, but cue playback and testing stay paused until you turn Overlays on in Channel setup.
+                                                Overlays are off. <a class="font-semibold text-blue-700 underline" href="/host#chat-tools">Channel setup</a>
                                             </p>
                                         }
                                         <div class="studio-span-6 space-y-2" data-overlay-cue-command>
@@ -179,7 +169,6 @@
                                     }
                                 </div>
                             </StudioStage>
-
 
 @code {
     private sealed record ActionChoice(CustomCommandActionKind Kind, string Icon, string Title, string Description);

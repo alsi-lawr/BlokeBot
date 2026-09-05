@@ -159,7 +159,7 @@ public sealed class RequestBoardCommandModule(
         await context.ReplyAsync(
             board is null
                 ? "Request board not found."
-                : $"{board.Title} is {(board.IsOpen ? "open" : "closed")}. Voting: {(board.VotingEnabled ? $"up to {board.VoteLimitPerUser} per viewer" : "off")}. Order: {board.OrderingDescription} /requests/{board.HostLogin}/{board.Slug}",
+                : $"{board.Title} is {(board.IsOpen ? "open" : "closed")}. Voting: {(board.VotingEnabled ? $"up to {board.VoteLimitPerUser} per viewer" : "off")}. /requests/{board.HostLogin}/{board.Slug}",
             ct
         );
         return new CommandHandlingOutcome.Handled();

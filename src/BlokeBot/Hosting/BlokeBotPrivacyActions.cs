@@ -86,10 +86,7 @@ internal static class BlokeBotPrivacyActions
                 var report = await ViewerPrivacyService.EraseAsync(db, subject, options.HostId, ct);
                 if (report.ChangedRows.Count == 0)
                 {
-                    console.WriteLine(
-                        "No stored rows matched this identity. "
-                            + "Erasure is idempotent; nothing remained to remove."
-                    );
+                    console.WriteLine("No stored rows matched this identity.");
                     return 0;
                 }
 
@@ -98,10 +95,7 @@ internal static class BlokeBotPrivacyActions
                     console.WriteLine($"{section}: {rows}");
                 }
 
-                console.WriteLine(
-                    $"Erased or de-identified {report.TotalChangedRows} rows. Existing backups "
-                        + "age out on the configured snapshot schedule."
-                );
+                console.WriteLine($"Erased or de-identified {report.TotalChangedRows} rows.");
                 return 0;
             },
             ct
