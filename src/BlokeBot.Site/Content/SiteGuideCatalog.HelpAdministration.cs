@@ -8,20 +8,29 @@ internal static partial class SiteGuideCatalog
         {
             Route = "/troubleshooting",
             Eyebrow = "Help and recovery",
-            Title = "Understand a warning or offline bot",
+            Title = "Warnings and an offline bot",
             Summary =
-                "Start with the message on the page. BlokeBot normally identifies the absent channel, permission, connection or tool.",
+                "Start with the message on the page. Use the reported problem to find the recovery action.",
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "BlokeBot normally identifies an absent channel.",
+                        "BlokeBot normally identifies an absent permission.",
+                        "BlokeBot normally identifies an absent connection.",
+                        "BlokeBot normally identifies an absent tool.",
+                    ],
                     Heading = "Quick checks",
                     Steps =
                     [
-                        "Confirm the selected channel.",
-                        "Open Channel setup and check the tool switch and bot status.",
+                        "Check the selected channel.",
+                        "Open Channel setup.",
+                        "Check the tool switch and bot status.",
                         "Complete the Twitch action offered by the page.",
-                        "Open Alerts and read the newest active alert.",
+                        "Open Alerts.",
+                        "Read the newest active alert.",
                     ],
                 },
                 new SiteGuideSection
@@ -29,19 +38,26 @@ internal static partial class SiteGuideCatalog
                     Heading = "Common Twitch failures",
                     Bullets =
                     [
-                        "Wrong account: sign out of Twitch in the pop-up. Repeat the specific Channel or Bot connection action.",
-                        "Moderator-only action unavailable: confirm the bot is still a moderator, then reconnect if its grant predates the required scope.",
-                        "Follower-only rejection: make the bot a moderator or manually follow the channel while signed in as the bot account.",
-                        "Announcement rejected: confirm that the bot is still a moderator. Reconnect the bot account with the action in Channel setup.",
-                        "Dashboard script or stylesheet is absent: ask the server owner to verify the reverse proxy path and static assets. Do not reconnect Twitch repeatedly.",
+                        "If Twitch uses the wrong account, sign out of Twitch in the pop-up. Repeat the specific Channel or Bot connection action.",
+                        "If a moderator-only action is unavailable, check that the bot is still a moderator. If its grant predates the required scope, reconnect.",
+                        "For a follower-only rejection, make the bot a moderator or follow the channel manually as the bot account.",
+                        "If Twitch rejects an announcement, check that the bot is still a moderator. Reconnect the bot account with the action in Channel setup.",
+                        "If a dashboard script or stylesheet is absent, ask the server owner to check proxy paths and static assets. Do not reconnect Twitch repeatedly.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Ask for useful help",
+                    Bullets =
+                    [
+                        "Include the time.",
+                        "Include the alert text.",
+                        "Include the support reference.",
+                    ],
+                    Heading = "Information for support",
+                    LegacyAnchor = "ask-for-useful-help",
                     Paragraphs =
                     [
-                        "If the problem remains, send the page name, channel, time, alert text and support reference to the server owner. Do not send Twitch secrets or tokens.",
+                        "If the problem remains, send the page name and channel to the server owner. Do not send Twitch secrets or tokens.",
                     ],
                 },
                 new SiteGuideSection
@@ -49,33 +65,55 @@ internal static partial class SiteGuideCatalog
                     Heading = "Plugin failures",
                     Bullets =
                     [
-                        "Marketplace unavailable: wait for one successful catalogue refresh. If Admin shows an older snapshot, search can still use it.",
-                        "Install or Update unavailable: confirm GitHub access and the tag. An absent or moved tag needs a corrected catalogue entry or package release.",
-                        "Validation fault: correct the manifest, package declarations, target support, paths, links, collisions, or size limits.",
-                        "Migration or activation fault: read the latest operation message. The old code cannot resume after durable migration starts.",
-                        "Worker fault: BlokeBot tries one automatic restart. Correct the cause and select Restart after the next fault.",
+                        "After Remove, no plugin settings remain.",
+                        "After Remove, no private data remains.",
+                        "After Remove, no page remains.",
+                        "After Remove, no flow remains.",
+                        "After Remove, no run history remains.",
+                        "After Remove, no receipt remains.",
+                        "After Remove, no context remains.",
+                        "After Remove, no latest outcome remains.",
+                        "If the marketplace is unavailable, wait for one successful catalog refresh. If Admin shows an older snapshot, search can still use it.",
+                        "If Install or Update is unavailable, check GitHub access and the tag. An absent or moved tag needs a corrected catalog entry or package release.",
+                        "For a validation fault, correct the reported cause.",
+                        "The manifest is a possible cause of a validation fault.",
+                        "Package declarations are a possible cause of a validation fault.",
+                        "Target support is a possible cause of a validation fault.",
+                        "Also check paths.",
+                        "Also check links.",
+                        "Also check collisions.",
+                        "Also check size limits.",
+                        "For a migration or activation fault, read the latest operation message. The old code cannot resume after durable migration starts.",
+                        "For a worker fault, BlokeBot tries one automatic restart. After the next fault, correct the cause. Select Restart.",
                         "Needs attention: complete the required Twitch scope or EventSub action. Independent work can remain available.",
-                        "Command absent: check built-in and custom commands first. Those routes shadow a plugin command.",
-                        "Feature enablement rejected: correct a plugin command collision, invalid automatic flow, or flow name that already exists.",
-                        "Automatic flow deleted: disable and enable the feature to create the flow again.",
+                        "If a command is absent, check built-in and custom commands first. Those routes shadow a plugin command.",
+                        "If BlokeBot rejects feature enablement, correct the reported cause.",
+                        "A possible cause is a plugin command collision.",
+                        "A possible cause is an invalid automatic flow.",
+                        "A possible cause is an existing flow name.",
+                        "If an automatic flow is deleted, disable the feature. Enable it again to create the flow again.",
                     ],
                     Links =
                     [
                         new SiteLink("Recover a plugin installation", "server-owners/plugins"),
                         new SiteLink("Recover a channel plugin feature", "plugins"),
                     ],
-                    Note =
-                        "Remove is permanent. After Remove, no plugin settings, private data, page, flow, run history, receipt, context, or latest outcome remains.",
+                    Note = "Remove is permanent.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Privacy, saved preferences and data requests",
+                    Heading = "Privacy and data requests",
+                    LegacyAnchor = "privacy-saved-preferences-and-data-requests",
                     Paragraphs =
                     [
-                        "The privacy notice is the authoritative description of stored data. It covers Twitch data, cookies, browser storage and retention for both origins.",
+                        "The privacy notice is the authoritative description of stored data.",
                     ],
                     Bullets =
                     [
+                        "The privacy notice covers Twitch data for both origins.",
+                        "The privacy notice covers cookies for both origins.",
+                        "The privacy notice covers browser storage for both origins.",
+                        "The privacy notice covers retention for both origins.",
                         "The control for this help site's preferences is on the privacy notice itself.",
                         "The dashboard's control is in its account menu: Stop saving view preferences. Each origin's control governs only that origin's storage.",
                         "Send private data requests to the privacy contact in the notice. Do not send them to chat or a public board.",
@@ -113,14 +151,17 @@ internal static partial class SiteGuideCatalog
                     Heading = "Choose an access mode",
                     Steps =
                     [
-                        "Open Channel setup and expand Moderator help.",
+                        "Open Channel setup.",
+                        "Expand Moderator help.",
                         "Turn on Let moderators help with this channel.",
-                        "Choose All mods or Allowed list only, then maintain allowed and blocked names as needed.",
+                        "Select All mods or Allowed list only.",
+                        "Maintain allowed and blocked names as necessary.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Know the boundary",
+                    Heading = "Moderator authority",
+                    LegacyAnchor = "know-the-boundary",
                     Bullets =
                     [
                         "Moderator access applies only to the selected channel.",
@@ -140,8 +181,7 @@ internal static partial class SiteGuideCatalog
             Route = "/server-owners",
             Eyebrow = "Technical operations",
             Title = "Run a BlokeBot server",
-            Summary =
-                "Install the service, connect one Twitch application, provide trusted HTTPS and keep its private state backed up.",
+            Summary = "Operate the BlokeBot server.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/dashboard/phone-dark-admin.png",
                 LightPhoneSource: "media/dashboard/phone-light-admin.png",
@@ -155,11 +195,21 @@ internal static partial class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
-                    Heading = "1. Install and run",
-                    Paragraphs =
+                    Bullets =
                     [
-                        "Choose Nix, Docker or a source checkout. Give BlokeBot a persistent data directory. Start the dashboard on a private address.",
+                        "Choose an installation method.",
+                        "Give BlokeBot a persistent data directory.",
+                        "Start the dashboard on a private address.",
+                        "Install the service.",
+                        "Connect one Twitch application.",
+                        "Provide trusted HTTPS.",
+                        "Keep backups of the private state.",
+                        "Installation method: Nix.",
+                        "Installation method: Docker.",
+                        "Installation method: a source checkout.",
                     ],
+                    Heading = "Installation",
+                    LegacyAnchor = "1-install-and-run",
                     Links =
                     [
                         new SiteLink("Choose the main database", "server-owners/database"),
@@ -172,11 +222,19 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "2. Create the Twitch application",
-                    Paragraphs =
+                    Bullets =
                     [
-                        "Create one Website Integration application in the Twitch Developer Console. Register both public HTTPS callbacks. Provide its Client ID and Client Secret to BlokeBot. Do not put the secret in source.",
+                        "Create one Website Integration application in the Twitch Developer Console.",
+                        "Register both public HTTPS callbacks.",
+                        "Provide its Client ID and Client Secret to BlokeBot.",
+                        "Do not put the secret in source.",
+                        "The callback text must exactly match the scheme.",
+                        "The callback text must exactly match the host.",
+                        "The callback text must exactly match the port.",
+                        "The callback text must exactly match the path.",
                     ],
+                    Heading = "Twitch application",
+                    LegacyAnchor = "2-create-the-twitch-application",
                     Code =
                         "https://bot.example.com/auth/twitch/callback\nhttps://bot.example.com/oauth/callback",
                     Links =
@@ -190,14 +248,20 @@ internal static partial class SiteGuideCatalog
                             "https://github.com/alsi-lawr/BlokeBot/wiki/Twitch-Identity-and-OAuth"
                         ),
                     ],
-                    Note = "The callback text must exactly match the scheme, host, port and path.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "3. Add HTTPS",
+                    Bullets =
+                    [
+                        "Caddy can forward the original scheme and host.",
+                        "nginx can forward the original scheme and host.",
+                        "Another reverse proxy can forward the original scheme and host.",
+                    ],
+                    Heading = "Public HTTPS",
+                    LegacyAnchor = "3-add-https",
                     Paragraphs =
                     [
-                        "Give the public dashboard a trusted HTTPS address. A typical deployment keeps BlokeBot on loopback. Caddy, nginx or another reverse proxy forwards the original scheme and host.",
+                        "Give the public dashboard a trusted HTTPS address. A typical deployment keeps BlokeBot on loopback. Use a reverse proxy that forwards the original scheme and host.",
                     ],
                     Links =
                     [
@@ -211,10 +275,11 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "4. Keep state private and backed up",
+                    Heading = "Private state and backups",
+                    LegacyAnchor = "4-keep-state-private-and-backed-up",
                     Paragraphs =
                     [
-                        "BlokeBot keeps local state beside its main database configuration. Restrict the state to the service account and back it up with the database.",
+                        "BlokeBot keeps local state beside its main database configuration. Restrict the state to the service account. Back up the state with the database.",
                     ],
                     Links =
                     [
@@ -226,7 +291,8 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "5. Custom-bot credentials",
+                    Heading = "Custom-bot credentials",
+                    LegacyAnchor = "5-custom-bot-credentials",
                     Paragraphs =
                     [
                         "Custom-bot encryption needs no operator configuration. ASP.NET Core manages Data Protection keys automatically in private persistent application state. Windows protects those keys with DPAPI LocalMachine.",

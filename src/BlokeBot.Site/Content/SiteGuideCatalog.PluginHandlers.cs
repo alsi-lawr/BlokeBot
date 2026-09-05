@@ -10,11 +10,18 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Plugin development",
             Title = "Plugin handlers",
             Summary =
-                "Handlers connect manifest declarations to Lua functions. Plugins can declare commands, events, schedules, webhooks, HTTP actions, page actions, pages, and automation handlers.",
+                "Handlers connect manifest declarations to Lua functions. Plugins can declare the handler types below.",
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Commands and events.",
+                        "Schedules and webhooks.",
+                        "HTTP actions and page actions.",
+                        "Pages and automation handlers.",
+                    ],
                     Heading = "Handler modules",
                     Paragraphs =
                     [
@@ -35,17 +42,21 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Commands, events, and schedules",
+                    Bullets =
+                    [
+                        "The event handler receives the event identity.",
+                        "The event handler receives the source.",
+                        "The event handler receives the timestamp.",
+                    ],
+                    Heading = "Feature handlers",
+                    LegacyAnchor = "commands-events-and-schedules",
                     Facts =
                     [
                         new(
                             "Command",
                             "The handler receives the normalized route and ordered arguments for the current channel."
                         ),
-                        new(
-                            "Typed Twitch event",
-                            "The handler receives the event identity, source, and timestamp."
-                        ),
+                        new("Typed Twitch event", "The handler receives the typed event data."),
                         new(
                             "Raw Twitch event",
                             "The handler receives the declared EventSub identity and a validated raw event map."
@@ -64,10 +75,15 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "An HTTP action receives method from the fixed authenticated endpoint.",
+                        "An HTTP action receives headers from the fixed authenticated endpoint.",
+                        "An HTTP action receives bodyBase64 from the fixed authenticated endpoint.",
+                    ],
                     Heading = "HTTP actions and page actions",
                     Paragraphs =
                     [
-                        "An HTTP action receives method, headers, and bodyBase64 from the fixed authenticated endpoint.",
                         "A page action receives only the exact fields in its manifest declaration.",
                     ],
                     Code = """
@@ -88,7 +104,7 @@ internal static partial class SiteGuideCatalog
                         operation = "refresh_item"
                         """,
                     Note =
-                        "If a task needs HTTP and page entry points, declare two actions and two handler operations.",
+                        "If a task needs HTTP and page entry points, declare two actions. Declare two handler operations.",
                 },
                 new SiteGuideSection
                 {
@@ -107,10 +123,16 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "A migration handler receives migrationId.",
+                        "A migration handler receives fromVersion.",
+                        "A migration handler receives toVersion.",
+                    ],
                     Heading = "Migrations",
                     Paragraphs =
                     [
-                        "A migration handler receives migrationId, fromVersion, and toVersion. It can use storage and redaction-safe diagnostics.",
+                        "It can use storage and redaction-safe diagnostics.",
                         "Before activation, BlokeBot runs one selected migration chain. If a migration fails, BlokeBot faults the selected installation.",
                     ],
                     Code = """
@@ -126,11 +148,19 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The cancellation rule applies to chat.",
+                        "The cancellation rule applies to schedules.",
+                        "The cancellation rule applies to HTTP.",
+                        "The cancellation rule applies to SQLite.",
+                        "The cancellation rule applies to other effects.",
+                    ],
                     Heading = "Cancellation",
                     Paragraphs =
                     [
                         "Cancellation stops a coroutine that waits for a host result. A late result does not resume the coroutine.",
-                        "Cancellation does not undo an effect that completed first. This rule applies to chat, schedules, HTTP, SQLite, and other effects.",
+                        "Cancellation does not undo an effect that completed first.",
                     ],
                 },
             ],

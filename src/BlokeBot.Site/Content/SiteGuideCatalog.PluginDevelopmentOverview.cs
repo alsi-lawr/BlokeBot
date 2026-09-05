@@ -10,11 +10,18 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Plugin development",
             Title = "Lua plugins",
             Summary =
-                "A plugin project includes generated Lua types, declared access to BlokeBot, local tests, and the files for the curated repository.",
+                "A plugin project declares its access to BlokeBot. It includes generated types and the files for local tests and the curated repository.",
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The project includes generated Lua types.",
+                        "The project includes declared access to BlokeBot.",
+                        "The project includes local tests.",
+                        "The project includes the files for the curated repository.",
+                    ],
                     Heading = "Project setup",
                     Steps =
                     [
@@ -23,7 +30,8 @@ internal static partial class SiteGuideCatalog
                         "Edit plugin.toml.",
                         "Run the generator after each manifest change.",
                         "Implement the declared handlers.",
-                        "Validate and test the package.",
+                        "Validate the package.",
+                        "Test the package.",
                     ],
                     Code = """
                         blokebot-plugin init community.my-plugin ./my-plugin
@@ -65,19 +73,26 @@ internal static partial class SiteGuideCatalog
                     [
                         "Declare every host module that your plugin uses.",
                         "Use only the plugin and feature identities that BlokeBot supplies for the invocation.",
-                        "Do not put protected values in logs, responses, or page documents.",
+                        "Do not put protected values in logs.",
+                        "Do not put protected values in responses.",
+                        "Do not put protected values in page documents.",
                         "If BlokeBot cancels an invocation, stop that invocation.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Installation, updates, and removal",
+                    Bullets =
+                    [
+                        "Installation validates the package.",
+                        "Installation prepares its worker.",
+                        "Installation runs its migrations.",
+                        "Installation activates the selected release.",
+                    ],
+                    Heading = "Plugin lifecycle",
+                    LegacyAnchor = "installation-updates-and-removal",
                     Facts =
                     [
-                        new(
-                            "Install",
-                            "BlokeBot validates the package, prepares its worker, runs its migrations, and activates the selected release."
-                        ),
+                        new("Install", "BlokeBot completes the installation phases in this order."),
                         new(
                             "Update",
                             "For each manual update, BlokeBot downloads the current tag again before it applies the update."
@@ -94,11 +109,15 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "API reference",
-                    Paragraphs =
+                    Bullets =
                     [
-                        "This wiki explains the plugin workflow. The generated reference lists every contract type, field, outcome, and host function.",
+                        "The generated reference lists all contract types.",
+                        "The generated reference lists all fields.",
+                        "The generated reference lists all outcomes.",
+                        "The generated reference lists all host functions.",
                     ],
+                    Heading = "API reference",
+                    Paragraphs = ["This wiki describes the plugin workflow."],
                     Links =
                     [
                         new(

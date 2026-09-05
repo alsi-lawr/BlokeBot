@@ -20,8 +20,11 @@ internal sealed record SiteGuideSection
 {
     internal required string Heading { get; init; }
 
+    internal string? LegacyAnchor { get; init; }
+
     internal string Anchor =>
-        string.Join(
+        LegacyAnchor
+        ?? string.Join(
             '-',
             Heading
                 .ToLowerInvariant()

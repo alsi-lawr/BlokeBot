@@ -8,9 +8,9 @@ internal static partial class SiteGuideCatalog
         {
             Route = "/community/moments",
             Eyebrow = "Community interaction · Moments",
-            Title = "Capture, moderate and recap moments",
+            Title = "Channel Moments",
             Summary =
-                "Turn live viewer calls into one moderated Twitch clip or marker, then publish safe stream and weekly recaps.",
+                "Turn live viewer calls into one moderated Twitch clip or marker. Then publish safe stream and weekly recaps.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/phone-dark-moments.png",
                 LightPhoneSource: "media/community/phone-light-moments.png",
@@ -18,7 +18,7 @@ internal static partial class SiteGuideCatalog
                 LightLaptopSource: "media/community/laptop-light-moments.png",
                 PhoneAlt: "The Sample Channel stream recap on a narrow screen with an approved Community clutch save and a recorded vote.",
                 LaptopAlt: "The Sample Channel Moments moderator page with capture settings and an approved Community clutch save in the clip gallery.",
-                "Moderators work at /moments. Approved entries appear in channel, stream and weekly recaps."
+                "Moderators work at /moments. Approved entries appear in channel and stream recaps. They also appear in weekly recaps."
             ),
             Sections =
             [
@@ -27,10 +27,17 @@ internal static partial class SiteGuideCatalog
                     Heading = "Prepare a live channel",
                     Bullets =
                     [
-                        "Choose the channel and open Moments at /moments. Captures require Twitch to report that channel live and require the selected channel's Twitch connection.",
+                        "Select the channel.",
+                        "Open Moments at /moments. Captures require a Twitch-reported live channel and the selected channel's Twitch connection.",
                         "Set the Merge window from 15 to 300 seconds. 90 seconds is the default. Calls inside that window join the same stream moment and keep each contributor and suggestion.",
-                        "Choose No reward, First viewer to request or All contributing viewers. Set the amount. Choose whether a confirmed clip failure can use a stream marker.",
-                        "Save settings and check that the page shows Live stream with a stream identity. Then invite viewers to capture.",
+                        "Select one reward option:",
+                        "Reward option: No reward.",
+                        "Reward option: First viewer to request.",
+                        "Reward option: All contributing viewers.",
+                        "Set the amount. Choose whether a confirmed clip failure can use a stream marker.",
+                        "Save settings.",
+                        "Check that the page shows Live stream with a stream identity.",
+                        "Invite viewers to capture.",
                     ],
                 },
                 new SiteGuideSection
@@ -47,16 +54,36 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Capture state: Creating clip.",
+                        "Capture state: Clip ready.",
+                        "Capture state: Marker ready.",
+                        "Capture state: Could not create clip.",
+                        "Public recap field: approved title.",
+                        "Public recap field: category.",
+                        "Public recap field: counts.",
+                        "Public recap field: Twitch link.",
+                        "The moderator view retains Moderator note.",
+                        "The moderator view retains rejection reason.",
+                        "The moderator view retains audit text.",
+                        "The moderator view retains Twitch failure details.",
+                    ],
                     Heading = "Moderate public metadata",
                     Steps =
                     [
-                        "In Candidates, review Creating clip, Clip ready, Marker ready or Could not create clip. Review the contributor count and viewer suggestions.",
-                        "Set Public title and Category, select Save details, then Approve. Reject keeps its reason private. Merge uses another moment number.",
-                        "Use Open on Twitch to verify available media. Only approved moments appear in public recaps.",
+                        "In Candidates, review the applicable capture state.",
+                        "Review the contributor count and viewer suggestions.",
+                        "Set Public title and Category.",
+                        "Select Save details.",
+                        "Select Approve.",
+                        "Use Open on Twitch to check available media.",
                     ],
                     Paragraphs =
                     [
-                        "Moderator note, rejection reason, audit text and Twitch failure details stay on the moderator view. Public recaps show only approved title, category, counts and the Twitch link.",
+                        "Public recaps show only the listed public recap fields.",
+                        "Reject keeps its reason private. Merge uses another moment number.",
+                        "Only approved moments appear in public recaps.",
                     ],
                 },
                 new SiteGuideSection
@@ -67,23 +94,59 @@ internal static partial class SiteGuideCatalog
                         LightPhoneSource: "media/community/figures/phone-light-moment-attachment.png",
                         DarkLaptopSource: "media/community/figures/laptop-dark-moment-attachment.png",
                         LightLaptopSource: "media/community/figures/laptop-light-moment-attachment.png",
-                        PhoneAlt: "The Sample Channel public bounty with an attached approved Moment, public-safe title and Twitch media link on a narrow screen.",
-                        LaptopAlt: "The Sample Channel public bounty with an attached approved Moment, public-safe title and Twitch media link on a narrow screen.",
+                        PhoneAlt: "The Sample Channel public bounty shows an attached approved Moment on a narrow screen. Its public-safe title and Twitch media link are visible.",
+                        LaptopAlt: "The Sample Channel public bounty shows an attached approved Moment on a narrow screen. Its public-safe title and Twitch media link are visible.",
                         "Authorized staff attach by reference in the destination. Viewers receive only the Moment's current approved public-safe fields."
                     ),
+                    Paragraphs =
+                    [
+                        "The destination context stays visible. This context distinguishes the confirmed result from another match.",
+                        "Detachment neither copies nor deletes these records.",
+                    ],
                     Steps =
                     [
-                        "Approve the Moment for the selected channel first. A channel owner or permitted moderator then opens the destination bounty, achievement or confirmed tournament match.",
-                        "Open its Moments section, choose a same-host approved Moment and attach it. The destination context remains visible. It prevents confusion between a confirmed result and another match.",
-                        "Use Remove in the same section to detach the reference. The Moment, Twitch clip or marker and moderation history remain owned by Moments and are not copied or deleted.",
+                        "Approve the Moment for the selected channel first.",
+                        "As the channel owner or permitted moderator, open the destination for the attachment.",
+                        "Open the destination's Moments section.",
+                        "Select a same-host approved Moment.",
+                        "Attach it.",
+                        "Use Remove in the same section to detach the reference.",
                     ],
                     Bullets =
                     [
-                        "A bounty attachment inherits Moments, Bounties and Bounties' effective Points requirement. An achievement attachment inherits Moments and Community progression. A match attachment inherits Moments and Tournaments & leagues. This feature does not add an attachment switch.",
-                        "Only approved, same-host, currently public-safe Moments are discoverable. BlokeBot suppresses unavailable Moments from management, public destination pages, events and downstream presentation.",
+                        "Moments still owns the Moment.",
+                        "Moments still owns its Twitch clip or marker.",
+                        "Moments still owns the moderation history.",
+                        "Attachment destination: a bounty.",
+                        "Attachment destination: an achievement.",
+                        "Attachment destination: a confirmed tournament match.",
+                        "A bounty attachment inherits Moments.",
+                        "A bounty attachment inherits Bounties.",
+                        "A bounty attachment inherits the effective Points requirement for Bounties.",
+                        "An achievement attachment inherits Moments and Community progression. A match attachment inherits Moments and Tournaments & leagues. This feature does not add an attachment switch.",
+                        "Discovery requires all these conditions:",
+                        "The Moment must be approved.",
+                        "The Moment must belong to the same host.",
+                        "The Moment must be currently public-safe.",
+                        "BlokeBot suppresses unavailable Moments from management.",
+                        "BlokeBot suppresses unavailable Moments from public destination pages.",
+                        "BlokeBot suppresses unavailable Moments from events.",
+                        "BlokeBot suppresses unavailable Moments from downstream presentation.",
                         "If the same source Moment returns to Approved, a retained link becomes visible again. Every parent gate must also be available. BlokeBot does not replay an attach event or suppressed work when it reappears.",
-                        "Public destinations can show current title, category and Twitch media link. Moderator notes, rejection reasons, failure detail, internal IDs and audit text remain private.",
-                        "If a parent is off, the embedded section shows Channel setup recovery. It blocks discovery, changes, public relationships, events, overlays and automations. Valid links remain saved and reappear from current state after re-enable without replay.",
+                        "Public destinations can show the current title.",
+                        "Public destinations can show the current category.",
+                        "Public destinations can show the current Twitch media link.",
+                        "These Moment fields remain private: moderator notes and rejection reasons.",
+                        "These Moment fields remain private: failure detail and internal IDs.",
+                        "These Moment fields remain private: audit text.",
+                        "If a parent is off, the embedded section shows Channel setup recovery.",
+                        "If a parent is off, BlokeBot blocks discovery.",
+                        "If a parent is off, BlokeBot blocks changes.",
+                        "If a parent is off, BlokeBot blocks public relationships.",
+                        "If a parent is off, BlokeBot blocks events.",
+                        "If a parent is off, BlokeBot blocks overlays.",
+                        "If a parent is off, BlokeBot blocks automations.",
+                        "Valid links remain saved and reappear from current state after re-enable without replay.",
                     ],
                     Links =
                     [
@@ -111,8 +174,16 @@ internal static partial class SiteGuideCatalog
                     [
                         "Creating clip means that Twitch continues to prepare the clip. Reload the same candidate later. Do not capture again just to force an answer.",
                         "An ambiguous outcome means Twitch did not confirm whether its request completed. BlokeBot preserves that uncertainty and does not create a fallback marker from it.",
-                        "Offline means wait for a live stream. If Twitch reports that clips or VODs are disabled, correct that setting or continue with no marker fallback. If access is unauthorized, reconnect the selected channel account.",
-                        "If the failure continues, keep the candidate. Send the channel, moment number, stream identity, approximate time and Twitch message to the server owner. Never send tokens or private moderation text.",
+                        "If the state is Offline, wait for a live stream.",
+                        "If Twitch reports that clips or VODs are disabled, correct that setting or continue with no marker fallback.",
+                        "If access is unauthorized, reconnect the selected channel account.",
+                        "If the failure continues, keep the candidate.",
+                        "Include the channel in the information for the server owner.",
+                        "Include the moment number in the information for the server owner.",
+                        "Include the stream identity in the information for the server owner.",
+                        "Include the approximate time in the information for the server owner.",
+                        "Include the Twitch message in the information for the server owner.",
+                        "Never send tokens or private moderation text.",
                     ],
                 },
             ],
@@ -139,28 +210,46 @@ internal static partial class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Only the viewer can choose the profile line.",
+                        "Only the viewer can choose the rewards.",
+                        "Only the viewer can choose the visibility.",
+                        "Only the viewer can choose the attendance choice.",
+                    ],
                     Heading = "Enable Viewer passports",
+                    Paragraphs =
+                    [
+                        "The feature card saves the change immediately. Each channel starts with this switch off.",
+                        "BlokeBot links the passport to the signed-in Twitch user ID.",
+                        "A later login or display-name change updates the same profile. A new passport starts Private and hides attendance.",
+                    ],
                     Steps =
                     [
-                        "As the channel owner or permitted moderator, choose the channel. Open Channel setup. Turn on Viewer passports under Chat tools.",
-                        "Expect the feature card to save the change immediately. Expect each channel to start with this switch off.",
-                        "As the viewer, sign in with Twitch. Open /passports/{channel}/me. Expect BlokeBot to link the passport to that Twitch user ID.",
-                        "Expect a later login or display-name change to update the same profile. Expect a new passport to start Private and hide attendance.",
+                        "As the channel owner or permitted moderator, select the channel.",
+                        "Open Channel setup.",
+                        "Turn on Viewer passports under Chat tools.",
+                        "As the viewer, sign in with Twitch.",
+                        "Open /passports/{channel}/me.",
                         "Save a different visibility to approve a broader audience.",
                     ],
-                    Note =
-                        "Replace {channel} with the channel login. Only the viewer can choose the profile line, rewards, visibility, and attendance choice.",
+                    Note = "Replace {channel} with the channel login.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Create a bounded profile",
+                    Heading = "Profile content",
+                    LegacyAnchor = "create-a-bounded-profile",
                     Bullets =
                     [
                         "Enter a profile line of 160 characters or fewer.",
                         "BlokeBot presents the profile line as plain text. The channel moderation policy still applies.",
                         "Choose only a title or badge that the viewer earned in this channel.",
                         "BlokeBot rejects an unearned or stale reward selection.",
-                        "The preview combines permitted points, rank, Guessing results, achievements, game and giveaway wins, supported bounties, and approved Moments. Each source feature remains authoritative. The passport summarizes its current records.",
+                        "The passport preview includes permitted points and permitted rank.",
+                        "The passport preview includes permitted Guessing results and permitted achievements.",
+                        "The passport preview includes permitted game wins and permitted giveaway wins.",
+                        "The passport preview includes supported bounties and approved Moments.",
+                        "Each source feature remains authoritative. The passport summarizes its current records.",
                         "Attendance counts consecutive recorded streams with a chat message. It does not measure watch time or every broadcast.",
                         "Change Show attendance streak independently of profile visibility.",
                     ],
@@ -170,23 +259,37 @@ internal static partial class SiteGuideCatalog
                     Heading = "Choose the audience",
                     Bullets =
                     [
-                        "Public lets anyone with /passport/{channel}/{viewer} see the selected public-safe fields. It also permits chat, overlay, and automation projections.",
-                        "Channel members permits the viewer, channel managers, and signed-in people with a passport in this channel. Other accounts receive an unavailable result.",
-                        "Private permits only the viewer, channel owner, and permitted managers. Private and Channel members profiles stay out of all public identity projections.",
-                        "The public route excludes Twitch user IDs, private source history, hidden attendance, and unselected rewards.",
+                        "Public lets anyone with /passport/{channel}/{viewer} see the selected public-safe fields.",
+                        "Public passport visibility permits chat projections.",
+                        "Public passport visibility permits overlay projections.",
+                        "Public passport visibility permits automation projections.",
+                        "Channel members permits the viewer.",
+                        "Channel members permits channel managers.",
+                        "Channel members permits signed-in people with a passport in this channel.",
+                        "Other accounts receive an unavailable result.",
+                        "Private permits only the listed Private audiences:",
+                        "Private audience: the viewer.",
+                        "Private audience: the channel owner.",
+                        "Private audience: permitted managers.",
+                        "Private and Channel members profiles stay out of all public identity projections.",
+                        "The public route excludes Twitch user IDs and private source history.",
+                        "The public route excludes hidden attendance and unselected rewards.",
                     ],
                     Code = "!passport",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Save, export, or reset the passport",
+                    Heading = "Passport data",
+                    LegacyAnchor = "save-export-or-reset-the-passport",
                     Bullets =
                     [
                         "Select Save passport after a profile change.",
                         "This control is the sticky Save action for the page.",
                         "Export my channel data downloads data that this BlokeBot installation associates with the viewer's Twitch identity in this channel.",
                         "Confirm Reset passport to remove the passport and its stream attendance.",
-                        "The reset does not change original points, Guessing, achievement, giveaway, bounty, or Moment records.",
+                        "The reset does not change original points records and Guessing records.",
+                        "The reset does not change original achievement records and giveaway records.",
+                        "The reset does not change original bounty records and Moment records.",
                     ],
                 },
                 new SiteGuideSection
@@ -194,14 +297,24 @@ internal static partial class SiteGuideCatalog
                     Heading = "Restore privacy and availability",
                     Bullets =
                     [
-                        "If a public link is unavailable, verify the channel, viewer login, visibility, audience access, and passport state.",
-                        "If activity is stale, use the current Twitch identity and wait for a supported source event.",
+                        "If a public link is unavailable, check the channel and viewer login.",
+                        "Check the visibility and audience access.",
+                        "Check the passport state.",
+                        "If activity is stale, use the current Twitch identity. Wait for a supported source event.",
                         "BlokeBot does not reconstruct suppressed or historical activity on demand.",
                         "Turn off Viewer passports to remove discovery and public output.",
-                        "BlokeBot then blocks edits, chat updates, commands, exports, resets, overlay data, and automation payloads before effects.",
-                        "The signed-in direct route links to Channel setup. BlokeBot keeps passports, visibility, and stream attendance.",
+                        "With Viewer passports off, BlokeBot blocks edits and chat updates before effects.",
+                        "With Viewer passports off, BlokeBot blocks commands and exports before effects.",
+                        "With Viewer passports off, BlokeBot blocks resets and overlay data before effects.",
+                        "With Viewer passports off, BlokeBot blocks automation payloads before effects.",
+                        "The signed-in direct route links to Channel setup.",
+                        "BlokeBot keeps passports.",
+                        "BlokeBot keeps visibility.",
+                        "BlokeBot keeps stream attendance.",
                         "The next new stream attendance starts a new streak after you re-enable the feature.",
-                        "BlokeBot does not replay suppressed chat messages, events, timers, queued work, or provider actions.",
+                        "BlokeBot does not replay suppressed chat messages and events.",
+                        "BlokeBot does not replay suppressed timers and queued work.",
+                        "BlokeBot does not replay suppressed provider actions.",
                     ],
                 },
             ],

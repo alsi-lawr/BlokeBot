@@ -9,35 +9,60 @@ internal static partial class SiteGuideCatalog
             Route = "/server-owners/plugins",
             Eyebrow = "Technical operations",
             Title = "Install and recover trusted plugins",
-            Summary =
-                "Only a BlokeBot administrator can install, update, restart, or remove a curated plugin.",
+            Summary = "Administer curated plugins.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/dashboard/phone-dark-admin.png",
                 LightPhoneSource: "media/dashboard/phone-light-admin.png",
                 DarkLaptopSource: "media/dashboard/laptop-dark-admin.png",
                 LightLaptopSource: "media/dashboard/laptop-light-admin.png",
-                PhoneAlt: "The Admin page with Bot account, channel creation, and channel management controls.",
-                LaptopAlt: "The Admin page with Bot account, channel creation, and channel management controls.",
+                PhoneAlt: "The Admin page shows Bot account controls. Channel creation and channel management controls are visible.",
+                LaptopAlt: "The Admin page shows Bot account controls. Channel creation and channel management controls are visible.",
                 "Open Admin to manage the Bot account and BlokeBot channels. The Plugins panel is lower on the same page."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Replace the old saved-script help",
+                    Bullets =
+                    [
+                        "A curated plugin has the same filesystem access as the BlokeBot service account.",
+                        "A curated plugin has the same process access as the BlokeBot service account.",
+                        "A curated plugin has the same network access as the BlokeBot service account.",
+                        "Only a BlokeBot administrator can install a curated plugin.",
+                        "Only a BlokeBot administrator can update a curated plugin.",
+                        "Only a BlokeBot administrator can restart a curated plugin.",
+                        "Only a BlokeBot administrator can remove a curated plugin.",
+                    ],
+                    Heading = "Trusted plugins",
+                    LegacyAnchor = "replace-the-old-saved-script-help",
                     Paragraphs =
                     [
-                        "This guide replaces the old saved-script and capability help. Current plugins do not use a capability grant or security sandbox.",
+                        "Current plugins do not use a capability grant or security sandbox.",
                     ],
                     Note =
-                        "A curated plugin is fully trusted. It has the same filesystem, process, and network access as the BlokeBot service account. Install only curated packages that you trust.",
+                        "Install only curated packages that you trust. A curated plugin is fully trusted.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Review the full trust boundary",
+                    Bullets =
+                    [
+                        "BlokeBot checks declarations.",
+                        "BlokeBot checks targets.",
+                        "BlokeBot checks archive paths.",
+                        "BlokeBot checks links.",
+                        "BlokeBot checks collisions.",
+                        "BlokeBot checks size limits.",
+                        "Native files.",
+                        ".NET files.",
+                        "WebAssembly files.",
+                        "Browser files.",
+                        "Media files.",
+                    ],
+                    Heading = "Plugin permissions",
+                    LegacyAnchor = "review-the-full-trust-boundary",
                     Paragraphs =
                     [
-                        "A curated package can contain any reviewed declared payload for its supported targets. Payloads can include native, .NET, WebAssembly, browser, and media files.",
+                        "A curated package can contain any reviewed declared payload for its supported targets. Supported payload types appear below.",
                         "Lua 5.4 is the only plugin entrypoint that BlokeBot manages. Other payloads and their dependencies remain the plugin's responsibility.",
                         "Each active plugin uses one worker process. The worker is an availability boundary, not a security sandbox.",
                     ],
@@ -47,17 +72,17 @@ internal static partial class SiteGuideCatalog
                         new("macOS", "osx-arm64"),
                         new("Windows", "win-x64 and win-arm64"),
                     ],
-                    Note =
-                        "BlokeBot checks declarations, targets, archive paths, links, collisions, and size limits. It does not inspect trusted payload bytes by content type.",
+                    Note = "It does not inspect trusted payload bytes by content type.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Use the saved marketplace catalogue",
+                    Heading = "Marketplace catalog",
+                    LegacyAnchor = "use-the-saved-marketplace-catalogue",
                     Facts =
                     [
                         new(
                             "Saved snapshot",
-                            "Search uses the last valid catalogue snapshot and does not wait for GitHub. Offline search can use this snapshot."
+                            "Search uses the last valid catalog snapshot and does not wait for GitHub. Offline search can use this snapshot."
                         ),
                         new(
                             "Refresh failure",
@@ -75,7 +100,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "An entry selects a compatible declared version and one Git tag. Plugin identity never contains a commit SHA.",
-                        "The community link queue is a local reference example. Its catalogue entry and tag are not public.",
+                        "The community link queue is a local reference example. Its catalog entry and tag are not public.",
                     ],
                 },
                 new SiteGuideSection
@@ -83,8 +108,12 @@ internal static partial class SiteGuideCatalog
                     Heading = "Install and configure",
                     Steps =
                     [
-                        "Open Admin and find Plugins.",
-                        "Review the package source, declared payloads, supported targets, version, and tag.",
+                        "Open Admin.",
+                        "Find Plugins.",
+                        "Review the package source.",
+                        "Review the declared payloads.",
+                        "Review the supported targets.",
+                        "Review the version and tag.",
                         "Select Install.",
                         "Enter the generated installation settings.",
                         "Enter each required protected secret.",
@@ -95,17 +124,29 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "A validation failure faults the selected installation.",
+                        "A migration failure faults the selected installation.",
+                        "An activation failure faults the selected installation.",
+                    ],
                     Heading = "Update the tag",
                     Paragraphs =
                     [
                         "Update is always a manual administrator action. It downloads and validates the current package at the selected tag.",
                         "BlokeBot stops the current plugin work before it applies the update.",
                         "The old version stays active during non-durable preparation. If durable migration starts, the old code can never resume.",
-                        "A validation, migration, or activation failure faults the selected installation. Correct the package or tag, then start a new administrator action.",
+                        "Correct the package or tag. Then start a new administrator action.",
                     ],
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The problem can be in the package.",
+                        "The problem can be in a dependency.",
+                        "The problem can be in the host.",
+                    ],
                     Heading = "Recover a worker fault",
                     Paragraphs =
                     [
@@ -113,8 +154,9 @@ internal static partial class SiteGuideCatalog
                     ],
                     Steps =
                     [
-                        "Open Admin and read the latest operation message.",
-                        "Correct the package, dependency, or host problem.",
+                        "Open Admin.",
+                        "Read the latest operation message.",
+                        "Correct the reported problem.",
                         "Select Restart.",
                     ],
                 },
@@ -124,18 +166,27 @@ internal static partial class SiteGuideCatalog
                     Paragraphs = ["Remove permanently deletes all plugin installation state:"],
                     Bullets =
                     [
+                        "Remove leaves no unavailable page.",
+                        "Remove leaves no unavailable flow.",
+                        "Remove leaves no latest lifecycle outcome.",
                         "Installed package files.",
-                        "Installation and feature settings, configuration, and secrets.",
+                        "Installation settings.",
+                        "Feature settings.",
+                        "Configuration.",
+                        "secrets.",
                         "Schedules and the private SQLite database with its sidecar files.",
-                        "Plugin definitions, automation ledgers, dependent flows, and dependent nodes.",
-                        "Run history, source receipts, the marketplace installation receipt, and plugin invocation context.",
+                        "Plugin definitions and automation ledgers.",
+                        "dependent flows and dependent nodes.",
+                        "Run history and source receipts.",
+                        "the marketplace installation receipt and plugin invocation context.",
                     ],
                     Note =
-                        "Remove keeps only global catalogue metadata. There is no Purge or plugin-data retention. Remove leaves no unavailable page, unavailable flow, or latest lifecycle outcome.",
+                        "Remove keeps only global catalog metadata. There is no Purge or plugin-data retention.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Use author documentation for package details",
+                    Heading = "Plugin package reference",
+                    LegacyAnchor = "use-author-documentation-for-package-details",
                     Paragraphs =
                     [
                         "The operator guide does not define plugin APIs or package schemas. Use the generated author reference for those contracts.",

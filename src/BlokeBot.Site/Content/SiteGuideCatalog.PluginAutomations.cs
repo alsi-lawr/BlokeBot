@@ -9,12 +9,17 @@ internal static partial class SiteGuideCatalog
             Route = "/plugin-development/automations",
             Eyebrow = "Plugin automations",
             Title = "Automation nodes",
-            Summary =
-                "Plugins can add typed source, action, value, control, and transform nodes to the standard automation editor.",
+            Summary = "Plugins can add typed nodes to the standard automation editor.",
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The editor supports plugin source and action nodes.",
+                        "It supports plugin value and control nodes.",
+                        "It supports plugin transform nodes.",
+                    ],
                     Heading = "Node types",
                     Facts =
                     [
@@ -76,11 +81,21 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Invalid ports prevent enablement.",
+                        "Duplicate writers prevent enablement.",
+                        "Missing inputs prevent enablement.",
+                        "Cycles prevent enablement.",
+                        "A template defines nodes.",
+                        "A template defines configuration.",
+                        "A template defines typed data edges.",
+                    ],
                     Heading = "Templates",
                     Paragraphs =
                     [
-                        "A template defines nodes, configuration, and typed data edges. Each feature lists the templates that it owns.",
-                        "BlokeBot validates the graph before feature enablement. Invalid ports, duplicate writers, missing inputs, and cycles prevent enablement.",
+                        "Each feature lists the templates that it owns.",
+                        "BlokeBot validates the graph before feature enablement.",
                     ],
                     Code = """
                         [[automationTemplates]]
@@ -99,20 +114,29 @@ internal static partial class SiteGuideCatalog
                     Heading = "Generated flows",
                     Bullets =
                     [
-                        "Feature enablement creates a valid flow and records which plugin and template created it in one transaction.",
+                        "One transaction creates a valid flow during feature enablement. It records which plugin and template created the flow.",
                         "Repeated recovery does not create a duplicate flow.",
                         "BlokeBot does not overwrite or rename a conflicting host flow.",
-                        "If a user deletes the generated flow, a later disable and enable can create it again.",
+                        "If a user deletes the generated flow, a later feature disablement and enablement can create it again.",
                         "A plugin update replaces the current node definitions and handlers.",
-                        "Plugin removal deletes plugin definitions, dependent flows, nodes, run history, ledgers, and source receipts.",
+                        "Plugin removal deletes plugin definitions and dependent flows.",
+                        "Plugin removal deletes nodes and run history.",
+                        "Plugin removal deletes ledgers and source receipts.",
                     ],
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Before each automation call, BlokeBot checks the plugin.",
+                        "Before each automation call, BlokeBot checks the host.",
+                        "Before each automation call, BlokeBot checks the feature.",
+                        "Before each automation call, BlokeBot checks the node definition.",
+                        "Before each automation call, BlokeBot checks the active installation.",
+                    ],
                     Heading = "Updates and disabled features",
                     Paragraphs =
                     [
-                        "BlokeBot checks the plugin, host, feature, node definition, and active installation before each automation call.",
                         "An old worker result cannot start or complete a run. Feature disablement and plugin removal cancel affected calls and runs.",
                     ],
                 },

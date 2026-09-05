@@ -5,9 +5,13 @@
 <article class="article-shell install-page">
     <header class="article-header">
         <p class="eyebrow">Installation</p>
-        <h1>Run BlokeBot on infrastructure you control.</h1>
-        <p class="lede">Use Nix for the shortest reproducible route. Use Docker for an isolated service. Use the source tree for development.</p>
-        <p class="lede">Each command below works from the current repository. No command uses an unreleased package placeholder.</p>
+        <h1>Install BlokeBot on your infrastructure</h1>
+        <ul>
+<li>Use Nix for the shortest reproducible installation.</li>
+<li>Use Docker for an isolated service.</li>
+<li>Use the source tree for development.</li>
+</ul>
+        <p class="lede">The commands below work from the current repository. They do not use placeholders for unreleased packages.</p>
     </header>
 
     <aside class="status-panel status-panel--ready" aria-labelledby="install-status-title">
@@ -20,7 +24,7 @@
     </aside>
 
     <nav class="install-index" aria-label="Installation routes">
-        <h2>Choose a route</h2>
+        <h2>Installation methods</h2>
         <ul>
             <li><a href="install#nix">Nix</a></li>
             <li><a href="install#docker">Docker</a></li>
@@ -33,19 +37,31 @@
     <section id="nix" aria-labelledby="nix-title">
         <p class="section-number">01</p>
         <h2 id="nix-title">Nix</h2>
-        <p>Run the current BlokeBot flake without a global installation. Use the first command to confirm the CLI. Use the second command to start the dashboard.</p>
+        <ol>
+            <li>Run the current BlokeBot flake without a global installation.</li>
+            <li>Use the first command to check the CLI.</li>
+            <li>Use the second command to start the dashboard.</li>
+</ol>
         <p>The second command writes durable state to the supplied directory.</p>
         <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot -- help
 nix run github:alsi-lawr/BlokeBot#blokebot -- \
   serve --host 127.0.0.1 --port 8080 --data-dir "$HOME/.local/state/blokebot"</code></pre>
-        <p>For a NixOS service, import <code>github:alsi-lawr/BlokeBot</code>. Enable <code>services.blokebot</code>. Put credentials in <code>services.blokebot.environmentFile</code>.</p>
+        <ol>
+            <li>For a NixOS service, import <code>github:alsi-lawr/BlokeBot</code>.</li>
+            <li>Enable <code>services.blokebot</code>.</li>
+            <li>Put credentials in <code>services.blokebot.environmentFile</code>.</li>
+</ol>
         <p>Do not put credentials in ordinary <code>environment</code> values. Nix stores these values in the world-readable Nix store.</p>
     </section>
 
     <section id="docker" aria-labelledby="docker-title">
         <p class="section-number">02</p>
         <h2 id="docker-title">Docker</h2>
-        <p>Build the production Dockerfile from a source checkout. Mount <code>/data</code> as durable state. Supply configuration through environment variables or an environment file.</p>
+        <ol>
+            <li>Build the production Dockerfile from a source checkout.</li>
+            <li>Mount <code>/data</code> as durable state.</li>
+            <li>Supply configuration through environment variables or an environment file.</li>
+</ol>
         <pre><code>git clone https://github.com/alsi-lawr/BlokeBot.git
 cd BlokeBot
 docker build --file packaging/docker/blokebot.Dockerfile --tag blokebot:local .
@@ -55,13 +71,22 @@ docker run --rm --init \
   --env-file /etc/blokebot/blokebot.env \
   blokebot:local</code></pre>
         <p>Before you replace or remove the named volume, back it up.</p>
-        <p>The image starts <code>blokebot serve</code> on port 8080. It stores the database, token cache, and automatically managed Data Protection keys under <code>/data</code>.</p>
+        <p>The image starts <code>blokebot serve</code> on port 8080. It stores these items under <code>/data</code>:</p>
+        <ul>
+            <li>The database.</li>
+            <li>The token cache.</li>
+            <li>Automatically managed Data Protection keys.</li>
+        </ul>
     </section>
 
     <section id="source" aria-labelledby="source-title">
         <p class="section-number">03</p>
         <h2 id="source-title">Source checkout</h2>
-        <p>Use the repository directly when you change BlokeBot. Install the .NET 10 SDK and Node.js.</p>
+        <ol>
+            <li>Use the repository directly when you change BlokeBot.</li>
+            <li>Install the .NET 10 SDK.</li>
+            <li>Install Node.js.</li>
+</ol>
         <p>The Core build restores its pinned npm dependencies and compiles Tailwind automatically.</p>
         <pre><code>git clone https://github.com/alsi-lawr/BlokeBot.git
 cd BlokeBot
@@ -74,12 +99,24 @@ dotnet run --project src/BlokeBot -- \
     <section id="site" aria-labelledby="site-title">
         <p class="section-number">04</p>
         <h2 id="site-title">Run the separate help site</h2>
-        <p>The site is stateless. It does not reference the bot, persistence, or Twitch projects.</p>
+        <p>The site is stateless.</p>
+<ul>
+            <li>The site does not reference the bot projects.</li>
+            <li>It does not reference the persistence projects.</li>
+            <li>It does not reference the Twitch projects.</li>
+</ul>
         <p>Run it independently on port 8081:</p>
         <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot-site -- \
   --urls http://127.0.0.1:8081</code></pre>
         <p>If a reverse proxy publishes the site below a path such as <code>/blokebot</code>, set the path base.</p>
-        <p>The generated base URL, internal links, theme media, and static assets then remain under that prefix:</p>
+        <p>The following items then remain under that prefix:</p>
+        <ul>
+            <li>The generated base URL.</li>
+            <li>Internal links.</li>
+            <li>Theme media.</li>
+            <li>Static assets.</li>
+        </ul>
+        <p>Use this command:</p>
         <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot-site -- \
   --urls http://127.0.0.1:8081 \
   --BlokeBotSite:PathBase=/blokebot</code></pre>
@@ -96,8 +133,13 @@ docker run --rm --init --publish 8081:8081 \
     <section id="next" aria-labelledby="after-install-title">
         <p class="section-number">05</p>
         <h2 id="after-install-title">Configure Twitch and public HTTPS</h2>
-        <p>A process is only the first half of server setup.</p>
-        <p>Create the Twitch developer application. Register both callback paths. Keep the client secret outside source. Give the public dashboard a trusted HTTPS address.</p>
+        <p>Server setup also requires Twitch configuration and public HTTPS.</p>
+        <ol>
+            <li>Create the Twitch developer application.</li>
+            <li>Register both callback paths.</li>
+            <li>Keep the client secret outside source.</li>
+            <li>Give the public dashboard a trusted HTTPS address.</li>
+</ol>
         <div class="action-row">
             <a class="button button-primary" href="server-owners"><SiteIcon Name="server" />Complete server setup</a>
             <a class="button button-secondary" href="guide/getting-started"><SiteIcon Name="book" />Then connect a channel</a>

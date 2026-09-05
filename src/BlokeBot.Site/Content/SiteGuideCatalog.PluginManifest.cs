@@ -9,12 +9,19 @@ internal static partial class SiteGuideCatalog
             Route = "/plugin-development/manifest",
             Eyebrow = "Plugin manifest",
             Title = "plugin.toml",
-            Summary =
-                "plugin.toml defines the package identity, compatibility, files, settings, features, handlers, pages, automations, and migrations.",
+            Summary = "plugin.toml defines the plugin package and its declarations.",
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The manifest defines package identity and compatibility.",
+                        "It defines files and settings.",
+                        "It defines features and handlers.",
+                        "It defines pages and automations.",
+                        "It defines migrations.",
+                    ],
                     Heading = "Plugin identity",
                     Paragraphs =
                     [
@@ -40,10 +47,15 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Declare one API range and one BlokeBot version range.",
+                        "Declare Lua 5.4.",
+                        "Declare every supported runtime target.",
+                    ],
                     Heading = "Compatibility",
                     Paragraphs =
                     [
-                        "Declare one API range and one BlokeBot version range. Declare Lua 5.4 and every supported runtime target.",
                         "Each target for an asset or payload must also appear in the top-level target list.",
                     ],
                     Code = """
@@ -64,13 +76,26 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The package validator rejects undeclared files.",
+                        "The package validator rejects missing files.",
+                        "The package validator rejects unsafe paths.",
+                        "The package validator rejects links.",
+                        "The package validator rejects path collisions.",
+                        "The package validator rejects incompatible targets.",
+                        "Each listed browser or media file declares its media type.",
+                        "Each listed browser or media file declares its purpose.",
+                        "Each listed browser or media file declares its targets.",
+                        "Each listed browser or media file declares its maximum size.",
+                    ],
                     Heading = "Package files",
                     Facts =
                     [
                         new("luaModules", "Lists each Lua module and its package path."),
                         new(
                             "assets",
-                            "Lists browser or media files with their media type, purpose, targets, and maximum size."
+                            "Lists browser or media files with their asset declarations."
                         ),
                         new("payloads", "Lists other reviewed files and their runtime targets."),
                     ],
@@ -88,8 +113,6 @@ internal static partial class SiteGuideCatalog
                         runtimeIdentifiers = ["linux-x64"]
                         maximumBytes = 65536
                         """,
-                    Note =
-                        "The package validator rejects undeclared files, missing files, unsafe paths, links, path collisions, or incompatible targets.",
                 },
                 new SiteGuideSection
                 {
@@ -157,7 +180,7 @@ internal static partial class SiteGuideCatalog
                         "Run blokebot-plugin generate after each manifest change.",
                         "Fix each manifest or package error.",
                         "Run blokebot-plugin validate for all supported targets.",
-                        "Run blokebot-plugin test when tests.toml exists.",
+                        "If tests.toml exists, run blokebot-plugin test.",
                     ],
                 },
             ],

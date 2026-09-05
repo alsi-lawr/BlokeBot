@@ -16,8 +16,8 @@ internal static partial class SiteGuideCatalog
                 LightPhoneSource: "media/dashboard/phone-light-channel-setup.png",
                 DarkLaptopSource: "media/dashboard/laptop-dark-channel-setup.png",
                 LightLaptopSource: "media/dashboard/laptop-light-channel-setup.png",
-                PhoneAlt: "Channel setup for Sample Channel with connection, bot status, and chat tool controls.",
-                LaptopAlt: "Channel setup for Sample Channel with connection, bot status, and chat tool controls.",
+                PhoneAlt: "Channel setup for Sample Channel shows connection and bot status. It also shows chat tool controls.",
+                LaptopAlt: "Channel setup for Sample Channel shows connection and bot status. It also shows chat tool controls.",
                 "Use Channel setup to select a channel and find its feature controls."
             ),
             Sections =
@@ -31,7 +31,8 @@ internal static partial class SiteGuideCatalog
                     ],
                     Steps =
                     [
-                        "Open Channel setup and select the channel.",
+                        "Open Channel setup.",
+                        "Select the channel.",
                         "Open the plugin feature that you want to use.",
                         "Enter the generated settings.",
                         "Save the settings.",
@@ -42,13 +43,20 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Read feature readiness",
+                    Bullets =
+                    [
+                        "A Disabled plugin feature receives no commands.",
+                        "A Disabled plugin feature receives no events.",
+                        "A Disabled plugin feature receives no schedules.",
+                        "A Disabled plugin feature receives no actions.",
+                        "A Disabled plugin feature receives no pages.",
+                        "A Disabled plugin feature receives no automatic work.",
+                    ],
+                    Heading = "Feature readiness",
+                    LegacyAnchor = "read-feature-readiness",
                     Facts =
                     [
-                        new(
-                            "Disabled",
-                            "The feature is off. It receives no commands, events, schedules, actions, pages, or automatic work."
-                        ),
+                        new("Disabled", "The feature is off."),
                         new(
                             "Ready",
                             "The feature is on. BlokeBot admits work that matches the current installation and channel."
@@ -66,12 +74,18 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Know how plugin work joins the channel",
+                    Heading = "Plugin work in a channel",
+                    LegacyAnchor = "know-how-plugin-work-joins-the-channel",
                     Bullets =
                     [
-                        "Commands use built-in, custom, then plugin precedence. A built-in or custom route shadows the plugin command. The feature stays enabled.",
+                        "Built-in commands have first precedence.",
+                        "Custom commands have second precedence.",
+                        "Plugin commands have third precedence.",
+                        "A built-in or custom route shadows the plugin command. The feature stays enabled.",
                         "A second enabled plugin cannot claim the same plugin command route. BlokeBot rejects that feature enablement.",
-                        "Typed events, schedules, and actions run only while their feature and required readiness are admitted.",
+                        "BlokeBot admits typed events only while their feature and required readiness are admitted.",
+                        "BlokeBot admits schedules only while their feature and required readiness are admitted.",
+                        "BlokeBot admits actions only while their feature and required readiness are admitted.",
                         "A plugin can store private data in its own SQLite database. The plugin must separate rows for each channel.",
                     ],
                 },
@@ -93,7 +107,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Recover a channel feature",
                     Paragraphs =
                     [
-                        "If you deleted an automatic flow, disable and enable the feature. BlokeBot creates the flow again.",
+                        "If you deleted an automatic flow, disable the feature. Enable it again. BlokeBot creates the flow again.",
                         "If the plugin is faulted or absent, ask a BlokeBot administrator to recover the installation.",
                     ],
                     Links =
