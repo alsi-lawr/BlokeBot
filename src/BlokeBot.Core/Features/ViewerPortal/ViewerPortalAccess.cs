@@ -30,7 +30,7 @@ public sealed class ViewerPortalAccess(
                 new PortalChannel(
                     new PortalHostKey(value.Id, value.Login),
                     value.DisplayName,
-                    ViewerPortalFeatures.PublicFeatures(value.EnabledFeatures)
+                    ViewerPortalCatalogue.PublicFeatures(value.EnabledFeatures)
                 )
             ),
             static () => new PortalChannelOutcome.NotFound()
