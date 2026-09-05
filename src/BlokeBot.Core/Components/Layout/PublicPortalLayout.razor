@@ -1,0 +1,43 @@
+@inherits LayoutComponentBase
+@using BlokeBot.Core.Features.ViewerPortal
+@inject NavigationManager Navigation
+
+<div class="portal">
+    <header class="portal__topbar">
+        <div class="portal__topbar-inner">
+            <a class="portal__brand" href="/" aria-label="BlokeBot home">
+                <img class="portal__brand-mark" src="/blokebot-mark.svg" alt="" />
+                <span>BlokeBot</span>
+            </a>
+            <div class="portal__topbar-utility">
+                <ThemeToggle />
+                @if (_identity is PortalIdentity.Authenticated identity)
+                {
+                    <div class="portal__account control-surface">
+                        <span class="portal__avatar" aria-hidden="true">@identity.DisplayName[..1]</span>
+                        <span class="portal__account-name" title="@identity.DisplayName">@identity.DisplayName</span>
+                        <a class="portal__account-signout" href="@($"/auth/logout?returnUrl={ReturnUrl}")">Sign out</a>
+                    </div>
+                }
+                else if (_identity.Presentation == PortalIdentityPresentation.Unavailable)
+                {
+                    <span class="portal__auth portal__auth--unavailable" aria-disabled="true">Sign-in not available</span>
+                }
+                else
+                {
+                    <a class="portal__auth auth-action" href="@($"/auth/login?start=true&returnUrl={ReturnUrl}")">Sign in with Twitch</a>
+                }
+            </div>
+        </div>
+    </header>
+    <main class="portal__main" id="main">@Body</main>
+    <footer class="portal__footer"><p>Public channel page by BlokeBot.</p></footer>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationState { get; set; }
+    private PortalIdentity _identity = new PortalIdentity.Anonymous();
+    private string ReturnUrl => Uri.EscapeDataString(new Uri(Navigation.Uri).PathAndQuery);
+    protected override async Task OnParametersSetAsync() =>
+        _identity = await ViewerPortalAccess.IdentifyAsync(AuthenticationState);
+}

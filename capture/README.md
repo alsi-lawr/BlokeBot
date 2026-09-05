@@ -73,3 +73,12 @@ BLOKEBOT_CAPTURE_PORT=5610 nix run ../../Viset -- capture viewer-portal-mockup-p
 `.luarc.json` loads `.viset/viset.d.lua` for Viset API completion and diagnostics in Lua Language
 Server. For optional Neovim Tree-sitter highlighting of the TOML header and `viset.javascript`
 regions, add `.viset/nvim` to `runtimepath` and install the Lua, TOML and JavaScript parsers.
+
+## Viewer portal implementation evidence
+
+`viewer-portal.lua` photographs the production portal (anonymous and authenticated) and every
+migrated public detail route in the public shell. Its laptop/phone and light/dark matrix writes to
+`agent-planning/.../evidence/BLOKEBOT-277/captures`, not help media. Build Simulation and run it
+directly with an unreserved `BLOKEBOT_CAPTURE_PORT`; it reuses that local fixture when available.
+It does not simulate loading/authentication failures or prove refresh behavior.
+`viewer-portal-phone-lower.lua` adds both phone identity/theme views scrolled to You.

@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Persistence;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BlokeBot.Core.Hosting;
 
@@ -55,7 +56,23 @@ public static partial class BlokeBotApplication
         );
         _ = app.UseStaticFiles();
         _ = app.MapStaticAssets();
-        _ = app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
+        var components = app.MapRazorComponents<App>()
+            .AddInteractiveServerRenderMode()
+            .RequireAuthorization();
+        components.Add(static endpoint =>
+        {
+            if (
+                endpoint is RouteEndpointBuilder route
+                && route.RoutePattern.RawText?.TrimEnd('/')
+                    is "/_blazor"
+                        or "/_blazor/negotiate"
+                        or "/_blazor/initializers"
+                        or "/_blazor/disconnect"
+            )
+            {
+                endpoint.Metadata.Add(new AllowAnonymousAttribute());
+            }
+        });
         app.MapAuthEndpoints();
         if (runtime == BlokeBotRuntimeMode.Online)
         {

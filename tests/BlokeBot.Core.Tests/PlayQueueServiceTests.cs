@@ -8,6 +8,48 @@ namespace BlokeBot.Core.Tests;
 public sealed class PlayQueueServiceTests
 {
     [Test]
+    public async Task ExactSelfPosition_RenameKeepsPositionWithoutClaimingSameLoginOrAnotherHost()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var alpha = await SeedHostAsync(database, "alpha");
+        var beta = await SeedHostAsync(database, "beta");
+        var service = CreateService(database);
+        _ = Success(await service.ConfigureAsync(alpha, Queue("squad"), default));
+        _ = Success(await service.ConfigureAsync(beta, Queue("squad"), default));
+        _ = Success(await service.JoinAsync(alpha, "squad", Join("ahead", "eu", "Tank"), default));
+        _ = Success(
+            await service.JoinAsync(alpha, "squad", Join("oldlogin", "eu", "Healer"), default)
+        );
+        _ = Success(
+            await service.JoinAsync(
+                alpha,
+                "squad",
+                Join("renamed", "eu", "Healer") with
+                {
+                    Viewer = new("renamed", "twitch-oldlogin", "Renamed"),
+                },
+                default
+            )
+        );
+        var own = Success(
+            await service.GetSelfPositionAsync(alpha, "squad", "twitch-oldlogin", default)
+        );
+        own.Value.Position.ShouldBe(2);
+        _ = (await service.GetSelfPositionAsync(alpha, "squad", "different-id", default))
+            .Match(
+                static _ => throw new InvalidOperationException("Unexpected self row"),
+                static value => value.Reason
+            )
+            .ShouldBeOfType<PlayQueueRejection.NotJoined>();
+        _ = (await service.GetSelfPositionAsync(beta, "squad", "twitch-oldlogin", default))
+            .Match(
+                static _ => throw new InvalidOperationException("Unexpected self row"),
+                static value => value.Reason
+            )
+            .ShouldBeOfType<PlayQueueRejection.NotJoined>();
+    }
+
+    [Test]
     public async Task DisabledSwitch_RetainsQueuesBlocksEffectsAndDoesNotReplayOnReenable()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

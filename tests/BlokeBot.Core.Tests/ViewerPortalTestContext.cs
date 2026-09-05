@@ -31,7 +31,8 @@ internal sealed class ViewerPortalTestContext
     )
     {
         Database = database;
-        var events = TestEventBus.Create<AppEventKind>();
+        Events = TestEventBus.Create<AppEventKind>();
+        var events = Events;
         Changes = new(events);
         Bounties = new(database, events, Clock);
         Collectives = new(database, new UnavailableRaidProvider(), Clock);
@@ -42,8 +43,9 @@ internal sealed class ViewerPortalTestContext
         Passports = new(database, points, new OfflineStream(), Clock);
         Access = new(new PublicLeaderboardHostLookup(database), Passports, database);
         var community = new CommunityProgressionService(database, events, Clock);
+        Bingo = new BingoService(bingoDatabase ?? database, community, events, Clock);
         var activities = new PortalActivityProjectors(
-            new BingoService(bingoDatabase ?? database, community, events, Clock),
+            Bingo,
             new BlokeRaidService(database, events, new BlokeRaidRandom(), Clock),
             Bounties,
             new CompetitionService(database, events, community, [], Clock),
@@ -67,6 +69,8 @@ internal sealed class ViewerPortalTestContext
         );
     }
 
+    internal BlokeBot.Eventing.EventBus<AppEventKind> Events { get; }
+    internal BingoService Bingo { get; }
     internal SqliteBlokeBotDbFactory Database { get; }
     internal PortalClock Clock { get; } =
         new(new DateTimeOffset(2026, 9, 5, 12, 0, 0, TimeSpan.Zero));

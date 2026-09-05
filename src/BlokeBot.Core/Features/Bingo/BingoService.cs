@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Bingo;
 
-public sealed class BingoService(
+public sealed partial class BingoService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     ICommunityAchievementGrantService achievementGrants,
     EventBus<AppEventKind> events,

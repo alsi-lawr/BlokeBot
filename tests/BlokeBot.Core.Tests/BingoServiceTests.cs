@@ -18,6 +18,47 @@ public sealed class BingoServiceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 14, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task SelfCard_FollowsExactParticipantAcrossRenameAndExcludesOtherHostAndArchivedGame()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var alpha = await SeedHostAsync(database, "alpha", HostFeatureFlags.Bingo);
+        var beta = await SeedHostAsync(database, "beta", HostFeatureFlags.Bingo);
+        var service = CreateService(database);
+        var template = await ConfigureTemplateAsync(database, service, alpha, 3, ManualSquares(3));
+        _ = Success(await service.CreateGameAsync(alpha, SharedGame(template.Id), default));
+        var game = (await service.GetModeratorGamesAsync(alpha, default)).Single().Game;
+        _ = Success(
+            await service.JoinAsync(
+                alpha,
+                Roster(game, new("stable-id", "oldlogin", "Old name"), null),
+                default
+            )
+        );
+        _ = Success(
+            await service.JoinAsync(
+                alpha,
+                Roster(game, new("stable-id", "renamed", "New name"), null),
+                default
+            )
+        );
+        _ = Success(await service.IssueAsync(alpha, Action(game), default));
+        var own = (
+            await service.GetSelfCardAsync(alpha, "stable-id", default)
+        ).ShouldBeOfType<BingoSelfCardOutcome.Available>();
+        own.Card.TotalSquares.ShouldBe(9);
+        _ = (
+            await service.GetSelfCardAsync(alpha, "other-id", default)
+        ).ShouldBeOfType<BingoSelfCardOutcome.NotJoined>();
+        _ = (
+            await service.GetSelfCardAsync(beta, "stable-id", default)
+        ).ShouldBeOfType<BingoSelfCardOutcome.NotJoined>();
+        _ = Success(await service.ArchiveAsync(alpha, Action(game), default));
+        _ = (
+            await service.GetSelfCardAsync(alpha, "stable-id", default)
+        ).ShouldBeOfType<BingoSelfCardOutcome.NotJoined>();
+    }
+
+    [Test]
     public async Task TeamRoster_EnforcesCapsAndFreezesAssignmentsAtIssue()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

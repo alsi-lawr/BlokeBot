@@ -1045,6 +1045,16 @@ internal sealed class SimulationFixtureSeeder(
         };
         var participants = new[]
         {
+            Participant(
+                hostId,
+                game,
+                aurora,
+                auroraCard,
+                SimulationMode.UserId,
+                SimulationMode.Login,
+                SimulationMode.DisplayName,
+                now
+            ),
             Participant(hostId, game, aurora, auroraCard, "3000", "nightowl", "NightOwl", now),
             Participant(hostId, game, aurora, auroraCard, "2002", "pixelpilot", "PixelPilot", now),
             Participant(hostId, game, nebula, nebulaCard, "2003", "cozycactus", "CozyCactus", now),
@@ -2533,6 +2543,18 @@ internal sealed class SimulationFixtureSeeder(
                 "Support"
             )
         );
+        var viewer = Entry(
+            SimulationMode.Login,
+            SimulationMode.DisplayName,
+            PlayQueueEntryStatus.Waiting,
+            -3,
+            null,
+            "PC",
+            "Support"
+        );
+        viewer.IdentityKey = $"id:{SimulationMode.UserId}";
+        viewer.TwitchUserId = SimulationMode.UserId;
+        queue.Entries.Add(viewer);
         _ = db.PlayQueues.Add(queue);
         return;
 

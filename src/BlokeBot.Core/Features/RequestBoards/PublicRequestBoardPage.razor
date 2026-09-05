@@ -1,9 +1,11 @@
+@layout PublicPortalLayout
 @page "/requests/{Channel}/{BoardSlug}"
 @using Microsoft.AspNetCore.Authorization
 @using BlokeBot.Persistence.Models
 @attribute [AllowAnonymous]
 @inject RequestBoardService _boards
 
+<ChannelReturnLink Channel="@Channel" />
 <PageTitle>BlokeBot | Request board</PageTitle>
 
 <div class="mx-auto max-w-6xl space-y-6">

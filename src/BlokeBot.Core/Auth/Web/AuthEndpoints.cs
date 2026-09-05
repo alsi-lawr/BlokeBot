@@ -426,10 +426,10 @@ internal static class AuthEndpoints
 
         _ = app.MapGet(
                 "/auth/logout",
-                async (HttpContext context, AuthSessionService session) =>
+                async (HttpContext context, AuthSessionService session, string? returnUrl) =>
                 {
                     await session.SignOutAsync(context);
-                    return Results.Redirect("/auth/login");
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/auth/login"));
                 }
             )
             .AllowAnonymous();

@@ -1,0 +1,7 @@
+@using BlokeBot.Core.Identity
+
+<a class="btn-secondary justify-self-start" href="@($"/channel/{Uri.EscapeDataString(LoginName.Parse(Channel).Value)}")">Back to channel</a>
+
+@code {
+    [Parameter, EditorRequired] public string Channel { get; set; } = string.Empty;
+}

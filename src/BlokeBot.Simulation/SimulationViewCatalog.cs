@@ -8,6 +8,12 @@ internal static class SimulationViewCatalog
     >(StringComparer.Ordinal)
     {
         ["home"] = "/",
+        ["viewer-portal"] = "/channel/samplechannel",
+        ["public-moments"] = "/moments/samplechannel",
+        ["public-moments-stream"] = "/moments/samplechannel/streams/stream-0001",
+        ["public-queue"] = "/queues/samplechannel/main",
+        ["public-requests"] = "/requests/samplechannel/requests",
+        ["public-collective"] = "/collectives/samplechannel/3f78b947-a0f8-4872-ae3b-a876a27e58a0",
         ["channel-setup"] = "/host",
         ["alerts"] = "/alerts",
         ["guessing"] = "/guessing#live",

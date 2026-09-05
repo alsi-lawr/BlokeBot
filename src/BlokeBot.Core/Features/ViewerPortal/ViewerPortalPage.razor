@@ -1,0 +1,125 @@
+@page "/channel/{Login}"
+@layout PublicPortalLayout
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<PageTitle>@(_channel is null ? "Channel | BlokeBot" : $"{_channel.DisplayName} | BlokeBot")</PageTitle>
+<HeadContent>
+    <meta name="description" content="@(_channel is null ? "Public channel page by BlokeBot." : $"Public activities for {_channel.DisplayName} on BlokeBot.")" />
+    @if (_channel is not null) { <link rel="canonical" href="@_canonicalUrl" /> }
+</HeadContent>
+<div class="portal-content">
+    @if (_notFound)
+    {
+        <PageHeader Kicker="Channel" Title="Channel not found" Description="@($"There is no BlokeBot channel named @{_normalizedLogin}. Check the link.")" />
+    }
+    else if (_channel is null)
+    {
+        <PageHeader Kicker="Channel" Title="Channel" />
+        <PageState Kind="PageStateKind.Loading" Title="Loading" />
+    }
+    else
+    {
+        <header class="portal__channel card" aria-labelledby="portal-channel-name">
+            <div class="portal__channel-avatar" aria-hidden="true">@Initials(_channel.DisplayName)</div>
+            <div class="portal__channel-body">
+                <div class="page-kicker portal__kicker">Channel</div>
+                <h1 id="portal-channel-name" class="page-header__title">@_channel.DisplayName</h1>
+                <p class="portal__channel-login">@($"@{_channel.Host.Login}")</p>
+                <div class="portal__channel-status">
+                    <span class="status-pill @(_live ? "status-pill--green" : "status-pill--slate")"><span class="status-pill__dot"></span><span class="status-pill__label">@_liveness</span></span>
+                    <a class="portal__external" href="@($"https://twitch.tv/{Uri.EscapeDataString(_channel.Host.Login)}")" rel="noreferrer">Watch on Twitch</a>
+                </div>
+            </div>
+        </header>
+        @if (_features.Count == 0)
+        {
+            <PageState Kind="PageStateKind.Empty" Title="No public activities" />
+        }
+        else
+        {
+            <nav class="portal__nav" aria-label="Activities">
+                <ul class="portal__chips">
+                    @foreach (var feature in _features)
+                    {
+                        <li @key="feature.Feature">
+                            @if (Links(feature).FirstOrDefault() is { } link)
+                            {
+                                <a class="portal__chip control-surface" href="@link.Href">@feature.Label@if (Summary(feature)?.IsActive == true) { <span class="portal__chip-dot" aria-hidden="true"></span><span class="sr-only">, live</span> }</a>
+                            }
+                            else { <span class="portal__chip control-surface">@feature.Label</span> }
+                        </li>
+                    }
+                </ul>
+                <div class="portal__resource-lists">
+                    @foreach (var feature in _features.Where(value => Links(value).Count > 1))
+                    {
+                        <div class="portal__resource-list" @key="feature.Feature">
+                            <p class="portal__card-title">@feature.Label</p>
+                            <ul>@foreach (var link in Links(feature)) { <li><a class="portal__external" href="@link.Href">@link.Label</a></li> }</ul>
+                        </div>
+                    }
+                </div>
+            </nav>
+            <div class="portal__grid">
+                <section class="portal__section portal__section--now" aria-labelledby="portal-now">
+                    <h2 id="portal-now" class="portal__heading">Happening now</h2>
+                    <div class="portal__cards">
+                        @if (_highlights.Count == 0) { <div class="card portal__card portal__card--muted"><p>No activity is live.</p></div> }
+                        @foreach (var feature in _highlights)
+                        {
+                            <article class="card portal__card @(Failed(feature) ? "portal__card--failed" : "")" @key="feature.Feature">
+                                <div class="portal__card-head">
+                                    <h3 class="portal__card-title">@feature.Label</h3>
+                                    @if (Summary(feature)?.IsActive == true) { <span class="status-pill status-pill--green"><span class="status-pill__label">Active</span></span> }
+                                </div>
+                                @if (!_projections.ContainsKey(feature.Feature)) { <p class="portal__card-detail" role="status">Loading</p> }
+                                else if (Failed(feature)) { <p class="portal__card-headline" role="status">@feature.Label did not load.</p> }
+                                else if (Summary(feature) is { } summary) { <p class="portal__card-headline">@summary.Headline</p><p class="portal__card-detail">@summary.Detail</p> }
+                                @if (Links(feature).FirstOrDefault() is { } action) { <a class="btn-secondary portal__card-action" href="@action.Href">Open @feature.Label</a> }
+                            </article>
+                        }
+                    </div>
+                </section>
+                <section class="portal__section portal__section--you" aria-labelledby="portal-you">
+                    <h2 id="portal-you" class="portal__heading">You</h2>
+                    <div class="card portal__card portal__personal-card">
+                        @if (_identity is PortalIdentity.Authenticated identity)
+                        {
+                            <p class="portal__you-identity">Signed in as <strong>@identity.DisplayName</strong> <span class="portal__you-login">@($"@{identity.Login}")</span></p>
+                            @if (_personalPending) { <p class="portal__card-detail" role="status">Loading</p> }
+                            @if (_personal.Values.Any(value => value.State == PortalReadState.Unavailable)) { <p role="status">Some of your information did not load.</p> }
+                            <ul class="portal__you-list">
+                                @foreach (var item in _personalItems)
+                                {
+                                    <li class="portal__you-item">
+                                        <span class="portal__you-label">@item.Label</span><span class="portal__you-value">@item.Value @if (item.Rank is { } rank) { <RankIndicator Rank="rank" /> }</span>
+                                        <span class="portal__you-detail">@item.Detail</span><a class="portal__you-link" href="@item.Link.Href">@item.Link.Label</a>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else if (_identity.Presentation == PortalIdentityPresentation.Unavailable) { <p role="status">Sign-in is not available. Try again later.</p> }
+                        else
+                        {
+                            <p class="portal__card-detail">Sign in to see your points, passport and queue place.</p>
+                            <a class="portal__you-link auth-action btn-secondary" href="@_signInUrl">Sign in with Twitch</a>
+                        }
+                    </div>
+                </section>
+                <section class="portal__section portal__section--recent" aria-labelledby="portal-recent">
+                    <h2 id="portal-recent" class="portal__heading">Recent activity</h2>
+                    <div class="card portal__card">
+                        @if (_recent.Count == 0) { <p class="portal__card-detail">No public activity.</p> }
+                        else
+                        {
+                            <ol class="portal__events">
+                                @foreach (var item in _recent) { <li class="portal__event"><span class="portal__event-when">@RelativeTime(item.Activity.OccurredAtUtc)</span><span class="portal__event-feature">@item.Feature</span><a class="portal__event-text" href="@item.Activity.Link.Href">@item.Activity.Description</a></li> }
+                            </ol>
+                        }
+                    </div>
+                </section>
+            </div>
+        }
+    }
+</div>
