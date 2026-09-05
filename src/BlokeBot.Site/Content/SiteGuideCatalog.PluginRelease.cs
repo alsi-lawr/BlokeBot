@@ -10,11 +10,18 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Plugin releases",
             Title = "Testing and releases",
             Summary =
-                "The release process validates each target, runs local tests, tags the package, and adds it to the curated repository.",
+                "The release process checks each target and submits the tested package to the curated repository.",
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The release process validates each target.",
+                        "It runs local tests.",
+                        "It tags the package.",
+                        "It adds the package to the curated repository.",
+                    ],
                     Heading = "Author commands",
                     Facts =
                     [
@@ -102,19 +109,24 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "For each download, BlokeBot records the version.",
+                        "For each download, BlokeBot records the tag.",
+                        "For each download, BlokeBot records a unique identity.",
+                    ],
                     Heading = "Release identity",
                     Steps =
                     [
                         "Set declaredVersion to the release semantic version.",
                         "Set tag to the Git tag for that release.",
-                        "Verify that the package repository resolves the tag.",
+                        "Check that the package repository resolves the tag.",
                         "Run generate from the final package tree.",
                         "Run validate from the final package tree.",
                         "Run test from the final package tree.",
                         "Submit the package through the curated repository review process.",
                     ],
-                    Note =
-                        "Do not put a commit SHA in plugin.toml. BlokeBot records the version, tag, and a unique identity for each download.",
+                    Note = "Do not put a commit SHA in plugin.toml.",
                 },
                 new SiteGuideSection
                 {
@@ -132,13 +144,13 @@ internal static partial class SiteGuideCatalog
                     Heading = "Release checklist",
                     Bullets =
                     [
-                        "Verify that the package contains plugin.toml and every declared file.",
-                        "Verify that the generated SDK matches the final manifest.",
-                        "Verify that validate accepts every declared runtime target.",
-                        "Verify that test passes every declared scenario on the current runtime target.",
-                        "Verify that the tag resolves to the reviewed package tree.",
-                        "Verify that the package contains no protected value or token.",
-                        "Verify that the package contains no production endpoint.",
+                        "Check that the package contains plugin.toml and every declared file.",
+                        "Check that the generated SDK matches the final manifest.",
+                        "Check that validate accepts every declared runtime target.",
+                        "Check that test passes every declared scenario on the current runtime target.",
+                        "Check that the tag resolves to the reviewed package tree.",
+                        "Check that the package contains no protected value or token.",
+                        "Check that the package contains no production endpoint.",
                     ],
                 },
             ],

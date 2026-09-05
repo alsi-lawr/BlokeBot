@@ -9,19 +9,30 @@ internal static partial class SiteGuideCatalog
             Route = "/plugin-development/host-api",
             Eyebrow = "Plugin development",
             Title = "Host API",
-            Summary =
-                "For each API call, BlokeBot checks the context, arguments, result, payload limits, cancellation, and active plugin state.",
+            Summary = "Use the API for the current invocation.",
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Context, settings, and diagnostics",
+                    Bullets =
+                    [
+                        "For each API call, BlokeBot checks context.",
+                        "For each API call, BlokeBot checks arguments.",
+                        "For each API call, BlokeBot checks the result.",
+                        "For each API call, BlokeBot checks payload limits.",
+                        "For each API call, BlokeBot checks cancellation.",
+                        "For each API call, BlokeBot checks active plugin state.",
+                        "The returned context can be the current installation context.",
+                        "The returned context can be the current channel context.",
+                        "The returned context can be the current automation context.",
+                        "The returned context can be the current migration context.",
+                        "The returned context can be the current page context.",
+                    ],
+                    Heading = "Invocation APIs",
+                    LegacyAnchor = "context-settings-and-diagnostics",
                     Facts =
                     [
-                        new(
-                            "blokebot.context.current()",
-                            "Returns the current installation, channel, automation, migration, or page context."
-                        ),
+                        new("blokebot.context.current()", "Returns the current context."),
                         new(
                             "blokebot.settings.installation()",
                             "Returns the declared values for the current plugin installation."
@@ -92,6 +103,13 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The storage API rejects attached databases.",
+                        "The storage API rejects unsafe file operations.",
+                        "The storage API rejects virtual tables.",
+                        "The storage API rejects multiple statements.",
+                    ],
                     Heading = "Private SQLite database",
                     Paragraphs =
                     [
@@ -109,16 +127,22 @@ internal static partial class SiteGuideCatalog
                             "Runs one supported query and returns typed row maps."
                         ),
                     ],
-                    Note =
-                        "The storage API rejects attached databases, unsafe file operations, virtual tables, and multiple statements.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "HTTP requests",
-                    Paragraphs =
+                    Bullets =
                     [
-                        "http.send enforces the host HTTP policy for the method, URI, headers, body, response, redirect, duration, cancellation, and plugin concurrency.",
+                        "The result can be a typed response.",
+                        "The result can be a typed rejection.",
+                        "The result can be a typed failure.",
+                        "The method and URI.",
+                        "The headers and body.",
+                        "The response and redirect.",
+                        "The duration and cancellation.",
+                        "Plugin concurrency.",
                     ],
+                    Heading = "HTTP requests",
+                    Paragraphs = ["http.send enforces the host HTTP policy for the items below."],
                     Code = """
                         local outcome = blokebot.http.send({
                           method = "POST",
@@ -131,8 +155,7 @@ internal static partial class SiteGuideCatalog
                           return outcome.status
                         end
                         """,
-                    Note =
-                        "The result is a typed response, rejection, or failure. If the caller cancels the request, the current call ends.",
+                    Note = "If the caller cancels the request, the current call ends.",
                 },
             ],
             Next =

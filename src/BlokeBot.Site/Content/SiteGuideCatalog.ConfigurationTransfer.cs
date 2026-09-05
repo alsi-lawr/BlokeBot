@@ -9,7 +9,7 @@ internal static partial class SiteGuideCatalog
         LightLaptopSource: "media/configuration-transfer/laptop-light-review.png",
         PhoneAlt: "The review for a Sample Channel import on a narrow screen.",
         LaptopAlt: "The review for a Sample Channel import on a wide screen.",
-        "Verify all additions and updates. Verify all skips and removals before you apply the import."
+        "Check all additions and updates. Check all skips and removals before you apply the import."
     );
 
     private static IEnumerable<SiteGuidePage> CreateConfigurationTransferPages()
@@ -20,7 +20,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Move channel settings",
             Title = "Export and move channel settings",
             Summary =
-                "This guide explains how to export supported channel settings and import them into another channel. The file is not a full backup.",
+                "Export supported channel settings to import them into another channel. The file is not a full backup.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/configuration-transfer/phone-dark-export.png",
                 LightPhoneSource: "media/configuration-transfer/phone-light-export.png",
@@ -34,15 +34,21 @@ internal static partial class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Broadcasters can use Configuration transfer for the selected channel.",
+                        "Administrators can use Configuration transfer for the selected channel.",
+                        "Moderators can use Configuration transfer for the selected channel.",
+                        "Before the import, export the supported settings from the destination channel.",
+                        "Keep each export private.",
+                        "Do not use an export as a full backup.",
+                    ],
                     Heading = "Before you start",
                     Paragraphs =
                     [
                         "The source channel supplies the settings. The destination channel receives the settings.",
-                        "Broadcasters and administrators can use Configuration transfer for the selected channel. Moderators can also use it.",
-                        "BlokeBot verifies saved access and current Twitch moderator status when a moderator applies an import.",
+                        "BlokeBot checks saved access and current Twitch moderator status when a moderator applies an import.",
                     ],
-                    Note =
-                        "Before the import, export the supported settings from the destination channel. Keep each export private. Do not use an export as a full backup.",
                 },
                 new SiteGuideSection
                 {
@@ -54,9 +60,9 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Open Configuration transfer for the source channel.",
-                        "Verify the seven selected sections.",
-                        "For Overlays, verify the URL layers and Media-document links selections.",
-                        "If you export URL layers, verify the Complete URLs can contain credentials warning.",
+                        "Check the seven selected sections.",
+                        "For Overlays, check the URL layers and Media-document links selections.",
+                        "If you export URL layers, check the Complete URLs can contain credentials warning.",
                         "Clear each section or Overlay child option that you do not need.",
                         "Select Download configuration.",
                         "Store the JSON file in a private location.",
@@ -64,24 +70,71 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "What the file contains",
+                    Bullets =
+                    [
+                        "Automations includes core visual flows.",
+                        "Automations includes graph layout.",
+                        "Automations includes nodes.",
+                        "Automations includes bindings.",
+                        "Automations includes expressions.",
+                        "Automations includes failure policies.",
+                        "Automations includes aliases.",
+                        "Automations includes positions.",
+                        "Automations includes edges.",
+                        "Automations includes host references.",
+                        "Overlays includes portable core Browser Sources.",
+                        "Overlays includes appearance.",
+                        "Overlays includes cues.",
+                        "Overlays includes queue policies.",
+                        "Points & giveaways includes the point label.",
+                        "Points & giveaways includes command aliases.",
+                        "Points & giveaways includes replies.",
+                        "Points & giveaways includes gambling rules.",
+                        "Points & giveaways includes giveaway rules.",
+                        "Guessing game includes profiles.",
+                        "Guessing game includes canonical slugs.",
+                        "Guessing game includes default states.",
+                        "Guessing game includes correct-guess rewards.",
+                        "Guessing game includes command aliases.",
+                        "Guessing game includes replies.",
+                        "Guessing game includes answers.",
+                        "Guessing game includes reply targets.",
+                        "Announcements item settings include enabled states.",
+                        "Announcements item settings include delivery options.",
+                        "Announcements item settings include colors.",
+                        "Announcements item settings include retry rules.",
+                        "Announcements item settings include lifetime rules.",
+                        "Announcements item settings include schedules.",
+                        "The Custom commands section includes reusable replies.",
+                        "The Custom commands section includes counters.",
+                        "The Custom commands section includes command names.",
+                        "The Custom commands section includes aliases.",
+                        "The Custom commands section includes access rules.",
+                        "The Custom commands section includes cooldowns.",
+                        "The Custom commands section includes limits.",
+                        "The Custom commands section includes actions.",
+                        "The Custom commands section includes routes.",
+                        "The Custom commands section includes enabled states.",
+                    ],
+                    Heading = "Export contents",
+                    LegacyAnchor = "what-the-file-contains",
                     Facts =
                     [
                         new SiteGuideFact(
                             "Custom commands",
-                            "The Custom commands section includes reusable replies and counters. It includes command names and aliases. It includes access rules and cooldowns. It includes limits and actions. It includes routes and enabled states. Merge by name and Replace section import the dashboard time zone."
+                            "Merge by name and Replace section import the dashboard time zone."
                         ),
                         new SiteGuideFact(
                             "Announcements",
-                            "Announcements includes reusable replies and item settings. Item settings include enabled states and delivery options. They include colors and retry rules. They include lifetime rules and schedules. Weekly schedules store UTC recurrence. An Announcements-only import keeps the destination time zone, which controls display but not UTC recurrence."
+                            "Announcements includes reusable replies and item settings. Weekly schedules store UTC recurrence. An Announcements-only import keeps the destination time zone, which controls display but not UTC recurrence."
                         ),
                         new SiteGuideFact(
                             "Guessing game",
-                            "Guessing game includes profiles and canonical slugs. It includes default states and correct-guess rewards. It includes command aliases and replies. It includes answers and reply targets."
+                            "The section contains reusable Guessing game configuration."
                         ),
                         new SiteGuideFact(
                             "Points & giveaways",
-                            "Points & giveaways includes the point label and command aliases. It includes replies and gambling rules. It also includes giveaway rules."
+                            "The section contains reusable Points & giveaways configuration."
                         ),
                         new SiteGuideFact(
                             "Chat Tools enablement",
@@ -89,11 +142,11 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Overlays",
-                            "Overlays includes portable core Browser Sources and appearance. It includes cues and queue policies. URL layers and Media-document links are separate child selections. URL layers preserve complete URLs. Media-document links contain immutable document IDs and metadata, but no media bytes. These links work only in the same BlokeBot instance."
+                            "URL layers and Media-document links are separate child selections. URL layers preserve complete URLs. Media-document links contain immutable document IDs and metadata, but no media bytes. These links work only in the same BlokeBot instance."
                         ),
                         new SiteGuideFact(
                             "Automations",
-                            "Automations includes core visual flows and graph layout. It includes nodes and bindings. It includes expressions and failure policies. It includes aliases and positions. It includes edges and host references. Format 1 transfers safely stored invalid core flows for repair."
+                            "Format 1 transfers safely stored invalid core flows for repair."
                         ),
                     ],
                     Note =
@@ -101,24 +154,56 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Exports replace source database keys with deterministic export-local references.",
+                        "Fixed Actor and Channel identities become identity-free placeholders.",
+                        "Unresolved Automation references also become identity-free placeholders for editor repair.",
+                        "Overlay media uses immutable same-instance document IDs without media bytes.",
+                        "Format 1 excludes community data.",
+                        "Format 1 excludes Lua configuration.",
+                        "Format 1 excludes plugin configuration.",
+                        "Format 1 rejects plugin-defined Automation nodes.",
+                        "Exports do not contain alerts.",
+                        "Exports do not contain queued public chat.",
+                        "Exports do not contain delivery receipts.",
+                        "Exports do not contain stream runtime state.",
+                        "Exports do not contain Overlay queues.",
+                        "Exports do not contain Automation runs.",
+                        "Exports do not contain history.",
+                        "Exports do not contain point balances.",
+                        "Exports do not contain point ledgers.",
+                        "Exports do not contain Guessing game rounds.",
+                        "Exports do not contain votes.",
+                        "Exports do not contain leaderboards.",
+                        "Exports do not contain giveaway entrants.",
+                        "Exports do not contain draw results.",
+                        "Exports do not contain OAuth tokens.",
+                        "Exports do not contain client secrets.",
+                        "Exports do not contain application credentials.",
+                        "Exports do not contain sessions.",
+                        "Exports do not contain cookies.",
+                        "Exports do not contain server paths.",
+                        "Exports do not contain deployment settings.",
+                    ],
                     Heading = "Export boundaries",
                     Facts =
                     [
                         new SiteGuideFact(
                             "Credentials and server settings",
-                            "Exports do not contain OAuth tokens or client secrets. They do not contain application credentials or sessions. They do not contain cookies or server paths. They do not contain deployment settings."
+                            "Exports exclude credentials and server settings."
                         ),
                         new SiteGuideFact(
                             "Live channel data",
-                            "Exports do not contain point balances or point ledgers. They do not contain Guessing game rounds or votes. They do not contain leaderboards or giveaway entrants. They do not contain draw results."
+                            "Exports exclude live channel data."
                         ),
                         new SiteGuideFact(
                             "Runtime and delivery data",
-                            "Exports do not contain alerts or queued public chat. They do not contain delivery receipts or stream runtime state. They do not contain Overlay queues. They do not contain Automation runs or history. Format 1 excludes community data and Lua configuration. It excludes plugin configuration and rejects plugin-defined Automation nodes."
+                            "Format 1 also excludes unsupported feature configuration."
                         ),
                         new SiteGuideFact(
                             "Linked definitions",
-                            "Exports replace source database keys with deterministic export-local references. Fixed Actor and Channel identities become identity-free placeholders. Unresolved Automation references also become identity-free placeholders for editor repair. Overlay media uses immutable same-instance document IDs without media bytes."
+                            "Exports replace database identities with portable references where supported."
                         ),
                         new SiteGuideFact(
                             "Format and limits",
@@ -145,13 +230,13 @@ internal static partial class SiteGuideCatalog
                         "Select Import.",
                         "Upload the JSON file or paste its contents.",
                         "Select Validate and review.",
-                        "Verify the Source and BlokeBot values.",
-                        "Verify the Format and Exported values.",
-                        "Use the Format value to verify compatibility.",
+                        "Check the Source and BlokeBot values.",
+                        "Check the Format and Exported values.",
+                        "Use the Format value to check compatibility.",
                         "Use the BlokeBot value only as information about the export.",
                         "Select the sections that you want to import.",
-                        "Verify the add and update counts.",
-                        "Verify the skip and remove counts.",
+                        "Check the add and update counts.",
+                        "Check the skip and remove counts.",
                         "Select a Conflict strategy for each selected section.",
                         "Resolve each required decision.",
                         "Select Apply selected sections.",
@@ -160,6 +245,30 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "An explicit Destination profile selection overrides the automatic target.",
+                        "Otherwise, Guessing game uses an exact canonical slug.",
+                        "If no profile matches, BlokeBot creates a profile.",
+                        "BlokeBot updates a matched profile in place.",
+                        "The profile keeps its ID and linked rounds.",
+                        "Replace section uses Merge by name behavior.",
+                        "Replace section removes eligible items that exist only in the destination.",
+                        "Shared replies stay when retained commands or Announcements need them.",
+                        "BlokeBot can remove an absent Guessing game profile without rounds or an absent Automation flow without runs.",
+                        "For Replace section, referenced destination Overlays require Retain target item or import cancellation.",
+                        "An empty imported collection can remove eligible destination-only items.",
+                        "Merge by name adds new items and updates names that match without regard to letter case.",
+                        "Merge by name keeps items that exist only in the destination.",
+                        "Matched Overlay records and Automation flows update in place.",
+                        "Matched Automation flows keep their runs and history.",
+                        "For Merge by name, Points & giveaways replaces its settings record.",
+                        "Add missing adds names that do not exist and skips names that match.",
+                        "Add missing keeps the destination time zone.",
+                        "For Guessing game, Add missing skips matched profiles.",
+                        "If no Points settings exist, Add missing applies the imported record.",
+                        "Otherwise, Add missing skips that record.",
+                    ],
                     Heading = "Resolve conflicts",
                     MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-conflict.png",
@@ -178,19 +287,19 @@ internal static partial class SiteGuideCatalog
                     [
                         new SiteGuideFact(
                             "Add missing",
-                            "Add missing adds names that do not exist and skips names that match. It keeps the destination time zone. For Guessing game, it skips matched profiles. If no Points settings exist, it applies the imported record. Otherwise, it skips that record."
+                            "Add missing applies only missing configuration."
                         ),
                         new SiteGuideFact(
                             "Merge by name",
-                            "Merge by name adds new items and updates names that match without regard to letter case. It keeps items that exist only in the destination. Matched Overlay records and Automation flows update in place. Matched Automation flows keep their runs and history. Points & giveaways replaces its settings record."
+                            "Merge by name applies the merge rules."
                         ),
                         new SiteGuideFact(
                             "Replace section",
-                            "Replace section uses Merge by name behavior. It removes eligible items that exist only in the destination. Shared replies stay when retained commands or Announcements need them. BlokeBot can remove an absent Guessing game profile without rounds or an absent Automation flow without runs. Referenced destination Overlays require Retain target item or import cancellation. An empty imported collection can remove eligible destination-only items."
+                            "Replace section also removes eligible destination-only configuration."
                         ),
                         new SiteGuideFact(
                             "Guessing game profile targets",
-                            "An explicit Destination profile selection overrides the automatic target. Otherwise, Guessing game uses an exact canonical slug. If no profile matches, BlokeBot creates a profile. BlokeBot updates a matched profile in place. The profile keeps its ID and linked rounds."
+                            "Guessing game uses the explicit selection or the canonical slug to select a target."
                         ),
                         new SiteGuideFact(
                             "Chat Tools enablement",
@@ -206,6 +315,16 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "After Apply selected sections, BlokeBot checks the file again.",
+                        "After Apply selected sections, BlokeBot checks the destination again.",
+                        "After Apply selected sections, BlokeBot checks the authority again.",
+                        "After Apply selected sections, BlokeBot checks the preview again.",
+                        "One serializable transaction saves selected settings and switch changes.",
+                        "The same transaction saves transition boundaries.",
+                        "The same transaction saves the import audit.",
+                    ],
                     Heading = "Apply the import",
                     MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-success.png",
@@ -220,7 +339,7 @@ internal static partial class SiteGuideCatalog
                     [
                         new SiteGuideFact(
                             "Database save",
-                            "When you select Apply selected sections, BlokeBot verifies the file and destination again. It verifies authority and the preview again. One serializable transaction saves selected settings and switch changes. It saves transition boundaries and the import audit. A pending activation record exists only when the import selects a Chat Tools switch change that alters feature state. If the transaction fails, BlokeBot saves none of these changes."
+                            "A pending activation record exists only for a selected Chat Tools switch change that alters feature state. If the transaction fails, BlokeBot saves none of these changes."
                         ),
                         new SiteGuideFact(
                             "Feature activation",
@@ -240,6 +359,23 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "For recovery, review the recovery file.",
+                        "Import the recovery file.",
+                        "Use Replace section only for removals that the review shows.",
+                        "Select each feature switch change that you must reverse.",
+                        "For Feature activation failures: Select Retry activation.",
+                        "For Feature activation failures: Do not import the file again.",
+                        "For Feature activation failures: Give the Operation ID to support.",
+                        "For import errors: Copy the Operation ID and message.",
+                        "For import errors: Check the selected channel and your authority.",
+                        "For import errors: Apply the import again.",
+                        "For file validation errors: Copy the location and message.",
+                        "For file validation errors: Correct the source file.",
+                        "For file validation errors: If you cannot correct it, export the file again.",
+                        "For file validation errors: Select Validate and review again.",
+                    ],
                     Heading = "Troubleshooting",
                     MediaAfterHeading = new SiteMedia(
                         DarkPhoneSource: "media/configuration-transfer/phone-dark-failed.png",
@@ -259,19 +395,16 @@ internal static partial class SiteGuideCatalog
                     [
                         new SiteGuideFact(
                             "File error or unsupported format",
-                            "Copy the location and message. Correct the source file. If you cannot correct it, export the file again. Select Validate and review again."
+                            "For file validation errors."
                         ),
-                        new SiteGuideFact(
-                            "Import rejected or not saved",
-                            "Copy the Operation ID and message. Verify the selected channel and your authority. Apply the import again."
-                        ),
+                        new SiteGuideFact("Import rejected or not saved", "For import errors."),
                         new SiteGuideFact(
                             "Feature activation failed",
-                            "Select Retry activation. Do not import the file again. Give the Operation ID to support."
+                            "For Feature activation failures."
                         ),
                         new SiteGuideFact(
                             "Unwanted settings",
-                            "Review the recovery file. Import the recovery file. Use Replace section only for removals that the review shows. Select each feature switch change that you must reverse. The recovery file does not reverse switch changes automatically."
+                            "The recovery file does not reverse switch changes automatically."
                         ),
                         new SiteGuideFact(
                             "Absent dependency",
@@ -289,7 +422,7 @@ internal static partial class SiteGuideCatalog
             Next =
             [
                 new SiteLink("Manage channel tools", "tools"),
-                new SiteLink("Verify moderator access", "moderators"),
+                new SiteLink("Check moderator access", "moderators"),
                 new SiteLink("Troubleshoot BlokeBot", "troubleshooting"),
             ],
         };

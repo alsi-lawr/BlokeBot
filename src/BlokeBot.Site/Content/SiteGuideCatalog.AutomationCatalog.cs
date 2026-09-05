@@ -18,21 +18,41 @@ internal static partial class SiteGuideCatalog
                     Heading = "Read the source list",
                     Bullets =
                     [
-                        "Open Automations, then Twitch events. Each source shows its Twitch subscription, the required approval and whether an enabled flow uses it today.",
-                        "Ready means the source can start flows now. Reconnect needed and Twitch connection needed mean that the source stays inactive. BlokeBot creates no Twitch subscription and starts no flow.",
-                        "Use Reconnect to Twitch on this page and complete Twitch as the selected channel owner to approve the required permissions.",
+                        "Open Automations. Open Twitch events.",
+                        "Each source shows its Twitch subscription.",
+                        "Each source shows the required approval.",
+                        "Each source shows whether an enabled flow uses it today.",
+                        "Ready means the source can start flows now.",
+                        "Reconnect needed means that the source stays inactive.",
+                        "Twitch connection needed also means that the source stays inactive.",
+                        "For an inactive source, BlokeBot creates no Twitch subscription and starts no flow.",
+                        "Use Reconnect to Twitch on this page. Complete Twitch authorization as the selected channel owner to approve the required permissions.",
                         "A source's Twitch subscription follows the bot runtime and exists only while an enabled flow uses that source.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Stream, community and Hype Train events",
+                    Heading = "Channel events",
+                    LegacyAnchor = "stream-community-and-hype-train-events",
                     Bullets =
                     [
-                        "Stream went live, Stream went offline, New follower and Incoming raid need no approval beyond the channel's bot connection.",
-                        "New subscription and Gifted subscriptions need the channel's subscription-reading permission. Cheer needs Bits reading. The three Hype Train events need Hype Train reading. The page names each required approval exactly.",
-                        "The Gifted subscriptions source uses a minimum gift count. Cheer uses a minimum Bits amount. Incoming raid uses a minimum viewer count. Smaller events do not start a flow.",
-                        "Chat notification starts flows from typed Twitch notices such as announcements, resubs, gift upgrades and charity donations. You choose the notification type. Ordinary chat messages never start automations.",
+                        "Stream went live needs no approval beyond the channel's bot connection.",
+                        "Stream went offline needs no approval beyond the channel's bot connection.",
+                        "New follower needs no approval beyond the channel's bot connection.",
+                        "Incoming raid needs no approval beyond the channel's bot connection.",
+                        "New subscription and Gifted subscriptions need the channel's subscription-reading permission.",
+                        "Cheer needs Bits reading.",
+                        "The three Hype Train events need Hype Train reading.",
+                        "The page names each required approval exactly.",
+                        "The Gifted subscriptions source uses a minimum gift count.",
+                        "Cheer uses a minimum Bits amount.",
+                        "Incoming raid uses a minimum viewer count.",
+                        "Smaller events do not start a flow.",
+                        "Chat notification starts flows from typed Twitch notices such as announcements.",
+                        "Chat notification starts flows from typed Twitch notices such as resubs.",
+                        "Chat notification starts flows from typed Twitch notices such as gift upgrades.",
+                        "Chat notification starts flows from typed Twitch notices such as charity donations.",
+                        "You choose the notification type. Ordinary chat messages never start automations.",
                     ],
                 },
                 new SiteGuideSection
@@ -42,8 +62,13 @@ internal static partial class SiteGuideCatalog
                     [
                         "The Channel Points redemption source starts a flow when a viewer redeems a Custom Reward. It needs the channel's redemption permissions and a Twitch Affiliate or Partner channel.",
                         "A reward filter limits the source to one Custom Reward. Without it, every redemption starts the flow.",
-                        "The completion policy controls the redemption status after the flow. Keep it manual, fulfil it after success or cancel it after failure. Cancellation refunds the viewer.",
-                        "Automatic completion applies only to rewards BlokeBot can manage. Redemptions of rewards created elsewhere still start flows, but their status stays untouched.",
+                        "The completion policy controls redemption status after the flow.",
+                        "Choose a redemption completion option.",
+                        "Completion option: manual completion.",
+                        "Completion option: fulfillment after success.",
+                        "Completion option: cancellation after failure.",
+                        "Cancellation refunds the viewer.",
+                        "Automatic completion applies only to rewards that BlokeBot can manage. Redemptions of rewards created elsewhere still start flows, but their status stays unchanged.",
                     ],
                     Links =
                     [
@@ -55,11 +80,14 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Shoutout, poll and Prediction events",
+                    Heading = "Native Twitch events",
+                    LegacyAnchor = "shoutout-poll-and-prediction-events",
                     Bullets =
                     [
                         "Shoutout sent and Shoutout received follow the bot account's moderator approvals and appear only while Raid & collaboration is on.",
-                        "Poll started, Poll progressed and Poll ended need the channel's poll-reading permission and appear only while Polls is on.",
+                        "Poll started needs the channel's poll-reading permission and appears only while Polls is on.",
+                        "Poll progressed needs the channel's poll-reading permission and appears only while Polls is on.",
+                        "Poll ended needs the channel's poll-reading permission and appears only while Polls is on.",
                         "Prediction events need the channel's Prediction-reading permission. They appear only while Predictions is on.",
                         "These sources report all polls and Predictions. This includes operations from outside BlokeBot.",
                     ],
@@ -70,17 +98,20 @@ internal static partial class SiteGuideCatalog
                     Heading = "Start flows from a custom command",
                     Paragraphs =
                     [
-                        "The Custom command source starts a flow after chat uses a selected custom command. It provides the viewer and command text. Create the command and choose Run automation flow under What happens. Custom commands and Automations must both be on.",
+                        "The Custom command source starts a flow after chat uses a selected custom command. It provides the viewer and command text. Create the command. Select Run automation flow under What happens. Custom commands and Automations must both be on.",
                     ],
                     Links = [new SiteLink("Create Custom Commands", "commands")],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "When events do not arrive",
+                    Heading = "Absent events",
+                    LegacyAnchor = "when-events-do-not-arrive",
                     Bullets =
                     [
                         "Check the source badge first. For an inactive source, the badge names the required approval or connection.",
-                        "BlokeBot does not replay events from an inactive source, a disabled flow or a period when Automations was off.",
+                        "BlokeBot does not replay events from an inactive source.",
+                        "BlokeBot does not replay events from a disabled flow.",
+                        "BlokeBot does not replay events from a period when Automations was off.",
                         "BlokeBot recognizes a repeated Twitch delivery inside ten minutes and starts nothing extra. This is not a lost event.",
                         "If the page cannot load, retry from the message shown. Your saved automations remain unchanged.",
                     ],
@@ -99,7 +130,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Automations · Actions",
             Title = "Choose what an automation does",
             Summary =
-                "Actions send chat, play overlay cues, complete Channel Points redemptions and run Native Twitch operations. Each action obeys its feature switches and Twitch limits.",
+                "Configure flow actions. Each action obeys its feature switches and Twitch limits.",
             Sections =
             [
                 new SiteGuideSection
@@ -107,8 +138,15 @@ internal static partial class SiteGuideCatalog
                     Heading = "Send chat and play overlay cues",
                     Bullets =
                     [
+                        "Actions can send chat.",
+                        "Actions can play overlay cues.",
+                        "Actions can complete Channel Points redemptions.",
+                        "Actions can run Native Twitch operations.",
                         "Send chat message sends up to 500 characters in the channel. The message can include automation variables from the source event.",
-                        "Play overlay cue plays a saved Cue through a chosen Cue player Browser Source. Enable the cue, Cue player and Overlays feature for playback.",
+                        "Play overlay cue plays a saved Cue through a chosen Cue player Browser Source.",
+                        "For playback, enable the cue.",
+                        "For playback, enable Cue player.",
+                        "For playback, enable the Overlays feature.",
                         "A replaced or deleted cue or Cue player makes the action fail. BlokeBot does not play a substitute.",
                     ],
                     Links = [new SiteLink("Build reusable Cues", "overlays/cues")],
@@ -128,16 +166,28 @@ internal static partial class SiteGuideCatalog
                     Heading = "Run native Twitch operations",
                     Paragraphs =
                     [
-                        "Nine actions run the same operations as the Native Twitch pages. They use the channel connection and each operation's switch and requirements.",
+                        "Nine actions run the same operations as the Native Twitch pages.",
                     ],
                     Bullets =
                     [
+                        "Native Twitch actions use the channel connection.",
+                        "They use each operation's switch.",
+                        "They use each operation's requirements.",
                         "Send shoutout targets the broadcaster who triggered the flow, such as a broadcaster from a raid. The source event must carry a viewer or broadcaster.",
-                        "Start poll accepts a question of up to 60 characters. Add 2–5 choices of up to 25 characters. Set a 15-second to 30-minute duration and an optional Channel Points cost per extra vote. If another poll is active, it fails.",
-                        "End poll finishes the channel's active poll immediately. A poll started outside BlokeBot is never ended by an automation.",
+                        "Start poll accepts a question of up to 60 characters.",
+                        "For Start poll, add 2–5 choices of up to 25 characters.",
+                        "Set a 15-second to 30-minute duration.",
+                        "Set an optional Channel Points cost per extra vote.",
+                        "If another poll is active, Start poll fails.",
+                        "End poll finishes the channel's active poll immediately. An automation never ends a poll that started outside BlokeBot.",
                         "Create clip captures the live stream immediately or after Twitch's broadcast delay. Create stream marker adds a marker with a description of up to 140 characters.",
-                        "Start prediction accepts a question of up to 45 characters. Add 2–10 outcomes of up to 25 characters. Set a 30-second to 30-minute window. If another Prediction is active, it fails.",
-                        "Lock prediction stops entries. Cancel prediction refunds all viewer Channel Points. Resolve prediction uses an outcome identifier from a variable or expression.",
+                        "Start prediction accepts a question of up to 45 characters.",
+                        "For Start prediction, add 2–10 outcomes of up to 25 characters.",
+                        "Set a 30-second to 30-minute window.",
+                        "If another Prediction is active, Start prediction fails.",
+                        "Lock prediction stops entries.",
+                        "Cancel prediction refunds all viewer Channel Points.",
+                        "Resolve prediction uses an outcome identifier from a variable or expression.",
                     ],
                     Note =
                         "Rewards and Predictions require a Twitch Affiliate or Partner channel. Each operation follows the prerequisites on its Native Twitch page.",
@@ -150,8 +200,16 @@ internal static partial class SiteGuideCatalog
                     [
                         "A failed action follows its step's failure choice: stop the flow or continue past the failure.",
                         "BlokeBot does not retry an action with an uncertain Twitch outcome. It never duplicates an action to force an answer.",
-                        "The applicable feature page shows the Twitch result. It shows shoutouts, the active poll or Prediction, clips and redemptions.",
-                        "If an action continues to fail, fix the named connection, permission or feature switch. Then run the flow again. Alerts collects problems that need attention.",
+                        "The applicable feature page shows the Twitch result.",
+                        "It shows shoutouts.",
+                        "It shows the active poll or Prediction.",
+                        "It shows clips.",
+                        "It shows redemptions.",
+                        "If an action continues to fail, fix the named requirement.",
+                        "The named requirement can be a connection.",
+                        "The named requirement can be a permission.",
+                        "The named requirement can be a feature switch.",
+                        "Then run the flow again. Alerts collects problems that need attention.",
                     ],
                     Links = [new SiteLink("Troubleshoot the bot", "troubleshooting")],
                 },

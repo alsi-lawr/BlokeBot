@@ -18,6 +18,8 @@ internal static partial class SiteGuideCatalog
                     Heading = "Provider configuration",
                     Bullets =
                     [
+                        "Do not put the PostgreSQL connection string in an environment value.",
+                        "Do not put the PostgreSQL connection string in an image.",
                         "Use Sqlite for the default local database file.",
                         "Use PostgreSql with BlokeBot__PostgreSqlConnectionStringFile for PostgreSQL 18.x.",
                         "Install the current PostgreSQL 18 minor release.",
@@ -25,7 +27,7 @@ internal static partial class SiteGuideCatalog
                         "Configure one active BlokeBot instance for each main database.",
                     ],
                     Note =
-                        "Do not put the PostgreSQL connection string in an environment value, command argument, image, or source file.",
+                        "Do not put the PostgreSQL connection string in a command argument or source file.",
                 },
                 new SiteGuideSection
                 {
@@ -125,8 +127,8 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Apply the new system configuration.",
-                        "Verify that the BlokeBot service stays active.",
-                        "Verify the database readiness endpoint.",
+                        "Check that the BlokeBot service stays active.",
+                        "Check the database readiness endpoint.",
                     ],
                     Code = """
                         sudo nixos-rebuild switch
@@ -136,6 +138,13 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Do not give the role superuser privileges.",
+                        "Do not give the role replication privileges.",
+                        "Do not give the role role-management privileges.",
+                        "Do not give the role database-creation privileges.",
+                    ],
                     Heading = "Native PostgreSQL installation",
                     Steps =
                     [
@@ -148,8 +157,6 @@ internal static partial class SiteGuideCatalog
                         sudo -u postgres createuser --login --pwprompt blokebot
                         sudo -u postgres createdb --owner=blokebot blokebot
                         """,
-                    Note =
-                        "Do not give the role superuser, replication, role-management, or database-creation privileges.",
                 },
                 new SiteGuideSection
                 {
@@ -158,7 +165,10 @@ internal static partial class SiteGuideCatalog
                     [
                         "Create /etc/blokebot/postgresql.connection for the BlokeBot service account.",
                         "Set the connection-file mode to 0400.",
-                        "Add the database host, database, user name, password, and TLS settings.",
+                        "Add the database host.",
+                        "Add the database and user name.",
+                        "Add the password.",
+                        "Add the TLS settings.",
                         "Set the non-secret values below in the service manager.",
                         "Start one BlokeBot process with the command below.",
                     ],
@@ -177,8 +187,8 @@ internal static partial class SiteGuideCatalog
                     Heading = "Native startup health",
                     Steps =
                     [
-                        "Open another terminal after BlokeBot starts.",
-                        "Verify both health endpoints before public traffic starts.",
+                        "After BlokeBot starts, open another terminal.",
+                        "Before public traffic starts, check both health endpoints.",
                     ],
                     Code = """
                         curl --fail http://127.0.0.1:8080/health/live
@@ -204,22 +214,39 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "For a non-superuser administrator login, CREATEDB is required.",
+                        "For that non-superuser login, EXECUTE on pg_control_system() is required.",
+                        "For that non-superuser login, membership of the application login is required.",
+                    ],
                     Heading = "SQLite cutover preconditions",
                     Steps =
                     [
                         "Stop the SQLite BlokeBot instance.",
                         "Back up the SQLite file and the matching state directory.",
                         "Keep the active provider configuration on Sqlite.",
-                        "Start PostgreSQL 18 and create the application login.",
+                        "Start PostgreSQL 18.",
+                        "Create the application login.",
                         "Do not create the application database.",
                         "Create a protected administrator connection file for an existing maintenance database.",
                         "Create a protected application connection file for the new database and the application login.",
                     ],
                     Note =
-                        "The administrator login must be a superuser, or it must have CREATEDB, EXECUTE on pg_control_system(), and membership of the application login.",
+                        "The administrator login must be a superuser or have all the listed non-superuser privileges.",
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The cutover command migrates SQLite first.",
+                        "The command then creates the database.",
+                        "The command applies the PostgreSQL schema.",
+                        "The command copies the data.",
+                        "The command checks the row count of each domain table.",
+                        "The command rejects a database that exists without a matching receipt.",
+                        "The command does not drop a database or change the active provider configuration.",
+                    ],
                     Heading = "SQLite cutover command",
                     Steps =
                     [
@@ -227,7 +254,8 @@ internal static partial class SiteGuideCatalog
                         "Rerun the same command to resume an interrupted transfer.",
                         "Reuse the operation ID if you set --operation-id.",
                         "Change the provider to PostgreSql only after successful verification.",
-                        "Start one BlokeBot instance and verify /health/ready.",
+                        "Start one BlokeBot instance.",
+                        "Check /health/ready.",
                     ],
                     Code = """
                         blokebot database cutover-postgresql \
@@ -235,8 +263,6 @@ internal static partial class SiteGuideCatalog
                           --postgresql-application-connection-string-file /etc/blokebot/postgresql.connection \
                           --data-dir /var/lib/blokebot
                         """,
-                    Note =
-                        "The command migrates SQLite first. It then creates the database, applies the PostgreSQL schema, copies the data, and verifies the row count of each domain table. It rejects a database that exists without a matching receipt. It does not drop a database or change the active provider configuration.",
                 },
                 new SiteGuideSection
                 {
@@ -254,7 +280,11 @@ internal static partial class SiteGuideCatalog
                     Heading = "PostgreSQL responsibilities",
                     Bullets =
                     [
-                        "Configure certificate-verified TLS and restrict network access.",
+                        "BlokeBot does not provide high availability.",
+                        "BlokeBot does not provide scale-out.",
+                        "BlokeBot does not provide multi-tenancy.",
+                        "Configure certificate-verified TLS.",
+                        "Restrict network access.",
                         "Back up PostgreSQL and the matching BlokeBot state directory.",
                         "Test a restore before a cutover or PostgreSQL upgrade.",
                         "Keep one active BlokeBot instance during migrations and normal operation.",
@@ -270,8 +300,6 @@ internal static partial class SiteGuideCatalog
                             "https://www.postgresql.org/support/versioning/"
                         ),
                     ],
-                    Note =
-                        "BlokeBot does not provide high availability, scale-out, or multi-tenancy.",
                 },
             ],
             Next = [new SiteLink("Server owner setup", "server-owners")],

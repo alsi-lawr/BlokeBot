@@ -9,8 +9,7 @@ internal static partial class SiteGuideCatalog
             Route = "/guessing",
             Eyebrow = "Guessing games",
             Title = "Set up and run a guessing game",
-            Summary =
-                "Create reusable round types and answers, collect one guess per viewer, then record the winning answer.",
+            Summary = "Manage Guessing rounds.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/points-and-guessing/phone-dark-guessing-workflow.webp",
                 LightPhoneSource: "media/points-and-guessing/phone-light-guessing-workflow.webp",
@@ -18,18 +17,29 @@ internal static partial class SiteGuideCatalog
                 LightLaptopSource: "media/points-and-guessing/laptop-light-guessing-workflow.webp",
                 PhoneAlt: "Animated BlokeBot guessing dashboard that moves through a live round workflow.",
                 LaptopAlt: "Animated BlokeBot guessing dashboard that moves through a live round workflow.",
-                "The live dashboard keeps round status, votes, answers and winner controls together."
+                "The live dashboard keeps round status and votes together. Answers and winner controls stay on the same page."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Create reusable round types and answers.",
+                        "Collect one guess per viewer.",
+                        "Then record the winning answer.",
+                    ],
                     Heading = "Prepare a round type",
                     Steps =
                     [
-                        "Turn on Guessing game and open its Settings page.",
-                        "Create a round type and add every accepted answer. Put comma-separated aliases after its main answer. Choose a winner point reward.",
-                        "Review the chat commands and bot replies, then save.",
+                        "Turn on Guessing game.",
+                        "Open its Settings page.",
+                        "Create a round type.",
+                        "Add every accepted answer.",
+                        "Put comma-separated aliases after its main answer.",
+                        "Select a winner point reward.",
+                        "Review the chat commands and bot replies.",
+                        "Save the settings.",
                     ],
                 },
                 new SiteGuideSection
@@ -37,9 +47,13 @@ internal static partial class SiteGuideCatalog
                     Heading = "Run the round",
                     Steps =
                     [
-                        "Open the Guessing game Dashboard and choose the round type.",
-                        "Start the round, let viewers submit guesses, then select Stop guessing.",
-                        "Enter the winning answer or one of its aliases and declare the winner.",
+                        "Open the Guessing game Dashboard.",
+                        "Select the round type.",
+                        "Start the round.",
+                        "Let viewers submit guesses.",
+                        "Select Stop guessing.",
+                        "Enter the winning answer or one of its aliases.",
+                        "Declare the winner.",
                     ],
                     Paragraphs =
                     [
@@ -56,26 +70,36 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Viewer points",
             Title = "Set up and manage points",
             Summary =
-                "Give each viewer a channel balance. Viewers can check, transfer or gamble points. Staff can adjust balances or award prizes.",
+                "Give each viewer a channel balance. Manage channel points. Staff can adjust balances or award prizes.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/points-and-guessing/phone-dark-points-settings.png",
                 LightPhoneSource: "media/points-and-guessing/phone-light-points-settings.png",
                 DarkLaptopSource: "media/points-and-guessing/laptop-dark-points-settings.png",
                 LightLaptopSource: "media/points-and-guessing/laptop-light-points-settings.png",
-                PhoneAlt: "Points settings with the point label, gambling chance, cooldown and chat command words.",
-                LaptopAlt: "Points settings with the point label, gambling chance, cooldown and chat command words.",
-                "Points settings define the channel's terminology, gambling rules and command words."
+                PhoneAlt: "Points settings show the point label and gambling chance. The cooldown and chat command words are also visible.",
+                LaptopAlt: "Points settings show the point label and gambling chance. The cooldown and chat command words are also visible.",
+                "Points settings define the channel's terminology and gambling rules. They also define the command words."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Viewers can check points.",
+                        "Viewers can transfer points.",
+                        "Viewers can gamble points.",
+                    ],
                     Heading = "Configure points",
                     Steps =
                     [
-                        "Turn on Points and open Points Settings.",
-                        "Choose the point label, gambling chance and wait between gambles.",
-                        "Review command words and bot replies, then save.",
+                        "Turn on Points.",
+                        "Open Points Settings.",
+                        "Select the point label.",
+                        "Select the gambling chance.",
+                        "Select the wait between gambles.",
+                        "Review command words and bot replies.",
+                        "Save the settings.",
                     ],
                 },
                 new SiteGuideSection
@@ -84,8 +108,13 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Search for a viewer from the Points Dashboard.",
-                        "Check both names and the amount. Then move points, add points or take points away.",
-                        "Use Recent changes to confirm adjustments and prizes. Delete balance only when the whole record must go.",
+                        "Check both names and the amount.",
+                        "Then choose the point adjustment.",
+                        "Adjustment: move points.",
+                        "Adjustment: add points.",
+                        "Adjustment: take points away.",
+                        "Use Recent changes to check adjustments and prizes.",
+                        "Use Delete balance only when the whole record must go.",
                     ],
                 },
             ],
@@ -97,8 +126,7 @@ internal static partial class SiteGuideCatalog
             Route = "/giveaways",
             Eyebrow = "Points giveaways",
             Title = "Run a giveaway",
-            Summary =
-                "Open timed entry while the channel is live, choose eligibility and winner count, then award random point prizes.",
+            Summary = "Manage giveaways.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/points-and-guessing/phone-dark-points-settings.png",
                 LightPhoneSource: "media/points-and-guessing/phone-light-points-settings.png",
@@ -112,27 +140,42 @@ internal static partial class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "While the channel is live, open timed entry.",
+                        "Select eligibility and the winner count.",
+                        "Then award random point prizes.",
+                    ],
                     Heading = "Set the rules",
                     Steps =
                     [
-                        "Open Points Settings and expand Giveaways.",
-                        "Set entry time, prize range, winner count, eligibility and the wait between giveaways.",
+                        "Open Points Settings.",
+                        "Expand Giveaways.",
+                        "Set the entry time.",
+                        "Set the prize range.",
+                        "Set the winner count.",
+                        "Set eligibility.",
+                        "Set the wait between giveaways.",
                         "Save the settings before you go live.",
                     ],
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "If Start is unavailable, check stream status.",
+                        "Check for an active giveaway.",
+                        "Check the cooldown that the dashboard shows.",
+                    ],
                     Heading = "Start and finish",
                     Steps =
                     [
-                        "While the Twitch channel is live, open the Points Dashboard and select Start in Giveaway.",
-                        "Tell viewers to use the configured join command. Each eligible viewer can enter once.",
+                        "While the Twitch channel is live, open the Points Dashboard.",
+                        "Select Start in Giveaway.",
+                        "Tell viewers to use the configured join command.",
                         "Select End to draw winners and award prizes, or Cancel to stop without winners.",
                     ],
-                    Paragraphs =
-                    [
-                        "If Start is unavailable, check stream status, an active giveaway and the cooldown shown by the dashboard.",
-                    ],
+                    Paragraphs = ["Each eligible viewer can enter once."],
                 },
             ],
             Next = [new SiteLink("Review points", "points")],
@@ -150,25 +193,33 @@ internal static partial class SiteGuideCatalog
                 LightPhoneSource: "media/points-and-guessing/phone-light-guessing-leaderboard.png",
                 DarkLaptopSource: "media/points-and-guessing/laptop-dark-guessing-leaderboard.png",
                 LightLaptopSource: "media/points-and-guessing/laptop-light-guessing-leaderboard.png",
-                PhoneAlt: "Public guessing leaderboard that shows players, correct guesses, rounds and accuracy.",
-                LaptopAlt: "Public guessing leaderboard that shows players, correct guesses, rounds and accuracy.",
+                PhoneAlt: "The public guessing leaderboard shows players and correct guesses. It also shows rounds and accuracy.",
+                LaptopAlt: "The public guessing leaderboard shows players and correct guesses. It also shows rounds and accuracy.",
                 "Public leaderboards turn completed channel activity into a shareable read-only ranking."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Destination: Twitch panels.",
+                        "Destination: chat.",
+                        "Destination: community pages.",
+                    ],
                     Heading = "Open and share it",
                     Steps =
                     [
                         "From Home or the sign-in page, choose Guessing or Points under Public leaderboard.",
-                        "Enter the Twitch channel name and open the leaderboard.",
-                        "Copy the browser address into Twitch panels, chat or community pages.",
+                        "Enter the Twitch channel name.",
+                        "Open the leaderboard.",
+                        "Copy the browser address to the intended destination.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "If it is empty",
+                    Heading = "Empty leaderboards",
+                    LegacyAnchor = "if-it-is-empty",
                     Bullets =
                     [
                         "Points rankings need viewer balances.",

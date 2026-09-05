@@ -9,35 +9,54 @@ internal static partial class SiteGuideCatalog
             Route = "/commands",
             Eyebrow = "Custom commands",
             Title = "Create commands and scheduled messages",
-            Summary =
-                "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
+            Summary = "Configure Custom commands.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/commands/phone-dark-custom-commands.png",
                 LightPhoneSource: "media/commands/phone-light-custom-commands.png",
                 DarkLaptopSource: "media/commands/laptop-dark-custom-commands.png",
                 LightLaptopSource: "media/commands/laptop-light-custom-commands.png",
                 PhoneAlt: "BlokeBot Custom commands on a phone with the saved command list and the selected command's Basics step.",
-                LaptopAlt: "BlokeBot Custom commands with the saved command list beside the selected command's name, command words and chat preview.",
+                LaptopAlt: "BlokeBot Custom commands shows the saved command list beside the selected command. That command's name and command words are visible. Its chat preview is visible.",
                 "The saved command list sits beside the selected command. Its words and the viewer reply stay visible together."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "For a command without a message, BlokeBot opens the relevant tab or section.",
+                        "It focuses the field.",
+                        "It shows the validation message.",
+                        "It keeps the command.",
+                        "Save reusable bot replies.",
+                        "Connect them to chat words.",
+                        "You can also keep counters.",
+                        "You can also schedule reminders.",
+                        "Replies can include viewer placeholders.",
+                        "Replies can include channel placeholders.",
+                        "Replies can include argument placeholders.",
+                    ],
                     Heading = "Create a chat reply and command",
                     Steps =
                     [
-                        "Open Custom commands, then Settings, and stay on the Commands tab.",
-                        "Add a command and enter its command words without the exclamation mark. Choose who can use it.",
-                        "Open Message library, add a reply with at least one message, then return to Commands.",
-                        "Choose the saved reply under What happens and select Save changes.",
+                        "Open Custom commands.",
+                        "Open Settings.",
+                        "Stay on the Commands tab.",
+                        "Add a command.",
+                        "Enter its command words without the exclamation mark.",
+                        "Select who can use it.",
+                        "Open Message library.",
+                        "Add a reply with at least one message.",
+                        "Return to Commands.",
+                        "Select the saved reply under What happens.",
+                        "Select Save changes.",
                     ],
                     Paragraphs =
                     [
-                        "Replies can include viewer, channel and argument placeholders. The Message library keeps reusable text separate from command structure.",
+                        "The Message library keeps reusable text separate from command structure.",
                     ],
-                    Note =
-                        "BlokeBot cannot save a command without a message. BlokeBot opens the relevant tab or section. It focuses the field and shows the validation message. It keeps the command.",
+                    Note = "BlokeBot cannot save a command without a message.",
                 },
                 new SiteGuideSection
                 {
@@ -53,13 +72,16 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Add a counter, scheduled message or Twitch announcement",
+                    Heading = "Other chat tools",
+                    LegacyAnchor = "add-a-counter-scheduled-message-or-twitch-announcement",
                     Bullets =
                     [
                         "Counters let a command change and report a saved number.",
-                        "Scheduled chat sends a saved reply on a timer, after chat activity or once a week.",
-                        "Twitch announcement uses Twitch's coloured announcement surface. The bot must currently be a moderator and authorized for announcements.",
-                        "If a scheduled send cannot happen, open its Alerts section and follow the displayed next action.",
+                        "Scheduled chat can send a saved reply on a timer.",
+                        "Scheduled chat can send a saved reply after chat activity.",
+                        "Scheduled chat can send a saved reply once a week.",
+                        "Twitch announcement uses Twitch's colored announcement surface. The bot must currently be a moderator and authorized for announcements.",
+                        "If a scheduled send cannot happen, open its Alerts section. Follow the displayed next action.",
                     ],
                 },
                 new SiteGuideSection
@@ -73,7 +95,10 @@ internal static partial class SiteGuideCatalog
                     [
                         "Custom commands and Automations must both be on for a command to start a flow.",
                         "Build the connection in Visual automations. The command does not keep a second flow picker.",
-                        "Turning either feature off keeps the command, flow, and run history but suppresses new work without replaying it later.",
+                        "If either feature is off, BlokeBot keeps the command.",
+                        "If either feature is off, BlokeBot keeps the flow.",
+                        "If either feature is off, BlokeBot keeps the run history.",
+                        "It suppresses new work and does not replay it later.",
                     ],
                     Links = [new SiteLink("Build a visual automation", "automations")],
                 },
@@ -98,32 +123,49 @@ internal static partial class SiteGuideCatalog
                 DarkLaptopSource: "media/commands/laptop-dark-viewer-command-catalog.png",
                 LightLaptopSource: "media/commands/laptop-light-viewer-command-catalog.png",
                 PhoneAlt: "Channel setup on a phone that shows the global Commands trigger and expanded Available viewer commands list.",
-                LaptopAlt: "Channel setup that shows the global Commands trigger, expanded Available viewer commands list and a command-name conflict.",
+                LaptopAlt: "Channel setup shows the global Commands trigger. It also shows the expanded Available viewer commands list and a command-name conflict.",
                 "Channel setup shows the same viewer-safe list of main command names that the global chat trigger publishes."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "If another command owns a word, Channel setup names the conflict.",
+                        "Select another word.",
+                        "Save the change.",
+                    ],
                     Heading = "Choose the global trigger",
                     Steps =
                     [
-                        "Choose the channel, open Channel setup and expand Commands.",
-                        "Enter the command words that viewers can use. Separate them with commas and omit the exclamation mark. The default is commands.",
-                        "Select Save Commands. The setting applies to the whole selected channel, not to one Custom Command.",
-                        "Leave the field blank and save only when you intend to disable the viewer command catalog.",
+                        "Select the channel.",
+                        "Open Channel setup.",
+                        "Expand Commands.",
+                        "Enter the command words that viewers can use.",
+                        "Separate the words with commas.",
+                        "Omit the exclamation mark.",
+                        "Select Save Commands.",
+                        "To disable the viewer command catalog, leave the field blank.",
+                        "Save the blank field only if you intend to disable the catalog.",
                     ],
                     Paragraphs =
                     [
-                        "If a word is already owned by another command, Channel setup names the conflict. Choose another word and save. BlokeBot does not silently replace the existing command.",
+                        "BlokeBot does not replace the existing command without your choice.",
+                        "The default Commands trigger is commands.",
+                        "The Commands trigger applies to the whole selected channel, not to one Custom Command.",
                     ],
                 },
                 new SiteGuideSection
                 {
                     Heading = "Check what viewers will see",
+                    Paragraphs =
+                    [
+                        "Available viewer commands starts collapsed to keep the setup page compact.",
+                    ],
                     Steps =
                     [
-                        "Open Available viewer commands inside the Commands section. It starts collapsed so the setup page stays compact.",
+                        "Open Available viewer commands inside the Commands section.",
                         "Review the current main command names and any conflict or availability explanation.",
                         "In chat, send the saved trigger such as !commands to publish the same ordered list.",
                     ],
@@ -131,15 +173,16 @@ internal static partial class SiteGuideCatalog
                     [
                         "The disclosure requests a fresh snapshot whenever it opens. Supported state changes also refresh an open list. They do not replace an unsaved trigger draft.",
                         "The list includes its own saved trigger and only commands an ordinary viewer can use.",
-                        "Moderator-only commands and private administration actions are never disclosed.",
+                        "The catalog never discloses moderator-only commands or private administration actions.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Understand main names",
+                    Heading = "Main command names",
+                    LegacyAnchor = "understand-main-names",
                     Paragraphs =
                     [
-                        "Each Custom Command contributes only the first command word in its saved alias list. That main-name rule keeps the catalog short and predictable. Secondary aliases still work in chat but are not advertised.",
+                        "Each Custom Command contributes only the first command word in its saved alias list. This rule keeps the catalog short and predictable. Secondary aliases still work in chat but do not appear in the catalog.",
                     ],
                     Bullets =
                     [
@@ -150,7 +193,8 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Why commands appear or disappear",
+                    Heading = "Command availability",
+                    LegacyAnchor = "why-commands-appear-or-disappear",
                     Bullets =
                     [
                         "Guess and round-summary commands appear only while the guessing game has the applicable active round state.",
@@ -166,11 +210,20 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Queue changes can also alter catalog membership.",
+                        "Feature-switch changes can also alter catalog membership.",
+                        "Stream-liveness changes can also alter catalog membership.",
+                        "Changes to games can alter catalog membership.",
+                        "Changes to giveaways can alter catalog membership.",
+                        "Changes to boards can alter catalog membership.",
+                    ],
                     Heading = "Long lists and live changes",
                     Paragraphs =
                     [
                         "BlokeBot keeps the command order stable. If the chat response exceeds the Twitch limit, BlokeBot splits the list across ordinary replies. It does not omit or duplicate names.",
-                        "A game, giveaway, board, queue, feature switch or stream-liveness change can alter membership. Before you prepare an announcement or stream instructions, reopen Available viewer commands for a new check.",
+                        "Before you prepare an announcement or stream instructions, reopen Available viewer commands for a new check.",
                     ],
                 },
                 new SiteGuideSection
@@ -178,11 +231,16 @@ internal static partial class SiteGuideCatalog
                     Heading = "Fix common catalog problems",
                     Bullets =
                     [
-                        "The chat trigger does nothing: confirm that at least one Commands word is saved. Resolve each conflict in Channel setup.",
-                        "A Custom Command alias is absent: only its first saved word is advertised.",
+                        "If the chat trigger does nothing, check that at least one Commands word is saved. Resolve each conflict in Channel setup.",
+                        "If a Custom Command alias is absent, check its position. The catalog shows only the first saved word.",
                         "A moderator command is absent: the public catalog deliberately shows viewer-safe commands only.",
-                        "A game or Moment command is absent: check the feature and active round or giveaway. Check the named live-stream state.",
-                        "The list is empty: enable or configure a viewer feature, board, queue or Custom Command. Reopen the disclosure.",
+                        "If a game or Moment command is absent, check the feature and active round or giveaway. Check the named live-stream state.",
+                        "If the list is empty, enable or configure a source of viewer commands.",
+                        "A viewer feature can supply commands.",
+                        "A board can supply commands.",
+                        "A queue can supply commands.",
+                        "A Custom Command can supply commands.",
+                        "Reopen the disclosure.",
                     ],
                 },
             ],

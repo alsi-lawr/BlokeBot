@@ -54,7 +54,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Run blokebot-plugin generate from the plugin root.",
-                        "Verify that .luarc.json lists ./.blokebot/lua/5.4/v1.",
+                        "Check that .luarc.json lists ./.blokebot/lua/5.4/v1.",
                         "Restart the Lua language server for the workspace.",
                         "If generation rejects the project, fix each plugin.toml error.",
                     ],
@@ -95,7 +95,7 @@ internal static partial class SiteGuideCatalog
                     [
                         new(
                             "Disabled",
-                            "Enable the feature after its required settings and template graph are valid."
+                            "After the required settings and template graph are valid, enable the feature."
                         ),
                         new(
                             "EnabledDegraded",
@@ -107,7 +107,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new(
                             "MigrationFailed",
-                            "Correct the selected package or migration and start a new administrator action. Old code does not resume."
+                            "Correct the selected package or migration. Start a new administrator action. Old code does not resume."
                         ),
                         new(
                             "RecoveryPackageUnavailable",

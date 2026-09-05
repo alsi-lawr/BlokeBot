@@ -15,13 +15,18 @@ internal static partial class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "BlokeBot renders standard text sections.",
+                        "BlokeBot renders standard status sections.",
+                        "BlokeBot renders standard form sections.",
+                        "BlokeBot renders standard table sections.",
+                        "BlokeBot renders standard list sections.",
+                    ],
                     Heading = "Page types",
                     Facts =
                     [
-                        new(
-                            "Generated pages",
-                            "A Lua renderer returns a versioned page document. BlokeBot renders standard text, status, form, table, and list sections."
-                        ),
+                        new("Generated pages", "A Lua renderer returns a versioned page document."),
                         new(
                             "Embedded pages",
                             "BlokeBot serves declared browser assets in one contained frame. The browser bridge validates messages."
@@ -32,6 +37,12 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "The renderer receives version.",
+                        "The renderer receives hostId.",
+                        "The renderer receives sessionId.",
+                    ],
                     Heading = "Generated page declarations",
                     Code = """
                         [[generatedPages]]
@@ -44,7 +55,7 @@ internal static partial class SiteGuideCatalog
                         """,
                     Paragraphs =
                     [
-                        "The renderer receives version, hostId, and sessionId. It returns document version 1 with an ordered list of sections.",
+                        "It returns document version 1 with an ordered list of sections.",
                     ],
                 },
                 new SiteGuideSection
@@ -77,12 +88,18 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Forms and actions",
-                    Paragraphs =
+                    Bullets =
                     [
-                        "Each page action input is declared in plugin.toml. The form must use the same field IDs, required flags, and value kinds.",
-                        "BlokeBot rejects an unknown field, a missing required field, a duplicate field, or a value with the wrong kind.",
+                        "BlokeBot rejects unknown fields.",
+                        "BlokeBot rejects duplicate fields.",
+                        "BlokeBot rejects a missing required field.",
+                        "BlokeBot rejects a value with the wrong kind.",
+                        "The form must use the same field IDs.",
+                        "The form must use the same required flags.",
+                        "The form must use the same value kinds.",
                     ],
+                    Heading = "Forms and actions",
+                    Paragraphs = ["plugin.toml declares each page action input."],
                     Facts =
                     [
                         new("text", "This type produces a string value."),
@@ -117,11 +134,17 @@ internal static partial class SiteGuideCatalog
                     Heading = "Browser bridge",
                     Paragraphs =
                     [
-                        "The bridge checks the frame source, HTTPS origin, session, protocol, schema, message size, selected host, and active plugin state.",
+                        "The bridge checks the frame source and HTTPS origin.",
                         "A message ID can run once in its active session. A restart invalidates the in-memory page session.",
                     ],
                     Bullets =
                     [
+                        "The bridge also checks message size.",
+                        "The bridge also checks selected host.",
+                        "The bridge also checks active plugin state.",
+                        "The bridge checks the session.",
+                        "The bridge checks the protocol.",
+                        "The bridge checks the schema.",
                         "Send only a declared page action.",
                         "Send only fields from that action schema.",
                         "Use a new message ID for each action attempt.",

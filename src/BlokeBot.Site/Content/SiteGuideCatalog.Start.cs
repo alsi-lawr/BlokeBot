@@ -10,7 +10,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Start here",
             Title = "Sign in and choose your channel",
             Summary =
-                "Use your normal Twitch account, then choose the channel whose tools you want to view or manage.",
+                "Use your normal Twitch account. Then select the channel whose tools you want to view or manage.",
             Sections =
             [
                 new SiteGuideSection
@@ -18,9 +18,9 @@ internal static partial class SiteGuideCatalog
                     Heading = "Before you begin",
                     Bullets =
                     [
-                        "Have the BlokeBot web address you were given.",
+                        "Have the BlokeBot web address that you received.",
                         "Use the Twitch account connected to your channel or moderator role.",
-                        "Ask a channel owner or BlokeBot administrator if you need permission to change setup.",
+                        "If you need permission to change setup, ask a channel owner or BlokeBot administrator.",
                     ],
                 },
                 new SiteGuideSection
@@ -28,9 +28,12 @@ internal static partial class SiteGuideCatalog
                     Heading = "Sign in",
                     Steps =
                     [
-                        "Open the BlokeBot address and select Continue with Twitch.",
-                        "Sign in to Twitch and review the permissions Twitch shows.",
-                        "Return to BlokeBot and check your account name and role in the top bar.",
+                        "Open the BlokeBot address.",
+                        "Select Continue with Twitch.",
+                        "Sign in to Twitch.",
+                        "Review the permissions that Twitch shows.",
+                        "Return to BlokeBot.",
+                        "Check your account name and role in the top bar.",
                     ],
                 },
                 new SiteGuideSection
@@ -39,7 +42,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Select My channel for the Twitch channel you own.",
-                        "Use Other channels when you help manage another available channel.",
+                        "When you help manage another available channel, use Other channels.",
                         "If a newly available channel does not appear, select Find channels again.",
                     ],
                     Paragraphs =
@@ -63,8 +66,8 @@ internal static partial class SiteGuideCatalog
                 LightPhoneSource: "media/dashboard/phone-light-home.png",
                 DarkLaptopSource: "media/dashboard/laptop-dark-home.png",
                 LightLaptopSource: "media/dashboard/laptop-light-home.png",
-                PhoneAlt: "BlokeBot dashboard that shows the selected Sample Channel, channel setup and chat-tool navigation.",
-                LaptopAlt: "BlokeBot dashboard that shows the selected Sample Channel, channel setup and chat-tool navigation.",
+                PhoneAlt: "The BlokeBot dashboard shows the selected Sample Channel. It also shows channel setup and chat-tool navigation.",
+                LaptopAlt: "The BlokeBot dashboard shows the selected Sample Channel. It also shows channel setup and chat-tool navigation.",
                 "The selected channel appears in the top bar. Its enabled tools appear in the menu."
             ),
             Sections =
@@ -85,13 +88,18 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Home gives a short introduction and public leaderboard shortcut.",
-                        "Channel setup contains connections, moderator access and feature switches.",
-                        "Chat tools contains the interaction, progression, game, points, command, overlay and enabled Native Twitch tools selected for this channel.",
-                        "Expand Native Twitch to move between its five focused task pages.",
+                        "Channel setup contains connections.",
+                        "Channel setup contains moderator access.",
+                        "Channel setup contains feature switches.",
+                        "For this channel, Chat tools contains selected interaction tools and progression tools.",
+                        "For this channel, Chat tools contains selected game tools and points tools.",
+                        "For this channel, Chat tools contains selected command tools and overlay tools.",
+                        "For this channel, Chat tools contains selected enabled Native Twitch tools.",
+                        "Expand Native Twitch to move between its four focused task pages.",
                     ],
                     Paragraphs =
                     [
-                        "Always confirm the selected channel before you save. A change for one channel does not change another.",
+                        "Before you save, check the selected channel. A change for one channel does not change another.",
                     ],
                 },
             ],
@@ -106,9 +114,8 @@ internal static partial class SiteGuideCatalog
         {
             Route = "/channels",
             Eyebrow = "Channels and access",
-            Title = "Add, choose and manage channels",
-            Summary =
-                "Each Twitch channel keeps its own connection, tools, games, points and people who can help.",
+            Title = "Channels and access",
+            Summary = "Each Twitch channel keeps its own connection and tools.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/dashboard/phone-dark-channel-setup.png",
                 LightPhoneSource: "media/dashboard/phone-light-channel-setup.png",
@@ -122,11 +129,19 @@ internal static partial class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
+                    Bullets =
+                    [
+                        "Each Twitch channel keeps its own games.",
+                        "Each Twitch channel keeps its own points.",
+                        "People who can help are specific to each Twitch channel.",
+                    ],
                     Heading = "Create your channel setup",
                     Steps =
                     [
                         "Sign in with the Twitch account that owns the channel.",
-                        "Select My channel, open Channel setup and choose Create channel setup.",
+                        "Select My channel.",
+                        "Open Channel setup.",
+                        "Select Create channel setup.",
                         "If the action is unavailable, ask a BlokeBot administrator for channel-creation access.",
                     ],
                 },
@@ -135,7 +150,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Switch safely",
                     Paragraphs =
                     [
-                        "Use the channel selector whenever you help more than one channel. Your role can permit tool use but not changes to channel setup.",
+                        "If you help more than one channel, use the channel selector. Your role can permit tool use but not changes to channel setup.",
                     ],
                 },
             ],
