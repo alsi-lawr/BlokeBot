@@ -16,45 +16,25 @@ internal sealed class PortalDirectoryProjectors(
         CancellationToken ct
     )
     {
-        var candidates = (await queues.GetQueuesForHostAsync(channel.Host.Id, ct))
-            .Where(value => value.IsOpen)
-            .OrderBy(value => value.Name, StringComparer.Ordinal)
-            .ThenBy(value => value.Slug, StringComparer.Ordinal)
-            .Take(PortalSummaryBounds.Items);
-        var results = await Task.WhenAll(
-            candidates.Select(candidate =>
-                PortalProjectionRunner.ReadAsync(
-                    async token =>
-                    {
-                        var page = await queues.GetPublicPageAsync(
-                            channel.Host.Login,
-                            candidate.Slug,
-                            token
-                        );
-                        return
-                            page is null
-                            || !page.Queue.IsOpen
-                            || page.Queue.HostId != channel.Host.Id
-                            ? new PortalSummaryOutcome.Disabled()
-                            : new PortalSummaryOutcome.Available(
-                                PortalSummaryBounds.Create(
-                                    page.Queue.Name,
-                                    page.Queue.ActivityName,
-                                    true,
-                                    [
-                                        PortalSummaryBounds.Link(
-                                            page.Queue.Name,
-                                            route(page.Queue.Slug)
-                                        ),
-                                    ]
-                                )
-                            );
-                    },
-                    ct
-                )
-            )
+        var destinations = await queues.GetPublicDestinationsAsync(
+            channel.Host.Id,
+            PortalSummaryBounds.Items,
+            ct
         );
-        return Combine(results, "No open queues", "Choose a queue");
+        return destinations.Count == 0
+            ? new PortalSummaryOutcome.Empty(
+                PortalSummaryBounds.Create("No open queues", string.Empty, false, [])
+            )
+            : new PortalSummaryOutcome.Available(
+                PortalSummaryBounds.Create(
+                    "Choose a queue",
+                    string.Empty,
+                    true,
+                    destinations.Select(value =>
+                        PortalSummaryBounds.Link(value.Name, route(value.Slug))
+                    )
+                )
+            );
     }
 
     internal async Task<PortalSummaryOutcome> RequestsAsync(
@@ -63,45 +43,25 @@ internal sealed class PortalDirectoryProjectors(
         CancellationToken ct
     )
     {
-        var candidates = (await requests.GetBoardsForHostAsync(channel.Host.Id, ct))
-            .Where(value => value.IsOpen)
-            .OrderBy(value => value.Title, StringComparer.Ordinal)
-            .ThenBy(value => value.Slug, StringComparer.Ordinal)
-            .Take(PortalSummaryBounds.Items);
-        var results = await Task.WhenAll(
-            candidates.Select(candidate =>
-                PortalProjectionRunner.ReadAsync(
-                    async token =>
-                    {
-                        var page = await requests.GetPublicPageAsync(
-                            channel.Host.Login,
-                            candidate.Slug,
-                            token
-                        );
-                        return
-                            page is null
-                            || !page.Board.IsOpen
-                            || page.Board.HostId != channel.Host.Id
-                            ? new PortalSummaryOutcome.Disabled()
-                            : new PortalSummaryOutcome.Available(
-                                PortalSummaryBounds.Create(
-                                    page.Board.Title,
-                                    string.Empty,
-                                    true,
-                                    [
-                                        PortalSummaryBounds.Link(
-                                            page.Board.Title,
-                                            route(page.Board.Slug)
-                                        ),
-                                    ]
-                                )
-                            );
-                    },
-                    ct
-                )
-            )
+        var destinations = await requests.GetPublicDestinationsAsync(
+            channel.Host.Id,
+            PortalSummaryBounds.Items,
+            ct
         );
-        return Combine(results, "No open request boards", "Choose a request board");
+        return destinations.Count == 0
+            ? new PortalSummaryOutcome.Empty(
+                PortalSummaryBounds.Create("No open request boards", string.Empty, false, [])
+            )
+            : new PortalSummaryOutcome.Available(
+                PortalSummaryBounds.Create(
+                    "Choose a request board",
+                    string.Empty,
+                    true,
+                    destinations.Select(value =>
+                        PortalSummaryBounds.Link(value.Title, route(value.Slug))
+                    )
+                )
+            );
     }
 
     internal async Task<PortalSummaryOutcome> CollectivesAsync(
@@ -110,81 +70,24 @@ internal sealed class PortalDirectoryProjectors(
         CancellationToken ct
     )
     {
-        var candidates = (await collectives.GetPublicListingsAsync(channel.Host.Id, ct)).Take(
-            PortalSummaryBounds.Items
+        var destinations = await collectives.GetPublicDestinationsAsync(
+            channel.Host.Id,
+            PortalSummaryBounds.Items,
+            ct
         );
-        var results = await Task.WhenAll(
-            candidates.Select(candidate =>
-                PortalProjectionRunner.ReadAsync(
-                    async token =>
-                    {
-                        var page = await collectives.LoadPublicAsync(
-                            channel.Host.Login,
-                            candidate.Id,
-                            token
-                        );
-                        return page is null
-                            ? new PortalSummaryOutcome.Disabled()
-                            : new PortalSummaryOutcome.Available(
-                                PortalSummaryBounds.Create(
-                                    page.Name,
-                                    string.Empty,
-                                    false,
-                                    [PortalSummaryBounds.Link(page.Name, route(page.Id))]
-                                )
-                            );
-                    },
-                    ct
+        return destinations.Count == 0
+            ? new PortalSummaryOutcome.Empty(
+                PortalSummaryBounds.Create("No public collectives", string.Empty, false, [])
+            )
+            : new PortalSummaryOutcome.Available(
+                PortalSummaryBounds.Create(
+                    "Choose a collective",
+                    string.Empty,
+                    false,
+                    destinations.Select(value =>
+                        PortalSummaryBounds.Link(value.Name, route(value.Id))
+                    )
                 )
-            )
-        );
-        return Combine(results, "No public collectives", "Choose a collective");
-    }
-
-    private static PortalSummaryOutcome Combine(
-        IReadOnlyList<PortalSummaryOutcome> results,
-        string emptyHeadline,
-        string populatedHeadline
-    )
-    {
-        var summaries = results
-            .SelectMany(result =>
-                result.Match<IEnumerable<PortalSummary>>(
-                    available: static value => [value.Summary],
-                    empty: static value => [value.Summary],
-                    disabled: static _ => [],
-                    degraded: static value => [value.Summary],
-                    unavailable: static _ => [],
-                    unauthorized: static _ => []
-                )
-            )
-            .ToArray();
-        var failed = results.Any(result =>
-            result.Match(
-                available: static _ => false,
-                empty: static _ => false,
-                disabled: static _ => false,
-                degraded: static _ => true,
-                unavailable: static _ => true,
-                unauthorized: static _ => false
-            )
-        );
-        if (summaries.Length == 0)
-        {
-            return failed
-                ? new PortalSummaryOutcome.Unavailable()
-                : new PortalSummaryOutcome.Empty(
-                    PortalSummaryBounds.Create(emptyHeadline, string.Empty, false, [])
-                );
-        }
-        var summary = PortalSummaryBounds.Create(
-            populatedHeadline,
-            string.Empty,
-            summaries.Any(value => value.IsActive),
-            summaries.SelectMany(value => value.Links)
-        );
-        return failed
-            ? new PortalSummaryOutcome.Degraded(summary)
-            : new PortalSummaryOutcome.Available(summary);
+            );
     }
 }

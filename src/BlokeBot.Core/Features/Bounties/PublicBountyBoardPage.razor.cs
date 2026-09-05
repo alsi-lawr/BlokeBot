@@ -7,6 +7,10 @@ namespace BlokeBot.Core.Features.Bounties;
 
 public partial class PublicBountyBoardPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     private readonly Dictionary<Guid, string> _pledges = [];
     private IReadOnlyList<BountyView> _items = [];
     private AuthenticatedSession _session = AuthenticatedSession.Anonymous;
@@ -31,18 +35,28 @@ public partial class PublicBountyBoardPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _items = [];
         _session = AuthenticatedSession.FromPrincipal((await _authenticationState).User);
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            _loaded = true;
+            return;
+        }
         _items = await _bounties.GetPublicBoardAsync(Channel, CancellationToken.None);
         _loaded = true;
     }
 
     private async Task PledgeAsync(BountyView bounty)
     {
+        if (!await _publicGate.TryActionAsync(bounty.HostId))
+        {
+            return;
+        }
         var amount = PointAmount
             .ParseNonNegativeAbsolute(PledgeFor(bounty.PublicId))
             .Match<PointAmount?>(static value => value, static _ => null);

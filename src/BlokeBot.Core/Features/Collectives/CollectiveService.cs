@@ -107,8 +107,20 @@ public sealed class CollectiveService(
         );
     }
 
-    public async Task<IReadOnlyList<CollectivePublicListing>> GetPublicListingsAsync(
+    public Task<IReadOnlyList<CollectivePublicListing>> GetPublicListingsAsync(
         int hostId,
+        CancellationToken ct
+    ) => ReadPublicListingsAsync(hostId, int.MaxValue, ct);
+
+    public Task<IReadOnlyList<CollectivePublicListing>> GetPublicDestinationsAsync(
+        int hostId,
+        int count,
+        CancellationToken ct
+    ) => ReadPublicListingsAsync(hostId, Math.Clamp(count, 0, 5), ct);
+
+    private async Task<IReadOnlyList<CollectivePublicListing>> ReadPublicListingsAsync(
+        int hostId,
+        int count,
         CancellationToken ct
     )
     {
@@ -123,6 +135,7 @@ public sealed class CollectiveService(
             )
             .OrderBy(value => value.Collective.Name)
             .ThenBy(value => value.Collective.PublicId)
+            .Take(count)
             .Select(value => new CollectivePublicListing(
                 new CollectiveId(value.Collective.PublicId),
                 value.Collective.Name

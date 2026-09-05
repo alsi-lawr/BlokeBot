@@ -1,5 +1,6 @@
 using System.Net;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Features.ViewerPortal.Boundary;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -74,6 +75,7 @@ public sealed class BlokeRaidPublicRouteTests
             app.Urls.Add("http://127.0.0.1:0");
             _ = app.UseAntiforgery();
             _ = app.UseAuthentication();
+            _ = app.UseMiddleware<PublicDocumentMiddleware>();
             _ = app.UseAuthorization();
             _ = app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode()

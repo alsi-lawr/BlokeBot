@@ -8,6 +8,67 @@ namespace BlokeBot.Core.Tests;
 public sealed class PlayQueueServiceTests
 {
     [Test]
+    public async Task KnownIdentity_PositionAndActionsPreferExactIdAndNeverClaimAnotherKnownLogin()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var alpha = await SeedHostAsync(database, "alpha");
+        var beta = await SeedHostAsync(database, "beta");
+        var service = CreateService(database);
+        _ = Success(await service.ConfigureAsync(alpha, Queue("squad"), default));
+        _ = Success(await service.ConfigureAsync(beta, Queue("squad"), default));
+        var other = Success(
+            await service.JoinAsync(alpha, "squad", Join("reclaimed", "eu", "Tank"), default)
+        ).Value;
+        var own = Success(
+            await service.JoinAsync(alpha, "squad", Join("oldlogin", "eu", "Healer"), default)
+        ).Value;
+        var legacy = Success(
+            await service.JoinAsync(alpha, "squad", Join("legacy", "eu", "Tank"), default)
+        ).Value;
+        await using (var legacySeed = await database.CreateDbContextAsync())
+        {
+            var row = await legacySeed.PlayQueueEntries.SingleAsync(value =>
+                value.Id == legacy.InternalEntryId
+            );
+            row.TwitchUserId = null;
+            row.IdentityKey = "login:legacy";
+            _ = await legacySeed.SaveChangesAsync();
+        }
+        var renamed = new PlayQueueViewerIdentity("reclaimed", "twitch-oldlogin", "Renamed");
+        Success(await service.GetPositionAsync(alpha, "squad", renamed, default))
+            .Value.InternalEntryId.ShouldBe(own.InternalEntryId);
+        Success(await service.GetPositionAsync(alpha, "squad", new("reclaimed"), default))
+            .Value.InternalEntryId.ShouldBe(other.InternalEntryId);
+        var stranger = new PlayQueueViewerIdentity("reclaimed", "unknown-id", "Stranger");
+        (await service.GetPositionAsync(alpha, "squad", stranger, default))
+            .Match(_ => false, value => value.Reason is PlayQueueRejection.NotJoined)
+            .ShouldBeTrue();
+        (await service.LeaveAsync(alpha, "squad", stranger, default))
+            .Match(_ => false, value => value.Reason is PlayQueueRejection.NotJoined)
+            .ShouldBeTrue();
+        (await service.ReadyAsync(alpha, "squad", stranger, default))
+            .Match(_ => false, value => value.Reason is PlayQueueRejection.NotJoined)
+            .ShouldBeTrue();
+        (await service.GetPositionAsync(beta, "squad", renamed, default))
+            .Match(_ => false, value => value.Reason is PlayQueueRejection.NotJoined)
+            .ShouldBeTrue();
+        Success(await service.LeaveAsync(alpha, "squad", renamed, default))
+            .Value.InternalEntryId.ShouldBe(own.InternalEntryId);
+        Success(await service.LeaveAsync(alpha, "squad", new("legacy", "new-known-id"), default))
+            .Value.InternalEntryId.ShouldBe(legacy.InternalEntryId);
+        await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify.PlayQueueEntries.SingleAsync(value => value.Id == other.InternalEntryId)
+        ).Status.ShouldBe(PlayQueueEntryStatus.Waiting);
+        (
+            await verify.PlayQueueEntries.SingleAsync(value => value.Id == own.InternalEntryId)
+        ).TwitchUserId.ShouldBe("twitch-oldlogin");
+        (
+            await verify.PlayQueueEntries.SingleAsync(value => value.Id == legacy.InternalEntryId)
+        ).TwitchUserId.ShouldBeNull();
+    }
+
+    [Test]
     public async Task ExactSelfPosition_RenameKeepsPositionWithoutClaimingSameLoginOrAnotherHost()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

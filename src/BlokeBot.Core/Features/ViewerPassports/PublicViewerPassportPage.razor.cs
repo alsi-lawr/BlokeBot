@@ -6,6 +6,10 @@ namespace BlokeBot.Core.Features.ViewerPassports;
 
 public partial class PublicViewerPassportPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     [CascadingParameter]
     private Task<AuthenticationState> _authenticationState { get; set; } =
         Task.FromResult(new AuthenticationState(new()));
@@ -22,6 +26,12 @@ public partial class PublicViewerPassportPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _passport = null;
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            _loaded = true;
+            return;
+        }
         _loaded = false;
         var context = await _pageContexts.FromAsync(_authenticationState);
         var manager = context.Session.AvailableHosts.Any(host =>

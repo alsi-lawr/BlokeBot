@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @using BlokeBot.Core.Features.ViewerPortal
 @inject NavigationManager Navigation
+@inject BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate PublicGate
+@implements IDisposable
 
 <div class="portal">
     <header class="portal__topbar">
@@ -30,12 +32,18 @@
             </div>
         </div>
     </header>
-    <main class="portal__main" id="main">@Body</main>
+    <main class="portal__main" id="main">
+        @if (PublicGate.Notice is { } notice) { <p class="card p-4 text-sm font-semibold" role="status">@notice</p> }
+        @Body
+    </main>
     <footer class="portal__footer"><p>Public channel page by BlokeBot.</p></footer>
 </div>
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthenticationState { get; set; }
+    protected override void OnInitialized() => PublicGate.Changed += GateChanged;
+    private void GateChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => PublicGate.Changed -= GateChanged;
     private PortalIdentity _identity = new PortalIdentity.Anonymous();
     private string ReturnUrl => Uri.EscapeDataString(new Uri(Navigation.Uri).PathAndQuery);
     protected override async Task OnParametersSetAsync() =>

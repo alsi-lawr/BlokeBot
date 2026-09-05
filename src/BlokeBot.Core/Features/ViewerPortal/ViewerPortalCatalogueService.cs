@@ -11,7 +11,9 @@ internal sealed record PortalProjectors(
 
 internal sealed class ViewerPortalCatalogueService(
     ViewerPortalAccess access,
-    PortalProjectors projectors
+    PortalProjectors projectors,
+    PortalReadScheduler scheduler,
+    PortalProjectionRunner runner
 )
 {
     public async Task<PortalCatalogueSnapshot> ReadAsync(
@@ -19,6 +21,37 @@ internal sealed class ViewerPortalCatalogueService(
         PortalIdentity identity,
         CancellationToken cancellationToken,
         IReadOnlySet<HostFeatureFlags>? featureKinds = null
+    )
+    {
+        try
+        {
+            return await ReadCoreAsync(channel, identity, cancellationToken, featureKinds);
+        }
+        catch (Exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Snapshot(
+                channel.Host,
+                identity,
+                ViewerPortalCatalogue
+                    .Descriptors.Where(value =>
+                        channel.PublicFeatures.Contains(value.Feature)
+                        && (featureKinds is null || featureKinds.Contains(value.Feature))
+                    )
+                    .Select(value => new PortalFeatureProjection(
+                        value,
+                        new PortalSummaryOutcome.Unavailable()
+                    ))
+                    .ToImmutableArray()
+            );
+        }
+    }
+
+    private async Task<PortalCatalogueSnapshot> ReadCoreAsync(
+        PortalChannel channel,
+        PortalIdentity identity,
+        CancellationToken cancellationToken,
+        IReadOnlySet<HostFeatureFlags>? featureKinds
     )
     {
         var current = await CurrentChannelAsync(channel.Host, cancellationToken);
@@ -35,8 +68,14 @@ internal sealed class ViewerPortalCatalogueService(
         var results = await Task.WhenAll(
             selected.Select(async descriptor => new PortalFeatureProjection(
                 descriptor,
-                await PortalProjectionRunner.ReadAsync(
-                    ct => descriptor.ProjectAsync(projectors, current, identity, ct),
+                await runner.ReadAsync(
+                    channel.Host.Id,
+                    descriptor,
+                    ct =>
+                        scheduler.ReadAsync(
+                            token => descriptor.ProjectAsync(projectors, current, identity, token),
+                            ct
+                        ),
                     cancellationToken
                 )
             ))
@@ -67,11 +106,18 @@ internal sealed class ViewerPortalCatalogueService(
     private async Task<PortalChannel?> CurrentChannelAsync(
         PortalHostKey expected,
         CancellationToken ct
-    ) =>
-        (await access.ResolveChannelAsync(expected.Login, ct)).Match(
-            resolved: resolved => resolved.Channel.Host.Id == expected.Id ? resolved.Channel : null,
-            notFound: static _ => null
+    )
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        var result = await scheduler
+            .ReadAsync(token => access.ResolveChannelAsync(expected.Login, token), timeout.Token)
+            .WaitAsync(timeout.Token);
+        return result.Match<PortalChannel?>(
+            resolved => resolved.Channel.Host.Id == expected.Id ? resolved.Channel : null,
+            static _ => null
         );
+    }
 
     private static PortalCatalogueSnapshot Snapshot(
         PortalHostKey host,

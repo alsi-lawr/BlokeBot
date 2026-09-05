@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject CollectiveService _service
+@inject BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate
 
 <ChannelReturnLink Channel="@HostLogin" />
 <PageTitle>BlokeBot | Collective</PageTitle>
@@ -48,10 +49,17 @@
 
     private CollectivePublicProjection? _projection;
 
-    protected override async Task OnParametersSetAsync() =>
+    protected override async Task OnParametersSetAsync()
+    {
+        _projection = null;
+        if (!await _publicGate.TryReadAsync(HostLogin, CancellationToken.None))
+        {
+            return;
+        }
         _projection = await _service.LoadPublicAsync(
             HostLogin,
             new(CollectivePublicId),
             CancellationToken.None
         );
+    }
 }

@@ -241,6 +241,7 @@ internal static partial class SiteGuideCatalog
                         ),
                     ],
                 },
+                .. ViewerPortalOperationSections(),
             ],
             Next = [new SiteLink("Return to the user guide", "guide")],
         };

@@ -6,6 +6,10 @@ namespace BlokeBot.Core.Features.RequestBoards;
 
 public partial class PublicRequestBoardPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     private readonly Dictionary<string, string> _fieldValues = new(StringComparer.Ordinal);
     private RequestBoardPage? _page;
     private RequestActor? _actor;
@@ -28,6 +32,8 @@ public partial class PublicRequestBoardPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _page = null;
+        _self = null;
         var authentication = await _authenticationState;
         _actor = RequestActor.FromSession(AuthenticatedSession.FromPrincipal(authentication.User));
         await LoadAsync();
@@ -35,6 +41,10 @@ public partial class PublicRequestBoardPage
 
     private async Task LoadAsync()
     {
+        if (!await _publicGate.TryReadAsync(Channel, CancellationToken.None))
+        {
+            return;
+        }
         _page = await _boards.GetPublicPageAsync(Channel, BoardSlug, CancellationToken.None);
         _self =
             _page is not null && _actor is not null
@@ -63,6 +73,10 @@ public partial class PublicRequestBoardPage
             return;
         }
 
+        if (!await _publicGate.TryActionAsync(_page.Board.HostId))
+        {
+            return;
+        }
         var result = await _boards.SubmitAsync(
             _page.Board.HostId,
             _page.Board.Slug,
@@ -97,6 +111,10 @@ public partial class PublicRequestBoardPage
             return;
         }
 
+        if (!await _publicGate.TryActionAsync(_page.Board.HostId))
+        {
+            return;
+        }
         var result = await _boards.VoteAsync(
             _page.Board.HostId,
             submissionId,
@@ -121,6 +139,10 @@ public partial class PublicRequestBoardPage
             return;
         }
 
+        if (!await _publicGate.TryActionAsync(_page.Board.HostId))
+        {
+            return;
+        }
         var result = await _boards.WithdrawAsync(
             _page.Board.HostId,
             submissionId,

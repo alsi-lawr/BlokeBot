@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Moments;
 
-public sealed class MomentHubService(
+public sealed partial class MomentHubService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IMomentProviderOperations provider,
     EventBus<AppEventKind> events,
@@ -582,9 +582,29 @@ public sealed class MomentHubService(
             );
         }
         var identity = MomentInput.IdentityKey(viewer);
-        var existing = candidate.Votes.SingleOrDefault(value =>
-            value.IdentityKey == identity || value.NormalizedLogin == login
+        var twitchUserId = CleanOptional(viewer.TwitchUserId);
+        var existing = twitchUserId is null
+            ? null
+            : candidate.Votes.SingleOrDefault(value => value.TwitchUserId == twitchUserId);
+        existing ??= candidate.Votes.SingleOrDefault(value =>
+            value.NormalizedLogin == login
+            && (
+                twitchUserId == null
+                || (value.TwitchUserId == null && value.IdentityKey == "login:" + login)
+            )
         );
+        if (
+            existing is null
+            && twitchUserId is not null
+            && candidate.Votes.Any(value => value.NormalizedLogin == login)
+        )
+        {
+            return new VoteDecision(
+                Rejected<MomentView>(
+                    new MomentRejection.Conflict("The vote could not be recorded.")
+                )
+            );
+        }
         var changed = false;
         if (existing is not null && !string.IsNullOrWhiteSpace(viewer.TwitchUserId))
         {

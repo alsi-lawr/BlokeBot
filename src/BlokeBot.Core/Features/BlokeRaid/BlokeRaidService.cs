@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.BlokeRaid;
 
-public sealed class BlokeRaidService(
+public sealed partial class BlokeRaidService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     IBlokeRaidRandom random,

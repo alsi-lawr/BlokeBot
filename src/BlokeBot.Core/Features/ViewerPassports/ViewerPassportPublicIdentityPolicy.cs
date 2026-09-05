@@ -21,6 +21,37 @@ public sealed class ViewerPassportPublicIdentityPolicy(
     IDbContextFactory<BlokeBotDbContext> dbFactory
 )
 {
+    internal static IQueryable<string> ExcludedLogins(BlokeBotDbContext db, int hostId)
+    {
+        var hidden = HiddenPassports(db, hostId);
+        return hidden
+            .Where(value => value.Login.Trim() != "")
+            .Select(value => value.Login)
+            .Union(
+                db.ViewerPassportLogins.Where(value =>
+                        hidden.Any(passport => passport.Id == value.PassportId)
+                    )
+                    .Select(value => value.Login)
+            )
+            .Union(
+                db.ViewerPassportAmbiguousLogins.Where(value => value.HostId == hostId)
+                    .Select(value => value.Login)
+            );
+    }
+
+    private static IQueryable<ViewerPassport> HiddenPassports(BlokeBotDbContext db, int hostId) =>
+        db
+            .ViewerPassports.AsNoTracking()
+            .Where(value =>
+                value.HostId == hostId
+                && value.Visibility != ViewerPassportVisibility.Public
+                && db.Hosts.Any(host =>
+                    host.Id == hostId
+                    && (host.EnabledFeatures & HostFeatureFlags.ViewerPassports)
+                        == HostFeatureFlags.ViewerPassports
+                )
+            );
+
     public async Task<ViewerPassportPublicExclusions> ExclusionsAsync(
         int hostId,
         CancellationToken cancellationToken

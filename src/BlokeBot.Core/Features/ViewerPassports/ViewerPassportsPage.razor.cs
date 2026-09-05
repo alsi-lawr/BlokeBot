@@ -6,6 +6,10 @@ namespace BlokeBot.Core.Features.ViewerPassports;
 
 public partial class ViewerPassportsPage
 {
+    [Inject]
+    private BlokeBot.Core.Features.ViewerPortal.Boundary.PublicViewerGate _publicGate { get; set; } =
+        null!;
+
     [Parameter]
     public string? Channel { get; set; }
 
@@ -53,6 +57,7 @@ public partial class ViewerPassportsPage
 
     protected override async Task OnParametersSetAsync()
     {
+        _passport = null;
         _ = await LoadPageContextAsync();
         await LoadAsync();
     }
@@ -60,6 +65,14 @@ public partial class ViewerPassportsPage
     private async Task LoadAsync()
     {
         _loaded = false;
+        if (
+            !string.IsNullOrWhiteSpace(Channel)
+            && !await _publicGate.TryReadAsync(Channel, CancellationToken.None)
+        )
+        {
+            _loaded = true;
+            return;
+        }
         var identity = Identity();
         var outcome = string.IsNullOrWhiteSpace(Channel)
             ? HostId == 0
@@ -87,6 +100,15 @@ public partial class ViewerPassportsPage
     {
         if (_passport is null)
         {
+            return;
+        }
+        if (
+            !string.IsNullOrWhiteSpace(Channel)
+            && !await _publicGate.TryActionAsync(_passport.HostId)
+        )
+        {
+            _feedback = _publicGate.Notice ?? string.Empty;
+            _failed = true;
             return;
         }
         var outcome = await _passports.SaveAsync(
@@ -128,6 +150,15 @@ public partial class ViewerPassportsPage
     {
         if (_passport is null)
         {
+            return;
+        }
+        if (
+            !string.IsNullOrWhiteSpace(Channel)
+            && !await _publicGate.TryActionAsync(_passport.HostId)
+        )
+        {
+            _feedback = _publicGate.Notice ?? string.Empty;
+            _failed = true;
             return;
         }
         var outcome = await _passports.ResetAsync(

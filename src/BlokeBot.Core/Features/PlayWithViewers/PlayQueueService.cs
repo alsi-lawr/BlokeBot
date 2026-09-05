@@ -868,14 +868,17 @@ public sealed partial class PlayQueueService(
             );
         }
 
-        var identity = PlayQueueInput.IdentityKey(viewer);
+        var twitchUserId = string.IsNullOrWhiteSpace(viewer.TwitchUserId)
+            ? null
+            : viewer.TwitchUserId.Trim();
         var login = CommunityInput.NormalizeLogin(viewer.Login);
-        var entry = page
-            .Waiting.Concat(page.CurrentParty)
-            .FirstOrDefault(value =>
-                (value.TwitchUserId is not null && identity == $"id:{value.TwitchUserId}")
-                || value.NormalizedLogin == login
-            );
+        var entries = page.Waiting.Concat(page.CurrentParty).ToArray();
+        var entry = twitchUserId is null
+            ? null
+            : entries.FirstOrDefault(value => value.TwitchUserId == twitchUserId);
+        entry ??= entries.FirstOrDefault(value =>
+            value.NormalizedLogin == login && (twitchUserId == null || value.TwitchUserId == null)
+        );
         return entry is null
             ? Rejected<PublicPlayQueueEntryView>(new PlayQueueRejection.NotJoined())
             : Succeeded(entry.Public);
@@ -1364,18 +1367,36 @@ public sealed partial class PlayQueueService(
         CancellationToken ct
     )
     {
-        var identity = PlayQueueInput.IdentityKey(viewer);
+        var twitchUserId = string.IsNullOrWhiteSpace(viewer.TwitchUserId)
+            ? null
+            : viewer.TwitchUserId.Trim();
         var login = CommunityInput.NormalizeLogin(viewer.Login);
-        return await db
+        var entries = db
             .PlayQueueEntries.Include(value => value.Values)
                 .ThenInclude(value => value.Field)
-            .Where(value =>
-                value.QueueId == queueId
-                && (value.IdentityKey == identity || value.NormalizedLogin == login)
-            )
-            .OrderByDescending(value => value.IdentityKey == identity)
+            .Where(value => value.QueueId == queueId);
+        if (twitchUserId is not null)
+        {
+            var exact = await entries
+                .OrderBy(value => value.Id)
+                .FirstOrDefaultAsync(value => value.TwitchUserId == twitchUserId, ct);
+            if (exact is not null)
+            {
+                return exact;
+            }
+        }
+        return await entries
+            .OrderByDescending(value => value.IdentityKey == "login:" + login)
             .ThenBy(value => value.Id)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(
+                value =>
+                    value.NormalizedLogin == login
+                    && (
+                        twitchUserId == null
+                        || (value.TwitchUserId == null && value.IdentityKey == "login:" + login)
+                    ),
+                ct
+            );
     }
 
     private static async Task<PlayQueueEntry?> ReconcileEntryAsync(
