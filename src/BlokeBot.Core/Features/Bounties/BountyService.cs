@@ -266,11 +266,33 @@ internal sealed partial class BountyService(
         var host = await db
             .Hosts.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Login == login, ct);
-        if (host is null)
-        {
-            return [];
-        }
+        return host is null ? [] : await LoadPublicBoardAsync(db, host, ct);
+    }
 
+    public async Task<BountyPublicBoardOutcome> GetPublicBoardAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        if (!await FeatureIsEnabledAsync(db, hostId, ct))
+        {
+            return new BountyPublicBoardOutcome.Disabled();
+        }
+        var host = await db
+            .Hosts.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == hostId, ct);
+        return host is null
+            ? new BountyPublicBoardOutcome.Disabled()
+            : new BountyPublicBoardOutcome.Available(await LoadPublicBoardAsync(db, host, ct));
+    }
+
+    private async Task<IReadOnlyList<BountyView>> LoadPublicBoardAsync(
+        BlokeBotDbContext db,
+        BotHost host,
+        CancellationToken ct
+    )
+    {
         var bounties = await db
             .Bounties.AsNoTracking()
             .Where(value => value.HostId == host.Id && value.Visibility == BountyVisibility.Public)

@@ -107,6 +107,29 @@ public sealed class CollectiveService(
         );
     }
 
+    public async Task<IReadOnlyList<CollectivePublicListing>> GetPublicListingsAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db
+            .CollectiveMemberships.AsNoTracking()
+            .Where(value =>
+                value.HostId == hostId
+                && value.Status == CollectiveMembershipStatus.Active
+                && (value.Host.EnabledFeatures & HostFeatureFlags.Collectives)
+                    == HostFeatureFlags.Collectives
+            )
+            .OrderBy(value => value.Collective.Name)
+            .ThenBy(value => value.Collective.PublicId)
+            .Select(value => new CollectivePublicListing(
+                new CollectiveId(value.Collective.PublicId),
+                value.Collective.Name
+            ))
+            .ToArrayAsync(ct);
+    }
+
     public async Task<CollectivePublicProjection?> LoadPublicAsync(
         string hostLogin,
         CollectiveId collectiveId,
