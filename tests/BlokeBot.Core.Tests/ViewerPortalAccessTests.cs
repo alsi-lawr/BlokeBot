@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.PublicLeaderboards;
 using BlokeBot.Core.Features.ViewerPassports;
@@ -11,6 +13,9 @@ using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Privacy;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -353,6 +358,103 @@ public sealed class ViewerPortalAccessTests
             .For(second.Host, new PortalIdentity.Anonymous())
             .ShouldBeOfType<PortalCacheScope.Public>();
         firstScope.Key.ShouldNotBe(secondScope.Key);
+    }
+
+    [Test]
+    public async Task RecreatedHost_OpeningThroughRetainedChannel_NeverExposesReplacementPassport()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new FixedTimeProvider(_now);
+        var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
+        var provisioning = new BotHostProvisioningService(database, changes, [], clock);
+        var originalId = await provisioning.EnsureHostAsync(
+            "channel",
+            "host-one",
+            "Original host",
+            null,
+            default
+        );
+        var (access, passports) = CreateAccess(database);
+        var retained = await ResolveAsync(access, "channel");
+        var stateDirectory = Directory.CreateTempSubdirectory("blokebot-portal-host-");
+        try
+        {
+            var options = Options.Create(
+                new BlokeBotOptions
+                {
+                    DatabasePath = Path.Combine(stateDirectory.FullName, "blokebot.db"),
+                }
+            );
+            using var maintenance = new OverlayMediaMaintenanceService(
+                database,
+                options,
+                new SystemOverlayMediaFileDeletion(),
+                clock,
+                NullLogger<OverlayMediaMaintenanceService>.Instance
+            );
+            var removal = new BotHostRemovalService(
+                database,
+                changes,
+                options,
+                maintenance,
+                clock,
+                NullLogger<BotHostRemovalService>.Instance
+            );
+            var removed = await removal.RemoveAsync(originalId, default);
+            var replacementId = await provisioning.EnsureHostAsync(
+                "channel",
+                "host-two",
+                "Replacement host",
+                null,
+                default
+            );
+            await using (var db = await database.CreateDbContextAsync())
+            {
+                _ = await db
+                    .Hosts.Where(host => host.Id == replacementId)
+                    .ExecuteUpdateAsync(update =>
+                        update.SetProperty(
+                            host => host.EnabledFeatures,
+                            HostFeatureFlags.ViewerPassports
+                        )
+                    );
+            }
+            _ = Success(
+                await passports.SaveAsync(
+                    Save(replacementId, "viewer-id", "viewer") with
+                    {
+                        Visibility = ViewerPassportVisibility.Public,
+                    },
+                    default
+                )
+            );
+            var current = await ResolveAsync(access, "channel");
+
+            var staleResult = await access.OpenPassportAsync(
+                retained,
+                "viewer",
+                new PortalIdentity.Anonymous(),
+                default
+            );
+            var currentResult = await access.OpenPassportAsync(
+                current,
+                "viewer",
+                new PortalIdentity.Anonymous(),
+                default
+            );
+
+            removed.Removed.ShouldBeTrue();
+            replacementId.ShouldNotBe(originalId);
+            _ = staleResult.ShouldBeOfType<PortalPassportOutcome.NotFound>();
+            current.Host.Id.ShouldBe(replacementId);
+            var visible = currentResult.ShouldBeOfType<PortalPassportOutcome.Visible>().Passport;
+            visible.HostId.ShouldBe(replacementId);
+            visible.TwitchUserId.ShouldBe("viewer-id");
+        }
+        finally
+        {
+            stateDirectory.Delete(recursive: true);
+        }
     }
 
     [Test]

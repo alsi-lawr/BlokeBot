@@ -75,58 +75,61 @@ public sealed class ViewerPortalAccess(
 
     // Identity is the Twitch user id; the session login is presentation. A passport row on this
     // host is read only to notice a rename or a retired login, never to grant or deny the binding.
-    public async Task<PortalSelfOutcome> BindSelfAsync(
+    public Task<PortalSelfOutcome> BindSelfAsync(
         PortalChannel channel,
         PortalIdentity identity,
         CancellationToken cancellationToken
+    ) =>
+        identity.Match(
+            anonymous: static _ =>
+                Task.FromResult<PortalSelfOutcome>(new PortalSelfOutcome.Anonymous()),
+            authenticated: authenticated =>
+                BindAuthenticatedSelfAsync(channel, authenticated, cancellationToken),
+            staleSession: static _ =>
+                Task.FromResult<PortalSelfOutcome>(new PortalSelfOutcome.StaleSession()),
+            unavailableAuthentication: static _ =>
+                Task.FromResult<PortalSelfOutcome>(
+                    new PortalSelfOutcome.UnavailableAuthentication()
+                )
+        );
+
+    private async Task<PortalSelfOutcome> BindAuthenticatedSelfAsync(
+        PortalChannel channel,
+        PortalIdentity.Authenticated authenticated,
+        CancellationToken cancellationToken
     )
     {
-        switch (identity)
+        var viewer = new PortalViewer(
+            channel.Host,
+            authenticated.TwitchUserId,
+            authenticated.Login,
+            authenticated.DisplayName
+        );
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var passport = await db
+            .ViewerPassports.AsNoTracking()
+            .Where(value =>
+                value.HostId == channel.Host.Id && value.TwitchUserId == authenticated.TwitchUserId
+            )
+            .Select(value => new { value.Login })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (passport is null)
         {
-            case PortalIdentity.Anonymous:
-                return new PortalSelfOutcome.Anonymous();
-            case PortalIdentity.StaleSession:
-                return new PortalSelfOutcome.StaleSession();
-            case PortalIdentity.UnavailableAuthentication:
-                return new PortalSelfOutcome.UnavailableAuthentication();
-            case PortalIdentity.Authenticated authenticated:
-                var viewer = new PortalViewer(
-                    channel.Host,
-                    authenticated.TwitchUserId,
-                    authenticated.Login,
-                    authenticated.DisplayName
-                );
-                await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
-                {
-                    var passport = await db
-                        .ViewerPassports.AsNoTracking()
-                        .Where(value =>
-                            value.HostId == channel.Host.Id
-                            && value.TwitchUserId == authenticated.TwitchUserId
-                        )
-                        .Select(value => new { value.Login })
-                        .SingleOrDefaultAsync(cancellationToken);
-                    if (passport is null)
-                    {
-                        // The erase sweep and a viewer reset both delete the passport and tombstone
-                        // its logins, so a retired session login with no passport is an erased
-                        // identity on this host until the viewer opts back in.
-                        return await IsRetiredLoginAsync(
-                            db,
-                            channel.Host.Id,
-                            authenticated.Login,
-                            cancellationToken
-                        )
-                            ? new PortalSelfOutcome.Erased()
-                            : new PortalSelfOutcome.AuthenticatedSelf(viewer);
-                    }
-                    return passport.Login.Length > 0 && passport.Login != authenticated.Login
-                        ? new PortalSelfOutcome.Renamed(viewer)
-                        : new PortalSelfOutcome.AuthenticatedSelf(viewer);
-                }
-            default:
-                throw new ArgumentOutOfRangeException(nameof(identity));
+            // The erase sweep and a viewer reset both delete the passport and tombstone
+            // its logins, so a retired session login with no passport is an erased
+            // identity on this host until the viewer opts back in.
+            return await IsRetiredLoginAsync(
+                db,
+                channel.Host.Id,
+                authenticated.Login,
+                cancellationToken
+            )
+                ? new PortalSelfOutcome.Erased()
+                : new PortalSelfOutcome.AuthenticatedSelf(viewer);
         }
+        return passport.Login.Length > 0 && passport.Login != authenticated.Login
+            ? new PortalSelfOutcome.Renamed(viewer)
+            : new PortalSelfOutcome.AuthenticatedSelf(viewer);
     }
 
     // The passport service decides visibility. The portal never elevates a channel manager: a
@@ -139,9 +142,15 @@ public sealed class ViewerPortalAccess(
     )
     {
         var login = LoginName.Parse(viewerLogin).Value;
-        var passportAudience = audience is PortalIdentity.Authenticated authenticated
-            ? new ViewerPassportAudience(authenticated.TwitchUserId, IsChannelManager: false)
-            : ViewerPassportAudience.Anonymous;
+        var passportAudience = audience.Match(
+            anonymous: static _ => ViewerPassportAudience.Anonymous,
+            authenticated: static authenticated => new ViewerPassportAudience(
+                authenticated.TwitchUserId,
+                IsChannelManager: false
+            ),
+            staleSession: static _ => ViewerPassportAudience.Anonymous,
+            unavailableAuthentication: static _ => ViewerPassportAudience.Anonymous
+        );
         var outcome = await passports.GetVisibleAsync(
             channel.Host.Login,
             login,
@@ -150,14 +159,18 @@ public sealed class ViewerPortalAccess(
         );
         return outcome switch
         {
-            ViewerPassportQueryOutcome.Available available => new PortalPassportOutcome.Visible(
-                available.Passport
-            ),
+            ViewerPassportQueryOutcome.Available available => available.Passport.HostId
+            == channel.Host.Id
+                ? new PortalPassportOutcome.Visible(available.Passport)
+                : new PortalPassportOutcome.NotFound(),
             ViewerPassportQueryOutcome.FeatureDisabled =>
                 new PortalPassportOutcome.FeatureDisabled(),
-            ViewerPassportQueryOutcome.Forbidden => audience is PortalIdentity.Authenticated
-                ? new PortalPassportOutcome.Unauthorized()
-                : new PortalPassportOutcome.Hidden(),
+            ViewerPassportQueryOutcome.Forbidden => audience.Match<PortalPassportOutcome>(
+                anonymous: static _ => new PortalPassportOutcome.Hidden(),
+                authenticated: static _ => new PortalPassportOutcome.Unauthorized(),
+                staleSession: static _ => new PortalPassportOutcome.Hidden(),
+                unavailableAuthentication: static _ => new PortalPassportOutcome.Hidden()
+            ),
             ViewerPassportQueryOutcome.NotFound => await ClassifyMissingAsync(
                 channel.Host.Id,
                 login,
