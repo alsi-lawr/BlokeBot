@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.RequestBoards;
 
-public sealed class RequestBoardService(
+public sealed partial class RequestBoardService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider
@@ -148,47 +148,31 @@ public sealed class RequestBoardService(
         string boardSlug,
         SubmitRequestCommand command,
         CancellationToken ct
-    )
-    {
-        if (!await FeatureIsEnabledAsync(hostId, ct))
-        {
-            return Rejected<PublicRequestSubmissionView>(
-                new RequestBoardRejection.FeatureDisabled()
-            );
-        }
-
-        if (command.OperationId == Guid.Empty)
-        {
-            return Rejected<PublicRequestSubmissionView>(
-                new RequestBoardRejection.Invalid("A submission operation ID is required.")
-            );
-        }
-
-        var login = CommunityInput.NormalizeLogin(command.SubmitterLogin);
-        return !CommunityInput.IsValidLogin(login)
+    ) =>
+        !await FeatureIsEnabledAsync(hostId, ct)
+            ? Rejected<PublicRequestSubmissionView>(new RequestBoardRejection.FeatureDisabled())
+        : command.OperationId == Guid.Empty
             ? Rejected<PublicRequestSubmissionView>(
-                new RequestBoardRejection.Invalid("A valid Twitch login is required.")
+                new RequestBoardRejection.Invalid("A submission operation ID is required.")
             )
-            : await ExecuteWithCollisionRecoveryAsync(
-                RetryGateFor(_submissionRetryGates, HashCode.Combine(hostId, command.OperationId)),
-                () => SubmitAttemptAsync(hostId, boardSlug, command, login, ct),
-                () =>
-                    LoadCommittedSubmissionRetryAsync(
-                        hostId,
-                        boardSlug,
-                        command.OperationId,
-                        login,
-                        ct
-                    ),
-                ct
-            );
-    }
+        : await ExecuteWithCollisionRecoveryAsync(
+            RetryGateFor(_submissionRetryGates, HashCode.Combine(hostId, command.OperationId)),
+            () => SubmitAttemptAsync(hostId, boardSlug, command, ct),
+            () =>
+                LoadCommittedSubmissionRetryAsync(
+                    hostId,
+                    boardSlug,
+                    command.OperationId,
+                    command.Actor,
+                    ct
+                ),
+            ct
+        );
 
     private async Task<RequestBoardResult<PublicRequestSubmissionView>> SubmitAttemptAsync(
         int hostId,
         string boardSlug,
         SubmitRequestCommand command,
-        string login,
         CancellationToken ct
     )
     {
@@ -212,7 +196,12 @@ public sealed class RequestBoardService(
                             && board.Slug == CommunityInput.NormalizeSlug(boardSlug),
                         ct
                     )
-                ) || !string.Equals(existing.SubmitterLogin, login, StringComparison.Ordinal)
+                )
+                || !string.Equals(
+                    existing.SubmitterTwitchUserId,
+                    command.Actor.TwitchUserId,
+                    StringComparison.Ordinal
+                )
                 ? Rejected<PublicRequestSubmissionView>(
                     new RequestBoardRejection.Conflict(
                         "That operation ID belongs to another submission."
@@ -249,8 +238,9 @@ public sealed class RequestBoardService(
         var activeStatuses = ActiveSubmissionStatuses();
         var activeCount = await db.RequestSubmissions.CountAsync(
             value =>
-                value.BoardId == board.Id
-                && value.SubmitterLogin == login
+                value.HostId == hostId
+                && value.BoardId == board.Id
+                && value.SubmitterTwitchUserId == command.Actor.TwitchUserId
                 && activeStatuses.Contains(value.Status),
             ct
         );
@@ -265,7 +255,9 @@ public sealed class RequestBoardService(
 
         var lastSubmissionAt = await db
             .RequestSubmissions.Where(value =>
-                value.BoardId == board.Id && value.SubmitterLogin == login
+                value.HostId == hostId
+                && value.BoardId == board.Id
+                && value.SubmitterTwitchUserId == command.Actor.TwitchUserId
             )
             .MaxAsync(value => (DateTime?)value.CreatedAtUtc, ct);
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -277,7 +269,7 @@ public sealed class RequestBoardService(
         }
 
         var cost = PointAmount.ParseAbsolute(board.PointCost);
-        var balance = await LoadBalanceAsync(db, hostId, login, now, ct);
+        var balance = await LoadBalanceAsync(db, hostId, command.Actor.Login, now, ct);
         var currentBalance = PointAmount.ParseAbsolute(balance.Amount);
         if (currentBalance.CompareTo(cost) < 0)
         {
@@ -291,7 +283,8 @@ public sealed class RequestBoardService(
             HostId = hostId,
             BoardId = board.Id,
             OperationId = command.OperationId,
-            SubmitterLogin = login,
+            SubmitterTwitchUserId = command.Actor.TwitchUserId,
+            SubmitterLogin = command.Actor.Login,
             Title = input.Title,
             NormalizedTitle = input.NormalizedTitle,
             NormalizedUrl = input.NormalizedUrl,
@@ -367,34 +360,25 @@ public sealed class RequestBoardService(
     public async Task<RequestBoardResult<PublicRequestSubmissionView>> VoteAsync(
         int hostId,
         long submissionId,
-        string voterLogin,
+        RequestActor actor,
         CancellationToken ct
-    )
-    {
-        if (!await FeatureIsEnabledAsync(hostId, ct))
-        {
-            return Rejected<PublicRequestSubmissionView>(
-                new RequestBoardRejection.FeatureDisabled()
-            );
-        }
-
-        var login = CommunityInput.NormalizeLogin(voterLogin);
-        return !CommunityInput.IsValidLogin(login)
-            ? Rejected<PublicRequestSubmissionView>(
-                new RequestBoardRejection.Invalid("A valid Twitch login is required.")
-            )
+    ) =>
+        !await FeatureIsEnabledAsync(hostId, ct)
+            ? Rejected<PublicRequestSubmissionView>(new RequestBoardRejection.FeatureDisabled())
             : await ExecuteWithCollisionRecoveryAsync(
-                RetryGateFor(_voteRetryGates, HashCode.Combine(hostId, submissionId, login)),
-                () => VoteAttemptAsync(hostId, submissionId, login, ct),
-                () => LoadCommittedVoteRetryAsync(hostId, submissionId, login, ct),
+                RetryGateFor(
+                    _voteRetryGates,
+                    HashCode.Combine(hostId, submissionId, actor.TwitchUserId)
+                ),
+                () => VoteAttemptAsync(hostId, submissionId, actor, ct),
+                () => LoadCommittedVoteRetryAsync(hostId, submissionId, actor, ct),
                 ct
             );
-    }
 
     private async Task<RequestBoardResult<PublicRequestSubmissionView>> VoteAttemptAsync(
         int hostId,
         long submissionId,
-        string login,
+        RequestActor actor,
         CancellationToken ct
     )
     {
@@ -414,7 +398,9 @@ public sealed class RequestBoardService(
 
         if (
             await db.RequestSubmissionVotes.AnyAsync(
-                vote => vote.SubmissionId == submissionId && vote.VoterLogin == login,
+                vote =>
+                    vote.SubmissionId == submissionId
+                    && vote.VoterTwitchUserId == actor.TwitchUserId,
                 ct
             )
         )
@@ -441,7 +427,10 @@ public sealed class RequestBoardService(
         }
 
         var voteCount = await db.RequestSubmissionVotes.CountAsync(
-            vote => vote.Submission!.BoardId == submission.BoardId && vote.VoterLogin == login,
+            vote =>
+                vote.Submission!.HostId == hostId
+                && vote.Submission.BoardId == submission.BoardId
+                && vote.VoterTwitchUserId == actor.TwitchUserId,
             ct
         );
         if (voteCount >= submission.Board.VoteLimitPerUser)
@@ -458,7 +447,8 @@ public sealed class RequestBoardService(
             new RequestSubmissionVote
             {
                 SubmissionId = submission.Id,
-                VoterLogin = login,
+                VoterTwitchUserId = actor.TwitchUserId,
+                VoterLogin = actor.Login,
                 CreatedAtUtc = now,
             }
         );
@@ -585,7 +575,7 @@ public sealed class RequestBoardService(
     public async Task<RequestBoardResult<PublicRequestSubmissionView>> WithdrawAsync(
         int hostId,
         long submissionId,
-        string submitterLogin,
+        RequestActor actor,
         CancellationToken ct
     )
     {
@@ -596,7 +586,6 @@ public sealed class RequestBoardService(
             );
         }
 
-        var login = CommunityInput.NormalizeLogin(submitterLogin);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var submission = await db
@@ -607,7 +596,7 @@ public sealed class RequestBoardService(
                 value =>
                     value.Id == submissionId
                     && value.HostId == hostId
-                    && value.SubmitterLogin == login,
+                    && value.SubmitterTwitchUserId == actor.TwitchUserId,
                 ct
             );
         if (submission?.Board is null)
@@ -730,11 +719,12 @@ public sealed class RequestBoardService(
             .ToListAsync(ct);
         var targetVoters = await db
             .RequestSubmissionVotes.Where(vote => vote.SubmissionId == target.Id)
-            .Select(vote => vote.VoterLogin)
+            .Where(vote => vote.VoterTwitchUserId != null)
+            .Select(vote => vote.VoterTwitchUserId!)
             .ToHashSetAsync(StringComparer.Ordinal, ct);
         foreach (var vote in sourceVotes)
         {
-            if (targetVoters.Add(vote.VoterLogin))
+            if (vote.VoterTwitchUserId is null || targetVoters.Add(vote.VoterTwitchUserId))
             {
                 vote.SubmissionId = target.Id;
                 target.VoteCount++;
@@ -942,7 +932,7 @@ public sealed class RequestBoardService(
         int hostId,
         string boardSlug,
         Guid operationId,
-        string submitterLogin,
+        RequestActor actor,
         CancellationToken ct
     )
     {
@@ -962,8 +952,8 @@ public sealed class RequestBoardService(
             { } value
                 when value.Board?.Slug != CommunityInput.NormalizeSlug(boardSlug)
                     || !string.Equals(
-                        value.SubmitterLogin,
-                        submitterLogin,
+                        value.SubmitterTwitchUserId,
+                        actor.TwitchUserId,
                         StringComparison.Ordinal
                     ) => Rejected<PublicRequestSubmissionView>(
                 new RequestBoardRejection.Conflict(
@@ -980,7 +970,7 @@ public sealed class RequestBoardService(
     private async Task<RequestBoardResult<PublicRequestSubmissionView>?> LoadCommittedVoteRetryAsync(
         int hostId,
         long submissionId,
-        string voterLogin,
+        RequestActor actor,
         CancellationToken ct
     )
     {
@@ -994,7 +984,9 @@ public sealed class RequestBoardService(
         return
             submission?.Board is null
             || !await db.RequestSubmissionVotes.AnyAsync(
-                vote => vote.SubmissionId == submissionId && vote.VoterLogin == voterLogin,
+                vote =>
+                    vote.SubmissionId == submissionId
+                    && vote.VoterTwitchUserId == actor.TwitchUserId,
                 ct
             )
             ? null

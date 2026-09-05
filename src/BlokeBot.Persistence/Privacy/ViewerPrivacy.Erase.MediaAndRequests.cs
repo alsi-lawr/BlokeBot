@@ -112,26 +112,22 @@ public static partial class ViewerPrivacyService
                 )
         );
 
-        var votedSubmissionIds = await db
-            .RequestSubmissionVotes.Where(x =>
-                safeLoginClaims.Any(claim =>
-                    claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
-                ) && (hostId == null || x.Submission!.HostId == hostId)
-            )
+        var ownedVotes = db.RequestSubmissionVotes.Where(x =>
+            (
+                x.VoterTwitchUserId == userId
+                || (
+                    x.VoterTwitchUserId == null
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
+                    )
+                )
+            ) && (hostId == null || x.Submission!.HostId == hostId)
+        );
+        var votedSubmissionIds = await ownedVotes
             .Select(x => x.SubmissionId)
             .Distinct()
             .ToListAsync(ct);
-        Record(
-            context,
-            "request-boards.votes",
-            await db
-                .RequestSubmissionVotes.Where(x =>
-                    safeLoginClaims.Any(claim =>
-                        claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
-                    ) && (hostId == null || x.Submission!.HostId == hostId)
-                )
-                .ExecuteDeleteAsync(ct)
-        );
+        Record(context, "request-boards.votes", await ownedVotes.ExecuteDeleteAsync(ct));
         if (votedSubmissionIds.Count > 0)
         {
             _ = await db
@@ -142,16 +138,39 @@ public static partial class ViewerPrivacyService
                 );
         }
 
+        var ownedSubmissions = db.RequestSubmissions.Where(x =>
+            (
+                x.SubmitterTwitchUserId == userId
+                || (
+                    x.SubmitterTwitchUserId == null
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.SubmitterLogin
+                    )
+                )
+            ) && (hostId == null || x.HostId == hostId)
+        );
+        Record(
+            context,
+            "request-boards.merge-references",
+            await db
+                .RequestSubmissions.Where(source =>
+                    (hostId == null || source.HostId == hostId)
+                    && ownedSubmissions.Any(target =>
+                        target.HostId == source.HostId
+                        && target.BoardId == source.BoardId
+                        && target.Id == source.MergedIntoSubmissionId
+                    )
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters.SetProperty(source => source.MergedIntoSubmissionId, (long?)null),
+                    ct
+                )
+        );
         Record(
             context,
             "request-boards.submissions",
-            await db
-                .RequestSubmissions.Where(x =>
-                    safeLoginClaims.Any(claim =>
-                        claim.HostId == x.HostId && claim.Login == x.SubmitterLogin
-                    ) && (hostId == null || x.HostId == hostId)
-                )
-                .ExecuteDeleteAsync(ct)
+            await ownedSubmissions.ExecuteDeleteAsync(ct)
         );
         var requestBoardEvents = 0;
         foreach (var claim in quotedIdentityClaims)

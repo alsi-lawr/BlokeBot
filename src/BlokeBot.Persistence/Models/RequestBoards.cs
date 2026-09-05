@@ -175,6 +175,8 @@ public sealed class RequestSubmission
 
     public Guid OperationId { get; set; }
 
+    public string? SubmitterTwitchUserId { get; set; }
+
     public string SubmitterLogin { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;
@@ -238,6 +240,8 @@ public sealed class RequestSubmissionVote
     public long SubmissionId { get; set; }
 
     public RequestSubmission? Submission { get; set; }
+
+    public string? VoterTwitchUserId { get; set; }
 
     public string VoterLogin { get; set; } = string.Empty;
 

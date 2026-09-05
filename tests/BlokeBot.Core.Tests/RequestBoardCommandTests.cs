@@ -58,6 +58,35 @@ public sealed class RequestBoardCommandTests
             ),
             responses
         );
+        await DispatchAsync(
+            dispatcher,
+            new ChatMessage(
+                "viewer",
+                "streamer",
+                "!request games Not owned | details=Missing ID",
+                "",
+                new Dictionary<string, string>()
+            ),
+            responses
+        );
+        await DispatchAsync(
+            dispatcher,
+            new ChatMessage(
+                "viewer",
+                "streamer",
+                "!requestvote 1",
+                "",
+                new Dictionary<string, string>()
+            ),
+            responses
+        );
+        await using (var identityCheck = await database.CreateDbContextAsync())
+        {
+            (await identityCheck.RequestSubmissions.SingleAsync()).SubmitterTwitchUserId.ShouldBe(
+                "request-test-viewer"
+            );
+            (await identityCheck.RequestSubmissionVotes.CountAsync()).ShouldBe(0);
+        }
         await DispatchAsync(dispatcher, Message("viewer", "!requests games"), responses);
         await DispatchAsync(dispatcher, Message("viewer", "!requestapprove 1"), responses);
 
@@ -130,7 +159,10 @@ public sealed class RequestBoardCommandTests
             "streamer",
             text,
             $":{login}!u@h PRIVMSG #streamer :{text}",
-            tags ?? new Dictionary<string, string>()
+            new Dictionary<string, string>(tags ?? new Dictionary<string, string>())
+            {
+                ["user-id"] = "request-test-viewer",
+            }
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

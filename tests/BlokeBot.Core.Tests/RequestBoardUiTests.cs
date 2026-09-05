@@ -6,7 +6,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class RequestBoardUiTests
+public sealed partial class RequestBoardUiTests
 {
     [Test]
     public async Task PublicBoard_RendersVisibleRulesEscapedLinksAndNoPrivateFields()
@@ -49,7 +49,7 @@ public sealed class RequestBoardUiTests
                 "clips",
                 new SubmitRequestCommand(
                     Guid.NewGuid(),
-                    "viewer",
+                    RequestBoardTestActor.ForLogin("viewer"),
                     "<script>alert('title')</script>",
                     "Clips",
                     ["review"],
@@ -95,7 +95,7 @@ public sealed class RequestBoardUiTests
                 "clips",
                 new SubmitRequestCommand(
                     Guid.NewGuid(),
-                    "another_viewer",
+                    RequestBoardTestActor.ForLogin("another_viewer"),
                     "Higher priority queued request",
                     "Clips",
                     ["review"],

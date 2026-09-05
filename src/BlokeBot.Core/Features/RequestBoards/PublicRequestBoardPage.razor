@@ -49,7 +49,7 @@
         {
             <section class="card p-5" aria-labelledby="request-board-submit">
                 <h2 id="request-board-submit" class="text-lg font-semibold text-slate-950">Submit a request</h2>
-                @if (string.IsNullOrWhiteSpace(_viewerLogin))
+                @if (_actor is null)
                 {
                     <p class="mt-2 text-sm text-muted-foreground">Sign in with Twitch to submit, vote, or withdraw your requests.</p>
                     <a class="btn-primary mt-4 inline-flex" href="/auth/login">Sign in with Twitch</a>
@@ -152,14 +152,14 @@
                     {
                         <p class="mt-3 text-sm font-semibold">Merged into request #@target.</p>
                     }
-                    @if (!string.IsNullOrWhiteSpace(_viewerLogin))
+                    @if (_actor is not null)
                     {
                         <div class="mt-4 flex flex-wrap gap-2">
                             @if (_page.Board.VotingEnabled && request.Status is RequestSubmissionStatus.Approved or RequestSubmissionStatus.Queued or RequestSubmissionStatus.Accepted)
                             {
-                                <button class="btn-secondary" type="button" @onclick="() => VoteAsync(request.Id)">Vote</button>
+                                <button class="btn-secondary" type="button" disabled="@(_self is null || _self.VotesRemaining == 0 || _self.VotedSubmissionIds.Contains(request.Id))" @onclick="() => VoteAsync(request.Id)">Vote</button>
                             }
-                            @if (request.SubmitterLogin == _viewerLogin && request.Status is RequestSubmissionStatus.Pending or RequestSubmissionStatus.Approved or RequestSubmissionStatus.Queued)
+                            @if (_self?.WithdrawableSubmissionIds.Contains(request.Id) == true)
                             {
                                 <button class="btn-secondary" type="button" @onclick="() => WithdrawAsync(request.Id)">Withdraw</button>
                             }

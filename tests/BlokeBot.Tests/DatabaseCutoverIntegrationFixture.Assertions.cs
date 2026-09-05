@@ -183,7 +183,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     {
         var sourceMigrations = await SqliteMigrationsAsync();
         var targetMigrations = await TargetMigrationsAsync(Primary);
-        targetMigrations.ShouldBe([CurrentPostgreSqlMigration]);
+        targetMigrations.ShouldBe(CurrentPostgreSqlMigrations);
         targetMigrations.Intersect(sourceMigrations, StringComparer.Ordinal).ShouldBeEmpty();
 
         await using var target = new NpgsqlConnection(Primary.ConnectionString);

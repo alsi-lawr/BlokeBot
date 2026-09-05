@@ -104,8 +104,14 @@ public static partial class ViewerPrivacyService
             context,
             "request-boards.submissions",
             db.RequestSubmissions.Where(x =>
-                    safeLoginClaims.Any(claim =>
-                        claim.HostId == x.HostId && claim.Login == x.SubmitterLogin
+                    (
+                        x.SubmitterTwitchUserId == userId
+                        || (
+                            x.SubmitterTwitchUserId == null
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.HostId && claim.Login == x.SubmitterLogin
+                            )
+                        )
                     ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
@@ -126,8 +132,14 @@ public static partial class ViewerPrivacyService
             context,
             "request-boards.votes",
             db.RequestSubmissionVotes.Where(x =>
-                    safeLoginClaims.Any(claim =>
-                        claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
+                    (
+                        x.VoterTwitchUserId == userId
+                        || (
+                            x.VoterTwitchUserId == null
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
+                            )
+                        )
                     ) && (hostId == null || x.Submission!.HostId == hostId)
                 )
                 .Select(x => new

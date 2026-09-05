@@ -65,6 +65,13 @@ public sealed class RequestBoardCommandModule(
             return new CommandHandlingOutcome.Handled();
         }
 
+        var actor = RequestActor.FromChatMessage(context.Message);
+        if (actor is null)
+        {
+            await context.ReplyAsync("A verified Twitch identity is required.", ct);
+            return new CommandHandlingOutcome.Handled();
+        }
+
         var sections = string.Join(' ', args.Skip(1)).Split('|', StringSplitOptions.TrimEntries);
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         var category = string.Empty;
@@ -98,7 +105,7 @@ public sealed class RequestBoardCommandModule(
             args[0],
             new SubmitRequestCommand(
                 MessageOperationId(context.Message),
-                context.Message.Login,
+                actor,
                 sections[0],
                 category,
                 tags,
@@ -178,7 +185,14 @@ public sealed class RequestBoardCommandModule(
             return new CommandHandlingOutcome.Handled();
         }
 
-        var outcome = await boards.VoteAsync(hostId.Value, id, context.Message.Login, ct);
+        var actor = RequestActor.FromChatMessage(context.Message);
+        if (actor is null)
+        {
+            await context.ReplyAsync("A verified Twitch identity is required.", ct);
+            return new CommandHandlingOutcome.Handled();
+        }
+
+        var outcome = await boards.VoteAsync(hostId.Value, id, actor, ct);
         await context.ReplyAsync(
             outcome.Match(
                 succeeded =>

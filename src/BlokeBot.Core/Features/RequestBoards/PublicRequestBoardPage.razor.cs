@@ -8,7 +8,8 @@ public partial class PublicRequestBoardPage
 {
     private readonly Dictionary<string, string> _fieldValues = new(StringComparer.Ordinal);
     private RequestBoardPage? _page;
-    private string _viewerLogin = string.Empty;
+    private RequestActor? _actor;
+    private RequestBoardSelfView? _self;
     private string _title = string.Empty;
     private string _category = string.Empty;
     private string _tags = string.Empty;
@@ -28,15 +29,23 @@ public partial class PublicRequestBoardPage
     protected override async Task OnParametersSetAsync()
     {
         var authentication = await _authenticationState;
-        _viewerLogin = CommunityInput.NormalizeLogin(
-            AuthenticatedSession.FromPrincipal(authentication.User).Login
-        );
+        _actor = RequestActor.FromSession(AuthenticatedSession.FromPrincipal(authentication.User));
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
         _page = await _boards.GetPublicPageAsync(Channel, BoardSlug, CancellationToken.None);
+        _self =
+            _page is not null && _actor is not null
+                ? await _boards.GetSelfAsync(
+                    _page.Board.HostId,
+                    _page.Board.Slug,
+                    _actor,
+                    _page.Submissions.Select(row => row.Id).ToArray(),
+                    CancellationToken.None
+                )
+                : null;
         _fieldValues.Clear();
         if (_page is not null)
         {
@@ -49,7 +58,7 @@ public partial class PublicRequestBoardPage
 
     private async Task SubmitAsync()
     {
-        if (_page is null || string.IsNullOrWhiteSpace(_viewerLogin))
+        if (_page is null || _actor is null)
         {
             return;
         }
@@ -59,7 +68,7 @@ public partial class PublicRequestBoardPage
             _page.Board.Slug,
             new SubmitRequestCommand(
                 Guid.NewGuid(),
-                _viewerLogin,
+                _actor,
                 _title,
                 _category,
                 RequestBoardInput.ParseTags(_tags),
@@ -83,7 +92,7 @@ public partial class PublicRequestBoardPage
 
     private async Task VoteAsync(long submissionId)
     {
-        if (_page is null)
+        if (_page is null || _actor is null)
         {
             return;
         }
@@ -91,7 +100,7 @@ public partial class PublicRequestBoardPage
         var result = await _boards.VoteAsync(
             _page.Board.HostId,
             submissionId,
-            _viewerLogin,
+            _actor,
             CancellationToken.None
         );
         _feedback = result.Match(
@@ -107,7 +116,7 @@ public partial class PublicRequestBoardPage
 
     private async Task WithdrawAsync(long submissionId)
     {
-        if (_page is null)
+        if (_page is null || _actor is null)
         {
             return;
         }
@@ -115,7 +124,7 @@ public partial class PublicRequestBoardPage
         var result = await _boards.WithdrawAsync(
             _page.Board.HostId,
             submissionId,
-            _viewerLogin,
+            _actor,
             CancellationToken.None
         );
         _feedback = result.Match(
