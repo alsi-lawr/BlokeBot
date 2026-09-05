@@ -15,6 +15,8 @@ internal static class BlokeBotAuthResultPage
         var support = result.SupportReference is { } reference
             ? $"<p class=\"support-reference\">Support reference: <code>{encode(reference)}</code></p><a class=\"support\" href=\"https://github.com/alsi-lawr/BlokeBot/issues\">Get help</a>"
             : string.Empty;
+        var message = view.Message is { } detail ? $"<p>{encode(detail)}</p>" : string.Empty;
+        var nextAction = view.NextAction is { } next ? $"<p>{encode(next)}</p>" : string.Empty;
         var returnAction = ReturnAction(result.ReturnAction);
         var role = result.Outcome == BlokeBotAuthOutcome.Success ? "status" : "alert";
         var html = $$"""
@@ -52,7 +54,6 @@ internal static class BlokeBotAuthResultPage
                     .brand { color: #6d28d9; font-size: .75rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
                     h1 { margin: .6rem 0 1rem; font-size: clamp(1.35rem, 6vw, 1.75rem); line-height: 1.2; }
                     p { margin: .75rem 0; line-height: 1.5; }
-                    .change { font-weight: 700; }
                     .actions { display: grid; gap: .625rem; margin-top: 1.5rem; }
                     .button { box-sizing: border-box; min-height: 2.75rem; border: 1px solid #cbd5e1; border-radius: .5rem; padding: .625rem .875rem; color: inherit; font: inherit; font-weight: 700; line-height: 1.4; text-align: center; text-decoration: none; }
                     .button-primary { border-color: #6d28d9; background: #6d28d9; color: #fff; }
@@ -74,9 +75,8 @@ internal static class BlokeBotAuthResultPage
                         <div class="brand">BlokeBot</div>
                         <section role="{{role}}">
                             <h1>{{encode(view.Title)}}</h1>
-                            <p>{{encode(view.Message)}}</p>
-                            <p class="change">{{encode(view.ChangeSummary)}}</p>
-                            <p>{{encode(view.NextAction)}}</p>
+                            {{message}}
+                            {{nextAction}}
                         </section>
                         <div class="actions">
                             {{retry}}
@@ -99,50 +99,42 @@ internal static class BlokeBotAuthResultPage
             BlokeBotAuthOutcome.Cancelled => new(
                 "Connection cancelled",
                 "Twitch did not finish this connection.",
-                "No changes were made.",
                 "Try again when you are ready."
             ),
             BlokeBotAuthOutcome.InvalidOrExpired => new(
                 "Connection link expired",
                 "This Twitch connection link is no longer valid.",
-                "No changes were made.",
                 "Start a new connection to continue."
             ),
             BlokeBotAuthOutcome.PermissionOrAccount => new(
                 "Twitch access needed",
                 "Use the required Twitch account and approve every requested permission.",
-                "No changes were made.",
                 "Try again after checking the Twitch account and permissions."
             ),
             BlokeBotAuthOutcome.WrongAccount => WrongAccountView(result.Context),
             BlokeBotAuthOutcome.ProviderUnavailable => new(
                 "Twitch is temporarily unavailable",
                 "BlokeBot could not finish this connection right now.",
-                "No changes were made.",
                 "Try again in a few minutes."
             ),
             BlokeBotAuthOutcome.Unavailable => new(
                 "Twitch connection unavailable",
                 "This Twitch connection is not available yet.",
-                "No changes were made.",
                 "An administrator needs to check the connection settings."
             ),
             BlokeBotAuthOutcome.AccessRequired => new(
                 "Access required",
                 "You do not have access to complete this Twitch connection.",
-                "No changes were made.",
                 "Ask the channel owner or a BlokeBot administrator for help."
             ),
             BlokeBotAuthOutcome.NoChannelSelected => new(
                 "Choose a channel to continue",
                 "Choose a channel before connecting Twitch.",
-                "No changes were made.",
                 "Open Channel setup, choose your channel, then try again."
             ),
             BlokeBotAuthOutcome.CustomBotDisabled => new(
                 "Turn on the custom bot first",
                 "Turn on the custom bot before connecting it to Twitch.",
-                "No changes were made.",
                 "Enable the custom bot in Channel setup, then try again."
             ),
             _ => throw new ArgumentOutOfRangeException(
@@ -157,15 +149,13 @@ internal static class BlokeBotAuthResultPage
         {
             BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.ChannelConnection) => new(
                 "Twitch access saved",
-                "BlokeBot has saved this Twitch connection.",
-                "Twitch access for this channel was saved.",
-                "Your channel settings have been updated."
+                null,
+                null
             ),
             BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.BotAccount) => new(
                 "Bot account connected",
-                "BlokeBot has saved Twitch access for the bot account.",
-                "The bot account connection was saved.",
-                "The bot account connection has been updated."
+                null,
+                null
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
@@ -176,7 +166,6 @@ internal static class BlokeBotAuthResultPage
             BlokeBotAuthContext.RequiredChannel required => new(
                 "Use the channel account",
                 $"@{required.Login} is the Twitch account needed for this channel.",
-                "No changes were made.",
                 "Reconnect using that channel account."
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
@@ -203,12 +192,7 @@ internal static class BlokeBotAuthResultPage
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
 
-    private sealed record BlokeBotAuthResultView(
-        string Title,
-        string Message,
-        string ChangeSummary,
-        string NextAction
-    );
+    private sealed record BlokeBotAuthResultView(string Title, string? Message, string? NextAction);
 
     private sealed record BlokeBotAuthResultAction(string Url, string Text);
 }

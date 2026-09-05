@@ -33,7 +33,7 @@
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground">
-                    Bounties are off for this channel. Turn them on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved bounties, pledges, and history are retained.
+                    Bounties are off for this channel. Turn them on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
                 </div>
             </ApplicationCardCollection>
         }
@@ -41,7 +41,7 @@
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground">
-                    Bounties depend on Points, which is off for this channel. Turn Points on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. No saved bounty work is changed while unavailable.
+                    Points is off for this channel. Turn Points on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
                 </div>
             </ApplicationCardCollection>
         }
@@ -127,7 +127,6 @@
                                     Open="_moderatorNoteOpen"
                                     OpenChanged="open => _moderatorNoteOpen = open">
                             <TextAreaField Id="bounty-create-reason" Label="Private note" @bind-Value="_draft.Reason" />
-                            <p class="mt-1 text-xs text-muted-foreground">Kept with the private moderation record for this bounty. Viewers never see it.</p>
                         </StudioFold>
                     </div>
                 </StudioStage>

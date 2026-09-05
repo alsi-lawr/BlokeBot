@@ -65,44 +65,6 @@ public partial class CollectivesPage
             _ => "Shared tournament reference",
         };
 
-    private string _workflowSubtitle =>
-        _workflow switch
-        {
-            "raid" => "Each host controls its own Twitch action",
-            "goal" => "Bounded progress without viewer attribution",
-            _ => "Bounded state from one host-owned competition",
-        };
-
-    private string _privateDetail =>
-        _workflow switch
-        {
-            "raid" =>
-                "Welcome rules, cooldowns, approved channels, and Twitch access remain local.",
-            "goal" =>
-                "The local goal source, contributor records, rewards, and moderator notes are not shared.",
-            _ =>
-                "Local reminders, source mapping, private lobby, and contact details are not shared.",
-        };
-
-    private string _sharedOutputTitle =>
-        _workflow switch
-        {
-            "raid" => "Aggregate relay state only",
-            "goal" => "Collective total and host totals",
-            _ => "Read-only tournament status",
-        };
-
-    private string _sharedOutputDetail =>
-        _workflow switch
-        {
-            "raid" =>
-                "Shared state carries the host names, the total viewer count, the hand-off status, and a reference for the operation. Individual viewer details stay private to the host that owns them.",
-            "goal" =>
-                "Public output shows the collective target and bounded host totals. Contributor identities and private goal configuration stay local.",
-            _ =>
-                "Public results remain owned by the competition host. Other hosts receive the same bounded reference, never private competition data.",
-        };
-
     protected override async Task OnInitializedAsync()
     {
         _workflow = SegmentedTabs.CanonicalKey(_navigation, _workflowTabs);

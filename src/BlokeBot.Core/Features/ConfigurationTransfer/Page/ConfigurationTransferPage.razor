@@ -73,8 +73,7 @@
             <div id="@SegmentedTabs.PanelId(_modeTabsId, _exportModeKey)"
                  role="tabpanel"
                  aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _exportModeKey)">
-                <TaskPanel Title="Choose what to export"
-                           Description="Only configuration is included. Runtime history, balances, credentials and queued work stay here.">
+                <TaskPanel Title="Choose what to export">
                     <Actions>
                         <span class="status-pill status-pill--slate">JSON · format 1</span>
                     </Actions>
@@ -133,8 +132,7 @@
             <div id="@SegmentedTabs.PanelId(_modeTabsId, _importModeKey)"
                  role="tabpanel"
                  aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _importModeKey)">
-                <TaskPanel Title="Import applied"
-                           Description="Runtime history and disabled configuration were preserved.">
+                <TaskPanel Title="Import applied">
                     <Actions>
                         <ConfigurationTransferImportProgress Stage="ConfigurationImportStage.Applied" />
                     </Actions>
@@ -202,8 +200,7 @@
             <div id="@SegmentedTabs.PanelId(_modeTabsId, _importModeKey)"
                  role="tabpanel"
                  aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _importModeKey)">
-                <TaskPanel Title="Add a configuration file"
-                           Description="Upload a BlokeBot JSON export or paste its contents. Nothing changes until you review and confirm.">
+                <TaskPanel Title="Add a configuration file">
                     <Actions>
                         <ConfigurationTransferImportProgress Stage="ConfigurationImportStage.File" />
                     </Actions>
@@ -254,7 +251,6 @@
                  role="tabpanel"
                  aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _importModeKey)">
                 <ConfigurationTransferReviewPanel Preview="@_preview"
-                                                  DestinationLogin="@HostLogin"
                                                   SelectedSections="@_importSections"
                                                   Strategies="@_strategies"
                                                   Resolutions="@_resolutions"

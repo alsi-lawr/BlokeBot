@@ -216,21 +216,14 @@ public partial class BingoPage
         return $"{defined} of {_template.Squares.Count} squares defined";
     }
 
-    private string RevisionNote()
-    {
-        var saved = _templates.FirstOrDefault(value => value.Id.Value == _template.Id);
-        var next = saved is null ? 1 : saved.Revision + 1;
-        return $"Saving creates revision {next}. Issued cards keep the revision, grid and seed they were dealt from.";
-    }
-
     private static string GameDescription(BingoGameView game) =>
         game.Status switch
         {
-            BingoGameStatus.Joining => "Open for joining. Rosters freeze when cards are issued.",
+            BingoGameStatus.Joining => "Open for joining.",
             BingoGameStatus.Issued when game.IssuedAtUtc is { } issued =>
-                $"Issued {issued.DayStamp()} · rosters and card assignments are frozen.",
+                $"Issued {issued.DayStamp()}",
             BingoGameStatus.Archived when game.ArchivedAtUtc is { } archived =>
-                $"Archived {archived.DayStamp()} · rewards already granted are retained permanently.",
+                $"Archived {archived.DayStamp()}",
             _ => "Rosters and card assignments are frozen.",
         };
 

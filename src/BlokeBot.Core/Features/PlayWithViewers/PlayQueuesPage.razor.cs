@@ -75,8 +75,6 @@ public partial class PlayQueuesPage
     private string _nameOrExample =>
         string.IsNullOrWhiteSpace(_draft.Name) ? "Ranked Duos" : _draft.Name;
 
-    private string _viewerPagePath => $"/queues/{HostLogin}/{_slugOrExample}";
-
     private IReadOnlyList<StudioRailGroup> _railGroups =>
         [
             new(
@@ -236,9 +234,6 @@ public partial class PlayQueuesPage
     private static void RemoveChoice(FieldDraft field, string choice) =>
         field.Choices = string.Join(", ", FieldChoices(field).Where(value => value != choice));
 
-    private static string KeyOrExample(FieldDraft field) =>
-        string.IsNullOrWhiteSpace(field.Key) ? "platform" : field.Key;
-
     private static string FieldPreviewPlaceholder(FieldDraft field) =>
         FieldChoices(field).Count > 0 ? "Choose… ▾" : "Free text";
 
@@ -246,11 +241,6 @@ public partial class PlayQueuesPage
         status is PlayQueueEntryStatus.Ready or PlayQueueEntryStatus.Selected
             ? "status-pill bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
             : "status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]";
-
-    private static string FairOrderProse(PlayQueueSelectionMode mode) =>
-        mode == PlayQueueSelectionMode.JoinOrder
-            ? "Picked in order: higher priority first, then join time."
-            : "Picked fairly: higher priority first, then whoever played with you least recently, then join time.";
 
     private static string ParticipationProse(ModeratorPlayQueueEntryView entry) =>
         entry.LastParticipatedAtUtc is { } last

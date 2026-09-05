@@ -17,8 +17,7 @@
     @if (_loadFailed)
     {
         <PageState Kind="PageStateKind.Failure"
-                   Title="Twitch events did not load"
-                   Description="Your saved automations did not change.">
+                   Title="Twitch events did not load">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
@@ -37,8 +36,7 @@
     else if (_outcome is TwitchEventSourceReadinessOutcome.FeatureDisabled)
     {
         <PageState Kind="PageStateKind.Unavailable"
-                   Title="Automations are off"
-                   Description="Saved automations and their history are retained, but Twitch events do not start flows while Automations is off. Suppressed events are not replayed when you turn it back on.">
+                   Title="Automations are off">
             <Actions>
                 <a class="btn-primary" href="/host#chat-tools" data-automation-events-channel-setup>Open Channel setup</a>
             </Actions>
@@ -61,8 +59,7 @@
             </PageState>
         }
 
-        <TaskPanel Title="Event sources"
-                   Description="Each source shows the Twitch approval it needs and whether an enabled automation flow uses it today.">
+        <TaskPanel Title="Event sources">
             <div class="grid gap-3" data-automation-event-sources>
                 @foreach (var source in available.Sources)
                 {
@@ -109,7 +106,7 @@
                 }
             </div>
             <p class="mt-4 text-sm text-muted-foreground" data-automation-events-editor-note>
-                These sources start every enabled flow connected to them. Open <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a> to build, validate, test, and enable a flow.
+                <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a>
             </p>
         </TaskPanel>
     }

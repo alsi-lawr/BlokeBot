@@ -11,8 +11,7 @@
 
 <div class="mx-auto max-w-6xl space-y-6" data-public-competitions>
     <PageHeader Kicker="Community progression"
-                Title="@(_board is null ? "Tournaments & leagues" : $"@{_board.HostLogin} competitions")"
-                Description="Authoritative brackets, schedules, standings, and archived results. Private contact and lobby information never appears here." />
+                Title="@(_board is null ? "Tournaments & leagues" : $"@{_board.HostLogin} competitions")" />
     @if (!_loaded)
     {
         <ApplicationCardCollection Owner="public-competition-cards"><div class="card p-8 text-sm text-muted-foreground">Loading competitions…</div></ApplicationCardCollection>

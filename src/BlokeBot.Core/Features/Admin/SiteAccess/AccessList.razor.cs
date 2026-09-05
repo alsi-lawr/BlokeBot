@@ -15,9 +15,6 @@ public partial class AccessList
     public bool Disabled { get; set; }
 
     [Parameter]
-    public string? DisabledText { get; set; }
-
-    [Parameter]
     public string EmptyText { get; set; } = string.Empty;
 
     [Parameter]

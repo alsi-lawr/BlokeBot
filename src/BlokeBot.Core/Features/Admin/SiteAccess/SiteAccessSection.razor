@@ -17,16 +17,12 @@
                         aria-label="Only allow people on the approved list"
                         @onclick="() => ToggleWhitelist(!State.WhitelistEnabled)"></button>
                 <span class="text-sm font-semibold text-[var(--app-text-strong)]">Only allow people on the approved list</span>
-                <span class="text-xs text-muted-foreground">
-                    @(State.WhitelistEnabled ? "Only approved Twitch users can create a channel." : "Any Twitch user can create a channel unless they are blocked.")
-                </span>
             </div>
             <div class="studio-span-6">
                 <AccessList Title="Approved people"
                             Entries="@WhitelistEntries"
                             Placeholder="twitch login"
                             EmptyText="No one added yet."
-                            DisabledText="Not used while the approved list is off. Kept for when you switch."
                             Add="@AddWhitelist"
                             Remove="@RemoveWhitelist"
                             NewLogin="@NewWhitelistLogin"
@@ -38,7 +34,6 @@
                             Entries="@BlacklistEntries"
                             Placeholder="twitch login"
                             EmptyText="No one added yet."
-                            DisabledText="Not used while the approved list is on. Everyone not approved is already unable to create channels."
                             Add="@AddBlacklist"
                             Remove="@RemoveBlacklist"
                             NewLogin="@NewBlacklistLogin"

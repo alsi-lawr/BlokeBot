@@ -20,21 +20,18 @@
                                 PressedChanged="@(_ => SelectProfile.InvokeAsync(profile.Id))" />
                 }
             </div>
-            <p class="mt-2 text-xs text-muted-foreground">Switching with unsaved edits still asks: save, discard, or keep editing.</p>
         </div>
         <div class="studio-span-6">
             <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")"
                    Label="Round type name"
                    @bind-Value="Configuration.Profile.Name"
                    Placeholder="Round type name" />
-            <p class="mt-1 text-xs text-muted-foreground">Up to 128 characters. Names must be unique.</p>
         </div>
         <div class="studio-span-6">
             <Field Id="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")"
                    Label="Points for a winning guess"
                    @bind-Value="Configuration.Profile.WinningGuessPointReward"
                    Placeholder="0" />
-            <p class="mt-1 text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
         </div>
         <div class="studio-span-6 content-end">
             <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">

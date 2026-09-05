@@ -2,8 +2,7 @@
 @using BlokeBot.Persistence.Models
 @using static BlokeBot.Core.Features.ConfigurationTransfer.Page.ConfigurationTransferPresentation
 
-<TaskPanel Title="Review changes"
-           Description="@($"Choose each section and how it combines with #{DestinationLogin}. Enablement changes are selected separately.")">
+<TaskPanel Title="Review changes">
     <Actions>
         <ConfigurationTransferImportProgress Stage="ConfigurationImportStage.Review" />
     </Actions>
@@ -96,7 +95,6 @@
                             <div class="mapping-row" @key="mapping.ImportedProfileId">
                                 <div class="mapping-row__copy">
                                     <strong>@mapping.ImportedProfileName</strong>
-                                    <small>Choose the destination profile for this imported profile.</small>
                                 </div>
                                 <div class="strategy-field field">
                                     <label class="field__label" for="@GuessingMappingId(mapping)">Destination profile</label>
@@ -171,7 +169,6 @@
                 <div class="review-row__main">
                     <div class="section-row__copy">
                         <span class="section-row__title">Chat Tools enablement</span>
-                        <span class="section-row__detail">Select each change independently</span>
                     </div>
                 </div>
                 <div class="enablement-grid">

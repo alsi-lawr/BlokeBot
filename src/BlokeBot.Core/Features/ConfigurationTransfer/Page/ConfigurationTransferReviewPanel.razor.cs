@@ -10,9 +10,6 @@ public partial class ConfigurationTransferReviewPanel
     public required ConfigurationImportPreview Preview { get; set; }
 
     [Parameter, EditorRequired]
-    public required string DestinationLogin { get; set; }
-
-    [Parameter, EditorRequired]
     public required IReadOnlySet<ConfigurationSectionId> SelectedSections { get; set; }
 
     [Parameter, EditorRequired]

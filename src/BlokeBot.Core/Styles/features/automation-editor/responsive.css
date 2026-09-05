@@ -84,8 +84,7 @@
 
     .automation-flow-rail-heading,
     .automation-flow-rail .automation-flow-item:not(.automation-flow-item--active),
-    .automation-flow-rail-actions,
-    .automation-flow-rail > p {
+    .automation-flow-rail-actions {
         display: none;
     }
 
@@ -198,8 +197,7 @@
         display: flex;
     }
 
-    .automation-editor--focus .automation-flow-rail .automation-flow-item,
-    .automation-editor--focus .automation-flow-rail > p {
+    .automation-editor--focus .automation-flow-rail .automation-flow-item {
         display: block;
     }
 

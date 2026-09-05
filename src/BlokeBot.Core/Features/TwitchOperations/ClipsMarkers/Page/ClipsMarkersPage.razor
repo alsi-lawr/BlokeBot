@@ -19,7 +19,7 @@
 
     @if (LoadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Clips and markers could not load" Description="Try again. Any earlier attempts are still saved.">
+        <PageState Kind="PageStateKind.Failure" Title="Clips and markers could not load" >
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }

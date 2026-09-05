@@ -20,7 +20,7 @@
 
     @if (LoadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Predictions could not load" Description="Try again. Your saved questions have not changed.">
+        <PageState Kind="PageStateKind.Failure" Title="Predictions could not load" >
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }

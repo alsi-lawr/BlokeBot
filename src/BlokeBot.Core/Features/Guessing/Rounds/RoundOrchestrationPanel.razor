@@ -1,7 +1,6 @@
 <section class="card">
     <div class="border-b border-slate-200 p-5">
         <h2 class="text-lg font-semibold text-slate-950">Run a round</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Start a round, stop new guesses, or pick the winner from here.</p>
     </div>
     <div class="studio-grid p-5">
         <div class="studio-span-6">
@@ -41,7 +40,6 @@
                 <input id="winner" class="input min-w-0 flex-1" placeholder="winning answer" value="@WinnerName" @oninput="OnWinnerNameChanged" />
                 <button class="btn-primary" @onclick="InvokeDeclareWinnerAsync">Declare win</button>
             </div>
-            <p class="text-xs text-muted-foreground">Tap an answer or type it. Moderators can still declare the winner from chat.</p>
         </div>
     </div>
 </section>

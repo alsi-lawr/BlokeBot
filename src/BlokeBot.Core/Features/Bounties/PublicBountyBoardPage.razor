@@ -102,7 +102,7 @@
                                                 <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
                                                 <div class="mt-2 flex flex-wrap items-center gap-3 max-md:mt-0">
                                                     <button class="btn-primary" type="button" @onclick="() => PledgeAsync(bounty)">Pledge</button>
-                                                    <p class="text-xs text-muted-foreground">Pledging as @($"@{_session.Login}"). Requests above the remaining target are capped automatically.</p>
+                                                    <p class="text-xs text-muted-foreground">Pledging as @($"@{_session.Login}").</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -115,7 +115,7 @@
                             }
                             else if (bounty.Status == BountyStatus.Accepted)
                             {
-                                <p class="border-t border-dashed border-[var(--app-border)] pt-4 text-sm text-muted-foreground">Funding is closed. The bounty is on: it completes, fails, or expires from here.</p>
+                                <p class="border-t border-dashed border-[var(--app-border)] pt-4 text-sm text-muted-foreground">Funding is closed.</p>
                             }
                             <PublicMomentAttachments Channel="@Channel"
                                                      Destination="@(new MomentAttachmentDestination.Bounty(bounty.PublicId))" />

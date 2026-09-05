@@ -14,7 +14,6 @@ public partial class OverlaySourcesPanel
         OverlaySourceStage.PositionLook
     );
     private bool _cssFoldOpen;
-    private bool _obsFoldOpen;
     private IReadOnlyList<OverlayInstanceView> _instances = [];
     private OverlayInstanceView? _selected;
     private Guid? _selectedId;

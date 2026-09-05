@@ -39,10 +39,6 @@
     z-index: 2;
 }
 
-.automation-inspector-cel-help p {
-    margin: 0;
-}
-
 .automation-binding-mode-option {
     display: inline-flex;
     position: relative;

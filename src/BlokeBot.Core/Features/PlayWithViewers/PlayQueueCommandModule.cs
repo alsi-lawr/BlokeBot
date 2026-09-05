@@ -46,7 +46,7 @@ public sealed class PlayQueueCommandModule(
         }
 
         await context.ReplyAsync(
-            $"{page.Queue.Name} is {(page.Queue.IsOpen ? "open" : "closed")}: {page.Waiting.Count} waiting, {page.CurrentParty.Count}/{page.Queue.Capacity} in the party. {page.Queue.PriorityDescription} /queues/{page.Queue.HostLogin}/{page.Queue.Slug}",
+            $"{page.Queue.Name} is {(page.Queue.IsOpen ? "open" : "closed")}: {page.Waiting.Count} waiting, {page.CurrentParty.Count}/{page.Queue.Capacity} in the party. /queues/{page.Queue.HostLogin}/{page.Queue.Slug}",
             ct
         );
         return new CommandHandlingOutcome.Handled();

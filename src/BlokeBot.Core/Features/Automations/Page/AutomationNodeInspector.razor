@@ -5,7 +5,6 @@
     <aside class="automation-inspector automation-inspector--empty" aria-label="Node inspector">
         <p class="automation-inspector-eyebrow">Inspector</p>
         <h2>Select a node</h2>
-        <p>Select one node in Grid or List. Then, edit its fields and connections.</p>
     </aside>
 }
 else
@@ -50,8 +49,6 @@ else
         @if (Node.IsCelTransform)
         {
             <div class="automation-inspector-cel-help">
-                <p>CEL is a small language that calculates a value from node inputs.</p>
-                <p>An input Expression can use only Arguments when the input has the Arguments type.</p>
                 <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
             </div>
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">

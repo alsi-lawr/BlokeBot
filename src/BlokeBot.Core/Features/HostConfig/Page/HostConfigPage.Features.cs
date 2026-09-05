@@ -223,7 +223,6 @@ public partial class HostConfigPage
         var featureName = FeatureName(feature);
         var channelName = _state is { Login.Length: > 0 } ? $"#{_state.Login}" : "this channel";
         var stateText = enabled ? "enabled" : "disabled";
-        var impactText = FeatureImpact(feature, enabled);
 
         if (result is HostFeatureUpdateResult.Saved { Activation: { } activation })
         {
@@ -266,7 +265,7 @@ public partial class HostConfigPage
             return;
         }
 
-        var message = $"{featureName} is now {stateText} for {channelName}. {impactText}";
+        var message = $"{featureName} is now {stateText} for {channelName}.";
         var title = $"{featureName} {stateText}";
         if (enabled)
         {
@@ -279,29 +278,6 @@ public partial class HostConfigPage
             _ = _toasts.Publish(ToastRequest<CautionStatusToastStrategy>.WithTitle(message, title));
         }
     }
-
-    private static string FeatureImpact(HostFeatureFlags feature, bool enabled) =>
-        feature switch
-        {
-            HostFeatureFlags.Automations when enabled =>
-                "Its flow editor, validation, sample runs, and current live triggers are available again; suppressed work is not replayed.",
-            HostFeatureFlags.Automations =>
-                "Its editor, triggers, queued work, and actions are paused while saved flows and history remain.",
-            HostFeatureFlags.Overlays when enabled =>
-                "Its dashboard and Browser Sources are available again.",
-            HostFeatureFlags.Overlays =>
-                "Its dashboard and Browser Sources are unavailable until you enable it again.",
-            HostFeatureFlags.RaidCollaboration when enabled =>
-                "Its hub and fresh Twitch event processing are available again; missed work is not repeated.",
-            HostFeatureFlags.RaidCollaboration =>
-                "Its hub, raid processing, welcome actions, and Twitch actions are paused while saved history and settings remain.",
-            HostFeatureFlags.Collectives when enabled =>
-                "Retained collectives resume where they left off; missed work is not repeated.",
-            HostFeatureFlags.Collectives =>
-                "Membership, workflows, shared output, events, and Twitch actions pause while retained data remains.",
-            _ when enabled => "Its chat commands and pages are available again.",
-            _ => "Its chat commands and pages are unavailable until you enable it again.",
-        };
 
     private static string FeatureName(HostFeatureFlags feature) =>
         feature switch

@@ -32,7 +32,7 @@
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground" data-bingo-disabled-recovery>
-                    Bingo is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Templates, rosters, issued cards, evidence, wins, rewards, and archives are retained without repeating events missed while off.
+                    Bingo is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
                 </div>
             </ApplicationCardCollection>
         }
@@ -89,7 +89,6 @@
                                 <div class="bingo-award-row">
                                     <div class="bingo-award-row__text">
                                         <strong id="bingo-full-card-label">Award full-card wins</strong>
-                                        <small>Count a full card as a win and grant its reward.</small>
                                     </div>
                                     <button id="bingo-full-card"
                                             type="button"
@@ -135,7 +134,6 @@
                                 {
                                     <p class="bingo-revisions__empty">No saved revisions yet.</p>
                                 }
-                                <p class="bingo-revisions__note" data-bingo-revision-note>@RevisionNote()</p>
                             </div>
                         </div>
                     </div>
@@ -183,7 +181,6 @@
                                         }
                                     </div>
                                 </div>
-                                <p class="bingo-board__hint">Select a square to edit it. Issued cards deal these squares into a seeded order.</p>
                             </div>
                             @{
                                 var selected = _template.Squares[_selectedSquare];
@@ -255,7 +252,6 @@
                                  OpenChanged="value => SetOpen(_openerKey, value)">
                     <Header>
                         <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Open a game</h2>
-                        <p class="text-sm text-muted-foreground">Deal cards deterministically from a template revision and a recorded seed.</p>
                     </Header>
                     <ChildContent>
                         <div class="studio-grid">
@@ -326,12 +322,10 @@
                             <div class="live-round-summary__metric">
                                 <p class="live-round-summary__label">Revision</p>
                                 <p class="live-round-summary__value">rev @game.TemplateRevision</p>
-                                <p class="live-round-summary__detail">frozen at issue</p>
                             </div>
                             <div class="live-round-summary__metric">
                                 <p class="live-round-summary__label">Seed</p>
                                 <p class="live-round-summary__value font-mono">@game.Seed</p>
-                                <p class="live-round-summary__detail">recorded</p>
                             </div>
                             @if (game.Status == BingoGameStatus.Joining)
                             {
@@ -353,7 +347,6 @@
 
                         @if (game.Status == BingoGameStatus.Joining)
                         {
-                            <p class="text-sm text-muted-foreground">Viewers join with <span class="font-mono">!bingojoin</span>@(game.Mode == BingoGameMode.Team ? " followed by a team name" : string.Empty). Owner and moderator changes remain available until cards are issued.</p>
                             @foreach (var roster in Rosters(game))
                             {
                                 <div class="space-y-2" @key="roster.Key">

@@ -139,10 +139,3 @@
     color: var(--tone-red-fg);
     min-height: 2.35rem;
 }
-
-.automation-flow-rail > p {
-    color: var(--app-text-muted);
-    font-size: 0.68rem;
-    line-height: 1.5;
-    margin: 1.2rem 0.2rem 0;
-}

@@ -57,7 +57,6 @@
                                 type="button"
                                 data-action="new-overlay"
                                 disabled="@_isCreating"
-                                aria-describedby="@(_isCreating ? "overlay-new-guidance" : null)"
                                 @onclick="NewOverlay">+ New Browser Source</button>
                     </Footer>
                 </StudioRail>
@@ -65,13 +64,7 @@
                 <div class="studio__inspector flex min-w-0 flex-col" data-overlay-editor data-sticky-save-scope>
                     <header class="studio__header flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] max-lg:rounded-tr-none">
                         <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_isCreating ? "New overlay (not saved)" : _selected?.Name ?? _draftName)</span>
-                        @if (_isCreating)
-                        {
-                            <span id="overlay-new-guidance" class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">
-                                Name this overlay, then select Create overlay. Its private Browser Source URL appears once, after creation.
-                            </span>
-                        }
-                        else if (_selected is { } headerOverlay)
+                        @if (!_isCreating && _selected is { } headerOverlay)
                         {
                             <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@TypeLabel(headerOverlay.Type) · @UpdatedLabel(headerOverlay)</span>
                             @if (headerOverlay.RequiresAccessKeyRegeneration)
@@ -146,9 +139,6 @@
                                             }
                                         </select>
                                     </div>
-                                    <p class="text-xs leading-5 text-muted-foreground">
-                                        Type is fixed after creation. Feature-owned sources appear only while their inherited Channel Setup tool is on.
-                                    </p>
                                 </div>
                             </div>
                         </StudioStage>
@@ -272,9 +262,6 @@
                                         </svg>
                                     }
                                 </div>
-                                <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                                    This 1920 × 1080 canvas shows how it will look in OBS. Drag to move, drag edges or corners to resize. Arrow keys nudge 1 px, Shift+arrow 10 px.
-                                </p>
 
                                 @if (previewOverlay.Type is not (OverlayType.Empty or OverlayType.CuePlayer))
                                 {
@@ -296,10 +283,6 @@
                                                       maxlength="@OverlayAppearance.MaximumCssBytes"
                                                       spellcheck="false"
                                                       @bind="_appearanceCss" @bind:event="oninput" data-appearance-css></textarea>
-                                            <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                                                Available selectors: .overlay, .&#99;ard, .accent, .kicker, .title, .detail, and .result. Up to @OverlayAppearance.MaximumCssBytes bytes.
-                                                Imports, external URLs, markup, scripts, at-rules, and selectors outside this Browser Source are rejected.
-                                            </p>
                                         </StudioFold>
                                     </div>
                                 }
@@ -320,9 +303,8 @@
                                          data-overlay-disabled-recovery>
                                         <p class="text-sm font-semibold text-slate-950">This guessing overlay is paused.</p>
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                                            Guessing game is off. Its saved setup is retained, but preview, live delivery, tests, and changes remain blocked.
+                                            Guessing game is off.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn Guessing game on in Channel setup</a>
-                                            to resume from the current round without repeating missed events or winner animations.
                                         </p>
                                     </div>
                                 }
@@ -352,9 +334,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <p class="mt-3 text-sm leading-6 text-muted-foreground">
-                                        Round names, status, answers, winners, and awarded points come from the existing Guessing game. Custom HTML is not supported.
-                                    </p>
                                 }
                             }
                             else if (_draftType is OverlayType.Giveaway)
@@ -365,9 +344,8 @@
                                          data-overlay-disabled-recovery>
                                         <p class="text-sm font-semibold text-slate-950">This giveaway overlay is paused.</p>
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                                            Points is off. The saved setup and giveaway history are retained, but preview, live delivery, tests, changes, and winner animations remain blocked.
+                                            Points is off.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn Points on in Channel setup</a>
-                                            to resume from current giveaway state without repeating missed events or animations.
                                         </p>
                                     </div>
                                 }
@@ -404,9 +382,6 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <p class="mt-3 text-sm leading-6 text-muted-foreground">
-                                        Giveaway state, entrant count, winners, prizes, and the canonical Points join alias come from Points. Entrant identities and private eligibility data are never published.
-                                    </p>
                                 }
                             }
                             else if (_draftType is OverlayType.CommunityGoal or OverlayType.ViewerFundedBounty)
@@ -423,9 +398,8 @@
                                          data-overlay-disabled-recovery>
                                         <p class="text-sm font-semibold text-slate-950">This @(TypeLabel(_draftType).ToLowerInvariant()) overlay is paused.</p>
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                                            @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") is off. The saved source configuration and domain history stay in place, but preview and live display remain blocked.
+                                            @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") is off.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") on in Channel setup</a>
-                                            to show current state without repeating missed progress or completion animations.
                                         </p>
                                     </div>
                                 }
@@ -443,7 +417,6 @@
                                                     }
                                                 </select>
                                             </div>
-                                            <p class="text-xs leading-5 text-muted-foreground">A selected item stays fixed. Rotation uses up to 12 current public items and restarts from current state after reconnect.</p>
                                         </div>
                                         <div class="studio-span-4">
                                             <div class="field">
@@ -539,9 +512,8 @@
                                             <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3"
                                                  data-achievement-event-disabled-recovery>
                                                 <p class="text-sm leading-6 text-slate-700">
-                                                    Community progression is off. Saved feed settings and history are retained, but achievement preview and live display stay blocked.
+                                                    Community progression is off.
                                                     <a class="font-semibold text-blue-700 underline" href="host">Turn Community progression on in Channel setup</a>
-                                                    to accept only new completions without repeating missed achievements.
                                                 </p>
                                             </div>
                                         }
@@ -647,14 +619,6 @@
                                             </div>
                                         }
                                     </section>
-                                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 xl:col-span-2"
-                                         data-achievement-event-inheritance>
-                                        <p class="text-sm font-semibold text-slate-950">Achievement events inherit Community progression and Overlays.</p>
-                                        <p class="mt-1 text-sm leading-6 text-slate-700">Turning either off retains saved feed settings and history while blocking preview and delivery. Re-enable accepts only new completions; missed achievements never repeat.</p>
-                                    </div>
-                                    <p class="text-xs leading-5 text-muted-foreground xl:col-span-2">
-                                        Achievement cards include only a public viewer name, achievement name, and presentation-safe reward names or points. Twitch user IDs, balances, moderator notes, internal keys, and reward tokens never enter the feed.
-                                    </p>
                                 </div>
                             }
                             else if (_draftType is OverlayType.ViewerQueue)
@@ -665,9 +629,8 @@
                                          data-overlay-disabled-recovery>
                                         <p class="text-sm font-semibold text-slate-950">This Viewer Queue overlay is paused.</p>
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                                            Play with viewers is off. The saved setup and queue stay in place, but preview, display, test pulses, changes, and animations remain paused.
+                                            Play with viewers is off.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn Play with viewers on in Channel setup</a>
-                                            to show the queue as it is now without playing missed animations.
                                         </p>
                                     </div>
                                 }
@@ -675,7 +638,7 @@
                                 {
                                     <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
                                         <p class="text-sm font-semibold text-slate-950">Create a play-with-viewers queue first.</p>
-                                        <p class="mt-1 text-sm text-slate-700"><a class="font-semibold text-blue-700 underline" href="/queues">Create a queue</a>, then return here to add its Browser Source.</p>
+                                        <p class="mt-1 text-sm text-slate-700"><a class="font-semibold text-blue-700 underline" href="/queues">Create a queue</a></p>
                                     </div>
                                 }
                                 else
@@ -705,9 +668,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <p class="mt-3 text-sm leading-6 text-muted-foreground">
-                                        The Browser Source shows the number of current and next players you choose, plus everyone waiting. Names follow the queue's public-name setting, and every optional entry field is public.
-                                    </p>
                                 }
                             }
                             else
@@ -735,7 +695,7 @@
                                              data-overlay-access-regeneration-required>
                                         <h3 class="text-sm font-bold text-slate-950">Generate this Browser Source URL</h3>
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                                            This imported source cannot connect yet. Select Generate private URL below, copy the one-time URL, and replace this source's URL in OBS.
+                                            This imported source cannot connect yet. Select Generate private URL below, copy the URL, and replace this source's URL in OBS.
                                             If the button is unavailable, turn this source's required tool on in Channel setup first.
                                         </p>
                                     </section>
@@ -745,7 +705,6 @@
                                     <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-4 py-3">
                                         <div>
                                             <p class="text-sm font-semibold text-slate-950">@_presenceLabel</p>
-                                            <p class="mt-1 text-xs leading-5 text-muted-foreground">Open OBS Browser Sources appear here when connected.</p>
                                         </div>
                                         <button class="btn-primary"
                                                 type="button"
@@ -762,9 +721,6 @@
                                         <h3 id="overlay-private-url-title" class="text-sm font-bold text-slate-950">
                                             Copy this private URL now
                                         </h3>
-                                        <p class="mt-1 text-sm text-slate-700">
-                                            It appears once, after creation or URL generation, and is not stored in a form BlokeBot can show again. Keep it out of screenshots and chat.
-                                        </p>
                                         <div class="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
                                             <input class="input min-w-0 flex-1 font-mono text-xs"
                                                    aria-label="Private Browser Source URL"
@@ -775,23 +731,6 @@
                                                     @onclick="CopyBrowserSourceUrlAsync">Copy URL</button>
                                         </div>
                                     </section>
-                                }
-
-                                @if (_selectedFeatureEnabled)
-                                {
-                                    <div class="mt-3">
-                                        <StudioFold Key="obs-setup"
-                                                    Label="OBS setup steps"
-                                                    Open="@_obsFoldOpen"
-                                                    OpenChanged="@(open => _obsFoldOpen = open)">
-                                            <ol class="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-                                                <li>Generate or rotate the private URL and copy it immediately.</li>
-                                                <li>Add an OBS Browser Source and paste the URL.</li>
-                                                <li>Set Width to <strong>1920</strong> and Height to <strong>1080</strong>.</li>
-                                                <li>Keep the URL private. Use Send test pulse to confirm delivery to this overlay only.</li>
-                                            </ol>
-                                        </StudioFold>
-                                    </div>
                                 }
 
                                 <div class="mt-4 flex flex-wrap gap-2">

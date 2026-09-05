@@ -171,7 +171,7 @@
                                             <label class="field__label" for="cue-target">Cue player</label>
                                             <select id="cue-target" class="field__input" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select>
                                         </div>
-                                        <p class="text-xs text-muted-foreground">Only enabled Cue player Browser Sources appear here. <a class="font-semibold text-blue-700 underline" href="overlays#sources">Manage Browser Sources →</a></p>
+                                        <p class="text-xs text-muted-foreground"><a class="font-semibold text-blue-700 underline" href="overlays#sources">Manage Browser Sources →</a></p>
                                     </div>
                                     <div class="studio-span-4 content-end">
                                         <button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || IsBusy)" @onclick="PlayAsync">Play test cue</button>

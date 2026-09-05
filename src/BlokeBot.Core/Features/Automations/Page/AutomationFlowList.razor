@@ -1,7 +1,6 @@
 <div class="automation-list-view" role="region" aria-label="Automation connection view" data-automation-list>
     <div class="automation-list-heading">
         <div><p>Connection view</p><h2>Nodes and connections</h2></div>
-        <span>This list shows connections. Connections do not define run order.</span>
         <span>@Nodes.Count nodes · @Edges.Count connections</span>
     </div>
     @if (Nodes.Count == 0)
@@ -19,7 +18,7 @@
                     <button type="button" class="automation-connection-node" data-automation-list-node="@node.Id.Value" @ref="_nodeSelectors[node.Id]" aria-pressed="@(node.Id == SelectedNodeId ? "true" : "false")" @onclick="() => SelectNode.InvokeAsync(node.Id)">
                         <AutomationNodeIcon DefinitionId="node.Definition.Id" /><span><strong>@node.EffectiveName</strong><small>@KindLabel(node.Definition.Kind) · @node.Definition.Display.Name</small></span>
                     </button>
-                    <div class="automation-list-connections"><strong>Connections, not run order</strong><span>From: @Incoming(node)</span><span>To: @Outgoing(node)</span></div>
+                    <div class="automation-list-connections"><strong>Connections</strong><span>From: @Incoming(node)</span><span>To: @Outgoing(node)</span></div>
                     <div class="automation-list-inputs"><strong>Data inputs · choice, source, type</strong>
                         @if (!node.Definition.Inputs.Any(IsDataPort))
                         {

@@ -43,11 +43,6 @@
                                         @onclick="ToggleWhisperResponses"></button>
                                 <span class="text-sm font-semibold text-[var(--app-text-strong)]">Reply with whispers from the custom bot</span>
                             </div>
-                            <p class="mt-2 text-xs font-medium text-slate-500">
-                                @(State.BotOverride.Enabled
-                                    ? "Reconnect the custom bot if Twitch asks for more access."
-                                    : "Turn on custom bot before enabling whisper responses.")
-                            </p>
                         </div>
                         <div class="mt-4 border-t border-slate-200 pt-4">
                             <div class="flex items-center justify-between gap-3">
@@ -92,7 +87,6 @@
                             aria-label="Let moderators help"
                             @onclick="ToggleModeratorHelp"></button>
                     <span class="text-sm font-semibold text-[var(--app-text-strong)]">Let moderators help with this channel</span>
-                    <span class="text-xs text-muted-foreground">When this is off, your saved allow and block lists stay here, but mods cannot use them.</span>
                 </div>
                 <div class="studio-span-12">
                     <StudioSegmentedPill TValue="bool"
@@ -100,16 +94,12 @@
                                          Options="@AccessModeOptions"
                                          Value="@State.ModAccess.AllowModsByDefault"
                                          ValueChanged="SetAllowModsByDefault" />
-                    <p class="mt-2 text-xs text-muted-foreground">
-                        @(State.ModAccess.AllowModsByDefault ? "All channel mods can help unless they are blocked." : "Only mods on the allowed list can help.")
-                    </p>
                 </div>
                 <div class="studio-span-6">
                     <AccessList Title="Allowed mods"
                                 Entries="WhitelistEntries"
                                 Placeholder="mod username"
                                 EmptyText="No mods added."
-                                DisabledText="@(State.ModAccess.ModsEnabled ? "Not used while “All mods” is selected. Kept for when you switch." : "Not used while moderator help is off. Kept for when you switch.")"
                                 NewLogin="@NewWhitelistLogin"
                                 NewLoginChanged="NewWhitelistLoginChanged"
                                 Add="() => AddAccess(AccessListEntryKind.Whitelist)"
@@ -121,7 +111,6 @@
                                 Entries="BlacklistEntries"
                                 Placeholder="mod username"
                                 EmptyText="No mods added."
-                                DisabledText="@(State.ModAccess.ModsEnabled ? "Not used while “Allowed list only” is selected. Kept for when you switch." : "Not used while moderator help is off. Kept for when you switch.")"
                                 NewLogin="@NewBlacklistLogin"
                                 NewLoginChanged="NewBlacklistLoginChanged"
                                 Add="() => AddAccess(AccessListEntryKind.Blacklist)"

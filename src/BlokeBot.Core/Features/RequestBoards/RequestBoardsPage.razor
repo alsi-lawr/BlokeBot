@@ -30,7 +30,7 @@
     {
         <ApplicationCardCollection Owner="dashboard-page-cards">
             <div class="card p-8 text-sm text-muted-foreground">
-                Request boards are off for this channel. Turn them on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved boards and requests are retained.
+                Request boards are off for this channel. Turn them on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>.
             </div>
         </ApplicationCardCollection>
     }
@@ -43,7 +43,6 @@
                             type="button"
                             data-action="new-board"
                             disabled="@_isCreating"
-                            aria-describedby="@(_isCreating ? "request-board-create-guidance" : null)"
                             @onclick="NewBoard">+ New board</button>
                 </Footer>
             </StudioRail>
@@ -83,12 +82,6 @@
                      role="@(_moderatorPage is null ? null : "tabpanel")"
                      aria-labelledby="@(_moderatorPage is null ? null : SegmentedTabs.TabId(_paneTabsId, _paneKey))"
                      tabindex="@(_moderatorPage is null ? null : "0")">
-                    @if (_isCreating)
-                    {
-                        <p id="request-board-create-guidance" class="text-sm text-muted-foreground">
-                            Complete the board details, then select Create board. The public board link is available after creation.
-                        </p>
-                    }
                     @if (!string.IsNullOrWhiteSpace(_feedback))
                     {
                         <p class="text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
@@ -96,7 +89,6 @@
 
                     @if (_paneKey == _reviewPaneKey && _moderatorPage is { } moderation)
                     {
-                        <p class="text-sm text-muted-foreground">Sorted the same way viewers see the board: accepted first, then queued, approved and awaiting review; ties broken by priority, votes, then age.</p>
                         <section class="application-card-collection" data-card-owner="request-board-review-cards" aria-label="Requests to review">
                         @if (moderation.Submissions.Count == 0)
                         {
@@ -219,14 +211,12 @@
                                 </div>
                                 <div class="studio-span-8">
                                     <Field Id="request-board-name" Label="Title" @bind-Value="_draft.Title" />
-                                    <p class="mt-1 text-xs text-muted-foreground">Shown at the top of the public board page.</p>
                                 </div>
                                 <div class="studio-span-12">
                                     <TextAreaField Id="request-board-description" Label="Description" @bind-Value="_draft.Description" />
                                 </div>
                                 <div class="studio-span-12">
                                     <StudioChatPreview Lines="ChatPreviewLines()" />
-                                    <p class="mt-1 text-xs text-muted-foreground">The full board also lives at <span class="font-mono">@_publicBoardUrl</span>, where signed-in viewers can submit with a proper form, vote, and withdraw.</p>
                                 </div>
                             </div>
                         </StudioStage>
@@ -238,7 +228,6 @@
                                      Open="@_openStages.IsOpen(RequestBoardStage.Questions)"
                                      OpenChanged="@(open => _openStages.Set(RequestBoardStage.Questions, open))">
                             <p id="request-field-limit" class="mb-3 text-xs text-muted-foreground">
-                                Viewers always give a title; these questions ask for anything extra.
                                 <b>@_draft.Fields.Count of @RequestBoardLimits.MaximumFields</b> questions used.
                                 @if (_draft.Fields.Count >= RequestBoardLimits.MaximumFields)
                                 {
@@ -280,14 +269,12 @@
                                         <div class="studio-grid">
                                             <div class="studio-span-8">
                                                 <Field Id="@($"request-field-label-{index}")" Label="Question" @bind-Value="field.Label" />
-                                                <p class="mt-1 text-xs text-muted-foreground">What viewers see next to the answer box.</p>
                                             </div>
                                             <div class="studio-span-4">
                                                 <Field Id="@($"request-field-key-{index}")"
                                                        Label="Short name"
                                                        FocusRequest="@FieldFocusRequest(field)"
                                                        @bind-Value="field.Key" />
-                                                <p class="mt-1 text-xs text-muted-foreground">Used in chat: <span class="font-mono">@(KeyOrExample(field))=…</span></p>
                                             </div>
                                             <div class="studio-span-12 space-y-2">
                                                 <span class="label">Kind of answer</span>
@@ -353,12 +340,7 @@
                                             <button class="btn-secondary"
                                                     type="button"
                                                     disabled="@(_draft.Fields.Count == 1)"
-                                                    aria-describedby="@(_draft.Fields.Count == 1 ? "request-field-minimum" : null)"
                                                     @onclick="() => RemoveField(field)">Remove question</button>
-                                            @if (_draft.Fields.Count == 1)
-                                            {
-                                                <p id="request-field-minimum" class="text-sm text-muted-foreground">Boards need at least one question.</p>
-                                            }
                                         </div>
                                     </section>
                                 }
@@ -394,7 +376,6 @@
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="request-board-cost" Label="Point cost" @bind-Value="_draft.PointCost" />
-                                    <p class="mt-1 text-xs text-muted-foreground">Set 0 to make requests free. Points are held when a request arrives and only charged when it sticks.</p>
                                 </div>
                                 <div class="studio-span-8 space-y-2">
                                     <span class="label">When do viewers get points back?</span>
@@ -427,7 +408,6 @@
                                 </div>
                                 <div class="studio-span-4">
                                     <Field Id="request-board-cooldown" Label="Wait between requests (seconds)" @bind-Value="_draft.CooldownSeconds" />
-                                    <p class="mt-1 text-xs text-muted-foreground">0 means no wait.</p>
                                 </div>
                                 <div class="studio-span-4">
                                     <Field Id="request-board-vote-limit" Label="Votes per viewer" @bind-Value="_draft.VoteLimit" />
