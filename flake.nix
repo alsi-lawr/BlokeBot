@@ -11,7 +11,7 @@
         "aarch64-linux"
         "aarch64-darwin"
       ];
-      releaseVersion = "0.14.1";
+      releaseVersion = "0.15.0";
       imageSource = "https://github.com/alsi-lawr/BlokeBot";
       imageRevision = self.rev or self.dirtyRev or "unknown";
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
