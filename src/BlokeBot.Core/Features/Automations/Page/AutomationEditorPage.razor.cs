@@ -13,7 +13,7 @@ public partial class AutomationEditorPage
     private ImmutableArray<AutomationDefinitionDescriptor> _definitions = [];
     private ImmutableArray<AutomationFlowSnapshot> _flowSnapshots = [];
     private ImmutableArray<AutomationGraphError> _validationErrors = [];
-    private ImmutableArray<AutomationSampleNodeOutcome> _sampleOutcomes = [];
+    private ImmutableArray<AutomationScenarioNodeOutcome> _sampleOutcomes = [];
     private ImmutableArray<AutomationRunSummary> _recentRuns = [];
     private readonly HashSet<AutomationNodeId> _selectedNodeIds = [];
     private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];

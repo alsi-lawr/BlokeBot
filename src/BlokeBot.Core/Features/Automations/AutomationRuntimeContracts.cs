@@ -186,29 +186,30 @@ public abstract record AutomationFlowDuplicateOutcome
     public sealed record FlowNotFound : AutomationFlowDuplicateOutcome;
 }
 
-public sealed record AutomationSampleNodeOutcome(
+public sealed record AutomationScenarioNodeOutcome(
     AutomationNodeId NodeId,
     AutomationNodeRunState State,
     string OutcomeCode,
-    ImmutableArray<AutomationValueDiagnostic> ResolvedInputs = default
+    ImmutableArray<AutomationValueDiagnostic> ResolvedInputs = default,
+    DateTimeOffset VirtualTimeUtc = default
 );
 
-public abstract record AutomationSampleRunOutcome
+public abstract record AutomationScenarioRunOutcome
 {
-    private AutomationSampleRunOutcome() { }
+    private AutomationScenarioRunOutcome() { }
 
-    public sealed record Completed(ImmutableArray<AutomationSampleNodeOutcome> Nodes)
-        : AutomationSampleRunOutcome;
+    public sealed record Completed(ImmutableArray<AutomationScenarioNodeOutcome> Nodes)
+        : AutomationScenarioRunOutcome;
 
-    public sealed record Failed(ImmutableArray<AutomationSampleNodeOutcome> Nodes)
-        : AutomationSampleRunOutcome;
+    public sealed record Failed(ImmutableArray<AutomationScenarioNodeOutcome> Nodes)
+        : AutomationScenarioRunOutcome;
 
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
-        : AutomationSampleRunOutcome;
+        : AutomationScenarioRunOutcome;
 
-    public sealed record FeatureDisabled : AutomationSampleRunOutcome;
+    public sealed record FeatureDisabled : AutomationScenarioRunOutcome;
 
-    public sealed record HostNotFound : AutomationSampleRunOutcome;
+    public sealed record HostNotFound : AutomationScenarioRunOutcome;
 }
 
 public abstract record AutomationFlowSaveOutcome
