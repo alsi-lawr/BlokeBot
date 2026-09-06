@@ -12,33 +12,32 @@ public sealed partial class AutomationScenarioService
     {
         var source = draft.Nodes.First(node => node.Id == sourceNodeId);
         var now = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var fields = SourceFields(draft, sourceNodeId);
         return new(
             sourceNodeId,
             new(source.Definition.TypeId),
             new(source.Definition.SchemaVersion),
             new(
                 new(Guid.Empty, new(source.Definition.TypeId)),
-                new("sample-viewer", "sample_viewer", "Sample Viewer"),
+                fields.Any(field => field.Id.Value == "actor")
+                    ? new("sample-viewer", "sample_viewer", "Sample Viewer")
+                    : null,
                 new(draft.HostId, "sample-channel", "sample_channel", "Sample Channel"),
-                new("sample-stream", "Sample stream", "Just Chatting", now.AddHours(-1)),
+                fields.Any(field => field.Id.Value == "stream")
+                    ? new("sample-stream", "Sample stream", "Just Chatting", now.AddHours(-1))
+                    : null,
                 new(now, now),
-                [new(0, "sample")],
+                fields.Any(field => field.Id.Value == "arguments") ? [new(0, "sample")] : [],
                 new(
-                    new Dictionary<AutomationVariableName, AutomationVariable>
-                    {
-                        [new("viewer_count")] = new(
-                            new AutomationValue.Number(24),
-                            AutomationDataSensitivity.Safe
-                        ),
-                        [new("bits")] = new(
-                            new AutomationValue.Number(100),
-                            AutomationDataSensitivity.Safe
-                        ),
-                        [new("category")] = new(
-                            new AutomationValue.Text("Just Chatting"),
-                            AutomationDataSensitivity.Safe
-                        ),
-                    }
+                    fields
+                        .Where(field => !ReservedContextVariable(new(field.Id.Value)))
+                        .Select(field => new KeyValuePair<
+                            AutomationVariableName,
+                            AutomationVariable
+                        >(
+                            new(field.Id.Value),
+                            new(DefaultSourceValue(field, now), field.Sensitivity)
+                        ))
                 )
             ),
             now,

@@ -154,44 +154,7 @@ public sealed partial class AutomationScenarioService
                 );
             }
         }
-        foreach (var field in SourceFields(configured, fixture.SourceNodeId))
-        {
-            if (
-                field.Id.Value == "actor"
-                && fixture.Context.Actor is null
-                && field.Nullability == AutomationPortNullability.NonNullable
-            )
-            {
-                errors.Add(
-                    new(
-                        fixture.SourceNodeId,
-                        "scenario-viewer-required",
-                        "Provide the viewer required by this trigger.",
-                        PortId: field.Id
-                    )
-                );
-            }
-            if (
-                fixture
-                    .Context.Variables.ForExecution()
-                    .TryGetValue(new(field.Id.Value), out var variable)
-                && (
-                    !AutomationScenarioSerialization.ValidValue(variable.Value)
-                    || !AutomationDataResolver.Matches(field, variable.Value)
-                    || variable.Sensitivity != field.Sensitivity
-                )
-            )
-            {
-                errors.Add(
-                    new(
-                        fixture.SourceNodeId,
-                        "scenario-source-value-invalid",
-                        "Use the trigger field's declared type and sensitivity.",
-                        PortId: field.Id
-                    )
-                );
-            }
-        }
+        ValidateSourceContext(configured, fixture, errors);
         if (
             fixture.Context.Arguments.IsDefault
             || fixture.Context.Arguments.Select(arg => arg.Position).Distinct().Count()

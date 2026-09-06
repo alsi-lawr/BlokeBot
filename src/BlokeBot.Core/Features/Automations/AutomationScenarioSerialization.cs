@@ -7,7 +7,10 @@ internal static class AutomationScenarioSerialization
 {
     private static readonly JsonSerializerOptions _options = new(JsonSerializerDefaults.Web);
 
-    internal static bool ValidValue(AutomationValue value)
+    internal static bool ValidValue(
+        AutomationValue value,
+        ImmutableArray<AutomationValueProvenance> provenance = default
+    )
     {
         if (
             value is AutomationValue.Nil
@@ -27,7 +30,10 @@ internal static class AutomationScenarioSerialization
             var json = AutomationDataValueSerialization.SerializeOutputs(
                 new Dictionary<AutomationPortId, AutomationResolvedValue>
                 {
-                    [new("fixture")] = new(value, [AutomationValueProvenance.Generated]),
+                    [new("fixture")] = new(
+                        value,
+                        provenance.IsDefault ? [AutomationValueProvenance.Generated] : provenance
+                    ),
                 }
             );
             return AutomationDataValueSerialization.RestoreOutputs(json)
