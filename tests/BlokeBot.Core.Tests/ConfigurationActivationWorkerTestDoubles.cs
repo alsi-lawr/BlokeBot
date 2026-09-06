@@ -135,9 +135,9 @@ public sealed partial class ConfigurationActivationTests
 
     private sealed class ClaimTransactionProbe : DbTransactionInterceptor
     {
-        private readonly TaskCompletionSource _secondStarted = new(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
+        // Observe the signal before this callback enters SQLite's blocking BEGIN;
+        // an asynchronously queued handoff can time out while the first claim is paused.
+        private readonly TaskCompletionSource _secondStarted = new();
         private int _armed;
         private int _started;
 
