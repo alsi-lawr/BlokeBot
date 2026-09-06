@@ -85,7 +85,7 @@ internal sealed class PublicDocumentMiddleware(RequestDelegate next)
         if (component is not null)
         {
             var bootstrap = protection.Create(
-                PublicDocumentProtector.IsPublicPage(component, context.Request.RouteValues.Keys),
+                PublicDocumentProtector.IsPublicPage(component, context.Request.RouteValues),
                 context.User
             );
             context.Items[PublicDocumentProtector.BootstrapKey] = bootstrap;

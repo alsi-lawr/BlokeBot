@@ -39,7 +39,7 @@ internal static class PublicViewerForwarding
         var type = context.GetEndpoint()?.Metadata.GetMetadata<ComponentTypeMetadata>()?.Type;
         return (
                 type is not null
-                && PublicDocumentProtector.IsPublicPage(type, context.Request.RouteValues.Keys)
+                && PublicDocumentProtector.IsPublicPage(type, context.Request.RouteValues)
             )
             || context.GetEndpoint()?.Metadata.GetMetadata<PublicViewerPrivateEndpoint>()
                 is not null

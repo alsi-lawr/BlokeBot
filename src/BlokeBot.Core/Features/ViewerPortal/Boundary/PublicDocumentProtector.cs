@@ -71,10 +71,16 @@ internal sealed class PublicDocumentProtector(IDataProtectionProvider protection
         return subject is { Length: > 0 and <= 64 } ? subject : null;
     }
 
-    internal static bool IsPublicPage(Type pageType, IEnumerable<string> routeKeys) =>
+    internal static bool IsPublicPage(
+        Type pageType,
+        IEnumerable<KeyValuePair<string, object?>> routeValues
+    ) =>
         pageType.GetCustomAttribute<LayoutAttribute>()?.LayoutType == typeof(PublicPortalLayout)
         || (
             pageType == typeof(ViewerPassportsPage)
-            && routeKeys.Contains("Channel", StringComparer.OrdinalIgnoreCase)
+            && routeValues.Any(value =>
+                string.Equals(value.Key, "Channel", StringComparison.OrdinalIgnoreCase)
+                && value.Value is not null
+            )
         );
 }
