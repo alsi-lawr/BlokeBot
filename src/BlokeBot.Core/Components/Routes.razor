@@ -3,7 +3,7 @@
 
 <Router AppAssembly="typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        @if (PublicDocument == PublicDocumentProtector.IsPublicPage(routeData.PageType, routeData.RouteValues.Keys))
+        @if (PublicDocument == PublicDocumentProtector.IsPublicPage(routeData.PageType, routeData.RouteValues))
         {
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized Context="routeAuth">
