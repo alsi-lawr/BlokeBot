@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class ViewerPortalBoundedReadTests
 {
     [Test]
-    public async Task PointsBudget_PreservesHistoricalParsingAndPrivacyWithoutReturningPartialRanks()
+    public async Task PointsBudget_IncludesPrivatePassportPlayersWithoutReturningPartialRanks()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var context = new ViewerPortalTestContext(database);
@@ -32,7 +32,7 @@ public sealed class ViewerPortalBoundedReadTests
             );
             _ = await seed.SaveChangesAsync();
         }
-        var nearLimit = await service.GetBoundedLeaderboardAsync(host, publicOnly: true, default);
+        var nearLimit = await service.GetBoundedLeaderboardAsync(host, default);
         nearLimit!.Count.ShouldBe(10_000);
         nearLimit[0].Login.ShouldBe("viewer00000");
         nearLimit[0].Balance.Value.ShouldBe(1000);
@@ -60,10 +60,7 @@ public sealed class ViewerPortalBoundedReadTests
             );
             _ = await seed.SaveChangesAsync();
         }
-        (await service.GetBoundedLeaderboardAsync(host, publicOnly: true, default))!.Count.ShouldBe(
-            10_000
-        );
-        (await service.GetBoundedLeaderboardAsync(host, publicOnly: false, default)).ShouldBeNull();
+        (await service.GetBoundedLeaderboardAsync(host, default)).ShouldBeNull();
         (await service.GetLeaderboardAsync(host, 1, default))[0].Login.ShouldBe("hidden");
         await using (var seed = await database.CreateDbContextAsync())
         {
@@ -78,7 +75,7 @@ public sealed class ViewerPortalBoundedReadTests
             );
             _ = await seed.SaveChangesAsync();
         }
-        (await service.GetBoundedLeaderboardAsync(host, publicOnly: true, default)).ShouldBeNull();
+        (await service.GetBoundedLeaderboardAsync(host, default)).ShouldBeNull();
     }
 
     [Test]
@@ -101,7 +98,7 @@ public sealed class ViewerPortalBoundedReadTests
             _ = await seed.SaveChangesAsync();
         }
         var service = new PointBalanceService(database);
-        (await service.GetBoundedLeaderboardAsync(host, publicOnly: true, default)).ShouldBeNull();
+        (await service.GetBoundedLeaderboardAsync(host, default)).ShouldBeNull();
         (await service.GetBalanceAsync(host, "viewer", default)).Balance.Value.ShouldBe(1);
     }
 

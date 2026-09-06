@@ -1,4 +1,3 @@
-using BlokeBot.Core.Features.ViewerPassports;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Points.Balances;
@@ -12,17 +11,13 @@ public sealed partial class PointBalanceService
     // Keep the existing parser: historical amounts need not be canonical decimal strings.
     internal async Task<IReadOnlyList<PointBalanceEntry>?> GetBoundedLeaderboardAsync(
         int hostId,
-        bool publicOnly,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var excluded = ViewerPassportPublicIdentityPolicy.ExcludedLogins(db, hostId);
         var candidates = await db
             .PointBalances.AsNoTracking()
-            .Where(value =>
-                value.HostId == hostId && (!publicOnly || !excluded.Contains(value.Login))
-            )
+            .Where(value => value.HostId == hostId)
             .Take(MaximumSummaryCandidates + 1)
             .Select(value => new
             {

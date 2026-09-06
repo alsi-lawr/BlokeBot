@@ -48,14 +48,9 @@ public partial class PublicPointsLeaderboardPage
 
         if (_featureEnabled)
         {
-            var exclusions = await _passportPrivacy.ExclusionsAsync(
-                _host!.Id,
-                CancellationToken.None
-            );
-            _leaderboard = await _balances.GetPublicLeaderboardAsync(
+            _leaderboard = await _balances.GetLeaderboardAsync(
                 _host!.Id,
                 _publicLeaderboardSize,
-                exclusions.Logins,
                 CancellationToken.None
             );
         }
