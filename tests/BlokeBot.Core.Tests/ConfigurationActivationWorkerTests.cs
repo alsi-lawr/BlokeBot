@@ -213,41 +213,78 @@ public sealed partial class ConfigurationActivationTests
         using var alerts = new DurableAlertService(database, TimeProvider.System, events);
         var queue = new ConfigurationActivationQueue();
         var authority = Authority(observer, events, alerts);
-        var first = Worker(database, queue, authority);
-        var second = Worker(database, queue, authority);
+        using var first = Worker(database, queue, authority);
+        using var second = Worker(database, queue, authority);
         claimSelection.Arm();
         claimTransactions.Arm();
 
-        await first.StartAsync(CancellationToken.None);
-        await claimSelection.WaitUntilPausedAsync();
-        await second.StartAsync(CancellationToken.None);
-        await claimTransactions.WaitForSecondStartAsync();
-        await Task.Delay(100);
-        claimSelection.CandidateSelectCount.ShouldBe(1);
-        claimSelection.Release();
-        await observer.BlockedChangeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        queue.Wake();
-        await WaitForStatusAsync(database, otherId, ConfigurationActivationStatus.Complete);
-        await using (var interleaved = await database.CreateDbContextAsync())
+        Exception? failure = null;
+        try
         {
-            var rows = await interleaved
-                .ConfigurationActivations.Where(x =>
-                    x.Id == staleId || x.Id == pendingId || x.Id == otherId
-                )
-                .ToDictionaryAsync(x => x.Id);
-            rows[staleId].Status.ShouldBe(ConfigurationActivationStatus.Processing);
-            rows[staleId].AttemptCount.ShouldBe(2);
-            rows[pendingId].Status.ShouldBe(ConfigurationActivationStatus.Pending);
-            rows[pendingId].AttemptCount.ShouldBe(0);
-            rows[otherId].Status.ShouldBe(ConfigurationActivationStatus.Complete);
-        }
-        observer.ReleaseBlockedChange();
+            await first.StartAsync(CancellationToken.None);
+            await claimSelection.WaitUntilPausedAsync();
+            await second.StartAsync(CancellationToken.None);
+            await claimTransactions.WaitForSecondStartAsync();
+            await Task.Delay(100);
+            claimSelection.CandidateSelectCount.ShouldBe(1);
+            claimSelection.Release();
+            await observer.BlockedChangeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await WaitForStatusAsync(database, staleId, ConfigurationActivationStatus.Complete);
-        await WaitForStatusAsync(database, pendingId, ConfigurationActivationStatus.Complete);
-        await first.StopAsync(CancellationToken.None);
-        await second.StopAsync(CancellationToken.None);
+            queue.Wake();
+            await WaitForStatusAsync(database, otherId, ConfigurationActivationStatus.Complete);
+            await using (var interleaved = await database.CreateDbContextAsync())
+            {
+                var rows = await interleaved
+                    .ConfigurationActivations.Where(x =>
+                        x.Id == staleId || x.Id == pendingId || x.Id == otherId
+                    )
+                    .ToDictionaryAsync(x => x.Id);
+                rows[staleId].Status.ShouldBe(ConfigurationActivationStatus.Processing);
+                rows[staleId].AttemptCount.ShouldBe(2);
+                rows[pendingId].Status.ShouldBe(ConfigurationActivationStatus.Pending);
+                rows[pendingId].AttemptCount.ShouldBe(0);
+                rows[otherId].Status.ShouldBe(ConfigurationActivationStatus.Complete);
+            }
+            observer.ReleaseBlockedChange();
+
+            await WaitForStatusAsync(database, staleId, ConfigurationActivationStatus.Complete);
+            await WaitForStatusAsync(database, pendingId, ConfigurationActivationStatus.Complete);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+            throw;
+        }
+        finally
+        {
+            claimSelection.Release();
+            observer.ReleaseBlockedChange();
+            var stopped = Task.WhenAll(
+                first.StopAsync(CancellationToken.None),
+                second.StopAsync(CancellationToken.None)
+            );
+            await stopped.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            var completed = Task.WhenAll(
+                first.ExecuteTask ?? Task.CompletedTask,
+                second.ExecuteTask ?? Task.CompletedTask
+            );
+            await completed.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            var cleanupErrors = new[] { stopped.Exception, completed.Exception }
+                .OfType<Exception>()
+                .ToArray();
+            if (cleanupErrors.Length > 0)
+            {
+                var cleanupFailure = new AggregateException(
+                    "Stale-lease workers failed during cleanup.",
+                    cleanupErrors
+                );
+                if (failure is null)
+                {
+                    throw cleanupFailure;
+                }
+                Console.Error.WriteLine(cleanupFailure);
+            }
+        }
 
         observer.MaximumSerializedHostConcurrency.ShouldBe(1);
         observer
