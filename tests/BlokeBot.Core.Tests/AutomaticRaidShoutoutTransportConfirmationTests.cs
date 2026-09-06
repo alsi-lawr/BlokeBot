@@ -85,15 +85,16 @@ public sealed class AutomaticRaidShoutoutTransportConfirmationTests
         );
         var runner = new AutomaticRaidShoutoutRunner(database, delivery, authority, clock);
         using var stopping = new CancellationTokenSource();
+        var immediate = await runner.RunAsync(
+            host,
+            Configuration(),
+            Raid(),
+            CancellationToken.None
+        );
         var worker = queue.RunAsync(stopping.Token);
+        Exception? failure = null;
         try
         {
-            var immediate = await runner.RunAsync(
-                host,
-                Configuration(),
-                Raid(),
-                CancellationToken.None
-            );
             await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             immediate.ShouldBe(AutomaticRaidShoutoutResultCode.Queued);
@@ -113,10 +114,22 @@ public sealed class AutomaticRaidShoutoutTransportConfirmationTests
                 AutomaticRaidShoutoutResultCode.Delivered
             );
         }
+        catch (Exception exception)
+        {
+            failure = exception;
+            throw;
+        }
         finally
         {
             _ = releaseSend.TrySetResult();
-            await StopAsync(stopping, worker);
+            try
+            {
+                await StopAsync(stopping, worker);
+            }
+            catch (Exception cleanupFailure) when (failure is not null)
+            {
+                throw new AggregateException(failure, cleanupFailure);
+            }
         }
     }
 
