@@ -36,7 +36,8 @@ internal sealed record AutomationPureHandlerContract(
     AutomationNodeKind Kind,
     ImmutableArray<AutomationPurePortContract> Inputs,
     ImmutableArray<AutomationPurePortContract> Outputs,
-    bool UsesEffectiveDescriptor = false
+    bool UsesEffectiveDescriptor = false,
+    bool SupportsScenarios = false
 );
 
 internal sealed record AutomationPureNodeInput(

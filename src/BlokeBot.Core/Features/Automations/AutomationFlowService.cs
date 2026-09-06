@@ -194,6 +194,7 @@ public sealed partial class AutomationFlowService(
     private enum AutomationGraphAdmission
     {
         Saved,
+        Scenario,
         Frozen,
         ConfigurationTransfer,
     }

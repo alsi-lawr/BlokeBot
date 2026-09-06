@@ -133,24 +133,24 @@ public partial class AutomationEditorPage
                         return;
                     }
 
-                    var outcome = await _flowsService.RunSampleAsync(
+                    var outcome = await _scenariosService.RunDefaultAsync(
                         _editor.Draft(new(requestedHostId)),
                         sourceNodeId,
                         CancellationToken.None
                     );
                     switch (outcome)
                     {
-                        case AutomationSampleRunOutcome.Completed completed:
+                        case AutomationScenarioRunOutcome.Completed completed:
                             _sampleOutcomes = completed.Nodes;
                             _feedback = null;
                             _operationFailed = false;
                             break;
-                        case AutomationSampleRunOutcome.Failed failed:
+                        case AutomationScenarioRunOutcome.Failed failed:
                             _sampleOutcomes = failed.Nodes;
                             _feedback = "The sample stopped at the failed node.";
                             _operationFailed = true;
                             break;
-                        case AutomationSampleRunOutcome.Invalid invalid:
+                        case AutomationScenarioRunOutcome.Invalid invalid:
                             ShowValidation(invalid.Errors, "Correct the flow before you test it.");
                             break;
                         default:

@@ -57,6 +57,9 @@ internal sealed class AutomationDataResolver(
 {
     private readonly AutomationSafeTriggerExpressionService _safeExpressions = new();
 
+    internal bool SupportsScenarios(AutomationDefinitionId id) =>
+        handlers.TryResolve(id, out var handler) && handler.Contract.SupportsScenarios;
+
     internal async ValueTask<AutomationInputResolution> ResolveInputsAsync(
         AutomationHostId hostId,
         AutomationContext context,
@@ -73,16 +76,18 @@ internal sealed class AutomationDataResolver(
             checkpoints,
             [],
             integerEntropy,
+            null,
             cancellationToken
         );
 
-    internal async ValueTask<AutomationInputResolution> ResolveSampleInputsAsync(
+    internal async ValueTask<AutomationInputResolution> ResolveScenarioInputsAsync(
         AutomationHostId hostId,
         AutomationContext context,
         AutomationRuntimeSerialization.PersistedFlow flow,
         AutomationRuntimeSerialization.PersistedNode consumer,
         IAutomationPureCheckpointStore checkpoints,
-        IAutomationIntegerEntropy sampleIntegerEntropy,
+        IAutomationIntegerEntropy scenarioIntegerEntropy,
+        ImmutableArray<AutomationScenarioConnectedInput> fixtures,
         CancellationToken cancellationToken
     ) =>
         await ResolveInputsAsync(
@@ -92,7 +97,8 @@ internal sealed class AutomationDataResolver(
             consumer,
             checkpoints,
             [],
-            sampleIntegerEntropy,
+            scenarioIntegerEntropy,
+            fixtures,
             cancellationToken
         );
 
@@ -104,6 +110,7 @@ internal sealed class AutomationDataResolver(
         IAutomationPureCheckpointStore checkpoints,
         ImmutableHashSet<Guid> resolving,
         IAutomationIntegerEntropy executionIntegerEntropy,
+        ImmutableArray<AutomationScenarioConnectedInput>? fixtures,
         CancellationToken cancellationToken
     )
     {
@@ -162,6 +169,18 @@ internal sealed class AutomationDataResolver(
             {
                 resolved = ResolveExpression(binding.Expression!, input, context);
             }
+            else if (
+                fixtures?.FirstOrDefault(fixture =>
+                    fixture.NodeId.Value == consumer.Id && fixture.PortId == input.Id
+                ) is
+                { } fixture
+            )
+            {
+                resolved =
+                    fixture.Value.Sensitivity == AutomationDataSensitivity.Safe
+                        ? new(fixture.Value.Value, [AutomationValueProvenance.Generated])
+                        : null;
+            }
             else
             {
                 var edges = flow
@@ -192,6 +211,7 @@ internal sealed class AutomationDataResolver(
                     checkpoints,
                     resolving,
                     executionIntegerEntropy,
+                    fixtures,
                     cancellationToken
                 );
             }
@@ -220,6 +240,7 @@ internal sealed class AutomationDataResolver(
         IAutomationPureCheckpointStore checkpoints,
         ImmutableHashSet<Guid> resolving,
         IAutomationIntegerEntropy executionIntegerEntropy,
+        ImmutableArray<AutomationScenarioConnectedInput>? fixtures,
         CancellationToken cancellationToken
     )
     {
@@ -260,6 +281,7 @@ internal sealed class AutomationDataResolver(
             checkpoints,
             resolving,
             executionIntegerEntropy,
+            fixtures,
             cancellationToken
         );
         return outputs?.GetValueOrDefault(outputPortId);
@@ -277,6 +299,7 @@ internal sealed class AutomationDataResolver(
         IAutomationPureCheckpointStore checkpoints,
         ImmutableHashSet<Guid> resolving,
         IAutomationIntegerEntropy executionIntegerEntropy,
+        ImmutableArray<AutomationScenarioConnectedInput>? fixtures,
         CancellationToken cancellationToken
     )
     {
@@ -291,12 +314,16 @@ internal sealed class AutomationDataResolver(
             return null;
         }
 
-        var check = await catalog.ValidatePersistedBeforeExecutionAsync(
-            hostId,
-            context,
-            AutomationRuntimeSerialization.Definition(producer),
-            cancellationToken
-        );
+        var check = fixtures is not null
+            ? catalog.ValidatePersistedDefinition(
+                AutomationRuntimeSerialization.Definition(producer)
+            )
+            : await catalog.ValidatePersistedBeforeExecutionAsync(
+                hostId,
+                context,
+                AutomationRuntimeSerialization.Definition(producer),
+                cancellationToken
+            );
         if (check is not AutomationConfigurationCheck.Valid valid)
         {
             await checkpoints.FailAsync(producer, "handler-unavailable", cancellationToken);
@@ -312,6 +339,7 @@ internal sealed class AutomationDataResolver(
             checkpoints,
             nextResolving,
             executionIntegerEntropy,
+            fixtures,
             cancellationToken
         );
         if (inputs is not AutomationInputResolution.Available resolvedInputs)
@@ -336,6 +364,7 @@ internal sealed class AutomationDataResolver(
         {
             result =
                 valid.Configuration is PluginAutomationConfiguration pluginConfiguration
+                && fixtures is null
                 && pluginExecution is not null
                     ? await pluginExecution.ExecutePureAsync(
                         hostId,
@@ -345,6 +374,7 @@ internal sealed class AutomationDataResolver(
                         cancellationToken
                     )
                 : handlers.TryResolve(new(producer.DefinitionId), out var handler)
+                && (fixtures is null || handler.Contract.SupportsScenarios)
                     ? await handler.ExecuteAsync(
                         new(
                             valid.Configuration,
@@ -571,7 +601,7 @@ internal sealed class AutomationDataResolver(
             _ => null,
         };
 
-    private static bool Matches(AutomationPortMetadata port, AutomationValue value) =>
+    internal static bool Matches(AutomationPortMetadata port, AutomationValue value) =>
         value switch
         {
             AutomationValue.Null nullValue => port.Nullability == AutomationPortNullability.Nullable
@@ -636,48 +666,4 @@ internal sealed class AutomationDataResolver(
 
     private static bool IsIdentifierCharacter(char value) =>
         char.IsAsciiLetterOrDigit(value) || value == '_';
-}
-
-internal sealed class AutomationSampleCheckpointStore : IAutomationPureCheckpointStore
-{
-    private readonly Dictionary<
-        Guid,
-        ImmutableDictionary<AutomationPortId, AutomationResolvedValue>
-    > _outputs = [];
-    private readonly HashSet<Guid> _failed = [];
-    private readonly HashSet<Guid> _running = [];
-
-    public ValueTask<AutomationPureCheckpoint> ReadOrBeginAsync(
-        AutomationRuntimeSerialization.PersistedNode node,
-        CancellationToken cancellationToken
-    ) =>
-        _outputs.TryGetValue(node.Id, out var outputs)
-            ? ValueTask.FromResult<AutomationPureCheckpoint>(
-                new AutomationPureCheckpoint.Available(outputs)
-            )
-        : _failed.Contains(node.Id) || !_running.Add(node.Id)
-            ? ValueTask.FromResult<AutomationPureCheckpoint>(new AutomationPureCheckpoint.Failed())
-        : ValueTask.FromResult<AutomationPureCheckpoint>(new AutomationPureCheckpoint.Begin());
-
-    public ValueTask<bool> CompleteAsync(
-        AutomationRuntimeSerialization.PersistedNode node,
-        ImmutableDictionary<AutomationPortId, AutomationResolvedValue> outputs,
-        CancellationToken cancellationToken
-    )
-    {
-        _ = _running.Remove(node.Id);
-        _outputs.Add(node.Id, outputs);
-        return ValueTask.FromResult(true);
-    }
-
-    public ValueTask FailAsync(
-        AutomationRuntimeSerialization.PersistedNode node,
-        string code,
-        CancellationToken cancellationToken
-    )
-    {
-        _ = _running.Remove(node.Id);
-        _ = _failed.Add(node.Id);
-        return ValueTask.CompletedTask;
-    }
 }
