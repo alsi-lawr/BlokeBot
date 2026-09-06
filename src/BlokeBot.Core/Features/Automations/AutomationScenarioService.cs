@@ -35,8 +35,9 @@ public sealed partial class AutomationScenarioService(
         {
             return new AutomationScenarioRunOutcome.Invalid(validation.Errors);
         }
-        var frozen = AutomationScenarioGraph.FreezeGraph(ApplyConfigurations(draft, fixture));
-        var context = fixture.Context;
+        var configured = ApplyConfigurations(draft, fixture);
+        var frozen = AutomationScenarioGraph.FreezeGraph(configured);
+        var context = SourceContext(configured, fixture);
         var now = fixture.ClockUtc.UtcDateTime;
         var outcomes = ImmutableArray.CreateBuilder<AutomationScenarioNodeOutcome>();
         outcomes.Add(

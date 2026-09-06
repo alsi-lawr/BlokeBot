@@ -141,7 +141,7 @@ public sealed partial class AutomationRuntimeTests
             bindings: Bindings(
                 "predicate",
                 AutomationInputBindingMode.Expression,
-                new(AutomationExpressionLanguage.CurrentVersion, "viewer_count >= 20")
+                new(AutomationExpressionLanguage.CurrentVersion, "arguments[0] == 'sample'")
             )
         );
         var action = Node("send-chat", """{"message":"Welcome ${actor.display_name}!"}""");
@@ -2302,7 +2302,7 @@ public sealed partial class AutomationRuntimeTests
     public async Task CelTransform_RestrictedInputAdmissionUsesArgumentsOnlyView()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
-        var source = Node("test-number-source", "{}");
+        var source = Node("custom-command", """{"custom-command-id":7}""");
         var transform = Node(
             "test-cel-transform",
             TransformJson(
@@ -2459,7 +2459,7 @@ public sealed partial class AutomationRuntimeTests
             await fixture.Flows.ValidateDraftAsync(literalDraft, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
 
-        var secondSource = Node("custom-command", """{"custom-command-id":7}""");
+        var secondSource = Node("test-number-source", "{}");
         var everyPath = draft with
         {
             Nodes = draft.Nodes.Add(secondSource),
@@ -5272,6 +5272,19 @@ public sealed partial class AutomationRuntimeTests
                     [
                         new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
                         DataOutput(AutomationPortValueType.Number),
+                    ],
+                    []
+                ),
+                Definition(
+                    "test-nullable-number-source",
+                    AutomationNodeKind.Source,
+                    [],
+                    [
+                        new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
+                        DataOutput(
+                            AutomationPortValueType.Number,
+                            nullability: AutomationPortNullability.Nullable
+                        ),
                     ],
                     []
                 ),
