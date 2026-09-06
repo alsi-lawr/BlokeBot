@@ -1,4 +1,3 @@
-using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,14 +11,12 @@ public sealed partial class GuessingHistoryService
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var excluded = ViewerPassportPublicIdentityPolicy.ExcludedLogins(db, hostId);
         return await db
             .Votes.AsNoTracking()
             .Where(value =>
                 value.GuessRound != null
                 && value.GuessRound.GuessRoundProfile != null
                 && value.GuessRound.GuessRoundProfile.HostId == hostId
-                && !excluded.Contains(value.Login)
             )
             .GroupBy(value => value.Login)
             .Select(group => new GuessLeaderboardEntry

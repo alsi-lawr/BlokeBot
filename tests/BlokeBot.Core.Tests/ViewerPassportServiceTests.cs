@@ -1,12 +1,16 @@
 using BlokeBot.Core.Features.Guessing.History;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Features.PublicLeaderboards;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Core.Features.ViewerPortal;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Privacy;
+using Bunit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -14,6 +18,77 @@ namespace BlokeBot.Core.Tests;
 public sealed class ViewerPassportServiceTests
 {
     private static readonly DateTimeOffset _now = new(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    public async Task AttendanceCreatedPrivatePassport_KeepsGameResultsPublicAndHostScoped()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var features =
+            HostFeatureFlags.ViewerPassports | HostFeatureFlags.Points | HostFeatureFlags.Guessing;
+        var host = await SeedHostAsync(database, "channel", features);
+        var otherHost = await SeedHostAsync(database, "other-channel", features);
+        var passports = CreateService(database);
+        (
+            await passports.RecordStreamAttendanceAsync(
+                "channel",
+                new("player-id", "player", "Player"),
+                _now,
+                default
+            )
+        ).ShouldBeTrue();
+        await SeedLegacyActivityAsync(database, host, "player", "125");
+        await SeedLegacyActivityAsync(database, otherHost, "other-player", "999");
+
+        _ = (
+            await passports.GetVisibleAsync(
+                "channel",
+                "player",
+                ViewerPassportAudience.Anonymous,
+                default
+            )
+        ).ShouldBeOfType<ViewerPassportQueryOutcome.Forbidden>();
+
+        using var context = new BunitContext();
+        _ = context.AddAuthorization();
+        context.AddPublicViewerBoundary(database);
+        _ = context.Services.AddSingleton(new PointBalanceService(database));
+        _ = context.Services.AddSingleton(new GuessingHistoryService(database));
+        var points = context.Render<PublicPointsLeaderboardPage>(parameters =>
+            parameters.Add(value => value.Channel, "channel")
+        );
+        points.WaitForAssertion(() =>
+        {
+            points.Find("tbody").TextContent.ShouldContain("player");
+            points.Find("tbody").TextContent.ShouldContain("125");
+            points.Find("tbody").TextContent.ShouldNotContain("other-player");
+        });
+        var guessing = context.Render<PublicGuessingLeaderboardPage>(parameters =>
+            parameters.Add(value => value.Channel, "channel")
+        );
+        guessing.WaitForAssertion(() =>
+        {
+            guessing.Find("tbody").TextContent.ShouldContain("player");
+            guessing.Find("tbody").TextContent.ShouldNotContain("other-player");
+        });
+        var portal = new ViewerPortalTestContext(database);
+        var snapshot = await portal.Catalogue.ReadAsync(
+            await portal.ChannelAsync("channel"),
+            new PortalIdentity.Anonymous(),
+            default
+        );
+        snapshot
+            .Features.Single(value => value.Descriptor.Feature == HostFeatureFlags.Points)
+            .Outcome.ShouldBeOfType<PortalSummaryOutcome.Available>()
+            .Summary.Headline.ShouldBe("player");
+        snapshot
+            .Features.Single(value => value.Descriptor.Feature == HostFeatureFlags.Guessing)
+            .Outcome.ShouldBeOfType<PortalSummaryOutcome.Available>()
+            .Summary.Headline.ShouldBe("player");
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.ViewerPassports.SingleAsync()).Visibility.ShouldBe(
+            ViewerPassportVisibility.Private
+        );
+    }
 
     [Test]
     public async Task DraftStatistics_ExcludeKnownOtherIdentityClaimsWithoutMutatingOrHidingSafeDrafts()
@@ -121,7 +196,7 @@ public sealed class ViewerPassportServiceTests
     }
 
     [Test]
-    public async Task PrivateRename_HidesRememberedLoginsFromPublicLegacyLeaderboards()
+    public async Task PrivateRename_PreservesPublicGameResultsWithoutPublishingThePassport()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
@@ -151,28 +226,19 @@ public sealed class ViewerPassportServiceTests
         var renamed = Success(
             await service.SaveAsync(Save(hostId, "viewer-id", "new_login"), default)
         );
-        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            hostId,
-            default
-        );
 
-        exclusions.Logins.Order().ShouldBe(["new_login", "old_login"]);
+        (await new PointBalanceService(database).GetLeaderboardAsync(hostId, 10, default))
+            .Select(value => value.Login)
+            .ShouldBe(["old_login"]);
         (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                hostId,
-                10,
-                exclusions.Logins,
-                default
-            )
-        ).ShouldBeEmpty();
-        (
-            await new GuessingHistoryService(database).LoadPublicLeaderboardAsync(
+            await new GuessingHistoryService(database).LoadLeaderboardAsync(
                 hostId,
                 new GuessHistoryQuery { Page = 1, PageSize = 10 },
-                exclusions.Logins,
                 default
             )
-        ).Entries.ShouldBeEmpty();
+        )
+            .Entries.Select(value => value.Login)
+            .ShouldBe(["old_login"]);
         renamed.Statistics.Points.ShouldBe("125");
         renamed.Statistics.GuessRounds.ShouldBe(1);
         renamed.Statistics.CorrectGuesses.ShouldBe(1);
@@ -316,18 +382,9 @@ public sealed class ViewerPassportServiceTests
         _ = owner.ShouldBeOfType<ViewerPassportQueryOutcome.Available>();
         (await projections.GetOverlayDataAsync("channel", "subject", default)).ShouldBeNull();
         (await projections.GetAutomationPayloadAsync("channel", "subject", default)).ShouldBeNull();
-        var hidden = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            hostId,
-            default
-        );
-        (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                hostId,
-                10,
-                hidden.Logins,
-                default
-            )
-        ).ShouldBeEmpty();
+        (await new PointBalanceService(database).GetLeaderboardAsync(hostId, 10, default))
+            .Select(value => value.Login)
+            .ShouldBe(["subject", "member"]);
 
         _ = Success(
             await service.SaveAsync(
@@ -346,20 +403,9 @@ public sealed class ViewerPassportServiceTests
         (await projections.GetAutomationPayloadAsync("channel", "subject", default))
             .ShouldNotBeNull()
             .AttendanceStreakSessions.ShouldBeNull();
-        var visible = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            hostId,
-            default
-        );
-        (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                hostId,
-                10,
-                visible.Logins,
-                default
-            )
-        )
+        (await new PointBalanceService(database).GetLeaderboardAsync(hostId, 10, default))
             .Select(value => value.Login)
-            .ShouldBe(["subject"]);
+            .ShouldBe(["subject", "member"]);
     }
 
     [Test]
@@ -483,7 +529,7 @@ public sealed class ViewerPassportServiceTests
     }
 
     [Test]
-    public async Task ReusedLogin_FailsClosedAcrossPublicStatsPrivacyErasureAndReset()
+    public async Task ReusedLogin_PreservesPublicGameResultsWithoutAttributingThemToEitherPassport()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
@@ -543,27 +589,18 @@ public sealed class ViewerPassportServiceTests
             statistics.GiveawaysWon.ShouldBe(0);
         }
 
-        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            hostId,
-            default
-        );
-        exclusions.Logins.ShouldContain("shared");
+        (await new PointBalanceService(database).GetLeaderboardAsync(hostId, 10, default))
+            .Select(value => value.Login)
+            .ShouldBe(["shared"]);
         (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                hostId,
-                10,
-                exclusions.Logins,
-                default
-            )
-        ).ShouldBeEmpty();
-        (
-            await new GuessingHistoryService(database).LoadPublicLeaderboardAsync(
+            await new GuessingHistoryService(database).LoadLeaderboardAsync(
                 hostId,
                 new GuessHistoryQuery { Page = 1, PageSize = 10 },
-                exclusions.Logins,
                 default
             )
-        ).Entries.ShouldBeEmpty();
+        )
+            .Entries.Select(value => value.Login)
+            .ShouldBe(["shared"]);
 
         foreach (var identity in new[] { firstIdentity, secondIdentity })
         {
@@ -629,11 +666,6 @@ public sealed class ViewerPassportServiceTests
         ).ShouldBeOfType<ViewerPassportResetOutcome.Succeeded>();
         await SetFeaturesAsync(database, hostId, HostFeatureFlags.None);
 
-        var sticky = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            hostId,
-            default
-        );
-        sticky.Logins.ShouldContain("shared");
         await using (var eraseLogin = await database.CreateDbContextAsync())
         {
             var report = await ViewerPrivacyService.EraseAsync(
@@ -700,19 +732,7 @@ public sealed class ViewerPassportServiceTests
         renamed.Statistics.GuessRounds.ShouldBe(1);
         renamed.Statistics.CorrectGuesses.ShouldBe(1);
         renamed.Statistics.GiveawaysWon.ShouldBe(1);
-        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            uniqueHost,
-            default
-        );
-        exclusions.Logins.ShouldNotContain("old_name");
-        (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                uniqueHost,
-                10,
-                exclusions.Logins,
-                default
-            )
-        )
+        (await new PointBalanceService(database).GetLeaderboardAsync(uniqueHost, 10, default))
             .Single()
             .Login.ShouldBe("old_name");
 
@@ -884,20 +904,9 @@ public sealed class ViewerPassportServiceTests
                 default
             )
         ).ShouldBeOfType<ViewerPassportQueryOutcome.NotFound>();
-        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            firstHost,
-            default
-        );
-        exclusions.Logins.ShouldContain("old_name");
-        exclusions.Logins.ShouldContain("new_name");
-        (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                firstHost,
-                10,
-                exclusions.Logins,
-                default
-            )
-        ).ShouldBeEmpty();
+        (await new PointBalanceService(database).GetLeaderboardAsync(firstHost, 10, default))
+            .Select(value => value.Login)
+            .ShouldBe(["old_name"]);
 
         _ = Success(
             await service.SaveAsync(
@@ -995,19 +1004,9 @@ public sealed class ViewerPassportServiceTests
             )
         );
         nextOwner.Statistics.Points.ShouldBe("0");
-        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
-            hostId,
-            default
-        );
-        exclusions.Logins.ShouldContain("reused_name");
-        (
-            await new PointBalanceService(database).GetPublicLeaderboardAsync(
-                hostId,
-                10,
-                exclusions.Logins,
-                default
-            )
-        ).ShouldBeEmpty();
+        (await new PointBalanceService(database).GetLeaderboardAsync(hostId, 10, default))
+            .Select(value => value.Login)
+            .ShouldBe(["reused_name"]);
     }
 
     private static ViewerPassportService CreateService(

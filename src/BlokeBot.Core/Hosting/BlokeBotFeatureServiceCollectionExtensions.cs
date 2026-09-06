@@ -52,7 +52,6 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
     {
         _ = services.AddSingleton<ViewerPassportService>();
         _ = services.AddSingleton<ViewerPassportProjectionService>();
-        _ = services.AddSingleton<ViewerPassportPublicIdentityPolicy>();
         _ = services.AddSingleton<ViewerPassportRuntime>();
         _ = services.AddSingleton<IChatMessageObserver>(static serviceProvider =>
             serviceProvider.GetRequiredService<ViewerPassportRuntime>()

@@ -227,7 +227,7 @@ public sealed class ViewerPortalCatalogueTests
     }
 
     [Test]
-    public async Task HiddenLeaderAndSelfPassport_KeepPublicProjectionSeparateFromPrivateIdentity()
+    public async Task PublicGameLeaderAndSelfPassport_KeepResultsSeparateFromPrivateProfile()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var context = new ViewerPortalTestContext(database);
@@ -265,7 +265,7 @@ public sealed class ViewerPortalCatalogueTests
         );
         Feature(anonymous, HostFeatureFlags.Points)
             .ShouldBeOfType<PortalSummaryOutcome.Available>()
-            .Summary.Headline.ShouldBe("visible");
+            .Summary.Headline.ShouldBe("hidden");
         anonymous.Features.ShouldNotContain(value =>
             value.Descriptor.Feature == HostFeatureFlags.ViewerPassports
         );

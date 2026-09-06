@@ -65,7 +65,7 @@ public sealed partial class ViewerPassportService
             .Where(value => logins.Contains(value))
             .ToArrayAsync(ct);
         logins.ExceptWith(other);
-        var leaderboard = await balances.GetBoundedLeaderboardAsync(hostId, publicOnly: false, ct);
+        var leaderboard = await balances.GetBoundedLeaderboardAsync(hostId, ct);
         if (leaderboard is null)
         {
             return null;

@@ -48,20 +48,6 @@ public sealed partial class PointBalanceService(
         int hostId,
         int count,
         CancellationToken ct
-    ) => await GetLeaderboardAsync(hostId, count, new HashSet<string>(), ct);
-
-    public async Task<IReadOnlyList<PointBalanceEntry>> GetPublicLeaderboardAsync(
-        int hostId,
-        int count,
-        IReadOnlySet<string> excludedLogins,
-        CancellationToken ct
-    ) => await GetLeaderboardAsync(hostId, count, excludedLogins, ct);
-
-    private async Task<IReadOnlyList<PointBalanceEntry>> GetLeaderboardAsync(
-        int hostId,
-        int count,
-        IReadOnlySet<string> excludedLogins,
-        CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -70,8 +56,7 @@ public sealed partial class PointBalanceService(
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
 
-        return rows.Where(x => !excludedLogins.Contains(x.Login))
-            .Select(x => new PointBalanceEntry(
+        return rows.Select(x => new PointBalanceEntry(
                 x.Login,
                 PointAmount.ParseAbsolute(x.Amount),
                 x.UpdatedAtUtc

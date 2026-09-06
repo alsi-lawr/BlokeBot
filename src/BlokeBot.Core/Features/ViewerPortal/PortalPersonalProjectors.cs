@@ -17,7 +17,7 @@ internal sealed class PortalPersonalProjectors(
         CancellationToken ct
     )
     {
-        var board = await points.GetBoundedLeaderboardAsync(channel.Host.Id, publicOnly: true, ct);
+        var board = await points.GetBoundedLeaderboardAsync(channel.Host.Id, ct);
         if (board is null)
         {
             return new PortalSummaryOutcome.Unavailable();
