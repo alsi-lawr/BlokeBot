@@ -2,7 +2,16 @@ using System.Collections.Immutable;
 
 namespace BlokeBot.Core.Features.Automations;
 
-internal sealed class AutomationScenarioCheckpointStore : IAutomationPureCheckpointStore
+internal sealed class AutomationScenarioCheckpointStore(
+    Func<
+        AutomationRuntimeSerialization.PersistedNode,
+        AutomationTraceEventKind,
+        AutomationTraceOutcome,
+        IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>?,
+        CancellationToken,
+        Task
+    > recordEvent
+) : IAutomationPureCheckpointStore
 {
     private readonly Dictionary<
         Guid,
@@ -23,7 +32,29 @@ internal sealed class AutomationScenarioCheckpointStore : IAutomationPureCheckpo
             ? ValueTask.FromResult<AutomationPureCheckpoint>(new AutomationPureCheckpoint.Failed())
         : ValueTask.FromResult<AutomationPureCheckpoint>(new AutomationPureCheckpoint.Begin());
 
-    public ValueTask<bool> CompleteAsync(
+    public async ValueTask RecordInputsAsync(
+        AutomationRuntimeSerialization.PersistedNode node,
+        ImmutableDictionary<AutomationPortId, AutomationResolvedValue> inputs,
+        CancellationToken cancellationToken
+    )
+    {
+        await recordEvent(
+            node,
+            AutomationTraceEventKind.ResolvedInputs,
+            AutomationTraceOutcome.None,
+            inputs,
+            cancellationToken
+        );
+        await recordEvent(
+            node,
+            AutomationTraceEventKind.Attempt,
+            AutomationTraceOutcome.None,
+            null,
+            cancellationToken
+        );
+    }
+
+    public async ValueTask<bool> CompleteAsync(
         AutomationRuntimeSerialization.PersistedNode node,
         ImmutableDictionary<AutomationPortId, AutomationResolvedValue> outputs,
         CancellationToken cancellationToken
@@ -31,10 +62,17 @@ internal sealed class AutomationScenarioCheckpointStore : IAutomationPureCheckpo
     {
         _ = _running.Remove(node.Id);
         _outputs.Add(node.Id, outputs);
-        return ValueTask.FromResult(true);
+        await recordEvent(
+            node,
+            AutomationTraceEventKind.Outputs,
+            AutomationTraceOutcome.Succeeded,
+            outputs,
+            cancellationToken
+        );
+        return true;
     }
 
-    public ValueTask FailAsync(
+    public async ValueTask FailAsync(
         AutomationRuntimeSerialization.PersistedNode node,
         string code,
         CancellationToken cancellationToken
@@ -42,6 +80,12 @@ internal sealed class AutomationScenarioCheckpointStore : IAutomationPureCheckpo
     {
         _ = _running.Remove(node.Id);
         _ = _failed.Add(node.Id);
-        return ValueTask.CompletedTask;
+        await recordEvent(
+            node,
+            AutomationTraceEventKind.Outputs,
+            AutomationTraceOutcome.Failed,
+            null,
+            cancellationToken
+        );
     }
 }

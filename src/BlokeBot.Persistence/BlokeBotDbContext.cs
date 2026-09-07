@@ -188,6 +188,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<AutomationFlow> AutomationFlows => Set<AutomationFlow>();
     public DbSet<AutomationFlowNode> AutomationFlowNodes => Set<AutomationFlowNode>();
     public DbSet<AutomationFlowEdge> AutomationFlowEdges => Set<AutomationFlowEdge>();
+    public DbSet<AutomationTrace> AutomationTraces { get; set; }
+    public DbSet<AutomationTraceEvent> AutomationTraceEvents { get; set; }
+
     public DbSet<AutomationFlowRun> AutomationFlowRuns => Set<AutomationFlowRun>();
     public DbSet<AutomationNodeRun> AutomationNodeRuns => Set<AutomationNodeRun>();
     public DbSet<AutomationEventReceipt> AutomationEventReceipts => Set<AutomationEventReceipt>();

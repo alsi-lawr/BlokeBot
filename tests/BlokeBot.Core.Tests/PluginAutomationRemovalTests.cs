@@ -154,7 +154,12 @@ public sealed class PluginAutomationRemovalTests
             new UnavailableOverlayCueAdmissionService(),
             TimeProvider.System
         );
-        var scenarios = new AutomationScenarioService(database, catalog, flows);
+        var scenarios = new AutomationScenarioService(
+            database,
+            catalog,
+            flows,
+            TimeProvider.System
+        );
         var source = registry.Current.Descriptors.Single(value =>
             value.Kind == AutomationNodeKind.Source
         );
