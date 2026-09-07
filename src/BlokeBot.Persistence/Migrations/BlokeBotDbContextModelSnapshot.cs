@@ -582,6 +582,105 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("automation_scenarios", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LastRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("HostId", "Id");
+
+                    b.ToTable("automation_subflows", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowCallerReference", b =>
+                {
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NodeId");
+
+                    b.HasIndex("HostId", "RevisionId");
+
+                    b.ToTable("automation_subflow_callers", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SubflowId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId", "Id");
+
+                    b.HasIndex("HostId", "SubflowId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("automation_subflow_revisions", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionReference", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("CallerRevisionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId", "CallerRevisionId", "NodeId");
+
+                    b.HasIndex("HostId", "RevisionId");
+
+                    b.ToTable("automation_subflow_revision_references", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRunReference", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("RunId", "RevisionId");
+
+                    b.HasIndex("HostId", "RevisionId");
+
+                    b.ToTable("automation_subflow_run_references", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTrace", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9161,6 +9260,69 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Flow");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowCallerReference", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationFlowNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "RevisionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflow", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "SubflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionReference", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "CallerRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "RevisionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRunReference", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationFlowRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "RevisionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTrace", b =>

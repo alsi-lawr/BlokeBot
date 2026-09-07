@@ -108,6 +108,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
 
     public IEnumerable<IAutomationDefinition> Definitions { get; } =
     [
+        .. AutomationSubflowDefinitions.Definitions,
         CustomCommandSource(),
         RandomNumber(),
         AutomationCelTransform.Definition(

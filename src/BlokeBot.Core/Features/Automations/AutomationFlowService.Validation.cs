@@ -30,10 +30,24 @@ public sealed partial class AutomationFlowService
             ? ValidateAsync(restored.Draft, AutomationGraphAdmission.Frozen, cancellationToken)
             : Task.FromResult<AutomationGraphValidation>(new(null, [MalformedGraphError()]));
 
+    internal Task<AutomationGraphValidation> ValidateSubflowAsync(
+        AutomationSubflowDraft draft,
+        CancellationToken cancellationToken
+    ) =>
+        ValidateAsync(
+            draft.Graph,
+            AutomationGraphAdmission.Saved,
+            cancellationToken,
+            draft.Interface,
+            draft.Id
+        );
+
     private async Task<AutomationGraphValidation> ValidateAsync(
         AutomationFlowDraft draft,
         AutomationGraphAdmission admission,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationSubflowInterface? subflowInterface = null,
+        AutomationSubflowId? publishing = null
     )
     {
         if (admission != AutomationGraphAdmission.Frozen)
@@ -112,7 +126,28 @@ public sealed partial class AutomationFlowService
                 && definition.Kind == AutomationNodeKind.Source
             )
             .ToArray();
-        if (sources.Length == 0)
+        var entries = nodes
+            .Values.Where(node => node.Definition.TypeId == AutomationSubflowDefinitions.Entry)
+            .ToArray();
+        var exits = nodes
+            .Values.Where(node => node.Definition.TypeId == AutomationSubflowDefinitions.Exit)
+            .ToArray();
+        if (subflowInterface is not null)
+        {
+            ValidateSubflowBoundaries(subflowInterface, sources, entries, exits, errors);
+        }
+        else if (entries.Length > 0 || exits.Length > 0)
+        {
+            errors.Add(
+                new(
+                    null,
+                    "subflow-boundary-outside",
+                    "Use entry and exit nodes only inside a subflow."
+                )
+            );
+        }
+        var roots = subflowInterface is null ? sources : entries;
+        if (subflowInterface is null && sources.Length == 0)
         {
             errors.Add(new(null, "source-count", "Add one or more trigger nodes."));
         }
@@ -194,7 +229,14 @@ public sealed partial class AutomationFlowService
                     new(nodeId, "source-incoming", "Remove the input connection from this trigger.")
                 );
             }
-            else if (kind is AutomationNodeKind.Action or AutomationNodeKind.Control && count == 0)
+            else if (
+                kind is AutomationNodeKind.Action or AutomationNodeKind.Control
+                && count == 0
+                && !(
+                    subflowInterface is not null
+                    && node!.Definition.TypeId == AutomationSubflowDefinitions.Entry
+                )
+            )
             {
                 errors.Add(
                     new(
@@ -206,9 +248,9 @@ public sealed partial class AutomationFlowService
             }
         }
 
-        if (sources.Length > 0)
+        if (roots.Length > 0)
         {
-            var reached = Reachable(sources.Select(static source => source.Id), flowAdjacency);
+            var reached = Reachable(roots.Select(static source => source.Id), flowAdjacency);
             foreach (
                 var nodeId in nodes.Keys.Where(nodeId =>
                     definitions.TryGetValue(nodeId, out var definition)
@@ -221,8 +263,29 @@ public sealed partial class AutomationFlowService
             }
         }
 
+        if (subflowInterface is not null && entries.Length == 1 && exits.Length == 1)
+        {
+            ValidateSubflowConnectivity(
+                nodes,
+                definitions,
+                entries[0].Id,
+                exits[0].Id,
+                flowAdjacency,
+                dataAdjacency,
+                draft.Edges,
+                errors
+            );
+        }
+        ValidateInvocationOutputAvailability(
+            nodes,
+            definitions,
+            roots.Select(root => root.Id),
+            flowAdjacency,
+            dataAdjacency,
+            errors
+        );
         ValidateTriggerContexts(nodes, definitions, sources, flowAdjacency, errors);
-        ValidateSourceAvailability(nodes, definitions, sources, draft.Edges, flowAdjacency, errors);
+        ValidateSourceAvailability(nodes, definitions, roots, draft.Edges, flowAdjacency, errors);
         ValidateSafeTriggerExpressions(draft, definitions, errors);
 
         if (HasCycle(flowAdjacency))
@@ -254,6 +317,15 @@ public sealed partial class AutomationFlowService
                 .Where(value => value.Id == draft.HostId.Value)
                 .Select(static value => value.EnabledFeatures)
                 .SingleAsync(cancellationToken);
+            await ValidateSubflowDependenciesAsync(
+                db,
+                draft,
+                publishing,
+                enabledFeatures,
+                admission,
+                errors,
+                cancellationToken
+            );
             errors.AddRange(
                 CapabilityUnavailableErrors(
                     draft.Nodes.Select(static node => (node.Id, node.Definition.TypeId)),
@@ -262,6 +334,23 @@ public sealed partial class AutomationFlowService
             );
         }
 
-        return new(null, errors.ToImmutable());
+        return new(
+            null,
+            errors.ToImmutable(),
+            subflowInterface is null
+                ? []
+                :
+                [
+                    .. definitions.Select(pair => new AutomationSubflowNodeContract(
+                        pair.Key,
+                        pair.Value.Kind,
+                        pair.Value.Display,
+                        pair.Value.Inputs,
+                        pair.Value.Outputs,
+                        pair.Value.Capabilities,
+                        pair.Value.RetrySafety
+                    )),
+                ]
+        );
     }
 }
