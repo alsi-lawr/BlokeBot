@@ -74,7 +74,8 @@
     else
     {
         <div class="automation-page-actions">
-            <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" />New flow</button>
+            <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="new-flow" />New flow</button>
+            <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><AutomationIcon Name="new-subflow" />New subflow</button>
         </div>
 
         @if (_flowRecoveryMessage is not null)
@@ -181,7 +182,17 @@
                                         ValidationErrorsEmpty="_validationErrors.IsEmpty"
                                         DeleteConfirmation="_deleteConfirmation"
                                         Toggle="ToggleFlowRail"
-                                        NewFlow="RequestNewFlowAsync"
+                                        Library="_libraryKind"
+                                        LibraryChanged="ChangeLibraryAsync"
+                                        EditingSubflow="@(_editor.Subflow is not null)"
+                                        CurrentSubflowId="_editor.Subflow?.Id"
+                                        Subflows="_subflowPage"
+                                        SubflowSearch="@_subflowSearch"
+                                        SubflowOffset="_subflowOffset"
+                                        SubflowsLoading="_subflowLoading"
+                                        SearchSubflows="SearchSubflowsAsync"
+                                        PageSubflows="LoadSubflowPageAsync"
+                                        SelectSubflow="SelectLibrarySubflowAsync"
                                         Select="RequestSelectFlowAsync"
                                         Duplicate="RequestDuplicateAsync"
                                         Delete="RequestDelete" />
@@ -196,7 +207,7 @@
                     }
 
                     <div class="automation-workspace" role="region" aria-label="Flow workspace" @onclick="CloseNodeLibraryFromOutsideAsync">
-                        <div class="automation-authoring-openers"><button class="btn-secondary" type="button" data-automation-authoring-opener @onclick="OpenSubflowsAsync">Subflows</button><button class="btn-secondary" type="button" disabled="@(_selectedNodeIds.Count == 0 || _busy)" data-automation-extract-selection @onclick="OpenExtractionAsync">Extract selection</button><button class="btn-secondary" type="button" @onclick="OpenRecentTraceAsync">Traces</button></div>
+                        <div class="automation-authoring-openers"><button class="btn-secondary" type="button" disabled="@(_selectedNodeIds.Count == 0 || _busy)" data-automation-extract-selection @onclick="OpenExtractionAsync">Extract selection</button><button class="btn-secondary" type="button" @onclick="OpenRecentTraceAsync">Traces</button>@if (_editor.Subflow is not null) { <button class="btn-secondary" type="button" data-automation-interface-opener @onclick="OpenInterfaceAsync">Interface</button> }</div>
                         <AutomationWorkspaceToolbar @ref="_workspaceToolbar"
                                                     ToolboxOpen="_nodeLibraryOpen"
                                                     Settings="_editor.Canvas"
@@ -249,8 +260,8 @@
                     @if (_authoringTask != AutomationAuthoringTask.None)
                     {
                         <aside class="automation-authoring-panel" data-automation-authoring tabindex="-1" @onkeydown="Handle_authoringKeyAsync">
-                            <header class="automation-authoring-tabs"><SegmentedTabs Id="automation-authoring" AriaLabel="Authoring task" Items="_authoringTabs" ActiveKey="@_authoringKey" ActiveKeyChanged="SelectAuthoringTabAsync" /><button class="btn-secondary" type="button" aria-label="Close authoring panel" @onclick="CloseAuthoringAsync">×</button></header>
-                            <div class="automation-authoring-content" id="@SegmentedTabs.PanelId("automation-authoring", _authoringKey)" role="tabpanel" aria-labelledby="@SegmentedTabs.TabId("automation-authoring", _authoringKey)">
+                            <header class="automation-authoring-tabs"><h2>@_authoringTitle</h2><button class="btn-secondary" type="button" aria-label="Close authoring panel" @onclick="CloseAuthoringAsync">×</button></header>
+                            <div class="automation-authoring-content">
                                 @if (_authoringTask == AutomationAuthoringTask.Scenarios)
                                 {
                                     <AutomationScenarioPanel Editor="_scenario" Saved="_savedScenarios" Nodes="_editor.Nodes" Fields="_scenarioFields" Busy="_busy" CanSave="@(_editor.Id is not null)" InvalidInputs="@(_invalidFixtureInputs.Count > 0)" InputValidity="SetFixtureValidity" Select="SelectScenario" SourceChanged="SelectScenarioSource" New="NewScenario" Generate="GenerateScenarioFixture" Run="RunScenarioAsync" Save="SaveScenarioAsync" Duplicate="DuplicateScenarioAsync" Delete="DeleteScenarioAsync" Cancel="() => _scenarioCancellation?.Cancel()" />
@@ -267,9 +278,9 @@
                                         }
                                     </div><footer class="automation-authoring-footer"><button class="btn-primary" type="button" disabled="@(_busy || _extraction?.IsValid is not true || !_selectedNodeIds.SetEquals(_extraction.Selection))" data-automation-apply-extraction @onclick="ApplyExtractionAsync">Create subflow and replace</button><button class="btn-secondary" type="button" @onclick="CloseAuthoringAsync">Cancel</button></footer>
                                 }
-                                else if (_editor.Subflow is { } subflow && _showInterface)
+                                else if (_editor.Subflow is { } subflow)
                                 {
-                                    <div class="automation-authoring-body" data-automation-subflow-editor><button class="btn-secondary" type="button" @onclick="OpenSubflowsAsync">Subflow library</button><h2>Subflow interface</h2><label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label><AutomationSubflowInterfaceEditor Contract="_currentInterface" Changed="ChangeSubflowInterface" /></div>
+                                    <div class="automation-authoring-body" data-automation-subflow-editor><label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label><AutomationSubflowInterfaceEditor Contract="_currentInterface" Changed="ChangeSubflowInterface" /></div>
                                     <footer class="automation-authoring-footer">
                                         @if (_subflowPreview is { } review)
                                         {
@@ -283,16 +294,6 @@
                                         }
                                         else { <button class="btn-primary" type="button" disabled="@_busy" data-automation-review-subflow @onclick="ReviewSubflowAsync">Review subflow</button> }
                                     </footer>
-                                }
-                                else
-                                {
-                                    <div class="automation-authoring-body" data-automation-subflow-library><div class="automation-authoring-heading"><h2>Subflows</h2><button class="btn-secondary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync">New</button></div>@if (_editor.Subflow is not null) { <button class="btn-secondary" type="button" @onclick="() => _showInterface = true">Edit interface</button> }<label class="field"><span class="field__label">Search subflows</span><input class="field__input" type="search" data-automation-subflow-search maxlength="200" value="@_subflowSearch" @onchange="SearchSubflowsAsync" /></label>
-                                        <ul class="automation-subflow-library">@foreach (var item in _subflowPage.Subflows) { <li><button type="button" class="@(_librarySubflow?.SubflowId == item.Id ? "is-selected" : null)" @onclick="() => SelectLibrarySubflowAsync(item.Id)"><strong>@item.Name</strong><small>@item.Description</small></button></li> }</ul><div class="automation-authoring-actions"><button class="btn-secondary" type="button" disabled="@(_subflowOffset == 0)" @onclick="() => LoadSubflowPageAsync(Math.Max(0, _subflowOffset - AutomationSubflowService.LibraryPageSize))">Previous</button><button class="btn-secondary" type="button" data-automation-library-next disabled="@(_subflowPage.NextOffset is null)" @onclick="() => LoadSubflowPageAsync(_subflowPage.NextOffset!.Value)">Next page</button></div>
-                                        @if (_librarySubflow is { } library)
-                                        {
-                                            <section class="automation-authoring-section"><h3>@library.Graph.Name</h3><p>@library.Description</p>@foreach (var input in library.Interface.Inputs) { <div class="automation-interface-summary"><span>Input @input.Id.Value</span><span>@input.ValueType</span></div> }@foreach (var output in library.Interface.Outputs) { <div class="automation-interface-summary"><span>Output @output.Id.Value</span><span>@output.ValueType</span></div> }<button class="btn-secondary" type="button" @onclick="EditLibrarySubflowAsync">Edit subflow</button></section>
-                                        }
-                                    </div><footer class="automation-authoring-footer"><button class="btn-primary" type="button" disabled="@(_librarySubflow is null || _busy)" data-automation-insert-invocation @onclick="InsertInvocation">Insert invocation</button>@if (_selectedNode?.Subflow is AutomationSubflowInvocationConfiguration selectedCall && _librarySubflow?.SubflowId == selectedCall.SubflowId) { <button class="btn-secondary" type="button" disabled="@_busy" @onclick="UpdateInvocationInterface">Update selected call interface</button> }</footer>
                                 }
                             </div>
                         </aside>
@@ -311,7 +312,11 @@
                                                  Connect="ConnectNodes"
                                                  Repair="RepairConnection"
                                                  DeleteEdge="DeleteEdge"
-                                                 DeleteNode="DeleteNode" />
+                                                 DeleteNode="DeleteNode">
+                            <CallSubflowSelector>
+                                <AutomationCallTarget Name="@(_callTarget?.Graph.Name)" HasTarget="@(_selectedNode.Subflow is AutomationSubflowInvocationConfiguration)" Loading="_callLoading" Choosing="_callChoosing" InterfaceChanged="_callInterfaceChanged" Message="@_callMessage" Page="_callPage" Search="@_callSearch" Offset="_callOffset" PageLoading="_callPageLoading" Change="ChooseCallTargetAsync" UpdateInterface="UpdateCallInterfaceAsync" SearchChanged="SearchCallTargetsAsync" PageChanged="LoadCallPageAsync" Selected="SelectCallTargetAsync" />
+                            </CallSubflowSelector>
+                        </AutomationNodeInspector>
                     }
                 </div>
 

@@ -25,28 +25,6 @@ public sealed partial class AutomationEditorNode
     {
         if (Subflow is not null)
         {
-            var values = Subflow
-                .FixedInputs.ToImmutableDictionary(pair => pair.Key, pair => pair.Value.Value)
-                .ToBuilder();
-            foreach (
-                var port in Definition.Inputs.Where(port =>
-                    port.ValueType != AutomationPortValueType.Flow
-                )
-            )
-            {
-                var field = new AutomationConfigurationFieldId(port.Id.Value);
-                var previous = values.TryGetValue(port.Id, out var original)
-                    ? DisplayFixedValue(original)
-                    : DefaultValue(Definition.Configuration.Single(item => item.Id == field));
-                if (_values[field] != previous)
-                {
-                    values[port.Id] = ParseFixedValue(
-                        _values[field],
-                        port.ValueType,
-                        port.Nullability
-                    );
-                }
-            }
             return AutomationSubflowDefinitions
                 .Create(
                     Definition.Id.Value,
@@ -54,7 +32,10 @@ public sealed partial class AutomationEditorNode
                     Subflow is AutomationSubflowInvocationConfiguration call
                         ? call.SubflowId
                         : null,
-                    values.ToImmutable()
+                    Subflow.FixedInputs.ToImmutableDictionary(
+                        pair => pair.Key,
+                        pair => pair.Value.Value
+                    )
                 )
                 .Configuration;
         }

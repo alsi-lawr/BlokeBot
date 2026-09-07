@@ -1,0 +1,31 @@
+<div class="automation-subflow-picker">
+    <label class="field"><span class="field__label">Search subflows</span><input class="field__input" type="search" aria-label="@SearchLabel" maxlength="200" value="@Search" @oninput="args => SearchChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)" /></label>
+    @if (Loading)
+    {
+        <p role="status">Loading subflows…</p>
+    }
+    else if (Page.Subflows.IsEmpty)
+    {
+        <p role="status">No subflows found.</p>
+    }
+    <ul class="automation-subflow-library" aria-label="@ResultsLabel">
+        @foreach (var item in Page.Subflows)
+        {
+            <li @key="item.Id"><button type="button" class="@(SelectedId == item.Id ? "is-selected" : null)" data-automation-subflow-id="@item.Id.Value" @onclick="() => Selected.InvokeAsync(item.Id)"><strong>@item.Name</strong>@if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }</button></li>
+        }
+    </ul>
+    <div class="automation-subflow-pagination"><button class="btn-secondary" type="button" disabled="@(Loading || Offset == 0)" @onclick="() => PageChanged.InvokeAsync(Math.Max(0, Offset - AutomationSubflowService.LibraryPageSize))">Previous</button><button class="btn-secondary" type="button" disabled="@(Loading || Page.NextOffset is null)" data-automation-library-next @onclick="() => PageChanged.InvokeAsync(Page.NextOffset!.Value)">Next page</button></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required AutomationSubflowLibraryPage Page { get; set; }
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public int Offset { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public AutomationSubflowId? SelectedId { get; set; }
+    [Parameter] public string SearchLabel { get; set; } = "Search subflows";
+    [Parameter] public string ResultsLabel { get; set; } = "Subflows";
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+    [Parameter] public EventCallback<AutomationSubflowId> Selected { get; set; }
+}

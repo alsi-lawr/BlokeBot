@@ -208,7 +208,7 @@ public sealed partial class AutomationEditorNode
         var subflow = AutomationSubflowDefinitions.TryRead(node.Definition, out var parsedSubflow)
             ? parsedSubflow
             : null;
-        return new(
+        var restored = new AutomationEditorNode(
             node.Id,
             definition,
             node.Position,
@@ -238,15 +238,39 @@ public sealed partial class AutomationEditorNode
             transform,
             subflow
         );
+        if (subflow is not null)
+        {
+            foreach (var (port, value) in subflow.FixedInputs)
+            {
+                _ = restored._values.TryAdd(new(port.Value), DisplayFixedValue(value.Value));
+            }
+            foreach (var (field, binding) in node.InputBindings)
+            {
+                restored._bindings[field] = binding;
+                _ = restored._values.TryAdd(field, string.Empty);
+            }
+        }
+        return restored;
     }
 
     internal string Value(AutomationConfigurationFieldId fieldId) => _values[fieldId];
 
-    internal void SetValue(AutomationConfigurationFieldId fieldId, string value) =>
+    internal void SetValue(AutomationConfigurationFieldId fieldId, string value)
+    {
+        if (Subflow is not null)
+        {
+            _ = TrySetSubflowFixedValue(new(fieldId.Value), value);
+            return;
+        }
         _values[fieldId] = value;
+    }
 
     internal bool SetComplexFixedValue(AutomationPortId portId, string source)
     {
+        if (Subflow is not null)
+        {
+            return TrySetSubflowFixedValue(portId, source);
+        }
         if (_transform is null)
         {
             return false;

@@ -6,7 +6,15 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationEditorPage
 {
-    private Task RefreshPageAsync() => _hasChanges ? Task.CompletedTask : LoadAsync();
+    private async Task RefreshPageAsync()
+    {
+        var host = HostId;
+        _ = await LoadPageContextAsync();
+        if (!_hasChanges || HostId != host)
+        {
+            await LoadAsync();
+        }
+    }
 
     private async Task LoadAsync()
     {
@@ -41,6 +49,7 @@ public partial class AutomationEditorPage
         var previousFlowId = _editor?.Id;
         _ = await LoadPageContextAsync();
         ResetTransientState();
+        ResetLibraryForHost();
         if (HostId == 0)
         {
             _featureEnabled = false;
@@ -200,6 +209,7 @@ public partial class AutomationEditorPage
     private Task RequestNewFlowAsync() =>
         RequestTransitionAsync(() =>
         {
+            _libraryKind = AutomationLibraryKind.Flows;
             StartNewFlow();
             return Task.CompletedTask;
         });

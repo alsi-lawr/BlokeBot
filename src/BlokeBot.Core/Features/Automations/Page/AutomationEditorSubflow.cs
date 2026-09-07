@@ -40,16 +40,41 @@ public sealed partial class AutomationEditorNode
     {
         var replacement = FromDefinition(persisted, catalog, Position, DisplayAlias, Id);
         Definition = replacement.Definition;
-        Subflow = replacement.Subflow;
-        foreach (var key in _values.Keys.Except(replacement._values.Keys).ToArray())
-        {
-            _ = _values.Remove(key);
-            _ = _bindings.Remove(key);
-        }
+        Subflow = Subflow is { } previous
+            ? replacement.Subflow! with
+            {
+                FixedInputs = previous.FixedInputs,
+            }
+            : replacement.Subflow;
         foreach (var (key, value) in replacement._values)
         {
             _ = _values.TryAdd(key, value);
             _ = _bindings.TryAdd(key, new(AutomationInputBindingMode.Fixed, null));
         }
+    }
+
+    internal IEnumerable<AutomationConfigurationFieldId> UnmatchedSubflowInputs =>
+        Subflow is null
+            ? []
+            : _bindings
+                .Keys.Union(
+                    Subflow.FixedInputs.Keys.Select(id => new AutomationConfigurationFieldId(
+                        id.Value
+                    ))
+                )
+                .Where(id => Definition.Configuration.All(item => item.Id != id));
+
+    internal AutomationInputBinding? SubflowInputBinding(AutomationConfigurationFieldId field) =>
+        _bindings.GetValueOrDefault(field);
+
+    internal void RemoveUnmatchedSubflowInput(AutomationConfigurationFieldId field)
+    {
+        if (Subflow is null || Definition.Configuration.Any(value => value.Id == field))
+        {
+            return;
+        }
+        Subflow = Subflow with { FixedInputs = Subflow.FixedInputs.Remove(new(field.Value)) };
+        _ = _values.Remove(field);
+        _ = _bindings.Remove(field);
     }
 }

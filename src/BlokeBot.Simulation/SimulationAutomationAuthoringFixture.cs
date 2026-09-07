@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Simulation;
 
-internal static class SimulationAutomationAuthoringFixture
+internal static partial class SimulationAutomationAuthoringFixture
 {
     internal static async Task SeedAsync(
         int host,
@@ -217,6 +217,8 @@ internal static class SimulationAutomationAuthoringFixture
             ),
             cancellationToken
         );
+
+        await SeedNodeLocalAsync(host, source, subflows, flows, catalog, cancellationToken);
 
         var delay = Node(
             Definition("delay", """{"duration-milliseconds":2000}"""),
