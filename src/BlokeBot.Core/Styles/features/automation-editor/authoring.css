@@ -50,11 +50,6 @@
     padding: 0.7rem;
 }
 
-.automation-authoring-tabs > nav {
-    flex: 1;
-    min-width: 0;
-}
-
 .automation-authoring-content {
     display: flex;
     flex: 1;
@@ -338,7 +333,8 @@
     }
 }
 
-.automation-authoring-tabs .segmented-motion--shared {
-    grid-template-columns: repeat(var(--segmented-count), minmax(0, 1fr));
-    width: 100%;
+.automation-authoring-tabs > h2 {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 700;
 }

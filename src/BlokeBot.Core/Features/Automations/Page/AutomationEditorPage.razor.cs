@@ -125,6 +125,8 @@ public partial class AutomationEditorPage
             await _pageModule.InvokeVoidAsync("focusInspector");
         }
 
+        await EnsureCallSelectorAsync();
+
         if (_acceptedTransition is not { } transition)
         {
             return;

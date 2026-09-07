@@ -51,6 +51,10 @@ public partial class AutomationEditorPage
 
     private void SetSingleNodeSelection(AutomationNodeId? nodeId)
     {
+        if (_selectedNodeId != nodeId)
+        {
+            ResetCallSelector();
+        }
         _disclosedNodeId = null;
         _selectedNodeIds.Clear();
         if (nodeId is { } selected)
@@ -66,6 +70,7 @@ public partial class AutomationEditorPage
 
     private void ClearSelection()
     {
+        ResetCallSelector();
         _disclosedNodeId = null;
         _selectedNodeIds.Clear();
         _selectedNodeId = null;

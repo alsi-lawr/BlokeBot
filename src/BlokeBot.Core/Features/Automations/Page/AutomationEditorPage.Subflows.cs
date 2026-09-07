@@ -5,12 +5,6 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationEditorPage
 {
-    private AutomationSubflowLibraryPage _subflowPage = new([], null);
-    private string _subflowSearch = string.Empty;
-    private int _subflowOffset;
-    private long _subflowQuery;
-    private bool _showInterface;
-    private AutomationSubflowRevision? _librarySubflow;
     private AutomationSubflowPreviewOutcome.Ready? _subflowPreview;
     private long _previewRevision = -1;
     private int _callerOffset;
@@ -36,55 +30,8 @@ public partial class AutomationEditorPage
             ?.Subflow?.Interface
         ?? new([], []);
 
-    private async Task OpenSubflowsAsync()
-    {
-        await OpenAuthoringAsync(AutomationAuthoringTask.Subflows);
-        _showInterface = false;
-        await LoadSubflowPageAsync(0);
-    }
-
-    private async Task LoadSubflowPageAsync(int offset)
-    {
-        var request = ++_subflowQuery;
-        var host = HostId;
-        var page = await _subflowsService.ListAsync(
-            new(host),
-            new(_subflowSearch, offset),
-            CancellationToken.None
-        );
-        if (request != _subflowQuery || host != HostId)
-        {
-            return;
-        }
-        _subflowOffset = offset;
-        _subflowPage = page;
-        _librarySubflow = null;
-    }
-
-    private async Task SearchSubflowsAsync(ChangeEventArgs args)
-    {
-        _subflowSearch = args.Value?.ToString() ?? string.Empty;
-        await LoadSubflowPageAsync(0);
-    }
-
-    private async Task SelectLibrarySubflowAsync(AutomationSubflowId id)
-    {
-        var host = HostId;
-        var request = ++_subflowQuery;
-        var loaded = await _subflowsService.LoadCurrentAsync(new(host), id, CancellationToken.None);
-        if (host != HostId || request != _subflowQuery)
-        {
-            return;
-        }
-        _librarySubflow = loaded;
-        if (_librarySubflow is null)
-        {
-            _feedback = "This subflow is unavailable.";
-        }
-    }
-
     private Task NewSubflowAsync() =>
-        RequestTransitionAsync(() =>
+        RequestTransitionAsync(async () =>
         {
             ResetAuthoring();
             var contract = new AutomationSubflowInterface([], []);
@@ -117,19 +64,10 @@ public partial class AutomationEditorPage
             _hasChanges = true;
             ClearSelection();
             ResetCanvasViewport();
-            _authoringTask = AutomationAuthoringTask.Subflows;
-            _showInterface = true;
-            return Task.CompletedTask;
+            _libraryKind = AutomationLibraryKind.Subflows;
+            await OpenInterfaceAsync();
+            await LoadSubflowPageAsync(0);
         });
-
-    private Task EditLibrarySubflowAsync() =>
-        _librarySubflow is { } revision
-            ? RequestTransitionAsync(() =>
-            {
-                LoadSubflowEditor(revision);
-                return Task.CompletedTask;
-            })
-            : Task.CompletedTask;
 
     private void LoadSubflowEditor(AutomationSubflowRevision revision)
     {
@@ -146,8 +84,6 @@ public partial class AutomationEditorPage
         _hasChanges = false;
         ClearSelection();
         ResetCanvasViewport();
-        _authoringTask = AutomationAuthoringTask.Subflows;
-        _showInterface = true;
     }
 
     private AutomationEditorState? RestoreAuthoringGraph(AutomationFlowDraft draft)
@@ -197,16 +133,8 @@ public partial class AutomationEditorPage
             )
         )
         {
-            var fixedInputs = node.Subflow!.FixedInputs.Where(pair =>
-                    contract.Outputs.Any(port => port.Id == pair.Key)
-                )
-                .ToImmutableDictionary(pair => pair.Key, pair => pair.Value.Value);
             node.ReplaceSubflowDefinition(
-                AutomationSubflowDefinitions.Boundary(
-                    node.Definition.Id.Value,
-                    contract,
-                    fixedInputs
-                ),
+                AutomationSubflowDefinitions.Boundary(node.Definition.Id.Value, contract),
                 _catalogService
             );
         }
@@ -252,8 +180,7 @@ public partial class AutomationEditorPage
             _subflowPreview = preview as AutomationSubflowPreviewOutcome.Ready;
             _previewRevision = version;
             _callerOffset = 0;
-            _authoringTask = AutomationAuthoringTask.Subflows;
-            _showInterface = true;
+            _authoringTask = AutomationAuthoringTask.Interface;
             if (preview is AutomationSubflowPreviewOutcome.Invalid invalid)
             {
                 ShowValidation(invalid.Errors, "Correct the subflow before publishing.");
@@ -332,60 +259,5 @@ public partial class AutomationEditorPage
         {
             _busy = false;
         }
-    }
-
-    private void InsertInvocation()
-    {
-        if (_editor is null || _librarySubflow is null)
-        {
-            return;
-        }
-        var node = AutomationEditorNode.FromDefinition(
-            AutomationSubflowDefinitions.Invocation(
-                _librarySubflow,
-                _librarySubflow.Interface.Inputs.ToImmutableDictionary(
-                    port => port.Id,
-                    port => AutomationEditorNode.DefaultFixtureValue(port.ValueType)
-                )
-            ),
-            _catalogService,
-            new(new(160), new(180)),
-            _librarySubflow.Graph.Name
-        );
-        _editor.Nodes.Add(node);
-        SetSingleNodeSelection(node.Id);
-        EditorChanged();
-    }
-
-    private void UpdateInvocationInterface()
-    {
-        if (
-            _selectedNode?.Subflow is not AutomationSubflowInvocationConfiguration previous
-            || _librarySubflow is null
-            || previous.SubflowId != _librarySubflow.SubflowId
-            || _selectedNode.Definition.Id.Value != AutomationSubflowDefinitions.Invoke
-        )
-        {
-            return;
-        }
-        _selectedNode.ReplaceSubflowDefinition(
-            AutomationSubflowDefinitions.Invocation(
-                _librarySubflow,
-                previous
-                    .FixedInputs.Where(pair =>
-                        _librarySubflow.Interface.Inputs.Any(port =>
-                            port.Id == pair.Key
-                            && previous.Interface.Inputs.Any(old =>
-                                old.Id == port.Id
-                                && old.ValueType == port.ValueType
-                                && old.Nullability == port.Nullability
-                            )
-                        )
-                    )
-                    .ToImmutableDictionary(pair => pair.Key, pair => pair.Value.Value)
-            ),
-            _catalogService
-        );
-        EditorChanged();
     }
 }

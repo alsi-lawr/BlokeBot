@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using BlokeBot.Core.Components.Layout;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
@@ -11,7 +10,7 @@ public partial class AutomationEditorPage
     {
         None,
         Scenarios,
-        Subflows,
+        Interface,
         Extraction,
     }
 
@@ -28,13 +27,13 @@ public partial class AutomationEditorPage
     private ImmutableArray<AutomationTraceSummary> _traceHeaders = [];
     private int _traceOffset;
     private long _traceLoad;
-    private static readonly SegmentedTabItem[] _authoringTabs =
-    [
-        new("scenarios", "Scenarios"),
-        new("subflows", "Subflows"),
-    ];
-    private string _authoringKey =>
-        _authoringTask == AutomationAuthoringTask.Scenarios ? "scenarios" : "subflows";
+    private string _authoringTitle =>
+        _authoringTask switch
+        {
+            AutomationAuthoringTask.Scenarios => "Scenarios",
+            AutomationAuthoringTask.Extraction => "Extract selection",
+            _ => "Subflow interface",
+        };
 
     private Task Handle_authoringKeyAsync(KeyboardEventArgs args) =>
         args.Key == "Escape" ? CloseAuthoringAsync() : Task.CompletedTask;
@@ -43,9 +42,6 @@ public partial class AutomationEditorPage
         _callerDetails.GetValueOrDefault(caller) is { } details
             ? $"{details.Name} · {details.NodeName}"
             : $"Unavailable caller · {caller.NodeId.Value}";
-
-    private Task SelectAuthoringTabAsync(string key) =>
-        key == "scenarios" ? OpenScenariosAsync() : OpenSubflowsAsync();
 
     private async Task OpenAuthoringAsync(AutomationAuthoringTask task)
     {
@@ -58,7 +54,7 @@ public partial class AutomationEditorPage
                 {
                     AutomationAuthoringTask.Scenarios => "[data-automation-test-flow]",
                     AutomationAuthoringTask.Extraction => "[data-automation-extract-selection]",
-                    _ => "[data-automation-authoring-opener]",
+                    _ => "[data-automation-interface-opener]",
                 }
             );
         }
@@ -84,9 +80,7 @@ public partial class AutomationEditorPage
         _draftRevision++;
         _traceLoad++;
         _extractionQuery++;
-        _subflowQuery++;
-        _subflowPage = new([], null);
-        _librarySubflow = null;
+        ResetCallSelector();
         _scenarioCancellation?.Cancel();
         _scenario = null;
         _scenarioFields = [];

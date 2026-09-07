@@ -1,0 +1,46 @@
+<section class="automation-call-target" aria-label="Subflow target">
+    <h3>Subflow</h3>
+    @if (Loading)
+    {
+        <p role="status">Loading subflow…</p>
+    }
+    else if (Name is not null)
+    {
+        <div class="automation-call-target-heading"><strong>@Name</strong><button class="btn-secondary" type="button" @onclick="Change">Change</button></div>
+    }
+    else
+    {
+        <p>@(HasTarget ? "Subflow unavailable" : "Not selected")</p>
+    }
+    @if (InterfaceChanged)
+    {
+        <p class="automation-field-error" role="alert">Update this call's interface and inputs.</p>
+        <button class="btn-secondary" type="button" data-automation-update-call-interface @onclick="UpdateInterface">Update inputs and outputs</button>
+    }
+    @if (Message is not null)
+    {
+        <p class="automation-field-error" role="alert">@Message</p>
+    }
+    @if (Choosing)
+    {
+        <AutomationSubflowList Page="Page" Search="@Search" Offset="Offset" Loading="PageLoading" SearchLabel="Search subflow targets" ResultsLabel="Subflow targets" SearchChanged="SearchChanged" PageChanged="PageChanged" Selected="Selected" />
+    }
+</section>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public bool HasTarget { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool Choosing { get; set; }
+    [Parameter] public bool InterfaceChanged { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter, EditorRequired] public required AutomationSubflowLibraryPage Page { get; set; }
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public int Offset { get; set; }
+    [Parameter] public bool PageLoading { get; set; }
+    [Parameter] public EventCallback Change { get; set; }
+    [Parameter] public EventCallback UpdateInterface { get; set; }
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+    [Parameter] public EventCallback<AutomationSubflowId> Selected { get; set; }
+}

@@ -42,7 +42,7 @@
     text-transform: uppercase;
 }
 
-.automation-flow-rail-heading button,
+.automation-flow-rail-heading > button,
 .automation-position-controls button,
 .automation-icon-button {
     align-items: center;

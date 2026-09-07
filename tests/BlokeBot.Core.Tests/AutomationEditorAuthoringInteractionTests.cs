@@ -30,16 +30,18 @@ public sealed partial class AutomationEditorInteractionTests
             call.Identifier == "focusAuthoring"
         );
         fixture
-            .Page.Find(".automation-authoring-tabs [aria-selected=true]")
+            .Page.Find(".automation-flow-rail-heading [aria-selected=true]")
             .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
         fixture.Page.WaitForAssertion(() =>
-            fixture.Page.Find("[data-automation-subflow-library]").ShouldNotBeNull()
+            fixture
+                .Page.FindComponent<AutomationFlowRail>()
+                .Instance.Library.ShouldBe(AutomationLibraryKind.Subflows)
         );
         fixture
             .Context.JSInterop.Invocations.Count(call => call.Identifier == "focusAuthoring")
             .ShouldBe(paneFocusCalls);
         fixture
-            .Page.Find(".automation-authoring-tabs [aria-selected=true]")
+            .Page.Find("[data-automation-authoring]")
             .KeyDown(new KeyboardEventArgs { Key = "Escape" });
         fixture.Page.WaitForAssertion(() =>
             fixture.Context.JSInterop.Invocations.ShouldContain(call =>
@@ -123,7 +125,6 @@ public sealed partial class AutomationEditorInteractionTests
     {
         await using var fixture = await AutomationEditorPageFixture.CreateAsync();
         var page = fixture.Page;
-        page.Find("[data-automation-authoring-opener]").Click();
         page.Find("[data-automation-new-subflow]").Click();
         page.WaitForAssertion(() =>
             page.Find("[data-automation-subflow-editor]").ShouldNotBeNull()
@@ -201,7 +202,11 @@ public sealed partial class AutomationEditorInteractionTests
                 )
             ).ShouldBeOfType<AutomationSubflowPublishOutcome.Published>();
         }
-        fixture.Page.Find("[data-automation-authoring-opener]").Click();
+        await fixture.Page.InvokeAsync(() =>
+            fixture
+                .Page.FindComponent<AutomationFlowRail>()
+                .Instance.LibraryChanged.InvokeAsync(AutomationLibraryKind.Subflows)
+        );
         fixture.Page.WaitForAssertion(() =>
             fixture
                 .Page.FindAll(".automation-subflow-library button")
@@ -211,11 +216,11 @@ public sealed partial class AutomationEditorInteractionTests
         fixture.Page.WaitForAssertion(() =>
             fixture.Page.FindAll(".automation-subflow-library button").Count.ShouldBe(1)
         );
-        fixture.Page.Find("[data-automation-subflow-search]").Change("not-found");
+        fixture.Page.Find(".automation-flow-rail input[type=search]").Input("not-found");
         fixture.Page.WaitForAssertion(() =>
             fixture.Page.FindAll(".automation-subflow-library button").ShouldBeEmpty()
         );
-        fixture.Page.Find("[data-automation-subflow-search]").Change("Findable");
+        fixture.Page.Find(".automation-flow-rail input[type=search]").Input("Findable");
         fixture.Page.WaitForAssertion(() =>
             fixture
                 .Page.FindAll(".automation-subflow-library button")
@@ -231,7 +236,6 @@ public sealed partial class AutomationEditorInteractionTests
             interceptors: [gate]
         );
         var page = fixture.Page;
-        page.Find("[data-automation-authoring-opener]").Click();
         page.Find("[data-automation-new-subflow]").Click();
         page.Find("[data-automation-review-subflow]").Click();
         page.WaitForAssertion(() =>
