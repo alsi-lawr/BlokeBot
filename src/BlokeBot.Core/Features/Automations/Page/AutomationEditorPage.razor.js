@@ -1,3 +1,4 @@
+import { revealNode } from "./AutomationFlowCanvas.js";
 let dirtyNavigation = null;
 let fullscreenState = null;
 let historyKeyboard = null;
@@ -159,4 +160,36 @@ export async function toggleBrowserFullscreen() {
 
 export function focusInspector() {
     document.querySelector("[data-automation-inspector]")?.focus({ preventScroll: true });
+}
+
+export function focusAuthoring() {
+    document.querySelector("[data-automation-authoring]")?.focus({ preventScroll: true });
+}
+
+let authoringOpener = null;
+
+export function rememberAuthoringOpener(fallbackSelector) {
+    const active = document.activeElement;
+    authoringOpener = active instanceof HTMLButtonElement && !active.closest("[data-automation-authoring]")
+        ? active : document.querySelector(fallbackSelector);
+}
+
+export function focusAuthoringOpener() {
+    if (authoringOpener?.isConnected) authoringOpener.focus({ preventScroll: true });
+}
+
+export function revealTraceNode(nodeId) {
+    const canvas = document.querySelector("[data-automation-canvas]");
+    if (canvas !== null) revealNode(canvas, nodeId);
+}
+
+export function revealSelectedTrace() {
+    const row = document.querySelector('[data-trace-sequence][aria-current="true"]');
+    const list = row?.closest('.automation-trace-events');
+    if (!(row instanceof HTMLElement) || !(list instanceof HTMLElement)) return;
+    const bounds = row.getBoundingClientRect();
+    const viewport = list.getBoundingClientRect();
+    if (bounds.top < viewport.top || bounds.bottom > viewport.bottom) {
+        list.scrollTop += bounds.top - viewport.top - (viewport.height - bounds.height) / 2;
+    }
 }

@@ -11,3 +11,5 @@
 @import "./automation-editor/inspector-theme.css";
 @import "./automation-editor/picker.css";
 @import "./automation-editor/list-theme.css";
+
+@import "./automation-editor/authoring.css";

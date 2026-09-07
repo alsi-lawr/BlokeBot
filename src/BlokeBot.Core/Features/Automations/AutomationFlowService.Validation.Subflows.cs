@@ -13,20 +13,27 @@ public sealed partial class AutomationFlowService
         HostFeatureFlags enabledFeatures,
         AutomationGraphAdmission admission,
         ImmutableArray<AutomationGraphError>.Builder errors,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationSubflowRevision? preparedCandidate
     )
     {
         if (draft.Nodes.Any(node => node.Definition.TypeId == AutomationSubflowDefinitions.Invoke))
         {
             errors.AddRange(
-                await AutomationSubflowStore.ValidatePinsAsync(db, draft, cancellationToken)
+                await AutomationSubflowStore.ValidatePinsAsync(
+                    db,
+                    draft,
+                    cancellationToken,
+                    preparedCandidate
+                )
             );
             var closure = await AutomationSubflowStore.LoadClosureAsync(
                 db,
                 draft.HostId,
                 AutomationSubflowStore.Pins(draft.Nodes).Select(pin => pin.RevisionId),
                 publishing,
-                cancellationToken
+                cancellationToken,
+                preparedCandidate
             );
             if (closure is AutomationSubflowClosureOutcome.Invalid invalid)
             {

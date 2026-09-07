@@ -27,7 +27,7 @@ public static class AutomationSubflowDefinitions
         ImmutableDictionary<AutomationPortId, AutomationValue>? fixedInputs = null
     ) => Create(definitionId, contract, null, fixedInputs);
 
-    private static PersistedAutomationNodeDefinition Create(
+    internal static PersistedAutomationNodeDefinition Create(
         string id,
         AutomationSubflowInterface contract,
         AutomationSubflowRevisionId? revision,

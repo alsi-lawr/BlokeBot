@@ -57,6 +57,12 @@ public partial class AutomationEditorPage
 
     private async Task SaveDirtyTransitionAsync()
     {
+        if (_editor?.Subflow is not null)
+        {
+            CancelDirtyTransition();
+            await ReviewSubflowAsync();
+            return;
+        }
         var transition = _pendingTransition;
         if (transition is null)
         {
@@ -103,6 +109,7 @@ public partial class AutomationEditorPage
 
     private void ResetTransientState()
     {
+        ResetAuthoring();
         CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];

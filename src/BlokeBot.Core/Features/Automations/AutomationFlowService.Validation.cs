@@ -54,12 +54,29 @@ public sealed partial class AutomationFlowService
             draft.Id
         );
 
+    internal Task<AutomationGraphValidation> ValidateExtractionReplacementAsync(
+        AutomationFlowDraft draft,
+        AutomationSubflowInterface? callerInterface,
+        AutomationSubflowId? callerId,
+        AutomationSubflowRevision preparedCandidate,
+        CancellationToken cancellationToken
+    ) =>
+        ValidateAsync(
+            draft,
+            AutomationGraphAdmission.Saved,
+            cancellationToken,
+            callerInterface,
+            callerId,
+            preparedCandidate: preparedCandidate
+        );
+
     private async Task<AutomationGraphValidation> ValidateAsync(
         AutomationFlowDraft draft,
         AutomationGraphAdmission admission,
         CancellationToken cancellationToken,
         AutomationSubflowInterface? subflowInterface = null,
-        AutomationSubflowId? publishing = null
+        AutomationSubflowId? publishing = null,
+        AutomationSubflowRevision? preparedCandidate = null
     )
     {
         if (admission != AutomationGraphAdmission.Frozen)
@@ -336,7 +353,8 @@ public sealed partial class AutomationFlowService
                 enabledFeatures,
                 admission,
                 errors,
-                cancellationToken
+                cancellationToken,
+                preparedCandidate
             );
             errors.AddRange(
                 CapabilityUnavailableErrors(

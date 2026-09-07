@@ -23,6 +23,39 @@ public sealed partial class AutomationEditorNode
 
     private JsonElement ConfigurationJson()
     {
+        if (Subflow is not null)
+        {
+            var values = Subflow
+                .FixedInputs.ToImmutableDictionary(pair => pair.Key, pair => pair.Value.Value)
+                .ToBuilder();
+            foreach (
+                var port in Definition.Inputs.Where(port =>
+                    port.ValueType != AutomationPortValueType.Flow
+                )
+            )
+            {
+                var field = new AutomationConfigurationFieldId(port.Id.Value);
+                var previous = values.TryGetValue(port.Id, out var original)
+                    ? DisplayFixedValue(original)
+                    : DefaultValue(Definition.Configuration.Single(item => item.Id == field));
+                if (_values[field] != previous)
+                {
+                    values[port.Id] = ParseFixedValue(
+                        _values[field],
+                        port.ValueType,
+                        port.Nullability
+                    );
+                }
+            }
+            return AutomationSubflowDefinitions
+                .Create(
+                    Definition.Id.Value,
+                    Subflow.Interface,
+                    Subflow.RevisionId,
+                    values.ToImmutable()
+                )
+                .Configuration;
+        }
         if (_transform is not null)
         {
             return TransformConfigurationJson();

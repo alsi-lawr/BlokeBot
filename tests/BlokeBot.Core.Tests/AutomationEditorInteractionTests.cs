@@ -15,7 +15,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class AutomationEditorInteractionTests
+public sealed partial class AutomationEditorInteractionTests
 {
     private const string _focusInterop = "Blazor._internal.domWrapper.focus";
 
@@ -1410,35 +1410,38 @@ public sealed class AutomationEditorInteractionTests
         private AutomationEditorPageFixture(
             SqliteBlokeBotDbFactory database,
             BunitContext context,
-            IRenderedComponent<AutomationEditorPage> page
+            IRenderedComponent<AutomationEditorPage> page,
+            Bunit.TestDoubles.BunitAuthorizationContext authorization
         )
         {
-            _database = database;
-            _context = context;
+            Database = database;
+            Context = context;
             Page = page;
+            Authorization = authorization;
         }
 
-        private readonly SqliteBlokeBotDbFactory _database;
-
-        private readonly BunitContext _context;
-
+        internal Bunit.TestDoubles.BunitAuthorizationContext Authorization { get; }
         internal IRenderedComponent<AutomationEditorPage> Page { get; }
+        internal BunitContext Context { get; }
+        internal SqliteBlokeBotDbFactory Database { get; }
 
-        internal int FocusCalls => AutomationEditorInteractionTests.FocusCalls(_context);
+        internal int FocusCalls => AutomationEditorInteractionTests.FocusCalls(Context);
 
         internal async Task<string> PersistedFlowNameAsync()
         {
-            await using var db = await _database.CreateDbContextAsync();
+            await using var db = await Database.CreateDbContextAsync();
             return await db.AutomationFlows.Select(static flow => flow.Name).SingleAsync();
         }
 
         internal static async Task<AutomationEditorPageFixture> CreateAsync(
-            bool includeUnavailableFlow = false
+            bool includeUnavailableFlow = false,
+            IEnumerable<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>? interceptors = null
         )
         {
-            var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var database = await SqliteBlokeBotDbFactory.CreateAsync([.. interceptors ?? []]);
             var hostId = await SeedHostAsync(database);
-            var context = UiTestContextFactory.Create(database, hostId);
+            var ui = UiTestContextFactory.CreateWithAuthorization(database, hostId);
+            var context = ui.Context;
             _ = context.Services.AddSingleton<IOverlayCueAdmissionService>(
                 new UnavailableOverlayCueAdmissionService()
             );
@@ -1458,7 +1461,7 @@ public sealed class AutomationEditorInteractionTests
             page.WaitForAssertion(() =>
                 page.FindComponent<AutomationFlowCanvas>().Instance.Nodes.Count.ShouldBe(2)
             );
-            return new(database, context, page);
+            return new(database, context, page, ui.Authorization);
         }
 
         private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
@@ -1553,8 +1556,8 @@ public sealed class AutomationEditorInteractionTests
 
         public async ValueTask DisposeAsync()
         {
-            _context.Dispose();
-            await _database.DisposeAsync();
+            Context.Dispose();
+            await Database.DisposeAsync();
         }
     }
 
