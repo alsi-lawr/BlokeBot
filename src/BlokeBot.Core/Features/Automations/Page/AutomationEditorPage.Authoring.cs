@@ -10,7 +10,7 @@ public partial class AutomationEditorPage
     {
         None,
         Scenarios,
-        Interface,
+        SubflowReview,
         Extraction,
     }
 
@@ -32,7 +32,7 @@ public partial class AutomationEditorPage
         {
             AutomationAuthoringTask.Scenarios => "Scenarios",
             AutomationAuthoringTask.Extraction => "Extract selection",
-            _ => "Subflow interface",
+            _ => "Subflow review",
         };
 
     private Task Handle_authoringKeyAsync(KeyboardEventArgs args) =>
@@ -46,6 +46,10 @@ public partial class AutomationEditorPage
     private async Task OpenAuthoringAsync(AutomationAuthoringTask task)
     {
         var opening = _authoringTask == AutomationAuthoringTask.None;
+        _authoringTask = task;
+        _nodeLibraryOpen = false;
+        _inspectorFocusMode = null;
+        _focusAuthoring = opening;
         if (opening && _pageModule is not null)
         {
             await _pageModule.InvokeVoidAsync(
@@ -54,14 +58,10 @@ public partial class AutomationEditorPage
                 {
                     AutomationAuthoringTask.Scenarios => "[data-automation-test-flow]",
                     AutomationAuthoringTask.Extraction => "[data-automation-extract-selection]",
-                    _ => "[data-automation-interface-opener]",
+                    _ => "[data-automation-save-flow]",
                 }
             );
         }
-        _authoringTask = task;
-        _nodeLibraryOpen = false;
-        _inspectorFocusMode = null;
-        _focusAuthoring = opening;
         await InvokeAsync(StateHasChanged);
     }
 

@@ -20,7 +20,6 @@ public partial class AutomationEditorPage
     private AutomationSubflowId _extractionId;
     private string _extractionName = "New subflow";
     private AutomationEditorDraftSnapshot? _extractionSource;
-    private AutomationSubflowInterface _currentInterface => InterfaceFor(_editor);
 
     private static AutomationSubflowInterface InterfaceFor(AutomationEditorState? editor) =>
         editor
@@ -65,17 +64,17 @@ public partial class AutomationEditorPage
             ClearSelection();
             ResetCanvasViewport();
             _libraryKind = AutomationLibraryKind.Subflows;
-            await OpenInterfaceAsync();
+            SelectSubflowEntry();
             await LoadSubflowPageAsync(0);
         });
 
-    private void LoadSubflowEditor(AutomationSubflowRevision revision)
+    private bool LoadSubflowEditor(AutomationSubflowRevision revision)
     {
         var restored = RestoreAuthoringGraph(revision.Graph);
         if (restored is null)
         {
             _feedback = "A node provider for this subflow is unavailable.";
-            return;
+            return false;
         }
         ResetAuthoring();
         _editor = restored;
@@ -84,6 +83,24 @@ public partial class AutomationEditorPage
         _hasChanges = false;
         ClearSelection();
         ResetCanvasViewport();
+        SelectSubflowEntry();
+        return true;
+    }
+
+    private void SelectSubflowEntry()
+    {
+        _nodeLibraryOpen = false;
+        var entries = _editor
+            ?.Nodes.Where(node => node.Definition.Id.Value == AutomationSubflowDefinitions.Entry)
+            .ToArray();
+        if (entries is not [var entry])
+        {
+            return;
+        }
+        SetSingleNodeSelection(entry.Id);
+        _disclosedNodeId = entry.Id;
+        _mobileInspectorOpen = true;
+        _focusInspectorAfterRender = true;
     }
 
     private AutomationEditorState? RestoreAuthoringGraph(AutomationFlowDraft draft)
@@ -113,9 +130,43 @@ public partial class AutomationEditorPage
         EditorChanged();
     }
 
-    private void ChangeSubflowInterface(AutomationSubflowInterface contract)
+    private void ChangeBoundaryPorts(AutomationBoundaryPortEdit edit)
     {
-        if (_editor?.Subflow is null)
+        if (
+            _editor?.Subflow is null
+            || !ReferenceEquals(_selectedNode, edit.Node)
+            || !_editor.Nodes.Contains(edit.Node)
+        )
+        {
+            return;
+        }
+        var entries = _editor
+            .Nodes.Where(node => node.Definition.Id.Value == AutomationSubflowDefinitions.Entry)
+            .ToArray();
+        var exits = _editor
+            .Nodes.Where(node => node.Definition.Id.Value == AutomationSubflowDefinitions.Exit)
+            .ToArray();
+        if (
+            entries is not [var entry]
+            || exits is not [var exit]
+            || entry.Subflow is not AutomationSubflowBoundaryConfiguration
+            || exit.Subflow is not AutomationSubflowBoundaryConfiguration
+        )
+        {
+            _feedback = "The subflow needs one valid Entry and Exit.";
+            _operationFailed = true;
+            return;
+        }
+        var contract = entry.Subflow.Interface;
+        if (ReferenceEquals(edit.Node, entry))
+        {
+            contract = contract with { Inputs = edit.Ports };
+        }
+        else if (ReferenceEquals(edit.Node, exit))
+        {
+            contract = contract with { Outputs = edit.Ports };
+        }
+        else
         {
             return;
         }
@@ -125,19 +176,16 @@ public partial class AutomationEditorPage
             _operationFailed = true;
             return;
         }
-        foreach (
-            var node in _editor.Nodes.Where(node =>
-                node.Definition.Id.Value
-                    is AutomationSubflowDefinitions.Entry
-                        or AutomationSubflowDefinitions.Exit
-            )
-        )
-        {
-            node.ReplaceSubflowDefinition(
-                AutomationSubflowDefinitions.Boundary(node.Definition.Id.Value, contract),
-                _catalogService
-            );
-        }
+        var entryDefinition = AutomationSubflowDefinitions.Boundary(
+            AutomationSubflowDefinitions.Entry,
+            contract
+        );
+        var exitDefinition = AutomationSubflowDefinitions.Boundary(
+            AutomationSubflowDefinitions.Exit,
+            contract
+        );
+        entry.ReplaceSubflowDefinition(entryDefinition, _catalogService);
+        exit.ReplaceSubflowDefinition(exitDefinition, _catalogService);
         EditorChanged();
     }
 
@@ -145,7 +193,7 @@ public partial class AutomationEditorPage
         new(
             editor.Subflow!.Id,
             editor.Subflow.Description,
-            _currentInterface,
+            InterfaceFor(editor),
             editor.Draft(new(HostId))
         );
 
@@ -180,7 +228,11 @@ public partial class AutomationEditorPage
             _subflowPreview = preview as AutomationSubflowPreviewOutcome.Ready;
             _previewRevision = version;
             _callerOffset = 0;
-            _authoringTask = AutomationAuthoringTask.Interface;
+            await OpenAuthoringAsync(AutomationAuthoringTask.SubflowReview);
+            if (host != HostId || !ReferenceEquals(editor, _editor) || version != _draftRevision)
+            {
+                return;
+            }
             if (preview is AutomationSubflowPreviewOutcome.Invalid invalid)
             {
                 ShowValidation(invalid.Errors, "Correct the subflow before publishing.");

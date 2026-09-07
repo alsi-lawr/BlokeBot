@@ -1,0 +1,79 @@
+@using System.Collections.Immutable
+
+@{
+    var inputs = Node.Definition.Id.Value == AutomationSubflowDefinitions.Entry;
+    var ports = CurrentPorts;
+}
+    <section class="automation-authoring-section">
+    <h3>@(inputs ? "Inputs" : "Outputs")</h3>
+        @for (var i = 0; i < ports.Length; i++)
+        {
+            var index = i;
+            var port = ports[index];
+            <div class="automation-interface-port" @key="index">
+                <div class="automation-interface-fields">
+                <label class="field">
+                <span class="field__label">Port name</span>
+                <input class="field__input" @bind:get="port.Id.Value" @bind:set="value => Update(port.Id, current => current with { Id = new(value), Name = value, Description = value })" />
+                </label>
+                <label class="field">
+                <span class="field__label">Type</span>
+                <select class="field__input" value="@port.ValueType" @onchange="args => ChangeType(port.Id, args)">@foreach (var type in _types) { <option value="@type">@type</option> }</select>
+                </label>
+                </div>
+                <div class="automation-port-options">
+                <label>
+                <input type="checkbox" checked="@(port.Nullability == AutomationPortNullability.Nullable)" @onchange="args => Update(port.Id, current => current with { Nullability = args.Value is true ? AutomationPortNullability.Nullable : AutomationPortNullability.NonNullable })" /> Nullable</label>
+                <label>
+                <input type="checkbox" checked="@(port.Sensitivity == AutomationDataSensitivity.Sensitive)" @onchange="args => Update(port.Id, current => current with { Sensitivity = args.Value is true ? AutomationDataSensitivity.Sensitive : AutomationDataSensitivity.Safe })" /> Sensitive</label>
+                <button class="btn-secondary" type="button" aria-label="@($"Remove {port.Name}")" @onclick="() => Remove(port.Id)">Remove</button>
+                </div>
+            </div>
+        }
+        <button class="btn-secondary" type="button" disabled="@(ports.Length >= 32)" @onclick="() => Add(inputs)">Add @(inputs ? "input" : "output")</button>
+    @if (_failure is { } failure)
+    {
+        <p class="automation-field-error" role="alert">@(failure == EditFailure.UnavailablePort ? "This port changed or was removed." : "Use unique valid port names and types.")</p>
+    }
+    </section>
+
+@code {
+    [Parameter, EditorRequired] public required AutomationEditorNode Node { get; set; }
+    [Parameter] public EventCallback<AutomationBoundaryPortEdit> Changed { get; set; }
+    private enum EditFailure { InvalidDeclaration, UnavailablePort }
+    private EditFailure? _failure;
+    private ImmutableArray<AutomationPortMetadata> CurrentPorts => Node.Subflow is { } boundary
+        ? Node.Definition.Id.Value == AutomationSubflowDefinitions.Entry ? boundary.Interface.Inputs : boundary.Interface.Outputs
+        : [];
+    private static readonly AutomationPortValueType[] _types = Enum.GetValues<AutomationPortValueType>().Where(type => type != AutomationPortValueType.Flow).ToArray();
+    private async Task ChangePortsAsync(ImmutableArray<AutomationPortMetadata> ports)
+    {
+        await Changed.InvokeAsync(new(Node, ports));
+        _failure = CurrentPorts.SequenceEqual(ports) ? null : EditFailure.InvalidDeclaration;
+    }
+    private Task ChangePortAsync(AutomationPortId id, Func<ImmutableArray<AutomationPortMetadata>, int, ImmutableArray<AutomationPortMetadata>> change)
+    {
+        var ports = CurrentPorts;
+        for (var index = 0; index < ports.Length; index++)
+        {
+            if (ports[index].Id == id)
+            {
+                return ChangePortsAsync(change(ports, index));
+            }
+        }
+        _failure = EditFailure.UnavailablePort;
+        return Task.CompletedTask;
+    }
+    private Task Update(AutomationPortId id, Func<AutomationPortMetadata, AutomationPortMetadata> change) => ChangePortAsync(id, (ports, index) => ports.SetItem(index, change(ports[index])));
+    private Task Remove(AutomationPortId id) => ChangePortAsync(id, (ports, index) => ports.RemoveAt(index));
+    private Task ChangeType(AutomationPortId id, ChangeEventArgs args) => Enum.TryParse<AutomationPortValueType>(args.Value?.ToString(), out var type) ? Update(id, current => current with { ValueType = type }) : Task.CompletedTask;
+    private Task Add(bool inputs)
+    {
+        var ports = CurrentPorts;
+        var prefix = inputs ? "input" : "output";
+        var sequence = 1;
+        while (ports.Any(port => port.Id.Value == $"{prefix}-{sequence}")) sequence++;
+        var name = $"{prefix}-{sequence}";
+        return ChangePortsAsync(ports.Add(new(new(name), name, name, AutomationPortValueType.Text)));
+    }
+}

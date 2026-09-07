@@ -28,7 +28,7 @@ else
                            title="Edit node name"
                            @oninput="args => SetDisplayAliasAsync(args.Value)" />
                     <span>@Node.Definition.Display.Name</span>
-                    @if (Node.Definition.Id.Value != AutomationSubflowDefinitions.Invoke) { <small class="automation-inspector-purpose">@Node.Definition.Display.Description</small> }
+                    @if (Node.Definition.Id.Value != AutomationSubflowDefinitions.Invoke && !_isSubflowBoundary) { <small class="automation-inspector-purpose">@Node.Definition.Display.Description</small> }
                 </div>
             </div>
             <button class="automation-icon-button" type="button" aria-label="Close Inspector" title="Close Inspector" @onclick="ClearSelection"><AutomationIcon Name="close" /></button>
@@ -37,6 +37,10 @@ else
         @if (Node.Definition.Id.Value == AutomationSubflowDefinitions.Invoke)
         {
             @CallSubflowSelector
+        }
+        else if (_isSubflowBoundary)
+        {
+            @BoundaryDeclarations
         }
         else
         {
@@ -73,15 +77,19 @@ else
             </section>
         }
 
+        @if (_isSubflowExit && Node.Definition.Inputs.Any(IsDataPort))
+        {
+            <h3 class="automation-return-values-heading">Return values</h3>
+        }
         @foreach (var input in Node.Definition.Inputs.Where(IsDataPort))
         {
             var fieldId = input.BindingFieldId!.Value;
             var binding = Node.Binding(fieldId);
             var edge = IncomingDataEdge(input.Id);
             var issue = edge is null ? null : AutomationConnections.Issue(edge, Nodes);
-            <section class="automation-input-editor" @key="input.Id" aria-label="@input.Name input">
-                <div class="automation-input-heading"><h3>Input · @input.Name</h3><span>@AutomationConnections.TypeLabel(input) · @(input.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</span></div>
-                <div class="automation-binding-mode-tabs" role="group" aria-label="@input.Name input choice">
+            <section class="automation-input-editor" @key="input.Id" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")}")">
+                <div class="automation-input-heading"><h3>@(_isSubflowExit ? input.Name : $"Input · {input.Name}")</h3><span>@AutomationConnections.TypeLabel(input) · @(input.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</span></div>
+                <div class="automation-binding-mode-tabs" role="group" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")} choice")">
                     @foreach (var mode in Enum.GetValues<AutomationInputBindingMode>())
                     {
                         <span class="automation-binding-mode-option">
@@ -131,7 +139,7 @@ else
                 {
                     @if (edge is null)
                     {
-                        <div class="automation-binding-card"><strong>No source</strong><span>Use another node for this input.</span></div>
+                        <div class="automation-binding-card"><strong>No source</strong><span>@(_isSubflowExit ? "Choose a return value source." : "Use another node for this input.")</span></div>
                     }
                     else
                     {
@@ -160,8 +168,8 @@ else
 
         @if (Node.UnmatchedSubflowInputs.Any())
         {
-            <section class="automation-inspector-section" aria-label="Unmatched inputs">
-                <h3>Unmatched inputs</h3>
+            <section class="automation-inspector-section" aria-label="@(_isSubflowExit ? "Unmatched return values" : "Unmatched inputs")">
+                <h3>@(_isSubflowExit ? "Unmatched return values" : "Unmatched inputs")</h3>
                 @foreach (var field in Node.UnmatchedSubflowInputs.ToArray())
                 {
                     <div class="automation-unmatched-input" @key="field">
@@ -174,7 +182,7 @@ else
                         {
                             <span>@binding.Mode</span>@if (binding.Expression is { } expression) { <code>@expression.Source</code> }
                         }
-                        <button class="automation-danger-button" type="button" @onclick="() => RemoveSubflowInputAsync(field)">Remove input</button>
+                        <button class="automation-danger-button" type="button" @onclick="() => RemoveSubflowInputAsync(field)">@(_isSubflowExit ? "Remove return value" : "Remove input")</button>
                     </div>
                 }
             </section>
