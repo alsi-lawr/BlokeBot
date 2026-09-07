@@ -34,6 +34,12 @@ internal interface IAutomationPureCheckpointStore
         CancellationToken cancellationToken
     );
 
+    ValueTask RecordInputsAsync(
+        AutomationRuntimeSerialization.PersistedNode node,
+        ImmutableDictionary<AutomationPortId, AutomationResolvedValue> inputs,
+        CancellationToken cancellationToken
+    );
+
     ValueTask<bool> CompleteAsync(
         AutomationRuntimeSerialization.PersistedNode node,
         ImmutableDictionary<AutomationPortId, AutomationResolvedValue> outputs,
@@ -358,6 +364,8 @@ internal sealed class AutomationDataResolver(
             await checkpoints.FailAsync(producer, "output-invalid", cancellationToken);
             return null;
         }
+
+        await checkpoints.RecordInputsAsync(producer, resolvedInputs.PortValues, cancellationToken);
 
         AutomationPureNodeResult result;
         try

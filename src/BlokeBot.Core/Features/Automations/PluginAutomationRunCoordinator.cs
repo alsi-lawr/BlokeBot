@@ -45,6 +45,30 @@ public sealed class PluginAutomationRunCoordinator(
             run.Status = AutomationFlowRunStatus.Invalidated;
             run.CompletedAtUtc = now;
             run.ExecutionLeaseId = null;
+            await AutomationTraceStore.AppendAsync(
+                db,
+                run.Id,
+                AutomationTraceRedaction.Event(
+                    run.Id,
+                    AutomationTraceEventKind.Cancellation,
+                    now,
+                    outcome: AutomationTraceOutcome.Invalidated
+                ),
+                now,
+                cancellationToken
+            );
+            await AutomationTraceStore.AppendAsync(
+                db,
+                run.Id,
+                AutomationTraceRedaction.Event(
+                    run.Id,
+                    AutomationTraceEventKind.Terminal,
+                    now,
+                    outcome: AutomationTraceOutcome.Invalidated
+                ),
+                now,
+                cancellationToken
+            );
             foreach (
                 var node in run.NodeRuns.Where(static node =>
                     node.Status

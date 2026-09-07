@@ -12,7 +12,7 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationRuntimeTests
 {
     [Test]
-    public async Task Scenario_SavedReplayAndUnsavedDraftUseFixedInputsWithoutAnyDatabaseWrites()
+    public async Task Scenario_SavedReplayAndUnsavedDraftUseFixedInputsWithOnlyTraceWrites()
     {
         var writes = new ScenarioWriteGuard();
         var entropy = new CountingIntegerEntropy(99);
@@ -86,7 +86,8 @@ public sealed partial class AutomationRuntimeTests
         var restarted = new AutomationScenarioService(
             fixture.Database,
             fixture.Catalog,
-            fixture.Flows
+            fixture.Flows,
+            fixture.Clock
         );
         var second = await restarted.RunSavedAsync(
             new(fixture.HostId),
@@ -94,7 +95,25 @@ public sealed partial class AutomationRuntimeTests
             saved.Id.Value,
             CancellationToken.None
         );
-        JsonSerializer.Serialize(second).ShouldBe(JsonSerializer.Serialize(first));
+        var replayed = second.ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
+        var original = first.ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
+        replayed
+            .Nodes.Select(node => (node.NodeId, node.State, node.OutcomeCode, node.VirtualTimeUtc))
+            .ShouldBe(
+                original.Nodes.Select(node =>
+                    (node.NodeId, node.State, node.OutcomeCode, node.VirtualTimeUtc)
+                )
+            );
+        foreach (var (replayNode, originalNode) in replayed.Nodes.Zip(original.Nodes))
+        {
+            replayNode
+                .ResolvedInputs.Select(value => (value.PortId, value.ValueType, value.DisplayValue))
+                .ShouldBe(
+                    originalNode.ResolvedInputs.Select(value =>
+                        (value.PortId, value.ValueType, value.DisplayValue)
+                    )
+                );
+        }
         var completed = first.ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         completed
             .Nodes.Select(node => node.NodeId)
@@ -134,6 +153,7 @@ public sealed partial class AutomationRuntimeTests
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
         (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
         writes.Writes.ShouldBe(0);
+        writes.TraceWrites.ShouldBeGreaterThan(0);
         entropy.Calls.ShouldBe(0);
         fixture.Chat.Calls.ShouldBe(0);
     }
@@ -424,7 +444,7 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task Scenario_RejectsUnsupportedLaterNodesBeforeEvaluationAndCancellationLeavesNoWrites()
+    public async Task Scenario_RejectsUnsupportedLaterNodesBeforeEvaluationAndCancellationWritesOnlyTrace()
     {
         var writes = new ScenarioWriteGuard();
         var display = DisplayNameHandler();
@@ -463,6 +483,10 @@ public sealed partial class AutomationRuntimeTests
             error.NodeId == unsupported.Id && error.Code == "scenario-simulation-unsupported"
         );
         display.Calls.ShouldBe(0);
+        await using (var rejectedDb = await fixture.Database.CreateDbContextAsync())
+        {
+            (await rejectedDb.AutomationTraces.CountAsync()).ShouldBe(0);
+        }
         var admitted = draft with
         {
             Nodes = [.. draft.Nodes.Where(node => node.Id != unsupported.Id)],
@@ -473,6 +497,21 @@ public sealed partial class AutomationRuntimeTests
         );
         display.Calls.ShouldBe(1);
         writes.Writes.ShouldBe(0);
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var storedTrace = (
+            await new AutomationTraceStore(fixture.Database, fixture.Clock).ListAsync(
+                new(fixture.HostId),
+                null,
+                CancellationToken.None
+            )
+        ).ShouldHaveSingleItem();
+        var trace = await ReadTraceAsync(fixture, storedTrace.Id);
+        trace.Events.ShouldContain(entry =>
+            entry.Event.Kind == AutomationTraceEventKind.Cancellation
+        );
+        trace.Events[^1].Event.Outcome.ShouldBe(AutomationTraceOutcome.Cancelled);
+        (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
     }
 
     private sealed class ForbiddenScenarioOverlay : IOverlayCueAdmissionService
@@ -523,6 +562,7 @@ public sealed partial class AutomationRuntimeTests
     {
         internal bool Armed { get; set; }
         internal int Writes { get; private set; }
+        internal int TraceWrites { get; private set; }
 
         private void Check(DbCommand command)
         {
@@ -533,8 +573,34 @@ public sealed partial class AutomationRuntimeTests
                     .StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
             )
             {
+                var statements = command.CommandText.Split(
+                    ';',
+                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
+                );
+                if (
+                    statements.All(statement =>
+                        statement.StartsWith(
+                            "INSERT INTO \"automation_traces\" ",
+                            StringComparison.Ordinal
+                        )
+                        || statement.StartsWith(
+                            "INSERT INTO \"automation_trace_events\" ",
+                            StringComparison.Ordinal
+                        )
+                        || statement.StartsWith(
+                            "UPDATE \"automation_traces\" ",
+                            StringComparison.Ordinal
+                        )
+                    )
+                )
+                {
+                    TraceWrites++;
+                    return;
+                }
                 Writes++;
-                throw new InvalidOperationException("Scenario attempted a database mutation.");
+                throw new InvalidOperationException(
+                    "Scenario attempted a production database mutation."
+                );
             }
         }
 

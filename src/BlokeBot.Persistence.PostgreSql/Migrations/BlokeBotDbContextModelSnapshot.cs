@@ -599,6 +599,68 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("automation_scenarios", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTrace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ByteCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EventCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FlowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ProductionRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Truncation")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("ProductionRunId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "CreatedAtUtc");
+
+                    b.ToTable("automation_traces", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTraceEvent", b =>
+                {
+                    b.Property<Guid>("TraceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("TraceId", "Sequence");
+
+                    b.ToTable("automation_trace_events", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>
                 {
                     b.Property<long>("Id")
@@ -9396,6 +9458,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Flow");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTrace", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTraceEvent", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationTrace", null)
+                        .WithMany()
+                        .HasForeignKey("TraceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>
