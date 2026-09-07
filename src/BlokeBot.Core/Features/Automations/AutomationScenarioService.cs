@@ -144,7 +144,8 @@ public sealed partial class AutomationScenarioService(
         {
             while (pending.Count > 0 || openInvocations.Count > 0)
             {
-                var incompleteBoundary = !pending.TryDequeue(out var pendingNode);
+                var pendingNode = TakeReadyNode();
+                var incompleteBoundary = pendingNode is null;
                 if (incompleteBoundary)
                 {
                     var unfinished = frozen.Invocations.Last(invocation =>
@@ -448,6 +449,43 @@ public sealed partial class AutomationScenarioService(
                 token: CancellationToken.None
             );
             throw;
+        }
+
+        PendingNode? TakeReadyNode()
+        {
+            var activeNodes = pending
+                .Select(item => item.Id)
+                .Concat(
+                    frozen.Invocations.IsDefault
+                        ? []
+                        : frozen
+                            .Invocations.Where(invocation =>
+                                openInvocations.Contains(invocation.EntryId)
+                            )
+                            .Select(invocation => invocation.CallerId)
+                )
+                .ToHashSet();
+            var count = pending.Count;
+            for (var index = 0; index < count; index++)
+            {
+                var candidate = pending.Dequeue();
+                var invocation = frozen.Invocations.IsDefault
+                    ? null
+                    : frozen.Invocations.FirstOrDefault(value => value.ExitId == candidate.Id);
+                if (
+                    invocation is null
+                    || !AutomationFrozenSubflows.HasActiveDescendants(
+                        frozen,
+                        invocation,
+                        activeNodes
+                    )
+                )
+                {
+                    return candidate;
+                }
+                pending.Enqueue(candidate);
+            }
+            return null;
         }
 
         void RecordOutcome(AutomationScenarioNodeOutcome outcome)

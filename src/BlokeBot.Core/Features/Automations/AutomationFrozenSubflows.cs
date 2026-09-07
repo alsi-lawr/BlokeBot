@@ -206,6 +206,19 @@ internal static class AutomationFrozenSubflows
         Encoding.UTF8.GetByteCount(AutomationRuntimeSerialization.SerializeDefinition(flow))
         <= MaximumSnapshotBytes;
 
+    internal static bool HasActiveDescendants(
+        AutomationRuntimeSerialization.PersistedFlow flow,
+        AutomationFrozenInvocation invocation,
+        IReadOnlySet<Guid> activeNodes
+    ) =>
+        flow.Nodes.Any(node =>
+            node.Id != invocation.ExitId
+            && activeNodes.Contains(node.Id)
+            && node.Invocation is { } nested
+            && flow.Invocations.Single(candidate => candidate.EntryId == nested.Id)
+                .Path.StartsWith(invocation.Path, StringComparison.Ordinal)
+        );
+
     internal static AutomationConfigurationCheck WithContract(
         AutomationRuntimeSerialization.PersistedNode node,
         AutomationConfigurationCheck check
@@ -230,7 +243,11 @@ internal static class AutomationFrozenSubflows
         AutomationRuntimeSerialization.PersistedNode node
     )
     {
-        while (!node.ContinueOnFailure && node.Invocation is { } parent)
+        // Exit has no authored continuation: failure cannot publish an invocation's typed outputs.
+        while (
+            (!node.ContinueOnFailure || node.DefinitionId == AutomationSubflowDefinitions.Exit)
+            && node.Invocation is { } parent
+        )
         {
             var invocation = flow.Invocations.Single(value => value.EntryId == parent.Id);
             yield return invocation;
