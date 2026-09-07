@@ -167,38 +167,24 @@
     }
 
     .automation-editor--focus .automation-editor-bar {
-        padding: 3.4rem 0.8rem 0.8rem;
+        padding: 0.8rem;
     }
 
     .automation-editor--focus .automation-editor-body {
         display: grid;
-        grid-template-columns: 8rem minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
         height: auto;
         min-height: 0;
     }
 
     .automation-editor--focus .automation-editor-body--flows-collapsed {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
     }
 
     .automation-editor--focus .automation-flow-rail {
-        border-bottom: 0;
-        border-right: 1px solid var(--app-border);
+        max-height: min(16rem, 22dvh);
         overflow-y: auto;
-        padding: 0.55rem;
-    }
-
-    .automation-editor--focus .automation-flow-rail-heading,
-    .automation-editor--focus .automation-flow-rail-actions {
-        display: grid;
-    }
-
-    .automation-editor--focus .automation-flow-rail-heading {
-        display: flex;
-    }
-
-    .automation-editor--focus .automation-flow-rail .automation-flow-item {
-        display: block;
     }
 
     .automation-editor--focus .automation-canvas-wrap,

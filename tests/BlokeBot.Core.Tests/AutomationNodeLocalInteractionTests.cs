@@ -17,11 +17,19 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationEditorInteractionTests
 {
     [Test]
-    public async Task AuthoringUi_LibraryBrowsingPreservesDirtyGraphSelectionViewportAndHistory()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AuthoringUi_LibraryBrowsingPreservesDirtyGraphSelectionViewportAndHistory(
+        bool focusMode
+    )
     {
         await using var fixture = await AutomationEditorPageFixture.CreateAsync();
         var target = await PublishNodeTargetAsync(fixture, "Reusable greeting");
         var page = fixture.Page;
+        if (focusMode)
+        {
+            page.Find("[aria-label=Focus]").Click();
+        }
         var source = page.FindComponent<AutomationFlowCanvas>().Instance.Nodes[0];
         await DiscloseAsync(page, source.Id);
         NodeSelector(page, source.Id).KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
