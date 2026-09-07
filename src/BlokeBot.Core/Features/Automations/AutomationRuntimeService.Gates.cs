@@ -42,6 +42,16 @@ public sealed partial class AutomationRuntimeService
             )
                 ? "required-feature-disabled"
             : null;
+        if (
+            outcomeCode is null
+            && AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
+                is AutomationDefinitionRestoreOutcome.Available frozen
+            && !frozen.Flow.Invocations.IsDefault
+            && !ExecutionDefinitionsAvailable(frozen.Flow)
+        )
+        {
+            outcomeCode = "definition-execution-stale";
+        }
         return outcomeCode is null ? AutomationExecutionGate.Open
             : await InvalidateOwnedAsync(db, run, leaseId, outcomeCode, cancellationToken)
                 ? AutomationExecutionGate.Invalidated

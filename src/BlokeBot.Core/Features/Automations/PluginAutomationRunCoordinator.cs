@@ -45,6 +45,19 @@ public sealed class PluginAutomationRunCoordinator(
             run.Status = AutomationFlowRunStatus.Invalidated;
             run.CompletedAtUtc = now;
             run.ExecutionLeaseId = null;
+            await AutomationSubflowExecutionTrace.CloseOpenAsync(
+                db,
+                run,
+                AutomationTraceOutcome.Invalidated,
+                now,
+                cancellationToken
+            );
+            _ = await AutomationSubflowRunReferences.RetireAsync(
+                db,
+                new(run.HostId),
+                new(run.Id),
+                cancellationToken
+            );
             await AutomationTraceStore.AppendAsync(
                 db,
                 run.Id,
@@ -74,6 +87,7 @@ public sealed class PluginAutomationRunCoordinator(
                     node.Status
                         is AutomationNodeRunStatus.Pending
                             or AutomationNodeRunStatus.Running
+                            or AutomationNodeRunStatus.Waiting
                 )
             )
             {
