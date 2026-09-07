@@ -73,10 +73,10 @@
     }
     else
     {
-        <div class="automation-page-actions">
-            <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="new-flow" />New flow</button>
-            <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><AutomationIcon Name="new-subflow" />New subflow</button>
-        </div>
+        @if (!_focusMode || _editor is null || _flowRecoveryMessage is not null)
+        {
+            @CreationActions
+        }
 
         @if (_flowRecoveryMessage is not null)
         {
@@ -100,6 +100,10 @@
                      aria-label="Visual automation editor"
                      data-editor-mode="@ModeToken(_mode)"
                      data-automation-editor-history>
+                @if (_focusMode)
+                {
+                    @CreationActions
+                }
                 <AutomationEditorHeader Visible="@(!_focusMode || !_editorToolsCollapsed)"
                                         Name="@_editor.Name"
                                         Subtitle="@_flowSubtitle"
@@ -360,3 +364,10 @@
                        Discard="DiscardDirtyTransitionAsync"
                        Subflow="@(_editor?.Subflow is not null)"
                        Save="SaveDirtyTransitionAsync" />
+
+@code {
+    private RenderFragment CreationActions => @<div class="automation-page-actions">
+        <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="new-flow" />New flow</button>
+        <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><AutomationIcon Name="new-subflow" />New subflow</button>
+    </div>;
+}

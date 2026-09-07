@@ -1,12 +1,12 @@
 @if (Visible)
 {
     <aside class="automation-flow-rail" aria-label="Automation library">
+        @if (FocusMode)
+        {
+            <div class="automation-flow-rail-controls"><button class="automation-icon-button" type="button" aria-label="Hide library" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button></div>
+        }
         <div class="automation-flow-rail-heading">
             <SegmentedTabs Items="_libraryTabs" ActiveKey="@(Library == AutomationLibraryKind.Flows ? "flows" : "subflows")" AriaLabel="Automation library" Id="automation-library" OwnsFragment="false" ActiveKeyChanged="SelectLibraryAsync" />
-            @if (FocusMode)
-            {
-                <button type="button" aria-label="Hide library" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button>
-            }
         </div>
         @if (Library == AutomationLibraryKind.Subflows)
         {

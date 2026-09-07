@@ -112,3 +112,41 @@
         padding-inline: 0.5rem;
     }
 }
+
+.automation-flow-rail-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.4rem;
+}
+
+.automation-editor--focus {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "creation" "tools" "notices" "workspace" "runs";
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.automation-editor--focus > .automation-page-actions {
+    border-bottom: 1px solid var(--app-border);
+    grid-area: creation;
+    justify-content: flex-start;
+    margin: 0;
+    min-height: 3.75rem;
+    padding: 0.65rem 6.2rem 0.65rem 1rem;
+}
+
+.automation-editor--focus .automation-restore-tab--tools {
+    left: auto;
+    right: 6.2rem;
+    top: 0.7rem;
+}
+
+@media (max-width: 48rem) {
+    .automation-editor--focus > .automation-page-actions {
+        padding: 3.5rem 0.8rem 0.8rem;
+    }
+
+    .automation-editor--focus .automation-restore-tab--tools {
+        left: 0.8rem;
+        right: auto;
+    }
+}
