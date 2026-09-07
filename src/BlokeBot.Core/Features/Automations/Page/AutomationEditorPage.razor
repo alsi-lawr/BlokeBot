@@ -211,7 +211,7 @@
                     }
 
                     <div class="automation-workspace" role="region" aria-label="Flow workspace" @onclick="CloseNodeLibraryFromOutsideAsync">
-                        <div class="automation-authoring-openers"><button class="btn-secondary" type="button" disabled="@(_selectedNodeIds.Count == 0 || _busy)" data-automation-extract-selection @onclick="OpenExtractionAsync">Extract selection</button><button class="btn-secondary" type="button" @onclick="OpenRecentTraceAsync">Traces</button>@if (_editor.Subflow is not null) { <button class="btn-secondary" type="button" data-automation-interface-opener @onclick="OpenInterfaceAsync">Interface</button> }</div>
+                        <div class="automation-authoring-openers"><button class="btn-secondary" type="button" disabled="@(_selectedNodeIds.Count == 0 || _busy)" data-automation-extract-selection @onclick="OpenExtractionAsync">Extract selection</button><button class="btn-secondary" type="button" @onclick="OpenRecentTraceAsync">Traces</button></div>
                         <AutomationWorkspaceToolbar @ref="_workspaceToolbar"
                                                     ToolboxOpen="_nodeLibraryOpen"
                                                     Settings="_editor.Canvas"
@@ -284,7 +284,7 @@
                                 }
                                 else if (_editor.Subflow is { } subflow)
                                 {
-                                    <div class="automation-authoring-body" data-automation-subflow-editor><label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label><AutomationSubflowInterfaceEditor Contract="_currentInterface" Changed="ChangeSubflowInterface" /></div>
+                                    <div class="automation-authoring-body" data-automation-subflow-review><label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label></div>
                                     <footer class="automation-authoring-footer">
                                         @if (_subflowPreview is { } review)
                                         {
@@ -317,6 +317,12 @@
                                                  Repair="RepairConnection"
                                                  DeleteEdge="DeleteEdge"
                                                  DeleteNode="DeleteNode">
+                            <BoundaryDeclarations>
+                                @if (_editor.Subflow is not null && _selectedNode.Subflow is AutomationSubflowBoundaryConfiguration)
+                                {
+                                    <AutomationBoundaryPorts @key="_selectedNode" Node="_selectedNode" Changed="ChangeBoundaryPorts" />
+                                }
+                            </BoundaryDeclarations>
                             <CallSubflowSelector>
                                 <AutomationCallTarget Name="@(_callTarget?.Graph.Name)" HasTarget="@(_selectedNode.Subflow is AutomationSubflowInvocationConfiguration)" Loading="_callLoading" Choosing="_callChoosing" InterfaceChanged="_callInterfaceChanged" Message="@_callMessage" Page="_callPage" Search="@_callSearch" Offset="_callOffset" PageLoading="_callPageLoading" Change="ChooseCallTargetAsync" UpdateInterface="UpdateCallInterfaceAsync" SearchChanged="SearchCallTargetsAsync" PageChanged="LoadCallPageAsync" Selected="SelectCallTargetAsync" />
                             </CallSubflowSelector>

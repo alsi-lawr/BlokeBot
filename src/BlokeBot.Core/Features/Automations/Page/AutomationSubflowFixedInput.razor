@@ -21,7 +21,7 @@
 }
 else if (Mismatch)
 {
-    <span class="automation-field-error" role="alert">Use a fixed value matching the declared input type.</span>
+    <span class="automation-field-error" role="alert">Use a fixed value matching the declared @(Node.Definition.Id.Value == AutomationSubflowDefinitions.Exit ? "output" : "input") type.</span>
 }
 
 @code {

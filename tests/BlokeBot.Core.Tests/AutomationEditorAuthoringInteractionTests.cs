@@ -127,7 +127,8 @@ public sealed partial class AutomationEditorInteractionTests
         var page = fixture.Page;
         page.Find("[data-automation-new-subflow]").Click();
         page.WaitForAssertion(() =>
-            page.Find("[data-automation-subflow-editor]").ShouldNotBeNull()
+            page.FindComponent<AutomationNodeInspector>()
+                .Instance.Node!.Definition.Id.Value.ShouldBe(AutomationSubflowDefinitions.Entry)
         );
         page.Find(".automation-page-actions button").Click();
         page.Find(".automation-dirty-dialog .btn-primary").Click();
@@ -237,7 +238,7 @@ public sealed partial class AutomationEditorInteractionTests
         );
         var page = fixture.Page;
         page.Find("[data-automation-new-subflow]").Click();
-        page.Find("[data-automation-review-subflow]").Click();
+        page.Find("[data-automation-save-flow]").Click();
         page.WaitForAssertion(() =>
             page.Find("[data-automation-publish-subflow]").ShouldNotBeNull()
         );

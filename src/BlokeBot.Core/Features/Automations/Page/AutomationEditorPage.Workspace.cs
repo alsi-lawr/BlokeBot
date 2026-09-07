@@ -174,14 +174,11 @@ public partial class AutomationEditorPage
     private Task CloseNodeLibraryFromOutsideAsync() =>
         _nodeLibraryOpen ? CloseNodeLibraryAsync() : Task.CompletedTask;
 
-    private async Task FocusInspectorAsync()
+    private Task FocusInspectorAsync()
     {
         _mobileInspectorOpen = true;
-        await InvokeAsync(StateHasChanged);
-        if (_pageModule is not null)
-        {
-            await _pageModule.InvokeVoidAsync("focusInspector");
-        }
+        _focusInspectorAfterRender = true;
+        return InvokeAsync(StateHasChanged);
     }
 
     private void ChangeOrientation(ChangeEventArgs args)

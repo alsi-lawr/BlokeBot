@@ -87,14 +87,12 @@ public partial class AutomationEditorPage
                 if (loaded is null)
                 {
                     _feedback = "This subflow is unavailable.";
+                    _hasChanges = _editor is not null && _history.IsDirty(_editor);
                     return;
                 }
-                LoadSubflowEditor(loaded);
-                await OpenInterfaceAsync();
+                if (!LoadSubflowEditor(loaded))
+                {
+                    _hasChanges = _editor is not null && _history.IsDirty(_editor);
+                }
             });
-
-    private Task OpenInterfaceAsync() =>
-        _editor?.Subflow is null
-            ? Task.CompletedTask
-            : OpenAuthoringAsync(AutomationAuthoringTask.Interface);
 }

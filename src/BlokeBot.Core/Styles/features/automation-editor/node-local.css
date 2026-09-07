@@ -150,3 +150,13 @@
         right: auto;
     }
 }
+
+.automation-inspector .automation-authoring-section {
+    padding-block: 1rem;
+}
+
+.automation-return-values-heading {
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding-top: 1rem;
+}
