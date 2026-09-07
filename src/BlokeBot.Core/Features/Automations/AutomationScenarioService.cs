@@ -23,7 +23,49 @@ public sealed partial class AutomationScenarioService(
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var validation = await ValidateAsync(draft, fixture, cancellationToken);
+        var shape = await ValidateAsync(draft, fixture, cancellationToken, transfer: true);
+        if (shape.Gate == AutomationCatalogAvailability.HostNotFound)
+        {
+            return new AutomationScenarioRunOutcome.HostNotFound();
+        }
+        if (!shape.Errors.IsEmpty)
+        {
+            return new AutomationScenarioRunOutcome.Invalid(shape.Errors);
+        }
+        await using var graphDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var preparation = await graphDb.Database.BeginTransactionAsync(
+            cancellationToken
+        );
+        if (
+            await MainDatabaseStatements.LockHostAsync(
+                graphDb,
+                draft.HostId.Value,
+                cancellationToken
+            ) == 0
+        )
+        {
+            return new AutomationScenarioRunOutcome.HostNotFound();
+        }
+        var configured = ApplyConfigurations(draft, fixture);
+        var resolution = await AutomationSubflowStore.LoadClosureAsync(
+            graphDb,
+            draft.HostId,
+            AutomationSubflowStore.Calls(configured.Nodes).Select(call => call.SubflowId),
+            null,
+            cancellationToken
+        );
+        if (resolution is AutomationSubflowClosureOutcome.Invalid unavailable)
+        {
+            return new AutomationScenarioRunOutcome.Invalid(unavailable.Errors);
+        }
+        var closure = ((AutomationSubflowClosureOutcome.Available)resolution).Closure;
+        var validation = await ValidateAsync(
+            draft,
+            fixture,
+            cancellationToken,
+            resolved: closure,
+            preparationDb: graphDb
+        );
         if (validation.Gate == AutomationCatalogAvailability.Disabled)
         {
             return new AutomationScenarioRunOutcome.FeatureDisabled();
@@ -36,23 +78,16 @@ public sealed partial class AutomationScenarioService(
         {
             return new AutomationScenarioRunOutcome.Invalid(validation.Errors);
         }
-        var configured = ApplyConfigurations(draft, fixture);
         var traceId = Guid.NewGuid();
-        await using var graphDb = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var expansion = await AutomationFrozenSubflows.FreezeAsync(
-            graphDb,
+        var expansion = AutomationFrozenSubflows.Freeze(
             AutomationScenarioGraph.FreezeGraph(configured),
             traceId,
-            cancellationToken
+            closure
         );
         if (expansion is null)
         {
             return new AutomationScenarioRunOutcome.Invalid([
-                new(
-                    null,
-                    "subflow-unavailable",
-                    "Restore the pinned subflow revisions before testing."
-                ),
+                new(null, "subflow-unavailable", "Choose available subflows before testing."),
             ]);
         }
         var frozen = expansion.Flow;
@@ -61,7 +96,8 @@ public sealed partial class AutomationScenarioService(
             if (
                 AutomationFrozenSubflows.WithContract(
                     node,
-                    catalog.ValidatePersistedDefinition(
+                    AutomationFrozenSubflows.ValidateDefinition(
+                        catalog,
                         AutomationRuntimeSerialization.Definition(node)
                     )
                 )
@@ -78,6 +114,7 @@ public sealed partial class AutomationScenarioService(
                 ]);
             }
         }
+        await preparation.CommitAsync(cancellationToken);
         var context = SourceContext(configured, fixture);
         var now = fixture.ClockUtc.UtcDateTime;
         await using var traceDb = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -162,7 +199,8 @@ public sealed partial class AutomationScenarioService(
                 var node = frozen.Nodes.Single(candidate => candidate.Id == pendingNode.Id);
                 var check = AutomationFrozenSubflows.WithContract(
                     node,
-                    catalog.ValidatePersistedDefinition(
+                    AutomationFrozenSubflows.ValidateDefinition(
+                        catalog,
                         AutomationRuntimeSerialization.Definition(node)
                     )
                 );

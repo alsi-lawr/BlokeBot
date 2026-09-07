@@ -83,7 +83,10 @@ public sealed class AutomationRunQueryService(
             && node is not null
             && AutomationFrozenSubflows.WithContract(
                 node,
-                catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(node))
+                AutomationFrozenSubflows.ValidateDefinition(
+                    catalog,
+                    AutomationRuntimeSerialization.Definition(node)
+                )
             )
                 is AutomationConfigurationCheck.Valid valid
             && AutomationDataValueSerialization.RestoreOutputs(outputJson)

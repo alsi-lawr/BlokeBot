@@ -31,7 +31,7 @@ public sealed partial class AutomationSubflowService
                 "Use bounded metadata, typed ports and a source-free subflow graph."
             );
         }
-        var validation = await flows.ValidateSubflowAsync(draft, cancellationToken);
+        var validation = await flows.ValidateSubflowTransferAsync(draft, cancellationToken);
         return validation.Gate is not null
             ? ValidationFailure("subflow-host-unavailable", "Enable automations for this host.")
             : validation;
@@ -44,19 +44,10 @@ public sealed partial class AutomationSubflowService
         CancellationToken cancellationToken
     )
     {
-        var pinErrors = await AutomationSubflowStore.ValidatePinsAsync(
-            db,
-            draft.Graph,
-            cancellationToken
-        );
-        if (!pinErrors.IsEmpty)
-        {
-            return new Preparation.Invalid(pinErrors);
-        }
         var loaded = await AutomationSubflowStore.LoadClosureAsync(
             db,
             draft.Graph.HostId,
-            AutomationSubflowStore.Pins(draft.Graph.Nodes).Select(pin => pin.RevisionId),
+            AutomationSubflowStore.Calls(draft.Graph.Nodes).Select(pin => pin.SubflowId),
             draft.Id,
             cancellationToken
         );
@@ -65,23 +56,25 @@ public sealed partial class AutomationSubflowService
             return new Preparation.Invalid(invalid.Errors);
         }
         var closure = ((AutomationSubflowClosureOutcome.Available)loaded).Closure;
-        var hostId = draft.Graph.HostId.Value;
-        var previous = await db
-            .AutomationSubflowRevisions.AsNoTracking()
-            .Where(row => row.HostId == hostId && row.SubflowId == draft.Id.Value)
-            .OrderByDescending(row => row.Revision)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (previous is not null)
+        var callErrors = AutomationSubflowStore.ValidateCalls(draft.Graph, closure);
+        if (!callErrors.IsEmpty)
         {
-            var rebindErrors = AutomationSubflowStore.RebindErrors(
-                AutomationSubflowSerialization.Restore(previous.SnapshotJson).Graph,
-                draft.Graph
-            );
-            if (!rebindErrors.IsEmpty)
-            {
-                return new Preparation.Invalid(rebindErrors);
-            }
+            return new Preparation.Invalid(callErrors);
         }
+        validation = await flows.ValidatePreparedAsync(
+            draft.Graph,
+            closure,
+            AutomationFlowService.AutomationGraphAdmission.Saved,
+            cancellationToken,
+            db,
+            draft.Interface,
+            draft.Id
+        );
+        if (validation.Gate is not null || !validation.Errors.IsEmpty)
+        {
+            return new Preparation.Invalid(validation.Errors);
+        }
+        var hostId = draft.Graph.HostId.Value;
         var number =
             (
                 await db

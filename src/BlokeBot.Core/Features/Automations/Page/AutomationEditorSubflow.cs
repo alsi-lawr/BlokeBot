@@ -2,11 +2,7 @@ using System.Collections.Immutable;
 
 namespace BlokeBot.Core.Features.Automations.Page;
 
-internal sealed record AutomationEditorSubflow(
-    AutomationSubflowId Id,
-    string Description,
-    AutomationSubflowRevisionId? BaseRevision
-);
+internal sealed record AutomationEditorSubflow(AutomationSubflowId Id, string Description);
 
 public sealed partial class AutomationEditorNode
 {

@@ -9,7 +9,7 @@ internal static partial class ConfigurationExportMappers
     private static AutomationFlowV2 ExportGraph(
         AutomationFlowDraft draft,
         string id,
-        IReadOnlyDictionary<AutomationSubflowRevisionId, string> revisions,
+        IReadOnlyDictionary<AutomationSubflowId, string> revisions,
         ConfigurationExportReferencePlan references,
         IDictionary<string, AutomationHostReferenceV2> hostReferences,
         AutomationCatalogService catalog
@@ -61,7 +61,7 @@ internal static partial class ConfigurationExportMappers
         AutomationHostId hostId,
         AutomationFlowDraftNode node,
         string id,
-        IReadOnlyDictionary<AutomationSubflowRevisionId, string> revisions,
+        IReadOnlyDictionary<AutomationSubflowId, string> revisions,
         ConfigurationExportReferencePlan references,
         IDictionary<string, AutomationHostReferenceV2> hostReferences,
         AutomationCatalogService catalog
@@ -120,7 +120,9 @@ internal static partial class ConfigurationExportMappers
         if (AutomationSubflowDefinitions.TryRead(node.Definition, out var binding))
         {
             subflow = new(
-                binding.RevisionId is { } revision ? revisions[revision] : null,
+                binding is AutomationSubflowInvocationConfiguration call
+                    ? revisions[call.SubflowId]
+                    : null,
                 binding.Interface,
                 AutomationDataValueSerialization.SerializeOutputs(binding.FixedInputs)
             );

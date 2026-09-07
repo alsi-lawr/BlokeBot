@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
+using BlokeBot.Persistence;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
@@ -16,7 +17,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
         IReadOnlyList<CommandMatch> commands,
         IReadOnlyList<RewardMatch> rewards,
         bool planned,
-        IReadOnlyDictionary<string, AutomationSubflowRevisionId> revisions,
+        IReadOnlyDictionary<string, AutomationSubflowId> revisions,
         ICollection<ConfigurationValidationIssue> issues,
         CancellationToken cancellationToken
     )
@@ -54,22 +55,19 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             if (node.Subflow is { } binding)
             {
                 var revision =
-                    binding.RevisionId is { } pin && revisions.TryGetValue(pin, out var resolved)
+                    binding.SubflowId is { } pin && revisions.TryGetValue(pin, out var resolved)
                         ? resolved
-                        : (AutomationSubflowRevisionId?)null;
+                        : (AutomationSubflowId?)null;
                 if (node.DefinitionId == AutomationSubflowDefinitions.Invoke && revision is null)
                 {
                     issues.Add(
-                        new(
-                            "sections.automations",
-                            $"Include pinned revision '{binding.RevisionId}'."
-                        )
+                        new("sections.automations", $"Include subflow '{binding.SubflowId}'.")
                     );
                 }
                 configuration = JsonSerializer.SerializeToElement(
                     new
                     {
-                        RevisionId = revision,
+                        SubflowId = revision,
                         binding.Interface,
                         FixedInputs = binding.FixedInputsJson,
                     },
@@ -181,6 +179,8 @@ internal sealed partial class AutomationConfigurationTransferAdapter
     }
 
     private async Task<IReadOnlyList<MappedScenario>> MapScenariosAsync(
+        BlokeBotDbContext db,
+        AutomationSubflowClosure closure,
         AutomationsSectionV2 section,
         IReadOnlyList<MappedAutomationDraft> drafts,
         ICollection<ConfigurationValidationIssue> issues,
@@ -258,7 +258,9 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                         mapped.Draft,
                         fixture,
                         cancellationToken,
-                        transfer: true
+                        transfer: true,
+                        resolved: closure,
+                        preparationDb: db
                     ),
                     issues
                 );

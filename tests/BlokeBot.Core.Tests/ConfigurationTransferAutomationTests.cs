@@ -1443,7 +1443,7 @@ public sealed partial class ConfigurationTransferAutomationTests
         new(
             id,
             definitionId,
-            1,
+            definitionId == AutomationSubflowDefinitions.Invoke ? 2 : 1,
             configuration,
             1,
             AutomationNodeFailurePolicy.Stop,

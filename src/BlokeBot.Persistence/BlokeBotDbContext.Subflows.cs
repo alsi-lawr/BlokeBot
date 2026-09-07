@@ -10,8 +10,8 @@ public sealed partial class BlokeBotDbContext
         Set<AutomationSubflowRevisionRecord>();
     public DbSet<AutomationSubflowCallerReference> AutomationSubflowCallers =>
         Set<AutomationSubflowCallerReference>();
-    public DbSet<AutomationSubflowRevisionReference> AutomationSubflowRevisionReferences =>
-        Set<AutomationSubflowRevisionReference>();
+    public DbSet<AutomationSubflowNestedCallerReference> AutomationSubflowNestedCallers =>
+        Set<AutomationSubflowNestedCallerReference>();
     public DbSet<AutomationSubflowRunReference> AutomationSubflowRunReferences =>
         Set<AutomationSubflowRunReference>();
 
@@ -50,27 +50,27 @@ public sealed partial class BlokeBotDbContext
                 .WithMany()
                 .HasForeignKey(x => x.NodeId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasOne<AutomationSubflowRevisionRecord>()
+            _ = b.HasOne<AutomationSubflow>()
                 .WithMany()
-                .HasForeignKey(x => new { x.HostId, x.RevisionId })
+                .HasForeignKey(x => new { x.HostId, x.SubflowId })
                 .OnDelete(DeleteBehavior.NoAction);
         });
-        _ = modelBuilder.Entity<AutomationSubflowRevisionReference>(b =>
+        _ = modelBuilder.Entity<AutomationSubflowNestedCallerReference>(b =>
         {
-            _ = b.ToTable("automation_subflow_revision_references");
+            _ = b.ToTable("automation_subflow_nested_callers");
             _ = b.HasKey(x => new
             {
                 x.HostId,
-                x.CallerRevisionId,
+                x.CallerSubflowId,
                 x.NodeId,
             });
-            _ = b.HasOne<AutomationSubflowRevisionRecord>()
+            _ = b.HasOne<AutomationSubflow>()
                 .WithMany()
-                .HasForeignKey(x => new { x.HostId, x.CallerRevisionId })
+                .HasForeignKey(x => new { x.HostId, x.CallerSubflowId })
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasOne<AutomationSubflowRevisionRecord>()
+            _ = b.HasOne<AutomationSubflow>()
                 .WithMany()
-                .HasForeignKey(x => new { x.HostId, x.RevisionId })
+                .HasForeignKey(x => new { x.HostId, x.SubflowId })
                 .OnDelete(DeleteBehavior.NoAction);
         });
         _ = modelBuilder.Entity<AutomationSubflowRunReference>(b =>

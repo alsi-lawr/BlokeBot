@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
+using BlokeBot.Persistence;
 
 namespace BlokeBot.Core.Features.Automations;
 
@@ -9,14 +10,18 @@ public sealed partial class AutomationScenarioService
         AutomationFlowDraft draft,
         AutomationScenarioFixture fixture,
         CancellationToken cancellationToken,
-        bool transfer = false
-    ) => ValidateAsync(draft, fixture, cancellationToken, transfer);
+        bool transfer = false,
+        AutomationSubflowClosure? resolved = null,
+        BlokeBotDbContext? preparationDb = null
+    ) => ValidateAsync(draft, fixture, cancellationToken, transfer, resolved, preparationDb);
 
     private async Task<AutomationGraphValidation> ValidateAsync(
         AutomationFlowDraft draft,
         AutomationScenarioFixture fixture,
         CancellationToken cancellationToken,
-        bool transfer = false
+        bool transfer = false,
+        AutomationSubflowClosure? resolved = null,
+        BlokeBotDbContext? preparationDb = null
     )
     {
         if (
@@ -86,8 +91,19 @@ public sealed partial class AutomationScenarioService
             return new(null, errors.ToImmutable());
         }
         var configured = ApplyConfigurations(draft, fixture);
-        var validation = transfer
-            ? await flows.ValidateConfigurationTransferAsync(configured, cancellationToken)
+        var validation =
+            resolved is not null
+                ? await flows.ValidatePreparedAsync(
+                    configured,
+                    resolved,
+                    transfer
+                        ? AutomationFlowService.AutomationGraphAdmission.ConfigurationTransfer
+                        : AutomationFlowService.AutomationGraphAdmission.Scenario,
+                    cancellationToken,
+                    preparationDb!
+                )
+            : transfer
+                ? await flows.ValidateConfigurationTransferAsync(configured, cancellationToken)
             : await flows.ValidateScenarioAsync(configured, cancellationToken);
         if (validation.Gate is not null)
         {

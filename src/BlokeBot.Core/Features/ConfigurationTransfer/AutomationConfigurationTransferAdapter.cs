@@ -104,6 +104,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
         CancellationToken cancellationToken
     )
     {
+        _ = await MainDatabaseStatements.LockHostAsync(db, host.Id, cancellationToken);
         var issues = new List<ConfigurationValidationIssue>();
         if (
             selection.ItemResolutions.Any(value =>

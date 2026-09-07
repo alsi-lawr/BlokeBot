@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
@@ -39,6 +40,7 @@ public sealed partial class AutomationFlowService
     }
 
     private async Task ValidateNodeAsync(
+        BlokeBotDbContext db,
         AutomationHostId hostId,
         AutomationFlowDraftNode node,
         ImmutableArray<AutomationGraphError>.Builder errors,
@@ -46,16 +48,16 @@ public sealed partial class AutomationFlowService
         CancellationToken cancellationToken
     )
     {
-        var check = admission
-            is AutomationGraphAdmission.Frozen
-                or AutomationGraphAdmission.ConfigurationTransfer
-                or AutomationGraphAdmission.Scenario
-            ? catalog.ValidatePersistedDefinition(node.Definition)
-            : await catalog.ValidatePersistedForSaveAsync(
-                hostId,
-                node.Definition,
-                cancellationToken
-            );
+        var check =
+            admission == AutomationGraphAdmission.Frozen
+            && AutomationSubflowDefinitions.CheckFrozen(node.Definition) is { } frozen
+                ? frozen
+            : admission
+                is AutomationGraphAdmission.Frozen
+                    or AutomationGraphAdmission.ConfigurationTransfer
+                    or AutomationGraphAdmission.Scenario
+                ? catalog.ValidatePersistedDefinition(node.Definition)
+            : catalog.ValidatePreparedDefinition(hostId, node.Definition);
         if (check is AutomationConfigurationCheck.Invalid invalid)
         {
             foreach (var error in invalid.Errors)
@@ -105,7 +107,8 @@ public sealed partial class AutomationFlowService
         {
             var references = await overlayCues.ResolveReferencesAsync(
                 new(hostId.Value, cue.TargetId.Value, cue.CueId.Value),
-                cancellationToken
+                cancellationToken,
+                db
             );
             if (references is not OverlayCueReferenceOutcome.Available)
             {
@@ -126,8 +129,7 @@ public sealed partial class AutomationFlowService
         {
             // The reward filter is a reference resolved against this channel's known rewards,
             // never free-text. Externally created rewards remain valid read-only triggers.
-            await using var rewardDb = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var known = await rewardDb
+            var known = await db
                 .TwitchCustomRewards.AsNoTracking()
                 .AnyAsync(
                     reward => reward.HostId == hostId.Value && reward.ProviderRewardId == rewardId,
@@ -150,8 +152,7 @@ public sealed partial class AutomationFlowService
             && valid.Configuration is CustomCommandSourceConfiguration command
         )
         {
-            await using var commandDb = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var known = await commandDb
+            var known = await db
                 .CustomCommands.AsNoTracking()
                 .AnyAsync(
                     candidate =>

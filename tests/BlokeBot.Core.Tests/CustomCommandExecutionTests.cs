@@ -1746,7 +1746,8 @@ public sealed class CustomCommandExecutionTests
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         )
         {
             ReferenceRequests.Add(request);

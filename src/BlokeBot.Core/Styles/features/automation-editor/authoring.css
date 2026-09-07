@@ -337,3 +337,8 @@
         transition: none !important;
     }
 }
+
+.automation-authoring-tabs .segmented-motion--shared {
+    grid-template-columns: repeat(var(--segmented-count), minmax(0, 1fr));
+    width: 100%;
+}

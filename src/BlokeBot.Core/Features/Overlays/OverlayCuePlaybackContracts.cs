@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -84,7 +85,8 @@ public interface IOverlayCueAdmissionService
 {
     Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
         OverlayCueReferenceRequest request,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        BlokeBotDbContext? preparationDb = null
     );
 
     Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(

@@ -17,6 +17,38 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationEditorInteractionTests
 {
     [Test]
+    public async Task AuthoringUi_ChangingTabsDoesNotStealTheSegmentedControlsFocus()
+    {
+        await using var fixture = await AutomationEditorPageFixture.CreateAsync();
+        fixture.Page.Find("[data-automation-test-flow]").Click();
+        fixture.Page.WaitForAssertion(() =>
+            fixture.Context.JSInterop.Invocations.ShouldContain(call =>
+                call.Identifier == "focusAuthoring"
+            )
+        );
+        var paneFocusCalls = fixture.Context.JSInterop.Invocations.Count(call =>
+            call.Identifier == "focusAuthoring"
+        );
+        fixture
+            .Page.Find(".automation-authoring-tabs [aria-selected=true]")
+            .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
+        fixture.Page.WaitForAssertion(() =>
+            fixture.Page.Find("[data-automation-subflow-library]").ShouldNotBeNull()
+        );
+        fixture
+            .Context.JSInterop.Invocations.Count(call => call.Identifier == "focusAuthoring")
+            .ShouldBe(paneFocusCalls);
+        fixture
+            .Page.Find(".automation-authoring-tabs [aria-selected=true]")
+            .KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        fixture.Page.WaitForAssertion(() =>
+            fixture.Context.JSInterop.Invocations.ShouldContain(call =>
+                call.Identifier == "focusAuthoringOpener"
+            )
+        );
+    }
+
+    [Test]
     public async Task AuthoringUi_UnsavedDraftRunKeepsProductionFlowAndSelectsTraceNode()
     {
         await using var fixture = await AutomationEditorPageFixture.CreateAsync();
@@ -160,7 +192,13 @@ public sealed partial class AutomationEditorInteractionTests
         for (var i = 0; i < AutomationSubflowService.LibraryPageSize + 1; i++)
         {
             _ = (
-                await service.PublishAsync(draft, CancellationToken.None)
+                await service.PublishAsync(
+                    draft with
+                    {
+                        Id = new(Guid.NewGuid()),
+                    },
+                    CancellationToken.None
+                )
             ).ShouldBeOfType<AutomationSubflowPublishOutcome.Published>();
         }
         fixture.Page.Find("[data-automation-authoring-opener]").Click();

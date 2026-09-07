@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
@@ -70,31 +72,70 @@ public sealed partial class AutomationFlowService
             preparedCandidate: preparedCandidate
         );
 
+    internal Task<AutomationGraphValidation> ValidatePreparedAsync(
+        AutomationFlowDraft draft,
+        AutomationSubflowClosure resolved,
+        AutomationGraphAdmission admission,
+        CancellationToken cancellationToken,
+        BlokeBotDbContext db,
+        AutomationSubflowInterface? contract = null,
+        AutomationSubflowId? owner = null
+    ) =>
+        ValidateAsync(
+            draft,
+            admission,
+            cancellationToken,
+            contract,
+            owner,
+            resolved: resolved,
+            preparationDb: db
+        );
+
     private async Task<AutomationGraphValidation> ValidateAsync(
         AutomationFlowDraft draft,
         AutomationGraphAdmission admission,
         CancellationToken cancellationToken,
         AutomationSubflowInterface? subflowInterface = null,
         AutomationSubflowId? publishing = null,
-        AutomationSubflowRevision? preparedCandidate = null
+        AutomationSubflowRevision? preparedCandidate = null,
+        AutomationSubflowClosure? resolved = null,
+        BlokeBotDbContext? preparationDb = null
     )
     {
+        await using var ownedDb = preparationDb is null
+            ? await dbFactory.CreateDbContextAsync(cancellationToken)
+            : null;
+        var db = preparationDb ?? ownedDb!;
+        await using var transaction =
+            preparationDb is null
+            && admission is AutomationGraphAdmission.Saved or AutomationGraphAdmission.Scenario
+                ? await db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+        if (transaction is not null)
+        {
+            _ = await MainDatabaseStatements.LockHostAsync(
+                db,
+                draft.HostId.Value,
+                cancellationToken
+            );
+        }
+        var enabledFeatures = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == draft.HostId.Value)
+            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
+            .SingleOrDefaultAsync(cancellationToken);
         if (admission != AutomationGraphAdmission.Frozen)
         {
-            var snapshot = await catalog.DiscoverAsync(draft.HostId, cancellationToken);
-            if (
-                admission is AutomationGraphAdmission.Saved or AutomationGraphAdmission.Scenario
-                && snapshot.Availability != AutomationCatalogAvailability.Enabled
-            )
+            if (enabledFeatures is null)
             {
-                return new(snapshot.Availability, []);
+                return new(AutomationCatalogAvailability.HostNotFound, []);
             }
             if (
-                admission == AutomationGraphAdmission.ConfigurationTransfer
-                && snapshot.Availability == AutomationCatalogAvailability.HostNotFound
+                admission is AutomationGraphAdmission.Saved or AutomationGraphAdmission.Scenario
+                && (enabledFeatures.Value & HostFeatureFlags.Automations) == 0
             )
             {
-                return new(snapshot.Availability, []);
+                return new(AutomationCatalogAvailability.Disabled, []);
             }
         }
 
@@ -139,9 +180,15 @@ public sealed partial class AutomationFlowService
                 );
             }
 
-            await ValidateNodeAsync(draft.HostId, node, errors, admission, cancellationToken);
+            await ValidateNodeAsync(db, draft.HostId, node, errors, admission, cancellationToken);
             if (
-                catalog.ValidatePersistedDefinition(node.Definition)
+                (
+                    (
+                        admission == AutomationGraphAdmission.Frozen
+                            ? AutomationSubflowDefinitions.CheckFrozen(node.Definition)
+                            : null
+                    ) ?? catalog.ValidatePersistedDefinition(node.Definition)
+                )
                 is AutomationConfigurationCheck.Valid valid
             )
             {
@@ -340,26 +387,21 @@ public sealed partial class AutomationFlowService
 
         if (admission is AutomationGraphAdmission.Saved or AutomationGraphAdmission.Scenario)
         {
-            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var enabledFeatures = await db
-                .Hosts.AsNoTracking()
-                .Where(value => value.Id == draft.HostId.Value)
-                .Select(static value => value.EnabledFeatures)
-                .SingleAsync(cancellationToken);
             await ValidateSubflowDependenciesAsync(
                 db,
                 draft,
                 publishing,
-                enabledFeatures,
+                enabledFeatures!.Value,
                 admission,
                 errors,
                 cancellationToken,
-                preparedCandidate
+                preparedCandidate,
+                resolved
             );
             errors.AddRange(
                 CapabilityUnavailableErrors(
                     draft.Nodes.Select(static node => (node.Id, node.Definition.TypeId)),
-                    enabledFeatures
+                    enabledFeatures!.Value
                 )
             );
         }

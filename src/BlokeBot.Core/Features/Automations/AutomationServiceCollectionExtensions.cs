@@ -43,6 +43,7 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddSingleton<AutomationActionExecutor>();
         services.TryAddSingleton<AutomationFlowService>();
         services.TryAddSingleton<AutomationSubflowService>();
+        services.TryAddSingleton<AutomationSubflowCurrentDataConversion>();
         services.TryAddSingleton<AutomationScenarioService>();
         services.TryAddSingleton<AutomationTraceStore>();
         services.TryAddEnumerable(

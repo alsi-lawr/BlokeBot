@@ -3,13 +3,7 @@ using System.Text.Json;
 
 namespace BlokeBot.Core.Features.Automations;
 
-internal sealed record AutomationSubflowConfiguration(
-    AutomationSubflowRevisionId? RevisionId,
-    AutomationSubflowInterface Interface,
-    ImmutableDictionary<AutomationPortId, AutomationResolvedValue> FixedInputs
-) : AutomationConfiguration;
-
-public static class AutomationSubflowDefinitions
+public static partial class AutomationSubflowDefinitions
 {
     public const string Entry = "subflow-entry";
     public const string Exit = "subflow-exit";
@@ -19,7 +13,7 @@ public static class AutomationSubflowDefinitions
     public static PersistedAutomationNodeDefinition Invocation(
         AutomationSubflowRevision revision,
         ImmutableDictionary<AutomationPortId, AutomationValue>? fixedInputs = null
-    ) => Create(Invoke, revision.Interface, revision.Id, fixedInputs);
+    ) => Create(Invoke, revision.Interface, revision.SubflowId, fixedInputs);
 
     public static PersistedAutomationNodeDefinition Boundary(
         string definitionId,
@@ -30,15 +24,15 @@ public static class AutomationSubflowDefinitions
     internal static PersistedAutomationNodeDefinition Create(
         string id,
         AutomationSubflowInterface contract,
-        AutomationSubflowRevisionId? revision,
+        AutomationSubflowId? subflowId,
         ImmutableDictionary<AutomationPortId, AutomationValue>? fixedInputs
     ) =>
         new(
             id,
-            1,
+            id == Invoke ? 2 : 1,
             JsonSerializer.SerializeToElement(
                 new Document(
-                    revision,
+                    subflowId,
                     contract,
                     AutomationDataValueSerialization.SerializeOutputs(
                         (
@@ -75,6 +69,7 @@ public static class AutomationSubflowDefinitions
     {
         if (
             node.TypeId is Entry or Exit or Invoke
+            && node.SchemaVersion == (node.TypeId == Invoke ? 2 : 1)
             && Parse(node.TypeId, node.Configuration)
                 is AutomationConfigurationParseResult.Parsed
                 {
@@ -105,18 +100,20 @@ public static class AutomationSubflowDefinitions
             || document.FixedInputs is null
             || (
                 id == Invoke
-                    ? document.RevisionId is null || document.RevisionId.Value.Value == Guid.Empty
-                    : document.RevisionId is not null
+                    ? document.SubflowId is null || document.SubflowId.Value.Value == Guid.Empty
+                    : document.SubflowId is not null
             )
             || AutomationDataValueSerialization.RestoreOutputs(document.FixedInputs)
                 is not AutomationOutputRestoreOutcome.Available values
             ? Invalid()
             : new AutomationConfigurationParseResult.Parsed(
-                new AutomationSubflowConfiguration(
-                    document.RevisionId,
-                    document.Interface,
-                    values.Outputs
-                )
+                id == Invoke
+                    ? new AutomationSubflowInvocationConfiguration(
+                        document.SubflowId!.Value,
+                        document.Interface,
+                        values.Outputs
+                    )
+                    : new AutomationSubflowBoundaryConfiguration(document.Interface, values.Outputs)
             );
     }
 
@@ -124,7 +121,7 @@ public static class AutomationSubflowDefinitions
         new AutomationConfigurationParseResult.Invalid([
             new(
                 new AutomationValidationTarget.Definition(),
-                "Select a valid immutable subflow interface."
+                "Choose an available subflow interface."
             ),
         ]);
 
@@ -213,7 +210,7 @@ public static class AutomationSubflowDefinitions
             new(id),
             AutomationNodeKind.Control,
             AutomationDefinitionScope.Host,
-            new(new(1), new(1)),
+            new(new(id == Invoke ? 2 : 1), new(id == Invoke ? 2 : 1)),
             new(
                 id == Entry ? "Subflow entry"
                     : id == Exit ? "Subflow exit"
@@ -265,7 +262,7 @@ public static class AutomationSubflowDefinitions
     }
 
     private sealed record Document(
-        AutomationSubflowRevisionId? RevisionId,
+        AutomationSubflowId? SubflowId,
         AutomationSubflowInterface Interface,
         string FixedInputs
     );
