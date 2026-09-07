@@ -94,7 +94,9 @@ Plugin nodes reference an already installed, available, compatible definition. T
 stable plugin code/definition identifiers only; destination lifecycle and feature generations are
 resolved locally. No package is fetched or installed, and no plugin settings or secrets transfer.
 
-Fixed identifying or event-derived values are rejected, not anonymized. Explicitly selected test
+Fixed values are checked using their declared types, sensitivity and provenance. Typed identifying
+values and nonportable resolved inputs are rejected, not anonymized; these checks do not detect
+secrets or real-world identities in arbitrary authored text constants. Explicitly selected test
 scenarios must originate from the canonical generated-fixture recipe and still match it exactly.
 The recipe carries source schema, virtual clock, seed, typed generated inputs and declared effect
 outcomes, not a serialized event context. Custom or edited local scenarios remain available locally;
@@ -117,7 +119,8 @@ zone, so the same imported UTC recurrence can display differently for different 
 
 ## Excluded data
 
-Exports never include OAuth tokens, client secrets, application credentials, sessions, cookies,
+The exporter does not read private or operational state such as OAuth tokens, client secrets,
+application credentials, sessions, cookies,
 server paths, deployment settings, point balances or ledgers, completed guessing rounds, votes,
 leaderboards, giveaway entrants or draws, alerts, public-chat outbox data, delivery receipts,
 viewer IDs, viewer logins, viewer display names, command viewer allow lists, stream runtime state,
