@@ -13,7 +13,8 @@ internal static partial class ConfigurationDocumentValidator
             return null;
         }
         var issue =
-            Limit("sections.automations.flows", section.Flows.Count)
+            ValidateAutomationStructure(section)
+            ?? Limit("sections.automations.flows", section.Flows.Count)
             ?? Limit("sections.automations.scenarios", section.Scenarios.Count)
             ?? Limit("sections.automations.hostReferences", section.HostReferences.Count)
             ?? DuplicateIds("sections.automations.flows", section.Flows.Select(value => value.Id))
