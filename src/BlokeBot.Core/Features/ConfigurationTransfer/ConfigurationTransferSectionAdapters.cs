@@ -30,7 +30,7 @@ internal interface IAutomationConfigurationTransferAdapter
     Task<ConfigurationSectionPreview> PreviewAsync(
         BlokeBotDbContext db,
         BotHost host,
-        AutomationsSectionV1? section,
+        AutomationsSectionV2? section,
         SectionImportSelection selection,
         ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
@@ -39,7 +39,7 @@ internal interface IAutomationConfigurationTransferAdapter
     Task<AutomationConfigurationStageResult> StageAsync(
         BlokeBotDbContext db,
         BotHost host,
-        AutomationsSectionV1 section,
+        AutomationsSectionV2 section,
         SectionImportSelection selection,
         ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
@@ -47,8 +47,7 @@ internal interface IAutomationConfigurationTransferAdapter
 }
 
 internal sealed record AutomationConfigurationStageResult(
-    IReadOnlyList<ConfigurationValidationIssue> Issues,
-    IReadOnlyList<AutomationTransferDiagnostic> Diagnostics
+    IReadOnlyList<ConfigurationValidationIssue> Issues
 );
 
 internal sealed class UnavailableOverlayConfigurationTransferAdapter
@@ -89,7 +88,7 @@ internal sealed class UnavailableAutomationConfigurationTransferAdapter
     public Task<ConfigurationSectionPreview> PreviewAsync(
         BlokeBotDbContext db,
         BotHost host,
-        AutomationsSectionV1? section,
+        AutomationsSectionV2? section,
         SectionImportSelection selection,
         ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
@@ -98,11 +97,11 @@ internal sealed class UnavailableAutomationConfigurationTransferAdapter
     public Task<AutomationConfigurationStageResult> StageAsync(
         BlokeBotDbContext db,
         BotHost host,
-        AutomationsSectionV1 section,
+        AutomationsSectionV2 section,
         SectionImportSelection selection,
         ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
-    ) => Task.FromResult(new AutomationConfigurationStageResult([Issue()], []));
+    ) => Task.FromResult(new AutomationConfigurationStageResult([Issue()]));
 
     private static ConfigurationSectionPreview Preview() =>
         new(ConfigurationSectionId.Automations, new(0, 0, 0, 0), [Issue()], []);

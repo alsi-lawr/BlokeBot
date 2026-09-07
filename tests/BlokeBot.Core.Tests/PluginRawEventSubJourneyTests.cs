@@ -589,10 +589,5 @@ public sealed class PluginRawEventSubJourneyTests
             PluginId pluginId,
             CancellationToken cancellationToken
         ) => throw new NotSupportedException();
-
-        public ValueTask<bool> HasFormat1IncompatibleStateAsync(
-            PluginHostId hostId,
-            CancellationToken cancellationToken
-        ) => throw new NotSupportedException();
     }
 }

@@ -2,8 +2,6 @@ using System.Reflection;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence;
-using BlokeBot.Plugins.Contracts;
-using BlokeBot.Plugins.Features;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
@@ -13,9 +11,8 @@ public sealed class ConfigurationDocumentExporter(
     ConfigurationDocumentCodec codec,
     AutomationCatalogService automationCatalog,
     AutomationFlowService automationFlows,
-    ILogger<ConfigurationDocumentExporter> logger,
     TimeProvider timeProvider,
-    IPluginFeatureStore pluginFeatures
+    AutomationScenarioService scenarios
 )
 {
     public async Task<ConfigurationExportOutcome> ExportAsync(
@@ -38,19 +35,7 @@ public sealed class ConfigurationDocumentExporter(
         )
         {
             return new ConfigurationExportOutcome.Unsupported(
-                "Channel tool enablement contains a flag that format 1 cannot represent."
-            );
-        }
-        if (
-            PluginHostId.TryCreate(hostId, out var pluginHostId)
-            && await pluginFeatures.HasFormat1IncompatibleStateAsync(
-                pluginHostId,
-                cancellationToken
-            )
-        )
-        {
-            return new ConfigurationExportOutcome.Unsupported(
-                "Format 1 cannot export plugin-owned settings, secrets, or feature state."
+                "Channel tool enablement contains a flag that format 2 cannot represent."
             );
         }
         if (
@@ -61,6 +46,21 @@ public sealed class ConfigurationDocumentExporter(
         {
             return new ConfigurationExportOutcome.Unsupported(
                 "Confirm the URL warning before exporting complete Overlay URLs."
+            );
+        }
+
+        if (
+            selection.Sections.Contains(ConfigurationSectionId.Automations)
+            && (
+                selection.AutomationFlowIds.Count
+                    > ConfigurationDocumentCodec.MaximumRecordsPerCollection
+                || selection.AutomationScenarioIds.Count
+                    > ConfigurationDocumentCodec.MaximumRecordsPerCollection
+            )
+        )
+        {
+            return new ConfigurationExportOutcome.Unsupported(
+                "Select at most 1,000 flows and 1,000 scenarios for one file."
             );
         }
 
@@ -87,10 +87,16 @@ public sealed class ConfigurationDocumentExporter(
                     references,
                     automationCatalog,
                     automationFlows,
+                    scenarios,
+                    selection,
                     cancellationToken
                 )
                 : null;
-            var document = new ConfigurationDocumentV1(
+            if (ConfigurationDocumentValidator.ValidateAutomations(automations) is { } issue)
+            {
+                return new ConfigurationExportOutcome.Unsupported(issue.Message);
+            }
+            var document = new ConfigurationDocumentV2(
                 ConfigurationDocumentCodec.Format,
                 ConfigurationDocumentCodec.CurrentVersion,
                 timeProvider.GetUtcNow(),
@@ -132,26 +138,20 @@ public sealed class ConfigurationDocumentExporter(
                             cancellationToken
                         )
                         : null,
-                    automations?.Section
+                    automations
                 )
             );
             var json = codec.Serialize(document);
-            if (automations is not null)
-            {
-                AutomationTransferDiagnostics.LogExport(logger, hostId, automations.Diagnostics);
-            }
-            return new ConfigurationExportOutcome.Success(document, json);
+            return json.Length > ConfigurationDocumentCodec.MaximumBytes
+                ? new ConfigurationExportOutcome.Unsupported(
+                    "Select fewer items. The configuration file exceeds the 2 MB limit."
+                )
+                : new ConfigurationExportOutcome.Success(document, json);
         }
-        catch (Format1AutomationExportException exception)
+        catch (AutomationConfigurationExportException exception)
         {
             return new ConfigurationExportOutcome.Unsupported(
-                $"Automation node '{exception.DefinitionId}' is not a core Format 1 node."
-            );
-        }
-        catch (Format1AutomationConfigurationExportException exception)
-        {
-            return new ConfigurationExportOutcome.Unsupported(
-                $"Automation node '{exception.DefinitionId}' cannot be exported in Format 1. {exception.Reason}"
+                $"Automation node '{exception.DefinitionId}' cannot be exported in Format 2. {exception.Reason}"
             );
         }
     }
@@ -167,10 +167,18 @@ public abstract record ConfigurationExportOutcome
 {
     private ConfigurationExportOutcome() { }
 
-    public sealed record Success(ConfigurationDocumentV1 Document, byte[] Json)
+    public sealed record Success(ConfigurationDocumentV2 Document, byte[] Json)
         : ConfigurationExportOutcome;
 
     public sealed record NotFound : ConfigurationExportOutcome;
 
     public sealed record Unsupported(string Message) : ConfigurationExportOutcome;
 }
+
+public sealed record AutomationExportChoice(
+    Guid Id,
+    string Name,
+    IReadOnlyList<AutomationScenarioExportChoice> Scenarios
+);
+
+public sealed record AutomationScenarioExportChoice(Guid Id, string Name);

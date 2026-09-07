@@ -75,7 +75,8 @@ internal static class AutomationScenarioSerialization
                     )),
                 ],
                 fixture.Configurations,
-                fixture.Effects
+                fixture.Effects,
+                fixture.SyntheticRecipe
             ),
             _options
         );
@@ -112,7 +113,10 @@ internal static class AutomationScenarioSerialization
             ],
             document.Configurations,
             document.Effects
-        );
+        )
+        {
+            SyntheticRecipe = document.SyntheticRecipe,
+        };
     }
 
     private sealed record Input(
@@ -131,6 +135,7 @@ internal static class AutomationScenarioSerialization
         ulong Seed,
         ImmutableArray<Input> ConnectedInputs,
         ImmutableArray<AutomationScenarioConfiguration> Configurations,
-        ImmutableArray<AutomationScenarioEffect> Effects
+        ImmutableArray<AutomationScenarioEffect> Effects,
+        AutomationScenarioSyntheticRecipe? SyntheticRecipe = null
     );
 }

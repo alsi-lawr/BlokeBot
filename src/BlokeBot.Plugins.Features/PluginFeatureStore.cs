@@ -133,9 +133,4 @@ public interface IPluginFeatureStore
     );
 
     ValueTask RemovePluginDataAsync(PluginId pluginId, CancellationToken cancellationToken);
-
-    ValueTask<bool> HasFormat1IncompatibleStateAsync(
-        PluginHostId hostId,
-        CancellationToken cancellationToken
-    );
 }

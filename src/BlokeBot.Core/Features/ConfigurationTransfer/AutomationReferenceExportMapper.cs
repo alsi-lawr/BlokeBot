@@ -7,7 +7,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal sealed record AutomationReferenceExportProjection(
     JsonElement Configuration,
-    string? PlaceholderReason = null
+    string? Rejection = null
 );
 
 internal static class AutomationReferenceExportMapper
@@ -15,12 +15,12 @@ internal static class AutomationReferenceExportMapper
     internal static AutomationReferenceExportProjection Map(
         AutomationFlowNode node,
         ConfigurationExportReferencePlan references,
-        IDictionary<string, AutomationHostReferenceV1> hostReferences
+        IDictionary<string, AutomationHostReferenceV2> hostReferences
     )
     {
         var persisted = DeserializeElement(node);
         return persisted.Configuration.ValueKind != JsonValueKind.Object
-            ? throw new Format1AutomationConfigurationExportException(
+            ? throw new AutomationConfigurationExportException(
                 node.DefinitionId,
                 "Automation configuration must be a JSON object."
             )
@@ -48,7 +48,7 @@ internal static class AutomationReferenceExportMapper
     private static AutomationReferenceExportProjection MapCommand(
         AutomationFlowNode node,
         ConfigurationExportReferencePlan references,
-        IDictionary<string, AutomationHostReferenceV1> hostReferences
+        IDictionary<string, AutomationHostReferenceV2> hostReferences
     )
     {
         if (
@@ -58,9 +58,9 @@ internal static class AutomationReferenceExportMapper
             ) || !references.Commands.TryGetValue(payload.CustomCommandId, out var reference)
         )
         {
-            return Placeholder(AutomationTransferPlaceholder.CustomCommand);
+            return RejectedReference("custom-command-reference-unavailable");
         }
-        AddReference(hostReferences, reference, AutomationHostReferenceKindV1.CustomCommand);
+        AddReference(hostReferences, reference, AutomationHostReferenceKindV2.CustomCommand);
         return new(
             JsonSerializer.SerializeToElement(
                 new AutomationCustomCommandTransferPayload(reference.Id)
@@ -71,7 +71,7 @@ internal static class AutomationReferenceExportMapper
     private static AutomationReferenceExportProjection MapOverlay(
         AutomationFlowNode node,
         ConfigurationExportReferencePlan references,
-        IDictionary<string, AutomationHostReferenceV1> hostReferences
+        IDictionary<string, AutomationHostReferenceV2> hostReferences
     )
     {
         if (
@@ -83,16 +83,16 @@ internal static class AutomationReferenceExportMapper
             || !references.OverlayCues.TryGetValue(payload.CueId, out var cue)
         )
         {
-            return Placeholder(AutomationTransferPlaceholder.Overlay);
+            return RejectedReference("overlay-reference-unavailable");
         }
-        AddReference(hostReferences, target, AutomationHostReferenceKindV1.OverlayTarget);
+        AddReference(hostReferences, target, AutomationHostReferenceKindV2.OverlayTarget);
         AddReference(
             hostReferences,
             cue with
             {
                 ParentId = target.Id,
             },
-            AutomationHostReferenceKindV1.OverlayCue
+            AutomationHostReferenceKindV2.OverlayCue
         );
         return new(
             JsonSerializer.SerializeToElement(
@@ -104,7 +104,7 @@ internal static class AutomationReferenceExportMapper
     private static AutomationReferenceExportProjection MapReward(
         AutomationFlowNode node,
         ConfigurationExportReferencePlan references,
-        IDictionary<string, AutomationHostReferenceV1> hostReferences
+        IDictionary<string, AutomationHostReferenceV2> hostReferences
     )
     {
         if (
@@ -114,7 +114,7 @@ internal static class AutomationReferenceExportMapper
             )
         )
         {
-            return Placeholder(AutomationTransferPlaceholder.CustomReward);
+            return RejectedReference("custom-reward-reference-unavailable");
         }
         if (payload.RewardId is null)
         {
@@ -126,9 +126,9 @@ internal static class AutomationReferenceExportMapper
         }
         if (!references.CustomRewards.TryGetValue(payload.RewardId, out var reward))
         {
-            return Placeholder(AutomationTransferPlaceholder.CustomReward);
+            return RejectedReference("custom-reward-reference-unavailable");
         }
-        AddReference(hostReferences, reward, AutomationHostReferenceKindV1.CustomReward);
+        AddReference(hostReferences, reward, AutomationHostReferenceKindV2.CustomReward);
         return new(
             JsonSerializer.SerializeToElement(
                 new AutomationRewardTransferPayload(reward.Id, payload.CompletionPolicy)
@@ -145,7 +145,7 @@ internal static class AutomationReferenceExportMapper
         }
         catch (JsonException exception)
         {
-            throw new Format1AutomationConfigurationExportException(
+            throw new AutomationConfigurationExportException(
                 node.DefinitionId,
                 "Its persisted configuration is not valid JSON.",
                 exception
@@ -153,12 +153,12 @@ internal static class AutomationReferenceExportMapper
         }
     }
 
-    private static AutomationReferenceExportProjection Placeholder(string reason) =>
-        new(AutomationTransferPlaceholder.Create(reason), reason);
+    private static AutomationReferenceExportProjection RejectedReference(string reason) =>
+        new(JsonSerializer.SerializeToElement(new { }), reason);
 
     private static void AddReference(
-        IDictionary<string, AutomationHostReferenceV1> references,
+        IDictionary<string, AutomationHostReferenceV2> references,
         ConfigurationExportReference reference,
-        AutomationHostReferenceKindV1 kind
+        AutomationHostReferenceKindV2 kind
     ) => references[reference.Id] = new(reference.Id, kind, reference.Name, reference.ParentId);
 }

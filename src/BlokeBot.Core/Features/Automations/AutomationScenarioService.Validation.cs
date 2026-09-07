@@ -5,10 +5,18 @@ namespace BlokeBot.Core.Features.Automations;
 
 public sealed partial class AutomationScenarioService
 {
+    internal Task<AutomationGraphValidation> ValidatePortableAsync(
+        AutomationFlowDraft draft,
+        AutomationScenarioFixture fixture,
+        CancellationToken cancellationToken,
+        bool transfer = false
+    ) => ValidateAsync(draft, fixture, cancellationToken, transfer);
+
     private async Task<AutomationGraphValidation> ValidateAsync(
         AutomationFlowDraft draft,
         AutomationScenarioFixture fixture,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        bool transfer = false
     )
     {
         if (
@@ -78,7 +86,9 @@ public sealed partial class AutomationScenarioService
             return new(null, errors.ToImmutable());
         }
         var configured = ApplyConfigurations(draft, fixture);
-        var validation = await flows.ValidateScenarioAsync(configured, cancellationToken);
+        var validation = transfer
+            ? await flows.ValidateConfigurationTransferAsync(configured, cancellationToken)
+            : await flows.ValidateScenarioAsync(configured, cancellationToken);
         if (validation.Gate is not null)
         {
             return validation;

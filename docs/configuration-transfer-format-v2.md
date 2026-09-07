@@ -1,17 +1,17 @@
-# Channel configuration transfer format 1
+# Channel configuration transfer format 2
 
 BlokeBot exports channel configuration as UTF-8 JSON with the format identifier
-`blokebot.channel-configuration` and schema version `1`. The dashboard can export one section or
+`blokebot.channel-configuration` and schema version `2`. The dashboard can export one section or
 a selected bundle and can import only selected sections from a bundle.
 
 ```json
 {
   "format": "blokebot.channel-configuration",
-  "version": 1,
+  "version": 2,
   "exportedAtUtc": "2026-08-20T12:00:00Z",
   "source": {
     "channelLogin": "example_channel",
-    "blokeBotVersion": "0.12.0"
+    "blokeBotVersion": "0.16.0"
   },
   "sections": {
     "customCommands": {},
@@ -34,14 +34,15 @@ a selected bundle and can import only selected sections from a bundle.
   schedules store their UTC weekday and UTC time directly.
 - `guessing`: profiles, canonical slugs, accepted answers, aliases, rewards, and reply text.
 - `points`: terminology, aliases, reply text, gambling rules, and giveaway rules.
-- `channelToolEnablement`: one Boolean for each independent Chat Tools switch. Format 1 has 20
+- `channelToolEnablement`: one Boolean for each independent Chat Tools switch. Format 2 has 20
   switches and keeps Polls, Clips and Markers, Rewards and Redemptions, Predictions, and Raid
   Collaboration separate.
 - `overlays`: portable core Browser Source instances, typed appearance and configuration, cues,
   queue policies, and independently selected URL layers and media-document links. Community Goal
-  and Viewer-funded Bounty instances are reported as omitted because Community is not in format 1.
-- `automations`: core flow definitions, graph layout, nodes, bindings, expressions, failure
-  policies, aliases, positions, and edges.
+  and Viewer-funded Bounty instances are reported as omitted because Community is not in format 2.
+- `automations`: explicitly selected flows, their complete reachable immutable subflow revisions,
+  graph layout, typed interfaces, bindings, expressions, failure policies, aliases and positions.
+  Saved generated test scenarios can be selected independently for each selected flow.
 
 References use deterministic export-local identifiers such as `reply-0001`; database primary keys
 are not part of the format. Object properties and collection order are deterministic where the
@@ -49,15 +50,14 @@ source configuration has a stable order.
 
 ## Compatibility and limits
 
-- The version 1 envelope and typed section records reject unknown properties and unknown enum
-  values rather than dropping them. A known core Automation node can retain an invalid
-  configuration object for repair in the destination editor.
-- The explicit version 0 adapter migrates its top-level `channelLogin` into the version 1 `source`
-  object. Other older or future versions are rejected.
-- The upload limit is 2 MB. Every configuration collection is limited to 1,000 records.
-- All export-local references, identifiers, canonical guessing slugs, and persistence limits are
-  checked before persistence. Automation editor errors do not block a safely representable core
-  flow.
+- Only version 2 is supported. Versions 0 and 1 receive an unsupported-version error. There is no
+  conversion reader. Unknown properties and enum values are rejected.
+- The upload limit is 2 MB; configuration collections remain limited to 1,000 records. Each
+  automation graph is limited to 256 nodes and 1,024 edges; subflow closures are limited to 128
+  revisions, eight levels and 1,024 visits. Each flow has at most 32 saved scenarios.
+- Node schemas, graphs, caller interfaces, complete revision dependencies, host references and
+  installed plugin contracts are validated before staging. Invalid automations cannot be imported
+  for later repair: fix them in the source application first.
 - Overlay media links contain an immutable document ID, media metadata, and a channel-local name.
   They never contain media bytes, storage keys, paths, or generated browser URLs. Import succeeds
   only when that document is already available in the same BlokeBot instance.
@@ -75,8 +75,8 @@ Guessing profiles match an explicit target mapping first and otherwise match can
 History-bound profiles are updated in place. Replace deletes only absent profiles without retained
 rounds; an absent history-bound profile must be retained or the import is aborted. Overlay Cue
 commands and Automation nodes resolve through the same export-local Overlay, cue, command, and
-provider-reference plan. An unresolved Automation dependency becomes an identity-free placeholder.
-The destination editor reports that node as invalid until the user selects a local dependency.
+provider-reference plan. An unresolved Automation dependency blocks the import. Select an available destination dependency
+before importing.
 
 Overlay instances and cues receive destination identities; imported access keys, revisions,
 timestamps, events, and live queues do not transfer. Existing destination records matched by the
@@ -85,12 +85,25 @@ unless the review explicitly aborts.
 
 Automation flows match by normalized name. A matched flow updates in place so its frozen runs and
 history remain attached. Replace never deletes an absent flow that has runs; the review must retain
-it or abort. Known core flows can transfer with invalid configuration, bindings, or graph layout
-when the document remains safe to persist. Fixed non-null CEL Actor and Channel values become
-explicit identity-free placeholders. A fixed nullable null stays null. In other invalid fixed
-fields, any nested object with a `login` or `display-name` member becomes an identity-free
-placeholder; member-name matching ignores letter case. Export and import write warning logs with
-only the host, flow, node, and reason. Unknown and plugin-defined nodes are rejected in format 1.
+it or abort. Imported graph, revision and scenario identities are mapped deterministically within
+this destination host and document. Referenced immutable revisions and admitted frozen runs are
+not rewritten or removed. Subflows, callers, scenarios, feature changes and the import audit share
+one transaction; any failure rolls back the complete import.
+
+Plugin nodes reference an already installed, available, compatible definition. The document contains
+stable plugin code/definition identifiers only; destination lifecycle and feature generations are
+resolved locally. No package is fetched or installed, and no plugin settings or secrets transfer.
+
+Fixed identifying or event-derived values are rejected, not anonymized. Explicitly selected test
+scenarios must originate from the canonical generated-fixture recipe and still match it exactly.
+The recipe carries source schema, virtual clock, seed, typed generated inputs and declared effect
+outcomes, not a serialized event context. Custom or edited local scenarios remain available locally;
+recreate them with generated inputs or deselect them before export. No arbitrary text, viewer/event
+record or secret can be smuggled into a generated value parameter.
+
+Disabled valid flows can be stored while host features are off. An enabled imported caller must
+have every required feature of its complete closure enabled by the resulting import. Missing or
+unavailable plugin contracts, invalid schemas and unsafe values always block import.
 
 Feature configuration can be imported while its Chat Tools switch remains off. Configuration does
 not implicitly enable a feature. Explicitly selected enablement changes commit a durable activation
@@ -109,6 +122,6 @@ server paths, deployment settings, point balances or ledgers, completed guessing
 leaderboards, giveaway entrants or draws, alerts, public-chat outbox data, delivery receipts,
 viewer IDs, viewer logins, viewer display names, command viewer allow lists, stream runtime state,
 Overlay events or playback queues, Automation runs, frozen contexts, checkpoints, delays, leases
-or receipts, community data, Lua or plugin configuration, media bytes, or raw database IDs.
-Community remains excluded. Plugin configuration and nodes first belong to a genuine format 2
-after the v0.13 plugin platform exists.
+or receipts, traces, invocation contexts, simulator results or operational diagnostics, community data, Lua or plugin configuration, media bytes, or raw database IDs.
+Community and plugin settings remain excluded. Plugin node contract references are the only plugin
+metadata included.

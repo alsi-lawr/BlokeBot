@@ -98,7 +98,7 @@ internal static partial class ConfigurationDocumentValidator
             {
                 return new(
                     $"sections.overlays.instances[{instance.Id}]",
-                    "The overlay instance is not a portable core Format 1 instance."
+                    "The overlay instance is not a portable core Format 2 instance."
                 );
             }
         }

@@ -56,7 +56,6 @@ public sealed class PluginAutomationCatalogTests
             Definition("publish-link")
         );
         catalog.TryResolve(staleDefinitionId, out _).ShouldBeTrue();
-        catalog.IsFormat1Definition(staleDefinitionId).ShouldBeFalse();
         var secondHostState = State(declaration, fence, revision: 1, enabled: true, hostId: 2);
         snapshots.Publish(secondHostState);
         catalog.TryResolve(new(2), staleDefinitionId, out var secondHostDefinition).ShouldBeTrue();

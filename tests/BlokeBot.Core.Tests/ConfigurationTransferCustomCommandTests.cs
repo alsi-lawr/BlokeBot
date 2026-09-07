@@ -1,12 +1,11 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Persistence.Plugins;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -51,9 +50,13 @@ public sealed class ConfigurationTransferCustomCommandTests
                 new(),
                 automation.Catalog,
                 automation.Flows,
-                NullLogger<ConfigurationDocumentExporter>.Instance,
                 TimeProvider.System,
-                new EfPluginFeatureStore(database, new())
+                new AutomationScenarioService(
+                    database,
+                    automation.Catalog,
+                    automation.Flows,
+                    TimeProvider.System
+                )
             ).ExportAsync(
                 hostId,
                 new(
@@ -653,7 +656,7 @@ public sealed class ConfigurationTransferCustomCommandTests
         SqliteBlokeBotDbFactory database,
         CustomCommandConfigurationTransferAdapter adapter,
         int hostId,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         SectionImportSelection section
     )
     {
@@ -693,10 +696,10 @@ public sealed class ConfigurationTransferCustomCommandTests
             new(CustomCommandActionTypeV1.Message, ZeroArgumentReplyId: "reply")
         );
 
-    private static ConfigurationDocumentV1 Document(CustomCommandsSectionV1 commands) =>
+    private static ConfigurationDocumentV2 Document(CustomCommandsSectionV1 commands) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source", "0.12.0"),
             new(CustomCommands: commands)

@@ -20,6 +20,18 @@ public sealed partial class AutomationFlowService
         CancellationToken cancellationToken
     ) => ValidateAsync(draft, AutomationGraphAdmission.ConfigurationTransfer, cancellationToken);
 
+    internal Task<AutomationGraphValidation> ValidateSubflowTransferAsync(
+        AutomationSubflowDraft draft,
+        CancellationToken cancellationToken
+    ) =>
+        ValidateAsync(
+            draft.Graph,
+            AutomationGraphAdmission.ConfigurationTransfer,
+            cancellationToken,
+            draft.Interface,
+            draft.Id
+        );
+
     internal Task<AutomationGraphValidation> ValidateFrozenDefinitionAsync(
         AutomationHostId hostId,
         AutomationRuntimeSerialization.PersistedFlow flow,

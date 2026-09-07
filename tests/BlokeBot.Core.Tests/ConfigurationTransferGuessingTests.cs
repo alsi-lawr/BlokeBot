@@ -455,10 +455,10 @@ public sealed class ConfigurationTransferGuessingTests
             Alias = alias,
         };
 
-    private static ConfigurationDocumentV1 Document(GuessingSectionV1 guessing) =>
+    private static ConfigurationDocumentV2 Document(GuessingSectionV1 guessing) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source", "0.12.0"),
             new(Guessing: guessing)

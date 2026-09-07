@@ -23,7 +23,11 @@ public sealed record OverlayExportSelection(
 public sealed record ConfigurationExportSelection(
     IReadOnlySet<ConfigurationSectionId> Sections,
     OverlayExportSelection Overlay
-);
+)
+{
+    public IReadOnlySet<Guid> AutomationFlowIds { get; init; } = new HashSet<Guid>();
+    public IReadOnlySet<Guid> AutomationScenarioIds { get; init; } = new HashSet<Guid>();
+}
 
 public enum ImportConflictStrategy
 {
@@ -100,7 +104,7 @@ public sealed record ConfigurationImportPreview(
     Guid PreviewId,
     int DestinationHostId,
     string DestinationLogin,
-    ConfigurationDocumentV1 Document,
+    ConfigurationDocumentV2 Document,
     IReadOnlyList<ConfigurationSectionPreview> Sections,
     IReadOnlyList<ConfigurationEnablementChange> EnablementChanges
 )
