@@ -80,3 +80,18 @@ public sealed record AutomationSubflowNodeContract(
     AutomationActionCapabilities Capabilities,
     AutomationActionRetrySafety RetrySafety
 );
+
+public sealed record AutomationSubflowLibraryQuery(string Search, int Offset = 0);
+
+public sealed record AutomationSubflowLibrarySummary(
+    AutomationSubflowRevisionId Id,
+    AutomationSubflowId SubflowId,
+    int Revision,
+    string Name,
+    string Description
+);
+
+public sealed record AutomationSubflowLibraryPage(
+    ImmutableArray<AutomationSubflowLibrarySummary> Revisions,
+    int? NextOffset
+);

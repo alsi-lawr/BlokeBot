@@ -1,11 +1,13 @@
 using System.Collections.Immutable;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Contracts.Testing;
 using BlokeBot.Plugins.Features;
 using BlokeBot.Plugins.Runtime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -127,8 +129,11 @@ public sealed partial class AutomationRuntimeTests
             await fixture.Flows.SaveAsync(caller, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
         var restored = (
-            await Subflows(fixture).ListAsync(new(fixture.HostId), CancellationToken.None)
-        ).ShouldHaveSingleItem();
+            await Subflows(fixture)
+                .LoadClosureAsync(new(fixture.HostId), [revision.Id], CancellationToken.None)
+        )
+            .ShouldBeOfType<AutomationSubflowClosureOutcome.Available>()
+            .Closure.Revisions.ShouldHaveSingleItem();
         AutomationSubflowSerialization
             .Serialize(restored)
             .ShouldBe(AutomationSubflowSerialization.Serialize(revision));
@@ -183,8 +188,12 @@ public sealed partial class AutomationRuntimeTests
         (
             await service.RemoveRevisionAsync(new(otherHost), revision.Id, CancellationToken.None)
         ).ShouldBe(AutomationSubflowRemovalOutcome.NotFound);
-        (await service.ListAsync(new(otherHost), CancellationToken.None)).ShouldBeEmpty();
-        (await service.ListAsync(new(fixture.HostId), CancellationToken.None)).Length.ShouldBe(1);
+        (
+            await service.ListAsync(new(otherHost), new(""), CancellationToken.None)
+        ).Revisions.ShouldBeEmpty();
+        (
+            await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
+        ).Revisions.Length.ShouldBe(1);
     }
 
     [Test]
@@ -215,9 +224,9 @@ public sealed partial class AutomationRuntimeTests
         )
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>()
             .Errors.ShouldContain(error => error.Code == "subflow-depth");
-        (await service.ListAsync(new(fixture.HostId), CancellationToken.None)).Length.ShouldBe(
-            AutomationSubflowStore.MaximumDepth
-        );
+        (
+            await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
+        ).Revisions.Length.ShouldBe(AutomationSubflowStore.MaximumDepth);
         (
             await service.RemoveRevisionAsync(new(fixture.HostId), first.Id, CancellationToken.None)
         ).ShouldBe(AutomationSubflowRemovalOutcome.Referenced);
@@ -271,7 +280,9 @@ public sealed partial class AutomationRuntimeTests
         _ = (
             await service.PublishAsync(invalid, CancellationToken.None)
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
-        (await service.ListAsync(new(fixture.HostId), CancellationToken.None)).ShouldBeEmpty();
+        (
+            await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
+        ).Revisions.ShouldBeEmpty();
     }
 
     [Test]
@@ -670,6 +681,147 @@ public sealed partial class AutomationRuntimeTests
             (await db.AutomationSubflowRevisions.CountAsync()).ShouldBe(0);
             (await db.AutomationSubflowCallers.CountAsync()).ShouldBe(0);
             (await db.AutomationSubflowRevisionReferences.CountAsync()).ShouldBe(0);
+        }
+    }
+
+    [Test]
+    public async Task Subflow_LibraryPagesAndSearchBoundMaterializationWhileOlderRevisionSelectionStaysHostScoped()
+    {
+        var materialization = new SubflowLibraryMaterialization();
+        await using var fixture = await RuntimeFixture.CreateAsync(
+            databaseInterceptors: [materialization]
+        );
+        var service = Subflows(fixture);
+        var draft = Subflow(fixture.HostId);
+        var nodes = new[] { draft.Graph.Nodes[0] }
+            .Concat(
+                Enumerable
+                    .Range(0, 40)
+                    .Select(_ => Node("delay", """{"duration-milliseconds":1}"""))
+            )
+            .Append(draft.Graph.Nodes[1])
+            .ToImmutableArray();
+        draft = draft with
+        {
+            Graph = draft.Graph with
+            {
+                Nodes = nodes,
+                Edges =
+                [
+                    .. nodes
+                        .Zip(nodes.Skip(1))
+                        .Select(pair => Edge(pair.First, "complete", pair.Second)),
+                ],
+            },
+        };
+        var revisions = new List<AutomationSubflowRevision>();
+        for (var index = 0; index < AutomationSubflowService.LibraryPageSize + 3; index++)
+        {
+            revisions.Add(
+                await Publish(
+                    service,
+                    draft with
+                    {
+                        Graph = draft.Graph with
+                        {
+                            Name = index == 0 ? "Older needle" : $"Library revision {index}",
+                        },
+                    }
+                )
+            );
+        }
+        var otherHost = await fixture.SeedHostAsync("library-other", HostFeatureFlags.Automations);
+        var otherDraft = Subflow(otherHost);
+        var other = await Publish(
+            service,
+            otherDraft with
+            {
+                Graph = otherDraft.Graph with { Name = "Other needle" },
+            }
+        );
+        materialization.Reset();
+        var first = await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None);
+        first.Revisions.Length.ShouldBe(AutomationSubflowService.LibraryPageSize);
+        _ = first.NextOffset.ShouldNotBeNull();
+        first.Revisions.ShouldNotContain(summary => summary.Id == revisions[0].Id);
+        materialization.Rows.ShouldBeInRange(1, AutomationSubflowService.LibraryPageSize + 1);
+        materialization.TextCharacters.ShouldBeLessThanOrEqualTo(
+            (AutomationSubflowService.LibraryPageSize + 1) * 2200
+        );
+        var response = System.Text.Json.JsonSerializer.Serialize(first);
+        response.Length.ShouldBeLessThan(AutomationSubflowService.LibraryPageSize * 15000);
+        materialization.Reset();
+        var last = await service.ListAsync(
+            new(fixture.HostId),
+            new("", first.NextOffset!.Value),
+            CancellationToken.None
+        );
+        last.NextOffset.ShouldBeNull();
+        first
+            .Revisions.Concat(last.Revisions)
+            .Select(summary => summary.Id)
+            .ShouldBe(revisions.Select(revision => revision.Id), ignoreOrder: true);
+        materialization.Rows.ShouldBeInRange(1, AutomationSubflowService.LibraryPageSize + 1);
+        materialization.Reset();
+        var found = await service.ListAsync(
+            new(fixture.HostId),
+            new("NEEDLE"),
+            CancellationToken.None
+        );
+        found.Revisions.ShouldHaveSingleItem().Id.ShouldBe(revisions[0].Id);
+        found.NextOffset.ShouldBeNull();
+        materialization.Rows.ShouldBe(1);
+        materialization.TextCharacters.ShouldBeLessThanOrEqualTo(2200);
+        materialization.Armed = false;
+        var selected = (
+            await service.LoadClosureAsync(
+                new(fixture.HostId),
+                [found.Revisions[0].Id],
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<AutomationSubflowClosureOutcome.Available>()
+            .Closure.Revisions.ShouldHaveSingleItem();
+        AutomationSubflowSerialization
+            .Serialize(selected)
+            .ShouldBe(AutomationSubflowSerialization.Serialize(revisions[0]));
+        _ = (
+            await service.LoadClosureAsync(new(otherHost), [selected.Id], CancellationToken.None)
+        ).ShouldBeOfType<AutomationSubflowClosureOutcome.Invalid>();
+        (await service.ListAsync(new(otherHost), new("needle"), CancellationToken.None))
+            .Revisions.ShouldHaveSingleItem()
+            .Id.ShouldBe(other.Id);
+    }
+
+    private sealed class SubflowLibraryMaterialization : IMaterializationInterceptor
+    {
+        internal bool Armed { get; set; }
+        internal int Rows { get; private set; }
+        internal int TextCharacters { get; private set; }
+
+        internal void Reset()
+        {
+            Armed = true;
+            Rows = 0;
+            TextCharacters = 0;
+        }
+
+        public object InitializedInstance(
+            MaterializationInterceptionData materializationData,
+            object entity
+        )
+        {
+            if (Armed)
+            {
+                Rows++;
+                TextCharacters += entity switch
+                {
+                    AutomationSubflowLibraryRow row => row.Name.Length + row.Description.Length,
+                    AutomationSubflowRevisionRecord row => row.SnapshotJson.Length,
+                    _ => 0,
+                };
+            }
+            return entity;
         }
     }
 

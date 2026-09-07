@@ -12,19 +12,42 @@ public sealed class AutomationSubflowService(
     TimeProvider clock
 )
 {
-    public async Task<ImmutableArray<AutomationSubflowRevision>> ListAsync(
+    public const int LibraryPageSize = 20;
+
+    public async Task<AutomationSubflowLibraryPage> ListAsync(
         AutomationHostId hostId,
+        AutomationSubflowLibraryQuery query,
         CancellationToken cancellationToken
     )
     {
+        var search = query.Search.Trim().ToLowerInvariant();
+        if (search.Length > 200)
+        {
+            return new([], null);
+        }
+        var offset = Math.Max(query.Offset, 0);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var rows = await db
-            .AutomationSubflowRevisions.AsNoTracking()
-            .Where(row => row.HostId == hostId.Value)
+        var rows = await MainDatabaseStatements
+            .QuerySubflowLibrary(db, hostId.Value)
+            .Where(row => row.Name.ToLower().Contains(search))
             .OrderBy(row => row.SubflowId)
-            .ThenBy(row => row.Revision)
+            .ThenByDescending(row => row.Revision)
+            .Skip(offset)
+            .Take(LibraryPageSize + 1)
             .ToArrayAsync(cancellationToken);
-        return [.. rows.Select(row => AutomationSubflowSerialization.Restore(row.SnapshotJson))];
+        return new(
+            [
+                .. rows.Take(LibraryPageSize)
+                    .Select(row => new AutomationSubflowLibrarySummary(
+                        new(row.Id),
+                        new(row.SubflowId),
+                        row.Revision,
+                        row.Name,
+                        row.Description
+                    )),
+            ],
+            rows.Length > LibraryPageSize ? checked(offset + LibraryPageSize) : null
+        );
     }
 
     public async Task<AutomationSubflowClosureOutcome> LoadClosureAsync(
