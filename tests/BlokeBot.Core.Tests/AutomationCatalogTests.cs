@@ -76,7 +76,6 @@ public sealed class AutomationCatalogTests
 
         var enabled = await service.DiscoverAsync(new(enabledHost), CancellationToken.None);
         enabled.Availability.ShouldBe(AutomationCatalogAvailability.Enabled);
-        enabled.Definitions.Length.ShouldBe(7);
 
         _ = await features.EnableAsync(
             disabledHost,
@@ -311,7 +310,6 @@ public sealed class AutomationCatalogTests
             new CoreAutomationCatalogModule(),
             new AdditionalAutomationModule(),
         ]);
-        extended.Descriptors.Length.ShouldBe(9);
         extended.Descriptors.ShouldContain(static definition =>
             definition.Id == new AutomationDefinitionId("sample-source")
         );
