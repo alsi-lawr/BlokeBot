@@ -103,6 +103,16 @@ public partial class AutomationEditorPage
         catch (JSException) { }
         catch (TaskCanceledException) { }
 
+        if (_focusAuthoring && _pageModule is not null)
+        {
+            _focusAuthoring = false;
+            await _pageModule.InvokeVoidAsync("focusAuthoring");
+        }
+        if (_revealSelectedTrace && _pageModule is not null)
+        {
+            _revealSelectedTrace = false;
+            await _pageModule.InvokeVoidAsync("revealSelectedTrace");
+        }
         if (_focusToolboxAfterRender && _toolbox is not null)
         {
             _focusToolboxAfterRender = false;
@@ -129,6 +139,7 @@ public partial class AutomationEditorPage
     {
         if (disposing)
         {
+            _scenarioCancellation?.Cancel();
             CancelValidationFeedback();
             _catalogChangeCancellation.Cancel();
             _history.Clear();

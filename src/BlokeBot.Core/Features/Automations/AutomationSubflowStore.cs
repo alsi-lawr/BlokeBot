@@ -15,7 +15,8 @@ internal static class AutomationSubflowStore
         AutomationHostId hostId,
         IEnumerable<AutomationSubflowRevisionId> roots,
         AutomationSubflowId? publishing,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationSubflowRevision? preparedCandidate = null
     )
     {
         var revisions = new Dictionary<AutomationSubflowRevisionId, AutomationSubflowRevision>();
@@ -58,23 +59,34 @@ internal static class AutomationSubflowStore
                     errors.Add(Error("subflow-closure-limit", "Use fewer subflow revisions."));
                     return;
                 }
-                var row = await db
-                    .AutomationSubflowRevisions.AsNoTracking()
-                    .SingleOrDefaultAsync(
-                        value => value.HostId == hostId.Value && value.Id == id.Value,
-                        cancellationToken
-                    );
-                if (row is null)
+                if (
+                    preparedCandidate is { } candidate
+                    && candidate.Id == id
+                    && candidate.Graph.HostId == hostId
+                )
                 {
-                    errors.Add(
-                        Error(
-                            "subflow-revision-missing",
-                            "Select a subflow revision owned by this host."
-                        )
-                    );
-                    return;
+                    revision = candidate;
                 }
-                revision = AutomationSubflowSerialization.Restore(row.SnapshotJson);
+                else
+                {
+                    var row = await db
+                        .AutomationSubflowRevisions.AsNoTracking()
+                        .SingleOrDefaultAsync(
+                            value => value.HostId == hostId.Value && value.Id == id.Value,
+                            cancellationToken
+                        );
+                    if (row is null)
+                    {
+                        errors.Add(
+                            Error(
+                                "subflow-revision-missing",
+                                "Select a subflow revision owned by this host."
+                            )
+                        );
+                        return;
+                    }
+                    revision = AutomationSubflowSerialization.Restore(row.SnapshotJson);
+                }
                 revisions.Add(id, revision);
             }
             if (!ancestors.Add(revision.SubflowId))
@@ -112,7 +124,8 @@ internal static class AutomationSubflowStore
     internal static async Task<ImmutableArray<AutomationGraphError>> ValidatePinsAsync(
         BlokeBotDbContext db,
         AutomationFlowDraft graph,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationSubflowRevision? preparedCandidate = null
     )
     {
         var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
@@ -129,26 +142,36 @@ internal static class AutomationSubflowStore
                 );
                 continue;
             }
-            var row = await db
-                .AutomationSubflowRevisions.AsNoTracking()
-                .SingleOrDefaultAsync(
-                    value =>
-                        value.HostId == graph.HostId.Value
-                        && value.Id == configuration.RevisionId!.Value.Value,
-                    cancellationToken
-                );
-            if (row is not null)
+            AutomationSubflowRevision? revision;
+            if (
+                preparedCandidate is { } candidate
+                && candidate.Id == configuration.RevisionId
+                && candidate.Graph.HostId == graph.HostId
+            )
+            {
+                revision = candidate;
+            }
+            else
+            {
+                var row = await db
+                    .AutomationSubflowRevisions.AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        value =>
+                            value.HostId == graph.HostId.Value
+                            && value.Id == configuration.RevisionId!.Value.Value,
+                        cancellationToken
+                    );
+                revision = row is null
+                    ? null
+                    : AutomationSubflowSerialization.Restore(row.SnapshotJson);
+            }
+            if (revision is not null)
             {
                 var enabled = await db
                     .Hosts.Where(host => host.Id == graph.HostId.Value)
                     .Select(host => host.EnabledFeatures)
                     .SingleAsync(cancellationToken);
-                if (
-                    (
-                        AutomationSubflowSerialization.Restore(row.SnapshotJson).RequiredFeatures
-                        & ~enabled
-                    ) != HostFeatureFlags.None
-                )
+                if ((revision.RequiredFeatures & ~enabled) != HostFeatureFlags.None)
                 {
                     errors.Add(
                         Error(
@@ -160,10 +183,10 @@ internal static class AutomationSubflowStore
                 }
             }
             if (
-                row is null
+                revision is null
                 || !AutomationSubflowDefinitions.SameInterface(
                     configuration.Interface,
-                    AutomationSubflowSerialization.Restore(row.SnapshotJson).Interface
+                    revision.Interface
                 )
             )
             {

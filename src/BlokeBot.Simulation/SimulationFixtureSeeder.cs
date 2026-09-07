@@ -14,7 +14,11 @@ namespace BlokeBot.Simulation;
 
 internal sealed class SimulationFixtureSeeder(
     BotHostProvisioningService provisioning,
-    IDbContextFactory<BlokeBotDbContext> dbFactory
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    AutomationSubflowService subflows,
+    AutomationFlowService flows,
+    AutomationScenarioService scenarios,
+    AutomationCatalogService catalog
 )
 {
     internal const string OverlayAccessKey = "simulation-overlay-access-key-0000000000000";
@@ -75,6 +79,19 @@ internal sealed class SimulationFixtureSeeder(
         _ = await db.SaveChangesAsync(cancellationToken);
         await SeedAutomationsAsync(db, hostId, now, cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
+
+        if (Environment.GetEnvironmentVariable("BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE") == "1")
+        {
+            await SimulationAutomationAuthoringFixture.SeedAsync(
+                hostId,
+                dbFactory,
+                subflows,
+                flows,
+                scenarios,
+                catalog,
+                cancellationToken
+            );
+        }
 
         return new BotHostChoice(
             hostId,

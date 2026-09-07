@@ -2,7 +2,17 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationEditorPage
 {
-    private async Task SaveAsync() => _ = await SaveCoreAsync();
+    private async Task SaveAsync()
+    {
+        if (_editor?.Subflow is not null)
+        {
+            await ReviewSubflowAsync();
+        }
+        else
+        {
+            _ = await SaveCoreAsync();
+        }
+    }
 
     private async Task<bool> SaveCoreAsync()
     {
@@ -64,6 +74,11 @@ public partial class AutomationEditorPage
             return;
         }
 
+        if (_editor.Subflow is not null)
+        {
+            await ReviewSubflowAsync();
+            return;
+        }
         _busy = true;
         var requestedHostId = HostId;
         try
@@ -111,59 +126,8 @@ public partial class AutomationEditorPage
 
     private async Task RunSampleAsync()
     {
-        if (_editor is null || HostId == 0)
-        {
-            return;
-        }
-
-        _busy = true;
-        var requestedHostId = HostId;
-        try
-        {
-            await RunSelectedHostMutationAsync(
-                requestedHostId,
-                async () =>
-                {
-                    if (SampleSourceId() is not { } sourceNodeId)
-                    {
-                        ShowValidation(
-                            [new(null, "source-count", "Add one or more trigger nodes.")],
-                            "Correct the flow before you test it."
-                        );
-                        return;
-                    }
-
-                    var outcome = await _scenariosService.RunDefaultAsync(
-                        _editor.Draft(new(requestedHostId)),
-                        sourceNodeId,
-                        CancellationToken.None
-                    );
-                    switch (outcome)
-                    {
-                        case AutomationScenarioRunOutcome.Completed completed:
-                            _sampleOutcomes = completed.Nodes;
-                            _feedback = null;
-                            _operationFailed = false;
-                            break;
-                        case AutomationScenarioRunOutcome.Failed failed:
-                            _sampleOutcomes = failed.Nodes;
-                            _feedback = "The sample stopped at the failed node.";
-                            _operationFailed = true;
-                            break;
-                        case AutomationScenarioRunOutcome.Invalid invalid:
-                            ShowValidation(invalid.Errors, "Correct the flow before you test it.");
-                            break;
-                        default:
-                            ShowUnavailable();
-                            break;
-                    }
-                }
-            );
-        }
-        finally
-        {
-            _busy = false;
-        }
+        await OpenScenariosAsync();
+        await RunScenarioAsync();
     }
 
     private async Task ToggleEnabledAsync()

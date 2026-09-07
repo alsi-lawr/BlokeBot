@@ -188,14 +188,12 @@ public partial class AutomationFlowCanvas
     private static string OutcomeLabel(AutomationScenarioNodeOutcome outcome) =>
         outcome.OutcomeCode switch
         {
-            "source-received" => "Sample received",
+            "source-received" => "Received",
             "condition-true" => "Yes branch",
             "condition-false" => "No branch",
             "delayed" => "Virtual delay",
-            "action-simulated" => "Action not sent",
-            _ => outcome.State == AutomationNodeRunState.Failed
-                ? "Sample failed"
-                : outcome.OutcomeCode,
+            "action-simulated" => "Succeeded",
+            _ => outcome.State == AutomationNodeRunState.Failed ? "Failed" : outcome.OutcomeCode,
         };
 
     private static string OrientationToken(AutomationFlowOrientation orientation) =>

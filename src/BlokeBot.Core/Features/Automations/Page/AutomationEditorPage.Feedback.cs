@@ -83,6 +83,10 @@ public partial class AutomationEditorPage
 
     private void DraftChanged()
     {
+        _draftRevision++;
+        _subflowPreview = null;
+        _extraction = null;
+        RefreshScenarioFields();
         CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];

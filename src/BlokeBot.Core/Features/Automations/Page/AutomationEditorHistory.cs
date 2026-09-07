@@ -131,6 +131,7 @@ internal sealed record AutomationEditorDraftDiff(
 internal sealed class AutomationEditorDraftSnapshot
 {
     private readonly AutomationFlowDraft _draft;
+    private readonly AutomationEditorSubflow? _subflow;
     private readonly ImmutableDictionary<
         AutomationNodeId,
         AutomationDefinitionDescriptor
@@ -138,11 +139,13 @@ internal sealed class AutomationEditorDraftSnapshot
 
     private AutomationEditorDraftSnapshot(
         AutomationFlowDraft draft,
-        ImmutableDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions
+        ImmutableDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions,
+        AutomationEditorSubflow? subflow
     )
     {
         _draft = draft;
         _definitions = definitions;
+        _subflow = subflow;
     }
 
     internal static AutomationEditorDraftSnapshot Capture(AutomationEditorState editor) =>
@@ -156,16 +159,18 @@ internal sealed class AutomationEditorDraftSnapshot
             editor.Nodes.ToImmutableDictionary(
                 static node => node.Id,
                 static node => node.Definition
-            )
+            ),
+            editor.Subflow
         );
 
     internal bool Matches(AutomationEditorState editor) => ContentEquals(Capture(editor));
 
     internal bool ContentEquals(AutomationEditorDraftSnapshot other) =>
-        DraftContentEquals(_draft, other._draft);
+        _subflow == other._subflow && DraftContentEquals(_draft, other._draft);
 
-    internal AutomationEditorState Restore(AutomationEditorState current) =>
-        AutomationEditorState.Restore(
+    internal AutomationEditorState Restore(AutomationEditorState current)
+    {
+        var restored = AutomationEditorState.Restore(
             _draft with
             {
                 Id = current.Id,
@@ -173,6 +178,9 @@ internal sealed class AutomationEditorDraftSnapshot
             },
             _definitions
         );
+        restored.Subflow = _subflow;
+        return restored;
+    }
 
     private static bool DraftContentEquals(AutomationFlowDraft left, AutomationFlowDraft right) =>
         left.Id == right.Id

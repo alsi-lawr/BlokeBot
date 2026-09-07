@@ -255,6 +255,20 @@ export function refresh(root) {
   scheduleRoutePass(state);
 }
 
+export function revealNode(root, nodeId) {
+  const state = states.get(root);
+  const node = root.querySelector(`[data-automation-node="${CSS.escape(nodeId)}"]`);
+  if (state === undefined || !(node instanceof HTMLElement)) return;
+  const viewport = root.getBoundingClientRect();
+  const bounds = node.getBoundingClientRect();
+  if (bounds.left < viewport.left || bounds.right > viewport.right
+    || bounds.top < viewport.top || bounds.bottom > viewport.bottom) {
+    state.panX += viewport.left + viewport.width / 2 - bounds.left - bounds.width / 2;
+    state.panY += viewport.top + viewport.height / 2 - bounds.top - bounds.height / 2;
+    applyTransform(state);
+  }
+}
+
 export function focusNode(root, nodeId) {
   root.querySelector(
     `[data-automation-node="${CSS.escape(nodeId)}"] [data-automation-node-select]`,

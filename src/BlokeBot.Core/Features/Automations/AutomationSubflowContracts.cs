@@ -95,3 +95,16 @@ public sealed record AutomationSubflowLibraryPage(
     ImmutableArray<AutomationSubflowLibrarySummary> Revisions,
     int? NextOffset
 );
+
+public abstract record AutomationSubflowPreviewOutcome
+{
+    private AutomationSubflowPreviewOutcome() { }
+
+    public sealed record Ready(
+        ImmutableArray<AutomationSubflowCaller> IncompatibleCallers,
+        AutomationSubflowRevision Candidate
+    ) : AutomationSubflowPreviewOutcome;
+
+    public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
+        : AutomationSubflowPreviewOutcome;
+}

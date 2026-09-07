@@ -133,6 +133,18 @@ public sealed partial class AutomationEditorNode
                 _ => new AutomationValue.Null(valueType),
             };
 
+    internal static AutomationValue DefaultFixtureValue(AutomationPortValueType type) =>
+        type switch
+        {
+            AutomationPortValueType.Text => new AutomationValue.Text(string.Empty),
+            AutomationPortValueType.Number => new AutomationValue.Number(0),
+            AutomationPortValueType.Boolean => new AutomationValue.Boolean(false),
+            AutomationPortValueType.Timestamp => new AutomationValue.Timestamp(
+                DateTimeOffset.UnixEpoch
+            ),
+            _ => CanonicalComplexFixedValue(type),
+        };
+
     private static AutomationValue CanonicalComplexFixedValue(AutomationPortValueType valueType) =>
         valueType switch
         {
@@ -166,7 +178,7 @@ public sealed partial class AutomationEditorNode
                 or AutomationPortValueType.Array
                 or AutomationPortValueType.Map;
 
-    private static bool TryParseComplexFixedValue(
+    internal static bool TryParseComplexFixedValue(
         string source,
         AutomationPortValueType valueType,
         AutomationPortNullability nullability,
@@ -190,7 +202,7 @@ public sealed partial class AutomationEditorNode
         }
     }
 
-    private static string DisplayFixedValue(AutomationValue value) =>
+    internal static string DisplayFixedValue(AutomationValue value) =>
         value switch
         {
             AutomationValue.Text text => text.Value,

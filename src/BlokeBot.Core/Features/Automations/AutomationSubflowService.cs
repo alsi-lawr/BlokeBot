@@ -1,12 +1,11 @@
 using System.Collections.Immutable;
-using System.Text;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public sealed class AutomationSubflowService(
+public sealed partial class AutomationSubflowService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationFlowService flows,
     TimeProvider clock
@@ -66,39 +65,40 @@ public sealed class AutomationSubflowService(
         );
     }
 
+    public async Task<AutomationSubflowPreviewOutcome> PreviewAsync(
+        AutomationSubflowDraft draft,
+        CancellationToken cancellationToken
+    )
+    {
+        var validation = await ValidateDraftAsync(draft, cancellationToken);
+        if (!validation.Errors.IsEmpty)
+        {
+            return new AutomationSubflowPreviewOutcome.Invalid(validation.Errors);
+        }
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await PrepareAsync(db, draft, validation, cancellationToken) switch
+        {
+            Preparation.Ready ready => new AutomationSubflowPreviewOutcome.Ready(
+                ready.Callers,
+                ready.Revision
+            ),
+            Preparation.Invalid invalid => new AutomationSubflowPreviewOutcome.Invalid(
+                invalid.Errors
+            ),
+            _ => throw new InvalidOperationException(),
+        };
+    }
+
     public async Task<AutomationSubflowPublishOutcome> PublishAsync(
         AutomationSubflowDraft draft,
         CancellationToken cancellationToken
     )
     {
-        if (
-            draft.Id.Value == Guid.Empty
-            || draft.Description is null
-            || draft.Description.Length > 2000
-            || draft.Graph.Id is not null
-            || draft.Graph.IsEnabled
-            || !AutomationSubflowDefinitions.ValidInterface(draft.Interface)
-            || draft.Graph.Nodes.IsDefault
-            || draft.Graph.Nodes.Length is < 2 or > 256
-            || draft.Graph.Edges.IsDefault
-            || draft.Graph.Edges.Length > 1024
-        )
-        {
-            return Invalid(
-                "subflow-contract-invalid",
-                "Use bounded metadata, typed ports and a source-free subflow graph."
-            );
-        }
-        var validation = await flows.ValidateSubflowAsync(draft, cancellationToken);
-        if (validation.Gate is not null)
-        {
-            return Invalid("subflow-host-unavailable", "Enable automations for this host.");
-        }
+        var validation = await ValidateDraftAsync(draft, cancellationToken);
         if (!validation.Errors.IsEmpty)
         {
             return new AutomationSubflowPublishOutcome.Invalid(validation.Errors);
         }
-
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         if (
@@ -111,126 +111,39 @@ public sealed class AutomationSubflowService(
         {
             return Invalid("subflow-host-unavailable", "Enable automations for this host.");
         }
-        var pinErrors = await AutomationSubflowStore.ValidatePinsAsync(
-            db,
-            draft.Graph,
-            cancellationToken
-        );
-        if (!pinErrors.IsEmpty)
-        {
-            return new AutomationSubflowPublishOutcome.Invalid(pinErrors);
-        }
-        var loaded = await AutomationSubflowStore.LoadClosureAsync(
-            db,
-            draft.Graph.HostId,
-            AutomationSubflowStore.Pins(draft.Graph.Nodes).Select(pin => pin.RevisionId),
-            draft.Id,
-            cancellationToken
-        );
-        if (loaded is AutomationSubflowClosureOutcome.Invalid invalid)
+        var prepared = await PrepareAsync(db, draft, validation, cancellationToken);
+        if (prepared is Preparation.Invalid invalid)
         {
             return new AutomationSubflowPublishOutcome.Invalid(invalid.Errors);
         }
-        var closure = ((AutomationSubflowClosureOutcome.Available)loaded).Closure;
+        var ready = (Preparation.Ready)prepared;
+        var revision = ready.Revision;
         var hostId = draft.Graph.HostId.Value;
-        var previous = await db
-            .AutomationSubflowRevisions.AsNoTracking()
-            .Where(row => row.HostId == hostId && row.SubflowId == draft.Id.Value)
-            .OrderByDescending(row => row.Revision)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (previous is not null)
-        {
-            var rebindErrors = AutomationSubflowStore.RebindErrors(
-                AutomationSubflowSerialization.Restore(previous.SnapshotJson).Graph,
-                draft.Graph
-            );
-            if (!rebindErrors.IsEmpty)
-            {
-                return new AutomationSubflowPublishOutcome.Invalid(rebindErrors);
-            }
-        }
         var updated = await db
             .AutomationSubflows.Where(row => row.HostId == hostId && row.Id == draft.Id.Value)
             .ExecuteUpdateAsync(
-                set => set.SetProperty(row => row.LastRevision, row => row.LastRevision + 1),
+                set => set.SetProperty(row => row.LastRevision, revision.Revision),
                 cancellationToken
             );
-        int number;
         if (updated == 0)
         {
-            number = 1;
             _ = db.AutomationSubflows.Add(
                 new()
                 {
                     HostId = hostId,
                     Id = draft.Id.Value,
-                    LastRevision = number,
+                    LastRevision = revision.Revision,
                 }
             );
         }
-        else
-        {
-            number = await db
-                .AutomationSubflows.Where(row => row.HostId == hostId && row.Id == draft.Id.Value)
-                .Select(row => row.LastRevision)
-                .SingleAsync(cancellationToken);
-        }
-        var allNodes = draft
-            .Graph.Nodes.Concat(closure.Revisions.SelectMany(revision => revision.Graph.Nodes))
-            .ToArray();
-        var revision = new AutomationSubflowRevision(
-            new(Guid.NewGuid()),
-            draft.Id,
-            number,
-            draft.Description.Trim(),
-            draft.Interface,
-            draft.Graph with
-            {
-                Name = draft.Graph.Name.Trim(),
-            },
-            validation.NodeContracts,
-            AutomationRequiredFeatures.ForDefinitions(
-                allNodes.Select(node => node.Definition.TypeId)
-            ),
-            [
-                .. allNodes
-                    .Select(node => node.Definition.PluginProvenance)
-                    .OfType<AutomationPluginProvenance>()
-                    .Distinct(),
-            ],
-            clock.GetUtcNow()
-        );
-        var enabled = await db
-            .Hosts.Where(host => host.Id == hostId)
-            .Select(host => host.EnabledFeatures)
-            .SingleAsync(cancellationToken);
-        if ((revision.RequiredFeatures & ~enabled) != HostFeatureFlags.None)
-        {
-            return Invalid(
-                "capability-unavailable",
-                "Enable the subflow's required host features."
-            );
-        }
-        var json = AutomationSubflowSerialization.Serialize(revision);
-        if (Encoding.UTF8.GetByteCount(json) > 524288)
-        {
-            return Invalid("subflow-size", "Reduce the subflow snapshot size.");
-        }
-        var incompatible = await IncompatibleCallersAsync(
-            db,
-            hostId,
-            draft.Id,
-            draft.Interface,
-            cancellationToken
-        );
         _ = db.AutomationSubflowRevisions.Add(
             new()
             {
                 HostId = hostId,
                 Id = revision.Id.Value,
                 SubflowId = draft.Id.Value,
-                Revision = number,
-                SnapshotJson = json,
+                Revision = revision.Revision,
+                SnapshotJson = ready.Json,
             }
         );
         db.AutomationSubflowRevisionReferences.AddRange(
@@ -246,7 +159,7 @@ public sealed class AutomationSubflowService(
         );
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return new AutomationSubflowPublishOutcome.Published(revision, incompatible);
+        return new AutomationSubflowPublishOutcome.Published(revision, ready.Callers);
     }
 
     public async Task<AutomationSubflowRemovalOutcome> RemoveRevisionAsync(

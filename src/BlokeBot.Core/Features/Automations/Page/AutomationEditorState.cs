@@ -23,6 +23,8 @@ internal sealed class AutomationEditorState
 
     internal AutomationFlowId? Id { get; set; }
 
+    internal AutomationEditorSubflow? Subflow { get; set; }
+
     internal string Name { get; set; }
 
     internal bool IsEnabled { get; set; }
@@ -109,7 +111,8 @@ public sealed partial class AutomationEditorNode
         string? displayAlias,
         Dictionary<AutomationConfigurationFieldId, string> values,
         Dictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings,
-        AutomationCelTransformConfiguration? transform
+        AutomationCelTransformConfiguration? transform,
+        AutomationSubflowConfiguration? subflow = null
     )
     {
         Id = id;
@@ -120,6 +123,7 @@ public sealed partial class AutomationEditorNode
         _values = values;
         _bindings = bindings;
         _transform = transform;
+        Subflow = subflow;
     }
 
     internal AutomationNodeId Id { get; }
@@ -201,6 +205,9 @@ public sealed partial class AutomationEditorNode
     )
     {
         var transform = ParseTransform(node, definition);
+        var subflow = AutomationSubflowDefinitions.TryRead(node.Definition, out var parsedSubflow)
+            ? parsedSubflow
+            : null;
         return new(
             node.Id,
             definition,
@@ -210,13 +217,17 @@ public sealed partial class AutomationEditorNode
             definition.Configuration.ToDictionary(
                 static field => field.Id,
                 field =>
-                    transform is null
-                        ? ReadValue(node.Definition.Configuration, field.Id)
-                        : DisplayFixedValue(
-                            transform
-                                .Inputs.Single(input => input.BindingFieldId == field.Id)
-                                .FixedValue
-                        )
+                    subflow is not null
+                        ? subflow.FixedInputs.TryGetValue(new(field.Id.Value), out var fixedInput)
+                            ? DisplayFixedValue(fixedInput.Value)
+                            : DefaultValue(field)
+                        : transform is null
+                            ? ReadValue(node.Definition.Configuration, field.Id)
+                            : DisplayFixedValue(
+                                transform
+                                    .Inputs.Single(input => input.BindingFieldId == field.Id)
+                                    .FixedValue
+                            )
             ),
             definition.Configuration.ToDictionary(
                 static field => field.Id,
@@ -224,7 +235,8 @@ public sealed partial class AutomationEditorNode
                     node.InputBindings.GetValueOrDefault(field.Id)
                     ?? new(AutomationInputBindingMode.Fixed, null)
             ),
-            transform
+            transform,
+            subflow
         );
     }
 
