@@ -75,7 +75,7 @@
                  aria-labelledby="@SegmentedTabs.TabId(_modeTabsId, _exportModeKey)">
                 <TaskPanel Title="Choose what to export">
                     <Actions>
-                        <span class="status-pill status-pill--slate">JSON · format 1</span>
+                        <span class="status-pill status-pill--slate">JSON · format 2</span>
                     </Actions>
                     <ChildContent>
                         @foreach (var section in _sectionOptions)
@@ -107,6 +107,36 @@
                                             aria-label="@($"Export {section.Title}")"
                                             @onclick="() => ToggleExport(section.Id, !selected)"></button>
                                 </div>
+                            }
+                            @if (section.Id == ConfigurationSectionId.Automations && selected)
+                            {
+                                @foreach (var flow in _automationChoices)
+                                {
+                                    <div class="section-row" @key="flow.Id">
+                                        <span class="section-row__title">@flow.Name</span>
+                                        <button type="button"
+                                                class="studio-toggle"
+                                                role="switch"
+                                                aria-checked="@_flowSelections.Contains(flow.Id).ToString().ToLowerInvariant()"
+                                                aria-label="@($"Export flow {flow.Name}")"
+                                                @onclick="() => ToggleFlow(flow.Id, !_flowSelections.Contains(flow.Id))"></button>
+                                    </div>
+                                    @if (_flowSelections.Contains(flow.Id))
+                                    {
+                                        @foreach (var scenario in flow.Scenarios)
+                                        {
+                                            <div class="section-row" @key="scenario.Id">
+                                                <span class="section-row__detail">@scenario.Name</span>
+                                                <button type="button"
+                                                        class="studio-toggle"
+                                                        role="switch"
+                                                        aria-checked="@_scenarioSelections.Contains(scenario.Id).ToString().ToLowerInvariant()"
+                                                        aria-label="@($"Export scenario {scenario.Name} for {flow.Name}")"
+                                                        @onclick="() => ToggleScenario(scenario.Id, !_scenarioSelections.Contains(scenario.Id))"></button>
+                                            </div>
+                                        }
+                                    }
+                                }
                             }
                         }
                     </ChildContent>

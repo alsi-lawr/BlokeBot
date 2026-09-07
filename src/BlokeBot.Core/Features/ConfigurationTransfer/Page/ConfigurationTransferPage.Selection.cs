@@ -104,6 +104,34 @@ public partial class ConfigurationTransferPage
         }
     }
 
+    private void ToggleFlow(Guid id, bool selected)
+    {
+        if (selected)
+        {
+            _ = _flowSelections.Add(id);
+        }
+        else
+        {
+            _ = _flowSelections.Remove(id);
+            foreach (var scenario in _automationChoices.Single(flow => flow.Id == id).Scenarios)
+            {
+                _ = _scenarioSelections.Remove(scenario.Id);
+            }
+        }
+    }
+
+    private void ToggleScenario(Guid id, bool selected)
+    {
+        if (selected)
+        {
+            _ = _scenarioSelections.Add(id);
+        }
+        else
+        {
+            _ = _scenarioSelections.Remove(id);
+        }
+    }
+
     private void ToggleOverlayUrls(bool enabled)
     {
         _exportOverlayUrls = enabled;

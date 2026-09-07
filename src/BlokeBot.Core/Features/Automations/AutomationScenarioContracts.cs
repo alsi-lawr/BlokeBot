@@ -36,7 +36,10 @@ public sealed record AutomationScenarioFixture(
     ImmutableArray<AutomationScenarioConnectedInput> ConnectedInputs,
     ImmutableArray<AutomationScenarioConfiguration> Configurations,
     ImmutableArray<AutomationScenarioEffect> Effects
-);
+)
+{
+    public AutomationScenarioSyntheticRecipe? SyntheticRecipe { get; init; }
+}
 
 public sealed record AutomationScenarioSnapshot(
     AutomationScenarioId Id,

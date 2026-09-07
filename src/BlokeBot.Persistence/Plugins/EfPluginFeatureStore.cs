@@ -103,32 +103,6 @@ public sealed partial class EfPluginFeatureStore(
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async ValueTask<bool> HasFormat1IncompatibleStateAsync(
-        PluginHostId hostId,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.PluginInstallationConfigurations.AnyAsync(cancellationToken)
-            || await db.PluginInstallationSecrets.AnyAsync(cancellationToken)
-            || await db.PluginFeatureConfigurations.AnyAsync(
-                value => value.HostId == hostId.Value,
-                cancellationToken
-            )
-            || await db.PluginFeatureSecrets.AnyAsync(
-                value => value.HostId == hostId.Value,
-                cancellationToken
-            )
-            || await db.PluginFeatureStates.AnyAsync(
-                value => value.HostId == hostId.Value,
-                cancellationToken
-            )
-            || await db.PluginAutomationInstantiations.AnyAsync(
-                value => value.HostId == hostId.Value,
-                cancellationToken
-            );
-    }
-
     private PluginSettingValues Decode(string json) =>
         codec.Decode(json) is PluginSettingValuesDecodingOutcome.Decoded decoded
             ? decoded.Values

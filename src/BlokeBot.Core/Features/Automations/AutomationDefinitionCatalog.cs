@@ -12,7 +12,6 @@ internal sealed partial class AutomationDefinitionCatalog
         AutomationDefinitionId,
         IAutomationDefinition
     > _definitions;
-    private readonly ImmutableDictionary<AutomationDefinitionId, AutomationModuleId> _modules;
     private readonly PluginAutomationCatalogRegistry _plugins;
 
     public AutomationDefinitionCatalog(
@@ -24,10 +23,6 @@ internal sealed partial class AutomationDefinitionCatalog
         var definitions = ImmutableDictionary.CreateBuilder<
             AutomationDefinitionId,
             IAutomationDefinition
-        >();
-        var definitionModules = ImmutableDictionary.CreateBuilder<
-            AutomationDefinitionId,
-            AutomationModuleId
         >();
         var moduleIds = new HashSet<AutomationModuleId>();
         foreach (var module in modules)
@@ -49,12 +44,10 @@ internal sealed partial class AutomationDefinitionCatalog
                         $"Automation definition identifier '{definition.Descriptor.Id.Value}' is registered more than once."
                     );
                 }
-                definitionModules.Add(definition.Descriptor.Id, module.Id);
             }
         }
 
         _definitions = definitions.ToImmutable();
-        _modules = definitionModules.ToImmutable();
         ValidateTriggerContextRequirements(_definitions);
         _coreDescriptors = _definitions
             .Values.Select(static definition => definition.Descriptor)
@@ -120,14 +113,6 @@ internal sealed partial class AutomationDefinitionCatalog
         definition = null!;
         return false;
     }
-
-    internal bool IsFormat1Definition(AutomationDefinitionId id) =>
-        _modules.TryGetValue(id, out var module)
-        && module.Value
-            is "blokebot.core"
-                or "blokebot.native-operations"
-                or "blokebot.twitch-events"
-                or "blokebot.competitions";
 
     internal static bool IsValidEffectiveDescriptor(
         AutomationDefinitionDescriptor registered,

@@ -149,12 +149,6 @@ public sealed class PluginAutomationPersistenceTests
             (
                 await context.Store.LoadFeatureStateAsync(key, CancellationToken.None)
             )!.Revision.ShouldBe(thirdState.Revision);
-            (
-                await context.Store.HasFormat1IncompatibleStateAsync(
-                    key.HostId,
-                    CancellationToken.None
-                )
-            ).ShouldBeTrue();
         }
 
         await using (var seed = context.Database.CreateDbContext())

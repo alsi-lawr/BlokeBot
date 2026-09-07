@@ -30,7 +30,7 @@ public sealed partial class ConfigurationImportPreviewService
     }
 
     public async Task<ConfigurationPreviewOutcome> PreviewAsync(
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         CancellationToken cancellationToken
     )

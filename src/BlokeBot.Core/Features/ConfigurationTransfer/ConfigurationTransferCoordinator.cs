@@ -13,7 +13,7 @@ public sealed partial class ConfigurationTransferCoordinator
 {
     public async Task<ConfigurationImportApplyOutcome> ApplyAsync(
         AuthenticatedSession session,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         ConfigurationImportActor actor,
         CancellationToken cancellationToken
@@ -117,7 +117,6 @@ public sealed partial class ConfigurationTransferCoordinator
                 .ToArray();
             var stagingSelection = selection with { Sections = changingSelections };
             var issues = new List<ConfigurationValidationIssue>();
-            IReadOnlyList<AutomationTransferDiagnostic> automationDiagnostics = [];
             if (
                 Selected(stagingSelection, ConfigurationSectionId.Overlays) is { } overlaySelection
                 && document.Sections.Overlays is { } overlaySection
@@ -159,7 +158,6 @@ public sealed partial class ConfigurationTransferCoordinator
                     cancellationToken
                 );
                 issues.AddRange(automationStage.Issues);
-                automationDiagnostics = automationStage.Diagnostics;
             }
             if (
                 Selected(stagingSelection, ConfigurationSectionId.Guessing) is { } guessingSelection
@@ -231,7 +229,6 @@ public sealed partial class ConfigurationTransferCoordinator
             );
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            AutomationTransferDiagnostics.LogImport(_logger, host.Id, automationDiagnostics);
 
             if (activation is not null)
             {

@@ -27,11 +27,15 @@ public partial class ConfigurationTransferPage
     private ConfigurationValidationIssue? _parseIssue;
     private string? _applyIssue;
     private ConfigurationImportPreview? _preview;
-    private ConfigurationDocumentV1? _document;
+    private ConfigurationDocumentV2? _document;
     private ConfigurationImportApplied? _applied;
     private ConfigurationActivationView? _activation;
     private AuthenticatedSession _session = AuthenticatedSession.Anonymous;
     private bool _busy;
+    private readonly HashSet<Guid> _flowSelections = [];
+    private readonly HashSet<Guid> _scenarioSelections = [];
+    private IReadOnlyList<AutomationExportChoice> _automationChoices = [];
+
     private bool _sectionQueryApplied;
     private bool _exportOverlayUrls = true;
     private bool _exportOverlayMedia = true;
@@ -96,7 +100,7 @@ public partial class ConfigurationTransferPage
         new(
             ConfigurationSectionId.Automations,
             "Automations",
-            "Core visual flows, graph layout, bindings and policies"
+            "Flows, subflows and selected test scenarios"
         ),
     ];
 
@@ -105,6 +109,13 @@ public partial class ConfigurationTransferPage
         _mode = ModeFor(SegmentedTabs.CanonicalKey(_navigation, _modeTabs));
         var page = await LoadPageContextAsync();
         _session = page.Session;
+        if (HostId != 0)
+        {
+            _automationChoices = await _previewService.ListAutomationsAsync(
+                HostId,
+                CancellationToken.None
+            );
+        }
         _loadState =
             HostId == 0
                 ? new PageLoadState.Failure(
@@ -133,6 +144,7 @@ public partial class ConfigurationTransferPage
     private string _activeModeKey => _mode == TransferMode.Import ? _importModeKey : _exportModeKey;
     private string _exportUrl =>
         $"/configuration-transfer/export?sections={Uri.EscapeDataString(string.Join(',', _exportSections.Order()))}"
+        + $"&automationFlows={string.Join(',', _flowSelections.Order())}&automationScenarios={string.Join(',', _scenarioSelections.Order())}"
         + $"&overlayUrls={_exportOverlayUrls.ToString().ToLowerInvariant()}"
         + $"&overlayMedia={_exportOverlayMedia.ToString().ToLowerInvariant()}"
         + $"&urlWarningAcknowledged={_urlWarningAcknowledged.ToString().ToLowerInvariant()}";
@@ -186,7 +198,7 @@ public partial class ConfigurationTransferPage
         };
 
     private static IReadOnlyList<ConfigurationSectionId> PresentSections(
-        ConfigurationDocumentV1 x
+        ConfigurationDocumentV2 x
     ) =>
         [
             .. new (ConfigurationSectionId, bool)[]

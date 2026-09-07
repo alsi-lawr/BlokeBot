@@ -225,10 +225,10 @@ public sealed class ConfigurationTransferCustomCommandAggregateTests
             new HashSet<HostFeatureFlags>()
         );
 
-    private static ConfigurationDocumentV1 Document(CustomCommandsSectionV1 section) =>
+    private static ConfigurationDocumentV2 Document(CustomCommandsSectionV1 section) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero),
             new("source", "0.12.0"),
             new(CustomCommands: section)
