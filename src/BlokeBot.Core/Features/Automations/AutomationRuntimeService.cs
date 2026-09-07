@@ -535,7 +535,15 @@ public sealed partial class AutomationRuntimeService(
         var due = await db
             .AutomationNodeRuns.AsNoTracking()
             .Where(value =>
-                value.Status == AutomationNodeRunStatus.Pending && value.AvailableAtUtc <= now
+                (value.Status == AutomationNodeRunStatus.Pending && value.AvailableAtUtc <= now)
+                || (
+                    value.Status == AutomationNodeRunStatus.Waiting
+                    && value.OutcomeCode == "subflow-draining"
+                    && value.Run.NodeRuns.All(node =>
+                        node.Status != AutomationNodeRunStatus.Pending
+                        && node.Status != AutomationNodeRunStatus.Running
+                    )
+                )
             )
             .OrderBy(static value => value.AvailableAtUtc)
             .Select(static value => value.RunId)
@@ -589,6 +597,10 @@ public sealed partial class AutomationRuntimeService(
                 return ExecutionBlocked(executionGate);
             }
 
+            if (await QueueDrainedExitsAsync(db, run, leaseId, cancellationToken))
+            {
+                continue;
+            }
             var now = clock.GetUtcNow().UtcDateTime;
             var pending = run
                 .NodeRuns.Where(static value => value.Status == AutomationNodeRunStatus.Pending)
@@ -597,12 +609,19 @@ public sealed partial class AutomationRuntimeService(
             if (pending is null)
             {
                 if (
-                    run.NodeRuns.FirstOrDefault(node =>
-                        node.Status == AutomationNodeRunStatus.Waiting
-                    )
-                        is { } unfinished
-                    && AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
+                    AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
                         is AutomationDefinitionRestoreOutcome.Available waitingFlow
+                    && !waitingFlow.Flow.Invocations.IsDefault
+                    && waitingFlow
+                        .Flow.Invocations.Reverse()
+                        .Select(invocation =>
+                            run.NodeRuns.FirstOrDefault(node =>
+                                node.NodeId == invocation.CallerId
+                                && node.Status == AutomationNodeRunStatus.Waiting
+                            )
+                        )
+                        .FirstOrDefault(node => node is not null)
+                        is { } unfinished
                 )
                 {
                     _ = await CompleteFailureAsync(
@@ -744,6 +763,18 @@ public sealed partial class AutomationRuntimeService(
             }
 
             var scope = new AutomationNodeExecutionScope(db, run, pending, node, flow, leaseId);
+            if (
+                node.DefinitionId == AutomationSubflowDefinitions.Exit
+                && AutomationFrozenSubflows.HasActiveDescendants(
+                    flow,
+                    flow.Invocations.Single(invocation => invocation.ExitId == node.Id),
+                    ActiveNodes(run)
+                )
+            )
+            {
+                await WaitForSubtreeAsync(scope, cancellationToken);
+                continue;
+            }
             if (node.ExpressionLanguageVersion != AutomationExpressionLanguage.CurrentVersion.Value)
             {
                 if (
@@ -893,7 +924,10 @@ public sealed partial class AutomationRuntimeService(
             .AutomationFlowRuns.Include(static value => value.NodeRuns)
             .Where(value =>
                 value.ExecutionLeaseId != null
-                || value.NodeRuns.Any(node => node.Status == AutomationNodeRunStatus.Running)
+                || value.NodeRuns.Any(node =>
+                    node.Status == AutomationNodeRunStatus.Running
+                    || node.Status == AutomationNodeRunStatus.Waiting
+                )
             )
             .ToArrayAsync(cancellationToken);
         if (runs.Length == 0)
@@ -1058,6 +1092,14 @@ public sealed partial class AutomationRuntimeService(
                                 ? AutomationTraceOutcome.Invalidated
                             : AutomationTraceOutcome.Interrupted
                     );
+                }
+                if (Terminal(run.Status) is null)
+                {
+                    foreach (var exit in DrainedExits(run, restored.Flow))
+                    {
+                        exit.Status = AutomationNodeRunStatus.Pending;
+                        exit.AvailableAtUtc = now;
+                    }
                 }
                 await TraceScheduledAsync(
                     db,
