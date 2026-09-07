@@ -63,6 +63,11 @@ internal sealed class AutomationDataResolver(
 {
     private readonly AutomationSafeTriggerExpressionService _safeExpressions = new();
 
+    internal bool SupportsExecution(AutomationDefinitionDescriptor definition) =>
+        definition.PluginProvenance is not null
+            ? pluginExecution is not null
+            : handlers.TryResolve(definition.Id, out _);
+
     internal bool SupportsScenarios(AutomationDefinitionId id) =>
         handlers.TryResolve(id, out var handler) && handler.Contract.SupportsScenarios;
 
@@ -123,8 +128,11 @@ internal sealed class AutomationDataResolver(
         if (
             AutomationRuntimeSerialization.RestoreInputBindings(consumer.InputBindingsJson)
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
-            || catalog.ValidatePersistedDefinition(
-                AutomationRuntimeSerialization.Definition(consumer)
+            || AutomationFrozenSubflows.WithContract(
+                consumer,
+                catalog.ValidatePersistedDefinition(
+                    AutomationRuntimeSerialization.Definition(consumer)
+                )
             )
                 is not AutomationConfigurationCheck.Valid valid
         )
@@ -227,6 +235,10 @@ internal sealed class AutomationDataResolver(
                 return new AutomationInputResolution.Failed("input-resolution-unavailable");
             }
 
+            if (input.Sensitivity == AutomationDataSensitivity.Sensitive)
+            {
+                resolved = resolved with { ValueFreeDiagnostic = true };
+            }
             portValues.Add(input.Id, resolved);
             fieldValues.Add(input.BindingFieldId.Value, resolved);
         }
@@ -251,7 +263,12 @@ internal sealed class AutomationDataResolver(
     )
     {
         if (
-            catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(producer))
+            AutomationFrozenSubflows.WithContract(
+                producer,
+                catalog.ValidatePersistedDefinition(
+                    AutomationRuntimeSerialization.Definition(producer)
+                )
+            )
             is not AutomationConfigurationCheck.Valid valid
         )
         {
@@ -266,6 +283,21 @@ internal sealed class AutomationDataResolver(
         )
         {
             return null;
+        }
+
+        if (
+            producer.DefinitionId
+            is AutomationSubflowDefinitions.Entry
+                or AutomationSubflowDefinitions.Invoke
+        )
+        {
+            return
+                await checkpoints.ReadOrBeginAsync(producer, cancellationToken)
+                    is AutomationPureCheckpoint.Available boundary
+                && boundary.Outputs.TryGetValue(outputPortId, out var value)
+                && Matches(outputPort, value.Value)
+                ? value
+                : null;
         }
 
         if (descriptor.Kind == AutomationNodeKind.Source)
@@ -434,6 +466,9 @@ internal sealed class AutomationDataResolver(
     ) =>
         (configuration, input.Id.Value) switch
         {
+            (AutomationSubflowConfiguration subflow, _) => subflow.FixedInputs.GetValueOrDefault(
+                input.Id
+            ),
             (SendChatActionConfiguration sendChat, "message") => new(
                 new AutomationValue.Text(sendChat.Message),
                 [AutomationValueProvenance.Generated]

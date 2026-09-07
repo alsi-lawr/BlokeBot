@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Automations;
@@ -199,6 +200,9 @@ internal static class AutomationRuntimeSerialization
             ),
             _options
         );
+
+    internal static string SerializeDefinition(PersistedFlow flow) =>
+        JsonSerializer.Serialize(flow, _options);
 
     internal static AutomationDefinitionRestoreOutcome RestoreDefinition(string json)
     {
@@ -441,7 +445,9 @@ internal static class AutomationRuntimeSerialization
         int HostId,
         int SchemaVersion,
         ImmutableArray<PersistedNode> Nodes,
-        ImmutableArray<PersistedEdge> Edges
+        ImmutableArray<PersistedEdge> Edges,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            ImmutableArray<AutomationFrozenInvocation> Invocations = default
     );
 
     internal sealed record PersistedNode(
@@ -452,7 +458,13 @@ internal static class AutomationRuntimeSerialization
         string InputBindingsJson,
         int ExpressionLanguageVersion,
         bool ContinueOnFailure,
-        string? PluginProvenanceJson = null
+        string? PluginProvenanceJson = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            Guid? AuthorNodeId = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            AutomationTraceInvocation? Invocation = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            AutomationSubflowNodeContract? Contract = null
     );
 
     internal sealed record PersistedEdge(
