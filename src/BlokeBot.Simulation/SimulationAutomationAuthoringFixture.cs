@@ -76,7 +76,7 @@ internal static class SimulationAutomationAuthoringFixture
             InputBindings = Connected("message"),
         };
         var leaf = new AutomationSubflowDraft(
-            new(Guid.NewGuid()),
+            new(new Guid(1, 0, 0, new byte[8])),
             "Send a viewer greeting",
             contract,
             Graph(
@@ -91,15 +91,22 @@ internal static class SimulationAutomationAuthoringFixture
                 ]
             )
         );
-        AutomationSubflowRevision? revision = null;
-        for (var i = 0; i <= AutomationSubflowService.LibraryPageSize; i++)
+        var revision =
+            (
+                await subflows.PublishAsync(leaf, cancellationToken)
+                as AutomationSubflowPublishOutcome.Published
+            )?.Revision
+            ?? throw new InvalidOperationException("The authoring fixture subflow is invalid.");
+        for (var i = 1; i <= AutomationSubflowService.LibraryPageSize; i++)
         {
-            revision =
-                (
-                    await subflows.PublishAsync(leaf, cancellationToken)
-                    as AutomationSubflowPublishOutcome.Published
-                )?.Revision
-                ?? throw new InvalidOperationException("The authoring fixture subflow is invalid.");
+            _ = await subflows.PublishAsync(
+                leaf with
+                {
+                    Id = new(new Guid(i + 1, 0, 0, new byte[8])),
+                    Graph = leaf.Graph with { Name = $"Reply helper {i:D2}" },
+                },
+                cancellationToken
+            );
         }
         var empty = new AutomationSubflowInterface([], []);
         var outerEntry = Node(

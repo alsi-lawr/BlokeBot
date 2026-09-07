@@ -130,7 +130,8 @@ internal sealed class AutomationDataResolver(
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
             || AutomationFrozenSubflows.WithContract(
                 consumer,
-                catalog.ValidatePersistedDefinition(
+                AutomationFrozenSubflows.ValidateDefinition(
+                    catalog,
                     AutomationRuntimeSerialization.Definition(consumer)
                 )
             )
@@ -265,7 +266,8 @@ internal sealed class AutomationDataResolver(
         if (
             AutomationFrozenSubflows.WithContract(
                 producer,
-                catalog.ValidatePersistedDefinition(
+                AutomationFrozenSubflows.ValidateDefinition(
+                    catalog,
                     AutomationRuntimeSerialization.Definition(producer)
                 )
             )
@@ -353,10 +355,12 @@ internal sealed class AutomationDataResolver(
         }
 
         var check = fixtures is not null
-            ? catalog.ValidatePersistedDefinition(
+            ? AutomationFrozenSubflows.ValidateDefinition(
+                catalog,
                 AutomationRuntimeSerialization.Definition(producer)
             )
-            : await catalog.ValidatePersistedBeforeExecutionAsync(
+            : await AutomationFrozenSubflows.ValidateBeforeExecutionAsync(
+                catalog,
                 hostId,
                 context,
                 AutomationRuntimeSerialization.Definition(producer),

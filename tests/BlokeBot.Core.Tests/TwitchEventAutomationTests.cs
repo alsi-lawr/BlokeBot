@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Functional;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -939,7 +940,8 @@ public sealed class TwitchEventAutomationTests
     {
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         ) =>
             Task.FromResult<OverlayCueReferenceOutcome>(
                 new OverlayCueReferenceOutcome.Missing(OverlayCueReferencePart.Cue)

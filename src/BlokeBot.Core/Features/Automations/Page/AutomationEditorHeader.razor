@@ -17,7 +17,7 @@
             {
             <button class="btn-secondary" type="button" disabled="@(Busy || !HasNodes)" data-automation-test-flow @onclick="Test"><AutomationIcon Name="test" />Test draft</button>
             }
-            <button class="btn-secondary" type="button" disabled="@Busy" data-automation-save-flow @onclick="Save"><AutomationIcon Name="save" />@(Subflow ? "Review revision" : "Save")</button>
+            <button class="btn-secondary" type="button" disabled="@Busy" data-automation-save-flow @onclick="Save"><AutomationIcon Name="save" />@(Subflow ? "Review subflow" : "Save")</button>
             @if (FocusMode)
             {
                 <button class="automation-focus-action" type="button" @onclick="Hide"><AutomationIcon Name="hide" />Hide tools</button>

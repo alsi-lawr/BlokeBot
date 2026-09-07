@@ -40,9 +40,12 @@ a selected bundle and can import only selected sections from a bundle.
 - `overlays`: portable core Browser Source instances, typed appearance and configuration, cues,
   queue policies, and independently selected URL layers and media-document links. Community Goal
   and Viewer-funded Bounty instances are reported as omitted because Community is not in format 2.
-- `automations`: explicitly selected flows, their complete reachable immutable subflow revisions,
+- `automations`: explicitly selected flows, their complete reachable current subflow definitions,
   graph layout, typed interfaces, bindings, expressions, failure policies, aliases and positions.
   Saved generated test scenarios can be selected independently for each selected flow.
+  Each subflow has one export-local `id`, `description`, `interface` and `graph`. Invocation bindings
+  contain `subflowId`, `interface` and `fixedInputsJson`; boundary bindings have a null `subflowId`.
+  Revision IDs, revision numbers and history are not portable authoring fields.
 
 References use deterministic export-local identifiers such as `reply-0001`; database primary keys
 are not part of the format. Object properties and collection order are deterministic where the
@@ -54,8 +57,8 @@ source configuration has a stable order.
   conversion reader. Unknown properties and enum values are rejected.
 - The upload limit is 2 MB; configuration collections remain limited to 1,000 records. Each
   automation graph is limited to 256 nodes and 1,024 edges; subflow closures are limited to 128
-  revisions, eight levels and 1,024 visits. Each flow has at most 32 saved scenarios.
-- Node schemas, graphs, caller interfaces, complete revision dependencies, host references and
+  subflows, eight levels and 1,024 visits. Each flow has at most 32 saved scenarios.
+- Node schemas, graphs, caller interfaces, complete subflow dependencies, host references and
   installed plugin contracts are validated before staging. Invalid automations cannot be imported
   for later repair: fix them in the source application first.
 - Overlay media links contain an immutable document ID, media metadata, and a channel-local name.
@@ -85,10 +88,17 @@ unless the review explicitly aborts.
 
 Automation flows match by normalized name. A matched flow updates in place so its frozen runs and
 history remain attached. Replace never deletes an absent flow that has runs; the review must retain
-it or abort. Imported graph, revision and scenario identities are mapped deterministically within
+it or abort. Imported graph, subflow and scenario identities are mapped deterministically within
 this destination host and document. Referenced immutable revisions and admitted frozen runs are
 not rewritten or removed. Subflows, callers, scenarios, feature changes and the import audit share
 one transaction; any failure rolls back the complete import.
+
+Saved calls reference a stable channel-local subflow identity. New production and isolated scenario
+runs use its current definition; repeated and nested calls resolve consistently for that operation.
+Compatible publications require no caller edit. An incompatible current interface blocks affected
+callers until their interface and bindings are repaired. Already admitted runs keep their exact frozen
+execution. Upgrading existing current calls converts their identities; where a current nested graph
+needs conversion, the application appends a successor rather than rewriting an immutable snapshot.
 
 Plugin nodes reference an already installed, available, compatible definition. The document contains
 stable plugin code/definition identifiers only; destination lifecycle and feature generations are

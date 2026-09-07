@@ -14,33 +14,29 @@ public sealed partial class AutomationFlowService
         AutomationGraphAdmission admission,
         ImmutableArray<AutomationGraphError>.Builder errors,
         CancellationToken cancellationToken,
-        AutomationSubflowRevision? preparedCandidate
+        AutomationSubflowRevision? preparedCandidate,
+        AutomationSubflowClosure? resolved
     )
     {
         if (draft.Nodes.Any(node => node.Definition.TypeId == AutomationSubflowDefinitions.Invoke))
         {
-            errors.AddRange(
-                await AutomationSubflowStore.ValidatePinsAsync(
+            var closure = resolved is not null
+                ? new AutomationSubflowClosureOutcome.Available(resolved)
+                : await AutomationSubflowStore.LoadClosureAsync(
                     db,
-                    draft,
+                    draft.HostId,
+                    AutomationSubflowStore.Calls(draft.Nodes).Select(pin => pin.SubflowId),
+                    publishing,
                     cancellationToken,
                     preparedCandidate
-                )
-            );
-            var closure = await AutomationSubflowStore.LoadClosureAsync(
-                db,
-                draft.HostId,
-                AutomationSubflowStore.Pins(draft.Nodes).Select(pin => pin.RevisionId),
-                publishing,
-                cancellationToken,
-                preparedCandidate
-            );
+                );
             if (closure is AutomationSubflowClosureOutcome.Invalid invalid)
             {
                 errors.AddRange(invalid.Errors);
             }
             else if (closure is AutomationSubflowClosureOutcome.Available available)
             {
+                errors.AddRange(AutomationSubflowStore.ValidateCalls(draft, available.Closure));
                 foreach (var revision in available.Closure.Revisions)
                 {
                     errors.AddRange(
@@ -52,6 +48,7 @@ public sealed partial class AutomationFlowService
                     foreach (var node in revision.Graph.Nodes)
                     {
                         await ValidateNodeAsync(
+                            db,
                             draft.HostId,
                             node,
                             errors,

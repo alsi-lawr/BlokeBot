@@ -41,7 +41,7 @@ public partial class AutomationEditorPage
 
     private string CallerDescription(AutomationSubflowCaller caller) =>
         _callerDetails.GetValueOrDefault(caller) is { } details
-            ? $"{details.Name}{(details.Revision is { } revision ? $" · revision {revision}" : string.Empty)} · {details.NodeName}"
+            ? $"{details.Name} · {details.NodeName}"
             : $"Unavailable caller · {caller.NodeId.Value}";
 
     private Task SelectAuthoringTabAsync(string key) =>
@@ -49,7 +49,8 @@ public partial class AutomationEditorPage
 
     private async Task OpenAuthoringAsync(AutomationAuthoringTask task)
     {
-        if (_authoringTask == AutomationAuthoringTask.None && _pageModule is not null)
+        var opening = _authoringTask == AutomationAuthoringTask.None;
+        if (opening && _pageModule is not null)
         {
             await _pageModule.InvokeVoidAsync(
                 "rememberAuthoringOpener",
@@ -64,7 +65,7 @@ public partial class AutomationEditorPage
         _authoringTask = task;
         _nodeLibraryOpen = false;
         _inspectorFocusMode = null;
-        _focusAuthoring = true;
+        _focusAuthoring = opening;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -85,7 +86,7 @@ public partial class AutomationEditorPage
         _extractionQuery++;
         _subflowQuery++;
         _subflowPage = new([], null);
-        _libraryRevision = null;
+        _librarySubflow = null;
         _scenarioCancellation?.Cancel();
         _scenario = null;
         _scenarioFields = [];
@@ -227,46 +228,4 @@ public partial class AutomationEditorPage
             _traceMessage = "No traces available.";
         }
     }
-
-    private Task OpenTraceRevisionAsync(AutomationTraceRow row) =>
-        row.RevisionId is { } revision
-            ? RequestTransitionAsync(async () =>
-            {
-                var editor = _editor;
-                var host = HostId;
-                var version = _draftRevision;
-                var loaded = await _subflowsService.LoadClosureAsync(
-                    new(host),
-                    [revision],
-                    CancellationToken.None
-                );
-                if (
-                    host != HostId
-                    || version != _draftRevision
-                    || !ReferenceEquals(editor, _editor)
-                )
-                {
-                    return;
-                }
-                if (
-                    loaded is AutomationSubflowClosureOutcome.Available available
-                    && available.Closure.Revisions.FirstOrDefault(value => value.Id == revision)
-                        is { } selected
-                )
-                {
-                    LoadSubflowEditor(selected);
-                    if (
-                        row.Entry.Event.Node is { } node
-                        && _editor!.Nodes.Any(candidate => candidate.Id == node.Id)
-                    )
-                    {
-                        SetSingleNodeSelection(node.Id);
-                    }
-                }
-                else
-                {
-                    _feedback = "This subflow revision is unavailable.";
-                }
-            })
-            : Task.CompletedTask;
 }

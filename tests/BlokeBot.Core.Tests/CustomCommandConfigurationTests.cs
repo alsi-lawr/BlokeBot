@@ -1,5 +1,6 @@
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -656,7 +657,8 @@ public sealed class CustomCommandConfigurationTests
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         )
         {
             Requests.Add(request);

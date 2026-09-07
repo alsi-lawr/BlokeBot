@@ -48,26 +48,22 @@ internal static class AutomationSubflowRunReferences
                 ),
             ];
         }
-        var nested = closure
-            .Revisions.SelectMany(revision => AutomationSubflowStore.Pins(revision.Graph.Nodes))
-            .Select(pin => pin.RevisionId)
-            .ToHashSet();
-        var loaded = await AutomationSubflowStore.LoadClosureAsync(
-            db,
-            hostId,
-            closure
-                .Revisions.Where(revision => !nested.Contains(revision.Id))
-                .Select(revision => revision.Id),
-            null,
-            cancellationToken
-        );
-        if (loaded is AutomationSubflowClosureOutcome.Invalid invalid)
-        {
-            return invalid.Errors;
-        }
-        var authoritative = ((AutomationSubflowClosureOutcome.Available)loaded).Closure;
+        var ids = closure.Revisions.Select(revision => revision.Id.Value).ToArray();
+        var rows = await db
+            .AutomationSubflowRevisions.AsNoTracking()
+            .Where(row => row.HostId == hostId.Value && ids.Contains(row.Id))
+            .Select(row => row.SnapshotJson)
+            .ToArrayAsync(cancellationToken);
+        var authoritative = new AutomationSubflowClosure([
+            .. rows.Select(AutomationSubflowSerialization.Restore),
+        ]);
         if (
-            authoritative.Revisions.Length != closure.Revisions.Length
+            closure.Revisions.Select(revision => revision.SubflowId).Distinct().Count()
+                != closure.Revisions.Length
+            || closure.Revisions.Any(revision =>
+                !AutomationSubflowStore.ValidateCalls(revision.Graph, closure).IsEmpty
+            )
+            || authoritative.Revisions.Length != closure.Revisions.Length
             || closure.Revisions.Any(revision =>
                 !authoritative.Revisions.Any(stored =>
                     stored.Id == revision.Id

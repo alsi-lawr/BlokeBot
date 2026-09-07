@@ -1,10 +1,13 @@
+using BlokeBot.Persistence;
+
 namespace BlokeBot.Core.Features.Overlays;
 
 internal sealed class UnavailableOverlayCueAdmissionService : IOverlayCueAdmissionService
 {
     public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
         OverlayCueReferenceRequest request,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        BlokeBotDbContext? preparationDb = null
     )
     {
         cancellationToken.ThrowIfCancellationRequested();

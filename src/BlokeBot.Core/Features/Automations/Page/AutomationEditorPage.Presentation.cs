@@ -17,9 +17,8 @@ public partial class AutomationEditorPage
             );
 
     private string _flowSubtitle =>
-        _hasChanges
-            ? (_editor?.Subflow is null ? "Unsaved changes" : "Subflow revision · Unsaved changes")
-        : _editor?.Subflow is not null ? "Subflow revision"
+        _hasChanges ? (_editor?.Subflow is null ? "Unsaved changes" : "Subflow · Unsaved changes")
+        : _editor?.Subflow is not null ? "Subflow"
         : _editor?.Id is null ? "Not saved"
         : _editor.IsEnabled ? "Enabled"
         : "Saved";

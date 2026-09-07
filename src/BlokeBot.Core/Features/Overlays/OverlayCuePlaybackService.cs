@@ -27,10 +27,14 @@ internal sealed partial class OverlayCuePlaybackService(
 
     public async Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
         OverlayCueReferenceRequest request,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        BlokeBotDbContext? preparationDb = null
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var ownedDb = preparationDb is null
+            ? await dbFactory.CreateDbContextAsync(cancellationToken)
+            : null;
+        var db = preparationDb ?? ownedDb!;
         return await ResolveReferencesAsync(db, request, cancellationToken) switch
         {
             ReferenceResolution.Available => new OverlayCueReferenceOutcome.Available(),

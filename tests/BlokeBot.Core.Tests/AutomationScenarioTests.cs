@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -526,7 +527,8 @@ public sealed partial class AutomationRuntimeTests
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         ) => throw Called();
 
         public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
@@ -573,6 +575,15 @@ public sealed partial class AutomationRuntimeTests
                     .StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
             )
             {
+                if (
+                    command.CommandText.StartsWith(
+                        "UPDATE hosts SET EnabledFeatures = EnabledFeatures WHERE Id = ",
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    return;
+                }
                 var statements = command.CommandText.Split(
                     ';',
                     StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries

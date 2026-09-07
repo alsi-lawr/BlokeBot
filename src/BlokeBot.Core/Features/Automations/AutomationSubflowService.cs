@@ -38,9 +38,7 @@ public sealed partial class AutomationSubflowService(
             [
                 .. rows.Take(LibraryPageSize)
                     .Select(row => new AutomationSubflowLibrarySummary(
-                        new(row.Id),
                         new(row.SubflowId),
-                        row.Revision,
                         row.Name,
                         row.Description
                     )),
@@ -49,20 +47,55 @@ public sealed partial class AutomationSubflowService(
         );
     }
 
-    public async Task<AutomationSubflowClosureOutcome> LoadClosureAsync(
-        AutomationHostId hostId,
-        ImmutableArray<AutomationSubflowRevisionId> roots,
+    public async Task<AutomationSubflowRevision?> LoadCurrentAsync(
+        AutomationHostId host,
+        AutomationSubflowId id,
         CancellationToken cancellationToken
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await AutomationSubflowStore.LoadClosureAsync(
-            db,
-            hostId,
-            roots,
-            null,
-            cancellationToken
-        );
+        var json = await (
+            from current in db.AutomationSubflows.AsNoTracking()
+            join revision in db.AutomationSubflowRevisions.AsNoTracking()
+                on new
+                {
+                    current.HostId,
+                    SubflowId = current.Id,
+                    Revision = current.LastRevision,
+                } equals new
+                {
+                    revision.HostId,
+                    revision.SubflowId,
+                    revision.Revision,
+                }
+            where current.HostId == host.Value && current.Id == id.Value
+            select revision.SnapshotJson
+        ).SingleOrDefaultAsync(cancellationToken);
+        return json is null ? null : AutomationSubflowSerialization.Restore(json);
+    }
+
+    public async Task<AutomationSubflowClosureOutcome> LoadClosureAsync(
+        AutomationHostId hostId,
+        ImmutableArray<AutomationSubflowId> roots,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        return await MainDatabaseStatements.LockHostAsync(db, hostId.Value, cancellationToken) == 0
+            ? new AutomationSubflowClosureOutcome.Invalid([
+                AutomationSubflowStore.Error(
+                    "subflow-host-unavailable",
+                    "Choose an available channel."
+                ),
+            ])
+            : await AutomationSubflowStore.LoadClosureAsync(
+                db,
+                hostId,
+                roots,
+                null,
+                cancellationToken
+            );
     }
 
     public async Task<AutomationSubflowPreviewOutcome> PreviewAsync(
@@ -76,17 +109,30 @@ public sealed partial class AutomationSubflowService(
             return new AutomationSubflowPreviewOutcome.Invalid(validation.Errors);
         }
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await PrepareAsync(db, draft, validation, cancellationToken) switch
-        {
-            Preparation.Ready ready => new AutomationSubflowPreviewOutcome.Ready(
-                ready.Callers,
-                ready.Revision
-            ),
-            Preparation.Invalid invalid => new AutomationSubflowPreviewOutcome.Invalid(
-                invalid.Errors
-            ),
-            _ => throw new InvalidOperationException(),
-        };
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        return
+            await MainDatabaseStatements.LockHostAsync(
+                db,
+                draft.Graph.HostId.Value,
+                cancellationToken
+            ) == 0
+            ? new AutomationSubflowPreviewOutcome.Invalid([
+                AutomationSubflowStore.Error(
+                    "subflow-host-unavailable",
+                    "Enable automations for this host."
+                ),
+            ])
+            : await PrepareAsync(db, draft, validation, cancellationToken) switch
+            {
+                Preparation.Ready ready => new AutomationSubflowPreviewOutcome.Ready(
+                    ready.Callers,
+                    ready.Revision
+                ),
+                Preparation.Invalid invalid => new AutomationSubflowPreviewOutcome.Invalid(
+                    invalid.Errors
+                ),
+                _ => throw new InvalidOperationException(),
+            };
     }
 
     public async Task<AutomationSubflowPublishOutcome> PublishAsync(
@@ -146,15 +192,20 @@ public sealed partial class AutomationSubflowService(
                 SnapshotJson = ready.Json,
             }
         );
-        db.AutomationSubflowRevisionReferences.AddRange(
+        _ = await db
+            .AutomationSubflowNestedCallers.Where(row =>
+                row.HostId == hostId && row.CallerSubflowId == draft.Id.Value
+            )
+            .ExecuteDeleteAsync(cancellationToken);
+        db.AutomationSubflowNestedCallers.AddRange(
             AutomationSubflowStore
-                .Pins(draft.Graph.Nodes)
-                .Select(pin => new AutomationSubflowRevisionReference
+                .Calls(draft.Graph.Nodes)
+                .Select(pin => new AutomationSubflowNestedCallerReference
                 {
                     HostId = hostId,
-                    CallerRevisionId = revision.Id.Value,
+                    CallerSubflowId = draft.Id.Value,
                     NodeId = pin.NodeId.Value,
-                    RevisionId = pin.RevisionId.Value,
+                    SubflowId = pin.SubflowId.Value,
                 })
         );
         _ = await db.SaveChangesAsync(cancellationToken);
@@ -162,7 +213,7 @@ public sealed partial class AutomationSubflowService(
         return new AutomationSubflowPublishOutcome.Published(revision, ready.Callers);
     }
 
-    public async Task<AutomationSubflowRemovalOutcome> RemoveRevisionAsync(
+    internal async Task<AutomationSubflowRemovalOutcome> RemoveRevisionAsync(
         AutomationHostId hostId,
         AutomationSubflowRevisionId revisionId,
         CancellationToken cancellationToken
@@ -177,18 +228,47 @@ public sealed partial class AutomationSubflowService(
         var rows = db.AutomationSubflowRevisions.Where(row =>
             row.HostId == hostId.Value && row.Id == revisionId.Value
         );
+        var target = await rows.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
         var removed = await rows.Where(row =>
-                !db.AutomationSubflowCallers.Any(reference =>
-                    reference.HostId == row.HostId && reference.RevisionId == row.Id
-                )
-                && !db.AutomationSubflowRevisionReferences.Any(reference =>
-                    reference.HostId == row.HostId && reference.RevisionId == row.Id
+                (
+                    !db.AutomationSubflows.Any(current =>
+                        current.HostId == row.HostId
+                        && current.Id == row.SubflowId
+                        && current.LastRevision == row.Revision
+                    )
+                    || (
+                        !db.AutomationSubflowCallers.Any(reference =>
+                            reference.HostId == row.HostId && reference.SubflowId == row.SubflowId
+                        )
+                        && !db.AutomationSubflowNestedCallers.Any(reference =>
+                            reference.HostId == row.HostId && reference.SubflowId == row.SubflowId
+                        )
+                    )
                 )
                 && !db.AutomationSubflowRunReferences.Any(reference =>
                     reference.HostId == row.HostId && reference.RevisionId == row.Id
                 )
             )
             .ExecuteDeleteAsync(cancellationToken);
+        if (
+            removed != 0
+            && target is not null
+            && await db.AutomationSubflows.AnyAsync(
+                current =>
+                    current.HostId == target.HostId
+                    && current.Id == target.SubflowId
+                    && current.LastRevision == target.Revision,
+                cancellationToken
+            )
+        )
+        {
+            _ = await db
+                .AutomationSubflowNestedCallers.Where(reference =>
+                    reference.HostId == target.HostId
+                    && reference.CallerSubflowId == target.SubflowId
+                )
+                .ExecuteDeleteAsync(cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
         return removed != 0 ? AutomationSubflowRemovalOutcome.Removed
             : await rows.AnyAsync(cancellationToken) ? AutomationSubflowRemovalOutcome.Referenced
@@ -197,52 +277,4 @@ public sealed partial class AutomationSubflowService(
 
     private static AutomationSubflowPublishOutcome.Invalid Invalid(string code, string message) =>
         new([AutomationSubflowStore.Error(code, message)]);
-
-    private static async Task<ImmutableArray<AutomationSubflowCaller>> IncompatibleCallersAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        AutomationSubflowId subflowId,
-        AutomationSubflowInterface contract,
-        CancellationToken cancellationToken
-    )
-    {
-        var previous = await db
-            .AutomationSubflowRevisions.AsNoTracking()
-            .Where(row => row.HostId == hostId && row.SubflowId == subflowId.Value)
-            .ToArrayAsync(cancellationToken);
-        var incompatibleIds = previous
-            .Where(row =>
-                !AutomationSubflowDefinitions.Compatible(
-                    AutomationSubflowSerialization.Restore(row.SnapshotJson).Interface,
-                    contract
-                )
-            )
-            .Select(row => row.Id)
-            .ToArray();
-        var ordinary = await (
-            from reference in db.AutomationSubflowCallers.AsNoTracking()
-            join node in db.AutomationFlowNodes.AsNoTracking() on reference.NodeId equals node.Id
-            where reference.HostId == hostId && incompatibleIds.Contains(reference.RevisionId)
-            select new { node.FlowId, reference.NodeId }
-        ).ToArrayAsync(cancellationToken);
-        var nested = await db
-            .AutomationSubflowRevisionReferences.AsNoTracking()
-            .Where(reference =>
-                reference.HostId == hostId && incompatibleIds.Contains(reference.RevisionId)
-            )
-            .ToArrayAsync(cancellationToken);
-        return
-        [
-            .. ordinary.Select(value => new AutomationSubflowCaller(
-                new(value.FlowId),
-                null,
-                new(value.NodeId)
-            )),
-            .. nested.Select(value => new AutomationSubflowCaller(
-                null,
-                new(value.CallerRevisionId),
-                new(value.NodeId)
-            )),
-        ];
-    }
 }

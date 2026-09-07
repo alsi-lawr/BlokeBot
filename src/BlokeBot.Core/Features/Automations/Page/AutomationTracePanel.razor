@@ -48,7 +48,7 @@
     {
         <footer class="automation-trace-detail">
         <strong>Selected: @NodeName(selected)</strong>
-        <span>@selected.Context</span>@if (selected.RootNodeId is null || !Nodes.Any(node => node.Id == selected.RootNodeId)) { <span>Graph node unavailable</span> }@foreach (var value in selected.Entry.Event.Values) { <span>@value.PortId.Value · @value.ValueType</span> }@if (selected.RevisionId is not null) { <button class="btn-secondary" type="button" @onclick="() => OpenRevision.InvokeAsync(selected)">Open revision</button> }<details>
+        <span>@selected.Context</span>@if (selected.RootNodeId is null || !Nodes.Any(node => node.Id == selected.RootNodeId)) { <span>Graph node unavailable</span> }@foreach (var value in selected.Entry.Event.Values) { <span>@value.PortId.Value · @value.ValueType</span> }<details>
         <summary>Event details</summary>
         <dl>
         <dt>Node</dt>
@@ -75,7 +75,6 @@
     [Parameter] public EventCallback<int> Select { get; set; }
     [Parameter] public EventCallback<int> Page { get; set; }
     [Parameter] public EventCallback<string> SelectRun { get; set; }
-    [Parameter] public EventCallback<AutomationTraceRow> OpenRevision { get; set; }
     [Parameter] public EventCallback EditScenario { get; set; }
     [Parameter] public EventCallback Close { get; set; }
 

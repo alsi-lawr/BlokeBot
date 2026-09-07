@@ -51,7 +51,9 @@ public sealed partial class AutomationEditorNode
                 .Create(
                     Definition.Id.Value,
                     Subflow.Interface,
-                    Subflow.RevisionId,
+                    Subflow is AutomationSubflowInvocationConfiguration call
+                        ? call.SubflowId
+                        : null,
                     values.ToImmutable()
                 )
                 .Configuration;

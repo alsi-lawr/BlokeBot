@@ -47,9 +47,9 @@ public sealed partial class AutomationRuntimeTests
         {
             (await db.AutomationSubflowRevisions.CountAsync()).ShouldBe(1);
             (await db.AutomationSubflows.Select(row => row.LastRevision).SingleAsync()).ShouldBe(1);
-            (
-                await db.AutomationSubflowCallers.Select(row => row.RevisionId).SingleAsync()
-            ).ShouldBe(original.Id.Value);
+            (await db.AutomationSubflowCallers.Select(row => row.SubflowId).SingleAsync()).ShouldBe(
+                original.SubflowId.Value
+            );
         }
         _ = await fixture.Features.DisableAsync(
             fixture.HostId,
@@ -64,7 +64,7 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task Authoring_InvocationRoundTripAndHistoryPreservePinnedInterfaceAndStructuredFixedValues()
+    public async Task Authoring_InvocationRoundTripAndHistoryPreserveCurrentInterfaceAndStructuredFixedValues()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var ports = ImmutableArray.Create(
@@ -106,7 +106,8 @@ public sealed partial class AutomationRuntimeTests
         AutomationSubflowDefinitions
             .TryRead(changed.Nodes[1].Definition, out var read)
             .ShouldBeTrue();
-        read.RevisionId.ShouldBe(published.Id);
+        read.ShouldBeOfType<AutomationSubflowInvocationConfiguration>()
+            .SubflowId.ShouldBe(published.SubflowId);
         AutomationEditorNode
             .DisplayFixedValue(read.FixedInputs[new("payload")].Value)
             .ShouldBe(AutomationEditorNode.DisplayFixedValue(values[new("payload")]));
@@ -126,7 +127,10 @@ public sealed partial class AutomationRuntimeTests
             .ShouldBeTrue();
         var nextRevision = await Publish(
             Subflows(fixture),
-            Subflow(fixture.HostId, new(ports, ports)) with
+            Subflow(
+                fixture.HostId,
+                new(ports.Add(SubflowPort("extra", AutomationPortValueType.Text)), ports)
+            ) with
             {
                 Id = published.SubflowId,
             }
@@ -144,11 +148,15 @@ public sealed partial class AutomationRuntimeTests
                 fixture.Catalog
             );
         history.Record(editor).ShouldBeTrue();
-        editor.Nodes[1].Subflow!.RevisionId.ShouldBe(nextRevision.Id);
+        editor
+            .Nodes[1]
+            .Subflow.ShouldBeOfType<AutomationSubflowInvocationConfiguration>()
+            .SubflowId.ShouldBe(nextRevision.SubflowId);
+        editor.Nodes[1].Subflow!.Interface.Inputs.Length.ShouldBe(3);
         editor = history.Undo(editor).ShouldNotBeNull();
-        editor.Nodes[1].Subflow!.RevisionId.ShouldBe(published.Id);
+        editor.Nodes[1].Subflow!.Interface.Inputs.Length.ShouldBe(2);
         editor = history.Redo(editor).ShouldNotBeNull();
-        editor.Nodes[1].Subflow!.RevisionId.ShouldBe(nextRevision.Id);
+        editor.Nodes[1].Subflow!.Interface.Inputs.Length.ShouldBe(3);
     }
 
     [Test]

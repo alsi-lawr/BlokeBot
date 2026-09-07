@@ -34,7 +34,7 @@ public sealed record AutomationSubflowRevision(
 
 public sealed record AutomationSubflowCaller(
     AutomationFlowId? FlowId,
-    AutomationSubflowRevisionId? RevisionId,
+    AutomationSubflowId? SubflowId,
     AutomationNodeId NodeId
 );
 
@@ -84,15 +84,13 @@ public sealed record AutomationSubflowNodeContract(
 public sealed record AutomationSubflowLibraryQuery(string Search, int Offset = 0);
 
 public sealed record AutomationSubflowLibrarySummary(
-    AutomationSubflowRevisionId Id,
-    AutomationSubflowId SubflowId,
-    int Revision,
+    AutomationSubflowId Id,
     string Name,
     string Description
 );
 
 public sealed record AutomationSubflowLibraryPage(
-    ImmutableArray<AutomationSubflowLibrarySummary> Revisions,
+    ImmutableArray<AutomationSubflowLibrarySummary> Subflows,
     int? NextOffset
 );
 

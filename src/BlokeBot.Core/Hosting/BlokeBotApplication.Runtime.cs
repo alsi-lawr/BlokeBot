@@ -1,6 +1,7 @@
 using BlokeBot.Core.Auth.Web;
 using BlokeBot.Core.BotRuntime;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -23,6 +24,9 @@ public static partial class BlokeBotApplication
         await app
             .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
             .InitializeAsync(cancellationToken);
+        await app
+            .Services.GetRequiredService<AutomationSubflowCurrentDataConversion>()
+            .ApplyAsync(cancellationToken);
         await app
             .Services.GetRequiredService<HostedChannelRuntimeLifecycleService>()
             .RecoverInterruptedStopsAsync(cancellationToken);

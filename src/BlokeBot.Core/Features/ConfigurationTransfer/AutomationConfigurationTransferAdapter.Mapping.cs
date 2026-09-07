@@ -69,7 +69,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             )
             .ToDictionary(pair => pair.Id, pair => pair.Value, StringComparer.Ordinal);
         var subflowIds = section
-            .Subflows.Select(value => value.SubflowId)
+            .Subflows.Select(value => value.Id)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .Select(
@@ -94,24 +94,30 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 commands,
                 rewards,
                 allowPlannedCommands,
-                revisionIds,
+                subflowIds,
                 issues,
                 cancellationToken
             );
-            var validation = await flows.ValidateSubflowTransferAsync(
-                new(
-                    subflowIds[imported.SubflowId],
-                    imported.Description.Trim(),
-                    imported.Interface,
-                    graph
-                ),
-                cancellationToken
+            var validation = await flows.ValidatePreparedAsync(
+                graph,
+                new([.. revisions]),
+                AutomationFlowService.AutomationGraphAdmission.ConfigurationTransfer,
+                cancellationToken,
+                db,
+                imported.Interface,
+                subflowIds[imported.Id]
             );
             AddErrors(imported.Id, validation, issues);
-            ValidatePins(graph, revisions, issues);
+            AddErrors(
+                imported.Id,
+                new(null, AutomationSubflowStore.ValidateCalls(graph, new([.. revisions]))),
+                issues
+            );
             var children = AutomationSubflowStore
-                .Pins(graph.Nodes)
-                .Select(pin => revisions.SingleOrDefault(revision => revision.Id == pin.RevisionId))
+                .Calls(graph.Nodes)
+                .Select(pin =>
+                    revisions.SingleOrDefault(revision => revision.SubflowId == pin.SubflowId)
+                )
                 .OfType<AutomationSubflowRevision>()
                 .ToArray();
             var required = children.Aggregate(
@@ -123,8 +129,8 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             revisions.Add(
                 new(
                     revisionIds[imported.Id],
-                    subflowIds[imported.SubflowId],
-                    imported.Revision,
+                    subflowIds[imported.Id],
+                    1,
                     imported.Description.Trim(),
                     imported.Interface,
                     graph,
@@ -182,19 +188,31 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 commands,
                 rewards,
                 allowPlannedCommands,
-                revisionIds,
+                subflowIds,
                 issues,
                 cancellationToken
             );
             AddErrors(
                 imported.Id,
-                await flows.ValidateConfigurationTransferAsync(graph, cancellationToken),
+                await flows.ValidatePreparedAsync(
+                    graph,
+                    new([.. revisions]),
+                    AutomationFlowService.AutomationGraphAdmission.ConfigurationTransfer,
+                    cancellationToken,
+                    db
+                ),
                 issues
             );
-            ValidatePins(graph, revisions, issues);
+            AddErrors(
+                imported.Id,
+                new(null, AutomationSubflowStore.ValidateCalls(graph, new([.. revisions]))),
+                issues
+            );
             var required = AutomationSubflowStore
-                .Pins(graph.Nodes)
-                .Select(pin => revisions.FirstOrDefault(revision => revision.Id == pin.RevisionId))
+                .Calls(graph.Nodes)
+                .Select(pin =>
+                    revisions.FirstOrDefault(revision => revision.SubflowId == pin.SubflowId)
+                )
                 .OfType<AutomationSubflowRevision>()
                 .Aggregate(
                     AutomationRequiredFeatures.ForDefinitions(
@@ -213,7 +231,14 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             }
             drafts.Add(new(imported.Id, graph));
         }
-        var fixtures = await MapScenariosAsync(section, drafts, issues, cancellationToken);
+        var fixtures = await MapScenariosAsync(
+            db,
+            new([.. revisions]),
+            section,
+            drafts,
+            issues,
+            cancellationToken
+        );
         foreach (var revision in revisions)
         {
             if (
@@ -257,36 +282,6 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             BitConverter.ToInt16(hash, 2),
             hash[4..12]
         );
-    }
-
-    private static void ValidatePins(
-        AutomationFlowDraft graph,
-        IReadOnlyList<AutomationSubflowRevision> revisions,
-        ICollection<ConfigurationValidationIssue> issues
-    )
-    {
-        foreach (var node in graph.Nodes)
-        {
-            if (
-                AutomationSubflowDefinitions.TryRead(node.Definition, out var pin)
-                && pin.RevisionId is { } id
-                && (
-                    revisions.FirstOrDefault(revision => revision.Id == id) is not { } revision
-                    || !AutomationSubflowDefinitions.SameInterface(
-                        pin.Interface,
-                        revision.Interface
-                    )
-                )
-            )
-            {
-                issues.Add(
-                    new(
-                        "sections.automations",
-                        $"Node '{node.Id.Value}' must pin an included revision with the same interface."
-                    )
-                );
-            }
-        }
     }
 
     private static void AddErrors(
