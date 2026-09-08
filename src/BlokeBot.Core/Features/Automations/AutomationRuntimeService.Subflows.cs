@@ -62,7 +62,10 @@ public sealed partial class AutomationRuntimeService
         foreach (var node in flow.Nodes)
         {
             if (
-                catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(node))
+                AutomationFrozenSubflows.ValidateDefinition(
+                    catalog,
+                    AutomationRuntimeSerialization.Definition(node)
+                )
                 is not AutomationConfigurationCheck.Valid valid
             )
             {
@@ -105,9 +108,14 @@ public sealed partial class AutomationRuntimeService
         foreach (var node in flow.Nodes)
         {
             if (
-                catalog.ValidateAdmittedDefinition(
-                    new(flow.HostId),
-                    AutomationRuntimeSerialization.Definition(node)
+                (
+                    AutomationSubflowDefinitions.CheckFrozen(
+                        AutomationRuntimeSerialization.Definition(node)
+                    )
+                    ?? catalog.ValidateAdmittedDefinition(
+                        new(flow.HostId),
+                        AutomationRuntimeSerialization.Definition(node)
+                    )
                 )
                     is not AutomationConfigurationCheck.Valid valid
                 || (

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using BlokeBot.Persistence;
-using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
@@ -13,12 +12,13 @@ internal static class AutomationSubflowStore
     internal static async Task<AutomationSubflowClosureOutcome> LoadClosureAsync(
         BlokeBotDbContext db,
         AutomationHostId hostId,
-        IEnumerable<AutomationSubflowRevisionId> roots,
+        IEnumerable<AutomationSubflowId> roots,
         AutomationSubflowId? publishing,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationSubflowRevision? preparedCandidate = null
     )
     {
-        var revisions = new Dictionary<AutomationSubflowRevisionId, AutomationSubflowRevision>();
+        var revisions = new Dictionary<AutomationSubflowId, AutomationSubflowRevision>();
         var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
         var visits = 0;
         foreach (var root in roots.Distinct())
@@ -29,15 +29,16 @@ internal static class AutomationSubflowStore
                 break;
             }
         }
+        var closure = new AutomationSubflowClosure([.. revisions.Values]);
+        foreach (var revision in closure.Revisions)
+        {
+            errors.AddRange(ValidateCalls(revision.Graph, closure));
+        }
         return errors.Count > 0
             ? new AutomationSubflowClosureOutcome.Invalid(errors.ToImmutable())
-            : new AutomationSubflowClosureOutcome.Available(new([.. revisions.Values]));
+            : new AutomationSubflowClosureOutcome.Available(closure);
 
-        async Task Visit(
-            AutomationSubflowRevisionId id,
-            HashSet<AutomationSubflowId> ancestors,
-            int depth
-        )
+        async Task Visit(AutomationSubflowId id, HashSet<AutomationSubflowId> ancestors, int depth)
         {
             if (++visits > 1024)
             {
@@ -55,158 +56,105 @@ internal static class AutomationSubflowStore
             {
                 if (revisions.Count >= MaximumClosureRevisions)
                 {
-                    errors.Add(Error("subflow-closure-limit", "Use fewer subflow revisions."));
+                    errors.Add(Error("subflow-closure-limit", "Use fewer subflows."));
                     return;
                 }
-                var row = await db
-                    .AutomationSubflowRevisions.AsNoTracking()
-                    .SingleOrDefaultAsync(
-                        value => value.HostId == hostId.Value && value.Id == id.Value,
-                        cancellationToken
-                    );
-                if (row is null)
+                if (
+                    preparedCandidate is { } candidate
+                    && candidate.SubflowId == id
+                    && candidate.Graph.HostId == hostId
+                )
                 {
-                    errors.Add(
-                        Error(
-                            "subflow-revision-missing",
-                            "Select a subflow revision owned by this host."
-                        )
-                    );
-                    return;
+                    revision = candidate;
                 }
-                revision = AutomationSubflowSerialization.Restore(row.SnapshotJson);
+                else
+                {
+                    var json = await (
+                        from current in db.AutomationSubflows.AsNoTracking()
+                        join stored in db.AutomationSubflowRevisions.AsNoTracking()
+                            on new
+                            {
+                                current.HostId,
+                                SubflowId = current.Id,
+                                Revision = current.LastRevision,
+                            } equals new
+                            {
+                                stored.HostId,
+                                stored.SubflowId,
+                                stored.Revision,
+                            }
+                        where current.HostId == hostId.Value && current.Id == id.Value
+                        select stored.SnapshotJson
+                    ).SingleOrDefaultAsync(cancellationToken);
+                    if (json is null)
+                    {
+                        errors.Add(Error("subflow-missing", "Choose an available subflow."));
+                        return;
+                    }
+                    revision = AutomationSubflowSerialization.Restore(json);
+                }
                 revisions.Add(id, revision);
             }
-            if (!ancestors.Add(revision.SubflowId))
+            if (!ancestors.Add(id))
             {
                 errors.Add(Error("subflow-recursion", "Remove the recursive subflow call."));
                 return;
             }
-            foreach (var child in Pins(revision.Graph.Nodes))
+            foreach (var child in Calls(revision.Graph.Nodes))
             {
-                await Visit(child.RevisionId, ancestors, depth + 1);
+                await Visit(child.SubflowId, ancestors, depth + 1);
                 if (errors.Count > 0)
                 {
                     break;
                 }
             }
-            _ = ancestors.Remove(revision.SubflowId);
+            _ = ancestors.Remove(id);
         }
     }
 
-    internal static IEnumerable<(
-        AutomationNodeId NodeId,
-        AutomationSubflowRevisionId RevisionId
-    )> Pins(IEnumerable<AutomationFlowDraftNode> nodes) =>
+    internal static IEnumerable<(AutomationNodeId NodeId, AutomationSubflowId SubflowId)> Calls(
+        IEnumerable<AutomationFlowDraftNode> nodes
+    ) =>
         nodes
             .Where(node => node.Definition.TypeId == AutomationSubflowDefinitions.Invoke)
             .Select(node =>
                 (
                     node.Id,
                     AutomationSubflowDefinitions.TryRead(node.Definition, out var configuration)
-                        ? configuration.RevisionId!.Value
+                    && configuration is AutomationSubflowInvocationConfiguration call
+                        ? call.SubflowId
                         : default
                 )
             );
 
-    internal static async Task<ImmutableArray<AutomationGraphError>> ValidatePinsAsync(
-        BlokeBotDbContext db,
+    internal static ImmutableArray<AutomationGraphError> ValidateCalls(
         AutomationFlowDraft graph,
-        CancellationToken cancellationToken
+        AutomationSubflowClosure closure
     )
     {
         var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
+        var revisions = closure.Revisions.ToDictionary(revision => revision.SubflowId);
         foreach (
             var node in graph.Nodes.Where(node =>
                 node.Definition.TypeId == AutomationSubflowDefinitions.Invoke
             )
         )
         {
-            if (!AutomationSubflowDefinitions.TryRead(node.Definition, out var configuration))
-            {
-                errors.Add(
-                    Error("subflow-pin-invalid", "Select a valid subflow revision.", node.Id)
-                );
-                continue;
-            }
-            var row = await db
-                .AutomationSubflowRevisions.AsNoTracking()
-                .SingleOrDefaultAsync(
-                    value =>
-                        value.HostId == graph.HostId.Value
-                        && value.Id == configuration.RevisionId!.Value.Value,
-                    cancellationToken
-                );
-            if (row is not null)
-            {
-                var enabled = await db
-                    .Hosts.Where(host => host.Id == graph.HostId.Value)
-                    .Select(host => host.EnabledFeatures)
-                    .SingleAsync(cancellationToken);
-                if (
-                    (
-                        AutomationSubflowSerialization.Restore(row.SnapshotJson).RequiredFeatures
-                        & ~enabled
-                    ) != HostFeatureFlags.None
-                )
-                {
-                    errors.Add(
-                        Error(
-                            "capability-unavailable",
-                            "Enable the selected subflow's required host features.",
-                            node.Id
-                        )
-                    );
-                }
-            }
             if (
-                row is null
-                || !AutomationSubflowDefinitions.SameInterface(
-                    configuration.Interface,
-                    AutomationSubflowSerialization.Restore(row.SnapshotJson).Interface
-                )
+                !AutomationSubflowDefinitions.TryRead(node.Definition, out var configuration)
+                || configuration is not AutomationSubflowInvocationConfiguration call
+                || !revisions.TryGetValue(call.SubflowId, out var revision)
+                || revision.Graph.HostId != graph.HostId
             )
+            {
+                errors.Add(Error("subflow-missing", "Choose an available subflow.", node.Id));
+            }
+            else if (!AutomationSubflowDefinitions.Compatible(call.Interface, revision.Interface))
             {
                 errors.Add(
                     Error(
-                        "subflow-pin-invalid",
-                        "Use the stored interface of a revision owned by this host.",
-                        node.Id
-                    )
-                );
-            }
-        }
-        return errors.ToImmutable();
-    }
-
-    internal static ImmutableArray<AutomationGraphError> RebindErrors(
-        AutomationFlowDraft existing,
-        AutomationFlowDraft candidate
-    )
-    {
-        var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
-        foreach (var node in candidate.Nodes)
-        {
-            var before = existing.Nodes.FirstOrDefault(value => value.Id == node.Id);
-            if (
-                before is null
-                || !AutomationSubflowDefinitions.TryRead(before.Definition, out var oldPin)
-                || before.Definition.TypeId != AutomationSubflowDefinitions.Invoke
-                || !AutomationSubflowDefinitions.TryRead(node.Definition, out var newPin)
-                || node.Definition.TypeId != AutomationSubflowDefinitions.Invoke
-            )
-            {
-                continue;
-            }
-            if (
-                oldPin.RevisionId != newPin.RevisionId
-                && !AutomationSubflowDefinitions.Compatible(oldPin.Interface, newPin.Interface)
-            )
-            {
-                errors.Add(
-                    Error(
-                        "subflow-rebind-incompatible",
-                        "Replace this invocation to use an incompatible interface.",
+                        "subflow-interface-incompatible",
+                        "Update this call's interface and inputs.",
                         node.Id
                     )
                 );

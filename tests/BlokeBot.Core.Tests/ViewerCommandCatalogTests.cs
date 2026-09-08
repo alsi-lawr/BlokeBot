@@ -591,7 +591,8 @@ public sealed class ViewerCommandCatalogTests
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         )
         {
             Requests.Add(request);

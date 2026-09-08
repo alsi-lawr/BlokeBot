@@ -12,7 +12,7 @@ public sealed class AutomationEditorKeyboardTests
             "\n",
             "import assert from \"node:assert/strict\";",
             _dom,
-            Source(),
+            _imports,
             _scenario
         );
         var startInfo = new ProcessStartInfo("node")
@@ -24,6 +24,12 @@ public sealed class AutomationEditorKeyboardTests
         startInfo.ArgumentList.Add("--input-type=module");
         startInfo.ArgumentList.Add("--eval");
         startInfo.ArgumentList.Add(source);
+        startInfo.ArgumentList.Add(
+            SourcePath("Features/Automations/Page/AutomationEditorPage.razor.js")
+        );
+        startInfo.ArgumentList.Add(
+            SourcePath("wwwroot/Features/Automations/Page/AutomationFlowCanvas.js")
+        );
         using var process =
             Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start Node.js.");
@@ -35,25 +41,40 @@ public sealed class AutomationEditorKeyboardTests
         process.ExitCode.ShouldBe(0, $"{await output}\n{await error}");
     }
 
-    private static string Source() =>
-        File.ReadAllText(
-            Path.GetFullPath(
-                Path.Combine(
-                    AppContext.BaseDirectory,
-                    "..",
-                    "..",
-                    "..",
-                    "..",
-                    "..",
-                    "src",
-                    "BlokeBot.Core",
-                    "Features",
-                    "Automations",
-                    "Page",
-                    "AutomationEditorPage.razor.js"
-                )
+    private static string SourcePath(string relative) =>
+        Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "..",
+                "..",
+                "..",
+                "..",
+                "..",
+                "src",
+                "BlokeBot.Core",
+                relative
             )
         );
+
+    private const string _imports = """
+import { registerHooks } from "node:module";
+import { pathToFileURL } from "node:url";
+const pageModule = pathToFileURL(process.argv[1]).href;
+const canvasModule = pathToFileURL(process.argv[2]).href;
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    return nextResolve(
+      context.parentURL === pageModule && specifier === "./AutomationFlowCanvas.js"
+        ? canvasModule : specifier,
+      context,
+    );
+  },
+});
+const {
+  initializeHistoryKeyboard, disposeHistoryKeyboard,
+  initializeToolboxKeyboard, disposeToolboxKeyboard,
+} = await import(pageModule);
+""";
 
     private const string _dom = """
 class FakeElement {

@@ -6,7 +6,7 @@ public sealed class AutomationCatalogRegistrationException(string message) : Exc
 
 internal sealed partial class AutomationDefinitionCatalog
 {
-    internal const int SupportedSchemaVersion = 1;
+    internal const int SupportedSchemaVersion = 2;
 
     private readonly ImmutableDictionary<
         AutomationDefinitionId,

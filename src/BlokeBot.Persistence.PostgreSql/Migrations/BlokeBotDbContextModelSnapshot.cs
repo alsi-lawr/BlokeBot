@@ -623,14 +623,35 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("RevisionId")
+                    b.Property<Guid>("SubflowId")
                         .HasColumnType("uuid");
 
                     b.HasKey("NodeId");
 
-                    b.HasIndex("HostId", "RevisionId");
+                    b.HasIndex("HostId", "SubflowId");
 
                     b.ToTable("automation_subflow_callers", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowNestedCallerReference", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CallerSubflowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubflowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("HostId", "CallerSubflowId", "NodeId");
+
+                    b.HasIndex("HostId", "SubflowId");
+
+                    b.ToTable("automation_subflow_nested_callers", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", b =>
@@ -657,27 +678,6 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsUnique();
 
                     b.ToTable("automation_subflow_revisions", (string)null);
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionReference", b =>
-                {
-                    b.Property<int>("HostId")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("CallerRevisionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("HostId", "CallerRevisionId", "NodeId");
-
-                    b.HasIndex("HostId", "RevisionId");
-
-                    b.ToTable("automation_subflow_revision_references", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRunReference", b =>
@@ -9576,11 +9576,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflow", null)
                         .WithMany()
-                        .HasForeignKey("HostId", "RevisionId")
+                        .HasForeignKey("HostId", "SubflowId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowNestedCallerReference", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflow", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "CallerSubflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflow", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "SubflowId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_automation_subflow_nested_callers_automation_subflows_Host~1");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", b =>
@@ -9590,22 +9606,6 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasForeignKey("HostId", "SubflowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionReference", b =>
-                {
-                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
-                        .WithMany()
-                        .HasForeignKey("HostId", "CallerRevisionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", null)
-                        .WithMany()
-                        .HasForeignKey("HostId", "RevisionId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired()
-                        .HasConstraintName("FK_automation_subflow_revision_references_automation_subflow_~1");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRunReference", b =>

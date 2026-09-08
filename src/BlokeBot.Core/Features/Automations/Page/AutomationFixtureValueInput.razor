@@ -1,0 +1,117 @@
+@using System.Globalization
+
+<div class="automation-fixture-value">
+    @if (Value is AutomationValue.Actor actor)
+    {
+        <label class="field">
+        <span class="field__label">@Label · Login</span>
+        <input class="field__input" value="@actor.Value.Login" @onchange="args => Changed.InvokeAsync(new AutomationValue.Actor(actor.Value with { Login = Text(args) }))" />
+        </label>
+        <label class="field">
+        <span class="field__label">Display name</span>
+        <input class="field__input" value="@actor.Value.DisplayName" @onchange="args => Changed.InvokeAsync(new AutomationValue.Actor(actor.Value with { DisplayName = Text(args) }))" />
+        </label>
+    }
+    else if (Value is AutomationValue.Channel channel)
+    {
+        <label class="field">
+        <span class="field__label">@Label · Login</span>
+        <input class="field__input" value="@channel.Value.Login" @onchange="args => Changed.InvokeAsync(new AutomationValue.Channel(channel.Value with { Login = Text(args) }))" />
+        </label>
+        <label class="field">
+        <span class="field__label">Display name</span>
+        <input class="field__input" value="@channel.Value.DisplayName" @onchange="args => Changed.InvokeAsync(new AutomationValue.Channel(channel.Value with { DisplayName = Text(args) }))" />
+        </label>
+    }
+    else if (Value is AutomationValue.Boolean boolean)
+    {
+        <label class="field">
+        <span class="field__label">@Label</span>
+        <select class="field__input" value="@boolean.Value.ToString()" @onchange="args => Changed.InvokeAsync(new AutomationValue.Boolean(bool.Parse(Text(args))))">
+        <option value="True">True</option>
+        <option value="False">False</option>
+        </select>
+        </label>
+    }
+    else
+    {
+        <label class="field">
+            <span class="field__label">@Label <small>@ValueType</small>
+            </span>
+            @if (AutomationEditorNode.IsComplexFixedValue(ValueType))
+            {
+                <textarea class="field__input" rows="3" @onchange="ParseAsync" aria-invalid="@_invalid">@_text</textarea>
+            }
+            else
+            {
+                <input class="field__input" value="@_text" @onchange="ParseAsync" aria-invalid="@_invalid" />
+            }
+        </label>
+    }
+    @if (Nullable)
+    {
+        <label class="automation-port-option">
+        <input type="checkbox" checked="@(Value is AutomationValue.Null)" @onchange="ToggleNullAsync" /> No value</label>
+    }
+    @if (_invalid)
+    {
+        <p class="automation-authoring-error" role="alert">Enter a valid @ValueType value.</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required string Label { get; set; }
+    [Parameter, EditorRequired] public required AutomationValue Value { get; set; }
+    [Parameter] public AutomationPortValueType ValueType { get; set; }
+    [Parameter] public bool Nullable { get; set; }
+    [Parameter] public EventCallback<AutomationValue> Changed { get; set; }
+    [Parameter] public EventCallback<bool> ValidityChanged { get; set; }
+    private AutomationValue? _previous;
+    private string _text = string.Empty;
+    private bool _invalid;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_previous, Value))
+        {
+            _previous = Value;
+            _text = AutomationEditorNode.DisplayFixedValue(Value);
+            _invalid = false;
+        }
+    }
+
+    private async Task ParseAsync(ChangeEventArgs args)
+    {
+        _text = Text(args);
+        AutomationValue? value = null;
+        if (ValueType == AutomationPortValueType.Text)
+        {
+            value = new AutomationValue.Text(_text);
+        }
+        else if (ValueType == AutomationPortValueType.Number && decimal.TryParse(_text, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+        {
+            value = new AutomationValue.Number(number);
+        }
+        else if (ValueType == AutomationPortValueType.Timestamp && DateTimeOffset.TryParse(_text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var timestamp))
+        {
+            value = new AutomationValue.Timestamp(timestamp);
+        }
+        else if (AutomationEditorNode.TryParseComplexFixedValue(_text, ValueType, Nullable ? AutomationPortNullability.Nullable : AutomationPortNullability.NonNullable, out var complex))
+        {
+            value = complex;
+        }
+        _invalid = value is null;
+        await ValidityChanged.InvokeAsync(!_invalid);
+        if (value is not null)
+        {
+            await Changed.InvokeAsync(value);
+        }
+    }
+
+    private async Task ToggleNullAsync(ChangeEventArgs args)
+    {
+        await ValidityChanged.InvokeAsync(true);
+        await Changed.InvokeAsync(args.Value is true ? new AutomationValue.Null(ValueType) : AutomationEditorNode.DefaultFixtureValue(ValueType));
+    }
+    private static string Text(ChangeEventArgs args) => args.Value?.ToString() ?? string.Empty;
+}

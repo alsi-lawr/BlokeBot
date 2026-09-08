@@ -19,6 +19,18 @@ public partial class AutomationNodeInspector
     private int _fixedValueAttempt;
 
     [Parameter]
+    public RenderFragment? CallSubflowSelector { get; set; }
+
+    [Parameter]
+    public RenderFragment? BoundaryDeclarations { get; set; }
+
+    private bool _isSubflowBoundary =>
+        Node?.Definition.Id.Value
+            is AutomationSubflowDefinitions.Entry
+                or AutomationSubflowDefinitions.Exit;
+    private bool _isSubflowExit => Node?.Definition.Id.Value == AutomationSubflowDefinitions.Exit;
+
+    [Parameter]
     public AutomationEditorNode? Node { get; set; }
 
     [Parameter]
@@ -71,6 +83,12 @@ public partial class AutomationNodeInspector
         AutomationPortValueType.Array,
         AutomationPortValueType.Map,
     ];
+
+    private async Task RemoveSubflowInputAsync(AutomationConfigurationFieldId field)
+    {
+        Node?.RemoveUnmatchedSubflowInput(field);
+        await Changed.InvokeAsync();
+    }
 
     private Task ChangedAsync() => Changed.InvokeAsync();
 

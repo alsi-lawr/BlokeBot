@@ -185,6 +185,7 @@
     color: var(--tone-green-fg);
 }
 
+.automation-node--failed .automation-node-status,
 .automation-node-status--repair {
     color: var(--tone-red-fg);
 }

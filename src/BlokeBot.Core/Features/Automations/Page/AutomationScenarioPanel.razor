@@ -1,0 +1,148 @@
+@using System.Collections.Immutable
+@using System.Globalization
+
+@if (Editor is not null)
+{
+    <div class="automation-authoring-body" data-automation-scenario-editor>
+        <div class="automation-authoring-heading">
+        <h2>Test scenarios</h2>
+        <button class="btn-secondary" type="button" @onclick="New">New</button>
+        </div>
+        <label class="field">
+        <span class="field__label">Scenario</span>
+        <select class="field__input" value="@Editor.Id?.Value.ToString()" @onchange="args => Select.InvokeAsync(args.Value?.ToString() ?? string.Empty)">
+        <option value="">New scenario</option>@foreach (var item in Saved) { <option value="@item.Id.Value">@item.Name</option> }</select>
+        </label>
+        <label class="field">
+        <span class="field__label">Name</span>
+        <input class="field__input" maxlength="200" @bind="Editor.Name" />
+        </label>
+        <label class="field">
+        <span class="field__label">Trigger</span>
+        <select class="field__input" value="@Editor.Fixture.SourceNodeId.Value" @onchange="args => SourceChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)">@foreach (var node in Nodes.Where(node => node.Definition.Kind == AutomationNodeKind.Source)) { <option value="@node.Id.Value">@node.EffectiveName</option> }</select>
+        </label>
+        <section class="automation-authoring-section">
+        <h3>Source fields</h3>
+            @foreach (var field in Fields)
+            {
+                <AutomationFixtureValueInput @key="(Editor, field.Id)" Label="@field.Name" Value="@Editor.SourceValue(field)" ValueType="field.ValueType" Nullable="@(field.Nullability == AutomationPortNullability.Nullable)" Changed="value => Editor.SetSourceValue(field, value)" ValidityChanged="valid => InputValidity.InvokeAsync(new(field.Id.Value, valid))" />
+            }
+        </section>
+        <details>
+        <summary>Clock and seed</summary>
+        <div class="automation-authoring-section">
+            <label class="field">
+            <span class="field__label">Clock (UTC)</span>
+            <input class="field__input" type="datetime-local" value="@Editor.Fixture.ClockUtc.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)" @onchange="ClockChanged" />
+            </label>
+            <label class="field">
+            <span class="field__label">Seed</span>
+            <input class="field__input" inputmode="numeric" value="@Editor.Fixture.Seed.ToString(CultureInfo.InvariantCulture)" @onchange="SeedChanged" />
+            </label>
+        </div>
+        </details>
+        <section class="automation-authoring-section">
+        <h3>Action outcomes</h3>
+            @foreach (var node in Nodes.Where(node => node.Definition.Kind == AutomationNodeKind.Action))
+            {
+                <label class="automation-effect-choice">
+                <span>@node.EffectiveName</span>
+                <select aria-label="@($"{node.EffectiveName} result")" value="@(Editor.Fixture.Effects.FirstOrDefault(effect => effect.NodeId == node.Id)?.Result ?? AutomationScenarioEffectResult.Succeeded)" @onchange="args => SetEffect(node.Id, args)">
+                <option value="Succeeded">Success</option>
+                <option value="Failed">Failure</option>
+                </select>
+                </label>
+            }
+        </section>
+        <details>
+        <summary>Connected input overrides</summary>
+        <div class="automation-authoring-section">
+            <label class="field">
+            <span class="field__label">Node</span>
+            <select class="field__input" value="@_inputNode?.Value" @onchange="args => _inputNode = Guid.TryParse(args.Value?.ToString(), out var id) ? new(id) : null">
+            <option value="">Choose node</option>@foreach (var node in Nodes.Where(node => node.Definition.Inputs.Any(port => port.BindingFieldId is { } field && node.Binding(field).Mode == AutomationInputBindingMode.Connected))) { <option value="@node.Id.Value">@node.EffectiveName</option> }</select>
+            </label>
+            @if (Nodes.FirstOrDefault(node => node.Id == _inputNode) is { } inputNode)
+            {
+                @foreach (var port in inputNode.Definition.Inputs.Where(port => port.BindingFieldId is { } field && inputNode.Binding(field).Mode == AutomationInputBindingMode.Connected))
+                {
+                    var overridden = Editor.Fixture.ConnectedInputs.FirstOrDefault(input => input.NodeId == inputNode.Id && input.PortId == port.Id);
+                    <label class="automation-port-option">
+                    <input type="checkbox" checked="@(overridden is not null)" @onchange="args => ToggleOverride(inputNode.Id, port, args.Value is true)" /> @port.Name</label>
+                    @if (overridden is not null)
+                    {
+                        <AutomationFixtureValueInput @key="(Editor, inputNode.Id, port.Id)" Label="@port.Name" Value="overridden.Value.Value" ValueType="port.ValueType" Nullable="@(port.Nullability == AutomationPortNullability.Nullable)" Changed="value => Editor.SetConnected(inputNode.Id, port, value)" ValidityChanged="valid => ConnectedValidity(inputNode.Id, port.Id, valid)" />
+                    }
+                }
+            }
+        </div>
+        </details>
+        <button class="btn-secondary" type="button" @onclick="Generate">Generate fixture</button>
+        @if (Editor.Id is not null)
+        {
+            <details>
+            <summary>Scenario actions</summary>
+            <div class="automation-authoring-actions">
+            <button class="btn-secondary" type="button" @onclick="Duplicate">Duplicate</button>
+            <button class="btn-secondary" type="button" @onclick="Delete">Delete</button>
+            </div>
+            </details>
+        }
+    </div>
+    <footer class="automation-authoring-footer">
+    <button class="btn-primary" type="button" disabled="@(Busy || InvalidInputs)" data-automation-run-scenario @onclick="Run">Run scenario</button>
+    <button class="btn-secondary" type="button" disabled="@(Busy || !CanSave || InvalidInputs)" data-automation-save-scenario @onclick="Save">Save scenario</button>@if (Busy) { <button class="btn-secondary" type="button" @onclick="Cancel">Cancel</button> }</footer>
+}
+else
+{
+    <div class="automation-authoring-body">
+    <h2>Test scenarios</h2>
+    <p>Add a trigger to test this draft.</p>
+    </div>
+}
+
+@code {
+    [Parameter] public AutomationScenarioEditor? Editor { get; set; }
+    [Parameter] public ImmutableArray<AutomationScenarioSnapshot> Saved { get; set; } = [];
+    [Parameter] public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];
+    [Parameter] public ImmutableArray<AutomationPortMetadata> Fields { get; set; } = [];
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool CanSave { get; set; }
+    [Parameter] public bool InvalidInputs { get; set; }
+    [Parameter] public EventCallback<AutomationFixtureInputValidity> InputValidity { get; set; }
+    [Parameter] public EventCallback<string> Select { get; set; }
+    [Parameter] public EventCallback<string> SourceChanged { get; set; }
+    [Parameter] public EventCallback New { get; set; }
+    [Parameter] public EventCallback Generate { get; set; }
+    [Parameter] public EventCallback Run { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+    [Parameter] public EventCallback Duplicate { get; set; }
+    [Parameter] public EventCallback Delete { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+    private AutomationNodeId? _inputNode;
+
+    private Task ConnectedValidity(AutomationNodeId node, AutomationPortId port, bool valid) => InputValidity.InvokeAsync(new($"{node.Value}/{port.Value}", valid));
+
+    private void SetEffect(AutomationNodeId node, ChangeEventArgs args)
+    {
+        if (Enum.TryParse<AutomationScenarioEffectResult>(args.Value?.ToString(), out var result)) Editor?.SetEffect(node, result);
+    }
+    private async Task ToggleOverride(AutomationNodeId node, AutomationPortMetadata port, bool enabled)
+    {
+        if (enabled) Editor?.SetConnected(node, port, AutomationEditorNode.DefaultFixtureValue(port.ValueType));
+        else Editor?.RemoveConnected(node, port.Id);
+        await ConnectedValidity(node, port.Id, true);
+    }
+    private async Task ClockChanged(ChangeEventArgs args)
+    {
+        var valid = DateTimeOffset.TryParse(args.Value?.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var clock);
+        await InputValidity.InvokeAsync(new("clock", valid));
+        if (valid) Editor?.SetClock(clock);
+    }
+    private async Task SeedChanged(ChangeEventArgs args)
+    {
+        var valid = ulong.TryParse(args.Value?.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var seed);
+        await InputValidity.InvokeAsync(new("seed", valid));
+        if (valid) Editor?.SetSeed(seed);
+    }
+}

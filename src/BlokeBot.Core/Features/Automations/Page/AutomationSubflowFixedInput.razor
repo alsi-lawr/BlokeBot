@@ -1,0 +1,60 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<label class="automation-field">
+    <span>@(Mismatch && Stored is { } stored ? $"Stored value · {AutomationPureHandlerRegistry.ValueType(stored)}" : "Value")</span>
+    @if (AutomationEditorNode.IsComplexFixedValue(Port.ValueType))
+    {
+        <textarea @key="_attempt" aria-invalid="@(Mismatch || _rejected ? "true" : null)" aria-label="@($"{Port.Name} fixed value")" value="@_text" @oninput="args => _text = args.Value?.ToString() ?? string.Empty" @onchange="CommitAsync" @onkeydown="KeyAsync"></textarea>
+    }
+    else
+    {
+        <input @key="_attempt" type="text" inputmode="@(Port.ValueType == AutomationPortValueType.Number ? "decimal" : null)" aria-invalid="@(Mismatch || _rejected ? "true" : null)" aria-label="@($"{Port.Name} fixed value")" value="@_text" @oninput="args => _text = args.Value?.ToString() ?? string.Empty" @onchange="CommitAsync" @onkeydown="KeyAsync" />
+    }
+</label>
+@if (Mismatch || Stored is null)
+{
+    <button class="btn-secondary" type="button" data-automation-set-fixed-value @onclick="CommitAsync">Set @AutomationConnections.TypeLabel(Port) value</button>
+}
+@if (_rejected)
+{
+    <span class="automation-field-error" role="alert">Enter a valid @AutomationConnections.TypeLabel(Port) value.</span>
+}
+else if (Mismatch)
+{
+    <span class="automation-field-error" role="alert">Use a fixed value matching the declared @(Node.Definition.Id.Value == AutomationSubflowDefinitions.Exit ? "output" : "input") type.</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public required AutomationEditorNode Node { get; set; }
+    [Parameter, EditorRequired] public required AutomationPortMetadata Port { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    private AutomationValue? _observed;
+    private string _text = string.Empty;
+    private bool _rejected;
+    private int _attempt;
+    private AutomationValue? Stored => Node.SubflowFixedValue(Port.Id);
+    private bool Mismatch => Stored is { } value && (AutomationPureHandlerRegistry.ValueType(value) != Port.ValueType || value is AutomationValue.Null && Port.Nullability == AutomationPortNullability.NonNullable);
+    protected override void OnParametersSet()
+    {
+        if (!Equals(_observed, Stored))
+        {
+            _observed = Stored;
+            _text = Stored is { } value ? AutomationEditorNode.DisplayFixedValue(value) : string.Empty;
+            _rejected = false;
+        }
+    }
+    private Task KeyAsync(KeyboardEventArgs args) => args.Key == "Enter" && !args.ShiftKey ? CommitAsync() : Task.CompletedTask;
+    private async Task CommitAsync()
+    {
+        if (!Node.TrySetSubflowFixedValue(Port.Id, _text))
+        {
+            _rejected = true;
+            _text = Stored is { } value ? AutomationEditorNode.DisplayFixedValue(value) : string.Empty;
+            _attempt++;
+            return;
+        }
+        _rejected = false;
+        _observed = Stored;
+        await Changed.InvokeAsync();
+    }
+}

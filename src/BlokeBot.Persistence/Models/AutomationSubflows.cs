@@ -20,15 +20,15 @@ public sealed class AutomationSubflowCallerReference
 {
     public Guid NodeId { get; set; }
     public int HostId { get; set; }
-    public Guid RevisionId { get; set; }
+    public Guid SubflowId { get; set; }
 }
 
-public sealed class AutomationSubflowRevisionReference
+public sealed class AutomationSubflowNestedCallerReference
 {
     public int HostId { get; set; }
-    public Guid CallerRevisionId { get; set; }
+    public Guid CallerSubflowId { get; set; }
     public Guid NodeId { get; set; }
-    public Guid RevisionId { get; set; }
+    public Guid SubflowId { get; set; }
 }
 
 public sealed class AutomationSubflowRunReference

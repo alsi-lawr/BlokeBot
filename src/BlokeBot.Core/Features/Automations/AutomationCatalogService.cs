@@ -102,6 +102,19 @@ public sealed partial class AutomationCatalogService
             requireCurrentExecution: false
         );
 
+    internal AutomationConfigurationCheck ValidatePreparedDefinition(
+        AutomationHostId hostId,
+        PersistedAutomationNodeDefinition persisted
+    ) =>
+        ValidateEnabledPersisted(
+            hostId,
+            new(persisted.TypeId),
+            new(persisted.SchemaVersion),
+            persisted.Configuration,
+            persisted.PluginProvenance,
+            requireCurrentExecution: false
+        );
+
     internal AutomationConfigurationCheck ValidateAdmittedDefinition(
         AutomationHostId hostId,
         PersistedAutomationNodeDefinition persisted
@@ -175,6 +188,19 @@ public sealed partial class AutomationCatalogService
         requestedHostId != context.HostId
             ? new AutomationConfigurationCheck.HostMismatch(requestedHostId, context.HostId)
             : await ValidateAdmittedPersistedAsync(requestedHostId, persisted, cancellationToken);
+
+    internal async Task<AutomationConfigurationCheck> ValidateFrozenBeforeExecutionAsync(
+        AutomationHostId hostId,
+        AutomationContext context,
+        PersistedAutomationNodeDefinition persisted,
+        CancellationToken cancellationToken
+    ) =>
+        hostId != context.HostId
+            ? new AutomationConfigurationCheck.HostMismatch(hostId, context.HostId)
+        : !await HostExistsAsync(hostId, cancellationToken)
+            ? new AutomationConfigurationCheck.HostNotFound()
+        : AutomationSubflowDefinitions.CheckFrozen(persisted)
+            ?? ValidateAdmittedDefinition(hostId, persisted);
 
     private async Task<AutomationConfigurationCheck> ValidateAdmittedPersistedAsync(
         AutomationHostId hostId,

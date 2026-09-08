@@ -23,6 +23,22 @@ public sealed partial class AutomationEditorNode
 
     private JsonElement ConfigurationJson()
     {
+        if (Subflow is not null)
+        {
+            return AutomationSubflowDefinitions
+                .Create(
+                    Definition.Id.Value,
+                    Subflow.Interface,
+                    Subflow is AutomationSubflowInvocationConfiguration call
+                        ? call.SubflowId
+                        : null,
+                    Subflow.FixedInputs.ToImmutableDictionary(
+                        pair => pair.Key,
+                        pair => pair.Value.Value
+                    )
+                )
+                .Configuration;
+        }
         if (_transform is not null)
         {
             return TransformConfigurationJson();

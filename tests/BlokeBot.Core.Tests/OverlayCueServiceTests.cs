@@ -1,11 +1,16 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Net;
+using System.Text.Json;
 using System.Threading.Channels;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -17,6 +22,119 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class OverlayCueServiceTests
 {
+    [Test]
+    public async Task SubflowLatest_CueValidationSharesThePreparationTransactionAndPreservesReferenceChecks()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Automations | HostFeatureFlags.Overlays);
+        var (target, cue) = await fixture.SeedPlaybackAsync();
+        var features = TestHostFeatureServices.Create(
+            fixture.Database,
+            new HostedChannelChangeNotifier(fixture.Events),
+            []
+        );
+        var expressions = new AutomationExpressionService();
+        var catalog = new AutomationCatalogService(
+            new([new CoreAutomationCatalogModule()]),
+            features
+        );
+        var flows = new AutomationFlowService(
+            fixture.Database,
+            catalog,
+            expressions,
+            fixture.Playback,
+            fixture.Clock
+        );
+        var contract = new AutomationSubflowInterface([], []);
+        var entry = Boundary(AutomationSubflowDefinitions.Entry);
+        var exit = Boundary(AutomationSubflowDefinitions.Exit);
+        using var json = JsonDocument.Parse($$"""{"target-id":"{{target}}","cue-id":"{{cue}}"}""");
+        var action = new AutomationFlowDraftNode(
+            new(Guid.NewGuid()),
+            new("play-overlay-cue", 1, json.RootElement.Clone()),
+            AutomationExpressionLanguage.CurrentVersion,
+            AutomationNodeFailurePolicy.Stop,
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
+        );
+        var draft = new AutomationSubflowDraft(
+            new(Guid.NewGuid()),
+            "Cue flow",
+            contract,
+            new(
+                null,
+                new(fixture.HostId),
+                "Cue flow",
+                1,
+                false,
+                [entry, action, exit],
+                [Link(entry, action), Link(action, exit)]
+            )
+        );
+        var validation = await flows.ValidateSubflowAsync(draft, CancellationToken.None);
+        validation.Gate.ShouldBeNull();
+        validation.Errors.ShouldBeEmpty();
+
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        (
+            await MainDatabaseStatements.LockHostAsync(db, fixture.HostId, CancellationToken.None)
+        ).ShouldBe(1);
+        _ = (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.HostId, target, cue),
+                CancellationToken.None,
+                db
+            )
+        ).ShouldBeOfType<OverlayCueReferenceOutcome.Available>();
+        _ = (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.OtherHostId, target, cue),
+                CancellationToken.None,
+                db
+            )
+        ).ShouldBeOfType<OverlayCueReferenceOutcome.Missing>();
+        _ = await db
+            .OverlayCues.Where(value => value.PublicId == cue)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.IsEnabled, false));
+        var disabled = (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.HostId, target, cue),
+                CancellationToken.None,
+                db
+            )
+        ).ShouldBeOfType<OverlayCueReferenceOutcome.Disabled>();
+        disabled.Part.ShouldBe(OverlayCueReferencePart.Cue);
+        (await db.Hosts.AnyAsync(value => value.Id == fixture.HostId)).ShouldBeTrue();
+        await transaction.RollbackAsync();
+        _ = (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.HostId, target, cue),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayCueReferenceOutcome.Available>();
+
+        AutomationFlowDraftNode Boundary(string type) =>
+            new(
+                new(Guid.NewGuid()),
+                AutomationSubflowDefinitions.Boundary(type, contract),
+                AutomationExpressionLanguage.CurrentVersion,
+                AutomationNodeFailurePolicy.Stop,
+                ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
+            );
+        static AutomationFlowDraftEdge Link(
+            AutomationFlowDraftNode from,
+            AutomationFlowDraftNode to
+        ) =>
+            new(
+                Guid.NewGuid(),
+                AutomationEdgeKind.Flow,
+                from.Id,
+                new("complete"),
+                to.Id,
+                new("flow")
+            );
+    }
+
     [Test]
     public async Task SharedDocument_RetargetAndReferenceRemovalStayHostIsolatedUntilLastOrphan()
     {
