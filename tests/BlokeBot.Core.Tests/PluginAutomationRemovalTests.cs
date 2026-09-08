@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -12,6 +13,7 @@ using BlokeBot.Plugins.Features;
 using BlokeBot.Plugins.Runtime;
 using Bunit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -95,6 +97,7 @@ public sealed class PluginAutomationRemovalTests
         history.ShouldBeEmpty();
 
         using var editor = new BunitContext();
+        _ = editor.Services.AddScoped<DashboardFragmentState>();
         var rail = editor.Render<AutomationFlowRail>(parameters =>
             parameters
                 .Add(component => component.Flows, projected)
