@@ -202,7 +202,8 @@ public sealed partial class AutomationFlowService(
 
 internal sealed record AutomationGraphValidation(
     AutomationCatalogAvailability? Gate,
-    ImmutableArray<AutomationGraphError> Errors
+    ImmutableArray<AutomationGraphError> Errors,
+    ImmutableArray<AutomationSubflowNodeContract> NodeContracts = default
 );
 
 internal abstract record AutomationFlowDraftRestoreOutcome
