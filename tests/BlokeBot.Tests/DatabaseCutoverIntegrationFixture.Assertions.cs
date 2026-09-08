@@ -301,6 +301,39 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             {
                 entry.EventJson.ShouldNotContain(_tracePrivateValue);
             }
+            var subflow = (
+                await db.AutomationSubflows.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            subflow.HostId.ShouldBe(SeedHostId);
+            subflow.Id.ShouldBe(_subflowId);
+            subflow.LastRevision.ShouldBe(_subflowRevision.Revision);
+            var revision = (
+                await db.AutomationSubflowRevisions.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            revision.HostId.ShouldBe(subflow.HostId);
+            revision.Id.ShouldBe(_subflowRevisionId);
+            revision.SubflowId.ShouldBe(subflow.Id);
+            revision.Revision.ShouldBe(subflow.LastRevision);
+            revision.SnapshotJson.ShouldBe(
+                AutomationSubflowSerialization.Serialize(_subflowRevision)
+            );
+            AutomationSubflowSerialization
+                .Serialize(AutomationSubflowSerialization.Restore(revision.SnapshotJson))
+                .ShouldBe(revision.SnapshotJson);
+            var caller = (
+                await db.AutomationSubflowCallers.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            caller.HostId.ShouldBe(revision.HostId);
+            caller.NodeId.ShouldBe(_subflowCallerId);
+            caller.RevisionId.ShouldBe(revision.Id);
+            var callerNode = await db
+                .AutomationFlowNodes.AsNoTracking()
+                .SingleAsync(node => node.Id == caller.NodeId);
+            callerNode.FlowId.ShouldBe(FlowId);
+            callerNode.DefinitionId.ShouldBe(AutomationSubflowDefinitions.Invoke);
+            callerNode.ConfigurationJson.ShouldBe(
+                AutomationSubflowDefinitions.Invocation(_subflowRevision).Configuration.GetRawText()
+            );
         }
     }
 
