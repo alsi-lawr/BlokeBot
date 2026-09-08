@@ -102,6 +102,19 @@ public sealed partial class AutomationCatalogService
             requireCurrentExecution: false
         );
 
+    internal AutomationConfigurationCheck ValidateAdmittedDefinition(
+        AutomationHostId hostId,
+        PersistedAutomationNodeDefinition persisted
+    ) =>
+        ValidateEnabledPersisted(
+            hostId,
+            new(persisted.TypeId),
+            new(persisted.SchemaVersion),
+            persisted.Configuration,
+            persisted.PluginProvenance,
+            requireCurrentExecution: true
+        );
+
     public bool TryDescribe(
         AutomationDefinitionId definitionId,
         out AutomationDefinitionDescriptor descriptor

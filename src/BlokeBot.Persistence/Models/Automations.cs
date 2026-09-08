@@ -17,6 +17,7 @@ public enum AutomationNodeRunStatus
     Failed,
     ContinuedAfterFailure,
     Invalidated,
+    Waiting,
 }
 
 public enum PersistedAutomationEdgeKind

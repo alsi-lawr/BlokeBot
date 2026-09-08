@@ -191,7 +191,9 @@ public sealed record AutomationScenarioNodeOutcome(
     AutomationNodeRunState State,
     string OutcomeCode,
     ImmutableArray<AutomationValueDiagnostic> ResolvedInputs = default,
-    DateTimeOffset VirtualTimeUtc = default
+    DateTimeOffset VirtualTimeUtc = default,
+    AutomationNodeId? AuthorNodeId = null,
+    AutomationTraceInvocation? Invocation = null
 );
 
 public abstract record AutomationScenarioRunOutcome
@@ -328,7 +330,9 @@ public sealed record AutomationNodeRunSummary(
     AutomationNodeRunState State,
     string? OutcomeCode,
     DateTimeOffset? CompletedAtUtc,
-    ImmutableArray<AutomationValueDiagnostic> Outputs = default
+    ImmutableArray<AutomationValueDiagnostic> Outputs = default,
+    AutomationNodeId? AuthorNodeId = null,
+    AutomationTraceInvocation? Invocation = null
 );
 
 public enum AutomationNodeRunState
@@ -339,6 +343,7 @@ public enum AutomationNodeRunState
     Failed,
     ContinuedAfterFailure,
     Invalidated,
+    Waiting,
 }
 
 public abstract record AutomationRunQueryOutcome

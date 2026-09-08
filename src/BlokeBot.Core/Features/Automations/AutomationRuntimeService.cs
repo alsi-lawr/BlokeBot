@@ -204,8 +204,28 @@ public sealed partial class AutomationRuntimeService(
 
         foreach (var (flow, source) in matching)
         {
-            var requiredFeatures = AutomationRequiredFeatures.ForDefinitions(
-                flow.Nodes.Select(static node => node.DefinitionId)
+            var runId = Guid.NewGuid();
+            var original = (
+                (AutomationDefinitionRestoreOutcome.Available)
+                    AutomationRuntimeSerialization.RestoreDefinition(
+                        AutomationRuntimeSerialization.SerializeDefinition(flow)
+                    )
+            ).Flow;
+            var frozen = await AutomationFrozenSubflows.FreezeAsync(
+                db,
+                original,
+                runId,
+                cancellationToken
+            );
+            if (frozen is null || FreezeExecutionFences(frozen.Flow) is not { } frozenFlow)
+            {
+                return Dispatched(AutomationDispatchStatus.InvalidFlow);
+            }
+            var requiredFeatures = frozen.Closure.Revisions.Aggregate(
+                AutomationRequiredFeatures.ForDefinitions(
+                    frozenFlow.Nodes.Select(static node => node.DefinitionId)
+                ),
+                (required, revision) => required | revision.RequiredFeatures
             );
             if (!host.EnabledFeatures.Contains(requiredFeatures))
             {
@@ -213,7 +233,6 @@ public sealed partial class AutomationRuntimeService(
                 continue;
             }
 
-            var runId = Guid.NewGuid();
             var now = clock.GetUtcNow().UtcDateTime;
             var inserted = await MainDatabaseStatements.TryInsertAutomationFlowRunAsync(
                 db,
@@ -228,10 +247,7 @@ public sealed partial class AutomationRuntimeService(
                     source.Id,
                     context.Event.OccurrenceId,
                     AutomationRuntimeSerialization.SerializeContext(context),
-                    AutomationRuntimeSerialization.SerializeDefinition(
-                        flow,
-                        definitionId => CurrentPluginProvenance(flow.HostId, definitionId)
-                    ),
+                    AutomationRuntimeSerialization.SerializeDefinition(frozenFlow),
                     AutomationFlowRunStatus.Running,
                     now
                 ),
@@ -276,6 +292,20 @@ public sealed partial class AutomationRuntimeService(
                 value => value.Id == runId,
                 cancellationToken
             );
+            if (
+                !(
+                    await AutomationSubflowRunReferences.AttachAsync(
+                        db,
+                        new(flow.HostId),
+                        new(runId),
+                        frozen.Closure,
+                        cancellationToken
+                    )
+                ).IsEmpty
+            )
+            {
+                return Dispatched(AutomationDispatchStatus.InvalidFlow);
+            }
             var traceFlow = (
                 (AutomationDefinitionRestoreOutcome.Available)
                     AutomationRuntimeSerialization.RestoreDefinition(traceRun.DefinitionJson)
@@ -297,7 +327,7 @@ public sealed partial class AutomationRuntimeService(
                 traceFlow.Nodes.Single(node => node.Id == source.Id),
                 AutomationTraceOutcome.Succeeded
             );
-            var next = Outgoing(flow.Edges, source.Id, null);
+            var next = AutomationFlowTraversal.Outgoing(traceFlow.Edges, source.Id, null);
             AddPending(db, runId, next, now, 1);
             await TraceScheduledAsync(db, traceRun, traceFlow, next, now, cancellationToken);
             if (next.Length == 0)
@@ -308,12 +338,11 @@ public sealed partial class AutomationRuntimeService(
                 );
                 run.Status = AutomationFlowRunStatus.Completed;
                 run.CompletedAtUtc = now;
-                await TraceAsync(
+                await CompleteTerminalAsync(
                     db,
                     run,
-                    AutomationTraceEventKind.Terminal,
-                    cancellationToken,
-                    outcome: AutomationTraceOutcome.Succeeded
+                    AutomationTraceOutcome.Succeeded,
+                    cancellationToken
                 );
             }
 
@@ -506,7 +535,15 @@ public sealed partial class AutomationRuntimeService(
         var due = await db
             .AutomationNodeRuns.AsNoTracking()
             .Where(value =>
-                value.Status == AutomationNodeRunStatus.Pending && value.AvailableAtUtc <= now
+                (value.Status == AutomationNodeRunStatus.Pending && value.AvailableAtUtc <= now)
+                || (
+                    value.Status == AutomationNodeRunStatus.Waiting
+                    && value.OutcomeCode == "subflow-draining"
+                    && value.Run.NodeRuns.All(node =>
+                        node.Status != AutomationNodeRunStatus.Pending
+                        && node.Status != AutomationNodeRunStatus.Running
+                    )
+                )
             )
             .OrderBy(static value => value.AvailableAtUtc)
             .Select(static value => value.RunId)
@@ -560,6 +597,10 @@ public sealed partial class AutomationRuntimeService(
                 return ExecutionBlocked(executionGate);
             }
 
+            if (await QueueDrainedExitsAsync(db, run, leaseId, cancellationToken))
+            {
+                continue;
+            }
             var now = clock.GetUtcNow().UtcDateTime;
             var pending = run
                 .NodeRuns.Where(static value => value.Status == AutomationNodeRunStatus.Pending)
@@ -567,6 +608,36 @@ public sealed partial class AutomationRuntimeService(
                 .FirstOrDefault();
             if (pending is null)
             {
+                if (
+                    AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
+                        is AutomationDefinitionRestoreOutcome.Available waitingFlow
+                    && !waitingFlow.Flow.Invocations.IsDefault
+                    && waitingFlow
+                        .Flow.Invocations.Reverse()
+                        .Select(invocation =>
+                            run.NodeRuns.FirstOrDefault(node =>
+                                node.NodeId == invocation.CallerId
+                                && node.Status == AutomationNodeRunStatus.Waiting
+                            )
+                        )
+                        .FirstOrDefault(node => node is not null)
+                        is { } unfinished
+                )
+                {
+                    _ = await CompleteFailureAsync(
+                        new(
+                            db,
+                            run,
+                            unfinished,
+                            waitingFlow.Flow.Nodes.Single(node => node.Id == unfinished.NodeId),
+                            waitingFlow.Flow,
+                            leaseId
+                        ),
+                        "subflow-exit-not-reached",
+                        cancellationToken
+                    );
+                    continue;
+                }
                 await using var completionTransaction = await db.Database.BeginTransactionAsync(
                     cancellationToken
                 );
@@ -586,13 +657,13 @@ public sealed partial class AutomationRuntimeService(
                     continue;
                 }
 
-                await TraceAsync(
+                await CompleteTerminalAsync(
                     db,
                     run,
-                    AutomationTraceEventKind.Terminal,
-                    cancellationToken,
-                    outcome: AutomationTraceOutcome.Succeeded
+                    AutomationTraceOutcome.Succeeded,
+                    cancellationToken
                 );
+                _ = await db.SaveChangesAsync(cancellationToken);
                 await completionTransaction.CommitAsync(cancellationToken);
                 return new(AutomationResumeStatus.Completed);
             }
@@ -642,40 +713,68 @@ public sealed partial class AutomationRuntimeService(
                 is not AutomationDefinitionRestoreOutcome.Available restoredDefinition
             )
             {
+                await using var malformedTransaction = await db.Database.BeginTransactionAsync(
+                    cancellationToken
+                );
+                if (await TouchOwnedRunAsync(db, run.Id, leaseId, cancellationToken) == 0)
+                {
+                    continue;
+                }
                 FailMalformedRun(run, now);
-                await TraceAsync(
+                await CompleteTerminalAsync(
                     db,
                     run,
-                    AutomationTraceEventKind.Terminal,
-                    cancellationToken,
-                    outcome: AutomationTraceOutcome.Failed
+                    AutomationTraceOutcome.Failed,
+                    cancellationToken
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
+                await malformedTransaction.CommitAsync(cancellationToken);
                 return new(AutomationResumeStatus.Failed);
             }
 
             var flow = restoredDefinition.Flow;
-            var validation = await flowService.ValidateFrozenDefinitionAsync(
-                new(run.HostId),
-                flow,
-                cancellationToken
-            );
+            var validation = flow.Invocations.IsDefault
+                ? await flowService.ValidateFrozenDefinitionAsync(
+                    new(run.HostId),
+                    flow,
+                    cancellationToken
+                )
+                : new AutomationGraphValidation(null, []);
             var node = flow.Nodes.SingleOrDefault(value => value.Id == pending.NodeId);
             if (validation.Gate is not null || !validation.Errors.IsEmpty || node is null)
             {
+                await using var malformedTransaction = await db.Database.BeginTransactionAsync(
+                    cancellationToken
+                );
+                if (await TouchOwnedRunAsync(db, run.Id, leaseId, cancellationToken) == 0)
+                {
+                    continue;
+                }
                 FailMalformedRun(run, now);
-                await TraceAsync(
+                await CompleteTerminalAsync(
                     db,
                     run,
-                    AutomationTraceEventKind.Terminal,
-                    cancellationToken,
-                    outcome: AutomationTraceOutcome.Failed
+                    AutomationTraceOutcome.Failed,
+                    cancellationToken
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
+                await malformedTransaction.CommitAsync(cancellationToken);
                 return new(AutomationResumeStatus.Failed);
             }
 
             var scope = new AutomationNodeExecutionScope(db, run, pending, node, flow, leaseId);
+            if (
+                node.DefinitionId == AutomationSubflowDefinitions.Exit
+                && AutomationFrozenSubflows.HasActiveDescendants(
+                    flow,
+                    flow.Invocations.Single(invocation => invocation.ExitId == node.Id),
+                    ActiveNodes(run)
+                )
+            )
+            {
+                await WaitForSubtreeAsync(scope, cancellationToken);
+                continue;
+            }
             if (node.ExpressionLanguageVersion != AutomationExpressionLanguage.CurrentVersion.Value)
             {
                 if (
@@ -702,11 +801,14 @@ public sealed partial class AutomationRuntimeService(
                 continue;
             }
 
-            var check = await catalog.ValidatePersistedBeforeExecutionAsync(
-                new(run.HostId),
-                available.Context,
-                AutomationRuntimeSerialization.Definition(node),
-                cancellationToken
+            var check = AutomationFrozenSubflows.WithContract(
+                node,
+                await catalog.ValidatePersistedBeforeExecutionAsync(
+                    new(run.HostId),
+                    available.Context,
+                    AutomationRuntimeSerialization.Definition(node),
+                    cancellationToken
+                )
             );
             if (check is not AutomationConfigurationCheck.Valid valid)
             {
@@ -760,6 +862,11 @@ public sealed partial class AutomationRuntimeService(
                 values: resolvedInputs.PortValues
             );
             await TraceAsync(db, run, AutomationTraceEventKind.Attempt, cancellationToken, node);
+            if (valid.Configuration is AutomationSubflowConfiguration)
+            {
+                _ = await CompleteBoundaryAsync(scope, resolvedInputs, cancellationToken);
+                continue;
+            }
             var result = await ExecuteNodeAsync(
                 new(run.HostId),
                 valid.Configuration,
@@ -817,7 +924,10 @@ public sealed partial class AutomationRuntimeService(
             .AutomationFlowRuns.Include(static value => value.NodeRuns)
             .Where(value =>
                 value.ExecutionLeaseId != null
-                || value.NodeRuns.Any(node => node.Status == AutomationNodeRunStatus.Running)
+                || value.NodeRuns.Any(node =>
+                    node.Status == AutomationNodeRunStatus.Running
+                    || node.Status == AutomationNodeRunStatus.Waiting
+                )
             )
             .ToArrayAsync(cancellationToken);
         if (runs.Length == 0)
@@ -900,6 +1010,47 @@ public sealed partial class AutomationRuntimeService(
 
             var flow = restoredDefinition.Flow;
             var definitions = flow.Nodes.ToDictionary(static node => node.Id);
+            if (!flow.Invocations.IsDefault)
+            {
+                if (
+                    AutomationRuntimeSerialization.RestoreContext(
+                        run.ContextSchemaVersion,
+                        run.ContextJson
+                    )
+                        is not AutomationContextRestoreOutcome.Available
+                    || !ExecutionDefinitionsAvailable(flow)
+                )
+                {
+                    Invalidate(run, now, "definition-execution-stale");
+                    continue;
+                }
+                foreach (var interruptedNode in interrupted)
+                {
+                    var definition = definitions[interruptedNode.NodeId];
+                    interruptedNode.Status = definition.ContinueOnFailure
+                        ? AutomationNodeRunStatus.ContinuedAfterFailure
+                        : AutomationNodeRunStatus.Failed;
+                    interruptedNode.OutcomeCode = "execution-interrupted";
+                    interruptedNode.CompletedAtUtc = now;
+                    var failureNode = await UnwindFailureAsync(
+                        new(db, run, interruptedNode, definition, flow, Guid.Empty),
+                        cancellationToken
+                    );
+                    if (!failureNode.ContinueOnFailure)
+                    {
+                        FailInterruptedRun(run, interrupted, definitions, now);
+                        break;
+                    }
+                    var next = AutomationFlowTraversal.Schedule(
+                        flow.Edges,
+                        AutomationFrozenSubflows.Continuation(flow, failureNode).Id,
+                        "complete",
+                        run.NodeRuns.Select(node => node.NodeId).ToHashSet()
+                    );
+                    AddPending(db, run.Id, next, now, run.NodeRuns.Max(node => node.Sequence) + 1);
+                }
+                continue;
+            }
             if (interrupted.Any(node => !definitions[node.NodeId].ContinueOnFailure))
             {
                 FailInterruptedRun(run, interrupted, definitions, now);
@@ -942,6 +1093,14 @@ public sealed partial class AutomationRuntimeService(
                             : AutomationTraceOutcome.Interrupted
                     );
                 }
+                if (Terminal(run.Status) is null)
+                {
+                    foreach (var exit in DrainedExits(run, restored.Flow))
+                    {
+                        exit.Status = AutomationNodeRunStatus.Pending;
+                        exit.AvailableAtUtc = now;
+                    }
+                }
                 await TraceScheduledAsync(
                     db,
                     run,
@@ -967,16 +1126,15 @@ public sealed partial class AutomationRuntimeService(
                         outcome: AutomationTraceOutcome.Invalidated
                     );
                 }
-                await TraceAsync(
+                await CompleteTerminalAsync(
                     db,
                     run,
-                    AutomationTraceEventKind.Terminal,
-                    cancellationToken,
-                    outcome: run.Status == AutomationFlowRunStatus.Completed
+                    run.Status == AutomationFlowRunStatus.Completed
                             ? AutomationTraceOutcome.Succeeded
                         : run.Status == AutomationFlowRunStatus.Invalidated
                             ? AutomationTraceOutcome.Invalidated
-                        : AutomationTraceOutcome.Failed
+                        : AutomationTraceOutcome.Failed,
+                    cancellationToken
                 );
             }
         }
@@ -1010,7 +1168,10 @@ public sealed partial class AutomationRuntimeService(
         run.CompletedAtUtc = now;
         foreach (
             var node in run.NodeRuns.Where(static node =>
-                node.Status is AutomationNodeRunStatus.Pending or AutomationNodeRunStatus.Running
+                node.Status
+                    is AutomationNodeRunStatus.Pending
+                        or AutomationNodeRunStatus.Running
+                        or AutomationNodeRunStatus.Waiting
             )
         )
         {
@@ -1040,7 +1201,7 @@ public sealed partial class AutomationRuntimeService(
 
         foreach (
             var pending in run.NodeRuns.Where(static value =>
-                value.Status == AutomationNodeRunStatus.Pending
+                value.Status is AutomationNodeRunStatus.Pending or AutomationNodeRunStatus.Waiting
             )
         )
         {
@@ -1301,14 +1462,33 @@ public sealed partial class AutomationRuntimeService(
                 ? AutomationTraceOutcome.ContinuedAfterFailure
                 : AutomationTraceOutcome.Failed
         );
-        if (!node.ContinueOnFailure)
+        if (
+            nodeRun.Status == AutomationNodeRunStatus.Waiting
+            && AutomationFrozenSubflows.Invocation(flow, node.Id) is { } ownInvocation
+        )
         {
-            nodeRun.Status = AutomationNodeRunStatus.Failed;
+            await AutomationSubflowExecutionTrace.CloseOpenAsync(
+                db,
+                run,
+                AutomationTraceOutcome.Failed,
+                now,
+                cancellationToken,
+                ownInvocation.Path
+            );
+        }
+        nodeRun.Status = node.ContinueOnFailure
+            ? AutomationNodeRunStatus.ContinuedAfterFailure
+            : AutomationNodeRunStatus.Failed;
+        var failureNode = await UnwindFailureAsync(scope, cancellationToken);
+        if (!failureNode.ContinueOnFailure)
+        {
             run.Status = AutomationFlowRunStatus.Failed;
             run.CompletedAtUtc = now;
             foreach (
                 var pending in run.NodeRuns.Where(static value =>
-                    value.Status == AutomationNodeRunStatus.Pending
+                    value.Status
+                        is AutomationNodeRunStatus.Pending
+                            or AutomationNodeRunStatus.Waiting
                 )
             )
             {
@@ -1317,22 +1497,15 @@ public sealed partial class AutomationRuntimeService(
                 pending.CompletedAtUtc = now;
             }
 
-            await TraceAsync(
-                db,
-                run,
-                AutomationTraceEventKind.Terminal,
-                cancellationToken,
-                outcome: AutomationTraceOutcome.Failed
-            );
+            await CompleteTerminalAsync(db, run, AutomationTraceOutcome.Failed, cancellationToken);
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return AutomationFailureCompletion.Stopped;
         }
 
-        nodeRun.Status = AutomationNodeRunStatus.ContinuedAfterFailure;
         var next = AutomationFlowTraversal.Schedule(
             flow.Edges,
-            node.Id,
+            AutomationFrozenSubflows.Continuation(flow, failureNode).Id,
             "complete",
             run.NodeRuns.Select(static value => value.NodeId).ToHashSet()
         );
@@ -1366,13 +1539,7 @@ public sealed partial class AutomationRuntimeService(
             cancellationToken,
             outcome: AutomationTraceOutcome.Invalidated
         );
-        await TraceAsync(
-            db,
-            run,
-            AutomationTraceEventKind.Terminal,
-            cancellationToken,
-            outcome: AutomationTraceOutcome.Invalidated
-        );
+        await CompleteTerminalAsync(db, run, AutomationTraceOutcome.Invalidated, cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
@@ -1515,7 +1682,10 @@ public sealed partial class AutomationRuntimeService(
         run.CompletedAtUtc = now;
         foreach (
             var node in run.NodeRuns.Where(static value =>
-                value.Status is AutomationNodeRunStatus.Pending or AutomationNodeRunStatus.Running
+                value.Status
+                    is AutomationNodeRunStatus.Pending
+                        or AutomationNodeRunStatus.Running
+                        or AutomationNodeRunStatus.Waiting
             )
         )
         {
@@ -1548,24 +1718,6 @@ public sealed partial class AutomationRuntimeService(
             );
         }
     }
-
-    private static ImmutableArray<Guid> Outgoing(
-        IEnumerable<AutomationFlowEdge> edges,
-        Guid sourceNodeId,
-        string? sourcePort
-    ) =>
-        AutomationFlowTraversal.Outgoing(
-            edges.Select(edge => new AutomationRuntimeSerialization.PersistedEdge(
-                edge.Id,
-                (AutomationEdgeKind)edge.Kind,
-                edge.SourceNodeId,
-                edge.SourcePortId,
-                edge.TargetNodeId,
-                edge.TargetPortId
-            )),
-            sourceNodeId,
-            sourcePort
-        );
 
     private bool IsSourceDefinition(AutomationFlowNode node) =>
         catalog.TryDescribe(new(node.DefinitionId), out var definition)
@@ -1650,6 +1802,14 @@ public sealed partial class AutomationRuntimeService(
                 return new AutomationPureCheckpoint.Available(restored.Outputs);
             }
 
+            if (
+                node.DefinitionId
+                is AutomationSubflowDefinitions.Entry
+                    or AutomationSubflowDefinitions.Invoke
+            )
+            {
+                return new AutomationPureCheckpoint.Failed();
+            }
             if (existing is not null)
             {
                 if (existing.Status == AutomationNodeRunStatus.Succeeded)
