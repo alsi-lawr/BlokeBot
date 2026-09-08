@@ -28,6 +28,28 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        _ = modelBuilder.Entity<AutomationTrace>(static b =>
+        {
+            _ = b.ToTable("automation_traces");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasIndex(static x => new { x.HostId, x.CreatedAtUtc });
+            _ = b.HasIndex(static x => x.ExpiresAtUtc);
+            _ = b.HasIndex(static x => x.ProductionRunId).IsUnique();
+            _ = b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(static x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        _ = modelBuilder.Entity<AutomationTraceEvent>(static b =>
+        {
+            _ = b.ToTable("automation_trace_events");
+            _ = b.HasKey(static x => new { x.TraceId, x.Sequence });
+            _ = b.HasOne<AutomationTrace>()
+                .WithMany()
+                .HasForeignKey(static x => x.TraceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         _ = modelBuilder.Entity<AutomationScenario>(static b =>
         {
             _ = b.ToTable("automation_scenarios");
