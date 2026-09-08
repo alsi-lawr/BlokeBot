@@ -1,196 +1,326 @@
 using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal sealed partial class AutomationConfigurationTransferAdapter
 {
-    private async Task<IReadOnlyList<MappedAutomationDraft>> BuildDraftsAsync(
+    private async Task<MappedAutomationSet> BuildDraftsAsync(
         BlokeBotDbContext db,
         int hostId,
-        AutomationsSectionV1 section,
+        AutomationsSectionV2 section,
         ConfigurationImportReferencePlan references,
         bool allowPlannedCommands,
         ICollection<ConfigurationValidationIssue> issues,
         CancellationToken cancellationToken
     )
     {
-        var existingFlows = await db
+        IReadOnlyList<AutomationSubflowV2> ordered;
+        try
+        {
+            ordered = AutomationPortableDependencies.Order(section.Subflows, section.Flows);
+        }
+        catch (AutomationConfigurationExportException exception)
+        {
+            issues.Add(new("sections.automations", exception.Reason));
+            return new([], [], []);
+        }
+        var current = await db
             .AutomationFlows.AsNoTracking()
-            .Where(value => value.HostId == hostId)
-            .Select(value => new FlowMatch(value.Id, value.Name))
+            .Where(flow => flow.HostId == hostId)
+            .Select(flow => new FlowMatch(flow.Id, flow.Name))
             .ToArrayAsync(cancellationToken);
         var commands = await db
             .CustomCommands.AsNoTracking()
-            .Where(value => value.HostId == hostId)
-            .Select(value => new CommandMatch(value.Id, value.Name))
+            .Where(command => command.HostId == hostId)
+            .Select(command => new CommandMatch(command.Id, command.Name))
             .ToArrayAsync(cancellationToken);
         var rewards = await db
             .TwitchCustomRewards.AsNoTracking()
-            .Where(value => value.HostId == hostId)
-            .Select(value => new RewardMatch(value.ProviderRewardId, value.Title))
+            .Where(reward => reward.HostId == hostId)
+            .Select(reward => new RewardMatch(reward.ProviderRewardId, reward.Title))
             .ToArrayAsync(cancellationToken);
-        var drafts = new List<MappedAutomationDraft>();
-        var diagnosticNodeIndex = 0;
-        for (var flowIndex = 0; flowIndex < section.Flows.Count; flowIndex++)
+        var enabled =
+            references.EnabledFeatures
+            ?? await db
+                .Hosts.Where(host => host.Id == hostId)
+                .Select(host => host.EnabledFeatures)
+                .SingleAsync(cancellationToken);
+        var documentKey = Convert.ToHexString(
+            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(section))
+        );
+        var revisionIds = section
+            .Subflows.OrderBy(value => value.Id, StringComparer.Ordinal)
+            .Select(
+                (value, index) =>
+                    (
+                        value.Id,
+                        Value: new AutomationSubflowRevisionId(
+                            DestinationId(hostId, documentKey + "revision", value.Id, index)
+                        )
+                    )
+            )
+            .ToDictionary(pair => pair.Id, pair => pair.Value, StringComparer.Ordinal);
+        var subflowIds = section
+            .Subflows.Select(value => value.SubflowId)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Select(
+                (id, index) =>
+                    (
+                        id,
+                        Value: new AutomationSubflowId(
+                            DestinationId(hostId, documentKey + "subflow", id, index)
+                        )
+                    )
+            )
+            .ToDictionary(pair => pair.id, pair => pair.Value, StringComparer.Ordinal);
+        var revisions = new List<AutomationSubflowRevision>();
+        foreach (var imported in ordered)
         {
-            var imported = section.Flows[flowIndex];
-            var diagnosticFlow = AutomationTransferLabels.Flow(flowIndex);
-            var flowMatches = existingFlows
-                .Where(value => SameName(value.Name, imported.Name))
+            var graph = await MapGraphAsync(
+                imported.Graph,
+                null,
+                documentKey,
+                hostId,
+                references,
+                commands,
+                rewards,
+                allowPlannedCommands,
+                revisionIds,
+                issues,
+                cancellationToken
+            );
+            var validation = await flows.ValidateSubflowTransferAsync(
+                new(
+                    subflowIds[imported.SubflowId],
+                    imported.Description.Trim(),
+                    imported.Interface,
+                    graph
+                ),
+                cancellationToken
+            );
+            AddErrors(imported.Id, validation, issues);
+            ValidatePins(graph, revisions, issues);
+            var children = AutomationSubflowStore
+                .Pins(graph.Nodes)
+                .Select(pin => revisions.SingleOrDefault(revision => revision.Id == pin.RevisionId))
+                .OfType<AutomationSubflowRevision>()
                 .ToArray();
-            if (flowMatches.Length > 1)
+            var required = children.Aggregate(
+                AutomationRequiredFeatures.ForDefinitions(
+                    graph.Nodes.Select(node => node.Definition.TypeId)
+                ),
+                (flags, child) => flags | child.RequiredFeatures
+            );
+            revisions.Add(
+                new(
+                    revisionIds[imported.Id],
+                    subflowIds[imported.SubflowId],
+                    imported.Revision,
+                    imported.Description.Trim(),
+                    imported.Interface,
+                    graph,
+                    validation.NodeContracts,
+                    required,
+                    [
+                        .. graph
+                            .Nodes.Select(node => node.Definition.PluginProvenance)
+                            .OfType<AutomationPluginProvenance>()
+                            .Concat(children.SelectMany(child => child.PluginDependencies))
+                            .Distinct(),
+                    ],
+                    timeProvider.GetUtcNow()
+                )
+            );
+        }
+        var drafts = new List<MappedAutomationDraft>();
+        foreach (var imported in section.Flows)
+        {
+            var matches = current.Where(flow => SameName(flow.Name, imported.Name)).ToArray();
+            if (matches.Length > 1)
             {
                 issues.Add(
                     new(
-                        $"sections.automations.flows[{imported.Id}]",
-                        "The destination flow name is ambiguous."
+                        "sections.automations",
+                        $"The destination flow name '{imported.Name}' is ambiguous."
                     )
                 );
                 continue;
             }
-            var nodeIds = imported.Nodes.ToDictionary(
-                value => value.Id,
-                _ => new AutomationNodeId(Guid.NewGuid()),
-                StringComparer.Ordinal
-            );
-            var diagnosticNodeLabels = imported.Nodes.ToDictionary(
-                value => value.Id,
-                _ => AutomationTransferLabels.Node(diagnosticNodeIndex++),
-                StringComparer.Ordinal
-            );
-            var draftNodeLabels = nodeIds.ToDictionary(
-                static pair => pair.Value,
-                pair => diagnosticNodeLabels[pair.Key]
-            );
-            var nodes = ImmutableArray.CreateBuilder<AutomationFlowDraftNode>();
-            var diagnostics = new List<AutomationTransferDiagnostic>();
-            foreach (var node in imported.Nodes)
-            {
-                var diagnosticNode = diagnosticNodeLabels[node.Id];
-                var path = $"sections.automations.flows[{imported.Id}].nodes[{node.Id}]";
-                if (!catalog.IsFormat1Definition(node.DefinitionId))
-                {
-                    issues.Add(
-                        new(path, $"Node '{node.DefinitionId}' is not a core Format 1 node.")
+            var id =
+                matches.Length == 1
+                    ? matches[0].Id
+                    : DestinationId(
+                        hostId,
+                        documentKey + "flow",
+                        imported.Id,
+                        section.Flows.ToList().IndexOf(imported)
                     );
-                    continue;
-                }
-                var reference = RemapConfiguration(
-                    node,
-                    references,
-                    commands,
-                    rewards,
-                    allowPlannedCommands
-                );
-                var bindingModes = node.InputBindings.ToDictionary(
-                    static binding => binding.FieldId,
-                    static binding => binding.Mode,
-                    StringComparer.Ordinal
-                );
-                var projection = AutomationFormat1ConfigurationProjector.Project(
-                    node.DefinitionId,
-                    reference.Configuration,
-                    bindingModes,
-                    ConfigurationDocumentCodec.MaximumRecordsPerCollection
-                );
-                if (projection is AutomationFormat1ConfigurationProjection.Rejected rejected)
-                {
-                    issues.Add(new(path, rejected.Message));
-                    continue;
-                }
-                var projected = (AutomationFormat1ConfigurationProjection.Projected)projection;
-                if (reference.PlaceholderReason is { } placeholderReason)
-                {
-                    diagnostics.Add(Invalid(diagnosticFlow, diagnosticNode, placeholderReason));
-                }
-                diagnostics.AddRange(
-                    projected.RedactionReasons.Select(reason =>
-                        Redaction(diagnosticFlow, diagnosticNode, reason)
-                    )
-                );
-                nodes.Add(
+            if (current.Any(flow => flow.Id == id && !SameName(flow.Name, imported.Name)))
+            {
+                issues.Add(
                     new(
-                        nodeIds[node.Id],
-                        new(
-                            node.DefinitionId,
-                            node.DefinitionSchemaVersion,
-                            projected.Configuration
-                        ),
-                        new(node.ExpressionLanguageVersion),
-                        node.FailurePolicy,
-                        node.InputBindings.ToImmutableDictionary(
-                            value => new AutomationConfigurationFieldId(value.FieldId),
-                            value => new AutomationInputBinding(
-                                value.Mode,
-                                value
-                                    is {
-                                        Expression: { } expression,
-                                        ExpressionLanguageVersion: { } expressionVersion,
-                                    }
-                                    ? new(new(expressionVersion), expression)
-                                    : null
-                            )
-                        ),
-                        new(new(node.CanvasX), new(node.CanvasY)),
-                        node.DisplayAlias
+                        "sections.automations",
+                        $"Flow '{imported.Name}' conflicts with a renamed destination flow. Resolve the destination name before importing."
                     )
                 );
             }
-            var edges = imported
-                .Edges.Select(edge => new AutomationFlowDraftEdge(
-                    Guid.NewGuid(),
-                    edge.Kind,
-                    nodeIds[edge.SourceNodeId],
-                    new(edge.SourcePortId),
-                    nodeIds[edge.TargetNodeId],
-                    new(edge.TargetPortId)
-                ))
-                .ToImmutableArray();
-            drafts.Add(
-                new(
-                    imported.Id,
-                    diagnosticFlow,
-                    draftNodeLabels,
-                    new(
-                        flowMatches.Length == 1 ? new(flowMatches[0].Id) : null,
-                        new(hostId),
-                        imported.Name,
-                        imported.SchemaVersion,
-                        imported.Enabled,
-                        nodes.ToImmutable(),
-                        edges,
-                        new(imported.Orientation, imported.EdgeStyle)
-                    ),
-                    diagnostics
-                )
+            var graph = await MapGraphAsync(
+                imported,
+                new(id),
+                documentKey,
+                hostId,
+                references,
+                commands,
+                rewards,
+                allowPlannedCommands,
+                revisionIds,
+                issues,
+                cancellationToken
             );
+            AddErrors(
+                imported.Id,
+                await flows.ValidateConfigurationTransferAsync(graph, cancellationToken),
+                issues
+            );
+            ValidatePins(graph, revisions, issues);
+            var required = AutomationSubflowStore
+                .Pins(graph.Nodes)
+                .Select(pin => revisions.FirstOrDefault(revision => revision.Id == pin.RevisionId))
+                .OfType<AutomationSubflowRevision>()
+                .Aggregate(
+                    AutomationRequiredFeatures.ForDefinitions(
+                        graph.Nodes.Select(node => node.Definition.TypeId)
+                    ),
+                    (flags, revision) => flags | revision.RequiredFeatures
+                );
+            if (graph.IsEnabled && (required & ~enabled) != HostFeatureFlags.None)
+            {
+                issues.Add(
+                    new(
+                        "sections.automations",
+                        $"Enable all required features for flow '{graph.Name}' and its subflows, or import it disabled."
+                    )
+                );
+            }
+            drafts.Add(new(imported.Id, graph));
         }
-        return drafts;
+        var fixtures = await MapScenariosAsync(section, drafts, issues, cancellationToken);
+        foreach (var revision in revisions)
+        {
+            if (
+                Encoding.UTF8.GetByteCount(AutomationSubflowSerialization.Serialize(revision))
+                > 524288
+            )
+            {
+                issues.Add(
+                    new("sections.automations.subflows", "Reduce the subflow snapshot size.")
+                );
+            }
+        }
+        foreach (var group in fixtures.GroupBy(fixture => fixture.FlowId))
+        {
+            var names = await db
+                .AutomationScenarios.Where(row => row.FlowId == group.Key.Value)
+                .Select(row => row.Name)
+                .ToArrayAsync(cancellationToken);
+            if (
+                names.Length + group.Count(fixture => !names.Contains(fixture.Name))
+                > AutomationScenarioService.MaximumScenariosPerFlow
+            )
+            {
+                issues.Add(
+                    new(
+                        "sections.automations.scenarios",
+                        "Remove existing scenarios or select fewer scenarios before importing."
+                    )
+                );
+            }
+        }
+        return new(drafts, revisions, fixtures);
     }
 
-    private sealed record MappedAutomationDraft(
+    private static Guid DestinationId(int hostId, string scope, string id, int index)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{hostId}:{scope}:{id}"));
+        return new(
+            index + 1,
+            BitConverter.ToInt16(hash, 0),
+            BitConverter.ToInt16(hash, 2),
+            hash[4..12]
+        );
+    }
+
+    private static void ValidatePins(
+        AutomationFlowDraft graph,
+        IReadOnlyList<AutomationSubflowRevision> revisions,
+        ICollection<ConfigurationValidationIssue> issues
+    )
+    {
+        foreach (var node in graph.Nodes)
+        {
+            if (
+                AutomationSubflowDefinitions.TryRead(node.Definition, out var pin)
+                && pin.RevisionId is { } id
+                && (
+                    revisions.FirstOrDefault(revision => revision.Id == id) is not { } revision
+                    || !AutomationSubflowDefinitions.SameInterface(
+                        pin.Interface,
+                        revision.Interface
+                    )
+                )
+            )
+            {
+                issues.Add(
+                    new(
+                        "sections.automations",
+                        $"Node '{node.Id.Value}' must pin an included revision with the same interface."
+                    )
+                );
+            }
+        }
+    }
+
+    private static void AddErrors(
+        string id,
+        AutomationGraphValidation validation,
+        ICollection<ConfigurationValidationIssue> issues
+    )
+    {
+        if (validation.Gate is not null)
+        {
+            issues.Add(
+                new("sections.automations", "The destination automation catalog is unavailable.")
+            );
+        }
+        foreach (var error in validation.Errors)
+        {
+            issues.Add(new($"sections.automations[{id}]", error.Message));
+        }
+    }
+
+    private sealed record MappedAutomationDraft(string ImportedId, AutomationFlowDraft Draft);
+
+    private sealed record MappedScenario(
         string ImportedId,
-        string DiagnosticFlow,
-        IReadOnlyDictionary<AutomationNodeId, string> DiagnosticNodeLabels,
-        AutomationFlowDraft Draft,
-        IReadOnlyList<AutomationTransferDiagnostic> Diagnostics
+        AutomationFlowId FlowId,
+        string Name,
+        AutomationScenarioFixture Fixture
     );
 
-    private static AutomationTransferDiagnostic Invalid(
-        string flowId,
-        string nodeId,
-        string reason
-    ) => new(flowId, nodeId, reason, AutomationTransferDiagnosticKind.Invalid);
-
-    private static AutomationTransferDiagnostic Redaction(
-        string flowId,
-        string nodeId,
-        string reason
-    ) => new(flowId, nodeId, reason, AutomationTransferDiagnosticKind.Redaction);
+    private sealed record MappedAutomationSet(
+        IReadOnlyList<MappedAutomationDraft> Flows,
+        IReadOnlyList<AutomationSubflowRevision> Revisions,
+        IReadOnlyList<MappedScenario> Scenarios
+    );
 
     private sealed record FlowMatch(Guid Id, string Name);
 }

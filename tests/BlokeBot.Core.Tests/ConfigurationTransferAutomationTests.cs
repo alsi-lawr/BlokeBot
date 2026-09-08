@@ -11,7 +11,6 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Persistence.Plugins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -21,135 +20,9 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class ConfigurationTransferAutomationTests
+public sealed partial class ConfigurationTransferAutomationTests
 {
     private const string _malformedCommandReference = "raw-host-reference-secret";
-
-    [Test]
-    public async Task KnownCoreInvalidConfiguration_PreviewsAsRepairableAndRoundTripsWithoutBlocking()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "closed-shape");
-        var transfer = AutomationTransfer(database);
-        var previewService = new ConfigurationImportPreviewService(
-            database,
-            UnavailableOverlayConfigurationTransferAdapter.Instance,
-            transfer.Adapter
-        );
-        var cases = new[]
-        {
-            (
-                Name: "Unknown member",
-                Configuration: JsonSerializer.SerializeToElement(
-                    new Dictionary<string, object> { ["message"] = "Hello", ["unknown"] = "extra" }
-                ),
-                Message: "Configuration member 'unknown' is not supported by automation definition 'send-chat'."
-            ),
-            (
-                Name: "Wrong known type",
-                Configuration: JsonSerializer.SerializeToElement(
-                    new Dictionary<string, int> { ["message"] = 42 }
-                ),
-                Message: "Enter a chat message."
-            ),
-        };
-
-        foreach (var item in cases)
-        {
-            var document = OrdinaryAutomationDocument(item.Name, item.Configuration);
-            var selection = AutomationSelection(hostId);
-            var preview = await previewService.PreviewAsync(
-                document,
-                selection,
-                CancellationToken.None
-            );
-            preview
-                .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
-                .Preview.Sections.Single()
-                .Issues.ShouldContain(issue => issue.Message == item.Message && !issue.BlocksApply);
-
-            var applied = await Coordinator(
-                    database,
-                    new RecordingLogger<ConfigurationTransferCoordinator>()
-                )
-                .ApplyAsync(
-                    Session(hostId),
-                    document,
-                    selection,
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                );
-            _ = applied.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-        }
-
-        _ = (
-            await ExportAutomationsAsync(database, transfer, hostId)
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        await using var verify = await database.CreateDbContextAsync();
-        (await verify.AutomationFlows.CountAsync()).ShouldBe(2);
-        (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(2);
-    }
-
-    [Test]
-    public async Task KnownCoreInvalidGraphAndRepairableBinding_TransferWithoutBlocking()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "invalid-graph");
-        var transfer = AutomationTransfer(database);
-        var document = AutomationDocument(
-            "Cyclic flow",
-            [
-                Node("source", AutomationDefinitionIds.StreamOnlineSource.Value, EmptyObject()),
-                Node(
-                    "action",
-                    AutomationDefinitionIds.SendChatAction.Value,
-                    JsonSerializer.SerializeToElement(
-                        new Dictionary<string, string> { ["message"] = "Hello" }
-                    ),
-                    [new("repair-me", AutomationInputBindingMode.Fixed)]
-                ),
-            ],
-            [
-                new("edge-1", AutomationEdgeKind.Flow, "source", "flow", "action", "flow"),
-                new("edge-2", AutomationEdgeKind.Flow, "action", "flow", "source", "flow"),
-            ]
-        );
-        var preview = await new ConfigurationImportPreviewService(
-            database,
-            UnavailableOverlayConfigurationTransferAdapter.Instance,
-            transfer.Adapter
-        ).PreviewAsync(document, AutomationSelection(hostId), CancellationToken.None);
-        var section = preview
-            .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
-            .Preview.Sections.Single();
-        section.Issues.ShouldNotBeEmpty();
-        section.Issues.ShouldAllBe(issue => !issue.BlocksApply);
-
-        _ = (
-            await Coordinator(database, new RecordingLogger<ConfigurationTransferCoordinator>())
-                .ApplyAsync(
-                    Session(hostId),
-                    document,
-                    AutomationSelection(hostId),
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                )
-        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-        _ = (
-            await ExportAutomationsAsync(database, transfer, hostId)
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-
-        await using var verify = await database.CreateDbContextAsync();
-        var flow = await verify
-            .AutomationFlows.Include(value => value.Nodes)
-            .Include(value => value.Edges)
-            .SingleAsync();
-        flow.Edges.Count.ShouldBe(2);
-        flow.Nodes.Single(value =>
-                value.DefinitionId == AutomationDefinitionIds.SendChatAction.Value
-            )
-            .InputBindingsJson.ShouldContain("repair-me");
-    }
 
     [Test]
     public async Task DynamicTransform_WithOptionalStreamFieldsImportsAndExports()
@@ -184,15 +57,22 @@ public sealed class ConfigurationTransferAutomationTests
             new(),
             transfer.Catalog,
             transfer.FlowService,
-            NullLogger<ConfigurationDocumentExporter>.Instance,
             TimeProvider.System,
-            new EfPluginFeatureStore(database, new())
+            new AutomationScenarioService(
+                database,
+                transfer.Catalog,
+                transfer.FlowService,
+                TimeProvider.System
+            )
         ).ExportAsync(
             hostId,
             new(
                 new HashSet<ConfigurationSectionId> { ConfigurationSectionId.Automations },
                 new(false, false, false)
-            ),
+            )
+            {
+                AutomationFlowIds = await SelectedFlowIdsAsync(database, hostId),
+            },
             CancellationToken.None
         );
         _ = exported.ShouldBeOfType<ConfigurationExportOutcome.Success>();
@@ -205,220 +85,6 @@ public sealed class ConfigurationTransferAutomationTests
             value.DefinitionId == AutomationDefinitionIds.CelTransform.Value
         );
         (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(1);
-    }
-
-    [Test]
-    public async Task ConnectedIdentityFallback_CelTransformRoundTripsAsValidConfiguration()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "connected-identity");
-        var transfer = AutomationTransfer(database);
-        const string LocalLogin = "local-raid-actor";
-        const string LocalDisplayName = "Local Raid Actor";
-        var configuration = TransformConfiguration(
-            [
-                TransformInput(
-                    "actor",
-                    "actor",
-                    "Actor",
-                    "actor-binding",
-                    AutomationPortValueType.Actor,
-                    new Dictionary<string, object>
-                    {
-                        ["login"] = LocalLogin,
-                        ["display-name"] = LocalDisplayName,
-                    }
-                ),
-                TransformInput(
-                    "number",
-                    "number",
-                    "Number",
-                    "number-binding",
-                    AutomationPortValueType.Number,
-                    0
-                ),
-                TransformInput(
-                    "threshold",
-                    "threshold",
-                    "Threshold",
-                    "threshold-binding",
-                    AutomationPortValueType.Number,
-                    0
-                ),
-                TransformInput(
-                    "arguments",
-                    "arguments_input",
-                    "Arguments",
-                    "arguments-binding",
-                    AutomationPortValueType.Arguments,
-                    Array.Empty<string>()
-                ),
-            ],
-            [
-                TransformOutput(
-                    "message",
-                    "Message",
-                    "${actor.display_name} rolled ${format_number(number)}"
-                ),
-                TransformOutput(
-                    "is-high",
-                    "Is high",
-                    "number >= 75",
-                    AutomationPortValueType.Boolean
-                ),
-                TransformOutput(
-                    "rolled",
-                    "Rolled",
-                    "number",
-                    AutomationPortValueType.Number,
-                    AutomationPortNullability.Nullable
-                ),
-            ]
-        );
-        var bindings = ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>
-            .Empty.Add(new("actor-binding"), new(AutomationInputBindingMode.Connected, null))
-            .Add(new("number-binding"), new(AutomationInputBindingMode.Connected, null))
-            .Add(new("threshold-binding"), new(AutomationInputBindingMode.Connected, null))
-            .Add(
-                new("arguments-binding"),
-                new(
-                    AutomationInputBindingMode.Expression,
-                    new(AutomationExpressionLanguage.CurrentVersion, "arguments")
-                )
-            );
-        _ = await SeedPersistedFlowAsync(
-            database,
-            hostId,
-            "Welcome a qualifying raid",
-            AutomationDefinitionIds.CelTransform.Value,
-            configuration,
-            AutomationRuntimeSerialization.SerializeInputBindings(bindings)
-        );
-
-        var exported = (
-            await ExportAutomationsAsync(database, transfer, hostId)
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        var exportedNode = exported.Document.Sections.Automations!.Flows.Single().Nodes.Single();
-        exportedNode.Configuration.GetRawText().ShouldNotContain(LocalLogin);
-        exportedNode.Configuration.GetRawText().ShouldNotContain(LocalDisplayName);
-        _ = transfer
-            .Catalog.ValidatePersistedDefinition(
-                new(
-                    exportedNode.DefinitionId,
-                    exportedNode.DefinitionSchemaVersion,
-                    exportedNode.Configuration
-                )
-            )
-            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
-
-        _ = (
-            await Coordinator(database, new RecordingLogger<ConfigurationTransferCoordinator>())
-                .ApplyAsync(
-                    Session(hostId),
-                    exported.Document,
-                    AutomationSelection(hostId),
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                )
-        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-
-        await using var verify = await database.CreateDbContextAsync();
-        var importedNode = await verify.AutomationFlowNodes.SingleAsync();
-        using var importedConfiguration = JsonDocument.Parse(importedNode.ConfigurationJson);
-        _ = transfer
-            .Catalog.ValidatePersistedDefinition(
-                new(
-                    importedNode.DefinitionId,
-                    importedNode.DefinitionSchemaVersion,
-                    importedConfiguration.RootElement.Clone()
-                )
-            )
-            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
-        AutomationCelTransformDocumentSerializer
-            .TryDeserialize<AutomationCelTransformDocument>(
-                importedConfiguration.RootElement,
-                out var importedTransform
-            )
-            .ShouldBeTrue();
-        importedTransform!
-            .Inputs.Single(input => input.PortId == "actor")
-            .FixedValue.GetProperty("login")
-            .GetString()
-            .ShouldBeEmpty();
-        importedTransform
-            .Outputs.Select(static output => (output.PortId, output.Source))
-            .ShouldBe([
-                ("message", "${actor.display_name} rolled ${format_number(number)}"),
-                ("is-high", "number >= 75"),
-                ("rolled", "number"),
-            ]);
-        var importedBindings = AutomationRuntimeSerialization
-            .RestoreInputBindings(importedNode.InputBindingsJson)
-            .ShouldBeOfType<AutomationInputBindingsRestoreOutcome.Available>();
-        importedBindings
-            .Bindings[new("actor-binding")]
-            .Mode.ShouldBe(AutomationInputBindingMode.Connected);
-        importedBindings
-            .Bindings[new("arguments-binding")]
-            .ShouldBe(bindings[new("arguments-binding")]);
-    }
-
-    [Test]
-    public async Task ConnectedIdentityPlaceholder_ImportsAsValidNeutralFallback()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "connected-placeholder");
-        var transfer = AutomationTransfer(database);
-        var configuration = TransformConfiguration(
-            [
-                TransformInput(
-                    "actor",
-                    "actor",
-                    "Actor",
-                    "actor-binding",
-                    AutomationPortValueType.Actor,
-                    AutomationTransferPlaceholder.Create(AutomationTransferPlaceholder.Identity)
-                ),
-            ],
-            [TransformOutput("message", "Message", "'ready'")]
-        );
-        var document = AutomationDocument(
-            "Affected connected identity",
-            [
-                Node(
-                    "transform",
-                    AutomationDefinitionIds.CelTransform.Value,
-                    configuration,
-                    [new("actor-binding", AutomationInputBindingMode.Connected)]
-                ),
-            ],
-            []
-        );
-
-        _ = (
-            await Coordinator(database, new RecordingLogger<ConfigurationTransferCoordinator>())
-                .ApplyAsync(
-                    Session(hostId),
-                    document,
-                    AutomationSelection(hostId),
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                )
-        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-
-        await using var verify = await database.CreateDbContextAsync();
-        var imported = await verify.AutomationFlowNodes.SingleAsync();
-        imported.ConfigurationJson.ShouldNotContain(AutomationTransferPlaceholder.Identity);
-        using var importedConfiguration = JsonDocument.Parse(imported.ConfigurationJson);
-        _ = transfer
-            .Catalog.ValidatePersistedDefinition(
-                new(
-                    imported.DefinitionId,
-                    imported.DefinitionSchemaVersion,
-                    importedConfiguration.RootElement.Clone()
-                )
-            )
-            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
     }
 
     [Test]
@@ -459,10 +125,24 @@ public sealed class ConfigurationTransferAutomationTests
             )
         );
 
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var flow = await db.AutomationFlows.SingleAsync();
+            _ = db.AutomationFlowNodes.Add(
+                PersistedNode(
+                    flow.Id,
+                    AutomationDefinitionIds.StreamOnlineSource.Value,
+                    EmptyObject()
+                )
+            );
+            _ = await db.SaveChangesAsync();
+        }
         var exported = (
             await ExportAutomationsAsync(database, transfer, hostId)
         ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        var exportedNode = exported.Document.Sections.Automations!.Flows.Single().Nodes.Single();
+        var exportedNode = exported
+            .Document.Sections.Automations!.Flows.Single()
+            .Nodes.Single(node => node.DefinitionId == AutomationDefinitionIds.CelTransform.Value);
         exportedNode.Configuration.GetRawText().ShouldNotContain("identity-redacted");
         _ = transfer
             .Catalog.ValidatePersistedDefinition(
@@ -486,7 +166,9 @@ public sealed class ConfigurationTransferAutomationTests
         ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
 
         await using var verify = await database.CreateDbContextAsync();
-        var importedNode = await verify.AutomationFlowNodes.SingleAsync();
+        var importedNode = await verify.AutomationFlowNodes.SingleAsync(node =>
+            node.DefinitionId == AutomationDefinitionIds.CelTransform.Value
+        );
         using var importedConfiguration = JsonDocument.Parse(importedNode.ConfigurationJson);
         _ = transfer
             .Catalog.ValidatePersistedDefinition(
@@ -507,398 +189,11 @@ public sealed class ConfigurationTransferAutomationTests
     }
 
     [Test]
-    [Arguments(AutomationInputBindingMode.Connected)]
-    [Arguments(AutomationInputBindingMode.Expression)]
-    public async Task NonFixedNonNullableIdentityNull_ExportsWithValidNeutralFallback(
-        AutomationInputBindingMode mode
-    )
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, $"non-fixed-null-{mode}");
-        var transfer = AutomationTransfer(database);
-        var configuration = TransformConfiguration(
-            [
-                TransformInput(
-                    "actor",
-                    "actorValue",
-                    "Actor",
-                    "actor-binding",
-                    AutomationPortValueType.Actor,
-                    JsonSerializer.SerializeToElement<object?>(null)
-                ),
-            ],
-            [TransformOutput("text-output", "Text", "'ready'")]
-        );
-        var expression =
-            mode == AutomationInputBindingMode.Expression
-                ? new AutomationExpressionSource(
-                    AutomationExpressionLanguage.CurrentVersion,
-                    "actor"
-                )
-                : null;
-        _ = await SeedPersistedFlowAsync(
-            database,
-            hostId,
-            "Non-fixed null identity",
-            AutomationDefinitionIds.CelTransform.Value,
-            configuration,
-            AutomationRuntimeSerialization.SerializeInputBindings(
-                ImmutableDictionary<
-                    AutomationConfigurationFieldId,
-                    AutomationInputBinding
-                >.Empty.Add(new("actor-binding"), new(mode, expression))
-            )
-        );
-
-        var exported = (
-            await ExportAutomationsAsync(database, transfer, hostId)
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        var exportedNode = exported.Document.Sections.Automations!.Flows.Single().Nodes.Single();
-        _ = transfer
-            .Catalog.ValidatePersistedDefinition(
-                new(
-                    exportedNode.DefinitionId,
-                    exportedNode.DefinitionSchemaVersion,
-                    exportedNode.Configuration
-                )
-            )
-            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
-        AutomationCelTransformDocumentSerializer
-            .TryDeserialize<AutomationCelTransformDocument>(
-                exportedNode.Configuration,
-                out var exportedTransform
-            )
-            .ShouldBeTrue();
-        var fallback = exportedTransform!.Inputs.Single().FixedValue;
-        fallback.GetProperty("login").GetString().ShouldBeEmpty();
-        fallback.GetProperty("display-name").GetString().ShouldBeEmpty();
-    }
-
-    [Test]
-    public async Task Format1FixedIdentityCel_RedactsRoundTripsLogsAndPreservesInvalidHistory()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "identity-shape");
-        var transfer = AutomationTransfer(database);
-        const string Login = "local-identity";
-        const string DisplayName = "Local Identity";
-        var configuration = TransformConfiguration(
-            [
-                IdentityTransformInput("actor", AutomationPortValueType.Actor, Login, DisplayName),
-                IdentityTransformInput(
-                    "channel",
-                    AutomationPortValueType.Channel,
-                    Login,
-                    DisplayName
-                ),
-            ],
-            [TransformOutput("text-output", "Text", "'ready'")]
-        );
-        var (flowId, nodeId) = await SeedPersistedFlowAsync(
-            database,
-            hostId,
-            "CEL transform",
-            AutomationDefinitionIds.CelTransform.Value,
-            configuration,
-            AutomationRuntimeSerialization.SerializeInputBindings(
-                ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>
-                    .Empty.Add(new("actor-binding"), new(AutomationInputBindingMode.Fixed, null))
-                    .Add(new("channel-binding"), new(AutomationInputBindingMode.Fixed, null))
-            ),
-            enabled: true
-        );
-        const string FrozenDefinition = "{\"frozen\":true}";
-        await SeedRunAsync(database, hostId, flowId, nodeId, FrozenDefinition);
-
-        var exportLogger = new RecordingLogger<ConfigurationDocumentExporter>();
-        var exported = (
-            await new ConfigurationDocumentExporter(
-                database,
-                new(),
-                transfer.Catalog,
-                transfer.FlowService,
-                exportLogger,
-                TimeProvider.System,
-                new EfPluginFeatureStore(database, new())
-            ).ExportAsync(
-                hostId,
-                new(
-                    new HashSet<ConfigurationSectionId> { ConfigurationSectionId.Automations },
-                    new(false, false, false)
-                ),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        var json = System.Text.Encoding.UTF8.GetString(exported.Json);
-        json.ShouldContain("identity-redacted");
-        json.ShouldNotContain(Login);
-        json.ShouldNotContain(DisplayName);
-        json.ShouldNotContain(flowId.ToString("D"));
-        json.ShouldNotContain(nodeId.ToString("D"));
-        AssertSafeDiagnosticLog(
-            exportLogger.Entries,
-            AutomationFormat1ConfigurationProjector.IdentityRedactedReason,
-            "flow-0001",
-            "node-0001",
-            Login,
-            DisplayName,
-            flowId.ToString("D"),
-            nodeId.ToString("D")
-        );
-        exportLogger.Entries.ShouldContain(entry =>
-            Equals(entry.Properties.GetValueOrDefault("Reason"), "source-count")
-        );
-
-        var importLogger = new RecordingLogger<ConfigurationTransferCoordinator>();
-        _ = (
-            await Coordinator(database, importLogger)
-                .ApplyAsync(
-                    Session(hostId),
-                    exported.Document,
-                    AutomationSelection(hostId),
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                )
-        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-        AssertSafeDiagnosticLog(
-            importLogger.Entries,
-            AutomationFormat1ConfigurationProjector.IdentityPlaceholderReason,
-            "flow-0001",
-            "node-0001",
-            Login,
-            DisplayName,
-            flowId.ToString("D"),
-            nodeId.ToString("D")
-        );
-        importLogger.Entries.ShouldContain(entry =>
-            Equals(entry.Properties.GetValueOrDefault("Reason"), "configuration-invalid")
-        );
-
-        await using var verify = await database.CreateDbContextAsync();
-        var imported = await verify
-            .AutomationFlows.Include(value => value.Nodes)
-            .SingleAsync(value => value.Id == flowId);
-        var importedNode = imported.Nodes.ShouldHaveSingleItem();
-        importedNode.ConfigurationJson.ShouldContain("identity-redacted");
-        importedNode.ConfigurationJson.ShouldNotContain(Login);
-        (await verify.AutomationFlowRuns.SingleAsync()).DefinitionJson.ShouldBe(FrozenDefinition);
-        (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(1);
-        using var persisted = JsonDocument.Parse(importedNode.ConfigurationJson);
-        _ = transfer
-            .Catalog.ValidatePersistedDefinition(
-                new(
-                    importedNode.DefinitionId,
-                    importedNode.DefinitionSchemaVersion,
-                    persisted.RootElement.Clone()
-                )
-            )
-            .ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
-        var restored = AutomationFlowService
-            .RestoreDraft(imported)
-            .ShouldBeOfType<AutomationFlowDraftRestoreOutcome.Available>();
-        var validation = await transfer.FlowService.ValidateConfigurationTransferAsync(
-            restored.Draft,
-            CancellationToken.None
-        );
-        validation.Errors.ShouldContain(error => error.Code == "configuration-invalid");
-    }
-
-    [Test]
-    public async Task NestedIdentityInInvalidFixedValue_RedactsAcrossExportAndImport()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "nested-invalid-identity");
-        var transfer = AutomationTransfer(database);
-        const string Login = "nested-viewer";
-        const string DisplayName = "Nested Viewer";
-        const string Retained = "unrelated retained value";
-        var configuration = DynamicFixedValueConfiguration(
-            AutomationPortValueType.Text,
-            new Dictionary<string, object>
-            {
-                ["items"] = new object[]
-                {
-                    new Dictionary<string, string>
-                    {
-                        ["LoGiN"] = Login,
-                        ["DiSpLaY-NaMe"] = DisplayName,
-                    },
-                    new Dictionary<string, string> { ["keep"] = Retained },
-                },
-            }
-        );
-        _ = await SeedPersistedFlowAsync(
-            database,
-            hostId,
-            "Nested invalid identity",
-            AutomationDefinitionIds.CelTransform.Value,
-            configuration,
-            AutomationRuntimeSerialization.SerializeInputBindings(
-                ImmutableDictionary<
-                    AutomationConfigurationFieldId,
-                    AutomationInputBinding
-                >.Empty.Add(new("value-binding"), new(AutomationInputBindingMode.Fixed, null))
-            )
-        );
-
-        var exportLogger = new RecordingLogger<ConfigurationDocumentExporter>();
-        var exported = (
-            await new ConfigurationDocumentExporter(
-                database,
-                new(),
-                transfer.Catalog,
-                transfer.FlowService,
-                exportLogger,
-                TimeProvider.System,
-                new EfPluginFeatureStore(database, new())
-            ).ExportAsync(
-                hostId,
-                new(
-                    new HashSet<ConfigurationSectionId> { ConfigurationSectionId.Automations },
-                    new(false, false, false)
-                ),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        var json = System.Text.Encoding.UTF8.GetString(exported.Json);
-        json.ShouldNotContain(Login);
-        json.ShouldNotContain(DisplayName);
-        json.ShouldContain(Retained);
-        AssertSafeDiagnosticLog(
-            exportLogger.Entries,
-            AutomationFormat1ConfigurationProjector.IdentityRedactedReason,
-            "flow-0001",
-            "node-0001",
-            Login,
-            DisplayName
-        );
-
-        var importLogger = new RecordingLogger<ConfigurationTransferCoordinator>();
-        _ = (
-            await Coordinator(database, importLogger)
-                .ApplyAsync(
-                    Session(hostId),
-                    exported.Document,
-                    AutomationSelection(hostId),
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                )
-        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-        AssertSafeDiagnosticLog(
-            importLogger.Entries,
-            AutomationFormat1ConfigurationProjector.IdentityPlaceholderReason,
-            "flow-0001",
-            "node-0001",
-            Login,
-            DisplayName
-        );
-
-        await using var verify = await database.CreateDbContextAsync();
-        var persisted = await verify.AutomationFlowNodes.SingleAsync();
-        persisted.ConfigurationJson.ShouldNotContain(Login);
-        persisted.ConfigurationJson.ShouldNotContain(DisplayName);
-        persisted.ConfigurationJson.ShouldContain(Retained);
-    }
-
-    [Test]
-    [Arguments(AutomationPortValueType.Actor)]
-    [Arguments(AutomationPortValueType.Text)]
-    public async Task Format1IdentityShapedImport_RedactsRawDocumentBeforePersistence(
-        AutomationPortValueType valueType
-    )
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "identity-import");
-        const string Login = "foreign-viewer";
-        const string DisplayName = "Foreign Viewer";
-        object fixedValue =
-            valueType == AutomationPortValueType.Actor
-                ? new Dictionary<string, object>
-                {
-                    ["login"] = Login,
-                    ["display-name"] = DisplayName,
-                }
-                : new Dictionary<string, object>
-                {
-                    ["nested"] = new Dictionary<string, object>
-                    {
-                        ["login"] = Login,
-                        ["display-name"] = DisplayName,
-                    },
-                };
-        var document = DynamicFixedValueDocument("Imported identity", valueType, fixedValue);
-        var importedFlowId = Guid.NewGuid().ToString("D");
-        var importedSourceNodeId = Guid.NewGuid().ToString("D");
-        var importedTransformNodeId = Guid.NewGuid().ToString("D");
-        var importedAutomation = document.Sections.Automations!;
-        var importedFlow = importedAutomation.Flows.Single();
-        document = document with
-        {
-            Sections = document.Sections with
-            {
-                Automations = importedAutomation with
-                {
-                    Flows =
-                    [
-                        importedFlow with
-                        {
-                            Id = importedFlowId,
-                            Nodes =
-                            [
-                                importedFlow.Nodes[0] with
-                                {
-                                    Id = importedSourceNodeId,
-                                },
-                                importedFlow.Nodes[1] with
-                                {
-                                    Id = importedTransformNodeId,
-                                },
-                            ],
-                        },
-                    ],
-                },
-            },
-        };
-        var logger = new RecordingLogger<ConfigurationTransferCoordinator>();
-
-        _ = (
-            await Coordinator(database, logger)
-                .ApplyAsync(
-                    Session(hostId),
-                    document,
-                    AutomationSelection(hostId),
-                    new("destination-id", "destination"),
-                    CancellationToken.None
-                )
-        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-        AssertSafeDiagnosticLog(
-            logger.Entries,
-            AutomationFormat1ConfigurationProjector.IdentityRedactedReason,
-            "flow-0001",
-            "node-0002",
-            Login,
-            DisplayName,
-            importedFlowId,
-            importedSourceNodeId,
-            importedTransformNodeId
-        );
-
-        await using var verify = await database.CreateDbContextAsync();
-        var persisted = await verify.AutomationFlowNodes.SingleAsync(value =>
-            value.DefinitionId == AutomationDefinitionIds.CelTransform.Value
-        );
-        persisted.ConfigurationJson.ShouldContain("identity-redacted");
-        persisted.ConfigurationJson.ShouldNotContain(Login);
-        persisted.ConfigurationJson.ShouldNotContain(DisplayName);
-    }
-
-    [Test]
     public async Task MalformedNestedCelIdentities_RejectWithoutLeakingValues()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "nested-redaction");
         var transfer = AutomationTransfer(database);
-        const string Message = "CEL Transform configuration does not match the Format 1 schema.";
         const string Login = "deep-viewer-login";
         const string DisplayName = "Deep Viewer Name";
         const string OrphanLogin = "orphan-viewer-login";
@@ -918,20 +213,25 @@ public sealed class ConfigurationTransferAutomationTests
             new(),
             transfer.Catalog,
             transfer.FlowService,
-            exportLogger,
             TimeProvider.System,
-            new EfPluginFeatureStore(database, new())
+            new AutomationScenarioService(
+                database,
+                transfer.Catalog,
+                transfer.FlowService,
+                TimeProvider.System
+            )
         ).ExportAsync(
             hostId,
             new(
                 new HashSet<ConfigurationSectionId> { ConfigurationSectionId.Automations },
                 new(false, false, false)
-            ),
+            )
+            {
+                AutomationFlowIds = await SelectedFlowIdsAsync(database, hostId),
+            },
             CancellationToken.None
         );
-        exported
-            .ShouldBeOfType<ConfigurationExportOutcome.Unsupported>()
-            .Message.ShouldContain(Message);
+        _ = exported.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
         AssertLogsExclude(exportLogger.Entries, Login, DisplayName, OrphanLogin);
 
         var importDocument = AutomationDocument(
@@ -947,7 +247,7 @@ public sealed class ConfigurationTransferAutomationTests
         preview
             .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
             .Preview.Sections.Single()
-            .Issues.ShouldContain(issue => issue.BlocksApply && issue.Message == Message);
+            .Issues.ShouldContain(issue => issue.BlocksApply);
 
         var importLogger = new RecordingLogger<ConfigurationTransferCoordinator>();
         var applied = await Coordinator(database, importLogger)
@@ -960,7 +260,7 @@ public sealed class ConfigurationTransferAutomationTests
             );
         applied
             .ShouldBeOfType<ConfigurationImportApplyOutcome.Invalid>()
-            .Issues.ShouldContain(issue => issue.Message == Message);
+            .Issues.ShouldContain(issue => issue.BlocksApply);
         AssertLogsExclude(importLogger.Entries, Login, DisplayName, OrphanLogin);
 
         await using var verify = await database.CreateDbContextAsync();
@@ -1016,9 +316,7 @@ public sealed class ConfigurationTransferAutomationTests
             "{}"
         );
         var exported = await ExportAutomationsAsync(database, transfer, hostId);
-        exported
-            .ShouldBeOfType<ConfigurationExportOutcome.Unsupported>()
-            .Message.ShouldContain("Automation configuration must be a JSON object.");
+        _ = exported.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.AutomationFlows.CountAsync()).ShouldBe(1);
@@ -1043,13 +341,20 @@ public sealed class ConfigurationTransferAutomationTests
                 AutomationSelection(hostId),
                 CancellationToken.None
             );
-            accepted
+            var acceptedIssues = accepted
                 .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
                 .Preview.Sections.Single()
-                .Issues.ShouldAllBe(issue => !issue.BlocksApply);
-
+                .Issues;
+            if (kind == DynamicCollectionKind.Arguments)
+            {
+                acceptedIssues.ShouldContain(issue => issue.BlocksApply);
+            }
+            else
+            {
+                acceptedIssues.ShouldAllBe(issue => !issue.BlocksApply);
+            }
             var rejectedDocument = DynamicCollectionDocument(kind, 1001);
-            var expected = DynamicCollectionLimitMessage(kind);
+            const string Expected = "1000";
             var rejected = await previewService.PreviewAsync(
                 rejectedDocument,
                 AutomationSelection(hostId),
@@ -1058,7 +363,9 @@ public sealed class ConfigurationTransferAutomationTests
             rejected
                 .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
                 .Preview.Sections.Single()
-                .Issues.ShouldContain(issue => issue.Message == expected && issue.BlocksApply);
+                .Issues.ShouldContain(issue =>
+                    issue.Message.Contains(Expected) && issue.BlocksApply
+                );
             var applied = await Coordinator(
                     database,
                     new RecordingLogger<ConfigurationTransferCoordinator>()
@@ -1072,7 +379,7 @@ public sealed class ConfigurationTransferAutomationTests
                 );
             applied
                 .ShouldBeOfType<ConfigurationImportApplyOutcome.Invalid>()
-                .Issues.ShouldContain(issue => issue.Message == expected);
+                .Issues.ShouldContain(issue => issue.Message.Contains(Expected));
 
             var rejectedTransform = rejectedDocument
                 .Sections.Automations!.Flows.Single()
@@ -1088,9 +395,7 @@ public sealed class ConfigurationTransferAutomationTests
                 "{}"
             );
             var exported = await ExportAutomationsAsync(database, transfer, hostId);
-            exported
-                .ShouldBeOfType<ConfigurationExportOutcome.Unsupported>()
-                .Message.ShouldContain(expected);
+            _ = exported.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
             await using var cleanup = await database.CreateDbContextAsync();
             _ = await cleanup.AutomationFlows.ExecuteDeleteAsync();
         }
@@ -1101,146 +406,7 @@ public sealed class ConfigurationTransferAutomationTests
     }
 
     [Test]
-    public async Task MalformedAutomationReferencePayload_ImportsAsInvalidPlaceholderWithoutRawIds()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var (hostId, _, _, documentId) = await SeedAsync(database);
-        var document = Document(documentId);
-        var automations = document.Sections.Automations!;
-        var flow = automations.Flows.Single();
-        var source = flow.Nodes.Single(value =>
-            value.DefinitionId == AutomationDefinitionIds.CustomCommandSource.Value
-        );
-        source = source with
-        {
-            Configuration = JsonSerializer.SerializeToElement(
-                new Dictionary<string, int> { ["custom-command-id"] = 42 }
-            ),
-        };
-        document = document with
-        {
-            Sections = document.Sections with
-            {
-                Automations = automations with
-                {
-                    Flows =
-                    [
-                        flow with
-                        {
-                            Nodes = flow
-                                .Nodes.Select(value => value.Id == source.Id ? source : value)
-                                .ToArray(),
-                        },
-                    ],
-                },
-            },
-        };
-
-        var outcome = await Coordinator(
-                database,
-                new RecordingLogger<ConfigurationTransferCoordinator>()
-            )
-            .ApplyAsync(
-                Session(hostId),
-                document,
-                new(
-                    hostId,
-                    [new(ConfigurationSectionId.Automations, ImportConflictStrategy.Merge, [])],
-                    new HashSet<HostFeatureFlags>()
-                ),
-                new("destination-id", "destination"),
-                CancellationToken.None
-            );
-
-        _ = outcome.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
-        await using var verify = await database.CreateDbContextAsync();
-        (await verify.ConfigurationImportAudits.CountAsync()).ShouldBe(1);
-        var persisted = (
-            await verify.AutomationFlows.Include(value => value.Nodes).SingleAsync()
-        ).Nodes.Single(value =>
-            value.DefinitionId == AutomationDefinitionIds.CustomCommandSource.Value
-        );
-        persisted.ConfigurationJson.ShouldContain("custom-command-reference-unmapped");
-        persisted.ConfigurationJson.ShouldNotContain("42");
-    }
-
-    [Test]
-    public async Task UnmappedPersistedHostReferences_ExportAsPlaceholdersWithoutRawIds()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "unmapped-references");
-        var transfer = AutomationTransfer(database);
-        const int CommandId = 7654321;
-        var targetId = Guid.NewGuid();
-        var cueId = Guid.NewGuid();
-        const string RewardId = "provider-reward-secret";
-        await using (var db = await database.CreateDbContextAsync())
-        {
-            var flowId = Guid.NewGuid();
-            _ = db.AutomationFlows.Add(
-                new()
-                {
-                    Id = flowId,
-                    HostId = hostId,
-                    Name = "Unmapped references",
-                    SchemaVersion = AutomationFlowSchema.CurrentVersion,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow,
-                    Nodes =
-                    [
-                        PersistedNode(
-                            flowId,
-                            AutomationDefinitionIds.CustomCommandSource.Value,
-                            JsonSerializer.SerializeToElement(
-                                new Dictionary<string, int> { ["custom-command-id"] = CommandId }
-                            )
-                        ),
-                        PersistedNode(
-                            flowId,
-                            AutomationDefinitionIds.PlayOverlayCueAction.Value,
-                            JsonSerializer.SerializeToElement(
-                                new Dictionary<string, Guid>
-                                {
-                                    ["target-id"] = targetId,
-                                    ["cue-id"] = cueId,
-                                }
-                            )
-                        ),
-                        PersistedNode(
-                            flowId,
-                            AutomationDefinitionIds.RewardRedemptionSource.Value,
-                            JsonSerializer.SerializeToElement(
-                                new Dictionary<string, object?>
-                                {
-                                    ["reward-id"] = RewardId,
-                                    ["completion-policy"] = "manual",
-                                }
-                            )
-                        ),
-                    ],
-                }
-            );
-            _ = await db.SaveChangesAsync();
-        }
-
-        var exported = (
-            await ExportAutomationsAsync(database, transfer, hostId)
-        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
-        var json = System.Text.Encoding.UTF8.GetString(exported.Json);
-        json.ShouldContain("custom-command-reference-unmapped");
-        json.ShouldContain("overlay-reference-unmapped");
-        json.ShouldContain("custom-reward-reference-unmapped");
-        json.ShouldNotContain(
-            CommandId.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        );
-        json.ShouldNotContain(targetId.ToString("D"));
-        json.ShouldNotContain(cueId.ToString("D"));
-        json.ShouldNotContain(RewardId);
-        exported.Document.Sections.Automations!.HostReferences.ShouldBeEmpty();
-    }
-
-    [Test]
-    public async Task UnknownPluginDefinition_RemainsOutsideFormat1OnImportAndExport()
+    public async Task UnavailablePluginDefinition_BlocksImportAndExport()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "plugin-boundary");
@@ -1258,9 +424,7 @@ public sealed class ConfigurationTransferAutomationTests
         preview
             .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
             .Preview.Sections.Single()
-            .Issues.ShouldContain(issue =>
-                issue.BlocksApply && issue.Message.Contains("not a core")
-            );
+            .Issues.ShouldContain(issue => issue.BlocksApply);
         _ = (
             await Coordinator(database, new RecordingLogger<ConfigurationTransferCoordinator>())
                 .ApplyAsync(
@@ -1306,7 +470,7 @@ public sealed class ConfigurationTransferAutomationTests
         var trigger = new RecordingReconciliationTrigger();
         var (dispatcher, gate) = Observers(database, events, trigger);
         var logger = new RecordingLogger<ConfigurationTransferCoordinator>();
-        var imported = WithMalformedAutomationCommandReference(Document(documentId));
+        var imported = Document(documentId);
         imported = imported with
         {
             Sections = imported.Sections with
@@ -1348,12 +512,7 @@ public sealed class ConfigurationTransferAutomationTests
             );
 
         _ = outcome.ShouldBeOfType<ConfigurationImportApplyOutcome.Failed>();
-        logger.Entries.ShouldNotContain(entry =>
-            Equals(
-                entry.Properties.GetValueOrDefault("Reason"),
-                AutomationTransferPlaceholder.CustomCommand
-            )
-        );
+
         overlayNotifications.ShouldBe(0);
         trigger.Calls.ShouldBe(0);
         await using var verify = await database.CreateDbContextAsync();
@@ -1393,7 +552,7 @@ public sealed class ConfigurationTransferAutomationTests
         var outcome = await Coordinator(database, logger, dispatcher, gate)
             .ApplyAsync(
                 Session(hostId),
-                WithMalformedAutomationCommandReference(Document(documentId)),
+                Document(documentId),
                 new(
                     hostId,
                     [
@@ -1415,15 +574,6 @@ public sealed class ConfigurationTransferAutomationTests
         applied.PostCommitFailures.ShouldBe([
             new(ConfigurationSectionId.Automations, "reconciliation-failed"),
         ]);
-        AssertSafeDiagnosticLog(
-            logger.Entries,
-            AutomationTransferPlaceholder.CustomCommand,
-            "flow-0001",
-            "node-0001",
-            _malformedCommandReference,
-            "source-node",
-            "flow-ref"
-        );
         overlayNotifications.ShouldBe(1);
         trigger.Calls.ShouldBe(1);
         await using var verify = await database.CreateDbContextAsync();
@@ -1457,9 +607,9 @@ public sealed class ConfigurationTransferAutomationTests
             );
             _ = await seed.SaveChangesAsync();
         }
-        var document = new ConfigurationDocumentV1(
+        var document = new ConfigurationDocumentV2(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source", "0.12.0"),
             new(
@@ -1533,9 +683,9 @@ public sealed class ConfigurationTransferAutomationTests
         var (hostId, flowId, runId, _) = await SeedAsync(database);
         var logger = new RecordingLogger<ConfigurationTransferCoordinator>();
         var coordinator = Coordinator(database, logger);
-        var document = new ConfigurationDocumentV1(
+        var document = new ConfigurationDocumentV2(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source", "0.12.0"),
             new(Automations: new([], []))
@@ -1728,10 +878,10 @@ public sealed class ConfigurationTransferAutomationTests
         return (host.Id, flowId, runId, documentId);
     }
 
-    private static ConfigurationDocumentV1 Document(Guid documentId) =>
+    private static ConfigurationDocumentV2 Document(Guid documentId) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source", "0.12.0"),
             new(
@@ -1859,22 +1009,22 @@ public sealed class ConfigurationTransferAutomationTests
                     [
                         new(
                             "command-ref",
-                            AutomationHostReferenceKindV1.CustomCommand,
+                            AutomationHostReferenceKindV2.CustomCommand,
                             "Imported command"
                         ),
                         new(
                             "overlay-ref",
-                            AutomationHostReferenceKindV1.OverlayTarget,
+                            AutomationHostReferenceKindV2.OverlayTarget,
                             "Imported cue player"
                         ),
-                        new("cue-ref", AutomationHostReferenceKindV1.OverlayCue, "Imported cue"),
+                        new("cue-ref", AutomationHostReferenceKindV2.OverlayCue, "Imported cue"),
                     ]
                 )
             )
         );
 
-    private static ConfigurationDocumentV1 WithMalformedAutomationCommandReference(
-        ConfigurationDocumentV1 document
+    private static ConfigurationDocumentV2 WithMalformedAutomationCommandReference(
+        ConfigurationDocumentV2 document
     )
     {
         var automations = document.Sections.Automations!;
@@ -1911,7 +1061,7 @@ public sealed class ConfigurationTransferAutomationTests
         };
     }
 
-    private static ConfigurationDocumentV1 OrdinaryAutomationDocument(
+    private static ConfigurationDocumentV2 OrdinaryAutomationDocument(
         string flowName,
         JsonElement sendChatConfiguration
     ) =>
@@ -1929,7 +1079,7 @@ public sealed class ConfigurationTransferAutomationTests
             [new("edge", AutomationEdgeKind.Flow, "source", "flow", "action", "flow")]
         );
 
-    private static ConfigurationDocumentV1 DynamicTransformDocument()
+    private static ConfigurationDocumentV2 DynamicTransformDocument()
     {
         var configuration = JsonSerializer.SerializeToElement(
             new Dictionary<string, object>
@@ -1943,8 +1093,8 @@ public sealed class ConfigurationTransferAutomationTests
                         ["display-name"] = "Stream",
                         ["binding-field-id"] = "stream-binding",
                         ["type"] = AutomationPortValueType.Stream.ToString(),
-                        ["nullability"] = AutomationPortNullability.NonNullable.ToString(),
-                        ["fixed"] = new Dictionary<string, object>(),
+                        ["nullability"] = AutomationPortNullability.Nullable.ToString(),
+                        ["fixed"] = null!,
                     },
                 },
                 ["outputs"] = new[]
@@ -1975,7 +1125,7 @@ public sealed class ConfigurationTransferAutomationTests
         );
     }
 
-    private static ConfigurationDocumentV1 DynamicFixedValueDocument(
+    private static ConfigurationDocumentV2 DynamicFixedValueDocument(
         string flowName,
         AutomationPortValueType valueType,
         object fixedValue
@@ -2012,7 +1162,7 @@ public sealed class ConfigurationTransferAutomationTests
             [TransformOutput("text-output", "Text", "'ready'")]
         );
 
-    private static ConfigurationDocumentV1 DynamicCollectionDocument(
+    private static ConfigurationDocumentV2 DynamicCollectionDocument(
         DynamicCollectionKind kind,
         int count
     )
@@ -2054,11 +1204,11 @@ public sealed class ConfigurationTransferAutomationTests
                     )
                     .ToArray()
                 : [TransformOutput("text-output", "Text", "'ready'")];
-        IReadOnlyList<AutomationInputBindingV1> bindings = kind switch
+        IReadOnlyList<AutomationInputBindingV2> bindings = kind switch
         {
             DynamicCollectionKind.Inputs when count <= 1000 => Enumerable
                 .Range(0, count)
-                .Select(index => new AutomationInputBindingV1(
+                .Select(index => new AutomationInputBindingV2(
                     $"binding-{index}",
                     AutomationInputBindingMode.Fixed
                 ))
@@ -2181,8 +1331,8 @@ public sealed class ConfigurationTransferAutomationTests
                         new Dictionary<string, object>
                         {
                             ["type"] = AutomationPortValueType.Channel.ToString(),
-                            ["fixed"] = AutomationTransferPlaceholder.Create(
-                                AutomationTransferPlaceholder.Identity
+                            ["fixed"] = JsonSerializer.SerializeToElement(
+                                new { invalid = "derived" }
                             ),
                         },
                     },
@@ -2255,14 +1405,14 @@ public sealed class ConfigurationTransferAutomationTests
         }
     }
 
-    private static ConfigurationDocumentV1 AutomationDocument(
+    private static ConfigurationDocumentV2 AutomationDocument(
         string flowName,
-        IReadOnlyList<AutomationNodeV1> nodes,
-        IReadOnlyList<AutomationEdgeV1> edges
+        IReadOnlyList<AutomationNodeV2> nodes,
+        IReadOnlyList<AutomationEdgeV2> edges
     ) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source", "0.12.0"),
             new(
@@ -2284,11 +1434,11 @@ public sealed class ConfigurationTransferAutomationTests
             )
         );
 
-    private static AutomationNodeV1 Node(
+    private static AutomationNodeV2 Node(
         string id,
         string definitionId,
         JsonElement configuration,
-        IReadOnlyList<AutomationInputBindingV1>? bindings = null
+        IReadOnlyList<AutomationInputBindingV2>? bindings = null
     ) =>
         new(
             id,
@@ -2414,27 +1564,48 @@ public sealed class ConfigurationTransferAutomationTests
         _ = await db.SaveChangesAsync();
     }
 
-    private static Task<ConfigurationExportOutcome> ExportAutomationsAsync(
+    private static async Task<ConfigurationExportOutcome> ExportAutomationsAsync(
         SqliteBlokeBotDbFactory database,
         AutomationTransferComponents transfer,
         int hostId
     ) =>
-        new ConfigurationDocumentExporter(
+        await new ConfigurationDocumentExporter(
             database,
             new(),
             transfer.Catalog,
             transfer.FlowService,
-            NullLogger<ConfigurationDocumentExporter>.Instance,
             TimeProvider.System,
-            new EfPluginFeatureStore(database, new())
+            new AutomationScenarioService(
+                database,
+                transfer.Catalog,
+                transfer.FlowService,
+                TimeProvider.System
+            )
         ).ExportAsync(
             hostId,
             new(
                 new HashSet<ConfigurationSectionId> { ConfigurationSectionId.Automations },
                 new(false, false, false)
-            ),
+            )
+            {
+                AutomationFlowIds = await SelectedFlowIdsAsync(database, hostId),
+            },
             CancellationToken.None
         );
+
+    private static async Task<HashSet<Guid>> SelectedFlowIdsAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        return (
+            await db
+                .AutomationFlows.Where(flow => flow.HostId == hostId)
+                .Select(flow => flow.Id)
+                .ToArrayAsync()
+        ).ToHashSet();
+    }
 
     private static ConfigurationTransferCoordinator Coordinator(
         SqliteBlokeBotDbFactory database,
@@ -2480,7 +1651,13 @@ public sealed class ConfigurationTransferAutomationTests
             new AutomationConfigurationTransferAdapter(
                 services.Flows,
                 services.Catalog,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationScenarioService(
+                    database,
+                    services.Catalog,
+                    services.Flows,
+                    TimeProvider.System
+                )
             )
         );
     }

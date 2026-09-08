@@ -190,10 +190,10 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
             NullLogger<ConfigurationTransferCoordinator>.Instance
         );
 
-    private static ConfigurationDocumentV1 EnablementDocument() =>
+    private static ConfigurationDocumentV2 EnablementDocument() =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            ConfigurationDocumentCodec.CurrentVersion,
             _enabledAt,
             new("source", "0.12.0"),
             new(

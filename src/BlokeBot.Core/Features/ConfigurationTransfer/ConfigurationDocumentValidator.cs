@@ -5,7 +5,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal static partial class ConfigurationDocumentValidator
 {
-    public static ConfigurationValidationIssue? Validate(ConfigurationDocumentV1 document) =>
+    public static ConfigurationValidationIssue? Validate(ConfigurationDocumentV2 document) =>
         !string.Equals(document.Format, ConfigurationDocumentCodec.Format, StringComparison.Ordinal)
             ? new("format", $"Expected format '{ConfigurationDocumentCodec.Format}'.")
         : document.Version != ConfigurationDocumentCodec.CurrentVersion

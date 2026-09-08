@@ -1,13 +1,13 @@
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Alerts;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Persistence.Plugins;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -18,7 +18,7 @@ namespace BlokeBot.Core.Tests;
 
 public sealed partial class ConfigurationTransferOverlayCredentialTests
 {
-    private static ConfigurationDocumentV1 Document(params string[] sourceNames) =>
+    private static ConfigurationDocumentV2 Document(params string[] sourceNames) =>
         new(
             ConfigurationDocumentCodec.Format,
             ConfigurationDocumentCodec.CurrentVersion,
@@ -175,14 +175,14 @@ public sealed partial class ConfigurationTransferOverlayCredentialTests
         }
 
         internal async Task<ConfigurationImportApplied> ImportAsync(
-            ConfigurationDocumentV1 document
+            ConfigurationDocumentV2 document
         ) =>
             (await ImportOutcomeAsync(document, CancellationToken.None))
                 .ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>()
                 .Result;
 
         internal Task<ConfigurationImportApplyOutcome> ImportOutcomeAsync(
-            ConfigurationDocumentV1 document,
+            ConfigurationDocumentV2 document,
             CancellationToken cancellationToken
         ) =>
             Coordinator.ApplyAsync(
@@ -242,9 +242,13 @@ public sealed partial class ConfigurationTransferOverlayCredentialTests
                 new(),
                 automation.Catalog,
                 automation.Flows,
-                NullLogger<ConfigurationDocumentExporter>.Instance,
                 TimeProvider.System,
-                new EfPluginFeatureStore(Database, new())
+                new AutomationScenarioService(
+                    Database,
+                    automation.Catalog,
+                    automation.Flows,
+                    TimeProvider.System
+                )
             );
             return (
                 await exporter.ExportAsync(

@@ -96,10 +96,10 @@ public sealed class ConfigurationTransferGuessingUiTests
             Options = [new() { Name = "answer", ReplyText = "answer" }],
         };
 
-    private static ConfigurationDocumentV1 Document() =>
+    private static ConfigurationDocumentV2 Document() =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero),
             new("source", "0.12.0"),
             new(

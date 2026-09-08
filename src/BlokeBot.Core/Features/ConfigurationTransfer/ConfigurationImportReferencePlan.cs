@@ -16,10 +16,12 @@ internal sealed record ConfigurationImportReferencePlan(
     IReadOnlyList<ConfigurationValidationIssue> Issues
 )
 {
+    internal HostFeatureFlags? EnabledFeatures { get; init; }
+
     internal static async Task<ConfigurationImportReferencePlan> BuildAsync(
         BlokeBotDbContext db,
         int hostId,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         CancellationToken cancellationToken
     )
@@ -150,7 +152,7 @@ internal sealed record ConfigurationImportReferencePlan(
         var hostReferences = document.Sections.Automations?.HostReferences ?? [];
         foreach (
             var reference in hostReferences.Where(value =>
-                value.Kind == AutomationHostReferenceKindV1.OverlayTarget
+                value.Kind == AutomationHostReferenceKindV2.OverlayTarget
                 && !overlayIds.ContainsKey(value.Id)
             )
         )
@@ -162,7 +164,7 @@ internal sealed record ConfigurationImportReferencePlan(
         }
         foreach (
             var reference in hostReferences.Where(value =>
-                value.Kind == AutomationHostReferenceKindV1.OverlayCue
+                value.Kind == AutomationHostReferenceKindV2.OverlayCue
                 && !cueIds.ContainsKey(value.Id)
             )
         )
@@ -183,16 +185,36 @@ internal sealed record ConfigurationImportReferencePlan(
         }
         foreach (
             var reference in hostReferences.Where(value =>
-                value.Kind == AutomationHostReferenceKindV1.CustomCommand
+                value.Kind == AutomationHostReferenceKindV2.CustomCommand
             )
         )
         {
             commandNames[reference.Id] = reference.Name;
         }
         var rewardNames = hostReferences
-            .Where(value => value.Kind == AutomationHostReferenceKindV1.CustomReward)
+            .Where(value => value.Kind == AutomationHostReferenceKindV2.CustomReward)
             .ToDictionary(value => value.Id, value => value.Name, StringComparer.Ordinal);
-        return new(overlayIds, cueIds, mediaTargets, commandNames, rewardNames, issues);
+        var enabled = await db
+            .Hosts.Where(host => host.Id == hostId)
+            .Select(host => host.EnabledFeatures)
+            .SingleAsync(cancellationToken);
+        if (
+            selection.Sections.Any(section =>
+                section.Section == ConfigurationSectionId.ChannelToolEnablement
+            ) && document.Sections.ChannelToolEnablement is { } enablement
+        )
+        {
+            var importedFlags = ChannelToolEnablementMapper.ToFlags(enablement);
+            foreach (var feature in selection.EnablementChanges)
+            {
+                enabled =
+                    (importedFlags & feature) == feature ? enabled | feature : enabled & ~feature;
+            }
+        }
+        return new(overlayIds, cueIds, mediaTargets, commandNames, rewardNames, issues)
+        {
+            EnabledFeatures = enabled,
+        };
     }
 
     internal static string NormalizeName(string value) => value.Trim().ToUpperInvariant();

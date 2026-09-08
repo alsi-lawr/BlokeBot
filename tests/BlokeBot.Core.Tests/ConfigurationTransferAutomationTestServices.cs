@@ -20,7 +20,8 @@ internal sealed record ConfigurationTransferAutomationTestServices(
         );
         var catalog = new AutomationCatalogService(
             new([new CoreAutomationCatalogModule(), new TwitchEventAutomationCatalogModule()]),
-            features
+            features,
+            handlers: [new AutomationCelTransformHandler(), new AutomationRandomNumberHandler()]
         );
         return new(
             catalog,

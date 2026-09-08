@@ -10,7 +10,7 @@ public sealed partial class ConfigurationImportPreviewService
     internal async Task<ConfigurationSectionPreview> PreviewSectionAsync(
         BlokeBotDbContext db,
         BotHost host,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         SectionImportSelection selection,
         ConfigurationImportSelection importSelection,
         ConfigurationImportReferencePlan references,

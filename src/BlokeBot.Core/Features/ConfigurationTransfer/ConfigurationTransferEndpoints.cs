@@ -10,6 +10,8 @@ public static class ConfigurationTransferEndpoints
                 async (
                     HttpContext context,
                     string? sections,
+                    string? automationFlows,
+                    string? automationScenarios,
                     bool? overlayUrls,
                     bool? overlayMedia,
                     bool? urlWarningAcknowledged,
@@ -40,14 +42,18 @@ public static class ConfigurationTransferEndpoints
                                     overlayMedia.GetValueOrDefault(),
                                     urlWarningAcknowledged.GetValueOrDefault()
                                 )
-                            ),
+                            )
+                            {
+                                AutomationFlowIds = ParseIds(automationFlows),
+                                AutomationScenarioIds = ParseIds(automationScenarios),
+                            },
                             cancellationToken
                         ) switch
                         {
                             ConfigurationExportOutcome.Success success => Results.File(
                                 success.Json,
                                 "application/json",
-                                $"blokebot-{host.Login}-configuration-v1.json"
+                                $"blokebot-{host.Login}-configuration-v2.json"
                             ),
                             ConfigurationExportOutcome.NotFound => Results.NotFound(),
                             ConfigurationExportOutcome.Unsupported unsupported =>
@@ -57,6 +63,12 @@ public static class ConfigurationTransferEndpoints
                 }
             )
             .RequireAuthorization("Operator");
+
+    private static HashSet<Guid> ParseIds(string? value) =>
+        (value ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(token => Guid.TryParse(token, out var id) ? id : Guid.Empty)
+            .ToHashSet();
 
     private static HashSet<ConfigurationSectionId> ParseSections(string? value)
     {

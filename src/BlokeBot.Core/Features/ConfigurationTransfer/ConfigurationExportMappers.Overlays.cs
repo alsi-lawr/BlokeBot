@@ -182,7 +182,7 @@ internal static partial class ConfigurationExportMappers
                 "A Viewer Queue overlay references a missing queue."
             ),
             _ => throw new InvalidOperationException(
-                "The overlay type is not portable in format 1."
+                "The overlay type is not portable in format 2."
             ),
         };
 

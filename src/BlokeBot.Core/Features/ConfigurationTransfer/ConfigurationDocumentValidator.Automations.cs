@@ -6,14 +6,16 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal static partial class ConfigurationDocumentValidator
 {
-    private static ConfigurationValidationIssue? ValidateAutomations(AutomationsSectionV1? section)
+    internal static ConfigurationValidationIssue? ValidateAutomations(AutomationsSectionV2? section)
     {
         if (section is null)
         {
             return null;
         }
         var issue =
-            Limit("sections.automations.flows", section.Flows.Count)
+            ValidateAutomationStructure(section)
+            ?? Limit("sections.automations.flows", section.Flows.Count)
+            ?? Limit("sections.automations.scenarios", section.Scenarios.Count)
             ?? Limit("sections.automations.hostReferences", section.HostReferences.Count)
             ?? DuplicateIds("sections.automations.flows", section.Flows.Select(value => value.Id))
             ?? DuplicateIds(
@@ -24,9 +26,75 @@ internal static partial class ConfigurationDocumentValidator
         {
             return issue;
         }
-        foreach (var flow in section.Flows)
+        try
+        {
+            _ = AutomationPortableDependencies.Order(section.Subflows, section.Flows);
+        }
+        catch (AutomationConfigurationExportException exception)
+        {
+            return new("sections.automations.subflows", exception.Reason);
+        }
+        if (
+            section.Flows.Select(flow => flow.Name.Trim().ToLowerInvariant()).Distinct().Count()
+            != section.Flows.Count
+        )
+        {
+            return new("sections.automations.flows", "Use distinct flow names.");
+        }
+        if (
+            section.Subflows.Any(revision =>
+                string.IsNullOrWhiteSpace(revision.Id)
+                || string.IsNullOrWhiteSpace(revision.SubflowId)
+                || revision.Revision < 1
+                || revision.Description.Length > 2000
+                || revision.Graph.Enabled
+                || !AutomationSubflowDefinitions.ValidInterface(revision.Interface)
+            )
+            || section
+                .Subflows.Select(revision => (revision.SubflowId, revision.Revision))
+                .Distinct()
+                .Count() != section.Subflows.Count
+        )
+        {
+            return new(
+                "sections.automations.subflows",
+                "Use unique valid immutable subflow revisions and interfaces."
+            );
+        }
+        if (
+            section
+                .Scenarios.GroupBy(scenario => scenario.FlowId)
+                .Any(group =>
+                    group.Count() > AutomationScenarioService.MaximumScenariosPerFlow
+                    || group.Select(scenario => scenario.Name.Trim()).Distinct().Count()
+                        != group.Count()
+                )
+            || section.Scenarios.Select(scenario => scenario.Id).Distinct().Count()
+                != section.Scenarios.Count
+            || section.Scenarios.Any(scenario =>
+                string.IsNullOrWhiteSpace(scenario.Id)
+                || string.IsNullOrWhiteSpace(scenario.Name)
+                || scenario.Name.Length > 200
+                || !section.Flows.Any(flow => flow.Id == scenario.FlowId)
+                || scenario.Inputs.Count > 1024
+                || scenario.Effects.Count > 256
+            )
+        )
+        {
+            return new(
+                "sections.automations.scenarios",
+                "Use distinct named scenarios belonging to included flows, within the scenario limits."
+            );
+        }
+        foreach (
+            var flow in section.Flows.Concat(section.Subflows.Select(revision => revision.Graph))
+        )
         {
             var path = $"sections.automations.flows[{flow.Id}]";
+            if (flow.Nodes.Count > 256 || flow.Edges.Count > 1024)
+            {
+                return new(path, "Reduce this graph to the supported node and edge limits.");
+            }
             issue =
                 Limit($"{path}.nodes", flow.Nodes.Count)
                 ?? Limit($"{path}.edges", flow.Edges.Count)
@@ -55,6 +123,33 @@ internal static partial class ConfigurationDocumentValidator
             foreach (var node in flow.Nodes)
             {
                 var nodePath = $"{path}.nodes[{node.Id}]";
+                var isSubflow =
+                    node.DefinitionId
+                    is AutomationSubflowDefinitions.Entry
+                        or AutomationSubflowDefinitions.Exit
+                        or AutomationSubflowDefinitions.Invoke;
+                if (
+                    isSubflow != (node.Subflow is not null)
+                    || (
+                        node.Subflow is { } binding
+                        && (
+                            !AutomationSubflowDefinitions.ValidInterface(binding.Interface)
+                            || !AutomationPortableConfiguration.ValidFixedInputs(
+                                binding.FixedInputsJson
+                            )
+                            || node.DefinitionId == AutomationSubflowDefinitions.Invoke
+                                != (binding.RevisionId is not null)
+                            || node.Configuration.ValueKind != JsonValueKind.Object
+                            || node.Configuration.EnumerateObject().Any()
+                        )
+                    )
+                )
+                {
+                    return new(
+                        nodePath,
+                        "Use the typed subflow binding with an included immutable revision."
+                    );
+                }
                 if (
                     string.IsNullOrWhiteSpace(node.Id)
                     || string.IsNullOrWhiteSpace(node.DefinitionId)
@@ -92,7 +187,7 @@ internal static partial class ConfigurationDocumentValidator
 
     private static ConfigurationValidationIssue? ValidateBindingShape(
         string nodePath,
-        IEnumerable<AutomationInputBindingV1> bindings
+        IEnumerable<AutomationInputBindingV2> bindings
     )
     {
         foreach (var binding in bindings)
