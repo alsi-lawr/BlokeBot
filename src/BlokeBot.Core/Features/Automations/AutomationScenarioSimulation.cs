@@ -35,9 +35,16 @@ internal static class AutomationScenarioSimulation
                 valid.Definition.Id
             ),
             AutomationNodeKind.Control => (
-                valid.Definition.Id.Value == "condition"
-                && valid.Configuration is ConditionControlConfiguration
+                valid.Definition.Id.Value
+                    is AutomationSubflowDefinitions.Entry
+                        or AutomationSubflowDefinitions.Exit
+                        or AutomationSubflowDefinitions.Invoke
+                && valid.Configuration is AutomationSubflowConfiguration
             )
+                || (
+                    valid.Definition.Id.Value == "condition"
+                    && valid.Configuration is ConditionControlConfiguration
+                )
                 || (
                     valid.Definition.Id.Value == "delay"
                     && valid.Configuration is DelayControlConfiguration

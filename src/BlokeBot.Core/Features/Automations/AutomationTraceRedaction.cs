@@ -15,11 +15,13 @@ internal static class AutomationTraceRedaction
         new(
             kind,
             new(now, TimeSpan.Zero),
-            new(invocationId),
+            node?.Invocation is { } nested
+                ? AutomationFrozenSubflows.Trace(nested, invocationId)
+                : new(invocationId),
             node is null
                 ? null
                 : new(
-                    new(node.Id),
+                    new(node.AuthorNodeId ?? node.Id),
                     new(node.DefinitionId),
                     new(node.DefinitionSchemaVersion),
                     node.ContinueOnFailure

@@ -55,7 +55,17 @@ public sealed class AutomationRunQueryService(
                     node.CompletedAtUtc is { } completed
                         ? new DateTimeOffset(completed, TimeSpan.Zero)
                         : null,
-                    Diagnostics(node.OutputJson, frozen?.Flow, node.NodeId)
+                    Diagnostics(node.OutputJson, frozen?.Flow, node.NodeId),
+                    frozen
+                        ?.Flow.Nodes.SingleOrDefault(value => value.Id == node.NodeId)
+                        ?.AuthorNodeId
+                        is { } author
+                        ? new(author)
+                        : null,
+                    frozen?.Flow.Nodes.SingleOrDefault(value => value.Id == node.NodeId)?.Invocation
+                        is { } invocation
+                        ? AutomationFrozenSubflows.Trace(invocation, run.Id)
+                        : new(run.Id)
                 ))
                 .ToImmutableArray()
         );
@@ -71,12 +81,23 @@ public sealed class AutomationRunQueryService(
         return
             outputJson is not null
             && node is not null
-            && catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(node))
+            && AutomationFrozenSubflows.WithContract(
+                node,
+                catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(node))
+            )
                 is AutomationConfigurationCheck.Valid valid
             && AutomationDataValueSerialization.RestoreOutputs(outputJson)
                 is AutomationOutputRestoreOutcome.Available restored
             && AutomationPureHandlerRegistry.ValidCheckpointShape(
-                valid.Definition,
+                valid.Definition with
+                {
+                    Outputs =
+                    [
+                        .. valid.Definition.Outputs.Where(port =>
+                            port.ValueType != AutomationPortValueType.Flow
+                        ),
+                    ],
+                },
                 restored.Outputs
             )
             ? AutomationDataValueSerialization.Diagnostics(restored.Outputs)
