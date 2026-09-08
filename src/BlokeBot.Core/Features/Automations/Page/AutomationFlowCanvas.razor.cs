@@ -36,7 +36,7 @@ public partial class AutomationFlowCanvas
     public IReadOnlyList<AutomationGraphError> Errors { get; set; } = [];
 
     [Parameter]
-    public IReadOnlyList<AutomationSampleNodeOutcome> SampleOutcomes { get; set; } = [];
+    public IReadOnlyList<AutomationScenarioNodeOutcome> SampleOutcomes { get; set; } = [];
 
     [Parameter]
     public AutomationFlowCanvasSettings Settings { get; set; }

@@ -5,13 +5,13 @@ public partial class AutomationFlowCanvas
     private IReadOnlyList<AutomationGraphError> ErrorsFor(AutomationNodeId nodeId) =>
         Errors.Where(error => error.NodeId == nodeId).ToArray();
 
-    private AutomationSampleNodeOutcome? OutcomeFor(AutomationNodeId nodeId) =>
+    private AutomationScenarioNodeOutcome? OutcomeFor(AutomationNodeId nodeId) =>
         SampleOutcomes.FirstOrDefault(outcome => outcome.NodeId == nodeId);
 
     private string NodeClass(
         AutomationEditorNode node,
         bool invalid,
-        AutomationSampleNodeOutcome? outcome
+        AutomationScenarioNodeOutcome? outcome
     ) =>
         string.Join(
             ' ',
@@ -108,7 +108,7 @@ public partial class AutomationFlowCanvas
     private string NodeAccessibleLabel(
         AutomationEditorNode node,
         bool needsRepair,
-        AutomationSampleNodeOutcome? outcome
+        AutomationScenarioNodeOutcome? outcome
     )
     {
         var ports = node
@@ -117,7 +117,7 @@ public partial class AutomationFlowCanvas
         return $"Select {node.EffectiveName}. {KindLabel(node.Definition.Kind)}. {node.Definition.Display.Name} icon. {NodeStatus(needsRepair, outcome)}. Ports: {string.Join(". ", ports)}";
     }
 
-    private static string NodeStatus(bool needsRepair, AutomationSampleNodeOutcome? outcome) =>
+    private static string NodeStatus(bool needsRepair, AutomationScenarioNodeOutcome? outcome) =>
         needsRepair ? "Needs repair"
         : outcome is null ? "Ready"
         : OutcomeLabel(outcome);
@@ -185,13 +185,13 @@ public partial class AutomationFlowCanvas
             )
         );
 
-    private static string OutcomeLabel(AutomationSampleNodeOutcome outcome) =>
+    private static string OutcomeLabel(AutomationScenarioNodeOutcome outcome) =>
         outcome.OutcomeCode switch
         {
             "source-received" => "Sample received",
             "condition-true" => "Yes branch",
             "condition-false" => "No branch",
-            "delay-skipped" => "Delay skipped",
+            "delayed" => "Virtual delay",
             "action-simulated" => "Action not sent",
             _ => outcome.State == AutomationNodeRunState.Failed
                 ? "Sample failed"

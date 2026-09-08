@@ -54,7 +54,14 @@ internal static partial class AutomationCelTransform
         );
 
     internal static AutomationPureHandlerContract HandlerContract(AutomationDefinitionId id) =>
-        new(id, AutomationNodeKind.Transform, [], [], UsesEffectiveDescriptor: true);
+        new(
+            id,
+            AutomationNodeKind.Transform,
+            [],
+            [],
+            UsesEffectiveDescriptor: true,
+            SupportsScenarios: true
+        );
 
     private static AutomationConfigurationParseResult Parse(JsonElement json)
     {

@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.Automations.Page;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -15,7 +16,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class AutomationRuntimeTests
+public sealed partial class AutomationRuntimeTests
 {
     [Test]
     public async Task AuthoringLifecycle_RoundTripsTypedGraphAndPositionsWithinSelectedHost()
@@ -140,12 +141,12 @@ public sealed class AutomationRuntimeTests
             bindings: Bindings(
                 "predicate",
                 AutomationInputBindingMode.Expression,
-                new(AutomationExpressionLanguage.CurrentVersion, "viewer_count >= 20")
+                new(AutomationExpressionLanguage.CurrentVersion, "arguments[0] == 'sample'")
             )
         );
         var action = Node("send-chat", """{"message":"Welcome ${actor.display_name}!"}""");
 
-        var outcome = await fixture.Flows.RunSampleAsync(
+        var outcome = await fixture.Scenarios.RunDefaultAsync(
             Draft(
                 fixture.HostId,
                 [source, condition, action],
@@ -155,7 +156,7 @@ public sealed class AutomationRuntimeTests
             CancellationToken.None
         );
 
-        var completed = outcome.ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        var completed = outcome.ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         completed
             .Nodes.Select(static node => node.OutcomeCode)
             .ShouldBe(["source-received", "condition-true", "action-simulated"]);
@@ -646,13 +647,13 @@ public sealed class AutomationRuntimeTests
             ]
         );
 
-        var first = await fixture.Flows.RunSampleAsync(
+        var first = await fixture.Scenarios.RunDefaultAsync(
             draft,
             source.Id,
             0x227UL,
             CancellationToken.None
         );
-        var second = await fixture.Flows.RunSampleAsync(
+        var second = await fixture.Scenarios.RunDefaultAsync(
             draft,
             source.Id,
             0x227UL,
@@ -662,7 +663,7 @@ public sealed class AutomationRuntimeTests
         JsonSerializer.Serialize(second).ShouldBe(JsonSerializer.Serialize(first));
         productionEntropy.Calls.ShouldBe(0);
         fixture.Chat.Calls.ShouldBe(0);
-        var completed = first.ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        var completed = first.ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         completed
             .Nodes.Single(node => node.NodeId == condition.Id)
             .ResolvedInputs.ShouldHaveSingleItem()
@@ -1647,11 +1648,11 @@ public sealed class AutomationRuntimeTests
             bindings: Bindings("actor", AutomationInputBindingMode.Connected)
         );
         var actionNode = Node(
-            "test-text-consumer",
+            "send-chat",
             """{"message":"fallback"}""",
             bindings: Bindings("message", AutomationInputBindingMode.Connected)
         );
-        var outcome = await sample.Flows.RunSampleAsync(
+        var outcome = await sample.Scenarios.RunDefaultAsync(
             Draft(
                 sample.HostId,
                 [sampleSource, projector, actionNode],
@@ -1665,7 +1666,7 @@ public sealed class AutomationRuntimeTests
             CancellationToken.None
         );
 
-        var completed = outcome.ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        var completed = outcome.ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         display.Calls.ShouldBe(1);
         completed
             .Nodes.Single(node => node.NodeId == actionNode.Id)
@@ -2301,7 +2302,7 @@ public sealed class AutomationRuntimeTests
     public async Task CelTransform_RestrictedInputAdmissionUsesArgumentsOnlyView()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
-        var source = Node("test-number-source", "{}");
+        var source = Node("custom-command", """{"custom-command-id":7}""");
         var transform = Node(
             "test-cel-transform",
             TransformJson(
@@ -2333,7 +2334,7 @@ public sealed class AutomationRuntimeTests
             )
         );
         var action = Node(
-            "test-text-consumer",
+            "send-chat",
             """{"message":"fallback"}""",
             bindings: Bindings("message", AutomationInputBindingMode.Connected)
         );
@@ -2353,8 +2354,8 @@ public sealed class AutomationRuntimeTests
             await fixture.Flows.ValidateDraftAsync(draft, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
         var sample = (
-            await fixture.Flows.RunSampleAsync(draft, source.Id, CancellationToken.None)
-        ).ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+            await fixture.Scenarios.RunDefaultAsync(draft, source.Id, CancellationToken.None)
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         sample
             .Nodes.Single(node => node.NodeId == action.Id)
             .ResolvedInputs.ShouldHaveSingleItem()
@@ -2458,7 +2459,7 @@ public sealed class AutomationRuntimeTests
             await fixture.Flows.ValidateDraftAsync(literalDraft, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
 
-        var secondSource = Node("custom-command", """{"custom-command-id":7}""");
+        var secondSource = Node("test-number-source", "{}");
         var everyPath = draft with
         {
             Nodes = draft.Nodes.Add(secondSource),
@@ -5185,7 +5186,11 @@ public sealed class AutomationRuntimeTests
     {
         private int _calls;
 
-        public AutomationPureHandlerContract Contract { get; } = contract;
+        public AutomationPureHandlerContract Contract { get; } =
+            contract with
+            {
+                SupportsScenarios = true,
+            };
 
         internal int Calls => Volatile.Read(ref _calls);
 
@@ -5267,6 +5272,19 @@ public sealed class AutomationRuntimeTests
                     [
                         new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
                         DataOutput(AutomationPortValueType.Number),
+                    ],
+                    []
+                ),
+                Definition(
+                    "test-nullable-number-source",
+                    AutomationNodeKind.Source,
+                    [],
+                    [
+                        new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
+                        DataOutput(
+                            AutomationPortValueType.Number,
+                            nullability: AutomationPortNullability.Nullable
+                        ),
                     ],
                     []
                 ),
@@ -5728,6 +5746,7 @@ public sealed class AutomationRuntimeTests
         internal AutomationActionExecutor Actions { get; }
         internal AutomationRuntimeService Runtime { get; }
         internal AutomationFlowService Flows { get; }
+        internal AutomationScenarioService Scenarios => new(Database, Catalog, Flows);
         internal AutomationRunQueryService Queries { get; }
         internal int HostId { get; }
 
@@ -5741,10 +5760,21 @@ public sealed class AutomationRuntimeTests
             Func<AutomationCelTransformHandler, IAutomationPureNodeHandler>? transformDecorator =
                 null,
             IAutomationIntegerEntropy? integerEntropy = null,
-            IInterceptor[]? databaseInterceptors = null
+            IInterceptor[]? databaseInterceptors = null,
+            bool migrateSchema = false
         )
         {
-            var database = await SqliteBlokeBotDbFactory.CreateAsync(databaseInterceptors ?? []);
+            var database = migrateSchema
+                ? await SqliteBlokeBotDbFactory.CreateEmptyAsync([
+                    .. databaseInterceptors ?? [],
+                    new WeeklyAnnouncementMigrationInterceptor(),
+                ])
+                : await SqliteBlokeBotDbFactory.CreateAsync(databaseInterceptors ?? []);
+            if (migrateSchema)
+            {
+                await using var migration = await database.CreateDbContextAsync();
+                await migration.Database.MigrateAsync();
+            }
             var clock = new MutableTimeProvider(
                 new DateTimeOffset(2026, 8, 3, 12, 0, 0, TimeSpan.Zero)
             );
