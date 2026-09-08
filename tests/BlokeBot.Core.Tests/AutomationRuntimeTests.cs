@@ -623,7 +623,7 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task SeededSample_ReusesProductValidationWithoutEntropyEffectsOrDurableWrites()
+    public async Task SeededSample_ReusesProductValidationWithoutEntropyEffectsOrProductionWrites()
     {
         var productionEntropy = new CountingIntegerEntropy(99);
         await using var fixture = await RuntimeFixture.CreateAsync(
@@ -1195,6 +1195,29 @@ public sealed partial class AutomationRuntimeTests
         diagnostic.ValueType.ShouldBe(AutomationPortValueType.Text);
         diagnostic.Provenance.ShouldBe([AutomationValueProvenance.Generated]);
         diagnostic.DisplayValue.ShouldBe("shared-value");
+        var trace = await ReadTraceAsync(fixture, summary.TraceId);
+        var output = trace
+            .Events.Single(entry =>
+                entry.Event.Kind == AutomationTraceEventKind.Outputs
+                && entry.Event.Node != null
+                && entry.Event.Node.Id == value.Id
+            )
+            .Event.Values.ShouldHaveSingleItem();
+        output.ValueType.ShouldBe(AutomationPortValueType.Text);
+        output.Provenance.ShouldBe([AutomationValueProvenance.Generated]);
+        _ = trace
+            .Events.Where(entry =>
+                entry.Event.Kind == AutomationTraceEventKind.Attempt
+                && entry.Event.Node != null
+                && entry.Event.Node.Id == transform.Id
+            )
+            .ShouldHaveSingleItem();
+        trace.Events.ShouldContain(entry =>
+            entry.Event.Kind == AutomationTraceEventKind.ResolvedInputs
+            && entry.Event.Node != null
+            && entry.Event.Node.Id == transform.Id
+        );
+        JsonSerializer.Serialize(trace).ShouldNotContain("shared-value");
 
         var otherHost = await fixture.SeedHostAsync(
             "other",
@@ -4274,6 +4297,20 @@ public sealed partial class AutomationRuntimeTests
                 CancellationToken.None
             )
         ).Status.ShouldBe(AutomationResumeStatus.Completed);
+        await AssertFailedAttemptTraceAsync(
+            stop,
+            stopped.RunIds.Single().Value,
+            stopFailure.Id,
+            AutomationTraceOutcome.Failed,
+            AutomationTraceOutcome.Failed
+        );
+        await AssertFailedAttemptTraceAsync(
+            continued,
+            completed.RunIds.Single().Value,
+            continueFailure.Id,
+            AutomationTraceOutcome.ContinuedAfterFailure,
+            AutomationTraceOutcome.Succeeded
+        );
     }
 
     [Test]
@@ -4343,6 +4380,22 @@ public sealed partial class AutomationRuntimeTests
         summary
             .Nodes.Single(node => node.NodeId == after.Id)
             .State.ShouldBe(AutomationNodeRunState.Succeeded);
+        await AssertFailedAttemptTraceAsync(
+            stop,
+            stopRunId,
+            stopAction.Id,
+            AutomationTraceOutcome.Interrupted,
+            AutomationTraceOutcome.Failed,
+            interrupted: true
+        );
+        await AssertFailedAttemptTraceAsync(
+            continued,
+            continueRunId,
+            continueAction.Id,
+            AutomationTraceOutcome.ContinuedAfterFailure,
+            AutomationTraceOutcome.Succeeded,
+            interrupted: true
+        );
     }
 
     [Test]
@@ -4540,6 +4593,17 @@ public sealed partial class AutomationRuntimeTests
         fixture.Chat.Messages.ShouldBeEmpty();
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(1);
+        var trace = await ReadTraceAsync(fixture, new(runId.Value));
+        trace.Events.ShouldContain(entry =>
+            entry.Event.Kind == AutomationTraceEventKind.Cancellation
+            && entry.Event.Outcome == AutomationTraceOutcome.Invalidated
+        );
+        trace.Events[^1].Event.Outcome.ShouldBe(AutomationTraceOutcome.Invalidated);
+        trace.Events.ShouldNotContain(entry =>
+            entry.Event.Kind == AutomationTraceEventKind.Attempt
+            && entry.Event.Node != null
+            && entry.Event.Node.Id == action.Id
+        );
     }
 
     [Test]
@@ -5746,7 +5810,7 @@ public sealed partial class AutomationRuntimeTests
         internal AutomationActionExecutor Actions { get; }
         internal AutomationRuntimeService Runtime { get; }
         internal AutomationFlowService Flows { get; }
-        internal AutomationScenarioService Scenarios => new(Database, Catalog, Flows);
+        internal AutomationScenarioService Scenarios => new(Database, Catalog, Flows, Clock);
         internal AutomationRunQueryService Queries { get; }
         internal int HostId { get; }
 

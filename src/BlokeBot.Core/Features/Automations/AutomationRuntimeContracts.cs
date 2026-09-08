@@ -198,11 +198,15 @@ public abstract record AutomationScenarioRunOutcome
 {
     private AutomationScenarioRunOutcome() { }
 
-    public sealed record Completed(ImmutableArray<AutomationScenarioNodeOutcome> Nodes)
-        : AutomationScenarioRunOutcome;
+    public sealed record Completed(
+        ImmutableArray<AutomationScenarioNodeOutcome> Nodes,
+        AutomationTraceId TraceId
+    ) : AutomationScenarioRunOutcome;
 
-    public sealed record Failed(ImmutableArray<AutomationScenarioNodeOutcome> Nodes)
-        : AutomationScenarioRunOutcome;
+    public sealed record Failed(
+        ImmutableArray<AutomationScenarioNodeOutcome> Nodes,
+        AutomationTraceId TraceId
+    ) : AutomationScenarioRunOutcome;
 
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
         : AutomationScenarioRunOutcome;
@@ -300,6 +304,8 @@ public sealed record AutomationRunSummary(
     ImmutableArray<AutomationNodeRunSummary> Nodes
 )
 {
+    public AutomationTraceId TraceId => new(Id.Value);
+
     public AutomationNodeRunSummary? FailedNode =>
         Nodes.FirstOrDefault(static node =>
             node.State

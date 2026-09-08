@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.DatabaseCutover;
@@ -274,6 +276,31 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 .SingleAsync(node => node.Id == restored.SourceNodeId.Value);
             scenarioSource.FlowId.ShouldBe(scenario.FlowId);
             scenarioSource.DefinitionId.ShouldBe(restored.SourceDefinitionId.Value);
+            var trace = (
+                await db.AutomationTraces.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            trace.Id.ShouldBe(_traceId);
+            trace.HostId.ShouldBe(SeedHostId);
+            trace.FlowId.ShouldBe(FlowId);
+            trace.ProductionRunId.ShouldBeNull();
+            trace.SchemaVersion.ShouldBe(AutomationTraceStore.SchemaVersion);
+            trace.EventCount.ShouldBe(_traceEvents.Length);
+            trace.Truncation.ShouldBe((int)AutomationTraceTruncation.None);
+            var events = await db
+                .AutomationTraceEvents.AsNoTracking()
+                .OrderBy(entry => entry.Sequence)
+                .ToArrayAsync();
+            events.Select(entry => entry.Sequence).ShouldBe([1, 2]);
+            events.Select(entry => entry.TraceId).ShouldAllBe(id => id == _traceId);
+            var expectedPayloads = _traceEvents
+                .Select(data => JsonSerializer.Serialize(data, JsonSerializerOptions.Web))
+                .ToArray();
+            events.Select(entry => entry.EventJson).ShouldBe(expectedPayloads);
+            trace.ByteCount.ShouldBe(expectedPayloads.Sum(Encoding.UTF8.GetByteCount));
+            foreach (var entry in events)
+            {
+                entry.EventJson.ShouldNotContain(_tracePrivateValue);
+            }
         }
     }
 

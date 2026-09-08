@@ -43,6 +43,10 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddSingleton<AutomationActionExecutor>();
         services.TryAddSingleton<AutomationFlowService>();
         services.TryAddSingleton<AutomationScenarioService>();
+        services.TryAddSingleton<AutomationTraceStore>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, AutomationTraceCleanupWorker>()
+        );
         services.TryAddSingleton(static provider =>
         {
             var runtime = new AutomationRuntimeService(
