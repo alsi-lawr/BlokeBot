@@ -325,7 +325,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             ).ShouldHaveSingleItem();
             caller.HostId.ShouldBe(revision.HostId);
             caller.NodeId.ShouldBe(_subflowCallerId);
-            caller.RevisionId.ShouldBe(revision.Id);
+            caller.SubflowId.ShouldBe(subflow.Id);
             var callerNode = await db
                 .AutomationFlowNodes.AsNoTracking()
                 .SingleAsync(node => node.Id == caller.NodeId);

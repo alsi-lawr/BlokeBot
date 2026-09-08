@@ -16,14 +16,15 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 {
     internal const string PriorReleaseSqliteMigration =
         "20260822192152_v0.12.0_GuessingSharedAliases";
-    internal const string CurrentSqliteMigration = "20260907005325_AutomationSubflows";
-    internal const string CurrentPostgreSqlMigration = "20260907005350_AutomationSubflows";
+    internal const string CurrentSqliteMigration = "20260907091826_CurrentSubflowCallers";
+    internal const string CurrentPostgreSqlMigration = "20260907093259_CurrentSubflowCallers";
     internal static readonly string[] CurrentPostgreSqlMigrations =
     [
         "20260901145930_20260901_v0_14_0_Baseline",
         "20260905033659_RequestsStableIdentity",
         "20260906180403_AutomationScenarios",
         "20260907001120_AutomationTraces",
+        "20260907005350_AutomationSubflows",
         CurrentPostgreSqlMigration,
     ];
     internal const int SeedHostId = 900;
@@ -369,7 +370,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             {
                 NodeId = _subflowCallerId,
                 HostId = SeedHostId,
-                RevisionId = _subflowRevisionId,
+                SubflowId = _subflowId,
             }
         );
         _ = await db.SaveChangesAsync();
