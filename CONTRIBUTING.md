@@ -15,11 +15,12 @@ Enter the supported development environment with `nix develop`, or install the .
 ```console
 dotnet tool restore
 dotnet csharpier check .
-dotnet test BlokeBot.slnx --configuration Release --property:TreatWarningsAsErrors=true -- --no-ansi --no-progress --output Normal
+dotnet test BlokeBot.slnx --configuration Release --property:TreatWarningsAsErrors=true --max-parallel-test-modules 1 -- --maximum-parallel-tests 1 --no-ansi --no-progress --output Normal
 ```
 
 These are the same direct formatting and test commands used by pull-request CI. The test command
 restores and builds the solution before running the complete Microsoft Testing Platform suite.
+The two parallelism limits run one test module and one test at a time without excluding tests.
 
 Use `--treenode-filter` for focused TUnit/Microsoft Testing Platform runs. Format C# with `dotnet csharpier format .`.
 
