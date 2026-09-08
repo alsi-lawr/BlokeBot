@@ -18,6 +18,7 @@ automatic_raid_shoutout_outcomes
 automatic_raid_shoutout_settings
 automation_event_receipts
 automation_flows
+automation_traces
 bingo_event_receipts
 bingo_events
 bingo_moderation_audit
@@ -81,6 +82,8 @@ whisper_quota_buckets
 automation_flow_edges
 automation_flow_nodes
 automation_flow_runs
+automation_scenarios
+automation_trace_events
 bingo_template_revisions
 bloke_raid_actions
 bloke_raid_contributions
