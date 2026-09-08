@@ -18,6 +18,8 @@ automatic_raid_shoutout_outcomes
 automatic_raid_shoutout_settings
 automation_event_receipts
 automation_flows
+automation_subflows
+automation_traces
 bingo_event_receipts
 bingo_events
 bingo_moderation_audit
@@ -81,6 +83,9 @@ whisper_quota_buckets
 automation_flow_edges
 automation_flow_nodes
 automation_flow_runs
+automation_scenarios
+automation_subflow_revisions
+automation_trace_events
 bingo_template_revisions
 bloke_raid_actions
 bloke_raid_contributions
@@ -134,6 +139,9 @@ twitch_poll_template_choices
 twitch_prediction_template_outcomes
 whisper_quota_recipients
 automation_node_runs
+automation_subflow_callers
+automation_subflow_revision_references
+automation_subflow_run_references
 bingo_games
 bingo_squares
 community_audits
