@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using BlokeBot.Announcements;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -14,11 +15,12 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 {
     internal const string PriorReleaseSqliteMigration =
         "20260822192152_v0.12.0_GuessingSharedAliases";
-    internal const string CurrentSqliteMigration = "20260905033522_RequestsStableIdentity";
-    internal const string CurrentPostgreSqlMigration = "20260905033659_RequestsStableIdentity";
+    internal const string CurrentSqliteMigration = "20260906180127_AutomationScenarios";
+    internal const string CurrentPostgreSqlMigration = "20260906180403_AutomationScenarios";
     internal static readonly string[] CurrentPostgreSqlMigrations =
     [
         "20260901145930_20260901_v0_14_0_Baseline",
+        "20260905033659_RequestsStableIdentity",
         CurrentPostgreSqlMigration,
     ];
     internal const int SeedHostId = 900;
@@ -31,6 +33,11 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
     internal const long TargetCandidateId = 400;
     internal static readonly Guid FlowId = Guid.Parse("c0edc830-c63f-4ec9-92ad-27632794c855");
 
+    private static readonly Guid _scenarioId = Guid.Parse("25c3fa68-dd1d-4f99-98c1-87b4c0f46ade");
+    private static readonly Guid _scenarioSourceId = Guid.Parse(
+        "4a48eebc-dab7-4e89-bf61-906b37d71760"
+    );
+
     // Real rows carry 100 ns ticks that PostgreSQL truncates to microseconds.
     internal static readonly DateTime SeedTime = new DateTime(
         2026,
@@ -41,6 +48,26 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         41,
         DateTimeKind.Utc
     ).AddTicks(1234567);
+
+    private static readonly AutomationScenarioFixture _scenarioFixture = new(
+        new(_scenarioSourceId),
+        AutomationDefinitionIds.CustomCommandSource,
+        new(1),
+        new(
+            new(Guid.Empty, AutomationDefinitionIds.CustomCommandSource),
+            new("scenario-viewer", "scenario_viewer", "Scenario Viewer"),
+            new(new(SeedHostId), "seed-user", "cutover_seed", "Cutover Seed"),
+            null,
+            new(new(SeedTime), new(SeedTime.AddSeconds(1))),
+            [new(0, "cutover rehearsal")],
+            new([])
+        ),
+        new(SeedTime),
+        17,
+        [],
+        [],
+        []
+    );
 
     internal string ReceiptPath => new CutoverReceiptStore(StateDirectory).Path;
 
@@ -214,6 +241,30 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 UseSmoothEdges = false,
                 CreatedAtUtc = SeedTime,
                 UpdatedAtUtc = SeedTime.AddSeconds(1),
+                Nodes =
+                [
+                    new()
+                    {
+                        Id = _scenarioSourceId,
+                        DefinitionId = AutomationDefinitionIds.CustomCommandSource.Value,
+                        DefinitionSchemaVersion = 1,
+                        ConfigurationJson = """{"custom-command-id":7}""",
+                        InputBindingsJson = "{}",
+                        ExpressionLanguageVersion = AutomationExpressionLanguage
+                            .CurrentVersion
+                            .Value,
+                    },
+                ],
+            }
+        );
+        _ = db.Add(
+            new AutomationScenario
+            {
+                Id = _scenarioId,
+                FlowId = FlowId,
+                Slot = 0,
+                Name = "Cutover rehearsal",
+                FixtureJson = AutomationScenarioSerialization.Serialize(_scenarioFixture),
             }
         );
         _ = db.Add(
