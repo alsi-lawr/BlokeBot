@@ -1,4 +1,5 @@
 using System.Globalization;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
@@ -254,6 +255,26 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             .Sqlite(SqliteDatabasePath)
             .CreateDbContext();
         (await source.Hosts.CountAsync()).ShouldBe(1);
+        foreach (var db in new[] { source, target })
+        {
+            var scenario = (
+                await db.AutomationScenarios.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            scenario.Id.ShouldBe(_scenarioId);
+            scenario.FlowId.ShouldBe(FlowId);
+            scenario.Slot.ShouldBe(0);
+            scenario.Name.ShouldBe("Cutover rehearsal");
+            scenario.FixtureJson.ShouldBe(
+                AutomationScenarioSerialization.Serialize(_scenarioFixture)
+            );
+            var restored = AutomationScenarioSerialization.Deserialize(scenario.FixtureJson);
+            restored.SourceNodeId.Value.ShouldBe(_scenarioSourceId);
+            var scenarioSource = await db
+                .AutomationFlowNodes.AsNoTracking()
+                .SingleAsync(node => node.Id == restored.SourceNodeId.Value);
+            scenarioSource.FlowId.ShouldBe(scenario.FlowId);
+            scenarioSource.DefinitionId.ShouldBe(restored.SourceDefinitionId.Value);
+        }
     }
 
     internal async Task DeliverTransferredPendingWorkOnceAsync()
