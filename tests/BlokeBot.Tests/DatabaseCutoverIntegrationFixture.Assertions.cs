@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
@@ -254,6 +257,84 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             .Sqlite(SqliteDatabasePath)
             .CreateDbContext();
         (await source.Hosts.CountAsync()).ShouldBe(1);
+        foreach (var db in new[] { source, target })
+        {
+            var scenario = (
+                await db.AutomationScenarios.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            scenario.Id.ShouldBe(_scenarioId);
+            scenario.FlowId.ShouldBe(FlowId);
+            scenario.Slot.ShouldBe(0);
+            scenario.Name.ShouldBe("Cutover rehearsal");
+            scenario.FixtureJson.ShouldBe(
+                AutomationScenarioSerialization.Serialize(_scenarioFixture)
+            );
+            var restored = AutomationScenarioSerialization.Deserialize(scenario.FixtureJson);
+            restored.SourceNodeId.Value.ShouldBe(_scenarioSourceId);
+            var scenarioSource = await db
+                .AutomationFlowNodes.AsNoTracking()
+                .SingleAsync(node => node.Id == restored.SourceNodeId.Value);
+            scenarioSource.FlowId.ShouldBe(scenario.FlowId);
+            scenarioSource.DefinitionId.ShouldBe(restored.SourceDefinitionId.Value);
+            var trace = (
+                await db.AutomationTraces.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            trace.Id.ShouldBe(_traceId);
+            trace.HostId.ShouldBe(SeedHostId);
+            trace.FlowId.ShouldBe(FlowId);
+            trace.ProductionRunId.ShouldBeNull();
+            trace.SchemaVersion.ShouldBe(AutomationTraceStore.SchemaVersion);
+            trace.EventCount.ShouldBe(_traceEvents.Length);
+            trace.Truncation.ShouldBe((int)AutomationTraceTruncation.None);
+            var events = await db
+                .AutomationTraceEvents.AsNoTracking()
+                .OrderBy(entry => entry.Sequence)
+                .ToArrayAsync();
+            events.Select(entry => entry.Sequence).ShouldBe([1, 2]);
+            events.Select(entry => entry.TraceId).ShouldAllBe(id => id == _traceId);
+            var expectedPayloads = _traceEvents
+                .Select(data => JsonSerializer.Serialize(data, JsonSerializerOptions.Web))
+                .ToArray();
+            events.Select(entry => entry.EventJson).ShouldBe(expectedPayloads);
+            trace.ByteCount.ShouldBe(expectedPayloads.Sum(Encoding.UTF8.GetByteCount));
+            foreach (var entry in events)
+            {
+                entry.EventJson.ShouldNotContain(_tracePrivateValue);
+            }
+            var subflow = (
+                await db.AutomationSubflows.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            subflow.HostId.ShouldBe(SeedHostId);
+            subflow.Id.ShouldBe(_subflowId);
+            subflow.LastRevision.ShouldBe(_subflowRevision.Revision);
+            var revision = (
+                await db.AutomationSubflowRevisions.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            revision.HostId.ShouldBe(subflow.HostId);
+            revision.Id.ShouldBe(_subflowRevisionId);
+            revision.SubflowId.ShouldBe(subflow.Id);
+            revision.Revision.ShouldBe(subflow.LastRevision);
+            revision.SnapshotJson.ShouldBe(
+                AutomationSubflowSerialization.Serialize(_subflowRevision)
+            );
+            AutomationSubflowSerialization
+                .Serialize(AutomationSubflowSerialization.Restore(revision.SnapshotJson))
+                .ShouldBe(revision.SnapshotJson);
+            var caller = (
+                await db.AutomationSubflowCallers.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            caller.HostId.ShouldBe(revision.HostId);
+            caller.NodeId.ShouldBe(_subflowCallerId);
+            caller.RevisionId.ShouldBe(revision.Id);
+            var callerNode = await db
+                .AutomationFlowNodes.AsNoTracking()
+                .SingleAsync(node => node.Id == caller.NodeId);
+            callerNode.FlowId.ShouldBe(FlowId);
+            callerNode.DefinitionId.ShouldBe(AutomationSubflowDefinitions.Invoke);
+            callerNode.ConfigurationJson.ShouldBe(
+                AutomationSubflowDefinitions.Invocation(_subflowRevision).Configuration.GetRawText()
+            );
+        }
     }
 
     internal async Task DeliverTransferredPendingWorkOnceAsync()
