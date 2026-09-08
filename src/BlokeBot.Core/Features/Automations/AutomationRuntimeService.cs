@@ -911,8 +911,12 @@ public sealed partial class AutomationRuntimeService(
             node.OutcomeCode = "execution-interrupted";
             node.CompletedAtUtc = now;
             foreach (
-                var next in Outgoing(flow.Edges, definitions[node.NodeId].Id, "complete")
-                    .Where(existingNodes.Add)
+                var next in AutomationFlowTraversal.Schedule(
+                    flow.Edges,
+                    definitions[node.NodeId].Id,
+                    "complete",
+                    existingNodes
+                )
             )
             {
                 AddPending(db, run.Id, [next], now, sequence++);
@@ -1042,12 +1046,16 @@ public sealed partial class AutomationRuntimeService(
         nodeRun.Status = AutomationNodeRunStatus.Succeeded;
         nodeRun.OutcomeCode = succeeded.Code;
         nodeRun.CompletedAtUtc = now;
-        var next = Outgoing(flow.Edges, node.Id, succeeded.OutputPort);
-        var existingNodes = run.NodeRuns.Select(static value => value.NodeId).ToHashSet();
+        var next = AutomationFlowTraversal.Schedule(
+            flow.Edges,
+            node.Id,
+            succeeded.OutputPort,
+            run.NodeRuns.Select(static value => value.NodeId).ToHashSet()
+        );
         AddPending(
             db,
             run.Id,
-            next.Where(existingNodes.Add).ToImmutableArray(),
+            next,
             succeeded.NextAvailableAtUtc,
             run.NodeRuns.Max(static value => value.Sequence) + 1
         );
@@ -1103,15 +1111,13 @@ public sealed partial class AutomationRuntimeService(
         }
 
         nodeRun.Status = AutomationNodeRunStatus.ContinuedAfterFailure;
-        var next = Outgoing(flow.Edges, node.Id, "complete");
-        var existingNodes = run.NodeRuns.Select(static value => value.NodeId).ToHashSet();
-        AddPending(
-            db,
-            run.Id,
-            next.Where(existingNodes.Add).ToImmutableArray(),
-            now,
-            run.NodeRuns.Max(static value => value.Sequence) + 1
+        var next = AutomationFlowTraversal.Schedule(
+            flow.Edges,
+            node.Id,
+            "complete",
+            run.NodeRuns.Select(static value => value.NodeId).ToHashSet()
         );
+        AddPending(db, run.Id, next, now, run.NodeRuns.Max(static value => value.Sequence) + 1);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return AutomationFailureCompletion.Continued;
@@ -1183,8 +1189,14 @@ public sealed partial class AutomationRuntimeService(
                     inputs,
                     cancellationToken
                 ),
-            ConditionControlConfiguration => EvaluateCondition(inputs),
-            DelayControlConfiguration delay => Delay(delay),
+            ConditionControlConfiguration => AutomationNodeEvaluation.Condition(
+                inputs,
+                clock.GetUtcNow().UtcDateTime
+            ),
+            DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(
+                delay,
+                clock.GetUtcNow().UtcDateTime
+            ),
             _ => await ExecuteActionAsync(
                 hostId,
                 configuration,
@@ -1220,27 +1232,6 @@ public sealed partial class AutomationRuntimeService(
                 clock.GetUtcNow().UtcDateTime
             );
     }
-
-    private AutomationNodeExecution Delay(DelayControlConfiguration configuration)
-    {
-        var now = clock.GetUtcNow().UtcDateTime;
-        return configuration.Duration <= DateTime.MaxValue - now
-            ? new AutomationNodeExecution.Succeeded("delayed", null, now + configuration.Duration)
-            : new AutomationNodeExecution.Failed("delay-unrepresentable");
-    }
-
-    private AutomationNodeExecution EvaluateCondition(
-        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs
-    ) =>
-        inputs.GetValueOrDefault(new("predicate"))?.Value switch
-        {
-            AutomationValue.Boolean { Value: var result } => new AutomationNodeExecution.Succeeded(
-                result ? "condition-true" : "condition-false",
-                result ? "yes" : "no",
-                clock.GetUtcNow().UtcDateTime
-            ),
-            _ => new AutomationNodeExecution.Failed("condition-invalid"),
-        };
 
     private async Task<AutomationNodeExecution> ExecuteActionAsync(
         AutomationHostId hostId,
@@ -1329,32 +1320,18 @@ public sealed partial class AutomationRuntimeService(
         Guid sourceNodeId,
         string? sourcePort
     ) =>
-        edges
-            .Where(edge =>
-                edge.Kind == PersistedAutomationEdgeKind.Flow
-                && edge.SourceNodeId == sourceNodeId
-                && (sourcePort is null || edge.SourcePortId == sourcePort)
-            )
-            .OrderBy(static edge => edge.SourcePortId, StringComparer.Ordinal)
-            .ThenBy(static edge => edge.TargetNodeId)
-            .Select(static edge => edge.TargetNodeId)
-            .ToImmutableArray();
-
-    private static ImmutableArray<Guid> Outgoing(
-        IEnumerable<AutomationRuntimeSerialization.PersistedEdge> edges,
-        Guid sourceNodeId,
-        string? sourcePort
-    ) =>
-        edges
-            .Where(edge =>
-                edge.Kind == AutomationEdgeKind.Flow
-                && edge.SourceNodeId == sourceNodeId
-                && (sourcePort is null || edge.SourcePortId == sourcePort)
-            )
-            .OrderBy(static edge => edge.SourcePortId, StringComparer.Ordinal)
-            .ThenBy(static edge => edge.TargetNodeId)
-            .Select(static edge => edge.TargetNodeId)
-            .ToImmutableArray();
+        AutomationFlowTraversal.Outgoing(
+            edges.Select(edge => new AutomationRuntimeSerialization.PersistedEdge(
+                edge.Id,
+                (AutomationEdgeKind)edge.Kind,
+                edge.SourceNodeId,
+                edge.SourcePortId,
+                edge.TargetNodeId,
+                edge.TargetPortId
+            )),
+            sourceNodeId,
+            sourcePort
+        );
 
     private bool IsSourceDefinition(AutomationFlowNode node) =>
         catalog.TryDescribe(new(node.DefinitionId), out var definition)
@@ -1532,18 +1509,5 @@ public sealed partial class AutomationRuntimeService(
         LostOwnership,
         Continued,
         Stopped,
-    }
-
-    private abstract record AutomationNodeExecution
-    {
-        private AutomationNodeExecution() { }
-
-        internal sealed record Succeeded(
-            string Code,
-            string? OutputPort,
-            DateTime NextAvailableAtUtc
-        ) : AutomationNodeExecution;
-
-        internal sealed record Failed(string Code) : AutomationNodeExecution;
     }
 }

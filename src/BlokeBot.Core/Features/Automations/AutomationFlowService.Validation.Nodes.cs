@@ -49,6 +49,7 @@ public sealed partial class AutomationFlowService
         var check = admission
             is AutomationGraphAdmission.Frozen
                 or AutomationGraphAdmission.ConfigurationTransfer
+                or AutomationGraphAdmission.Scenario
             ? catalog.ValidatePersistedDefinition(node.Definition)
             : await catalog.ValidatePersistedForSaveAsync(
                 hostId,

@@ -553,6 +553,35 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("automation_node_runs", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationScenario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FixtureJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FlowId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Slot")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FlowId", "Slot")
+                        .IsUnique();
+
+                    b.ToTable("automation_scenarios", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>
                 {
                     b.Property<long>("Id")
@@ -9059,6 +9088,17 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Run");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationScenario", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationFlow", "Flow")
+                        .WithMany()
+                        .HasForeignKey("FlowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Flow");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>

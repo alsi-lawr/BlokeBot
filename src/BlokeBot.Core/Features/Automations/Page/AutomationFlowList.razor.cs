@@ -20,7 +20,7 @@ public partial class AutomationFlowList
     public IReadOnlyList<AutomationGraphError> Errors { get; set; } = [];
 
     [Parameter]
-    public IReadOnlyList<AutomationSampleNodeOutcome> SampleOutcomes { get; set; } = [];
+    public IReadOnlyList<AutomationScenarioNodeOutcome> SampleOutcomes { get; set; } = [];
 
     [Parameter]
     public IReadOnlySet<AutomationDefinitionId> UnavailableDefinitionIds { get; set; } =

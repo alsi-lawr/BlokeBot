@@ -81,6 +81,7 @@ whisper_quota_buckets
 automation_flow_edges
 automation_flow_nodes
 automation_flow_runs
+automation_scenarios
 bingo_template_revisions
 bloke_raid_actions
 bloke_raid_contributions

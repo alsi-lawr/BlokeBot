@@ -10,6 +10,11 @@ public sealed partial class AutomationFlowService
         CancellationToken cancellationToken
     ) => ValidateAsync(draft, AutomationGraphAdmission.Saved, cancellationToken);
 
+    internal Task<AutomationGraphValidation> ValidateScenarioAsync(
+        AutomationFlowDraft draft,
+        CancellationToken cancellationToken
+    ) => ValidateAsync(draft, AutomationGraphAdmission.Scenario, cancellationToken);
+
     internal Task<AutomationGraphValidation> ValidateConfigurationTransferAsync(
         AutomationFlowDraft draft,
         CancellationToken cancellationToken
@@ -35,7 +40,7 @@ public sealed partial class AutomationFlowService
         {
             var snapshot = await catalog.DiscoverAsync(draft.HostId, cancellationToken);
             if (
-                admission == AutomationGraphAdmission.Saved
+                admission is AutomationGraphAdmission.Saved or AutomationGraphAdmission.Scenario
                 && snapshot.Availability != AutomationCatalogAvailability.Enabled
             )
             {
@@ -241,7 +246,7 @@ public sealed partial class AutomationFlowService
             );
         }
 
-        if (admission == AutomationGraphAdmission.Saved)
+        if (admission is AutomationGraphAdmission.Saved or AutomationGraphAdmission.Scenario)
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             var enabledFeatures = await db

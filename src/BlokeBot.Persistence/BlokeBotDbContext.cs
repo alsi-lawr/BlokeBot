@@ -183,6 +183,8 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<OverlayCueMediaAssetReference> OverlayCueMediaAssetReferences =>
         Set<OverlayCueMediaAssetReference>();
     public DbSet<OverlayEventFeedItem> OverlayEventFeedItems => Set<OverlayEventFeedItem>();
+    public DbSet<AutomationScenario> AutomationScenarios => Set<AutomationScenario>();
+
     public DbSet<AutomationFlow> AutomationFlows => Set<AutomationFlow>();
     public DbSet<AutomationFlowNode> AutomationFlowNodes => Set<AutomationFlowNode>();
     public DbSet<AutomationFlowEdge> AutomationFlowEdges => Set<AutomationFlowEdge>();

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -111,6 +112,124 @@ public sealed class PluginAutomationRemovalTests
         (await verify.AutomationFlows.CountAsync()).ShouldBe(0);
         (await verify.AutomationFlowNodes.CountAsync()).ShouldBe(0);
         (await verify.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Scenario_PluginScheduledSourceAndActionRejectWithoutInvokingPluginCode()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        var registry = new PluginAutomationCatalogRegistry();
+        var declarations = new PluginFeatureDeclarationRegistry(automations: registry);
+        var snapshots = new PluginFeatureSnapshotRegistry(automations: registry);
+        var manifest = PluginManifestToml
+            .Validate(
+                PluginContractFixtures.CompleteManifestToml(),
+                PluginContractFixtures.CompatibleHost()
+            )
+            .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+            .Manifest;
+        var fence = Fence();
+        declarations.Publish(manifest, fence);
+        snapshots.Publish(State(Key(manifest.Manifest.Id, hostId), fence));
+        var definitions = new AutomationDefinitionCatalog(
+            [new CoreAutomationCatalogModule(), new TwitchEventAutomationCatalogModule()],
+            registry
+        );
+        var invoker = new ForbiddenScenarioPluginInvoker();
+        var features = TestHostFeatureServices.Create(
+            database,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            []
+        );
+        var catalog = new AutomationCatalogService(
+            definitions,
+            features,
+            pluginExecution: new(definitions, invoker)
+        );
+        var flows = new AutomationFlowService(
+            database,
+            catalog,
+            new(),
+            new UnavailableOverlayCueAdmissionService(),
+            TimeProvider.System
+        );
+        var scenarios = new AutomationScenarioService(database, catalog, flows);
+        var source = registry.Current.Descriptors.Single(value =>
+            value.Kind == AutomationNodeKind.Source
+        );
+        var action = registry.Current.Descriptors.Single(value =>
+            value.Kind == AutomationNodeKind.Action
+        );
+        var pluginSource = ScenarioNode(source, "{}");
+        var pluginAction = ScenarioNode(action, """{"link":"https://example.invalid"}""");
+        var draft = new AutomationFlowDraft(
+            null,
+            new(hostId),
+            "Plugin schedule rehearsal",
+            AutomationFlowSchema.CurrentVersion,
+            false,
+            [pluginSource, pluginAction],
+            [
+                new(
+                    Guid.NewGuid(),
+                    AutomationEdgeKind.Flow,
+                    pluginSource.Id,
+                    new("next"),
+                    pluginAction.Id,
+                    new("flow")
+                ),
+            ]
+        );
+        var rejected = (
+            await scenarios.RunDefaultAsync(draft, pluginSource.Id, CancellationToken.None)
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>();
+        rejected.Errors.ShouldContain(error =>
+            error.NodeId == pluginSource.Id && error.Code == "scenario-simulation-unsupported"
+        );
+        rejected.Errors.ShouldContain(error =>
+            error.NodeId == pluginAction.Id && error.Code == "scenario-simulation-unsupported"
+        );
+        invoker.Calls.ShouldBe(0);
+        await using var db = await database.CreateDbContextAsync();
+        (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
+    }
+
+    private static AutomationFlowDraftNode ScenarioNode(
+        AutomationDefinitionDescriptor definition,
+        string json
+    ) =>
+        new(
+            new(Guid.NewGuid()),
+            new(
+                definition.Id.Value,
+                definition.Schema.Current.Value,
+                JsonDocument.Parse(json).RootElement.Clone(),
+                definition.PluginProvenance
+            ),
+            AutomationExpressionLanguage.CurrentVersion,
+            AutomationNodeFailurePolicy.Stop,
+            definition.Configuration.ToImmutableDictionary(
+                field => field.Id,
+                _ => new AutomationInputBinding(AutomationInputBindingMode.Fixed, null)
+            )
+        );
+
+    private sealed class ForbiddenScenarioPluginInvoker : IPluginAutomationInvoker
+    {
+        internal int Calls { get; private set; }
+
+        public ValueTask<PluginDispatchInvocationOutcome> InvokeAutomationAsync(
+            PluginAutomationEndpoint endpoint,
+            PluginInvocationContext.Automation context,
+            PluginValue input,
+            CancellationToken cancellationToken
+        )
+        {
+            Calls++;
+            throw new InvalidOperationException("Scenario invoked plugin code.");
+        }
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

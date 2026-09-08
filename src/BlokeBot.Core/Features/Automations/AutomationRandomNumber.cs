@@ -114,7 +114,8 @@ internal sealed class AutomationRandomNumberHandler : IAutomationPureNodeHandler
                     AutomationPortValueType.Number,
                     AutomationPortNullability.NonNullable
                 ),
-            ]
+            ],
+            SupportsScenarios: true
         );
 
     public ValueTask<AutomationPureNodeResult> ExecuteAsync(
