@@ -46,7 +46,9 @@ jobs:
           dotnet test BlokeBot.slnx
           --configuration Release
           --property:TreatWarningsAsErrors=true
+          --max-parallel-test-modules 1
           --
+          --maximum-parallel-tests 1
           --no-ansi
           --no-progress
           --output Normal
