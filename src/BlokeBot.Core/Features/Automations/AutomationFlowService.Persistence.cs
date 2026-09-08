@@ -135,7 +135,7 @@ public sealed partial class AutomationFlowService
             );
     }
 
-    private static AutomationFlowDraftRestoreOutcome RestoreFrozenDraft(
+    internal static AutomationFlowDraftRestoreOutcome RestoreFrozenDraft(
         AutomationRuntimeSerialization.PersistedFlow flow
     )
     {

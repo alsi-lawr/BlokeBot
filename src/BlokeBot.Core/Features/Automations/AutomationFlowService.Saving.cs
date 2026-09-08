@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,28 @@ public sealed partial class AutomationFlowService
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        if (draft.Nodes.Any(node => node.Definition.TypeId == AutomationSubflowDefinitions.Invoke))
+        {
+            if (
+                await MainDatabaseStatements.LockHostAsync(
+                    db,
+                    draft.HostId.Value,
+                    cancellationToken
+                ) == 0
+            )
+            {
+                return new AutomationFlowSaveOutcome.HostNotFound();
+            }
+        }
+        var pinErrors = await AutomationSubflowStore.ValidatePinsAsync(
+            db,
+            draft,
+            cancellationToken
+        );
+        if (!pinErrors.IsEmpty)
+        {
+            return new AutomationFlowSaveOutcome.Invalid(pinErrors);
+        }
         AutomationFlow flow;
         if (draft.Id is { } existingId)
         {
@@ -52,6 +75,11 @@ public sealed partial class AutomationFlowService
                 return new AutomationFlowSaveOutcome.Invalid([MalformedGraphError()]);
             }
 
+            var rebindErrors = AutomationSubflowStore.RebindErrors(restored.Draft, draft);
+            if (!rebindErrors.IsEmpty)
+            {
+                return new AutomationFlowSaveOutcome.Invalid(rebindErrors);
+            }
             var bindingFieldErrors = TransformInputBindingFieldErrors(restored.Draft, draft);
             if (!bindingFieldErrors.IsEmpty)
             {
@@ -88,6 +116,16 @@ public sealed partial class AutomationFlowService
         flow.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
         db.AutomationFlowNodes.AddRange(draft.Nodes.Select(node => Persist(flow.Id, node)));
         db.AutomationFlowEdges.AddRange(draft.Edges.Select(edge => Persist(flow.Id, edge)));
+        db.AutomationSubflowCallers.AddRange(
+            AutomationSubflowStore
+                .Pins(draft.Nodes)
+                .Select(pin => new AutomationSubflowCallerReference
+                {
+                    NodeId = pin.NodeId.Value,
+                    HostId = draft.HostId.Value,
+                    RevisionId = pin.RevisionId.Value,
+                })
+        );
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await ReconcileEventSubAsync(cancellationToken);

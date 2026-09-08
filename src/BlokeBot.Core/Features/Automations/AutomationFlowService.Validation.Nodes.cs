@@ -171,6 +171,10 @@ public sealed partial class AutomationFlowService
         }
 
         var descriptor = valid.Definition;
+        if (valid.Configuration is AutomationSubflowConfiguration subflow)
+        {
+            ValidateSubflowFixedInputs(node, subflow, descriptor, errors);
+        }
 
         foreach (var (fieldId, binding) in node.InputBindings)
         {
