@@ -146,7 +146,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Automations",
-                            "Format 1 transfers safely stored invalid core flows for repair."
+                            "Format 2 transfers selected valid flows, their referenced subflows, and selected generated scenarios."
                         ),
                     ],
                     Note =
@@ -157,13 +157,13 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Exports replace source database keys with deterministic export-local references.",
-                        "Fixed Actor and Channel identities become identity-free placeholders.",
-                        "Unresolved Automation references also become identity-free placeholders for editor repair.",
+                        "Identifying and event-derived fixed values are rejected rather than anonymized.",
+                        "Unresolved Automation references block the import.",
                         "Overlay media uses immutable same-instance document IDs without media bytes.",
-                        "Format 1 excludes community data.",
-                        "Format 1 excludes Lua configuration.",
-                        "Format 1 excludes plugin configuration.",
-                        "Format 1 rejects plugin-defined Automation nodes.",
+                        "Format 2 excludes community data.",
+                        "Format 2 excludes Lua configuration.",
+                        "Format 2 excludes plugin configuration.",
+                        "Plugin nodes require compatible definitions already installed and available on the destination.",
                         "Exports do not contain alerts.",
                         "Exports do not contain queued public chat.",
                         "Exports do not contain delivery receipts.",
@@ -199,7 +199,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Runtime and delivery data",
-                            "Format 1 also excludes unsupported feature configuration."
+                            "Format 2 also excludes unsupported feature configuration."
                         ),
                         new SiteGuideFact(
                             "Linked definitions",
@@ -207,7 +207,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Format and limits",
-                            "BlokeBot exports UTF-8 JSON with the identifier blokebot.channel-configuration and format version 1. The maximum file size is 2 MB, and each collection accepts up to 1,000 records. The envelope and typed section records reject unknown properties and enum values. Present sections with empty collections are valid. BlokeBot accepts format 1 and adapts format 0. No other format version is valid."
+                            "BlokeBot exports UTF-8 JSON with the identifier blokebot.channel-configuration and format version 2. The maximum file size is 2 MB, and each collection accepts up to 1,000 records. The envelope and typed section records reject unknown properties and enum values. Present sections with empty collections are valid. Only format 2 is accepted; versions 0 and 1 are unsupported."
                         ),
                     ],
                 },
@@ -408,7 +408,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Absent dependency",
-                            "For an absent Overlay or cue in a Custom command, select Skip whole item. In the Automation editor, select a local dependency for each identity-free placeholder."
+                            "For an absent Overlay or cue in a Custom command, select Skip whole item. Resolve every missing Automation dependency before importing."
                         ),
                         new SiteGuideFact(
                             "Retained history",

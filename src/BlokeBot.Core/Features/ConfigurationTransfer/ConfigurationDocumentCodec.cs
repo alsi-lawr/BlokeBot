@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 public sealed class ConfigurationDocumentCodec
 {
     public const string Format = "blokebot.channel-configuration";
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
     public const int MaximumBytes = 2 * 1024 * 1024;
     public const int MaximumRecordsPerCollection = 1_000;
 
@@ -46,10 +46,7 @@ public sealed class ConfigurationDocumentCodec
 
             var document = header.Version switch
             {
-                0 => Migrate(
-                    JsonSerializer.Deserialize<ConfigurationDocumentV0>(json.Span, _documentOptions)
-                ),
-                CurrentVersion => JsonSerializer.Deserialize<ConfigurationDocumentV1>(
+                CurrentVersion => JsonSerializer.Deserialize<ConfigurationDocumentV2>(
                     json.Span,
                     _documentOptions
                 ),
@@ -88,22 +85,11 @@ public sealed class ConfigurationDocumentCodec
         }
     }
 
-    public byte[] Serialize(ConfigurationDocumentV1 document) =>
+    public byte[] Serialize(ConfigurationDocumentV2 document) =>
         JsonSerializer.SerializeToUtf8Bytes(document, _documentOptions);
 
     public static ConfigurationDocumentParseOutcome.Invalid TooLarge() =>
         new(new("$", $"The configuration file exceeds the {MaximumBytes / 1024 / 1024} MB limit."));
-
-    private static ConfigurationDocumentV1? Migrate(ConfigurationDocumentV0? document) =>
-        document is null
-            ? null
-            : new(
-                Format,
-                CurrentVersion,
-                document.ExportedAtUtc,
-                new(document.ChannelLogin, null),
-                document.Sections
-            );
 
     private static JsonSerializerOptions CreateOptions(JsonUnmappedMemberHandling handling) =>
         new(JsonSerializerDefaults.Web)
@@ -119,7 +105,7 @@ public abstract record ConfigurationDocumentParseOutcome
 {
     private ConfigurationDocumentParseOutcome() { }
 
-    public sealed record Valid(ConfigurationDocumentV1 Document)
+    public sealed record Valid(ConfigurationDocumentV2 Document)
         : ConfigurationDocumentParseOutcome;
 
     public sealed record Invalid(ConfigurationValidationIssue Issue)

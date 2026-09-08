@@ -14,7 +14,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
     internal async Task<IReadOnlyList<ConfigurationValidationIssue>> StageAsync(
         BlokeBotDbContext db,
         int hostId,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         CancellationToken cancellationToken
     ) =>
@@ -36,7 +36,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
     internal async Task<IReadOnlyList<ConfigurationValidationIssue>> StageAsync(
         BlokeBotDbContext db,
         int hostId,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         ConfigurationImportReferencePlan referencePlan,
         CancellationToken cancellationToken

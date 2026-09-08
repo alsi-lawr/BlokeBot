@@ -9,13 +9,14 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 internal sealed partial class AutomationConfigurationTransferAdapter(
     AutomationFlowService flows,
     AutomationCatalogService catalog,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    AutomationScenarioService scenarios
 ) : IAutomationConfigurationTransferAdapter
 {
     public async Task<ConfigurationSectionPreview> PreviewAsync(
         BlokeBotDbContext db,
         BotHost host,
-        AutomationsSectionV1? section,
+        AutomationsSectionV2? section,
         SectionImportSelection selection,
         ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
@@ -50,7 +51,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
             issues,
             cancellationToken
         );
-        _ = await ValidateDraftsAsync(drafts, issues, cancellationToken);
+
         var counts = Counts(
             existing.Select(value => value.Name),
             section.Flows.Select(value => value.Name),
@@ -97,7 +98,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
     public async Task<AutomationConfigurationStageResult> StageAsync(
         BlokeBotDbContext db,
         BotHost host,
-        AutomationsSectionV1 section,
+        AutomationsSectionV2 section,
         SectionImportSelection selection,
         ConfigurationImportReferencePlan references,
         CancellationToken cancellationToken
@@ -123,7 +124,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
             issues,
             cancellationToken
         );
-        var diagnostics = await ValidateDraftsAsync(drafts, null, cancellationToken);
+
         if (selection.Strategy == ImportConflictStrategy.ReplaceSection)
         {
             var importedNames = section
@@ -159,17 +160,11 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
         }
         if (issues.Count > 0)
         {
-            return new(issues, []);
+            return new(issues);
         }
 
-        await StageDraftsAsync(
-            db,
-            host.Id,
-            drafts.Select(static value => value.Draft).ToArray(),
-            selection,
-            cancellationToken
-        );
-        return new([], diagnostics);
+        await StageDraftsAsync(db, host.Id, drafts, selection, cancellationToken);
+        return new([]);
     }
 
     private static ConfigurationPreviewCount Counts(

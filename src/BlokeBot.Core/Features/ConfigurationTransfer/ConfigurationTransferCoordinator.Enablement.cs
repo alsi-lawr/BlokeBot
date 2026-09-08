@@ -11,7 +11,7 @@ public sealed partial class ConfigurationTransferCoordinator
     private async Task<ConfigurationActivation?> StageEnablementAsync(
         BlokeBotDbContext db,
         BotHost host,
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         CancellationToken cancellationToken
     )

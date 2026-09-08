@@ -5,9 +5,7 @@ using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Persistence.Plugins;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -55,7 +53,7 @@ public sealed class ConfigurationTransferContractTests
             (
                 Bindings: Enumerable
                     .Range(0, ConfigurationDocumentCodec.MaximumRecordsPerCollection + 1)
-                    .Select(index => new AutomationInputBindingV1(
+                    .Select(index => new AutomationInputBindingV2(
                         $"field-{index}",
                         AutomationInputBindingMode.Fixed
                     ))
@@ -85,7 +83,7 @@ public sealed class ConfigurationTransferContractTests
     }
 
     [Test]
-    public async Task AutomationReferencePayload_WrongJsonTypeIsDeterministicNonBlockingPreview()
+    public async Task AutomationReferencePayload_WrongJsonTypeBlocksImport()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         int hostId;
@@ -136,7 +134,13 @@ public sealed class ConfigurationTransferContractTests
         var adapter = new AutomationConfigurationTransferAdapter(
             automation.Flows,
             automation.Catalog,
-            TimeProvider.System
+            TimeProvider.System,
+            new AutomationScenarioService(
+                database,
+                automation.Catalog,
+                automation.Flows,
+                TimeProvider.System
+            )
         );
 
         foreach (var (definitionId, configuration) in malformedReferences)
@@ -160,7 +164,7 @@ public sealed class ConfigurationTransferContractTests
                 .Preview.Sections.Single()
                 .Issues;
             issues.ShouldNotBeEmpty();
-            issues.ShouldAllBe(issue => !issue.BlocksApply);
+            issues.ShouldContain(issue => issue.BlocksApply);
         }
     }
 
@@ -250,13 +254,17 @@ public sealed class ConfigurationTransferContractTests
             new(),
             automation.Catalog,
             automation.Flows,
-            NullLogger<ConfigurationDocumentExporter>.Instance,
             TimeProvider.System,
-            new EfPluginFeatureStore(database, new())
+            new AutomationScenarioService(
+                database,
+                automation.Catalog,
+                automation.Flows,
+                TimeProvider.System
+            )
         );
 
         var both = await ExportOverlaysAsync(exporter, hostId, urls: true, media: true);
-        both.Version.ShouldBe(1);
+        both.Version.ShouldBe(2);
         both.Sections.Overlays!.Cues.ShouldHaveSingleItem().Layers.Count.ShouldBe(2);
         _ = both.Sections.Overlays.MediaReferences.ShouldHaveSingleItem();
         both.Sections.Overlays.Cues[0]
@@ -320,9 +328,13 @@ public sealed class ConfigurationTransferContractTests
                 new(),
                 automation.Catalog,
                 automation.Flows,
-                NullLogger<ConfigurationDocumentExporter>.Instance,
                 TimeProvider.System,
-                new EfPluginFeatureStore(database, new())
+                new AutomationScenarioService(
+                    database,
+                    automation.Catalog,
+                    automation.Flows,
+                    TimeProvider.System
+                )
             ).ExportAsync(
                 hostId,
                 new(
@@ -342,7 +354,7 @@ public sealed class ConfigurationTransferContractTests
     }
 
     [Test]
-    public async Task ChannelToolExport_WithPluginFeatureConfigurationOrState_ReturnsUnsupported()
+    public async Task ChannelToolExport_ExcludesPluginFeatureConfigurationAndState()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         int hostId;
@@ -375,9 +387,13 @@ public sealed class ConfigurationTransferContractTests
             new(),
             automation.Catalog,
             automation.Flows,
-            NullLogger<ConfigurationDocumentExporter>.Instance,
             TimeProvider.System,
-            new EfPluginFeatureStore(database, new())
+            new AutomationScenarioService(
+                database,
+                automation.Catalog,
+                automation.Flows,
+                TimeProvider.System
+            )
         ).ExportAsync(
             hostId,
             new(
@@ -390,7 +406,7 @@ public sealed class ConfigurationTransferContractTests
             CancellationToken.None
         );
 
-        _ = outcome.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
+        _ = outcome.ShouldBeOfType<ConfigurationExportOutcome.Success>();
 
         await using (var db = await database.CreateDbContextAsync())
         {
@@ -419,9 +435,13 @@ public sealed class ConfigurationTransferContractTests
                 new(),
                 automation.Catalog,
                 automation.Flows,
-                NullLogger<ConfigurationDocumentExporter>.Instance,
                 TimeProvider.System,
-                new EfPluginFeatureStore(database, new())
+                new AutomationScenarioService(
+                    database,
+                    automation.Catalog,
+                    automation.Flows,
+                    TimeProvider.System
+                )
             ).ExportAsync(
                 hostId,
                 new(
@@ -433,11 +453,11 @@ public sealed class ConfigurationTransferContractTests
                 ),
                 CancellationToken.None
             )
-        ).ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
+        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
     }
 
     [Test]
-    public async Task Export_WithInstallationPluginSettingAndSecret_ReturnsUnsupportedForAnySection()
+    public async Task Export_ExcludesInstallationPluginSettingAndSecret()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         int hostId;
@@ -476,9 +496,13 @@ public sealed class ConfigurationTransferContractTests
             new(),
             automation.Catalog,
             automation.Flows,
-            NullLogger<ConfigurationDocumentExporter>.Instance,
             TimeProvider.System,
-            new EfPluginFeatureStore(database, new())
+            new AutomationScenarioService(
+                database,
+                automation.Catalog,
+                automation.Flows,
+                TimeProvider.System
+            )
         ).ExportAsync(
             hostId,
             new(
@@ -488,7 +512,7 @@ public sealed class ConfigurationTransferContractTests
             CancellationToken.None
         );
 
-        _ = outcome.ShouldBeOfType<ConfigurationExportOutcome.Unsupported>();
+        _ = outcome.ShouldBeOfType<ConfigurationExportOutcome.Success>();
     }
 
     [Test]
@@ -497,7 +521,7 @@ public sealed class ConfigurationTransferContractTests
         const string Json = """
             {
               "format": "blokebot.channel-configuration",
-              "version": 1,
+              "version": 2,
               "exportedAtUtc": "2026-08-20T12:00:00Z",
               "source": { "channelLogin": "source" },
               "sections": {
@@ -553,7 +577,7 @@ public sealed class ConfigurationTransferContractTests
                 Json: """
                 {
                   "format": "blokebot.channel-configuration",
-                  "version": 1,
+                  "version": 2,
                   "exportedAtUtc": "2026-08-20T12:00:00Z",
                   "sections": {}
                 }
@@ -564,7 +588,7 @@ public sealed class ConfigurationTransferContractTests
                 Json: """
                 {
                   "format": "blokebot.channel-configuration",
-                  "version": 1,
+                  "version": 2,
                   "exportedAtUtc": "2026-08-20T12:00:00Z",
                   "source": { "channelLogin": "source" },
                   "sections": {
@@ -578,7 +602,7 @@ public sealed class ConfigurationTransferContractTests
                 Json: """
                 {
                   "format": "blokebot.channel-configuration",
-                  "version": 1,
+                  "version": 2,
                   "exportedAtUtc": "2026-08-20T12:00:00Z",
                   "source": { "channelLogin": "source" },
                   "sections": {
@@ -637,7 +661,7 @@ public sealed class ConfigurationTransferContractTests
     }
 
     [Test]
-    public void VersionAdapter_MigratesV0AndRejectsFutureVersion()
+    public void DirectFormat2_RejectsSupersededAndFutureVersions()
     {
         var codec = new ConfigurationDocumentCodec();
         const string V0 = """
@@ -659,11 +683,14 @@ public sealed class ConfigurationTransferContractTests
             }
             """;
 
-        var migrated = codec
-            .Parse(Encoding.UTF8.GetBytes(V0))
-            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Valid>();
-        migrated.Document.Version.ShouldBe(1);
-        migrated.Document.Source.ChannelLogin.ShouldBe("source");
+        codec
+            .Parse(V0)
+            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>()
+            .Issue.Location.ShouldBe("version");
+        codec
+            .Parse(V0.Replace("\"version\": 0", "\"version\": 1"))
+            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>()
+            .Issue.Location.ShouldBe("version");
 
         var rejected = codec
             .Parse(Encoding.UTF8.GetBytes(Future))
@@ -751,22 +778,22 @@ public sealed class ConfigurationTransferContractTests
         invalid.Issue.Location.ShouldBe("$.sections.channelToolEnablement.futureTool");
     }
 
-    private static ConfigurationDocumentV1 Document(
+    private static ConfigurationDocumentV2 Document(
         ChannelToolEnablementV1? enablement = null,
         CustomCommandsSectionV1? commands = null
     ) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.Parse("2026-08-20T12:00:00Z", CultureInfo.InvariantCulture),
             new("source", "0.12.0"),
             new(commands, ChannelToolEnablement: enablement)
         );
 
-    private static ConfigurationDocumentV1 AutomationDocument(AutomationNodeV1 node) =>
+    private static ConfigurationDocumentV2 AutomationDocument(AutomationNodeV2 node) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.Parse("2026-08-20T12:00:00Z", CultureInfo.InvariantCulture),
             new("source", "0.12.0"),
             new(
@@ -788,8 +815,8 @@ public sealed class ConfigurationTransferContractTests
             )
         );
 
-    private static AutomationNodeV1 AutomationNode(
-        IReadOnlyList<AutomationInputBindingV1> bindings,
+    private static AutomationNodeV2 AutomationNode(
+        IReadOnlyList<AutomationInputBindingV2> bindings,
         string definitionId = "send-chat",
         JsonElement configuration = default
     ) =>
@@ -809,7 +836,7 @@ public sealed class ConfigurationTransferContractTests
             0
         );
 
-    private static async Task<ConfigurationDocumentV1> ExportOverlaysAsync(
+    private static async Task<ConfigurationDocumentV2> ExportOverlaysAsync(
         ConfigurationDocumentExporter exporter,
         int hostId,
         bool urls,

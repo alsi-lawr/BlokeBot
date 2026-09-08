@@ -5,39 +5,50 @@ using BlokeBot.Core.Features.Automations;
 namespace BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AutomationsSectionV1(
-    [property: JsonRequired] IReadOnlyList<AutomationFlowV1> Flows,
-    [property: JsonRequired] IReadOnlyList<AutomationHostReferenceV1> HostReferences
-);
+public sealed record AutomationsSectionV2(
+    [property: JsonRequired] IReadOnlyList<AutomationFlowV2> Flows,
+    [property: JsonRequired] IReadOnlyList<AutomationHostReferenceV2> HostReferences
+)
+{
+    [JsonRequired]
+    public IReadOnlyList<AutomationSubflowV2> Subflows { get; init; } = [];
+
+    [JsonRequired]
+    public IReadOnlyList<AutomationScenarioV2> Scenarios { get; init; } = [];
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AutomationFlowV1(
+public sealed record AutomationFlowV2(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string Name,
     [property: JsonRequired] bool Enabled,
     [property: JsonRequired] int SchemaVersion,
     [property: JsonRequired] AutomationFlowOrientation Orientation,
     [property: JsonRequired] AutomationEdgeStyle EdgeStyle,
-    [property: JsonRequired] IReadOnlyList<AutomationNodeV1> Nodes,
-    [property: JsonRequired] IReadOnlyList<AutomationEdgeV1> Edges
+    [property: JsonRequired] IReadOnlyList<AutomationNodeV2> Nodes,
+    [property: JsonRequired] IReadOnlyList<AutomationEdgeV2> Edges
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AutomationNodeV1(
+public sealed record AutomationNodeV2(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string DefinitionId,
     [property: JsonRequired] int DefinitionSchemaVersion,
     [property: JsonRequired] JsonElement Configuration,
     [property: JsonRequired] int ExpressionLanguageVersion,
     [property: JsonRequired] AutomationNodeFailurePolicy FailurePolicy,
-    [property: JsonRequired] IReadOnlyList<AutomationInputBindingV1> InputBindings,
+    [property: JsonRequired] IReadOnlyList<AutomationInputBindingV2> InputBindings,
     [property: JsonRequired] int CanvasX,
     [property: JsonRequired] int CanvasY,
     string? DisplayAlias = null
-);
+)
+{
+    public AutomationPluginContractV2? Plugin { get; init; }
+    public AutomationSubflowBindingV2? Subflow { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AutomationInputBindingV1(
+public sealed record AutomationInputBindingV2(
     [property: JsonRequired] string FieldId,
     [property: JsonRequired] AutomationInputBindingMode Mode,
     int? ExpressionLanguageVersion = null,
@@ -45,7 +56,7 @@ public sealed record AutomationInputBindingV1(
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AutomationEdgeV1(
+public sealed record AutomationEdgeV2(
     [property: JsonRequired] string Id,
     [property: JsonRequired] AutomationEdgeKind Kind,
     [property: JsonRequired] string SourceNodeId,
@@ -54,7 +65,7 @@ public sealed record AutomationEdgeV1(
     [property: JsonRequired] string TargetPortId
 );
 
-public enum AutomationHostReferenceKindV1
+public enum AutomationHostReferenceKindV2
 {
     CustomCommand,
     OverlayTarget,
@@ -63,9 +74,9 @@ public enum AutomationHostReferenceKindV1
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record AutomationHostReferenceV1(
+public sealed record AutomationHostReferenceV2(
     [property: JsonRequired] string Id,
-    [property: JsonRequired] AutomationHostReferenceKindV1 Kind,
+    [property: JsonRequired] AutomationHostReferenceKindV2 Kind,
     [property: JsonRequired] string Name,
     string? ParentId = null
 );

@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Text.Json;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Page;
 using BlokeBot.Persistence.Models;
@@ -74,6 +77,106 @@ public sealed class ConfigurationTransferNavigationTests
 
         navigation.Uri.ShouldEndWith("/configuration-transfer#import");
         _ = page.Find("#configuration-transfer-json");
+    }
+
+    [Test]
+    public async Task AutomationExport_SelectsOnlyChosenFlowAndDropsDeselectedScenarios()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        var flowId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+        var scenarioId = Guid.NewGuid();
+        var services = ConfigurationTransferAutomationTestServices.Create(database);
+        var source = new AutomationFlowDraftNode(
+            new(Guid.NewGuid()),
+            new(
+                AutomationDefinitionIds.StreamOnlineSource.Value,
+                1,
+                JsonSerializer.SerializeToElement(new { })
+            ),
+            new(1),
+            AutomationNodeFailurePolicy.Stop,
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
+        );
+        var draft = new AutomationFlowDraft(
+            new(flowId),
+            new(hostId),
+            "First flow",
+            1,
+            false,
+            [source],
+            []
+        );
+        var scenarios = new AutomationScenarioService(
+            database,
+            services.Catalog,
+            services.Flows,
+            TimeProvider.System
+        );
+        var fixtureJson = AutomationScenarioSerialization.Serialize(
+            scenarios.CreatePortableFixture(draft, source.Id)
+        );
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            db.AutomationFlows.AddRange(
+                new AutomationFlow
+                {
+                    Id = flowId,
+                    HostId = hostId,
+                    Name = "First flow",
+                    Nodes = [AutomationFlowService.Persist(flowId, source)],
+                    SchemaVersion = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                },
+                new AutomationFlow
+                {
+                    Id = otherId,
+                    HostId = hostId,
+                    Name = "Second flow",
+                    Nodes =
+                    [
+                        AutomationFlowService.Persist(
+                            otherId,
+                            source with
+                            {
+                                Id = new(Guid.NewGuid()),
+                            }
+                        ),
+                    ],
+                    SchemaVersion = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            _ = db.AutomationScenarios.Add(
+                new()
+                {
+                    Id = scenarioId,
+                    FlowId = flowId,
+                    Slot = 0,
+                    Name = "Generated test",
+                    FixtureJson = fixtureJson,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        await using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddBlokeBotConfigurationTransfer();
+        var page = context.Render<ConfigurationTransferPage>();
+        var overlay = page.FindComponent<ConfigurationTransferOverlayExportOptions>();
+        await page.InvokeAsync(() => overlay.Instance.UrlLayersChanged.InvokeAsync(false));
+        page.Find("button[aria-label='Export flow First flow']").Click();
+        page.Find("button[aria-label='Export scenario Generated test for First flow']").Click();
+        var link = page.Find("#configuration-transfer-download").GetAttribute("href")!;
+        link.ShouldContain(flowId.ToString());
+        link.ShouldContain(scenarioId.ToString());
+        link.ShouldNotContain(otherId.ToString());
+        page.Find("button[aria-label='Export flow First flow']").Click();
+        link = page.Find("#configuration-transfer-download").GetAttribute("href")!;
+        link.ShouldNotContain(flowId.ToString());
+        link.ShouldNotContain(scenarioId.ToString());
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

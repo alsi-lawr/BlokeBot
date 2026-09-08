@@ -392,7 +392,7 @@ public sealed class ConfigurationTransferCoordinatorTests
             new HashSet<HostFeatureFlags>()
         );
 
-    private static ConfigurationDocumentV1 Document(
+    private static ConfigurationDocumentV2 Document(
         CustomCommandsSectionV1? commands = null,
         GuessingSectionV1? guessing = null,
         PointsSectionV1? points = null,
@@ -400,7 +400,7 @@ public sealed class ConfigurationTransferCoordinatorTests
     ) =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            2,
             DateTimeOffset.UtcNow,
             new("source-channel", "0.12.0"),
             new(commands, Guessing: guessing, Points: points, ChannelToolEnablement: enablement)

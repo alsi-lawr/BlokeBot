@@ -7,7 +7,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 internal sealed partial class AutomationConfigurationTransferAdapter
 {
     private static AutomationReferenceImportProjection RemapConfiguration(
-        AutomationNodeV1 node,
+        AutomationNodeV2 node,
         ConfigurationImportReferencePlan references,
         IReadOnlyList<CommandMatch> commands,
         IReadOnlyList<RewardMatch> rewards,
@@ -47,7 +47,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             ) || !references.CommandNames.TryGetValue(payload.CustomCommandId, out var name)
         )
         {
-            return Placeholder(AutomationTransferPlaceholder.CustomCommand);
+            return RejectedReference("custom-command-reference-unavailable");
         }
 
         var matches = commands.Where(value => SameName(value.Name, name)).ToArray();
@@ -64,7 +64,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     new AutomationCustomCommandPersistedPayload(commandId)
                 )
             )
-            : Placeholder(AutomationTransferPlaceholder.CustomCommand);
+            : RejectedReference("custom-command-reference-unavailable");
     }
 
     private static AutomationReferenceImportProjection RemapOverlay(
@@ -79,7 +79,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             || !references.OverlayInstances.TryGetValue(payload.TargetId, out var targetId)
             || !references.OverlayCues.TryGetValue(payload.CueId, out var cueId)
         )
-            ? Placeholder(AutomationTransferPlaceholder.Overlay)
+            ? RejectedReference("overlay-reference-unavailable")
             : new(
                 JsonSerializer.SerializeToElement(
                     new AutomationOverlayPersistedPayload(targetId, cueId)
@@ -99,7 +99,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             )
         )
         {
-            return Placeholder(AutomationTransferPlaceholder.CustomReward);
+            return RejectedReference("custom-reward-reference-unavailable");
         }
         if (payload.RewardId is null)
         {
@@ -111,7 +111,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
         }
         if (!references.RewardNames.TryGetValue(payload.RewardId, out var name))
         {
-            return Placeholder(AutomationTransferPlaceholder.CustomReward);
+            return RejectedReference("custom-reward-reference-unavailable");
         }
         var matches = rewards.Where(value => SameName(value.Title, name)).ToArray();
         return matches.Length == 1
@@ -123,11 +123,11 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     )
                 )
             )
-            : Placeholder(AutomationTransferPlaceholder.CustomReward);
+            : RejectedReference("custom-reward-reference-unavailable");
     }
 
-    private static AutomationReferenceImportProjection Placeholder(string reason) =>
-        new(AutomationTransferPlaceholder.Create(reason), reason);
+    private static AutomationReferenceImportProjection RejectedReference(string reason) =>
+        new(JsonSerializer.SerializeToElement(new { }), reason);
 
     private static bool SameName(string left, string right) =>
         ConfigurationImportReferencePlan.NormalizeName(left)
@@ -135,7 +135,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
 
     private sealed record AutomationReferenceImportProjection(
         JsonElement Configuration,
-        string? PlaceholderReason = null
+        string? Rejection = null
     );
 
     private sealed record CommandMatch(int Id, string Name);

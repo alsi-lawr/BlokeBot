@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 public sealed partial class ConfigurationTransferCoordinator
 {
     private static string AuditSummary(
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         IReadOnlyCollection<ConfigurationSectionId> changedSections
     )
@@ -21,7 +21,7 @@ public sealed partial class ConfigurationTransferCoordinator
         return JsonSerializer.Serialize(new AuditSummaryV1(sections));
     }
 
-    private static int Count(ConfigurationDocumentV1 document, ConfigurationSectionId section) =>
+    private static int Count(ConfigurationDocumentV2 document, ConfigurationSectionId section) =>
         section switch
         {
             ConfigurationSectionId.CustomCommands => document.Sections.CustomCommands is { } custom
@@ -43,7 +43,7 @@ public sealed partial class ConfigurationTransferCoordinator
         };
 
     private static ConfigurationValidationIssue? ValidateSelection(
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection
     )
     {
@@ -86,7 +86,7 @@ public sealed partial class ConfigurationTransferCoordinator
     }
 
     private static bool SectionPresent(
-        ConfigurationDocumentV1 document,
+        ConfigurationDocumentV2 document,
         ConfigurationSectionId section
     ) =>
         section switch
