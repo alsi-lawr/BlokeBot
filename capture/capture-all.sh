@@ -17,7 +17,7 @@ default_jobs=$(( $(nproc 2>/dev/null || echo 4) / 4 ))
 [[ "$default_jobs" -gt 6 ]] && default_jobs=6
 JOBS="${CAPTURE_JOBS:-$default_jobs}"
 
-# definition:port. Port 5084 is reserved for human visual signoff.
+# definition:port. Ports 5084–5088 are reserved for human visual signoff.
 DEFINITIONS=(
   "dashboard-and-admin.lua:43217"
   "home-scroll.lua:43218"
@@ -47,6 +47,9 @@ run_definition() {
   local base="http://127.0.0.1:${port}"
   local log="/tmp/capture-${definition%.lua}.log"
 
+  if [[ "$definition" == "automations.lua" ]]; then
+    export BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE=1
+  fi
   "$DOTNET" run --project "$PROJECT" --configuration Release --no-build \
     --no-launch-profile -- --urls "$base" >"/tmp/simulation-${port}.log" 2>&1 &
   local simulation=$!

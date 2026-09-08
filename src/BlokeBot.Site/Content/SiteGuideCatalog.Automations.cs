@@ -9,15 +9,15 @@ internal static partial class SiteGuideCatalog
             Route = "/automations",
             Eyebrow = "Automations",
             Title = "Connect channel events to automatic actions",
-            Summary = "Build visual automations.",
+            Summary = "Build, test and reuse visual channel automations.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/automations/phone-dark-grid-visual-automations.png",
                 LightPhoneSource: "media/automations/phone-light-grid-visual-automations.png",
                 DarkLaptopSource: "media/automations/wide-dark-grid-visual-automations.png",
                 LightLaptopSource: "media/automations/wide-light-grid-visual-automations.png",
-                PhoneAlt: "The Visual automations editor on a phone. It shows compact nodes and connections. The validation state is visible.",
-                LaptopAlt: "The Visual automations editor. It shows the Toolbox and typed nodes. Connections and the node inspector are visible.",
-                "Use Grid view to arrange nodes. Use List view to inspect the same nodes and connections."
+                PhoneAlt: "A draft test on a phone, with its graph and ordered node trace.",
+                LaptopAlt: "The automation editor with scenario source fields and a trace from the unsaved draft.",
+                "Test draft opens scenarios beside the graph. A completed scenario produces a selectable node trace."
             ),
             Sections =
             [
@@ -87,21 +87,65 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Test and enable safely",
-                    Bullets =
+                    Steps =
                     [
-                        "Test flow runs a sample event through the graph and reports each node result.",
-                        "Test flow does not send chat.",
-                        "Test flow does not change points.",
-                        "Test flow does not play an overlay.",
-                        "Test flow does not call Twitch.",
-                        "You cannot enable an invalid graph.",
-                        "The editor first shows a warning if a flow can send public messages.",
-                        "The editor first shows a warning if a flow can change points.",
-                        "The editor first shows a warning if a flow can play overlays.",
-                        "The editor first shows a warning if a flow can call Twitch.",
-                        "The run drawer shows the latest sample and recent live results. It names the node that failed, even if the flow continued.",
-                        "Duplicate copies the graph and node positions as a disabled draft. It does not copy run history.",
+                        "Open a flow and select Test draft. You do not need to save your current graph edits.",
+                        "Choose a saved scenario or select New. Choose the trigger and edit its typed Source fields.",
+                        "Set Clock and seed for repeatable values. Generate fixture creates source values from the current trigger schema.",
+                        "Choose Success or Failure under Action outcomes. Connected input overrides can supply a specific typed value to a connected input.",
+                        "Select Run scenario. The draft is validated before the isolated test starts.",
+                        "Select a trace row to highlight its authored graph node. Nested calls include their call context, so repeated calls remain distinguishable.",
+                        "Select Save scenario to keep the fixture for a saved flow. This does not save or enable the production graph.",
                     ],
+                    Paragraphs =
+                    [
+                        "Scenarios simulate supported actions instead of sending chat, changing points, playing overlays or calling Twitch. Unsupported nodes and plugin execution are rejected, not run live. Outcome choices apply to action nodes in the authored flow, not individual actions inside nested calls.",
+                        "Configuration Transfer includes only selected generated fixtures that still match their portable recipe. Other authored fixtures and traces are excluded.",
+                        "Traces opens recent test results. The ordered details show successes, failures and selected call context. Expired or truncated details are reported rather than reconstructed. Recent live runs remain available in the run drawer.",
+                        "Validate and repair the flow before enabling it. The editor asks for confirmation when enabling public-message, points, overlay or Twitch effects. Duplicate creates a disabled graph copy without run history.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Reuse a subflow",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/automations/phone-dark-list-visual-automations.png",
+                        LightPhoneSource: "media/automations/phone-light-list-visual-automations.png",
+                        DarkLaptopSource: "media/automations/wide-dark-list-visual-automations.png",
+                        LightLaptopSource: "media/automations/wide-light-list-visual-automations.png",
+                        PhoneAlt: "A subflow's Exit inspector on a phone, with Outputs declarations and separate Return values.",
+                        LaptopAlt: "The Subflows library and a subflow in List view, with its Exit output contract and connected return value.",
+                        "Entry declares Inputs. Exit declares Outputs and supplies their Return values. Grid and List edit the same subflow."
+                    ),
+                    Steps =
+                    [
+                        "Use Flows and Subflows at the top of the left library to browse either collection. Switching library tabs does not replace your open draft.",
+                        "Select the top-level New subflow action. New flow creates an ordinary event-driven flow instead.",
+                        "In the selected Entry inspector, add Inputs and choose each port's name, type, Nullable and Sensitive settings. These values become Entry's Data outputs inside the subflow.",
+                        "Add the internal nodes and connect the Flow route from Entry to Exit.",
+                        "Select Exit. Declare Outputs, then set each Return value to Fixed, Connected or Expression. A declaration defines the contract; its return binding supplies the actual value.",
+                        "Select Review subflow. Edit Description there and review validation and any incompatible callers before Publish subflow. Draft or description changes require a fresh review.",
+                        "In another flow or subflow, add Call subflow from the Toolbox. Select its target in that node's inspector, then configure the typed input values or connections.",
+                    ],
+                    Paragraphs =
+                    [
+                        "The library exposes only the current subflow. Compatible published changes apply automatically to saved callers' future runs. Repeated calls in one operation use the same resolved current definition. Already admitted runs keep their frozen graph and do not switch partway through.",
+                        "An incompatible caller is flagged and cannot start with the old interface as a fallback. Open its Call subflow node, use Update inputs and outputs when offered, and repair invalid values or connections. The editor retains incompatible authored work until you explicitly repair or remove it.",
+                        "Selecting a library row or either New action can replace the open document and uses the unsaved-change prompt. Browsing tabs alone does not discard it.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Extract selected nodes",
+                    Steps =
+                    [
+                        "Select a supported connected group of nodes and choose Extract selection.",
+                        "Review the generated typed Inputs and Outputs, boundary connections, name conflicts and proposed Call subflow replacement.",
+                        "Correct unsupported cuts or invalid connections before publishing the extracted subflow.",
+                        "Select Create subflow and replace. This publishes the extracted subflow and replaces the selection in the open draft with one undoable edit; it does not save the production flow.",
+                    ],
+                    Note =
+                        "Undo restores the draft selection and connections. It does not undo the separate publication of the library subflow. Arbitrary branch boundaries are not supported; the preview reports cuts that cannot preserve routing or failure order.",
                 },
                 new SiteGuideSection
                 {

@@ -193,7 +193,7 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
     private static ConfigurationDocumentV2 EnablementDocument() =>
         new(
             ConfigurationDocumentCodec.Format,
-            1,
+            ConfigurationDocumentCodec.CurrentVersion,
             _enabledAt,
             new("source", "0.12.0"),
             new(
