@@ -191,7 +191,7 @@ public sealed partial class AutomationFlowService(
         };
     }
 
-    private enum AutomationGraphAdmission
+    internal enum AutomationGraphAdmission
     {
         Saved,
         Scenario,

@@ -32,22 +32,22 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             )
             .ToArray();
         var needed = appliedFlows
-            .SelectMany(imported => AutomationSubflowStore.Pins(imported.Draft.Nodes))
-            .Select(pin => pin.RevisionId)
+            .SelectMany(imported => AutomationSubflowStore.Calls(imported.Draft.Nodes))
+            .Select(pin => pin.SubflowId)
             .ToHashSet();
         foreach (var revision in mapped.Revisions.Reverse())
         {
-            if (needed.Contains(revision.Id))
+            if (needed.Contains(revision.SubflowId))
             {
                 needed.UnionWith(
-                    AutomationSubflowStore.Pins(revision.Graph.Nodes).Select(pin => pin.RevisionId)
+                    AutomationSubflowStore.Calls(revision.Graph.Nodes).Select(pin => pin.SubflowId)
                 );
             }
         }
         await StageRevisionsAsync(
             db,
             hostId,
-            mapped.Revisions.Where(revision => needed.Contains(revision.Id)).ToArray(),
+            mapped.Revisions.Where(revision => needed.Contains(revision.SubflowId)).ToArray(),
             cancellationToken
         );
         foreach (var imported in appliedFlows)
@@ -88,12 +88,12 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             _ = await db.SaveChangesAsync(cancellationToken);
             db.AutomationSubflowCallers.AddRange(
                 AutomationSubflowStore
-                    .Pins(draft.Nodes)
+                    .Calls(draft.Nodes)
                     .Select(pin => new AutomationSubflowCallerReference
                     {
                         HostId = hostId,
                         NodeId = pin.NodeId.Value,
-                        RevisionId = pin.RevisionId.Value,
+                        SubflowId = pin.SubflowId.Value,
                     })
             );
             await StageScenariosAsync(
@@ -137,16 +137,9 @@ internal sealed partial class AutomationConfigurationTransferAdapter
         CancellationToken cancellationToken
     )
     {
-        foreach (var revision in revisions)
+        foreach (var imported in revisions)
         {
-            var existing = await db.AutomationSubflowRevisions.SingleOrDefaultAsync(
-                row => row.HostId == hostId && row.Id == revision.Id.Value,
-                cancellationToken
-            );
-            if (existing is not null)
-            {
-                continue;
-            }
+            var revision = imported;
             var parent = await db.AutomationSubflows.SingleOrDefaultAsync(
                 row => row.HostId == hostId && row.Id == revision.SubflowId.Value,
                 cancellationToken
@@ -163,7 +156,40 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             }
             else
             {
-                parent.LastRevision = Math.Max(parent.LastRevision, revision.Revision);
+                var stored = await db
+                    .AutomationSubflowRevisions.AsNoTracking()
+                    .SingleAsync(
+                        row =>
+                            row.HostId == hostId
+                            && row.SubflowId == parent.Id
+                            && row.Revision == parent.LastRevision,
+                        cancellationToken
+                    );
+                var current = AutomationSubflowSerialization.Restore(stored.SnapshotJson);
+                if (
+                    AutomationSubflowSerialization.Serialize(
+                        current with
+                        {
+                            Id = revision.Id,
+                            Revision = revision.Revision,
+                            PublishedAtUtc = revision.PublishedAtUtc,
+                        }
+                    ) == AutomationSubflowSerialization.Serialize(revision)
+                )
+                {
+                    continue;
+                }
+                revision = revision with
+                {
+                    Id = new(Guid.NewGuid()),
+                    Revision = checked(parent.LastRevision + 1),
+                };
+                parent.LastRevision = revision.Revision;
+                _ = await db
+                    .AutomationSubflowNestedCallers.Where(row =>
+                        row.HostId == hostId && row.CallerSubflowId == parent.Id
+                    )
+                    .ExecuteDeleteAsync(cancellationToken);
             }
             _ = db.AutomationSubflowRevisions.Add(
                 new()
@@ -175,15 +201,15 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     SnapshotJson = AutomationSubflowSerialization.Serialize(revision),
                 }
             );
-            db.AutomationSubflowRevisionReferences.AddRange(
+            db.AutomationSubflowNestedCallers.AddRange(
                 AutomationSubflowStore
-                    .Pins(revision.Graph.Nodes)
-                    .Select(pin => new AutomationSubflowRevisionReference
+                    .Calls(revision.Graph.Nodes)
+                    .Select(pin => new AutomationSubflowNestedCallerReference
                     {
                         HostId = hostId,
-                        CallerRevisionId = revision.Id.Value,
+                        CallerSubflowId = revision.SubflowId.Value,
                         NodeId = pin.NodeId.Value,
-                        RevisionId = pin.RevisionId.Value,
+                        SubflowId = pin.SubflowId.Value,
                     })
             );
             _ = await db.SaveChangesAsync(cancellationToken);

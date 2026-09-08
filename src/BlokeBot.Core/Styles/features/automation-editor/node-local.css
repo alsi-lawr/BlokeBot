@@ -1,0 +1,162 @@
+.automation-flow-rail-heading > .segmented-motion--shared {
+    flex: 1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+}
+
+.automation-flow-rail-heading > .segmented-motion--shared .segmented-motion__tab {
+    min-width: 0;
+    padding-inline: 0.35rem;
+}
+
+.automation-subflow-picker {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.automation-subflow-pagination,
+.automation-call-target-heading {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.automation-subflow-pagination button {
+    font-size: 0.7rem;
+    padding-inline: 0.5rem;
+}
+
+.automation-flow-rail .automation-subflow-library {
+    max-height: 32rem;
+    overflow-y: auto;
+}
+
+.automation-flow-rail .automation-subflow-library button {
+    border: 1px solid var(--app-border);
+    border-radius: 0.65rem;
+    margin-bottom: 0.4rem;
+    padding: 0.65rem;
+}
+
+.automation-call-target {
+    border-bottom: 1px solid var(--app-border);
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 0;
+}
+
+.automation-call-target h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.automation-call-target p,
+.automation-call-target button,
+.automation-call-target-heading strong {
+    font-size: 0.8rem;
+}
+
+.automation-call-target .automation-subflow-library {
+    max-height: 14rem;
+    overflow-y: auto;
+}
+
+.automation-unmatched-input {
+    border-top: 1px solid var(--app-border);
+    display: grid;
+    gap: 0.4rem;
+    padding-block: 0.75rem;
+}
+
+.automation-unmatched-input code {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.automation-page-actions .automation-icon {
+    height: 1.5rem;
+    width: 1.5rem;
+}
+
+@media (max-width: 767px) {
+    .automation-flow-rail-heading {
+        display: flex;
+    }
+
+    .automation-flow-rail .automation-flow-item:not(.automation-flow-item--active) {
+        display: block;
+    }
+
+    .automation-flow-rail [role="tabpanel"] > .automation-flow-item {
+        margin-bottom: 0.4rem;
+    }
+
+    .automation-flow-rail [role="tabpanel"]:has(> .automation-flow-item) {
+        max-height: 9rem;
+        overflow-y: auto;
+    }
+
+    .automation-flow-rail .automation-subflow-library {
+        max-height: 9rem;
+    }
+
+    .automation-page-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .automation-page-actions button {
+        justify-content: center;
+        padding-inline: 0.5rem;
+    }
+}
+
+.automation-flow-rail-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.4rem;
+}
+
+.automation-editor--focus {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "creation" "tools" "notices" "workspace" "runs";
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.automation-editor--focus > .automation-page-actions {
+    border-bottom: 1px solid var(--app-border);
+    grid-area: creation;
+    justify-content: flex-start;
+    margin: 0;
+    min-height: 3.75rem;
+    padding: 0.65rem 6.2rem 0.65rem 1rem;
+}
+
+.automation-editor--focus .automation-restore-tab--tools {
+    left: auto;
+    right: 6.2rem;
+    top: 0.7rem;
+}
+
+@media (max-width: 48rem) {
+    .automation-editor--focus > .automation-page-actions {
+        padding: 3.5rem 0.8rem 0.8rem;
+    }
+
+    .automation-editor--focus .automation-restore-tab--tools {
+        left: 0.8rem;
+        right: auto;
+    }
+}
+
+.automation-inspector .automation-authoring-section {
+    padding-block: 1rem;
+}
+
+.automation-return-values-heading {
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding-top: 1rem;
+}

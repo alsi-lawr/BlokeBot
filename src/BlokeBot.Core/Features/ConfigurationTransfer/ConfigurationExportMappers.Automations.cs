@@ -18,6 +18,8 @@ internal static partial class ConfigurationExportMappers
         CancellationToken cancellationToken
     )
     {
+        await using var snapshot = await db.Database.BeginTransactionAsync(cancellationToken);
+        _ = await MainDatabaseStatements.LockHostAsync(db, hostId, cancellationToken);
         var rows = await db
             .AutomationFlows.AsNoTracking()
             .AsSplitQuery()
@@ -51,8 +53,8 @@ internal static partial class ConfigurationExportMappers
             db,
             new(hostId),
             drafts
-                .SelectMany(draft => AutomationSubflowStore.Pins(draft.Nodes))
-                .Select(pin => pin.RevisionId),
+                .SelectMany(draft => AutomationSubflowStore.Calls(draft.Nodes))
+                .Select(pin => pin.SubflowId),
             null,
             cancellationToken
         );
@@ -63,13 +65,21 @@ internal static partial class ConfigurationExportMappers
                 string.Join(" ", invalid.Errors.Select(error => error.Message))
             );
         }
+        var closure = ((AutomationSubflowClosureOutcome.Available)loaded).Closure;
+        var callErrors = drafts
+            .SelectMany(draft => AutomationSubflowStore.ValidateCalls(draft, closure))
+            .ToArray();
+        if (callErrors.Length > 0)
+        {
+            throw new AutomationConfigurationExportException(
+                "subflow",
+                string.Join(" ", callErrors.Select(error => error.Message))
+            );
+        }
         var revisions = ((AutomationSubflowClosureOutcome.Available)loaded)
             .Closure.Revisions.OrderBy(revision => revision.SubflowId.Value)
             .ThenBy(revision => revision.Revision)
             .ToArray();
-        var revisionIds = revisions
-            .Select((revision, index) => (revision.Id, Label("revision", index)))
-            .ToDictionary(pair => pair.Id, pair => pair.Item2);
         var subflowIds = revisions
             .Select(revision => revision.SubflowId)
             .Distinct()
@@ -82,9 +92,12 @@ internal static partial class ConfigurationExportMappers
         var nodeMaps = new Dictionary<AutomationFlowId, Dictionary<AutomationNodeId, string>>();
         foreach (var draft in drafts)
         {
-            var validation = await flowService.ValidateConfigurationTransferAsync(
+            var validation = await flowService.ValidatePreparedAsync(
                 draft,
-                cancellationToken
+                closure,
+                AutomationFlowService.AutomationGraphAdmission.ConfigurationTransfer,
+                cancellationToken,
+                db
             );
             if (!validation.Errors.IsEmpty)
             {
@@ -96,7 +109,7 @@ internal static partial class ConfigurationExportMappers
             var graph = ExportGraph(
                 draft,
                 Label("flow", exported.Count),
-                revisionIds,
+                subflowIds,
                 references,
                 hostReferences,
                 catalog
@@ -112,15 +125,13 @@ internal static partial class ConfigurationExportMappers
         }
         var subflows = revisions
             .Select(revision => new AutomationSubflowV2(
-                revisionIds[revision.Id],
                 subflowIds[revision.SubflowId],
-                revision.Revision,
                 revision.Description,
                 revision.Interface,
                 ExportGraph(
                     revision.Graph,
-                    revisionIds[revision.Id],
-                    revisionIds,
+                    subflowIds[revision.SubflowId],
+                    subflowIds,
                     references,
                     hostReferences,
                     catalog
@@ -169,7 +180,9 @@ internal static partial class ConfigurationExportMappers
             var validation = await scenarios.ValidatePortableAsync(
                 draft,
                 fixture,
-                cancellationToken
+                cancellationToken,
+                resolved: closure,
+                preparationDb: db
             );
             if (!validation.Errors.IsEmpty || validation.Gate is not null)
             {

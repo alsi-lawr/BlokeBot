@@ -103,6 +103,19 @@ public sealed partial class AutomationRuntimeService(
     {
         await EnsureInitializedAsync(cancellationToken);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var dispatchTransaction = await db.Database.BeginTransactionAsync(
+            cancellationToken
+        );
+        var hostExists = await MainDatabaseStatements.LockHostAsync(
+            db,
+            context.HostId.Value,
+            cancellationToken
+        );
+        if (hostExists == 0)
+        {
+            return Dispatched(AutomationDispatchStatus.HostNotFound);
+        }
+
         var flows = await db
             .AutomationFlows.AsNoTracking()
             .Include(static flow => flow.Nodes)
@@ -150,16 +163,6 @@ public sealed partial class AutomationRuntimeService(
                 continue;
             }
 
-            var validation = await flowService.ValidateAsync(restored.Draft, cancellationToken);
-            if (
-                validation.Gate is not null
-                || validation.Errors.Any(static error => error.Code != "capability-unavailable")
-            )
-            {
-                invalidFlow = true;
-                continue;
-            }
-
             foreach (var source in matchingSources)
             {
                 matching.Add((flow, source));
@@ -169,18 +172,6 @@ public sealed partial class AutomationRuntimeService(
         var accepted = ImmutableArray.CreateBuilder<AutomationRunId>();
         var duplicateCount = 0;
         var blockedCount = 0;
-        await using var dispatchTransaction = await db.Database.BeginTransactionAsync(
-            cancellationToken
-        );
-        var hostExists = await MainDatabaseStatements.LockHostAsync(
-            db,
-            context.HostId.Value,
-            cancellationToken
-        );
-        if (hostExists == 0)
-        {
-            return Dispatched(AutomationDispatchStatus.HostNotFound);
-        }
 
         var host = await db
             .Hosts.AsNoTracking()
@@ -202,6 +193,47 @@ public sealed partial class AutomationRuntimeService(
             return Dispatched(AutomationDispatchStatus.NoMatchingFlow);
         }
 
+        var drafts = matching
+            .Select(item => item.Flow)
+            .DistinctBy(flow => flow.Id)
+            .Select(flow =>
+                (
+                    (AutomationFlowDraftRestoreOutcome.Available)
+                        AutomationFlowService.RestoreDraft(flow)
+                ).Draft
+            )
+            .ToArray();
+        var resolved = await AutomationSubflowStore.LoadClosureAsync(
+            db,
+            context.HostId,
+            drafts
+                .SelectMany(draft => AutomationSubflowStore.Calls(draft.Nodes))
+                .Select(call => call.SubflowId),
+            null,
+            cancellationToken
+        );
+        if (resolved is not AutomationSubflowClosureOutcome.Available current)
+        {
+            return Dispatched(AutomationDispatchStatus.InvalidFlow);
+        }
+        foreach (var draft in drafts)
+        {
+            var validation = await flowService.ValidatePreparedAsync(
+                draft,
+                current.Closure,
+                AutomationFlowService.AutomationGraphAdmission.Saved,
+                cancellationToken,
+                db
+            );
+            if (
+                validation.Gate is not null
+                || validation.Errors.Any(error => error.Code != "capability-unavailable")
+            )
+            {
+                return Dispatched(AutomationDispatchStatus.InvalidFlow);
+            }
+        }
+
         foreach (var (flow, source) in matching)
         {
             var runId = Guid.NewGuid();
@@ -211,21 +243,13 @@ public sealed partial class AutomationRuntimeService(
                         AutomationRuntimeSerialization.SerializeDefinition(flow)
                     )
             ).Flow;
-            var frozen = await AutomationFrozenSubflows.FreezeAsync(
-                db,
-                original,
-                runId,
-                cancellationToken
-            );
+            var frozen = AutomationFrozenSubflows.Freeze(original, runId, current.Closure);
             if (frozen is null || FreezeExecutionFences(frozen.Flow) is not { } frozenFlow)
             {
                 return Dispatched(AutomationDispatchStatus.InvalidFlow);
             }
-            var requiredFeatures = frozen.Closure.Revisions.Aggregate(
-                AutomationRequiredFeatures.ForDefinitions(
-                    frozenFlow.Nodes.Select(static node => node.DefinitionId)
-                ),
-                (required, revision) => required | revision.RequiredFeatures
+            var requiredFeatures = AutomationRequiredFeatures.ForDefinitions(
+                frozenFlow.Nodes.Select(static node => node.DefinitionId)
             );
             if (!host.EnabledFeatures.Contains(requiredFeatures))
             {
@@ -803,7 +827,8 @@ public sealed partial class AutomationRuntimeService(
 
             var check = AutomationFrozenSubflows.WithContract(
                 node,
-                await catalog.ValidatePersistedBeforeExecutionAsync(
+                await AutomationFrozenSubflows.ValidateBeforeExecutionAsync(
+                    catalog,
                     new(run.HostId),
                     available.Context,
                     AutomationRuntimeSerialization.Definition(node),

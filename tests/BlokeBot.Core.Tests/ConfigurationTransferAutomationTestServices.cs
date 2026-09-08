@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Persistence;
 
 namespace BlokeBot.Core.Tests;
 
@@ -41,7 +42,8 @@ internal sealed record ConfigurationTransferAutomationTestServices(
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         ) => Unavailable<OverlayCueReferenceOutcome>();
 
         public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(

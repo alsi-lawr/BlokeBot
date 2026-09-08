@@ -1,0 +1,83 @@
+@using System.Collections.Immutable
+
+<section class="automation-trace-panel" data-automation-trace aria-label="Execution trace">
+    <header class="automation-trace-heading">
+    <h2>@Title</h2>
+    <div class="automation-authoring-actions">
+    <button class="btn-secondary" type="button" @onclick="EditScenario">Edit scenario</button>
+    <button class="btn-secondary" type="button" @onclick="Close">Close trace</button>
+    </div>
+    </header>
+    @if (Headers.Length > 0)
+    {
+        <label class="automation-trace-history">
+        <span>Run</span>
+        <select value="@Snapshot?.Id.Value" @onchange="args => SelectRun.InvokeAsync(args.Value?.ToString() ?? string.Empty)">@foreach (var header in Headers) { <option value="@header.Id.Value">@(header.ProductionRunId is null ? "Test" : "Live") · @header.CreatedAtUtc.ToLocalTime().ToString("g")</option> }</select>
+        </label>
+    }
+    @if (Message is not null) { <p role="status" class="automation-trace-message">@Message</p> }
+    @if (Presentation is not null)
+    {
+        <ol class="automation-trace-events" aria-label="Ordered execution events">
+            @foreach (var row in Presentation.Rows.Skip(Offset).Take(PageSize))
+            {
+                var data = row.Entry.Event;
+                <li @key="row.Entry.Sequence">
+                <button type="button" class="@(Selected?.Entry.Sequence == row.Entry.Sequence ? "is-selected" : null)" aria-current="@(Selected?.Entry.Sequence == row.Entry.Sequence ? "true" : null)" data-trace-sequence="@row.Entry.Sequence" @onclick="() => Select.InvokeAsync(row.Entry.Sequence)">
+                <span class="automation-trace-sequence">@row.Entry.Sequence</span>
+                <span>
+                <strong>@NodeName(row)</strong>
+                <small>@row.Context · @data.Kind · @data.TimeUtc.ToLocalTime().ToString("HH:mm:ss.fff")</small>
+                </span>
+                <span>@(data.Outcome == AutomationTraceOutcome.None ? null : data.Outcome)</span>
+                </button>
+                </li>
+            }
+        </ol>
+        @if (Presentation.Rows.Length > PageSize)
+        {
+            <div class="automation-trace-pagination">
+            <button class="btn-secondary" type="button" disabled="@(Offset == 0)" @onclick="() => Page.InvokeAsync(Math.Max(0, Offset - PageSize))">Previous events</button>
+            <span>@(Offset + 1)–@Math.Min(Offset + PageSize, Presentation.Rows.Length)</span>
+            <button class="btn-secondary" type="button" disabled="@(Offset + PageSize >= Presentation.Rows.Length)" @onclick="() => Page.InvokeAsync(Offset + PageSize)">Next events</button>
+            </div>
+        }
+    }
+    @if (Snapshot?.Truncation is not null and not AutomationTraceTruncation.None) { <p class="automation-trace-message" role="status">Trace truncated · @Snapshot.Events.Length recorded events</p> }
+    @if (Selected is { } selected)
+    {
+        <footer class="automation-trace-detail">
+        <strong>Selected: @NodeName(selected)</strong>
+        <span>@selected.Context</span>@if (selected.RootNodeId is null || !Nodes.Any(node => node.Id == selected.RootNodeId)) { <span>Graph node unavailable</span> }@foreach (var value in selected.Entry.Event.Values) { <span>@value.PortId.Value · @value.ValueType</span> }<details>
+        <summary>Event details</summary>
+        <dl>
+        <dt>Node</dt>
+        <dd>@selected.Entry.Event.Node?.Id.Value</dd>
+        <dt>Invocation</dt>
+        <dd>@selected.Entry.Event.Invocation.Id</dd>@if (selected.RevisionId is { } revision) { <dt>Revision</dt>
+        <dd>@revision.Value</dd> }@foreach (var value in selected.Entry.Event.Values) { <dt>@value.PortId.Value</dt>
+        <dd>@string.Join(", ", value.Provenance)</dd> }</dl>
+        </details>
+        </footer>
+    }
+</section>
+
+@code {
+    public const int PageSize = 50;
+    [Parameter] public string Title { get; set; } = "Execution trace";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public AutomationTraceSnapshot? Snapshot { get; set; }
+    [Parameter] public AutomationTracePresentation? Presentation { get; set; }
+    [Parameter] public AutomationTraceRow? Selected { get; set; }
+    [Parameter] public ImmutableArray<AutomationTraceSummary> Headers { get; set; } = [];
+    [Parameter] public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];
+    [Parameter] public int Offset { get; set; }
+    [Parameter] public EventCallback<int> Select { get; set; }
+    [Parameter] public EventCallback<int> Page { get; set; }
+    [Parameter] public EventCallback<string> SelectRun { get; set; }
+    [Parameter] public EventCallback EditScenario { get; set; }
+    [Parameter] public EventCallback Close { get; set; }
+
+    private string NodeName(AutomationTraceRow row) => row.Entry.Event.Node is not { } node ? row.Entry.Event.Kind.ToString()
+        : row.Entry.Event.Invocation.ParentId is null && Nodes.FirstOrDefault(candidate => candidate.Id == node.Id && candidate.Definition.Id == node.DefinitionId) is { } current ? current.EffectiveName : node.DefinitionId.Value;
+}

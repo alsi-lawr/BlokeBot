@@ -15,7 +15,7 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationRuntimeTests
 {
     [Test]
-    public async Task Subflow_PublicationPinsMultipleCallersAndOnlyExplicitCompatibleRebindMovesOne()
+    public async Task Subflow_PublicationKeepsStableCallersAndIncompatibleCurrentCallsRequireRepair()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var service = Subflows(fixture);
@@ -31,70 +31,53 @@ public sealed partial class AutomationRuntimeTests
             .FlowId;
         var compatible = await Publish(service, draft with { Description = "Revised description" });
         (
-            await service.RemoveRevisionAsync(new(fixture.HostId), first.Id, CancellationToken.None)
-        ).ShouldBe(AutomationSubflowRemovalOutcome.Referenced);
+            await service.LoadCurrentAsync(new(fixture.HostId), draft.Id, CancellationToken.None)
+        )!.Id.ShouldBe(compatible.Id);
         var changedInterface = new AutomationSubflowInterface(
             [SubflowPort("text", AutomationPortValueType.Text)],
             [SubflowPort("text", AutomationPortValueType.Text)]
         );
-        var changed = Subflow(fixture.HostId, changedInterface) with { Id = draft.Id };
         var publication = (
-            await service.PublishAsync(changed, CancellationToken.None)
+            await service.PublishAsync(
+                Subflow(fixture.HostId, changedInterface) with
+                {
+                    Id = draft.Id,
+                },
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Published>();
         publication
             .IncompatibleCallers.Select(caller => caller.FlowId)
             .ShouldBe([idA, idB], ignoreOrder: true);
-        var rebind = callerA with
+        (await fixture.Flows.SaveAsync(callerA with { Id = idA }, CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
+            .Errors.ShouldContain(error => error.Code == "subflow-interface-incompatible");
+        var repaired = callerA with
         {
             Id = idA,
             Nodes =
             [
-                .. callerA.Nodes.Select(node =>
-                    node.Definition.TypeId == AutomationSubflowDefinitions.Invoke
-                        ? node with
-                        {
-                            Definition = AutomationSubflowDefinitions.Invocation(compatible),
-                        }
-                        : node
+                callerA.Nodes[0],
+                Invoke(
+                    publication.Revision,
+                    callerA.Nodes[1].Id,
+                    ImmutableDictionary<AutomationPortId, AutomationValue>.Empty.Add(
+                        new("text"),
+                        new AutomationValue.Text("value")
+                    )
                 ),
             ],
         };
         _ = (
-            await fixture.Flows.SaveAsync(rebind, CancellationToken.None)
+            await fixture.Flows.SaveAsync(repaired, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
-        var invalidRebind = rebind with
-        {
-            Nodes =
-            [
-                .. rebind.Nodes.Select(node =>
-                    node.Definition.TypeId == AutomationSubflowDefinitions.Invoke
-                        ? Invoke(
-                            publication.Revision,
-                            node.Id,
-                            new Dictionary<AutomationPortId, AutomationValue>
-                            {
-                                [new("text")] = new AutomationValue.Text("value"),
-                            }.ToImmutableDictionary()
-                        )
-                        : node
-                ),
-            ],
-        };
-        (await fixture.Flows.SaveAsync(invalidRebind, CancellationToken.None))
-            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
-            .Errors.ShouldContain(error => error.Code == "subflow-rebind-incompatible");
         await using var db = await fixture.Database.CreateDbContextAsync();
-        var pins = await db.AutomationSubflowCallers.AsNoTracking().ToArrayAsync();
-        pins.Single(pin => pin.NodeId == callerA.Nodes[1].Id.Value)
-            .RevisionId.ShouldBe(compatible.Id.Value);
-        pins.Single(pin => pin.NodeId == callerB.Nodes[1].Id.Value)
-            .RevisionId.ShouldBe(first.Id.Value);
-        _ = (
-            await fixture.Flows.DeleteAsync(new(fixture.HostId), idB, CancellationToken.None)
-        ).ShouldBeOfType<AutomationFlowDeleteOutcome.Deleted>();
-        (
-            await service.RemoveRevisionAsync(new(fixture.HostId), first.Id, CancellationToken.None)
-        ).ShouldBe(AutomationSubflowRemovalOutcome.Removed);
+        var calls = await db.AutomationSubflowCallers.AsNoTracking().ToArrayAsync();
+        calls.Length.ShouldBe(2);
+        calls.ShouldAllBe(call => call.SubflowId == draft.Id.Value);
+        (await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None))
+            .Subflows.ShouldHaveSingleItem()
+            .Id.ShouldBe(publication.Revision.SubflowId);
     }
 
     [Test]
@@ -130,7 +113,7 @@ public sealed partial class AutomationRuntimeTests
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
         var restored = (
             await Subflows(fixture)
-                .LoadClosureAsync(new(fixture.HostId), [revision.Id], CancellationToken.None)
+                .LoadClosureAsync(new(fixture.HostId), [revision.SubflowId], CancellationToken.None)
         )
             .ShouldBeOfType<AutomationSubflowClosureOutcome.Available>()
             .Closure.Revisions.ShouldHaveSingleItem();
@@ -140,7 +123,7 @@ public sealed partial class AutomationRuntimeTests
         var closure = (
             await service.LoadClosureAsync(
                 new(fixture.HostId),
-                [revision.Id],
+                [revision.SubflowId],
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationSubflowClosureOutcome.Available>();
@@ -151,7 +134,7 @@ public sealed partial class AutomationRuntimeTests
         var forgedCaller = Caller(fixture.HostId, forged);
         (await fixture.Flows.SaveAsync(forgedCaller, CancellationToken.None))
             .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
-            .Errors.ShouldContain(error => error.Code == "subflow-pin-invalid");
+            .Errors.ShouldContain(error => error.Code == "subflow-interface-incompatible");
         var wrongValue = Caller(
             fixture.HostId,
             revision,
@@ -163,7 +146,7 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task Subflow_HostIsolationRejectsCrossHostPinsAndLeavesBothCataloguesUnchanged()
+    public async Task Subflow_HostIsolationRejectsCrossHostCallsAndLeavesBothCataloguesUnchanged()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var otherHost = await fixture.SeedHostAsync(
@@ -174,7 +157,11 @@ public sealed partial class AutomationRuntimeTests
         var service = Subflows(fixture);
         var revision = await Publish(service, Subflow(fixture.HostId));
         _ = (
-            await service.LoadClosureAsync(new(otherHost), [revision.Id], CancellationToken.None)
+            await service.LoadClosureAsync(
+                new(otherHost),
+                [revision.SubflowId],
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowClosureOutcome.Invalid>();
         _ = (
             await fixture.Flows.SaveAsync(Caller(otherHost, revision), CancellationToken.None)
@@ -190,10 +177,10 @@ public sealed partial class AutomationRuntimeTests
         ).ShouldBe(AutomationSubflowRemovalOutcome.NotFound);
         (
             await service.ListAsync(new(otherHost), new(""), CancellationToken.None)
-        ).Revisions.ShouldBeEmpty();
+        ).Subflows.ShouldBeEmpty();
         (
             await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
-        ).Revisions.Length.ShouldBe(1);
+        ).Subflows.Length.ShouldBe(1);
     }
 
     [Test]
@@ -226,7 +213,7 @@ public sealed partial class AutomationRuntimeTests
             .Errors.ShouldContain(error => error.Code == "subflow-depth");
         (
             await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
-        ).Revisions.Length.ShouldBe(AutomationSubflowStore.MaximumDepth);
+        ).Subflows.Length.ShouldBe(AutomationSubflowStore.MaximumDepth);
         (
             await service.RemoveRevisionAsync(new(fixture.HostId), first.Id, CancellationToken.None)
         ).ShouldBe(AutomationSubflowRemovalOutcome.Referenced);
@@ -282,7 +269,7 @@ public sealed partial class AutomationRuntimeTests
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
         (
             await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
-        ).Revisions.ShouldBeEmpty();
+        ).Subflows.ShouldBeEmpty();
     }
 
     [Test]
@@ -301,7 +288,11 @@ public sealed partial class AutomationRuntimeTests
             .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>()
             .FlowId;
         var closure = (
-            await service.LoadClosureAsync(new(fixture.HostId), [parent.Id], CancellationToken.None)
+            await service.LoadClosureAsync(
+                new(fixture.HostId),
+                [parent.SubflowId],
+                CancellationToken.None
+            )
         )
             .ShouldBeOfType<AutomationSubflowClosureOutcome.Available>()
             .Closure;
@@ -504,7 +495,11 @@ public sealed partial class AutomationRuntimeTests
             await flows.SaveAsync(Caller(fixture.HostId, parent), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
         var restored = (
-            await service.LoadClosureAsync(new(fixture.HostId), [parent.Id], CancellationToken.None)
+            await service.LoadClosureAsync(
+                new(fixture.HostId),
+                [parent.SubflowId],
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowClosureOutcome.Available>();
         restored
             .Closure.Revisions.Single(value => value.Id == parent.Id)
@@ -645,7 +640,11 @@ public sealed partial class AutomationRuntimeTests
             .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>()
             .FlowId;
         var closure = (
-            await service.LoadClosureAsync(new(fixture.HostId), [parent.Id], CancellationToken.None)
+            await service.LoadClosureAsync(
+                new(fixture.HostId),
+                [parent.SubflowId],
+                CancellationToken.None
+            )
         )
             .ShouldBeOfType<AutomationSubflowClosureOutcome.Available>()
             .Closure;
@@ -680,12 +679,12 @@ public sealed partial class AutomationRuntimeTests
             _ = await db.Hosts.Where(host => host.Id == fixture.HostId).ExecuteDeleteAsync();
             (await db.AutomationSubflowRevisions.CountAsync()).ShouldBe(0);
             (await db.AutomationSubflowCallers.CountAsync()).ShouldBe(0);
-            (await db.AutomationSubflowRevisionReferences.CountAsync()).ShouldBe(0);
+            (await db.AutomationSubflowNestedCallers.CountAsync()).ShouldBe(0);
         }
     }
 
     [Test]
-    public async Task Subflow_LibraryPagesAndSearchBoundMaterializationWhileOlderRevisionSelectionStaysHostScoped()
+    public async Task Subflow_LibraryPagesAndSearchBoundCurrentItemsAndSelectionStaysHostScoped()
     {
         var materialization = new SubflowLibraryMaterialization();
         await using var fixture = await RuntimeFixture.CreateAsync(
@@ -722,14 +721,25 @@ public sealed partial class AutomationRuntimeTests
                     service,
                     draft with
                     {
+                        Id = new(Guid.NewGuid()),
                         Graph = draft.Graph with
                         {
-                            Name = index == 0 ? "Older needle" : $"Library revision {index}",
+                            Name = index == 0 ? "Current needle" : $"Library subflow {index}",
                         },
                     }
                 )
             );
         }
+        var old = revisions[0];
+        revisions[0] = await Publish(
+            service,
+            draft with
+            {
+                Id = old.SubflowId,
+                Graph = draft.Graph with { Name = "Current needle" },
+                Description = "Current detail",
+            }
+        );
         var otherHost = await fixture.SeedHostAsync("library-other", HostFeatureFlags.Automations);
         var otherDraft = Subflow(otherHost);
         var other = await Publish(
@@ -741,9 +751,11 @@ public sealed partial class AutomationRuntimeTests
         );
         materialization.Reset();
         var first = await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None);
-        first.Revisions.Length.ShouldBe(AutomationSubflowService.LibraryPageSize);
+        first.Subflows.Length.ShouldBe(AutomationSubflowService.LibraryPageSize);
         _ = first.NextOffset.ShouldNotBeNull();
-        first.Revisions.ShouldNotContain(summary => summary.Id == revisions[0].Id);
+        first.Subflows.ShouldNotContain(summary =>
+            summary.Description == old.Description && summary.Id == old.SubflowId
+        );
         materialization.Rows.ShouldBeInRange(1, AutomationSubflowService.LibraryPageSize + 1);
         materialization.TextCharacters.ShouldBeLessThanOrEqualTo(
             (AutomationSubflowService.LibraryPageSize + 1) * 2200
@@ -758,9 +770,9 @@ public sealed partial class AutomationRuntimeTests
         );
         last.NextOffset.ShouldBeNull();
         first
-            .Revisions.Concat(last.Revisions)
+            .Subflows.Concat(last.Subflows)
             .Select(summary => summary.Id)
-            .ShouldBe(revisions.Select(revision => revision.Id), ignoreOrder: true);
+            .ShouldBe(revisions.Select(revision => revision.SubflowId), ignoreOrder: true);
         materialization.Rows.ShouldBeInRange(1, AutomationSubflowService.LibraryPageSize + 1);
         materialization.Reset();
         var found = await service.ListAsync(
@@ -768,7 +780,7 @@ public sealed partial class AutomationRuntimeTests
             new("NEEDLE"),
             CancellationToken.None
         );
-        found.Revisions.ShouldHaveSingleItem().Id.ShouldBe(revisions[0].Id);
+        found.Subflows.ShouldHaveSingleItem().Id.ShouldBe(revisions[0].SubflowId);
         found.NextOffset.ShouldBeNull();
         materialization.Rows.ShouldBe(1);
         materialization.TextCharacters.ShouldBeLessThanOrEqualTo(2200);
@@ -776,7 +788,7 @@ public sealed partial class AutomationRuntimeTests
         var selected = (
             await service.LoadClosureAsync(
                 new(fixture.HostId),
-                [found.Revisions[0].Id],
+                [found.Subflows[0].Id],
                 CancellationToken.None
             )
         )
@@ -786,11 +798,15 @@ public sealed partial class AutomationRuntimeTests
             .Serialize(selected)
             .ShouldBe(AutomationSubflowSerialization.Serialize(revisions[0]));
         _ = (
-            await service.LoadClosureAsync(new(otherHost), [selected.Id], CancellationToken.None)
+            await service.LoadClosureAsync(
+                new(otherHost),
+                [selected.SubflowId],
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowClosureOutcome.Invalid>();
         (await service.ListAsync(new(otherHost), new("needle"), CancellationToken.None))
-            .Revisions.ShouldHaveSingleItem()
-            .Id.ShouldBe(other.Id);
+            .Subflows.ShouldHaveSingleItem()
+            .Id.ShouldBe(other.SubflowId);
     }
 
     private sealed class SubflowLibraryMaterialization : IMaterializationInterceptor

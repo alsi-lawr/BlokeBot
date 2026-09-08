@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Plugins.Contracts;
 using BlokeBot.Plugins.Contracts.Testing;
@@ -1291,7 +1292,8 @@ public sealed class PluginDynamicBridgeTests
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         )
         {
             Requests.Add((request.HostId, request.TargetOverlayId, request.CueId));

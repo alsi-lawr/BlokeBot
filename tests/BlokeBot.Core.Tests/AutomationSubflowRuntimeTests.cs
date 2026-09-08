@@ -256,7 +256,7 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task SubflowRuntime_DelayFreezesRevisionsAndPureCheckpointsAcrossRebindDisableAndRestart()
+    public async Task SubflowRuntime_DelayFreezesRevisionsAndPureCheckpointsAcrossPublicationDisableAndRestart()
     {
         var handler = TextValueHandler("test-counting-text-value", "frozen-value");
         await using var fixture = await RuntimeFixture.CreateAsync(handlers: [handler]);
@@ -290,9 +290,9 @@ public sealed partial class AutomationRuntimeTests
         var library = Subflows(fixture);
         var revision = await Publish(library, draft);
         var caller = Caller(fixture.HostId, revision);
-        var flowId = (await fixture.Flows.SaveAsync(caller, CancellationToken.None))
-            .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>()
-            .FlowId;
+        _ = (
+            await fixture.Flows.SaveAsync(caller, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
         var dispatch = await fixture.Runtime.DispatchAsync(
             new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
             CancellationToken.None
@@ -312,24 +312,7 @@ public sealed partial class AutomationRuntimeTests
             definition = run.DefinitionJson;
             executionIds = run.NodeRuns.Select(node => node.NodeId).ToArray();
         }
-        var newer = await Publish(library, draft with { Description = "later revision" });
-        _ = (
-            await fixture.Flows.SaveAsync(
-                caller with
-                {
-                    Id = flowId,
-                    Nodes =
-                    [
-                        caller.Nodes[0],
-                        caller.Nodes[1] with
-                        {
-                            Definition = AutomationSubflowDefinitions.Invocation(newer),
-                        },
-                    ],
-                },
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        _ = await Publish(library, draft with { Description = "later revision" });
         (
             await library.RemoveRevisionAsync(
                 new(fixture.HostId),

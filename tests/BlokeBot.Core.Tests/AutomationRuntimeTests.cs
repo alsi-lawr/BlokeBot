@@ -6036,7 +6036,8 @@ public sealed partial class AutomationRuntimeTests
     {
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         ) =>
             Task.FromResult<OverlayCueReferenceOutcome>(
                 new OverlayCueReferenceOutcome.Missing(OverlayCueReferencePart.Cue)
@@ -6068,7 +6069,8 @@ public sealed partial class AutomationRuntimeTests
 
         public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
             OverlayCueReferenceRequest request,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            BlokeBotDbContext? preparationDb = null
         ) => Task.FromResult(ResolveReferences(request));
 
         public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(

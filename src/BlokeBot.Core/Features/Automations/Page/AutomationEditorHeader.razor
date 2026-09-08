@@ -13,22 +13,29 @@
             </div>
             <span class="@ValidationClass" role="status">@ValidationLabel</span>
             <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Validate"><AutomationIcon Name="validate" />Validate</button>
-            <button class="btn-secondary" type="button" disabled="@(Busy || !HasNodes)" data-automation-test-flow @onclick="Test"><AutomationIcon Name="test" />Test flow</button>
-            <button class="btn-secondary" type="button" disabled="@Busy" data-automation-save-flow @onclick="Save"><AutomationIcon Name="save" />Save</button>
+            @if (!Subflow)
+            {
+            <button class="btn-secondary" type="button" disabled="@(Busy || !HasNodes)" data-automation-test-flow @onclick="Test"><AutomationIcon Name="test" />Test draft</button>
+            }
+            <button class="btn-secondary" type="button" disabled="@Busy" data-automation-save-flow @onclick="Save"><AutomationIcon Name="save" />@(Subflow ? "Review subflow" : "Save")</button>
             @if (FocusMode)
             {
                 <button class="automation-focus-action" type="button" @onclick="Hide"><AutomationIcon Name="hide" />Hide tools</button>
             }
+            @if (!Subflow)
+            {
             <button class="@(Enabled ? "btn-secondary" : "btn-primary")"
                     type="button"
                     disabled="@(Busy || !Saved || HasChanges)"
                     title="@(HasChanges ? "Save the flow before you change its state." : null)"
                     @onclick="ToggleEnabled"><AutomationIcon Name="power" />@(Enabled ? "Disable" : EnableConfirmation ? "Enable anyway" : "Enable")</button>
+            }
         </div>
     </header>
 }
 
 @code {
+    [Parameter] public bool Subflow { get; set; }
     [Parameter] public bool Visible { get; set; }
     [Parameter] public string Name { get; set; } = string.Empty;
     [Parameter] public string Subtitle { get; set; } = string.Empty;

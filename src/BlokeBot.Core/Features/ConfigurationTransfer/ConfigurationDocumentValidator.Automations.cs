@@ -44,21 +44,17 @@ internal static partial class ConfigurationDocumentValidator
         if (
             section.Subflows.Any(revision =>
                 string.IsNullOrWhiteSpace(revision.Id)
-                || string.IsNullOrWhiteSpace(revision.SubflowId)
-                || revision.Revision < 1
                 || revision.Description.Length > 2000
                 || revision.Graph.Enabled
                 || !AutomationSubflowDefinitions.ValidInterface(revision.Interface)
             )
-            || section
-                .Subflows.Select(revision => (revision.SubflowId, revision.Revision))
-                .Distinct()
-                .Count() != section.Subflows.Count
+            || section.Subflows.Select(revision => revision.Id).Distinct().Count()
+                != section.Subflows.Count
         )
         {
             return new(
                 "sections.automations.subflows",
-                "Use unique valid immutable subflow revisions and interfaces."
+                "Use unique valid subflows and interfaces."
             );
         }
         if (
@@ -138,7 +134,7 @@ internal static partial class ConfigurationDocumentValidator
                                 binding.FixedInputsJson
                             )
                             || node.DefinitionId == AutomationSubflowDefinitions.Invoke
-                                != (binding.RevisionId is not null)
+                                != (binding.SubflowId is not null)
                             || node.Configuration.ValueKind != JsonValueKind.Object
                             || node.Configuration.EnumerateObject().Any()
                         )

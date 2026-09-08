@@ -1,16 +1,22 @@
 @if (Visible)
 {
-    <aside class="automation-flow-rail" aria-label="Flow library">
+    <aside class="automation-flow-rail" aria-label="Automation library">
+        @if (FocusMode)
+        {
+            <div class="automation-flow-rail-controls"><button class="automation-icon-button" type="button" aria-label="Hide library" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button></div>
+        }
         <div class="automation-flow-rail-heading">
-            <strong>Flows</strong>
-            <span>
-                @if (FocusMode)
-                {
-                    <button type="button" aria-label="Hide flow list" title="Hide flow list" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button>
-                }
-                <button type="button" aria-label="New flow" title="New flow" @onclick="NewFlow"><AutomationIcon Name="add" /></button>
-            </span>
+            <SegmentedTabs Items="_libraryTabs" ActiveKey="@(Library == AutomationLibraryKind.Flows ? "flows" : "subflows")" AriaLabel="Automation library" Id="automation-library" OwnsFragment="false" ActiveKeyChanged="SelectLibraryAsync" />
         </div>
+        @if (Library == AutomationLibraryKind.Subflows)
+        {
+            <div id="automation-library-subflows-panel" role="tabpanel" aria-labelledby="automation-library-subflows-tab">
+                <AutomationSubflowList Page="Subflows" Search="@SubflowSearch" Offset="SubflowOffset" Loading="SubflowsLoading" SelectedId="CurrentSubflowId" SearchChanged="SearchSubflows" PageChanged="PageSubflows" Selected="SelectSubflow" />
+            </div>
+        }
+        else
+        {
+        <div id="automation-library-flows-panel" role="tabpanel" aria-labelledby="automation-library-flows-tab">
         @foreach (var flow in Flows)
         {
             <button @key="flow.Draft.Id"
@@ -21,24 +27,40 @@
                 <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
             </button>
         }
-        @if (CurrentFlowId is null)
+        @if (CurrentFlowId is null && !EditingSubflow)
         {
             <div class="automation-flow-item automation-flow-item--active">
                 <strong>@CurrentName</strong>
                 <span><span><i class="automation-status-dot automation-status-dot--draft"></i>Not saved</span><span>@CurrentNodeCount nodes</span></span>
             </div>
         }
-        @if (CurrentFlowId is not null)
+        @if (CurrentFlowId is not null && !EditingSubflow)
         {
             <div class="automation-flow-rail-actions">
                 <button class="btn-secondary" type="button" @onclick="Duplicate"><AutomationIcon Name="duplicate" />Duplicate</button>
                 <button class="automation-danger-button" type="button" @onclick="Delete"><AutomationIcon Name="delete" />@(DeleteConfirmation ? "Confirm delete" : "Delete")</button>
             </div>
         }
+        </div>
+        }
     </aside>
 }
 
 @code {
+    private static readonly SegmentedTabItem[] _libraryTabs = [new("flows", "Flows"), new("subflows", "Subflows")];
+    [Parameter] public AutomationLibraryKind Library { get; set; }
+    [Parameter] public EventCallback<AutomationLibraryKind> LibraryChanged { get; set; }
+    [Parameter] public bool EditingSubflow { get; set; }
+    [Parameter] public AutomationSubflowId? CurrentSubflowId { get; set; }
+    [Parameter, EditorRequired] public required AutomationSubflowLibraryPage Subflows { get; set; }
+    [Parameter] public string SubflowSearch { get; set; } = string.Empty;
+    [Parameter] public int SubflowOffset { get; set; }
+    [Parameter] public bool SubflowsLoading { get; set; }
+    [Parameter] public EventCallback<string> SearchSubflows { get; set; }
+    [Parameter] public EventCallback<int> PageSubflows { get; set; }
+    [Parameter] public EventCallback<AutomationSubflowId> SelectSubflow { get; set; }
+    private Task SelectLibraryAsync(string key) => LibraryChanged.InvokeAsync(key == "subflows" ? AutomationLibraryKind.Subflows : AutomationLibraryKind.Flows);
+
     [Parameter, EditorRequired]
     public required IReadOnlyList<AutomationFlowSnapshot> Flows { get; set; }
 
@@ -69,8 +91,6 @@
     [Parameter]
     public EventCallback Toggle { get; set; }
 
-    [Parameter]
-    public EventCallback NewFlow { get; set; }
 
     [Parameter]
     public EventCallback<AutomationFlowSnapshot> Select { get; set; }

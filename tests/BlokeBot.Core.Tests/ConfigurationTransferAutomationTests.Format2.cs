@@ -65,7 +65,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             TimeProvider.System
         );
         var leafPage = await library.ListAsync(new(first), new("Leaf"), CancellationToken.None);
-        leafPage.Revisions.ShouldHaveSingleItem().Name.ShouldBe("Leaf");
+        leafPage.Subflows.ShouldHaveSingleItem().Name.ShouldBe("Leaf");
         var scenarioService = new AutomationScenarioService(
             database,
             transfer.Catalog,
@@ -444,7 +444,7 @@ public sealed partial class ConfigurationTransferAutomationTests
         (await db.AutomationFlows.CountAsync()).ShouldBe(0);
         (await db.AutomationSubflows.CountAsync()).ShouldBe(0);
         (await db.AutomationSubflowRevisions.CountAsync()).ShouldBe(0);
-        (await db.AutomationSubflowRevisionReferences.CountAsync()).ShouldBe(0);
+        (await db.AutomationSubflowNestedCallers.CountAsync()).ShouldBe(0);
         (await db.AutomationSubflowCallers.CountAsync()).ShouldBe(0);
         (await db.AutomationScenarios.CountAsync()).ShouldBe(0);
         (await db.ConfigurationActivations.CountAsync()).ShouldBe(0);
@@ -677,8 +677,8 @@ public sealed partial class ConfigurationTransferAutomationTests
                 {
                     Subflows =
                     [
-                        new("leaf", "leaf", 1, "Leaf", new([], []), leaf),
-                        new("outer", "outer", 1, "Outer", new([], []), outer),
+                        new("leaf", "Leaf", new([], []), leaf),
+                        new("outer", "Outer", new([], []), outer),
                     ],
                 },
             },

@@ -1,5 +1,4 @@
 using System.Text;
-using BlokeBot.Persistence;
 
 namespace BlokeBot.Core.Features.Automations;
 
@@ -22,40 +21,17 @@ internal static class AutomationFrozenSubflows
     internal const int MaximumInvocations = 1024;
     internal const int MaximumSnapshotBytes = 8 * 1024 * 1024;
 
-    internal static async Task<AutomationFrozenGraph?> FreezeAsync(
-        BlokeBotDbContext db,
+    internal static AutomationFrozenGraph? Freeze(
         AutomationRuntimeSerialization.PersistedFlow root,
         Guid traceId,
-        CancellationToken cancellationToken
+        AutomationSubflowClosure closure
     )
     {
-        var pins = root
-            .Nodes.Where(node => node.DefinitionId == AutomationSubflowDefinitions.Invoke)
-            .Select(node =>
-                AutomationSubflowDefinitions.TryRead(
-                    AutomationRuntimeSerialization.Definition(node),
-                    out var configuration
-                )
-                    ? configuration.RevisionId!.Value
-                    : default
-            )
-            .ToArray();
-        var result = await AutomationSubflowStore.LoadClosureAsync(
-            db,
-            new(root.HostId),
-            pins,
-            null,
-            cancellationToken
-        );
-        if (result is not AutomationSubflowClosureOutcome.Available available)
+        if (!root.Nodes.Any(node => node.DefinitionId == AutomationSubflowDefinitions.Invoke))
         {
-            return null;
+            return new(root, closure);
         }
-        if (pins.Length == 0)
-        {
-            return new(root, available.Closure);
-        }
-        var revisions = available.Closure.Revisions.ToDictionary(revision => revision.Id);
+        var revisions = closure.Revisions.ToDictionary(revision => revision.SubflowId);
         var bytes = Encoding.UTF8.GetByteCount(
             AutomationRuntimeSerialization.SerializeDefinition(root)
         );
@@ -91,8 +67,9 @@ internal static class AutomationFrozenSubflows
                     AutomationRuntimeSerialization.Definition(caller),
                     out var configuration
                 )
-                || !revisions.TryGetValue(configuration.RevisionId!.Value, out var revision)
-                || !AutomationSubflowDefinitions.SameInterface(
+                || configuration is not AutomationSubflowInvocationConfiguration call
+                || !revisions.TryGetValue(call.SubflowId, out var revision)
+                || !AutomationSubflowDefinitions.Compatible(
                     configuration.Interface,
                     revision.Interface
                 )
@@ -107,6 +84,13 @@ internal static class AutomationFrozenSubflows
             {
                 return false;
             }
+            var exact = AutomationSubflowDefinitions.FreezeInvocation(call, revision.Id);
+            var callerIndex = nodes.FindIndex(node => node.Id == caller.Id);
+            nodes[callerIndex] = caller with
+            {
+                DefinitionSchemaVersion = 1,
+                ConfigurationJson = exact.Configuration.GetRawText(),
+            };
             var graph = AutomationScenarioGraph.FreezeGraph(revision.Graph);
             var ids = graph
                 .Nodes.OrderBy(node => node.Id)
@@ -199,7 +183,7 @@ internal static class AutomationFrozenSubflows
             Edges = [.. edges],
             Invocations = [.. invocations],
         };
-        return WithinSnapshotBound(frozen) ? new(frozen, available.Closure) : null;
+        return WithinSnapshotBound(frozen) ? new(frozen, closure) : null;
     }
 
     internal static bool WithinSnapshotBound(AutomationRuntimeSerialization.PersistedFlow flow) =>
@@ -217,6 +201,27 @@ internal static class AutomationFrozenSubflows
             && node.Invocation is { } nested
             && flow.Invocations.Single(candidate => candidate.EntryId == nested.Id)
                 .Path.StartsWith(invocation.Path, StringComparison.Ordinal)
+        );
+
+    internal static AutomationConfigurationCheck ValidateDefinition(
+        AutomationCatalogService catalog,
+        PersistedAutomationNodeDefinition definition
+    ) =>
+        AutomationSubflowDefinitions.CheckFrozen(definition)
+        ?? catalog.ValidatePersistedDefinition(definition);
+
+    internal static async Task<AutomationConfigurationCheck> ValidateBeforeExecutionAsync(
+        AutomationCatalogService catalog,
+        AutomationHostId host,
+        AutomationContext context,
+        PersistedAutomationNodeDefinition definition,
+        CancellationToken cancellationToken
+    ) =>
+        await catalog.ValidateFrozenBeforeExecutionAsync(
+            host,
+            context,
+            definition,
+            cancellationToken
         );
 
     internal static AutomationConfigurationCheck WithContract(

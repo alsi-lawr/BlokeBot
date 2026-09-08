@@ -476,7 +476,12 @@ public sealed class AutomationCatalogTests
         public AutomationModuleId Id => new("tests.unsupported");
 
         public IEnumerable<IAutomationDefinition> Definitions =>
-            [TestDefinition(new("future-source"), new(new(2), new(1)))];
+            [
+                TestDefinition(
+                    new("future-source"),
+                    new(new(AutomationDefinitionCatalog.SupportedSchemaVersion + 1), new(1))
+                ),
+            ];
     }
 
     private sealed class SequenceUInt64Source(params ulong[] values) : IAutomationUInt64Source

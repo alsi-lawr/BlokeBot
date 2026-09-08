@@ -1,0 +1,39 @@
+using BlokeBot.Core.Features.Automations;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+
+namespace BlokeBot.Core.Tests;
+
+public sealed partial class AutomationRuntimeTests
+{
+    [Test]
+    public async Task GeneratePreLatestFrozenFixture()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync(migrateSchema: true);
+        var draft = Subflow(fixture.HostId);
+        var before = Node("send-chat", """{"message":"acknowledged-before-upgrade"}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var after = Node("send-chat", """{"message":"frozen-after-upgrade"}""");
+        draft = draft with { Graph = draft.Graph with
+        {
+            Name = "Pre-amendment leaf",
+            Nodes = [draft.Graph.Nodes[0], before, delay, after, draft.Graph.Nodes[1]],
+            Edges = [Edge(draft.Graph.Nodes[0], "complete", before), Edge(before, "complete", delay),
+                Edge(delay, "complete", after), Edge(after, "complete", draft.Graph.Nodes[1])]
+        }};
+        var leaf = await Publish(Subflows(fixture), draft);
+        var outer = await Publish(Subflows(fixture), Nesting(Subflow(fixture.HostId), leaf));
+        _ = (await fixture.Flows.SaveAsync(Caller(fixture.HostId, outer), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var admitted = await fixture.Runtime.DispatchAsync(new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))), CancellationToken.None);
+        admitted.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        fixture.Chat.Messages.ShouldBe(["acknowledged-before-upgrade"]);
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        (await db.AutomationFlowRuns.SingleAsync()).Status.ShouldBe(BlokeBot.Persistence.Models.AutomationFlowRunStatus.Waiting);
+        await db.Database.OpenConnectionAsync();
+        await using var target = new SqliteConnection("Data Source=" + Environment.GetEnvironmentVariable("BLOKEBOT_BASELINE_FIXTURE_OUTPUT"));
+        await target.OpenAsync();
+        ((SqliteConnection)db.Database.GetDbConnection()).BackupDatabase(target);
+    }
+}

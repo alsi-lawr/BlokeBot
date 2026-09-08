@@ -6,8 +6,6 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AutomationSubflowV2(
     [property: JsonRequired] string Id,
-    [property: JsonRequired] string SubflowId,
-    [property: JsonRequired] int Revision,
     [property: JsonRequired] string Description,
     [property: JsonRequired] AutomationSubflowInterface Interface,
     [property: JsonRequired] AutomationFlowV2 Graph
@@ -15,7 +13,7 @@ public sealed record AutomationSubflowV2(
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AutomationSubflowBindingV2(
-    [property: JsonRequired] string? RevisionId,
+    [property: JsonRequired] string? SubflowId,
     [property: JsonRequired] AutomationSubflowInterface Interface,
     [property: JsonRequired] string FixedInputsJson
 );

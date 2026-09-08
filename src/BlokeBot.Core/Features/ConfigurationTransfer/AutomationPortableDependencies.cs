@@ -15,7 +15,7 @@ internal static class AutomationPortableDependencies
                 != revisions.Count
         )
         {
-            throw Invalid("Use at most 128 distinct subflow revisions.");
+            throw Invalid("Use at most 128 distinct subflows.");
         }
         var byId = revisions.ToDictionary(revision => revision.Id, StringComparer.Ordinal);
         var ordered = new List<AutomationSubflowV2>();
@@ -24,32 +24,30 @@ internal static class AutomationPortableDependencies
         var visits = 0;
         foreach (var flow in flows.OrderBy(flow => flow.Id, StringComparer.Ordinal))
         {
-            foreach (var pin in Pins(flow).Order(StringComparer.Ordinal))
+            foreach (var call in Calls(flow).Order(StringComparer.Ordinal))
             {
-                Visit(pin, 0);
+                Visit(call, 0);
             }
         }
         return visited.Count == revisions.Count
             ? ordered
-            : throw Invalid(
-                "Remove subflow revisions that are not reachable from a selected flow."
-            );
+            : throw Invalid("Remove subflows that are not reachable from a selected flow.");
 
         void Visit(string id, int depth)
         {
             if (!byId.TryGetValue(id, out var revision))
             {
-                throw Invalid($"Include missing subflow revision '{id}'.");
+                throw Invalid($"Include missing subflow '{id}'.");
             }
-            if (depth >= 8 || ++visits > 1024 || !stack.Add(revision.SubflowId))
+            if (depth >= 8 || ++visits > 1024 || !stack.Add(revision.Id))
             {
                 throw Invalid("Remove recursive subflow calls or reduce dependency depth.");
             }
-            foreach (var pin in Pins(revision.Graph).Order(StringComparer.Ordinal))
+            foreach (var call in Calls(revision.Graph).Order(StringComparer.Ordinal))
             {
-                Visit(pin, depth + 1);
+                Visit(call, depth + 1);
             }
-            _ = stack.Remove(revision.SubflowId);
+            _ = stack.Remove(revision.Id);
             if (visited.Add(id))
             {
                 ordered.Add(revision);
@@ -57,8 +55,8 @@ internal static class AutomationPortableDependencies
         }
     }
 
-    internal static IEnumerable<string> Pins(AutomationFlowV2 graph) =>
-        graph.Nodes.Select(node => node.Subflow?.RevisionId).OfType<string>();
+    internal static IEnumerable<string> Calls(AutomationFlowV2 graph) =>
+        graph.Nodes.Select(node => node.Subflow?.SubflowId).OfType<string>();
 
     private static AutomationConfigurationExportException Invalid(string reason) =>
         new("subflow", reason);

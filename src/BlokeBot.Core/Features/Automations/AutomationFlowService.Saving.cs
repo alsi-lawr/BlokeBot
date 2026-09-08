@@ -45,14 +45,27 @@ public sealed partial class AutomationFlowService
                 return new AutomationFlowSaveOutcome.HostNotFound();
             }
         }
-        var pinErrors = await AutomationSubflowStore.ValidatePinsAsync(
+        var loaded = await AutomationSubflowStore.LoadClosureAsync(
             db,
-            draft,
+            draft.HostId,
+            AutomationSubflowStore.Calls(draft.Nodes).Select(call => call.SubflowId),
+            null,
             cancellationToken
         );
-        if (!pinErrors.IsEmpty)
+        if (loaded is AutomationSubflowClosureOutcome.Invalid invalidClosure)
         {
-            return new AutomationFlowSaveOutcome.Invalid(pinErrors);
+            return new AutomationFlowSaveOutcome.Invalid(invalidClosure.Errors);
+        }
+        validation = await ValidatePreparedAsync(
+            draft,
+            ((AutomationSubflowClosureOutcome.Available)loaded).Closure,
+            AutomationGraphAdmission.Saved,
+            cancellationToken,
+            db
+        );
+        if (!validation.Errors.IsEmpty)
+        {
+            return new AutomationFlowSaveOutcome.Invalid(validation.Errors);
         }
         AutomationFlow flow;
         if (draft.Id is { } existingId)
@@ -75,11 +88,6 @@ public sealed partial class AutomationFlowService
                 return new AutomationFlowSaveOutcome.Invalid([MalformedGraphError()]);
             }
 
-            var rebindErrors = AutomationSubflowStore.RebindErrors(restored.Draft, draft);
-            if (!rebindErrors.IsEmpty)
-            {
-                return new AutomationFlowSaveOutcome.Invalid(rebindErrors);
-            }
             var bindingFieldErrors = TransformInputBindingFieldErrors(restored.Draft, draft);
             if (!bindingFieldErrors.IsEmpty)
             {
@@ -118,12 +126,12 @@ public sealed partial class AutomationFlowService
         db.AutomationFlowEdges.AddRange(draft.Edges.Select(edge => Persist(flow.Id, edge)));
         db.AutomationSubflowCallers.AddRange(
             AutomationSubflowStore
-                .Pins(draft.Nodes)
+                .Calls(draft.Nodes)
                 .Select(pin => new AutomationSubflowCallerReference
                 {
                     NodeId = pin.NodeId.Value,
                     HostId = draft.HostId.Value,
-                    RevisionId = pin.RevisionId.Value,
+                    SubflowId = pin.SubflowId.Value,
                 })
         );
         _ = await db.SaveChangesAsync(cancellationToken);

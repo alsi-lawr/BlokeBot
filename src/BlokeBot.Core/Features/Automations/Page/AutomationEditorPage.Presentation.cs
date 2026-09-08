@@ -17,7 +17,9 @@ public partial class AutomationEditorPage
             );
 
     private string _flowSubtitle =>
-        _editor?.Id is null ? "Not saved"
+        _hasChanges ? (_editor?.Subflow is null ? "Unsaved changes" : "Subflow · Unsaved changes")
+        : _editor?.Subflow is not null ? "Subflow"
+        : _editor?.Id is null ? "Not saved"
         : _editor.IsEnabled ? "Enabled"
         : "Saved";
 
@@ -76,15 +78,9 @@ public partial class AutomationEditorPage
     private string _runDescription =>
         _sampleOutcomes.IsEmpty
             ? _recentRuns.IsEmpty
-                ? "Test this flow. The sample does not contact Twitch or run live actions."
+                ? string.Empty
                 : RecentRunDescription(_recentRuns[0])
-            : string.Join(
-                " → ",
-                _sampleOutcomes.Select(outcome =>
-                    _editor?.Nodes.FirstOrDefault(node => node.Id == outcome.NodeId)?.EffectiveName
-                    ?? "Unknown node"
-                )
-            ) + " · No live action was sent";
+            : $"{_sampleOutcomes.Length} node outcomes";
 
     private string _runIconClass =>
         _runTitle.Contains("failed", StringComparison.OrdinalIgnoreCase)
@@ -99,9 +95,17 @@ public partial class AutomationEditorPage
         get
         {
             var classes = new List<string> { "automation-editor" };
+            if (_authoringTask != AutomationAuthoringTask.None)
+            {
+                classes.Add("automation-editor--authoring");
+            }
+            if (_traceOpen)
+            {
+                classes.Add("automation-editor--trace");
+            }
             if (!_focusMode)
             {
-                return classes[0];
+                return string.Join(' ', classes);
             }
 
             classes.Add("automation-editor--focus");
@@ -123,6 +127,9 @@ public partial class AutomationEditorPage
             new[]
             {
                 "automation-editor-body",
+                _authoringTask != AutomationAuthoringTask.None
+                    ? "automation-editor-body--authoring"
+                    : string.Empty,
                 _focusMode && _flowRailCollapsed
                     ? "automation-editor-body--flows-collapsed"
                     : string.Empty,

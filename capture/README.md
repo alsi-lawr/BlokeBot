@@ -32,7 +32,7 @@ is, so running one directly still works:
 BLOKEBOT_CAPTURE_PORT=5335 nix run ../../Viset -- capture chat-tools-switches.lua --force
 ```
 
-Port `5084` is reserved for human visual signoff and must not be used or stopped by capture work.
+Ports `5084`–`5088` are reserved for human previews and must not be used or stopped by capture work.
 
 ## How a capture behaves
 
@@ -51,9 +51,15 @@ finished reconnecting before the picture is taken.
 
 Files go to an area subdirectory of `../src/BlokeBot.Site/wwwroot/media`: `dashboard`,
 `chat-tools`, `commands`, `points-and-guessing`, `native-twitch`, `overlays`, `community`,
-`community/figures` and `community/progression`. Do not hand-edit them.
+`community/figures`, `community/progression`, `automations` and `configuration-transfer`. Do not hand-edit them.
 
-Laptop frames are 1920x1080 and phone frames 495x1100, both before Viset's device chrome.
+Most laptop frames are 1920x1080 and phone frames 495x1100, before Viset's device chrome.
+Automation media uses 1920x1180 wide, 1440x1180 desktop and 390x1250 phone viewports. Its
+`grid` outputs show a draft scenario/trace; `list` outputs show the subflow Exit contract and
+return bindings. All twelve theme/device/mode outputs are regenerated together.
+`automations.lua` and its `capture-all.sh` entry enable the existing isolated
+`BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE=1` seed. A manually supplied Simulation must use that
+flag too; do not point the recipe at a human preview.
 
 ## Design evidence
 
