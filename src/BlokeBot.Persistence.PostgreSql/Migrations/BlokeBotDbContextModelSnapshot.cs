@@ -4970,6 +4970,97 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlay", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<byte[]>("AccessKeyDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DraftDocumentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<long>("PublicationSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PublishedVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessKeyDigest")
+                        .IsUnique();
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "IsArchived", "PublicId");
+
+                    b.ToTable("full_overlays", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
+                {
+                    b.Property<long>("OverlayId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AuthorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("AuthorUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("OverlayId", "Version");
+
+                    b.ToTable("full_overlay_publications", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.GuessOption", b =>
                 {
                     b.Property<int>("Id")
@@ -10582,6 +10673,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlay", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", null)
+                        .WithMany()
+                        .HasForeignKey("OverlayId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

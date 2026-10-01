@@ -23,6 +23,7 @@ public sealed partial class BlokeBotDbContext
     private void ConfigureOverlays(ModelBuilder modelBuilder)
     {
         ConfigureOverlayInstances(modelBuilder);
+        ConfigureFullOverlays(modelBuilder);
         ConfigureOverlayCues(modelBuilder);
         ConfigureOverlayMedia(modelBuilder);
         ConfigureOverlayEventFeed(modelBuilder);
