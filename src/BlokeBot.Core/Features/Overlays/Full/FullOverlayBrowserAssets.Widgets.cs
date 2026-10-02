@@ -15,14 +15,15 @@ internal static partial class FullOverlayBrowserAssets
               plugin = null; runs.clear(); host.replaceChildren();
             };
             const sourceEngine = (widget) => {
-              host.dataset.overlayRoot = "";
+              host.dataset.overlayRoot = ""; host.id = `blokebot-native-${widget.id}`;
               const canvas = document.createElementNS("http://www.w3.org/2000/svg", "svg");
               const cueCanvas = document.createElement("div"); cueCanvas.style.cssText = "position:absolute;inset:0";
-              const stylesheet = document.createElement("link"); stylesheet.rel = "stylesheet";
+              const stylesheet = document.createElement("style");
               host.append(canvas, cueCanvas, stylesheet);
               engine = create(host, canvas, cueCanvas, stylesheet, {
                 credentials: "omit", startTransport: false, audio: widget.audio,
-                clipPrefix: `${widget.id}-`, onCueComplete: () => {},
+                clipPrefix: `${widget.id}-`, appearanceSelector: `#${CSS.escape(host.id)}`,
+                onCueComplete: () => {},
                 onAudioBlocked: () => report(widget.id, "audio-blocked"),
               });
               return canvas;

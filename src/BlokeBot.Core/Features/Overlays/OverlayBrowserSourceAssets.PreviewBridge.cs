@@ -73,7 +73,10 @@ internal static partial class OverlayBrowserSourceAssets
             if (sheet === null || typeof css !== "string" || css.length === 0) return;
             for (const rule of css.matchAll(/([^{}]+)\{([^{}]+)\}/g)) {
               try {
-                sheet.insertRule(`${rule[1]} { ${rule[2]} }`, sheet.cssRules.length);
+                const selectors = options.appearanceSelector
+                  ? rule[1].split(",").map(selector => `${options.appearanceSelector} ${selector.trim()}`).join(",")
+                  : rule[1];
+                sheet.insertRule(`${selectors} { ${rule[2]} }`, sheet.cssRules.length);
               } catch (error) {
                 if (!(error instanceof DOMException)) throw error;
               }
@@ -240,7 +243,8 @@ internal static partial class OverlayBrowserSourceAssets
             root.dataset.sequence = String(sequence);
             root.dataset.generatedAtUtc = occurredAtUtc;
             window.requestAnimationFrame(() => {
-              applyDraftCss(dashboardDraft?.css ?? "");
+              applyDraftCss(dashboardDraft?.css ??
+                (options.appearanceSelector ? projection.appearance?.css ?? "" : ""));
               refitFittedText();
               acknowledgeDashboardDraft();
             });

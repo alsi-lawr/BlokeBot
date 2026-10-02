@@ -63,9 +63,31 @@ public sealed partial class FullOverlayServiceTests
                 _ct
             )
         );
+        await using var app = BrowserApp(fixture, environment, runtime);
+        _ = app.MapGet(
+            "/fixture",
+            () =>
+                Results.Json(
+                    new
+                    {
+                        relativeUrl = created.PrivateAccess.RelativeUrl,
+                        document = created.Overlay.Draft,
+                    }
+                )
+        );
+        await RunBrowserAsync(app, driver);
+    }
+
+    private static WebApplication BrowserApp(
+        Fixture fixture,
+        WidgetEnvironment environment,
+        DeliveryRuntime runtime
+    )
+    {
         var builder = WebApplication.CreateBuilder();
         _ = builder.Logging.ClearProviders();
         _ = builder.Services.AddSingleton(fixture.Reader);
+        _ = builder.Services.AddSingleton(new OverlayInstanceResolver(fixture.Database));
         _ = builder.Services.AddSingleton(fixture.Service);
         _ = builder.Services.AddSingleton(runtime.Delivery);
         _ = builder.Services.AddSingleton(runtime.Live);
@@ -82,7 +104,7 @@ public sealed partial class FullOverlayServiceTests
                 policy => policy.RequireAuthenticatedUser().RequireClaim(BotHostClaims.SelectedHost)
             )
         );
-        await using var app = builder.Build();
+        var app = builder.Build();
         app.Urls.Add("http://127.0.0.1:0");
         app.UseAuthCookieRequestBoundary();
         _ = app.UseAuthentication();
@@ -126,17 +148,6 @@ public sealed partial class FullOverlayServiceTests
             }
         );
         _ = app.MapGet(
-            "/fixture",
-            () =>
-                Results.Json(
-                    new
-                    {
-                        relativeUrl = created.PrivateAccess.RelativeUrl,
-                        document = created.Overlay.Draft,
-                    }
-                )
-        );
-        _ = app.MapGet(
                 "/fixture/csrf",
                 (HttpContext context, IAntiforgery antiforgery) =>
                     Results.Json(
@@ -144,6 +155,11 @@ public sealed partial class FullOverlayServiceTests
                     )
             )
             .RequireAuthorization();
+        return app;
+    }
+
+    private static async Task RunBrowserAsync(WebApplication app, string driver)
+    {
         await app.StartAsync();
         var address = app
             .Services.GetRequiredService<IServer>()

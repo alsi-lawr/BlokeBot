@@ -11,7 +11,7 @@ internal static partial class OverlayBrowserSourceAssets
             !(root instanceof HTMLElement) ||
             !(canvas instanceof SVGSVGElement) ||
             !(cueCanvas instanceof HTMLElement) ||
-            !(appearanceStylesheet instanceof HTMLLinkElement)
+            !(appearanceStylesheet instanceof HTMLLinkElement || appearanceStylesheet instanceof HTMLStyleElement)
           ) {
             return;
           }
