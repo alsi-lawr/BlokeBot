@@ -8,21 +8,21 @@ internal static partial class FullOverlayBrowserAssets
           const create = window.blokeBotOverlayRenderer.create;
           const mount = (anchor, initial, report) => {
             const host = document.createElement("div"); host.dataset.fullWidgetRenderer = ""; anchor.append(host);
-            let engine = null; let fingerprint = null; let kind = null; let plugin = null; let nestedPort = null;
+            let engine = null; let appearanceStylesheet = null; let fingerprint = null; let kind = null; let plugin = null; let nestedPort = null;
             const runs = new Set();
             const cleanup = () => {
-              engine?.dispose(); engine = null; nestedPort?.close(); nestedPort = null;
+              engine?.dispose(); engine = null; appearanceStylesheet = null; nestedPort?.close(); nestedPort = null;
               plugin = null; runs.clear(); host.replaceChildren();
             };
             const sourceEngine = (widget) => {
               host.dataset.overlayRoot = ""; host.id = `blokebot-native-${widget.id}`;
               const canvas = document.createElementNS("http://www.w3.org/2000/svg", "svg");
               const cueCanvas = document.createElement("div"); cueCanvas.style.cssText = "position:absolute;inset:0";
-              const stylesheet = document.createElement("style");
-              host.append(canvas, cueCanvas, stylesheet);
-              engine = create(host, canvas, cueCanvas, stylesheet, {
+              appearanceStylesheet = document.createElement("style");
+              host.append(canvas, cueCanvas, appearanceStylesheet);
+              engine = create(host, canvas, cueCanvas, appearanceStylesheet, {
                 credentials: "omit", startTransport: false, audio: widget.audio,
-                clipPrefix: `${widget.id}-`, appearanceSelector: `#${CSS.escape(host.id)}`,
+                clipPrefix: `${widget.id}-`,
                 onCueComplete: () => {},
                 onAudioBlocked: () => report(widget.id, "audio-blocked"),
               });
@@ -46,6 +46,7 @@ internal static partial class FullOverlayBrowserAssets
               fingerprint = next;
               if (kind === "source") {
                 if (!engine) canvas = sourceEngine(widget);
+                appearanceStylesheet.textContent = widget.appearanceCss;
                 const snapshot = widget.content;
                 if (snapshot.appearance) canvas.setAttribute("viewBox", `${snapshot.appearance.x} ${snapshot.appearance.y} ${snapshot.appearance.width} ${snapshot.appearance.height}`);
                 if (!engine.applyPresentation(snapshot, snapshot.sequence, snapshot.serverEpoch, snapshot.generatedAtUtc))

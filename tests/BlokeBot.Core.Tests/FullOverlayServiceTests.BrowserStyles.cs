@@ -38,7 +38,7 @@ public sealed partial class FullOverlayServiceTests
         {
             Widgets = [first, second],
         };
-        document = StyledDocument(document, [".card{opacity:.31}", ".card{opacity:.73}"]);
+        document = StyledDocument(document, [".card, {opacity:.31}", ", .card {opacity:.73}"]);
         var created = Value(
             await fixture.Service.CreateAsync(fixture.Owner, new("Native styles", document), _ct)
         );
@@ -74,7 +74,7 @@ public sealed partial class FullOverlayServiceTests
                     Name = "Simple style regression",
                     Type = OverlayType.Giveaway,
                     IsEnabled = true,
-                    ConfigurationJson = SourceStyle(".card{opacity:.42}").ToPersistenceJson(),
+                    ConfigurationJson = SourceStyle(".card, {opacity:.42}").ToPersistenceJson(),
                     AccessKeyDigest = OverlayAccessKeyDigest.Compute(simpleKey),
                     KeyVersion = 1,
                     Revision = 1,

@@ -52,9 +52,10 @@ internal sealed partial class FullOverlayDelivery
                     await widget.Output.Match<Task<FullOverlayWidgetFrame>>(
                         source =>
                             Task.FromResult(
-                                Frame(
-                                    "source",
-                                    FullOverlayPublicSnapshots.Source(source.Projection)
+                                FullOverlayPublicSnapshots.Source(
+                                    widget.Id.Value,
+                                    widget.Audio,
+                                    source.Projection
                                 )
                             ),
                         cue =>
