@@ -158,12 +158,14 @@ internal sealed partial class PluginWorkerSession
         : context is PluginInvocationContext.Channel channel ? channel.Plugin
         : context is PluginInvocationContext.Automation automation ? automation.Plugin
         : context is PluginInvocationContext.Migration migration ? migration.Plugin
+        : context is PluginInvocationContext.Widget widget ? widget.Plugin
         : ((PluginInvocationContext.Page)context).Plugin;
 
     private static bool ContextHostMatches(PluginInvocationContext context, PluginHostId host) =>
         (context is not PluginInvocationContext.Channel channel || channel.Host == host)
         && (context is not PluginInvocationContext.Automation automation || automation.Host == host)
-        && (context is not PluginInvocationContext.Page page || page.Host == host);
+        && (context is not PluginInvocationContext.Page page || page.Host == host)
+        && (context is not PluginInvocationContext.Widget widget || widget.Host == host);
 
     private async ValueTask<bool> StopAsync(CancellationToken cancellationToken)
     {

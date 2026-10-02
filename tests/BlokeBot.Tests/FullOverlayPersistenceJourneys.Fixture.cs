@@ -26,29 +26,39 @@ public sealed partial class FullOverlayPersistenceJourneys
     {
         int hostId;
         OverlayInstance simple;
+        long retainedFeedItemOwner;
         var key = new CryptographicOverlayAccessKeyGenerator().Generate();
         if (start == FullOverlayMigrationStart.Released016)
         {
             await using var previous = factory.CreateDbContext();
             await previous.Database.MigrateAsync(releasedMigration);
             (hostId, simple) = await SeedSimpleAsync(previous, key);
+            retainedFeedItemOwner = await SeedFeedBeforeWidgetMigrationAsync(previous, hostId);
         }
         else
         {
             await new BlokeBotDatabaseInitializer(factory).InitializeAsync(CancellationToken.None);
             await using var fresh = factory.CreateDbContext();
             (hostId, simple) = await SeedSimpleAsync(fresh, key);
+            retainedFeedItemOwner = await SeedFeedBeforeWidgetMigrationAsync(fresh, hostId);
         }
         await new BlokeBotDatabaseInitializer(factory).InitializeAsync(CancellationToken.None);
         await using (var upgraded = factory.CreateDbContext())
         {
-            var retained = await upgraded.OverlayInstances.SingleAsync();
+            var retained = await upgraded.OverlayInstances.SingleAsync(overlay =>
+                overlay.Id == simple.Id
+            );
             retained.Id.ShouldBe(simple.Id);
             retained.PublicId.ShouldBe(simple.PublicId);
             retained.AccessKeyDigest.ShouldBe(simple.AccessKeyDigest);
             retained.KeyVersion.ShouldBe(simple.KeyVersion);
             retained.ConfigurationJson.ShouldBe(simple.ConfigurationJson);
             retained.Revision.ShouldBe(simple.Revision);
+            var feedItem = await upgraded.OverlayEventFeedItems.SingleAsync();
+            feedItem.OverlayInstanceId.ShouldBe(retainedFeedItemOwner);
+            feedItem.FullOverlayEventFeedBindingId.ShouldBeNull();
+            feedItem.SourceKey.ShouldBe("before-widget-migration");
+            feedItem.Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Active);
         }
         var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Streamer);
         var session = new AuthenticatedSession
@@ -60,6 +70,7 @@ public sealed partial class FullOverlayPersistenceJourneys
         };
         var services = new ServiceCollection();
         _ = services.AddLogging();
+        _ = services.AddSingleton<IOverlayLivePublisher, FeedPublisher>();
         _ = services.AddEventBus<AppEventKind>(
             ObserverBoundary.Named("full-overlay-journey"),
             kind => ObserverEventIdentity.Named(kind.ToString())
@@ -206,10 +217,11 @@ public sealed partial class FullOverlayPersistenceJourneys
         liveSimple
             .Configuration.ShouldBeOfType<OverlayConfiguration.GuessingV1>()
             .ResultDurationSeconds.ShouldBe(17);
+        await EventFeedWidgetJourneyAsync(factory, session, full, provider);
         await using var final = factory.CreateDbContext();
-        (await final.OverlayInstances.SingleAsync()).AccessKeyDigest.ShouldBe(
-            simple.AccessKeyDigest
-        );
+        (
+            await final.OverlayInstances.SingleAsync(overlay => overlay.Id == simple.Id)
+        ).AccessKeyDigest.ShouldBe(simple.AccessKeyDigest);
         Console.WriteLine(
             $"Full overlay lifecycle/restart and unchanged simple key/live-save verified: {final.Database.ProviderName}, {start}."
         );

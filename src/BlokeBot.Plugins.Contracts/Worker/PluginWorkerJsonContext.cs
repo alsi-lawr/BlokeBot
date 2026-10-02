@@ -10,6 +10,8 @@ namespace BlokeBot.Plugins.Contracts;
     TypeInfoPropertyName = "ContextMigration"
 )]
 [JsonSerializable(typeof(PluginLiveInvocation.Page), TypeInfoPropertyName = "LivePage")]
+[JsonSerializable(typeof(PluginLiveInvocation.Widget), TypeInfoPropertyName = "LiveWidget")]
+[JsonSerializable(typeof(PluginInvocationContext.Widget), TypeInfoPropertyName = "ContextWidget")]
 [JsonSerializable(typeof(PluginInvocationContext.Page), TypeInfoPropertyName = "ContextPage")]
 [JsonSerializable(typeof(PluginLiveInvocation.Automation), TypeInfoPropertyName = "LiveAutomation")]
 [JsonSerializable(

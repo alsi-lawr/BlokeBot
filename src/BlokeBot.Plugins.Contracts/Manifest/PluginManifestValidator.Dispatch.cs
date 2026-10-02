@@ -233,6 +233,10 @@ public static partial class PluginManifestValidator
         {
             yield return (page.Module, page.RenderEntryPoint);
         }
+        foreach (var widget in manifest.Widgets)
+        {
+            yield return (widget.Module, widget.RenderEntryPoint);
+        }
         foreach (var automation in manifest.AutomationDefinitions)
         {
             yield return (automation.Module, automation.EntryPoint);
