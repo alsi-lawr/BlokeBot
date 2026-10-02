@@ -8,6 +8,7 @@ public sealed class FullOverlay
     public string Name { get; set; } = string.Empty;
     public string DraftDocumentJson { get; set; } = string.Empty;
     public byte[] AccessKeyDigest { get; set; } = [];
+    public string? ProtectedAccessKey { get; set; }
     public bool IsArchived { get; set; }
     public long Revision { get; set; }
     public long PublicationSequence { get; set; }

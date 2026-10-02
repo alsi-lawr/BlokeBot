@@ -15,7 +15,11 @@ internal sealed partial class FullOverlayService
             command,
             async (db, _, row) =>
             {
-                row.IsArchived = true;
+                if (!row.IsArchived)
+                {
+                    row.PublicationSequence++;
+                    row.IsArchived = true;
+                }
                 return await CommitAsync(db, row, ToView, ct);
             },
             ct
@@ -31,7 +35,11 @@ internal sealed partial class FullOverlayService
             command,
             async (db, _, row) =>
             {
-                row.IsArchived = false;
+                if (row.IsArchived)
+                {
+                    row.PublicationSequence++;
+                    row.IsArchived = false;
+                }
                 return await CommitAsync(db, row, ToView, ct);
             },
             ct

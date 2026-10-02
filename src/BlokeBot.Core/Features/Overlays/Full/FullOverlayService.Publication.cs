@@ -119,7 +119,11 @@ internal sealed partial class FullOverlayService
                 {
                     return Reject<FullOverlayPublicationSelection>(changedAuthority);
                 }
-                row.PublishedVersion = publication.Version;
+                if (row.PublishedVersion != publication.Version)
+                {
+                    row.PublicationSequence++;
+                    row.PublishedVersion = publication.Version;
+                }
                 var warnings = (
                     (FullOverlayResult<ImmutableArray<FullOverlayDiagnostic>>.Succeeded)admitted
                 ).Value;

@@ -16,6 +16,7 @@ internal sealed partial class FullOverlayService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     OverlayManagementAuthority authority,
     IOverlayAccessKeyGenerator accessKeys,
+    FullOverlayKeyProtection keyProtection,
     IFullOverlayPublicationAdmission admission,
     EventBus<AppEventKind> events,
     TimeProvider clock
@@ -139,6 +140,7 @@ internal sealed partial class FullOverlayService(
                 Name = name.Trim(),
                 DraftDocumentJson = FullOverlayDocuments.Serialize(document with { Id = id }),
                 AccessKeyDigest = OverlayAccessKeyDigest.Compute(key),
+                ProtectedAccessKey = keyProtection.Protect(hostId, id, key),
                 Revision = 1,
                 CreatedAtUtc = clock.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = clock.GetUtcNow().UtcDateTime,
