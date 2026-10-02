@@ -66,10 +66,11 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<OverlayInstanceResolver>();
         _ = services.AddSingleton<OverlayManagementAuthority>();
         _ = services.AddSingleton<FullOverlayService>();
+        _ = services.AddSingleton<FullOverlayKeyProtection>();
         _ = services.AddSingleton<FullOverlayPublishedReader>();
         services.TryAddSingleton<
             IFullOverlayPublicationAdmission,
-            UnavailableFullOverlayPublicationAdmission
+            FullOverlayPublicationAdmission
         >();
         _ = services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
         _ = services.AddSingleton<OverlayRemoteUrlPolicy>();
@@ -108,6 +109,10 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
             provider.GetRequiredService<OverlayStateProvider>()
         );
         _ = services.AddSingleton<FullOverlayWidgetRegistry>();
+        _ = services.AddSingleton<FullOverlayDelivery>();
+        _ = services.AddHostedService(provider =>
+            provider.GetRequiredService<FullOverlayDelivery>()
+        );
         _ = services.AddSingleton<OverlayLiveCoordinator>();
         _ = services.AddSingleton<IOverlayLivePublisher>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()

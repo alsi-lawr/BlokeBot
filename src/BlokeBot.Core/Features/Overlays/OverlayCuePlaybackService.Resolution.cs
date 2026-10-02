@@ -9,15 +9,18 @@ internal sealed partial class OverlayCuePlaybackService
 {
     private async Task<PlanResolution> ResolvePlanAsync(
         OverlayCueAdmissionRequest request,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        OverlayCueTarget? previewTarget = null
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var references = await ResolveReferencesAsync(
-            db,
-            new(request.HostId, request.TargetOverlayId, request.CueId),
-            cancellationToken
-        );
+        var references = previewTarget is null
+            ? await ResolveReferencesAsync(
+                db,
+                new(request.HostId, request.TargetOverlayId, request.CueId),
+                cancellationToken
+            )
+            : await ResolvePreviewReferencesAsync(db, request, previewTarget, cancellationToken);
         if (references is not ReferenceResolution.Available available)
         {
             return references switch
@@ -82,6 +85,15 @@ internal sealed partial class OverlayCuePlaybackService
         var layers = valid
             .Value.Layers.Select(layer => ResolveLayer(layer, assets))
             .ToImmutableArray();
+        if (
+            previewTarget is null
+            && target is OverlayCueTarget.Full full
+            && await ResolveFullTargetAsync(db, full.HostId, full.OverlayId, cancellationToken)
+                != full
+        )
+        {
+            return new PlanResolution.ParentDisabled();
+        }
         var plan = new OverlayCuePlaybackPlan(
             Guid.NewGuid(),
             request.HostId,
@@ -93,16 +105,7 @@ internal sealed partial class OverlayCuePlaybackService
             request.Context,
             layers
         );
-        return new PlanResolution.Ready(
-            new ResolvedOverlayInstance(
-                target.HostId,
-                target.PublicId,
-                target.Type,
-                OverlayConfiguration.FromPersistence(target.Type, target.ConfigurationJson),
-                new OverlayRevision(target.Revision)
-            ),
-            plan
-        );
+        return new PlanResolution.Ready(target, plan);
     }
 
     private static async Task<ReferenceResolution> ResolveReferencesAsync(
@@ -147,13 +150,30 @@ internal sealed partial class OverlayCuePlaybackService
                     && value.Type == OverlayType.CuePlayer,
                 cancellationToken
             );
-        if (target is null)
-        {
-            return new ReferenceResolution.Missing(OverlayCueReferencePart.Target);
-        }
-        if (!target.IsEnabled)
+        if (target is { IsEnabled: false })
         {
             return new ReferenceResolution.Disabled(OverlayCueReferencePart.Target);
+        }
+
+        OverlayCueTarget? resolvedTarget = target is not null
+            ? new OverlayCueTarget.Simple(
+                new(
+                    target.HostId,
+                    target.PublicId,
+                    target.Type,
+                    OverlayConfiguration.FromPersistence(target.Type, target.ConfigurationJson),
+                    new(target.Revision)
+                )
+            )
+            : await ResolveFullTargetAsync(
+                db,
+                request.HostId,
+                request.TargetOverlayId,
+                cancellationToken
+            );
+        if (resolvedTarget is null)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Target);
         }
 
         var cue = await db
@@ -165,7 +185,7 @@ internal sealed partial class OverlayCuePlaybackService
         return cue switch
         {
             null => new ReferenceResolution.Missing(OverlayCueReferencePart.Cue),
-            { IsEnabled: true } => new ReferenceResolution.Available(target, cue),
+            { IsEnabled: true } => new ReferenceResolution.Available(resolvedTarget, cue),
             _ => new ReferenceResolution.Disabled(OverlayCueReferencePart.Cue),
         };
     }

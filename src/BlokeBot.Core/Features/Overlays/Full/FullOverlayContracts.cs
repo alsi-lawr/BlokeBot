@@ -102,6 +102,7 @@ public enum FullOverlayRejectionKind
     PublicationRejected,
     SelectedVersion,
     ConfirmationRequired,
+    AccessUnavailable,
 }
 
 public sealed record FullOverlayRejection(

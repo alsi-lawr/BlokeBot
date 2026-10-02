@@ -14,6 +14,7 @@ internal static class SimulationEndpoints
     public static void MapSimulationEndpoints(this WebApplication app)
     {
         app.MapViewerPortalMockup();
+        app.MapFullOverlayFixtures();
         _ = app.MapGet(
                 "/simulation/ready",
                 static (SimulationReadiness readiness) =>

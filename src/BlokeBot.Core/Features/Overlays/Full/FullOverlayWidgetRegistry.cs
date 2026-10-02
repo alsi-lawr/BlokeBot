@@ -87,13 +87,30 @@ internal sealed partial class FullOverlayWidgetRegistry(
             || plugins.Resolve(declaration.Plugin, declaration.Descriptor.Id, host)
                 is not { } endpoint
             ? new PluginAssetContentResolution.NotFound()
-            : await pluginAssets.ResolveAsync(
+            : await ResolvePluginAssetAsync(context, widgetId, endpoint, assetPath, ct);
+    }
+
+    internal ValueTask<PluginAssetContentResolution> ResolvePluginAssetAsync(
+        FullOverlayRenderContext context,
+        FullOverlayWidgetId widgetId,
+        PluginWidgetEndpoint endpoint,
+        string assetPath,
+        CancellationToken ct
+    ) =>
+        endpoint.State.Key.HostId.Value != context.HostId
+        || !context.Document.Widgets.Any(widget =>
+            widget.Id == widgetId
+            && widget.Kind == PluginKind(endpoint.State.Key.PluginId, endpoint.Descriptor.Id)
+        )
+            ? ValueTask.FromResult<PluginAssetContentResolution>(
+                new PluginAssetContentResolution.NotFound()
+            )
+            : pluginAssets.ResolveAsync(
                 endpoint,
                 assetPath,
                 () => context.Version is null || IsSelected(context),
                 ct
             );
-    }
 
     private bool IsSelected(FullOverlayRenderContext context)
     {

@@ -156,7 +156,7 @@ internal abstract record OverlayCuePlaybackLayer
 
 internal interface IOverlayCueTransport
 {
-    void Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan);
+    void Start(OverlayCueTarget target, OverlayCuePlaybackPlan plan);
 
-    void Stop(ResolvedOverlayInstance target, Guid runId);
+    void Stop(OverlayCueTarget target, Guid runId);
 }

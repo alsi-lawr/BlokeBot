@@ -6,6 +6,7 @@ using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 
@@ -86,11 +87,17 @@ public sealed partial class FullOverlayServiceTests
             Reader = new(Database);
         }
 
-        internal FullOverlayService NewService(IFullOverlayPublicationAdmission admission) =>
+        private readonly EphemeralDataProtectionProvider _keyProtection = new();
+
+        internal FullOverlayService NewService(
+            IFullOverlayPublicationAdmission admission,
+            IDataProtectionProvider? protection = null
+        ) =>
             new(
                 Database,
                 new(Database, Moderator),
                 new CryptographicOverlayAccessKeyGenerator(),
+                new(protection ?? _keyProtection),
                 admission,
                 Events,
                 TimeProvider.System

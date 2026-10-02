@@ -5001,6 +5001,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("ProtectedAccessKey")
+                        .HasColumnType("text");
+
                     b.Property<string>("PublicId")
                         .IsRequired()
                         .HasColumnType("character varying(36)");
