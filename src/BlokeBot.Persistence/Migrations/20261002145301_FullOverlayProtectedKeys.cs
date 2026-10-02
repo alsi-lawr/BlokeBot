@@ -19,9 +19,9 @@ namespace BlokeBot.Persistence.Migrations
         }
 
         /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropColumn(name: "ProtectedAccessKey", table: "full_overlays");
-        }
+        protected override void Down(MigrationBuilder migrationBuilder) =>
+            throw new NotSupportedException(
+                "Full overlay protected key migrations are forward-only."
+            );
     }
 }
