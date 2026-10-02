@@ -138,6 +138,7 @@ public static class PluginManifestToml
                 new PluginContractIdentifierTomlConverter<PluginAutomationTemplateId>(),
                 new PluginContractIdentifierTomlConverter<PluginTemplateNodeId>(),
                 new PluginContractIdentifierTomlConverter<PluginPageId>(),
+                new PluginContractIdentifierTomlConverter<PluginWidgetId>(),
                 new PluginContractIdentifierTomlConverter<PluginAssetId>(),
                 new PluginContractIdentifierTomlConverter<PluginPayloadId>(),
                 new PluginContractIdentifierTomlConverter<PluginAutomationFieldId>(),

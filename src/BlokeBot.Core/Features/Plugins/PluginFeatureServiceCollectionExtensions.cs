@@ -185,6 +185,9 @@ public static class PluginFeatureServiceCollectionExtensions
         services.TryAddSingleton<PluginFeatureManager>();
         services.TryAddSingleton<PluginFeatureAdmissionService>();
         services.TryAddSingleton<PluginPageCatalog>();
+        services.TryAddSingleton<PluginWidgetCatalog>();
+        services.TryAddSingleton<PluginDeclaredAssetReader>();
+        services.TryAddSingleton<PluginWidgetAssetService>();
         services.TryAddSingleton<PluginPageSessionRegistry>();
         services.TryAddSingleton<
             IPluginPackageAssetResolver,
@@ -192,6 +195,9 @@ public static class PluginFeatureServiceCollectionExtensions
         >();
         services.TryAddSingleton<PluginPageAssetService>();
         services.TryAddSingleton<IPluginDispatchInvoker, PluginDispatchInvoker>();
+        services.TryAddSingleton<IPluginWidgetInvoker>(provider =>
+            (IPluginWidgetInvoker)provider.GetRequiredService<IPluginDispatchInvoker>()
+        );
         services.TryAddSingleton<IPluginAutomationInvoker>(provider =>
             provider.GetRequiredService<IPluginDispatchInvoker>() as IPluginAutomationInvoker
             ?? throw new InvalidOperationException(

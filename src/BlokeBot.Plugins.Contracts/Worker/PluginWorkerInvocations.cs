@@ -30,6 +30,7 @@ public sealed record PluginPreparationInvocation(
 [JsonDerivedType(typeof(PluginLiveInvocation.HostAction), "host-action")]
 [JsonDerivedType(typeof(PluginLiveInvocation.Storage), "storage")]
 [JsonDerivedType(typeof(PluginLiveInvocation.Page), "page")]
+[JsonDerivedType(typeof(PluginLiveInvocation.Widget), "widget")]
 [JsonDerivedType(typeof(PluginLiveInvocation.Automation), "automation")]
 public abstract record PluginLiveInvocation
 {
@@ -87,6 +88,12 @@ public abstract record PluginLiveInvocation
     ) : PluginLiveInvocation(Module, Operation, Input);
 
     public sealed record Storage(
+        PluginLuaModuleId Module,
+        PluginHostOperationId Operation,
+        PluginValue Input
+    ) : PluginLiveInvocation(Module, Operation, Input);
+
+    public sealed record Widget(
         PluginLuaModuleId Module,
         PluginHostOperationId Operation,
         PluginValue Input
