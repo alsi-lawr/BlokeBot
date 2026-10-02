@@ -166,13 +166,13 @@ public sealed record OverlayAppearance
         return null;
     }
 
-    internal string ToScopedCss() =>
+    internal string ToScopedCss(string rootSelector = "#overlay-root") =>
         string.IsNullOrEmpty(Css)
             ? string.Empty
             : Regex.Replace(
                 Css,
                 @"(?<selector>[^{}]+)\{",
-                static match =>
+                match =>
                     string.Join(
                         ",",
                         match
@@ -182,7 +182,7 @@ public sealed record OverlayAppearance
                                 StringSplitOptions.TrimEntries
                                     | StringSplitOptions.RemoveEmptyEntries
                             )
-                            .Select(static selector => $"#overlay-root {selector}")
+                            .Select(selector => $"{rootSelector} {selector}")
                     ) + "{"
             );
 }
