@@ -41,7 +41,7 @@ internal sealed class FullOverlayTransferService(
                 null,
                 ct
             );
-            var decoded = await FullOverlayPackageCodec.ReadAsync(archive, ct);
+            var decoded = await FullOverlayPackageCodec.ReadAsync(archive, transfer, ct);
             if (decoded is FullOverlayResult<FullOverlayPackage>.Rejected invalid)
             {
                 return new FullOverlayResult<FullOverlayImportApplied>.Rejected(invalid.Reason);

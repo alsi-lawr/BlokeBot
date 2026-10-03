@@ -103,7 +103,12 @@ public sealed partial class FullOverlayServiceTests
                 new(1, "Wrong selection", Document(), [], []),
                 staging,
                 new(new BlokeBot.Plugins.Features.PluginFeatureDeclarationRegistry()),
-                Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+                Microsoft
+                    .Extensions
+                    .Logging
+                    .Abstractions
+                    .NullLogger<FullOverlayTransferService>
+                    .Instance,
                 _ct
             ),
             FullOverlayRejectionKind.Unauthorized
@@ -128,7 +133,8 @@ public sealed partial class FullOverlayServiceTests
         await prepared.CopyToAsync(copied, _ct);
         using (var zip = new ZipArchive(new MemoryStream(copied.ToArray()), ZipArchiveMode.Read))
         {
-            var parsed = Value(await FullOverlayPackageCodec.ReadAsync(zip, _ct));
+            await using var staging = await environment.Media.BeginTransferAsync(_ct);
+            var parsed = Value(await FullOverlayPackageCodec.ReadAsync(zip, staging, _ct));
             parsed.Document.Html.ShouldBe(raw.Html);
         }
         await prepared.DisposeAsync();

@@ -121,7 +121,8 @@ public sealed partial class FullOverlayServiceTests
             new MemoryStream(next),
             System.IO.Compression.ZipArchiveMode.Read
         );
-        var again = Value(await FullOverlayPackageCodec.ReadAsync(archive, _ct));
+        await using var staging = await environment.Media.BeginTransferAsync(_ct);
+        var again = Value(await FullOverlayPackageCodec.ReadAsync(archive, staging, _ct));
         again.Document.Widgets[0].RequiresSetup.ShouldBeTrue();
         again
             .Document.Widgets[0]

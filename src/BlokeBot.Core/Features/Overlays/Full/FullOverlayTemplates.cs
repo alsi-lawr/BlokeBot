@@ -33,7 +33,6 @@ internal static class FullOverlayTemplates
                 "viewer-funded-bounty",
                 "viewer-queue",
             ],
-            _ => throw new ArgumentOutOfRangeException(nameof(template)),
         };
         var widgets = kinds
             .Select(kind => registry.Create(new(kind), document.Id)! with { RequiresSetup = true })
@@ -43,7 +42,6 @@ internal static class FullOverlayTemplates
             FullOverlayTemplate.Blank => "Your stream",
             FullOverlayTemplate.StreamCompanion => "Live with the community",
             FullOverlayTemplate.CommunityProgress => "Building together",
-            _ => throw new ArgumentOutOfRangeException(nameof(template)),
         };
         return document with
         {

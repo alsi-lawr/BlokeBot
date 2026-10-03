@@ -13,7 +13,7 @@ internal sealed partial class FullOverlayService
         FullOverlayPackage package,
         OverlayCueService.OverlayMediaTransfer media,
         FullOverlayPortability portability,
-        ILogger logger,
+        ILogger<FullOverlayTransferService> logger,
         CancellationToken ct
     )
     {
