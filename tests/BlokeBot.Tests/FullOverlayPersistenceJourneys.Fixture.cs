@@ -22,7 +22,8 @@ public sealed partial class FullOverlayPersistenceJourneys
     private static async Task JourneyAsync(
         Database factory,
         FullOverlayMigrationStart start,
-        string releasedMigration
+        string releasedMigration,
+        string directory
     )
     {
         int hostId;
@@ -79,7 +80,8 @@ public sealed partial class FullOverlayPersistenceJourneys
         await using var provider = services.BuildServiceProvider();
         var events = provider.GetRequiredService<EventBus<AppEventKind>>();
         var moderator = new Moderator();
-        var protection = new EphemeralDataProtectionProvider();
+        var keyRing = new DirectoryInfo(Path.Combine(directory, "keyring"));
+        var protection = DataProtectionProvider.Create(keyRing);
         var full = new FullOverlayService(
             factory,
             new(factory, moderator),
@@ -125,7 +127,7 @@ public sealed partial class FullOverlayPersistenceJourneys
             factory,
             new(factory, moderator),
             new CryptographicOverlayAccessKeyGenerator(),
-            new(protection),
+            new(DataProtectionProvider.Create(keyRing)),
             new Admission(),
             events,
             TimeProvider.System
@@ -234,6 +236,8 @@ public sealed partial class FullOverlayPersistenceJourneys
             .Configuration.ShouldBeOfType<OverlayConfiguration.GuessingV1>()
             .ResultDurationSeconds.ShouldBe(17);
         await EventFeedWidgetJourneyAsync(factory, session, full, provider);
+        await TransferJourneyAsync(factory, session, full, events, directory);
+        Directory.GetFiles(keyRing.FullName, "key-*.xml").ShouldNotBeEmpty();
         await using var final = factory.CreateDbContext();
         (
             await final.OverlayInstances.SingleAsync(overlay => overlay.Id == simple.Id)
