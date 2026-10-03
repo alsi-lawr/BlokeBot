@@ -69,6 +69,17 @@ internal abstract partial record EventSubNotification
 
         return subscriptionType switch
         {
+            "channel.ad_break.begin"
+            or "channel.goal.begin"
+            or "channel.goal.progress"
+            or "channel.goal.end"
+            or "channel.chat_settings.update"
+            or "channel.moderate" => ParseExpanded(
+                subscriptionType,
+                subscriptionVersion,
+                payload,
+                envelope.Metadata
+            ),
             "" or "channel.chat.message" => payload.Deserialize<EventSubChatMessageEvent>(options)
                 is { } chat
                 ? new Chat(chat)
@@ -114,7 +125,8 @@ internal abstract partial record EventSubNotification
                         redemption.ToDomain(
                             envelope.Metadata.MessageId,
                             subscriptionType
-                                == "channel.channel_points_custom_reward_redemption.add"
+                                == "channel.channel_points_custom_reward_redemption.add",
+                            envelope.Metadata.MessageTimestamp
                         )
                     )
                     : new Unknown(),

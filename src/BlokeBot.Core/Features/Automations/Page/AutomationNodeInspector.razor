@@ -211,6 +211,11 @@ else
             </div>
         }
 
+        @if (_scheduleTimeWarning is { } timeWarning)
+        {
+            <p class="automation-field-error" role="status" data-automation-schedule-skipped-time>@timeWarning</p>
+        }
+
         @if (Node.IsCelTransform)
         {
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-outputs-heading">

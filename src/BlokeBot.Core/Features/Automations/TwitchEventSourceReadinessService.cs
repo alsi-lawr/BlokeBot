@@ -16,6 +16,8 @@ public abstract record TwitchEventSourceReadinessState
     public sealed record MissingScopes(ImmutableArray<string> Scopes)
         : TwitchEventSourceReadinessState;
 
+    public sealed record ObservationUnavailable(string Reason) : TwitchEventSourceReadinessState;
+
     public sealed record BroadcasterNotConnected : TwitchEventSourceReadinessState;
 }
 
@@ -45,18 +47,36 @@ public abstract record TwitchEventSourceReadinessOutcome
 }
 
 /// <summary>
-/// Computes the editor-facing readiness of every Twitch EventSub automation source: whether the
-/// milestone-wide broadcaster grant is ready, which exact scopes are missing, and whether an
-/// enabled flow currently uses the source. There is no per-source consent model; a grant missing
-/// any scope of the extended milestone union is not ready until the owner reconnects.
+/// Reports source-specific observation grants and live connection availability. Existing milestone
+/// grants remain unchanged; additional read-only grants are requested only for enabled sources.
 /// </summary>
 public sealed class TwitchEventSourceReadinessService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationCatalogService catalog,
     AutomationRuntimeService runtime,
-    IHostBroadcasterTokenStatusProvider broadcasterTokens
+    IHostBroadcasterTokenStatusProvider broadcasterTokens,
+    IServiceProvider? services = null
 )
 {
+    public async Task<ImmutableArray<string>> AuthorizationScopesAsync(
+        int hostId,
+        CancellationToken cancellation
+    )
+    {
+        var enabled = await runtime.EnabledSourceDefinitionIdsAsync(new(hostId), cancellation);
+        return
+        [
+            .. HostBroadcasterAuthorizationService
+                .MilestoneScopes.Concat(
+                    TwitchEventAutomationSources
+                        .All.Where(s => enabled.Contains(s.DefinitionId.Value))
+                        .SelectMany(s => s.BroadcasterScopes)
+                )
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal),
+        ];
+    }
+
     public async Task<TwitchEventSourceReadinessOutcome> LoadAsync(
         AutomationHostId hostId,
         CancellationToken cancellationToken
@@ -97,33 +117,75 @@ public sealed class TwitchEventSourceReadinessService(
             static missing => (true, missing.Missing),
             static _ => (true, [])
         );
-        var sources = TwitchEventAutomationSources
-            .All.Where(source => descriptors.ContainsKey(source.DefinitionId))
-            .Select(source =>
+        var sourceBuilder = ImmutableArray.CreateBuilder<TwitchEventSourceReadiness>();
+        var expanded = services?.GetService<ExpandedAutomationRuntime>();
+        foreach (
+            var source in TwitchEventAutomationSources.All.Where(source =>
+                descriptors.ContainsKey(source.DefinitionId)
+            )
+        )
+        {
+            var descriptor = descriptors[source.DefinitionId];
+            var used = enabledSources.Contains(source.DefinitionId.Value);
+            var sourceStatus = source.BroadcasterScopes.IsEmpty
+                ? null
+                : await broadcasterTokens.GetTokenStatusAsync(
+                    host.Id,
+                    source.BroadcasterScopes,
+                    cancellationToken
+                );
+            TwitchEventSourceReadinessState state = sourceStatus switch
             {
-                var descriptor = descriptors[source.DefinitionId];
-                var missingForSource = source
-                    .BroadcasterScopes.Where(scope =>
-                        missingScopes.Contains(scope, StringComparer.Ordinal)
-                    )
-                    .ToImmutableArray();
-                TwitchEventSourceReadinessState state =
-                    source.BroadcasterScopes.IsEmpty ? new TwitchEventSourceReadinessState.Ready()
-                    : !broadcasterConnected
-                        ? new TwitchEventSourceReadinessState.BroadcasterNotConnected()
-                    : missingForSource.IsEmpty ? new TwitchEventSourceReadinessState.Ready()
-                    : new TwitchEventSourceReadinessState.MissingScopes(missingForSource);
-                return new TwitchEventSourceReadiness(
+                TokenStatus.MissingScopes missing
+                    when source
+                        .BroadcasterScopes.Where(scope =>
+                            missing.Missing.Contains(scope, StringComparer.Ordinal)
+                        )
+                        .All(scope =>
+                            EventSubModerationActions.ScopeSatisfied(missing.GrantedScopes, scope)
+                        ) => new TwitchEventSourceReadinessState.Ready(),
+                TokenStatus.MissingScopes missing =>
+                    new TwitchEventSourceReadinessState.MissingScopes([
+                        .. source.BroadcasterScopes.Where(scope =>
+                            missing.Missing.Contains(scope, StringComparer.Ordinal)
+                            && !EventSubModerationActions.ScopeSatisfied(
+                                missing.GrantedScopes,
+                                scope
+                            )
+                        ),
+                    ]),
+                TokenStatus.Ready or null => new TwitchEventSourceReadinessState.Ready(),
+                TokenStatus.Unknown => new TwitchEventSourceReadinessState.ObservationUnavailable(
+                    "Twitch authorization could not be checked. No observation authority is assumed."
+                ),
+                _ => new TwitchEventSourceReadinessState.BroadcasterNotConnected(),
+            };
+            if (used && state is TwitchEventSourceReadinessState.Ready && expanded is not null)
+            {
+                if (!expanded.Connected(host))
+                {
+                    state = new TwitchEventSourceReadinessState.ObservationUnavailable(
+                        "The bot is not connected to this channel. Suppressed or missed events are not replayed."
+                    );
+                }
+                else if (expanded.ObservationReason(host.Id, source.DefinitionId) is { } reason)
+                {
+                    state = new TwitchEventSourceReadinessState.ObservationUnavailable(reason);
+                }
+            }
+            sourceBuilder.Add(
+                new(
                     source.DefinitionId,
                     descriptor.Display.Name,
                     descriptor.Display.Description,
                     source.SubscriptionTypes,
                     source.BroadcasterScopes,
-                    enabledSources.Contains(source.DefinitionId.Value),
+                    used,
                     state
-                );
-            })
-            .ToImmutableArray();
+                )
+            );
+        }
+        var sources = sourceBuilder.ToImmutable();
         return new TwitchEventSourceReadinessOutcome.Available(
             sources,
             missingScopes,

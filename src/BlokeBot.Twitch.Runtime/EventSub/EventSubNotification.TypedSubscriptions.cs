@@ -28,5 +28,11 @@ internal abstract partial record EventSubNotification
                 or "channel.hype_train.begin"
                 or "channel.hype_train.progress"
                 or "channel.hype_train.end"
-                or "channel.chat.notification";
+                or "channel.chat.notification"
+                or "channel.ad_break.begin"
+                or "channel.goal.begin"
+                or "channel.goal.progress"
+                or "channel.goal.end"
+                or "channel.chat_settings.update"
+                or "channel.moderate";
 }

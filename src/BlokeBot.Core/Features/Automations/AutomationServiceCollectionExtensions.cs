@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Plugins.Features;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -16,6 +17,35 @@ public static class AutomationServiceCollectionExtensions
             provider.GetRequiredService<PluginAutomationCatalogRegistry>()
         );
         _ = services.AddAutomationCatalogModule<CoreAutomationCatalogModule>();
+        _ = services.AddAutomationCatalogModule<ExpandedAutomationCatalogModule>();
+        services.TryAddSingleton<ExpandedAutomationRuntime>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IChatMessageObserver, AutomationIrcChatObserver>()
+        );
+        services.TryAddSingleton<AutomationCountdownService>();
+        services.TryAddSingleton<AutomationManualRunService>();
+        services.TryAddSingleton<AutomationFeatureLifecycle>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IOverlayCueLifecycleObserver,
+                AutomationCueLifecycleObserver
+            >()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IHostFeatureActivationObserver,
+                ExpandedAutomationActivationObserver
+            >()
+        );
+        services.TryAddSingleton<IExpandedTwitchEventObserver>(p =>
+            p.GetRequiredService<ExpandedAutomationRuntime>()
+        );
+        _ = services.AddSingleton<IEventSubExactRequirementSource>(p =>
+            p.GetRequiredService<ExpandedAutomationRuntime>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, ExpandedAutomationWorker>()
+        );
         _ = services.AddAutomationCatalogModule<TwitchEventAutomationCatalogModule>();
         _ = services.AddAutomationCatalogModule<NativeOperationAutomationCatalogModule>();
         services.TryAddSingleton<AutomationDefinitionCatalog>();
@@ -122,4 +152,16 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAutomationCatalogModule, TModule>());
         return services;
     }
+}
+
+internal sealed class ExpandedAutomationActivationObserver(IServiceProvider services)
+    : IHostFeatureActivationObserver
+{
+    public ValueTask<HostFeatureAutomaticWorkResult> ApplyAsync(
+        HostFeatureActivationChange change,
+        CancellationToken cancellationToken
+    ) =>
+        services
+            .GetRequiredService<ExpandedAutomationRuntime>()
+            .ApplyAsync(change, cancellationToken);
 }

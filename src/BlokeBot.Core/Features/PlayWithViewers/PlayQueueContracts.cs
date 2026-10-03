@@ -140,8 +140,11 @@ public enum PlayQueueOverlayTransition
 public readonly record struct PlayQueueCommittedChange(
     int HostId,
     int QueueId,
-    PlayQueueOverlayTransition Transition
+    PlayQueueOverlayTransition Transition,
+    IReadOnlyList<PlayQueueAutomationNotice>? AutomationNotices = null
 );
+
+public sealed record PlayQueueAutomationNotice(long Id, PlayQueueEventKind Kind, DateTime AtUtc);
 
 public interface IPlayQueueChangeObserver
 {

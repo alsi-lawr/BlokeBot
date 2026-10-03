@@ -16,9 +16,15 @@ internal static class AutomationRequiredFeatures
                     definitionId switch
                     {
                         "custom-command" => HostFeatureFlags.CustomCommands,
-                        "play-overlay-cue" => HostFeatureFlags.Overlays,
-                        "reward-redemption" or "fulfil-redemption" or "cancel-redemption" =>
-                            HostFeatureFlags.RewardsAndRedemptions,
+                        "play-overlay-cue" or "cue-lifecycle" => HostFeatureFlags.Overlays,
+                        "reward-redemption"
+                        or "redemption-updated"
+                        or "fulfil-redemption"
+                        or "cancel-redemption" => HostFeatureFlags.RewardsAndRedemptions,
+                        "giveaway-lifecycle" => HostFeatureFlags.Points,
+                        "guessing-lifecycle" => HostFeatureFlags.Guessing,
+                        "queue-lifecycle" => HostFeatureFlags.PlayWithViewers,
+                        "outgoing-raid" => HostFeatureFlags.RaidCollaboration,
                         _ => NativeOperationAutomations.BackingFeature(definitionId),
                     }
                 )

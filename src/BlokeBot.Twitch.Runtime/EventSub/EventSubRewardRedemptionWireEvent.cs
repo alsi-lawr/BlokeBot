@@ -34,7 +34,11 @@ internal sealed record EventSubRewardRedemptionWireEvent
     [JsonPropertyName("redeemed_at")]
     public DateTimeOffset RedeemedAt { get; init; }
 
-    public EventSubRewardRedemptionEvent ToDomain(string messageId, bool isNewRedemption) =>
+    public EventSubRewardRedemptionEvent ToDomain(
+        string messageId,
+        bool isNewRedemption,
+        DateTimeOffset? timestamp = null
+    ) =>
         new(
             BroadcasterUserId,
             BroadcasterUserLogin,
@@ -55,7 +59,8 @@ internal sealed record EventSubRewardRedemptionWireEvent
             },
             RedeemedAt,
             messageId,
-            isNewRedemption
+            isNewRedemption,
+            timestamp
         );
 
     internal sealed record RedemptionRewardWire

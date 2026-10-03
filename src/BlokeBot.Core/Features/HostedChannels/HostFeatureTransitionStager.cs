@@ -15,6 +15,36 @@ internal static class HostFeatureTransitionStager
     )
     {
         var previous = host.EnabledFeatures;
+        if (Disabled(previous, updated, HostFeatureFlags.Automations))
+        {
+            _ = await db
+                .AutomationCountdowns.Where(t => t.HostId == host.Id && t.IsRunning)
+                .ExecuteUpdateAsync(
+                    s =>
+                        s.SetProperty(t => t.IsRunning, false)
+                            .SetProperty(t => t.WasCancelled, true),
+                    cancellationToken
+                );
+        }
+        if (Enabled(previous, updated, HostFeatureFlags.Automations))
+        {
+            var admission = await db.AutomationSourceAdmissions.SingleOrDefaultAsync(
+                s => s.HostId == host.Id,
+                cancellationToken
+            );
+            if (admission is null)
+            {
+                admission = new() { HostId = host.Id };
+                _ = db.AutomationSourceAdmissions.Add(admission);
+            }
+            admission.AcceptEventsAfterUtc = now;
+            _ = await db
+                .AutomationStreamObservations.Where(s => s.HostId == host.Id)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(v => v.SuppressUptimeBeforeUtc, now),
+                    cancellationToken
+                );
+        }
         var bountyRequirements = HostFeatureFlags.Bounties | HostFeatureFlags.Points;
         if (previous.Contains(bountyRequirements) && !updated.Contains(bountyRequirements))
         {

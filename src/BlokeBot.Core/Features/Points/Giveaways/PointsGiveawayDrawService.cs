@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Gambling;
@@ -14,7 +15,8 @@ public sealed class PointsGiveawayDrawService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
     IPointsRandom random,
-    IEnumerable<IOverlayEventPresenter> eventPresenters
+    IEnumerable<IOverlayEventPresenter> eventPresenters,
+    AutomationFeatureLifecycle? automations = null
 )
 {
     public PointsGiveawayDrawService(
@@ -110,6 +112,18 @@ public sealed class PointsGiveawayDrawService(
             var outcome = new PointsGiveawayDrawOutcome.NoEntrants(settings);
             await CommitAsync(tx, giveawayId, outcome, ct);
             onCommitted(outcome);
+            if (automations is not null)
+            {
+                await automations.EmitAsync(
+                    giveaway.HostId,
+                    FeatureLifecycleKind.GiveawayClosed,
+                    giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    DateTime.UtcNow,
+                    "no entrants",
+                    ct
+                );
+            }
             return outcome;
         }
 
@@ -169,6 +183,27 @@ public sealed class PointsGiveawayDrawService(
             _ = await db.SaveChangesAsync(ct);
             var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
             await CommitAsync(tx, giveawayId, completed, ct);
+            if (automations is not null)
+            {
+                await automations.EmitAsync(
+                    giveaway.HostId,
+                    FeatureLifecycleKind.GiveawayClosed,
+                    giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    now,
+                    "draw complete",
+                    ct
+                );
+                await automations.EmitAsync(
+                    giveaway.HostId,
+                    FeatureLifecycleKind.GiveawayWinners,
+                    giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    now,
+                    string.Join(", ", winners),
+                    ct
+                );
+            }
             foreach (var presenter in eventPresenters)
             {
                 await presenter.PresentAsync(
