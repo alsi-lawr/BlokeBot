@@ -27,3 +27,5 @@
 **/obj/
 **/node_modules/
 src/BlokeBot.Core/wwwroot/app.css
+
+src/BlokeBot.Core/wwwroot/vendor/full-overlay-editor/

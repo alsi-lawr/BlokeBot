@@ -1,0 +1,35 @@
+@if (View.Selected is null) { <h2>Inspector</h2><p class="text-muted-foreground">Select a widget or HTML layer. Source edits remain available without a selection.</p> }
+else {
+    <header class="full-inspector-heading"><h2>@(View.Layers.FirstOrDefault(layer => layer.Key == View.Selected)?.Label ?? "Selected layer")</h2><button class="btn-secondary" @onclick="Find">Find HTML</button></header>
+    <div class="full-inspector-actions"><button class="btn-secondary" @onclick='() => Send(new { kind = "duplicate" })'>Duplicate</button><button class="btn-secondary" @onclick='() => Send(new { kind = "remove" })'>Remove</button></div>
+    <div class="full-inspector-actions"><button class="btn-secondary" @onclick='() => Send(new { kind = "reorder", direction = -1 })'>Earlier</button><button class="btn-secondary" @onclick='() => Send(new { kind = "reorder", direction = 1 })'>Later</button></div>
+    <div class="full-inspector-toggles"><label><input type="checkbox" checked='@(View.Widget?.Authoring.IsVisible ?? Value("display") != "none")' @onchange='args => Send(new { kind = "visible", value = (bool)args.Value! })' />Visible</label>
+        <label><input type="checkbox" checked='@View.Locked' @onchange='args => Send(new { kind = "lock", value = (bool)args.Value! })' />Lock</label>
+        <label><input type="checkbox" checked='@(View.Widget?.Authoring.ClipOverflow ?? Value("overflow") == "hidden")' @onchange='args => Send(new { kind = "clip", value = (bool)args.Value! })' />Clip overflow</label>
+    </div>
+    <section class="full-inspector-section"><h3>Position &amp; size</h3><div class="full-inspector-grid">
+        <Field Id="full-x" Label="X" Value='@Position("x")' ValueChanged='value => PositionAsync("x", value)' />
+        <Field Id="full-y" Label="Y" Value='@Position("y")' ValueChanged='value => PositionAsync("y", value)' />
+        <Field Id="full-width" Label="Width" Value='@Value("width", View.Widget?.Authoring.Width ?? "auto")' ValueChanged='value => DimensionAsync("width", value)' />
+        <Field Id="full-height" Label="Height" Value='@Value("height", View.Widget?.Authoring.Height ?? "auto")' ValueChanged='value => DimensionAsync("height", value)' />
+        <Field Id="full-rotate" Label="Rotation (°)" Value='@(Value("rotate", "0deg").Replace("deg", ""))' ValueChanged="RotateAsync" />
+        <Field Id="full-scale" Label="Scale" Value='@Value("scale", "1")' ValueChanged="ScaleAsync" />
+    </div></section>
+    <section class="full-inspector-section"><h3>Anchors</h3><div class="full-inspector-grid">
+        <label class="full-editor-field">Horizontal<select aria-label="Horizontal anchor" value='@Anchor("x")' @onchange='args => AnchorAsync("x", args)'><option value="0">Start</option><option value="1">Centre</option><option value="2">End</option></select></label>
+        <label class="full-editor-field">Vertical<select aria-label="Vertical anchor" value='@Anchor("y")' @onchange='args => AnchorAsync("y", args)'><option value="0">Start</option><option value="1">Centre</option><option value="2">End</option></select></label>
+    </div><div class="full-inspector-align" role="group" aria-label="Align within preview viewport">
+        <button class="btn-secondary" aria-label="Align left" @onclick='() => Align.InvokeAsync(("x", 0))'>←</button><button class="btn-secondary" aria-label="Centre horizontally" @onclick='() => Align.InvokeAsync(("x", 1))'>↔</button><button class="btn-secondary" aria-label="Align right" @onclick='() => Align.InvokeAsync(("x", 2))'>→</button>
+        <button class="btn-secondary" aria-label="Align top" @onclick='() => Align.InvokeAsync(("y", 0))'>↑</button><button class="btn-secondary" aria-label="Centre vertically" @onclick='() => Align.InvokeAsync(("y", 1))'>↕</button><button class="btn-secondary" aria-label="Align bottom" @onclick='() => Align.InvokeAsync(("y", 2))'>↓</button>
+    </div></section>
+    <StudioFold Key="full-style" Label="Style" @bind-Open="_styleOpen" Bare="true">
+        <div class="full-inspector-grid">@foreach (var field in _styleFields) { <Field Id='@($"full-style-{field.Property}")' Label='@field.Label' Value='@Value(field.Property)' ValueChanged='value => StyleAsync(field.Property, value)' /> }</div>
+    </StudioFold>
+    <StudioFold Key="full-motion" Label="Motion" @bind-Open="_motionOpen" Bare="true">
+        <label class="full-editor-field">When<select aria-label="When" @bind="_motionPhase"><option value="entrance">Entrance</option><option value="exit">Exit / unavailable</option><option value="state">State change</option></select></label>
+        <label class="full-editor-field">Preset<select aria-label="Preset" @bind="_motionPreset"><option value="fade">Fade</option><option value="rise">Rise</option><option value="scale">Scale</option><option value="none">None</option></select></label>
+        <div class="full-inspector-grid"><Field Id="full-motion-duration" Label="Duration (ms)" @bind-Value="_duration" /><Field Id="full-motion-easing" Label="Easing" @bind-Value="_easing" /></div>
+        <button class="btn-secondary" @onclick="MotionAsync">Apply preset</button>
+    </StudioFold>
+    @if (View.Widget is { } audioWidget) { <StudioFold Key="full-audio" Label="Audio" @bind-Open="_audioOpen" Bare="true"><label class="full-editor-inline"><input type="checkbox" checked='@audioWidget.Audio.IsMuted' @onchange='args => Send(new { kind = "audio", property = "isMuted", value = (bool)args.Value! })' />Mute this widget</label><label class="full-editor-field">Volume<input type="range" min="0" max="1" step="0.01" value='@audioWidget.Audio.Volume.ToString(CultureInfo.InvariantCulture)' @oninput="VolumeAsync" /></label></StudioFold> }
+}

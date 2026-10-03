@@ -1,0 +1,29 @@
+<div role="tree" aria-label="HTML and widget layers" class="full-editor-tree" @onkeydown="KeyAsync">
+    @foreach (var layer in Visible()) {
+        var children = View.Layers.Any(item => item.Parent == layer.Key);
+        <div @ref="_elements[layer.Key]" role="treeitem" aria-level='@Level(layer)' aria-selected='@(View.Selected == layer.Key ? "true" : "false")' aria-expanded='@(children ? (!_collapsed.Contains(layer.Key)).ToString().ToLowerInvariant() : null)' tabindex='@(View.Selected == layer.Key || View.Selected is null && layer == View.Layers.FirstOrDefault() ? 0 : -1)' class="full-editor-layer" style='@($"--layer-depth:{Level(layer) - 1}")' @onclick='() => Selected.InvokeAsync(layer.Key)'>
+            @if (children) { <button type="button" tabindex="-1" aria-label='@($"{(_collapsed.Contains(layer.Key) ? "Expand" : "Collapse")} {layer.Label}")' @onclick:stopPropagation @onclick='() => Toggle(layer.Key)'>@(_collapsed.Contains(layer.Key) ? "▸" : "▾")</button> } else { <span aria-hidden="true">·</span> }
+            <span class="full-editor-layer-label">@layer.Label</span><small>@(layer.WidgetId is null ? layer.Tag : "widget")</small>
+        </div>
+    }
+</div>
+@code {
+    [Parameter, EditorRequired] public required FullOverlayEditorView View { get; set; }
+    [Parameter] public EventCallback<string> Selected { get; set; }
+    private readonly HashSet<string> _collapsed = [];
+    private readonly Dictionary<string, ElementReference> _elements = [];
+    private string? _pendingFocus;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (_pendingFocus is { } key && _elements.TryGetValue(key, out var element)) { _pendingFocus = null; await element.FocusAsync(); } }
+
+    private int Level(FullOverlayEditorLayer layer) { var level = 1; while (layer.Parent is { } parent && View.Layers.FirstOrDefault(item => item.Key == parent) is { } ancestor) { level++; layer = ancestor; } return level; }
+    private IEnumerable<FullOverlayEditorLayer> Visible() => View.Layers.Where(layer => !Hidden(layer));
+    private bool Hidden(FullOverlayEditorLayer layer) { while (layer.Parent is { } parent && View.Layers.FirstOrDefault(item => item.Key == parent) is { } ancestor) { if (_collapsed.Contains(parent)) return true; layer = ancestor; } return false; }
+    private void Toggle(string key) { if (!_collapsed.Add(key)) _collapsed.Remove(key); }
+    private async Task KeyAsync(KeyboardEventArgs args) {
+        var visible = Visible().ToArray(); var index = Array.FindIndex(visible, layer => layer.Key == View.Selected);
+        if (args.Key is "ArrowDown" or "ArrowUp" or "Home" or "End") { var next = args.Key switch { "Home" => 0, "End" => visible.Length - 1, "ArrowDown" => Math.Min(index + 1, visible.Length - 1), _ => Math.Max(index - 1, 0) }; if (next >= 0) { _pendingFocus = visible[next].Key; await Selected.InvokeAsync(visible[next].Key); } }
+        else if (View.Selected is { } key && args.Key == "ArrowRight") { var child = View.Layers.FirstOrDefault(layer => layer.Parent == key); if (child is not null) { if (!_collapsed.Remove(key)) { _pendingFocus = child.Key; await Selected.InvokeAsync(child.Key); } } }
+        else if (View.Selected is { } other && args.Key == "ArrowLeft") { var child = View.Layers.Any(layer => layer.Parent == other); if (child && !_collapsed.Contains(other)) _collapsed.Add(other); else if (View.Layers.FirstOrDefault(layer => layer.Key == other)?.Parent is { } parent) { _pendingFocus = parent; await Selected.InvokeAsync(parent); } }
+        else if (args.Key is "Enter" or " " && View.Selected is { } selected) await Selected.InvokeAsync(selected);
+    }
+}
