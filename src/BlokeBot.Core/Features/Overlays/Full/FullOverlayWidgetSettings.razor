@@ -1,0 +1,42 @@
+@using BlokeBot.Plugins.Contracts
+@if (Widget.Configuration.ValueKind != System.Text.Json.JsonValueKind.Object) { <p role="status">This configuration is unresolved. Its original value is kept; use Configuration JSON to repair it.</p> }
+else {
+    @switch (Widget.Kind.Value) {
+        case "guessing":
+            <label class="full-editor-inline"><input type="checkbox" checked='@Boolean("showGuessCount")' @onchange='args => ChangeAsync(["showGuessCount"], (bool)args.Value!)' />Show guess count</label>
+            <Field Id="full-result-duration" Label="Result duration (seconds)" Value='@Text("resultDurationSeconds")' ValueChanged='value => NumberAsync(["resultDurationSeconds"], value)' />
+            break;
+        case "giveaway":
+            <Field Id="full-giveaway-title" Label="Title" Value='@Text("title")' ValueChanged='value => ChangeAsync(["title"], value)' />
+            @foreach (var option in new[] { ("showEntrantCount", "Entrant count"), ("showCountdown", "Countdown"), ("showJoinCommand", "Join command") }) { <label class="full-editor-inline"><input type="checkbox" checked='@Boolean(option.Item1)' @onchange='args => ChangeAsync([option.Item1], (bool)args.Value!)' />@option.Item2</label> }
+            break;
+        case "viewer-queue":
+        case "community-goal":
+        case "viewer-funded-bounty":
+            var property = Widget.Kind.Value == "viewer-queue" ? "queueId" : Widget.Kind.Value == "community-goal" ? "definitionId" : "bountyId";
+            <label class="full-editor-field">Source<select value='@Text(property)' @onchange='args => BindingAsync(property, args)'><option value="">Choose a source</option>@foreach (var choice in Bindings) { <option value='@choice.Value'>@choice.Label</option> }@if (Text(property).Length > 0 && !Bindings.Any(item => item.Value == Text(property))) { <option value='@Text(property)'>Unresolved · @Text(property)</option> }</select></label>
+            @if (Widget.Kind.Value == "viewer-queue") { <div class="full-inspector-grid"><Field Id="full-current-rows" Label="Current rows" Value='@Text("currentRows")' ValueChanged='value => NumberAsync(["currentRows"], value)' /><Field Id="full-next-rows" Label="Next rows" Value='@Text("nextRows")' ValueChanged='value => NumberAsync(["nextRows"], value)' /></div> }
+            break;
+        case "event-feed":
+            <Field Id="full-feed-binding" Label="Shared feed binding ID" Value='@Text("bindingId")' ValueChanged='value => ChangeAsync(["bindingId"], value)' />
+            <p class="text-muted-foreground">Repeated widgets with the same binding share one feed queue. Layout and audio remain independent.</p>
+            break;
+        case "html":
+            <label class="full-editor-field">Widget HTML<textarea class="full-editor-config" value='@Text("html")' @onchange='args => ChangeAsync(["html"], args.Value?.ToString() ?? "")' spellcheck="false"></textarea></label>
+            <label class="full-editor-field">Widget CSS<textarea class="full-editor-config" value='@Text("css")' @onchange='args => ChangeAsync(["css"], args.Value?.ToString() ?? "")' spellcheck="false"></textarea></label>
+            break;
+        case "web":
+            <Field Id="full-web-url" Label="Web page URL" Value='@Text("url")' ValueChanged='value => ChangeAsync(["url"], value)' />
+            break;
+        case "audio":
+        case "video":
+            <label class="full-editor-inline"><input type="checkbox" checked='@Boolean("loop")' @onchange='args => ChangeAsync(["loop"], (bool)args.Value!)' />Loop</label>
+            break;
+    }
+    @foreach (var field in PluginFields) {
+        @if (field.ValueKind == PluginValueKind.Boolean) { <label class="full-editor-inline"><input type="checkbox" checked='@Boolean(field.Name)' @onchange='args => ChangeAsync([field.Name], (bool)args.Value!)' />@field.Title@(field.Required ? " *" : "")</label> }
+        else if (field.ValueKind == PluginValueKind.Number) { <Field Id='@($"full-plugin-{field.Name}")' Label='@field.Title' Value='@Text(field.Name)' ValueChanged='value => NumberAsync([field.Name], value)' /> }
+        else if (field.ValueKind == PluginValueKind.String) { <Field Id='@($"full-plugin-{field.Name}")' Label='@field.Title' Value='@Text(field.Name)' ValueChanged='value => ChangeAsync([field.Name], value)' /> }
+    }
+    @if (AppearancePath() is { } appearance) { <label class="full-editor-field">Native source CSS<textarea class="full-editor-config" value='@Text([..appearance, "css"])' @onchange='args => ChangeAsync([..appearance, "css"], args.Value?.ToString() ?? "")' spellcheck="false"></textarea></label><p class="text-muted-foreground">This source-specific CSS uses the existing native source validation. The full document CSS remains unrestricted.</p> }
+}

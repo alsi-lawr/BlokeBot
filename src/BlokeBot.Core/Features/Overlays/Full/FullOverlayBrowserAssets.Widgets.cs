@@ -32,6 +32,14 @@ internal static partial class FullOverlayBrowserAssets
             const update = (widget) => {
               if (kind !== widget.kind) { cleanup(); kind = widget.kind; fingerprint = null; canvas = null; }
               const next = JSON.stringify(widget.content);
+              const changed = next !== fingerprint;
+              if (changed) {
+                const phase = kind === "unavailable" ? "exit" : fingerprint === null ? "entrance" : "state";
+                anchor.removeAttribute("data-blokebot-phase");
+                if (phase !== "entrance") void anchor.offsetWidth;
+                anchor.dataset.blokebotPhase = phase;
+                fingerprint = next;
+              }
               if (kind === "cue") {
                 if (!engine) canvas = sourceEngine(widget);
                 const active = new Set(widget.content.map(plan => plan.runId));
@@ -42,8 +50,7 @@ internal static partial class FullOverlayBrowserAssets
                 }
                 return;
               }
-              if (next === fingerprint) return;
-              fingerprint = next;
+              if (!changed) return;
               if (kind === "source") {
                 if (!engine) canvas = sourceEngine(widget);
                 appearanceStylesheet.textContent = widget.appearanceCss;
