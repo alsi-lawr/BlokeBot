@@ -96,3 +96,22 @@ test('Responsive direct movement and grouped resize preserve independent transfo
  assert.equal(owner.candidate().widgets[0].authoring.width,'180px');assert.equal(owner.candidate().widgets[0].authoring.x,'-48px');
  owner.history('undo');assert.deepEqual(owner.candidate(),before);
 });
+
+
+test('Destination setup confirmation has focused metadata history and preserves newer source/audio without implicit resolution',()=>{
+ const imported={...structuredClone(document),widgets:[{...structuredClone(widget),requiresSetup:true}]};
+ const owner=createEditorDocument(imported);owner.select(`widget:${id}`);
+ owner.command({kind:'audio',property:'volume',value:.7});
+ owner.command({kind:'style',property:'opacity',value:'.5'});
+ assert.equal(owner.candidate().widgets[0].requiresSetup,true);
+ owner.command({kind:'setup',value:false});
+ owner.source('html','<!-- newer -->'+owner.candidate().html);
+ owner.focus(EditorFocus.Visual);owner.history('undo');
+ assert.equal(owner.candidate().widgets[0].requiresSetup,true);
+ assert.equal(owner.candidate().widgets[0].audio.volume,.7);
+ assert.match(owner.candidate().html,/newer/);assert.match(owner.candidate().css,/opacity: .5/);
+ owner.history('redo');assert.equal(owner.candidate().widgets[0].requiresSetup,false);
+ const pending=owner.view();owner.source('css',owner.candidate().css+'\n/* newer CSS */');
+ owner.control({kind:'setup',value:true},pending.selected,pending.revision);
+ assert.equal(owner.candidate().widgets[0].requiresSetup,false);
+});

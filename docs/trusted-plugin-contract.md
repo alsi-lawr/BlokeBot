@@ -93,3 +93,19 @@ For `test`, a missing, malformed, or semantically invalid `tests.toml` reports
 `TestMetadataMissing`, `TestMetadataMalformed`, or `TestMetadataInvalid` and exits `6`. An invalid
 source reports `SourceInvalid` and exits `3`; a rejected package reports `PackageRejected` and exits
 `4` before worker execution.
+
+## Widget configuration portability
+
+Widget configuration fields may declare `portability = "portable"`, `"destinationBinding"` or
+`"withheld"`. Missing metadata means withheld on full-document export, not a rejection of local
+configuration or an existing plugin. `portable` declares the entire top-level value, including
+nested maps/arrays, safe to transfer; that declaration is the trusted plugin author's responsibility.
+Destination and withheld values, undeclared fields and unknown plugin configuration never transfer.
+Defaults, installation settings, protected secrets, storage and live output are not export fallbacks.
+
+An imported widget retains source identity, layout and audio but requires explicit destination setup.
+The destination's current declaration governs which supplied values remain portable. Optional omitted
+fields also require setup confirmation; they do not auto-bind just because local validation succeeds.
+Old manifests remain usable on a new host. Older hosts reject the new TOML keys; authors using them
+must set an appropriate `compatibility.minimumBlokeBotVersion`. Manifest/worker protocol versions and
+Lua widget invocation inputs are unchanged.

@@ -12,7 +12,8 @@ internal static class FullOverlayEventFeeds
     {
         configuration = null!;
         if (
-            widget.Kind.Value != "event-feed"
+            widget.RequiresSetup
+            || widget.Kind.Value != "event-feed"
             || widget.Configuration.ValueKind != JsonValueKind.Object
             || !widget.Configuration.TryGetProperty("bindingId", out var binding)
             || binding.ValueKind != JsonValueKind.String

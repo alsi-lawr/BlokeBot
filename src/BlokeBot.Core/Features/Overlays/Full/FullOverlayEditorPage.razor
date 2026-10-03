@@ -61,6 +61,10 @@
                             <label class="full-editor-field">Uploaded media<select value='@MediaAsset(widget)' aria-label="Uploaded media" @onchange="args => MediaSelectedAsync(args, controlView)"><option value="">Choose a file</option>@foreach (var asset in MediaFor(widget.Kind.Value)) { <option value='@asset.Id'>@asset.Name@(!asset.IsAvailable ? " (unavailable)" : "")</option> }</select></label>
                             <label class="full-editor-field">Upload a @widget.Kind.Value<InputFile OnChange="args => UploadAsync(args, controlView)" accept='@($"{widget.Kind.Value}/*")' /></label>
                         }
+                        @if (widget.RequiresSetup) {
+                            <p role="status">This widget needs setup for this channel. Choose its destination configuration, then confirm.</p>
+                            <button class="btn-secondary" @onclick='() => CommandAtAsync(new { kind = "setup", value = false }, controlView.Selected, controlView.Revision)'>Confirm destination setup</button>
+                        }
                         <FullOverlayWidgetSettings @key="widget.Id" Widget="widget" Bindings="BindingsFor(widget)" PluginFields="@(_registry.Descriptors.FirstOrDefault(item => item.Kind == widget.Kind)?.PluginConfigurationFields ?? [])" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" />
                         <label class="full-editor-field" for="full-widget-json">Configuration JSON<textarea id="full-widget-json" class="full-editor-config" value='@_configuration' @oninput="ConfigurationInput" spellcheck="false"></textarea></label>
                         <button class="btn-secondary" @onclick="() => ApplyConfigurationAsync(controlView)">Apply configuration</button>
@@ -80,6 +84,7 @@
             <header><h2 id="full-management-title">History &amp; live URL</h2><button class="btn-secondary" @onclick="CloseManagementAsync">Close</button></header>
             <label class="full-editor-field" for="full-live-url">Stable live URL<input class="field__input" id="full-live-url" readonly value='@_liveUrl' /></label><button class="btn-secondary" @onclick="CopyUrlAsync">Copy live URL</button>
             <p class="text-muted-foreground">Use this URL in OBS. Draft saves do not change the live publication or this URL.</p>
+            <form method="post" action="/full-overlays/export" @ref="_exportForm"><AntiforgeryToken /><input type="hidden" name="document" /><input type="hidden" name="name" /><button class="btn-secondary" type="button" @onclick="ExportAsync">Export working document / template</button></form>
             <h3>Published history</h3>
             @if (_history.Count == 0) { <p>No published versions yet.</p> }
             @foreach (var version in _history) {
