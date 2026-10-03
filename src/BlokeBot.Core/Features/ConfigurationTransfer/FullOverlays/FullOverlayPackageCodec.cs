@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Overlays.Full;
 
 namespace BlokeBot.Core.Features.ConfigurationTransfer.FullOverlays;
@@ -16,6 +17,7 @@ internal static class FullOverlayPackageCodec
 
     internal static async Task<FullOverlayResult<FullOverlayPackage>> ReadAsync(
         ZipArchive archive,
+        OverlayCueService.OverlayMediaTransfer staging,
         CancellationToken ct
     )
     {
@@ -27,7 +29,13 @@ internal static class FullOverlayPackageCodec
         {
             return Rejected("The package must contain one document manifest and unique entries.");
         }
-        await using var stream = await entry.OpenAsync(ct);
+        await using var decompressed = await entry.OpenAsync(ct);
+        var copied = await staging.StageDocumentAsync(decompressed, ct);
+        if (copied is OverlayCueResult<FileStream>.Rejected oversized)
+        {
+            return Rejected($"The imported document was rejected. {oversized.Reason.Message}");
+        }
+        await using var stream = ((OverlayCueResult<FileStream>.Succeeded)copied).Value;
         var package = await JsonSerializer.DeserializeAsync<FullOverlayPackage>(stream, _json, ct);
         if (
             package is null

@@ -83,6 +83,28 @@ internal sealed partial class OverlayCueService
             );
         }
 
+        internal async Task<OverlayCueResult<FileStream>> StageDocumentAsync(
+            Stream source,
+            CancellationToken ct
+        )
+        {
+            var path = Path.Combine(root, $".import-document-{Guid.NewGuid():N}");
+            _ownedPaths.Add(path);
+            var copied = await owner.WriteUploadAsync(source, path, ct);
+            return copied is OverlayCueResult<long>.Rejected rejected
+                ? Reject<FileStream>(rejected.Reason)
+                : Success(
+                    new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read,
+                        81920,
+                        FileOptions.Asynchronous
+                    )
+                );
+        }
+
         internal async Task<ImmutableArray<OverlayMediaTransferSource>> ReadAsync(
             int hostId,
             IReadOnlySet<Guid> ids,
@@ -127,24 +149,20 @@ internal sealed partial class OverlayCueService
             }
             var path = Path.Combine(root, $".import-{Guid.NewGuid():N}");
             _ownedPaths.Add(path);
-            try
+            var copied = await owner.WriteUploadAsync(input, path, ct);
+            if (copied is OverlayCueResult<long>.Rejected rejected)
             {
-                var length = await owner.WriteUploadAsync(input, path, ct);
-                if (length != content.ByteLength)
-                {
-                    return new OverlayCueRejection.Invalid(
-                        "Packaged media length does not match its declared length."
-                    );
-                }
-                _staged.Add(content.Id, (content with { ContentType = contentType }, path));
-                return null;
+                return rejected.Reason;
             }
-            catch (UploadTooLargeException)
+            var length = ((OverlayCueResult<long>.Succeeded)copied).Value;
+            if (length != content.ByteLength)
             {
                 return new OverlayCueRejection.Invalid(
-                    $"The upload exceeds the {owner._options.Overlays.Media.MaximumUploadBytes}-byte limit."
+                    "Packaged media length does not match its declared length."
                 );
             }
+            _staged.Add(content.Id, (content with { ContentType = contentType }, path));
+            return null;
         }
 
         internal async Task<OverlayCueResult<IReadOnlyDictionary<Guid, Guid>>> AttachAsync(

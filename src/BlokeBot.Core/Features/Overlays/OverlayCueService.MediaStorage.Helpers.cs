@@ -6,7 +6,7 @@ namespace BlokeBot.Core.Features.Overlays;
 
 internal sealed partial class OverlayCueService
 {
-    private async Task<long> WriteUploadAsync(
+    private async Task<OverlayCueResult<long>> WriteUploadAsync(
         Stream content,
         string tempPath,
         CancellationToken cancellationToken
@@ -80,7 +80,7 @@ internal sealed partial class OverlayCueService
 
     private string DocumentPath(string storageKey) => Path.Combine(DocumentDirectory(), storageKey);
 
-    private static async Task<long> CopyBoundedAsync(
+    private static async Task<OverlayCueResult<long>> CopyBoundedAsync(
         Stream source,
         Stream destination,
         long maximumBytes,
@@ -94,13 +94,17 @@ internal sealed partial class OverlayCueService
             var read = await source.ReadAsync(buffer, cancellationToken);
             if (read == 0)
             {
-                return total;
+                return Success(total);
+            }
+            if (read > maximumBytes - total)
+            {
+                return Reject<long>(
+                    new OverlayCueRejection.Invalid(
+                        $"The upload exceeds the {maximumBytes}-byte limit."
+                    )
+                );
             }
             total += read;
-            if (total > maximumBytes)
-            {
-                throw new UploadTooLargeException();
-            }
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
     }
@@ -118,6 +122,4 @@ internal sealed partial class OverlayCueService
         );
 
     private void TryDelete(string path) => _ = fileDeletion.Delete(path);
-
-    private sealed class UploadTooLargeException : Exception;
 }
