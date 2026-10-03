@@ -26,7 +26,11 @@ public sealed record FullOverlayWidget(
     JsonElement Configuration,
     FullOverlayAuthoringMetadata Authoring,
     FullOverlayAudio Audio
-);
+)
+{
+    // Imported source dependencies require explicit destination setup; legacy local widgets do not.
+    public bool RequiresSetup { get; init; }
+}
 
 public sealed record FullOverlayAudio(bool IsMuted, double Volume)
 {

@@ -373,16 +373,25 @@ public sealed partial class FullOverlayServiceTests
         internal OverlayStateProvider Sources { get; }
         internal OverlayRemoteUrlPolicy Urls { get; }
         internal OverlayMediaMaintenanceService Maintenance { get; }
+        internal string MediaRoot => OverlayMediaDirectory.DocumentDirectory(_root);
 
         internal WidgetEnvironment(
             Fixture fixture,
             WidgetPluginRig? plugin = null,
             IOverlayDnsResolver? dns = null,
-            ILogger<FullOverlayWidgetRegistry>? logger = null
+            ILogger<FullOverlayWidgetRegistry>? logger = null,
+            BlokeBotOverlayMediaOptions? mediaOptions = null,
+            IOverlayMediaFileDeletion? fileDeletion = null
         )
         {
             _fixture = fixture;
-            var options = Options.Create(new BlokeBotOptions { StateDirectory = _root });
+            var options = Options.Create(
+                new BlokeBotOptions
+                {
+                    StateDirectory = _root,
+                    Overlays = new() { Media = mediaOptions ?? new() },
+                }
+            );
             _ = Directory.CreateDirectory(_root);
             Services = new ServiceCollection()
                 .AddSingleton(fixture.Events)
@@ -396,7 +405,7 @@ public sealed partial class FullOverlayServiceTests
             );
             var urls = new OverlayRemoteUrlPolicy(dns ?? new PublicDns(), options);
             Urls = urls;
-            var deletion = new SystemOverlayMediaFileDeletion();
+            var deletion = fileDeletion ?? new SystemOverlayMediaFileDeletion();
             Maintenance = new(
                 fixture.Database,
                 options,
