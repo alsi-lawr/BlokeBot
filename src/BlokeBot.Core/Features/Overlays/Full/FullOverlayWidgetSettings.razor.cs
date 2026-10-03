@@ -46,7 +46,7 @@ public partial class FullOverlayWidgetSettings
             ? ["feed", "appearance"]
         : null;
 
-    private Task ChangeAsync(string[] path, object value) =>
+    private Task ChangeAsync(string[] path, object? value) =>
         Command.InvokeAsync(
             new
             {
@@ -65,5 +65,8 @@ public partial class FullOverlayWidgetSettings
     private Task BindingAsync(string property, ChangeEventArgs args) =>
         property == "queueId"
             ? NumberAsync([property], args.Value?.ToString() ?? "0")
-            : ChangeAsync([property], args.Value?.ToString() ?? "");
+            : ChangeAsync(
+                [property],
+                string.IsNullOrEmpty(args.Value?.ToString()) ? null : args.Value?.ToString()
+            );
 }
