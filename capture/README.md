@@ -88,3 +88,23 @@ migrated public detail route in the public shell. Its laptop/phone and light/dar
 directly with an unreserved `BLOKEBOT_CAPTURE_PORT`; it reuses that local fixture when available.
 It does not simulate loading/authentication failures or prove refresh behavior.
 `viewer-portal-phone-lower.lua` adds both phone identity/theme views scrolled to You.
+
+## Full overlay editor
+
+`full-overlays.lua` captures the real full-window editor, populated private sample preview and
+selected widget, plus the narrow source view in both themes. It uses only the isolated Simulation
+`/simulation/full-overlay` seed, then ordinary production editor controls. Each matrix item waits
+for the private preview's ready status before capture; these pictures are not behavioral assertions.
+The recipe does not open the live-URL dialog or include a delivery key.
+
+Build Simulation normally (it is not publishable), then run the one definition:
+
+```sh
+BLOKEBOT_CAPTURE_PORT=5479 ./capture-all.sh full-overlays.lua
+```
+
+When run directly, a newly started fixture uses a disposable
+`.agent-workspace/full-overlay-capture/<port>` StateDirectory. Set
+`BLOKEBOT_CAPTURE_STATE_DIRECTORY` to another owned disposable directory if needed, and remove
+that owned state after stopping the fixture. A reused fixture remains its caller's responsibility.
+Outputs are the four `media/full-overlays/*-full-overlay-editor.png` files.
