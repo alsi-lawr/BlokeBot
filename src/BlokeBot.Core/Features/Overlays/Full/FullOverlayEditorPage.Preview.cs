@@ -28,18 +28,10 @@ public partial class FullOverlayEditorPage
         );
         if (result is FullOverlayResult<Guid>.Succeeded created)
         {
-            if (_disposed || request != _previewRequest || revision != _view.Revision)
+            if (!await InstallPreviewAsync(created.Value, request, revision))
             {
-                await _delivery.ReleasePreviewAsync(
-                    PageContext.Session,
-                    created.Value,
-                    CancellationToken.None
-                );
                 return;
             }
-            await ReleasePreviewAsync();
-            _previewId = created.Value;
-            await _client.InvokeVoidAsync("preview", created.Value.ToString(), revision);
         }
         else
         {
@@ -55,6 +47,32 @@ public partial class FullOverlayEditorPage
 
         await InvokeAsync(StateHasChanged);
     }
+
+    internal async Task<bool> InstallPreviewAsync(Guid id, long request, long revision)
+    {
+        if (!PreviewCurrent(request, revision))
+        {
+            await ReleaseCandidateAsync(id);
+            return false;
+        }
+
+        await ReleasePreviewAsync();
+        if (!PreviewCurrent(request, revision))
+        {
+            await ReleaseCandidateAsync(id);
+            return false;
+        }
+
+        _previewId = id;
+        await _client!.InvokeVoidAsync("preview", id.ToString(), revision);
+        return true;
+    }
+
+    private bool PreviewCurrent(long request, long revision) =>
+        !_disposed && request == _previewRequest && revision == _view.Revision;
+
+    private Task ReleaseCandidateAsync(Guid id) =>
+        _delivery.ReleasePreviewAsync(PageContext.Session, id, CancellationToken.None);
 
     [JSInvokable]
     public Task PreviewStatusAsync(string state, string[] codes)
@@ -73,11 +91,7 @@ public partial class FullOverlayEditorPage
         if (_previewId is { } previous)
         {
             _previewId = null;
-            await _delivery.ReleasePreviewAsync(
-                PageContext.Session,
-                previous,
-                CancellationToken.None
-            );
+            await ReleaseCandidateAsync(previous);
         }
     }
 

@@ -8,7 +8,7 @@ internal static partial class FullOverlayBrowserAssets
           const create = window.blokeBotOverlayRenderer.create;
           const mount = (anchor, initial, report) => {
             const host = document.createElement("div"); host.dataset.fullWidgetRenderer = ""; anchor.append(host);
-            let engine = null; let appearanceStylesheet = null; let fingerprint = null; let kind = null; let plugin = null; let nestedPort = null;
+            let engine = null; let appearanceStylesheet = null; let fingerprint = null; let presentation = null; let kind = null; let plugin = null; let nestedPort = null;
             const runs = new Set();
             const cleanup = () => {
               engine?.dispose(); engine = null; appearanceStylesheet = null; nestedPort?.close(); nestedPort = null;
@@ -30,16 +30,20 @@ internal static partial class FullOverlayBrowserAssets
             };
             let canvas = null;
             const update = (widget) => {
-              if (kind !== widget.kind) { cleanup(); kind = widget.kind; fingerprint = null; canvas = null; }
+              if (kind !== widget.kind) { cleanup(); kind = widget.kind; fingerprint = null; presentation = null; canvas = null; }
               const next = JSON.stringify(widget.content);
               const changed = next !== fingerprint;
-              if (changed) {
-                const phase = kind === "unavailable" ? "exit" : fingerprint === null ? "entrance" : "state";
+              const motion = kind === "source"
+                ? JSON.stringify([widget.content.overlayType, widget.content.serverEpoch, widget.content.sequence, widget.content.state])
+                : next;
+              if (motion !== presentation) {
+                const phase = kind === "unavailable" ? "exit" : presentation === null ? "entrance" : "state";
                 anchor.removeAttribute("data-blokebot-phase");
                 if (phase !== "entrance") void anchor.offsetWidth;
                 anchor.dataset.blokebotPhase = phase;
-                fingerprint = next;
+                presentation = motion;
               }
+              fingerprint = next;
               if (kind === "cue") {
                 if (!engine) canvas = sourceEngine(widget);
                 const active = new Set(widget.content.map(plan => plan.runId));

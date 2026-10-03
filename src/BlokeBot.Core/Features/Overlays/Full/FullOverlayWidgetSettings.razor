@@ -13,8 +13,8 @@ else {
         case "viewer-queue":
         case "community-goal":
         case "viewer-funded-bounty":
-            var property = Widget.Kind.Value == "viewer-queue" ? "queueId" : Widget.Kind.Value == "community-goal" ? "definitionId" : "bountyId";
-            <label class="full-editor-field">Source<select value='@Text(property)' @onchange='args => BindingAsync(property, args)'><option value="">Choose a source</option>@foreach (var choice in Bindings) { <option value='@choice.Value'>@choice.Label</option> }@if (Text(property).Length > 0 && !Bindings.Any(item => item.Value == Text(property))) { <option value='@Text(property)'>Unresolved · @Text(property)</option> }</select></label>
+            var property = Widget.Kind.Value == "viewer-queue" ? "queueId" : "selectedItemId";
+            <label class="full-editor-field">Source<select aria-label="Source" value='@Text(property)' @onchange='args => BindingAsync(property, args)'><option value="">Choose a source</option>@foreach (var choice in Bindings) { <option value='@choice.Value'>@choice.Label</option> }@if (Text(property).Length > 0 && !Bindings.Any(item => item.Value == Text(property))) { <option value='@Text(property)'>Unresolved · @Text(property)</option> }</select></label>
             @if (Widget.Kind.Value == "viewer-queue") { <div class="full-inspector-grid"><Field Id="full-current-rows" Label="Current rows" Value='@Text("currentRows")' ValueChanged='value => NumberAsync(["currentRows"], value)' /><Field Id="full-next-rows" Label="Next rows" Value='@Text("nextRows")' ValueChanged='value => NumberAsync(["nextRows"], value)' /></div> }
             break;
         case "event-feed":
