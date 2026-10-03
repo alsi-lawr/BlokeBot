@@ -80,7 +80,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "The document CSS is arbitrary browser CSS. HTML scripts and event handlers execute in an isolated browser frame, not on the server or with dashboard credentials.",
                         "Native source Appearance CSS is a separate, restricted setting inherited from simple overlays. It is scoped to that widget instance; do not use it as a replacement for full document CSS.",
-                        "Motion presets write editable CSS. Reduced-motion preferences suppress presentation motion. A changed widget state can trigger motion; an unchanged heartbeat does not.",
+                        "Motion presets write editable CSS. These presets respect reduced-motion preferences. A changed widget state can trigger motion; an unchanged heartbeat does not.",
                         "Set document audio and each widget's mute/volume independently. Browser autoplay policy can prevent sound until interaction; a visual preview does not prove audible playback.",
                         "Cue-player widgets use the existing overlay-level cue owner. Advancement is duration-derived, not a guarantee that every media element played or that every widget acknowledged completion.",
                     ],
@@ -121,6 +121,8 @@ internal static partial class SiteGuideCatalog
                         "Duplicate copies the current saved draft into an unpublished document with a new live key, preserved audio and no copied publication history. Export the working candidate instead when you need unsaved edits.",
                         "Archive stops live delivery; restore resumes the retained live selection. Permanent deletion requires confirmation and makes that document's key unavailable.",
                     ],
+                    Note =
+                        "Retained publications keep the document and widget configuration, not old media files or frozen live source data. Replaced media uses its current bytes; deleted media may be unavailable. Rollback warns about missing media but can proceed, leaving only affected widgets unavailable while the rest renders.",
                 },
                 new SiteGuideSection
                 {
