@@ -32,7 +32,8 @@ public sealed class AutomationActionExecutor(
     IShoutoutDashboardOperations? shoutouts = null,
     IClipMarkerDashboardOperations? clipsMarkers = null,
     IPollAutomationOperations? polls = null,
-    IPredictionAutomationOperations? predictions = null
+    IPredictionAutomationOperations? predictions = null,
+    IServiceProvider? services = null
 )
 {
     internal async Task<AutomationActionOutcome> ExecuteAsync(
@@ -48,6 +49,11 @@ public sealed class AutomationActionExecutor(
         {
             return configuration switch
             {
+                CountdownActionConfiguration countdown when services is not null => await services
+                    .GetRequiredService<AutomationCountdownService>()
+                    .ApplyAsync(hostId, countdown, cancellationToken)
+                    ? new AutomationActionOutcome.Succeeded()
+                    : new AutomationActionOutcome.Failed("countdown-unavailable"),
                 SendChatActionConfiguration => await SendChatAsync(
                     hostId,
                     inputs,

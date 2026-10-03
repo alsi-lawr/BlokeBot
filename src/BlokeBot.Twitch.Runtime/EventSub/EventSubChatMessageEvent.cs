@@ -4,6 +4,15 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed record EventSubChatMessageEvent
 {
+    [JsonPropertyName("broadcaster_user_id")]
+    public string BroadcasterUserId { get; init; } = string.Empty;
+
+    [JsonPropertyName("source_broadcaster_user_id")]
+    public string? SourceBroadcasterUserId { get; init; }
+
+    [JsonPropertyName("chatter_user_name")]
+    public string ChatterUserName { get; init; } = string.Empty;
+
     [JsonPropertyName("badges")]
     public IReadOnlyList<EventSubBadge> Badges { get; init; } = [];
 

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Core.Features.Guessing.Profiles;
@@ -21,7 +22,8 @@ public sealed class GuessingRoundService(
     GuessingChangeNotifier changes,
     PointBalanceService balances,
     PointsChangeNotifier pointsChanges,
-    IEnumerable<IOverlayEventPresenter> eventPresenters
+    IEnumerable<IOverlayEventPresenter> eventPresenters,
+    AutomationFeatureLifecycle? automations = null
 )
 {
     public GuessingRoundService(
@@ -163,6 +165,18 @@ public sealed class GuessingRoundService(
         {
             _ = await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
+            if (automations is not null)
+            {
+                await automations.EmitAsync(
+                    hostId,
+                    FeatureLifecycleKind.GuessingFinished,
+                    round.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    round.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    DateTime.UtcNow,
+                    "",
+                    ct
+                );
+            }
             await changes.NotifyChangedAsync(hostId, ct);
             if (mutations.Count > 0)
             {
@@ -288,6 +302,18 @@ public sealed class GuessingRoundService(
         };
         _ = db.Rounds.Add(round);
         _ = await db.SaveChangesAsync(ct);
+        if (automations is not null)
+        {
+            await automations.EmitAsync(
+                hostId,
+                FeatureLifecycleKind.GuessingStarted,
+                round.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                round.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                round.StartedAtUtc,
+                "",
+                ct
+            );
+        }
         var pinPolicy = await db
             .ReplyPinPolicies.AsNoTracking()
             .SingleOrDefaultAsync(

@@ -15,6 +15,7 @@ internal static class SimulationEndpoints
     {
         app.MapViewerPortalMockup();
         app.MapFullOverlayFixtures();
+        SimulationAutomationAuthoringFixture.MapEvidence(app);
         _ = app.MapGet(
                 "/simulation/ready",
                 static (SimulationReadiness readiness) =>

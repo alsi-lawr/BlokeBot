@@ -55,9 +55,9 @@ public sealed partial class AutomationCatalogService
                                 .DescriptorsForHost(hostId)
                                 .Where(descriptor =>
                                     enabled.Contains(
-                                        NativeOperationAutomations.BackingFeature(
-                                            descriptor.Id.Value
-                                        )
+                                        AutomationRequiredFeatures.ForDefinitions([
+                                            descriptor.Id.Value,
+                                        ])
                                     )
                                 ),
                         ],
