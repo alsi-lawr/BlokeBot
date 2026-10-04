@@ -18,10 +18,12 @@ internal static partial class FullOverlayBrowserAssets
           let loaded = false;
           let retry = 500;
           let observation = null;
+          let presentationSequence = 0;
+          let presentation = null;
           const completions = new Map();
           const finished = new Set();
           const clear = () => {
-            port?.close(); port = null; loaded = false; pending = null; lifetime = null;
+            port?.close(); port = null; loaded = false; pending = null; lifetime = null; presentation = null;
             for (const timer of completions.values()) clearTimeout(timer);
             completions.clear(); finished.clear();
           };
@@ -32,15 +34,30 @@ internal static partial class FullOverlayBrowserAssets
               status.textContent = "Overlay audio blocked by browser autoplay";
             if (preview && parent !== window) parent.postMessage({
               kind: "blokebot-full-preview-status", previewId: location.pathname.split("/").pop(),
-              state, diagnostics,
+              state, diagnostics, lifetime,
             }, location.origin);
           };
           const observe = () => { if (preview && loaded && observation) port.postMessage({ kind: "observe", lifetime, ...observation }); };
           window.addEventListener("message", (event) => {
             if (!preview || parent === window || event.source !== parent || event.origin !== location.origin) return;
             const data = event.data;
-            if (data?.kind !== "blokebot-full-observe" || typeof data.requestId !== "string" || !Array.isArray(data.selectors)) return;
-            observation = { requestId: data.requestId, selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
+            if (data?.previewId !== location.pathname.split("/").pop()) return;
+            if (data.kind === "blokebot-full-present") {
+              if (!loaded || !observation || data.requestId !== observation.requestId || data.revision !== observation.revision
+                || typeof data.gestureId !== "string" || !Number.isSafeInteger(data.sequence) || data.sequence <= presentationSequence) return;
+              const value = data.presentation;
+              if (value !== null && (!value || typeof value.css !== "string" || !value.attributes || typeof value.attributes !== "object"
+                || !Object.entries(value.attributes).every(([key, value]) => ["style", "data-blokebot-element"].includes(key) && typeof value === "string")
+                || !observation.selectors.some(item => item.selector === value.selector))) return;
+              presentationSequence = data.sequence;
+              presentation = value === null ? null : { gestureId: data.gestureId, sequence: data.sequence,
+                renderedSequence: presentation?.gestureId === data.gestureId ? presentation.renderedSequence : 0 };
+              port.postMessage({ kind: "present", lifetime, requestId: data.requestId, gestureId: data.gestureId, sequence: data.sequence, presentation: value });
+              return;
+            }
+            if (data.kind !== "blokebot-full-observe" || typeof data.requestId !== "string" || !Number.isSafeInteger(data.revision) || !Array.isArray(data.selectors)) return;
+            presentation = null;
+            observation = { requestId: data.requestId, revision: data.revision, selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
             observe();
           });
           frame.addEventListener("load", () => {
@@ -57,13 +74,20 @@ internal static partial class FullOverlayBrowserAssets
                 if (pending) port.postMessage({ kind: "render", lifetime: identity, ...pending });
                 observe();
               } else if (preview && value.kind === "observations" && value.requestId === observation?.requestId && Array.isArray(value.items)) {
+                if (value.gestureId !== undefined) {
+                  if (value.gestureId !== presentation?.gestureId || !Number.isSafeInteger(value.sequence)
+                    || value.sequence <= presentation.renderedSequence || value.sequence > presentation.sequence) return;
+                  presentation.renderedSequence = value.sequence;
+                }
+                if (value.gestureId === undefined && presentation) return;
                 const allowed = new Set(observation.selectors.map(item => item.key));
                 const items = value.items.filter(item => allowed.has(item?.key)
                   && [item.x,item.y,item.width,item.height,item.layoutX,item.layoutY].every(Number.isFinite) && item.width >= 0 && item.height >= 0
                   && item.styles && Object.values(item.styles).every(style => typeof style === "string"));
                 const viewport = value.viewport;
                 if (viewport && [viewport.width,viewport.height].every(size => Number.isFinite(size) && size > 0))
-                  parent.postMessage({ kind: "blokebot-full-observations", previewId: location.pathname.split("/").pop(), requestId: value.requestId, viewport, items }, location.origin);
+                  parent.postMessage({ kind: "blokebot-full-observations", previewId: location.pathname.split("/").pop(), requestId: value.requestId,
+                    ...(presentation ? { gestureId: value.gestureId, sequence: value.sequence } : {}), viewport, items }, location.origin);
               } else if (value.kind === "diagnostics" && Array.isArray(value.items)) {
                 const allowed = new Set(pending?.widgets.map(widget => widget.id));
                 const codes = new Set(["missing-anchor", "widget-unavailable", "audio-blocked"]);

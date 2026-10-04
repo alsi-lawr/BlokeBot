@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createEditorDocument } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/EditorDocument.js';
 import { createSourceSession, EditorFocus } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceSession.js';
+import { targetElement } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/VisualStyles.js';
 
 const id='91c902f7-4020-416c-8b99-a5bdf008e55b';
 const widget={id:{value:id},kind:{value:'giveaway'},configuration:{appearance:{css:'.card { opacity: .7; }'},secretSetting:'EDITOR ONLY'},authoring:{isVisible:true,isLocked:false,clipOverflow:false,x:'0px',y:'0px',width:'100px',height:'50px',rotationDegrees:0,scaleX:1,scaleY:1,horizontalAnchor:0,verticalAnchor:0},audio:{isMuted:false,volume:.3}};
@@ -114,4 +115,61 @@ test('Destination setup confirmation has focused metadata history and preserves 
  const pending=owner.view();owner.source('css',owner.candidate().css+'\n/* newer CSS */');
  owner.control({kind:'setup',value:true},pending.selected,pending.revision);
  assert.equal(owner.candidate().widgets[0].requiresSetup,false);
+});
+
+test('Held manipulation plans stay transient and one final apply preserves newer unrelated source on undo',()=>{
+ const html=`<!-- kept --><section data-blokebot-widget="${id}" style='left:40px; /* inline kept */ top:20px; width:100px; height:50px'></section><script>const raw = '<section>';</script>`;
+ const owner=createEditorDocument({...structuredClone(document),html});const key=`widget:${id}`;owner.select(key);
+ const before=owner.candidate(),revision=owner.view().revision;
+ const move=dx=>owner.planGesture({kind:'move',dx,dy:8,computed:{left:'40px',top:'20px',width:'100px',height:'50px'},layoutX:40,layoutY:20},key,revision);
+ move(8);move(16);const last=move(24);
+ assert.deepEqual(owner.candidate(),before);assert.equal(owner.view().revision,revision);
+ owner.commitGesture(last);
+ assert.equal(owner.view().revision,revision+1);assert.equal(owner.candidate().css,last.presentation.css);
+ assert.equal(owner.candidate().widgets[0].authoring.x,'64px');assert.equal(owner.candidate().widgets[0].authoring.y,'28px');
+ assert.equal(targetElement(owner.session.snapshot(),key).values.style,last.presentation.attributes.style);
+ assert.match(owner.candidate().html,/inline kept/);
+ assert.match(owner.candidate().html,/const raw = '<section>'/);
+ owner.source('css',owner.candidate().css+'\n/* unrelated newer edit */');owner.focus(EditorFocus.Visual);owner.history('undo');
+ assert.equal(owner.candidate().html,before.html);assert.equal(owner.candidate().css,before.css+'\n/* unrelated newer edit */');
+ assert.deepEqual(owner.candidate().widgets,before.widgets);
+});
+
+test('Held west resize clamps displacement with size and commits its exact anchored transform-preserving plan',()=>{
+ const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;owner.select(key);
+ owner.command({kind:'anchor',axis:'x',value:1});owner.command({kind:'style',property:'rotate',value:'25deg'});
+ const before=owner.candidate(),revision=owner.view().revision;
+ const planned=owner.planGesture({kind:'resize',handle:'w',dx:180,dy:0,computed:{width:'100px',height:'50px'},observedWidth:112,observedHeight:87},key,revision);
+ assert.deepEqual(owner.candidate(),before);
+ owner.commitGesture(planned);
+ assert.equal(owner.candidate().widgets[0].authoring.width,'1px');assert.equal(owner.candidate().widgets[0].authoring.x,'49.5px');
+ assert.equal(owner.candidate().css,planned.presentation.css);assert.match(owner.candidate().css,/rotate: 25deg/);
+ owner.history('undo');assert.deepEqual(owner.candidate(),before);
+});
+
+test('Pending manipulation cannot commit over a newer source revision or a changed selection',()=>{
+ const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;owner.select(key);
+ const command={kind:'move',dx:16,dy:8,computed:{left:'40px',top:'20px'}};
+ const sourcePending=owner.planGesture(command,key,owner.view().revision);
+ owner.source('css',owner.candidate().css+'\n/* newer source */');const newer=owner.candidate();
+ assert.match(owner.commitGesture(sourcePending).feedback,/newer work/);assert.deepEqual(owner.candidate(),newer);
+ const selectionPending=owner.planGesture(command,key,owner.view().revision);
+ owner.select(owner.view().layers.find(layer=>layer.tag==='p').key);
+ assert.match(owner.commitGesture(selectionPending).feedback,/newer work/);assert.deepEqual(owner.candidate(),newer);
+});
+
+
+test('Layout planning preserves authored value trivia and separates an unterminated final custom declaration',()=>{
+ const css=`/* retained */[data-blokebot-widget="${id}"] { left: /* position */ 40px !important; top:20px; --unknown:future(x) } @supports (display:grid) { .unfamiliar { unknown:future(y) } }`;
+ const owner=createEditorDocument({...structuredClone(document),css}),key=`widget:${id}`;owner.select(key);
+ const command={kind:'move',dx:24,dy:8,computed:{left:'40px',top:'20px'}};
+ const first=owner.planGesture(command,key,owner.view().revision);owner.commitGesture(first);
+ assert.equal(owner.candidate().css,first.presentation.css);
+ assert.match(owner.candidate().css,/left: \/\* position \*\/ var\(--blokebot-x\) !important/);
+ assert.match(owner.candidate().css,/--unknown:future\(x\) ;\n  position: absolute;/);
+ assert.match(owner.candidate().css,/@supports \(display:grid\) \{ .unfamiliar \{ unknown:future\(y\) \} \}/);
+ assert.deepEqual(owner.view().diagnostics.filter(item=>item.buffer==='css'),[]);
+ owner.source('css',owner.candidate().css.replace('--blokebot-x: 64px','--blokebot-x: 100px'));
+ const revision=owner.view().revision,second=owner.planGesture({...command,dx:8},key,revision);owner.commitGesture(second);
+ assert.match(owner.candidate().css,/--blokebot-x:\s*108px/);
 });

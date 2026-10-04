@@ -9,6 +9,9 @@ internal static partial class FullOverlayBrowserAssets
           let port = null;
           let lifetime = null;
           let source = null;
+          let authored = null;
+          let presentation = null;
+          let presentationSequence = 0;
           const widgets = new Map();
           let observation = null;
           const observe = () => {
@@ -23,9 +26,17 @@ internal static partial class FullOverlayBrowserAssets
                 styles: Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)])) }];
             });
             port.postMessage({ kind: "observations", lifetime, requestId: observation.requestId,
+              ...(presentation ? { gestureId: presentation.gestureId, sequence: presentation.sequence } : {}),
               viewport: { width: innerWidth, height: innerHeight }, items });
           };
           const dispose = () => { for (const widget of widgets.values()) widget.dispose(); widgets.clear(); };
+          const restorePresentation = () => {
+            if (!presentation) return;
+            for (const [key, value] of Object.entries(presentation.attributes))
+              if (value === null) presentation.node.removeAttribute(key); else presentation.node.setAttribute(key, value);
+            authored.textContent = presentation.css;
+            presentation = null;
+          };
           window.addEventListener("message", (event) => {
             if (port || event.source !== parent || parent === window || event.ports.length !== 1) return;
             const value = event.data;
@@ -34,7 +45,27 @@ internal static partial class FullOverlayBrowserAssets
             port.onmessage = (message) => {
               const data = message.data;
               if (data?.kind === "observe" && data.lifetime === lifetime && typeof data.requestId === "string" && Array.isArray(data.selectors)) {
+                restorePresentation();
                 observation = { requestId: data.requestId, selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
+                requestAnimationFrame(observe); return;
+              }
+              if (data?.kind === "present" && data.lifetime === lifetime) {
+                if (!authored || data.requestId !== observation?.requestId || typeof data.gestureId !== "string"
+                  || !Number.isSafeInteger(data.sequence) || data.sequence <= presentationSequence) return;
+                const value = data.presentation;
+                if (value !== null && (!value || typeof value.css !== "string" || !value.attributes || typeof value.attributes !== "object"
+                  || !Object.entries(value.attributes).every(([key, value]) => ["style", "data-blokebot-element"].includes(key) && typeof value === "string")
+                  || !observation.selectors.some(item => item.selector === value.selector))) return;
+                presentationSequence = data.sequence; restorePresentation();
+                if (value !== null) {
+                  let node;
+                  try { node = document.querySelector(value.selector); } catch { return; }
+                  if (!node) return;
+                  presentation = { node, gestureId: data.gestureId, sequence: data.sequence, css: authored.textContent,
+                    attributes: Object.fromEntries(Object.keys(value.attributes).map(key => [key, node.getAttribute(key)])) };
+                  for (const [key, attributeValue] of Object.entries(value.attributes)) node.setAttribute(key, attributeValue);
+                  authored.textContent = value.css;
+                }
                 requestAnimationFrame(observe); return;
               }
               if (data?.kind !== "render" || data.lifetime !== lifetime || typeof data.html !== "string"
@@ -45,13 +76,14 @@ internal static partial class FullOverlayBrowserAssets
                 port.postMessage({ kind: "diagnostics", lifetime, items: diagnostics });
               };
               if (source !== data.html + "\0" + data.css) {
+                restorePresentation();
                 dispose(); source = data.html + "\0" + data.css;
                 document.open(); document.write(data.html); document.close();
                 const baseline = document.createElement("style");
                 baseline.textContent = "html,body{margin:0;background:transparent} [data-full-widget-renderer]{position:relative;width:100%;height:100%} [data-full-widget-renderer]>iframe{width:100%;height:100%;border:0} [data-full-widget-renderer] svg{display:block;width:100%;height:100%;overflow:visible} [data-full-widget-renderer] .cue-run,[data-full-widget-renderer] .cue-layer{position:absolute;border:0} [data-full-widget-renderer] .cue-run{inset:0}";
                 const sheet = document.createElement("link"); sheet.rel = "stylesheet";
                 sheet.href = "/full-overlay/assets/presentation.css";
-                const authored = document.createElement("style"); authored.textContent = data.css;
+                authored = document.createElement("style"); authored.textContent = data.css;
                 document.head.prepend(baseline, sheet); document.head.append(authored);
               }
               const current = new Set(data.widgets.map(widget => widget.id));
@@ -74,7 +106,7 @@ internal static partial class FullOverlayBrowserAssets
             port.start(); port.postMessage({ kind: "ready", lifetime });
           });
           window.addEventListener("resize", () => requestAnimationFrame(observe));
-          window.addEventListener("pagehide", () => { dispose(); port?.close(); }, { once: true });
+          window.addEventListener("pagehide", () => { restorePresentation(); dispose(); port?.close(); }, { once: true });
         })();
         """;
 }
