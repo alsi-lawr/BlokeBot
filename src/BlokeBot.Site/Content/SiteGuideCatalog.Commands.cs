@@ -65,6 +65,11 @@ internal static partial class SiteGuideCatalog
                     [
                         "{random_from|one|two} picks one value.",
                         "{random_between|1|10} picks an inclusive whole number.",
+                        "Nest existing tokens in either random function: {random_between|1|{arg1}} or {random_from|Hello {user}|{random_between|1|10}}.",
+                        "Command arguments are {arg1} through {arg9}; {args} is their joined text. Counter commands also provide {count}.",
+                        "Number bounds must be ordered whole numbers from -2147483648 to 2147483647. Negative and equal bounds work.",
+                        "Missing, non-whole-number, out-of-range or reversed resolved bounds send a short explanation instead of the affected reply. Other command actions keep their normal behavior.",
+                        "Braces and pipes in argument or chatter text stay text, not extra tokens or choices.",
                         "Each random token occurrence makes a fresh pick.",
                         "{random_viewer} picks from Twitch chatters currently connected to chat. The active bot account must be a moderator with connected-chatter access.",
                         "If Twitch cannot return the complete chatter list, {random_viewer} becomes empty text.",
