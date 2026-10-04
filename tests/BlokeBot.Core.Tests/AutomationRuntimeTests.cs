@@ -5870,18 +5870,17 @@ public sealed partial class AutomationRuntimeTests
                 integerEntropy
             );
             overlays ??= new NoOverlayCues();
-            var sourceServices = new ExpandedServices();
-            sourceServices.Countdowns = new(database, clock, sourceServices);
+            AutomationRuntimeService runtime = null!;
+            var countdowns = new AutomationCountdownService(database, clock, () => runtime);
             var actions = new AutomationActionExecutor(
                 features,
                 chat,
                 overlays,
                 expressions,
-                services: sourceServices
+                countdowns
             );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
-            sourceServices.Runtime = runtime;
+            runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
             var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
                 database,
@@ -5916,7 +5915,7 @@ public sealed partial class AutomationRuntimeTests
                 hostId
             )
             {
-                Countdowns = sourceServices.Countdowns,
+                Countdowns = countdowns,
             };
         }
 

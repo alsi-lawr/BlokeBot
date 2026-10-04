@@ -8,13 +8,25 @@ public enum OverlayCueLifecycleKind
     Interrupted,
 }
 
+public enum OverlayCueLifecycleOutcome
+{
+    Queued,
+    QueuedDisconnected,
+    ServerStartedUnconfirmed,
+    TimeDerivedEndUnconfirmed,
+    BrowserReportedEndUnverified,
+    QueueExpiredUnavailable,
+    CancelledOrTargetUnavailable,
+    CancelledWhileQueued,
+}
+
 public sealed record OverlayCueLifecycleNotice(
     int HostId,
     Guid CueId,
     Guid RunId,
     Guid TargetId,
     OverlayCueLifecycleKind Kind,
-    string Outcome,
+    OverlayCueLifecycleOutcome Outcome,
     DateTimeOffset AtUtc
 );
 

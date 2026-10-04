@@ -18,7 +18,7 @@ public abstract record AutomationManualRunOutcome
 
 public sealed class AutomationManualRunService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IServiceProvider services,
+    AutomationRuntimeService runtime,
     AutomationCatalogService catalog,
     TimeProvider clock
 )
@@ -78,7 +78,6 @@ public sealed class AutomationManualRunService(
         {
             return new AutomationManualRunOutcome.Unavailable();
         }
-        var runtime = services.GetRequiredService<AutomationRuntimeService>();
         var invocation = Guid.NewGuid().ToString();
         var now = clock.GetUtcNow();
         var runs = System.Collections.Immutable.ImmutableArray.CreateBuilder<AutomationRunId>();

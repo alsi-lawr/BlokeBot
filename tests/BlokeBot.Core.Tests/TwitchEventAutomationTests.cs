@@ -413,18 +413,26 @@ public sealed class TwitchEventAutomationTests
             [cheerSource, cheerAction],
             [Edge(cheerSource, "flow", cheerAction)]
         );
+        var tokens = new FakeBroadcasterTokens(
+            new TokenStatus.MissingScopes(
+                "token",
+                new("host-user-id", fixture.HostLogin, OAuthScopeSet.Empty),
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                [],
+                ["bits:read", "channel:read:hype_train"]
+            )
+        );
         var readiness = new TwitchEventSourceReadinessService(
             fixture.Database,
             fixture.Catalog,
             fixture.FlowRuntime,
-            new FakeBroadcasterTokens(
-                new TokenStatus.MissingScopes(
-                    "token",
-                    new("host-user-id", fixture.HostLogin, OAuthScopeSet.Empty),
-                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
-                    [],
-                    ["bits:read", "channel:read:hype_train"]
-                )
+            tokens,
+            AutomationRuntimeTests.ObservationRuntimeFor(
+                fixture.Database,
+                fixture.FlowRuntime,
+                fixture.Catalog,
+                fixture.Clock,
+                tokens
             )
         );
 
@@ -447,15 +455,23 @@ public sealed class TwitchEventAutomationTests
         Source(available, "cheer").UsedByEnabledFlow.ShouldBeTrue();
         Source(available, "stream-online").UsedByEnabledFlow.ShouldBeFalse();
 
+        var disconnectedTokens = new FakeBroadcasterTokens(
+            new TokenStatus.Unavailable(
+                AccessTokenUnavailableReason.MissingRefreshToken,
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes]
+            )
+        );
         var disconnected = new TwitchEventSourceReadinessService(
             fixture.Database,
             fixture.Catalog,
             fixture.FlowRuntime,
-            new FakeBroadcasterTokens(
-                new TokenStatus.Unavailable(
-                    AccessTokenUnavailableReason.MissingRefreshToken,
-                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
-                )
+            disconnectedTokens,
+            AutomationRuntimeTests.ObservationRuntimeFor(
+                fixture.Database,
+                fixture.FlowRuntime,
+                fixture.Catalog,
+                fixture.Clock,
+                disconnectedTokens
             )
         );
         var disconnectedOutcome = (TwitchEventSourceReadinessOutcome.Available)
@@ -686,15 +702,17 @@ public sealed class TwitchEventAutomationTests
             );
             var expressions = new AutomationExpressionService();
             var overlays = new NoOverlayCues();
-            var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
-            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var flowRuntime = new AutomationRuntimeService(
-                database,
-                catalog,
-                flows,
-                actions,
-                clock
+            AutomationRuntimeService flowRuntime = null!;
+            var countdowns = new AutomationCountdownService(database, clock, () => flowRuntime);
+            var actions = new AutomationActionExecutor(
+                features,
+                chat,
+                overlays,
+                expressions,
+                countdowns
             );
+            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
+            flowRuntime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
             var runtime = new TwitchEventAutomationRuntime(
                 database,
                 flowRuntime,

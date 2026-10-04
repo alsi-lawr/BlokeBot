@@ -3,8 +3,10 @@ using System.Globalization;
 
 namespace BlokeBot.Core.Features.Automations;
 
-internal sealed class AutomationIrcChatObserver(IServiceProvider services, BotSettings settings)
-    : IChatMessageObserver
+internal sealed class AutomationIrcChatObserver(
+    ExpandedAutomationRuntime runtime,
+    BotSettings settings
+) : IChatMessageObserver
 {
     public async ValueTask MessageReceivedAsync(ChatMessage message, CancellationToken cancellation)
     {
@@ -33,21 +35,19 @@ internal sealed class AutomationIrcChatObserver(IServiceProvider services, BotSe
             .Where(id => id.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
-        await services
-            .GetRequiredService<ExpandedAutomationRuntime>()
-            .ChatReceivedAsync(
-                new(
-                    messageId,
-                    DateTimeOffset.FromUnixTimeMilliseconds(milliseconds),
-                    channelId,
-                    source,
-                    viewerId,
-                    message.Login,
-                    message.Tags.GetValueOrDefault("display-name") ?? message.Login,
-                    message.Text,
-                    emotes
-                ),
-                cancellation
-            );
+        await runtime.ChatReceivedAsync(
+            new(
+                messageId,
+                DateTimeOffset.FromUnixTimeMilliseconds(milliseconds),
+                channelId,
+                source,
+                viewerId,
+                message.Login,
+                message.Tags.GetValueOrDefault("display-name") ?? message.Login,
+                message.Text,
+                emotes
+            ),
+            cancellation
+        );
     }
 }

@@ -38,7 +38,7 @@ public sealed partial class OverlayCueServiceTests
         var derived = observer.Notices.Single(n =>
             n.RunId == first.RunId && n.Kind == OverlayCueLifecycleKind.Finished
         );
-        derived.Outcome.ShouldBe("time-derived-end-unconfirmed");
+        derived.Outcome.ShouldBe(OverlayCueLifecycleOutcome.TimeDerivedEndUnconfirmed);
         derived.CueId.ShouldBe(cue);
         derived.TargetId.ShouldBe(target);
         derived.HostId.ShouldBe(f.HostId);
@@ -49,7 +49,9 @@ public sealed partial class OverlayCueServiceTests
                 n.RunId == queued.RunId && n.Kind == OverlayCueLifecycleKind.Finished
             )
             .ShouldBe(1);
-        observer.Notices.Last().Outcome.ShouldBe("browser-reported-end-unverified");
+        observer
+            .Notices.Last()
+            .Outcome.ShouldBe(OverlayCueLifecycleOutcome.BrowserReportedEndUnverified);
     }
 
     private sealed class CueNotices : IOverlayCueLifecycleObserver

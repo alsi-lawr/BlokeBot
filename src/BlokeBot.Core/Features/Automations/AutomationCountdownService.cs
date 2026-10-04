@@ -9,7 +9,7 @@ namespace BlokeBot.Core.Features.Automations;
 public sealed class AutomationCountdownService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider clock,
-    IServiceProvider services
+    Func<AutomationRuntimeService> runtime
 )
 {
     internal Guid ProcessId { get; } = Guid.NewGuid();
@@ -201,8 +201,7 @@ public sealed class AutomationCountdownService(
                 ),
             ]
         );
-        return services
-            .GetRequiredService<AutomationRuntimeService>()
+        return runtime()
             .DispatchExpandedAsync(
                 context,
                 c =>

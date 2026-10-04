@@ -50,20 +50,35 @@ public abstract record TwitchEventSourceReadinessOutcome
 /// Reports source-specific observation grants and live connection availability. Existing milestone
 /// grants remain unchanged; additional read-only grants are requested only for enabled sources.
 /// </summary>
-public sealed class TwitchEventSourceReadinessService(
-    IDbContextFactory<BlokeBotDbContext> dbFactory,
-    AutomationCatalogService catalog,
-    AutomationRuntimeService runtime,
-    IHostBroadcasterTokenStatusProvider broadcasterTokens,
-    IServiceProvider? services = null
-)
+public sealed class TwitchEventSourceReadinessService
 {
+    private readonly IDbContextFactory<BlokeBotDbContext> _dbFactory;
+    private readonly AutomationCatalogService _catalog;
+    private readonly AutomationRuntimeService _runtime;
+    private readonly IHostBroadcasterTokenStatusProvider _broadcasterTokens;
+    private readonly ExpandedAutomationRuntime _expanded;
+
+    internal TwitchEventSourceReadinessService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        AutomationCatalogService catalog,
+        AutomationRuntimeService runtime,
+        IHostBroadcasterTokenStatusProvider broadcasterTokens,
+        ExpandedAutomationRuntime expanded
+    )
+    {
+        _dbFactory = dbFactory;
+        _catalog = catalog;
+        _runtime = runtime;
+        _broadcasterTokens = broadcasterTokens;
+        _expanded = expanded;
+    }
+
     public async Task<ImmutableArray<string>> AuthorizationScopesAsync(
         int hostId,
         CancellationToken cancellation
     )
     {
-        var enabled = await runtime.EnabledSourceDefinitionIdsAsync(new(hostId), cancellation);
+        var enabled = await _runtime.EnabledSourceDefinitionIdsAsync(new(hostId), cancellation);
         return
         [
             .. HostBroadcasterAuthorizationService
@@ -82,7 +97,7 @@ public sealed class TwitchEventSourceReadinessService(
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db
             .Hosts.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Id == hostId.Value, cancellationToken);
@@ -96,13 +111,13 @@ public sealed class TwitchEventSourceReadinessService(
             return new TwitchEventSourceReadinessOutcome.FeatureDisabled();
         }
 
-        var snapshot = await catalog.DiscoverAsync(hostId, cancellationToken);
+        var snapshot = await _catalog.DiscoverAsync(hostId, cancellationToken);
         var descriptors = snapshot.Definitions.ToImmutableDictionary(static value => value.Id);
-        var enabledSources = await runtime.EnabledSourceDefinitionIdsAsync(
+        var enabledSources = await _runtime.EnabledSourceDefinitionIdsAsync(
             hostId,
             cancellationToken
         );
-        var tokenStatus = await broadcasterTokens.GetTokenStatusAsync(
+        var tokenStatus = await _broadcasterTokens.GetTokenStatusAsync(
             hostId.Value,
             HostBroadcasterAuthorizationService.MilestoneScopes,
             cancellationToken
@@ -118,7 +133,6 @@ public sealed class TwitchEventSourceReadinessService(
             static _ => (true, [])
         );
         var sourceBuilder = ImmutableArray.CreateBuilder<TwitchEventSourceReadiness>();
-        var expanded = services?.GetService<ExpandedAutomationRuntime>();
         foreach (
             var source in TwitchEventAutomationSources.All.Where(source =>
                 descriptors.ContainsKey(source.DefinitionId)
@@ -129,7 +143,7 @@ public sealed class TwitchEventSourceReadinessService(
             var used = enabledSources.Contains(source.DefinitionId.Value);
             var sourceStatus = source.BroadcasterScopes.IsEmpty
                 ? null
-                : await broadcasterTokens.GetTokenStatusAsync(
+                : await _broadcasterTokens.GetTokenStatusAsync(
                     host.Id,
                     source.BroadcasterScopes,
                     cancellationToken
@@ -160,15 +174,15 @@ public sealed class TwitchEventSourceReadinessService(
                 ),
                 _ => new TwitchEventSourceReadinessState.BroadcasterNotConnected(),
             };
-            if (used && state is TwitchEventSourceReadinessState.Ready && expanded is not null)
+            if (used && state is TwitchEventSourceReadinessState.Ready)
             {
-                if (!expanded.Connected(host))
+                if (!_expanded.Connected(host))
                 {
                     state = new TwitchEventSourceReadinessState.ObservationUnavailable(
                         "The bot is not connected to this channel. Suppressed or missed events are not replayed."
                     );
                 }
-                else if (expanded.ObservationReason(host.Id, source.DefinitionId) is { } reason)
+                else if (_expanded.ObservationReason(host.Id, source.DefinitionId) is { } reason)
                 {
                     state = new TwitchEventSourceReadinessState.ObservationUnavailable(reason);
                 }
