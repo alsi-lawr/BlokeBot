@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Features.Automations;
 
 internal sealed class AutomationCueLifecycleObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IServiceProvider services,
+    Func<AutomationRuntimeService> runtime,
     TimeProvider clock
 ) : IOverlayCueLifecycleObserver
 {
@@ -38,8 +38,7 @@ internal sealed class AutomationCueLifecycleObserver(
             OverlayCueLifecycleKind.Finished => CueLifecycleKind.Finished,
             OverlayCueLifecycleKind.Interrupted => CueLifecycleKind.Interrupted,
         };
-        _ = await services
-            .GetRequiredService<AutomationRuntimeService>()
+        _ = await runtime()
             .DispatchExpandedAsync(
                 Create(
                     host,
@@ -52,7 +51,7 @@ internal sealed class AutomationCueLifecycleObserver(
                         Text("cue-id", notice.CueId.ToString()),
                         Text("cue-run-id", notice.RunId.ToString()),
                         Text("target-id", notice.TargetId.ToString()),
-                        Text("playback-outcome", notice.Outcome),
+                        Text("playback-outcome", OutcomeLabel(notice.Outcome)),
                     ]
                 ),
                 c =>
@@ -70,4 +69,19 @@ internal sealed class AutomationCueLifecycleObserver(
                 deferExecution: true
             );
     }
+
+    private static string OutcomeLabel(OverlayCueLifecycleOutcome outcome) =>
+        outcome switch
+        {
+            OverlayCueLifecycleOutcome.Queued => "queued",
+            OverlayCueLifecycleOutcome.QueuedDisconnected => "queued-disconnected",
+            OverlayCueLifecycleOutcome.ServerStartedUnconfirmed => "server-started-unconfirmed",
+            OverlayCueLifecycleOutcome.TimeDerivedEndUnconfirmed => "time-derived-end-unconfirmed",
+            OverlayCueLifecycleOutcome.BrowserReportedEndUnverified =>
+                "browser-reported-end-unverified",
+            OverlayCueLifecycleOutcome.QueueExpiredUnavailable => "queue-expired-unavailable",
+            OverlayCueLifecycleOutcome.CancelledOrTargetUnavailable =>
+                "cancelled-or-target-unavailable",
+            OverlayCueLifecycleOutcome.CancelledWhileQueued => "cancelled-while-queued",
+        };
 }

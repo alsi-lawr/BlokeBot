@@ -27,13 +27,13 @@ public sealed class AutomationActionExecutor(
     IPublicChatMessageSender chat,
     IOverlayCueAdmissionService overlayCues,
     AutomationExpressionService expressions,
+    AutomationCountdownService countdowns,
     IDbContextFactory<BlokeBotDbContext>? dbFactory = null,
     IChannelPointsDashboardOperations? channelPoints = null,
     IShoutoutDashboardOperations? shoutouts = null,
     IClipMarkerDashboardOperations? clipsMarkers = null,
     IPollAutomationOperations? polls = null,
-    IPredictionAutomationOperations? predictions = null,
-    IServiceProvider? services = null
+    IPredictionAutomationOperations? predictions = null
 )
 {
     internal async Task<AutomationActionOutcome> ExecuteAsync(
@@ -49,9 +49,11 @@ public sealed class AutomationActionExecutor(
         {
             return configuration switch
             {
-                CountdownActionConfiguration countdown when services is not null => await services
-                    .GetRequiredService<AutomationCountdownService>()
-                    .ApplyAsync(hostId, countdown, cancellationToken)
+                CountdownActionConfiguration countdown => await countdowns.ApplyAsync(
+                    hostId,
+                    countdown,
+                    cancellationToken
+                )
                     ? new AutomationActionOutcome.Succeeded()
                     : new AutomationActionOutcome.Failed("countdown-unavailable"),
                 SendChatActionConfiguration => await SendChatAsync(

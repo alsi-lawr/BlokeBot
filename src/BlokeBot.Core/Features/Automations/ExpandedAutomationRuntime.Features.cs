@@ -60,11 +60,20 @@ internal sealed partial class ExpandedAutomationRuntime
     }
 }
 
-public sealed class AutomationFeatureLifecycle(
-    IServiceProvider services,
-    ILogger<AutomationFeatureLifecycle> logger
-)
+public sealed class AutomationFeatureLifecycle
 {
+    private readonly Func<ExpandedAutomationRuntime> _runtime;
+    private readonly ILogger<AutomationFeatureLifecycle> _logger;
+
+    internal AutomationFeatureLifecycle(
+        Func<ExpandedAutomationRuntime> runtime,
+        ILogger<AutomationFeatureLifecycle> logger
+    )
+    {
+        _runtime = runtime;
+        _logger = logger;
+    }
+
     internal async Task EmitAsync(
         int hostId,
         FeatureLifecycleKind kind,
@@ -78,8 +87,7 @@ public sealed class AutomationFeatureLifecycle(
     {
         try
         {
-            await services
-                .GetRequiredService<ExpandedAutomationRuntime>()
+            await _runtime()
                 .FeatureAsync(
                     hostId,
                     kind,
@@ -97,7 +105,7 @@ public sealed class AutomationFeatureLifecycle(
         }
         catch (Exception failure)
         {
-            logger.LogError(
+            _logger.LogError(
                 "Committed feature lifecycle automation for host {HostId} failed ({FailureType}).",
                 hostId,
                 failure.GetType().Name

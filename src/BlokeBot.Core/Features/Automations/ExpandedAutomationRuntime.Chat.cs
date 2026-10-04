@@ -14,16 +14,19 @@ internal sealed partial class ExpandedAutomationRuntime
         CancellationToken cancellation
     )
     {
-        var host = await HostAsync(stream.BroadcasterUserId, HostFeatureFlags.None, cancellation);
-        if (host is null)
+        if (string.IsNullOrWhiteSpace(stream.BroadcasterUserId))
         {
             return;
         }
         await using var db = await dbFactory.CreateDbContextAsync(cancellation);
+        var hostId = await db
+            .Hosts.Where(h => h.TwitchUserId == stream.BroadcasterUserId)
+            .Select(h => (int?)h.Id)
+            .SingleOrDefaultAsync(cancellation);
         // An older offline delivery must not erase a subsequently observed stream.
         _ = await db
             .AutomationStreamObservations.Where(s =>
-                s.HostId == host.Id && s.StartedAtUtc <= stream.MessageTimestamp.UtcDateTime
+                s.HostId == hostId && s.StartedAtUtc <= stream.MessageTimestamp.UtcDateTime
             )
             .ExecuteDeleteAsync(cancellation);
     }

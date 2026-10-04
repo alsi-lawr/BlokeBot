@@ -12,7 +12,7 @@ internal sealed partial class OverlayCuePlaybackService
         OverlayTargetIdentity identity,
         AdmittedRun run,
         OverlayCueLifecycleKind kind,
-        string outcome
+        OverlayCueLifecycleOutcome outcome
     )
     {
         if (

@@ -96,6 +96,15 @@ internal abstract partial record EventSubNotification
                     !EventSubModerationActions.All.Contains(action)
                     || ReadText(payload, "moderator_user_id") is not { Length: > 0 }
                     || ReadText(payload, "source_broadcaster_user_id") is not { Length: > 0 } source
+                    || !OptionalTexts(
+                        payload,
+                        "broadcaster_user_login",
+                        "broadcaster_user_name",
+                        "source_broadcaster_user_login",
+                        "source_broadcaster_user_name",
+                        "moderator_user_login",
+                        "moderator_user_name"
+                    )
                 )
                 {
                     return new Unknown();
@@ -103,28 +112,54 @@ internal abstract partial record EventSubNotification
                 var key =
                     action is "approve_unban_request" or "deny_unban_request" ? "unban_request"
                     : action.Contains("_term", StringComparison.Ordinal) ? "automod_terms"
-                    : action;
+                    : action
+                        is "followers"
+                            or "slow"
+                            or "vip"
+                            or "unvip"
+                            or "mod"
+                            or "unmod"
+                            or "ban"
+                            or "unban"
+                            or "timeout"
+                            or "untimeout"
+                            or "raid"
+                            or "unraid"
+                            or "delete"
+                            or "warn"
+                            or "shared_chat_ban"
+                            or "shared_chat_unban"
+                            or "shared_chat_timeout"
+                            or "shared_chat_untimeout"
+                            or "shared_chat_delete"
+                        ? action
+                    : null;
                 var detail =
-                    payload.TryGetProperty(key, out var value)
+                    key is not null
+                    && payload.TryGetProperty(key, out var value)
                     && value.ValueKind == JsonValueKind.Object
                         ? value
                         : default;
                 if (
                     (
-                        payload.TryGetProperty(key, out var declared)
+                        key is not null
+                        && payload.TryGetProperty(key, out var declared)
                         && declared.ValueKind is not (JsonValueKind.Object or JsonValueKind.Null)
-                    )
-                    || ReadSmallNumber(detail, "wait_time_seconds") is not { } wait
-                    || ReadSmallNumber(detail, "viewer_count") is not { } viewers
+                    ) || !ValidModerationDetail(action, detail)
                 )
                 {
                     return new Unknown();
                 }
-                var moderationDuration = ReadTime(detail, "expires_at") is { } expires
-                    ? Math.Clamp((expires - at).TotalSeconds, 0, int.MaxValue)
-                    : wait;
+                var wait = action == "slow" ? ReadSmallNumber(detail, "wait_time_seconds") ?? 0 : 0;
+                var viewers = action == "raid" ? ReadSmallNumber(detail, "viewer_count") ?? 0 : 0;
+                var moderationDuration =
+                    action is "timeout" or "shared_chat_timeout"
+                    && ReadTime(detail, "expires_at") is { } expires
+                        ? Math.Clamp((expires - at).TotalSeconds, 0, int.MaxValue)
+                        : wait;
                 var count =
                     detail.ValueKind == JsonValueKind.Object
+                    && key == "automod_terms"
                     && detail.TryGetProperty("terms", out var terms)
                     && terms.ValueKind == JsonValueKind.Array
                         ? terms.GetArrayLength()
@@ -150,6 +185,84 @@ internal abstract partial record EventSubNotification
                 return new Unknown();
         }
     }
+
+    private static bool ValidModerationDetail(string action, JsonElement detail) =>
+        action switch
+        {
+            "followers" => OptionalSmallNumber(detail, "follow_duration_minutes"),
+            "slow" => OptionalSmallNumber(detail, "wait_time_seconds"),
+            "vip"
+            or "unvip"
+            or "mod"
+            or "unmod"
+            or "unban"
+            or "untimeout"
+            or "unraid"
+            or "shared_chat_unban"
+            or "shared_chat_untimeout" => OptionalSubject(detail),
+            "ban" or "shared_chat_ban" => OptionalSubject(detail)
+                && OptionalTexts(detail, "reason"),
+            "timeout" or "shared_chat_timeout" => OptionalSubject(detail)
+                && OptionalTexts(detail, "reason")
+                && (
+                    !Supplied(detail, "expires_at", out var expires)
+                    || (
+                        expires.ValueKind == JsonValueKind.String
+                        && ReadTime(detail, "expires_at") is not null
+                    )
+                ),
+            "raid" => OptionalSubject(detail) && OptionalSmallNumber(detail, "viewer_count"),
+            "delete" or "shared_chat_delete" => OptionalSubject(detail)
+                && OptionalTexts(detail, "message_id", "message_body"),
+            "add_blocked_term"
+            or "add_permitted_term"
+            or "remove_blocked_term"
+            or "remove_permitted_term" => OptionalTexts(detail, "action", "list")
+                && OptionalStrings(detail, "terms")
+                && OptionalBoolean(detail, "from_automod"),
+            "approve_unban_request" or "deny_unban_request" => OptionalSubject(detail)
+                && OptionalTexts(detail, "moderator_message")
+                && OptionalBoolean(detail, "is_approved"),
+            "warn" => OptionalSubject(detail)
+                && OptionalTexts(detail, "reason")
+                && OptionalStrings(detail, "chat_rules_cited"),
+            _ => true,
+        };
+
+    private static bool OptionalSubject(JsonElement detail) =>
+        OptionalTexts(detail, "user_id", "user_login", "user_name");
+
+    private static bool Supplied(JsonElement detail, string key, out JsonElement value)
+    {
+        value = default;
+        return detail.ValueKind == JsonValueKind.Object
+            && detail.TryGetProperty(key, out value)
+            && value.ValueKind != JsonValueKind.Null;
+    }
+
+    private static bool OptionalTexts(JsonElement detail, params string[] keys) =>
+        keys.All(key =>
+            !Supplied(detail, key, out var value) || value.ValueKind == JsonValueKind.String
+        );
+
+    private static bool OptionalStrings(JsonElement detail, string key) =>
+        !Supplied(detail, key, out var value)
+        || (
+            value.ValueKind == JsonValueKind.Array
+            && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String)
+        );
+
+    private static bool OptionalBoolean(JsonElement detail, string key) =>
+        !Supplied(detail, key, out var value)
+        || value.ValueKind is JsonValueKind.True or JsonValueKind.False;
+
+    private static bool OptionalSmallNumber(JsonElement detail, string key) =>
+        !Supplied(detail, key, out var value)
+        || (
+            value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt32(out var number)
+            && number >= 0
+        );
 
     internal static string ReadText(JsonElement json, string key) =>
         json.ValueKind == JsonValueKind.Object

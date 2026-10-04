@@ -194,7 +194,9 @@ internal sealed partial class OverlayCuePlaybackService(
                     identity,
                     admitted,
                     OverlayCueLifecycleKind.Queued,
-                    connected ? "queued" : "queued-disconnected"
+                    connected
+                        ? OverlayCueLifecycleOutcome.Queued
+                        : OverlayCueLifecycleOutcome.QueuedDisconnected
                 );
                 return connected
                     ? new OverlayCueAdmissionOutcome.Queued(ready.Plan.RunId)
@@ -236,7 +238,7 @@ internal sealed partial class OverlayCuePlaybackService(
                 identity,
                 completed,
                 OverlayCueLifecycleKind.Finished,
-                "browser-reported-end-unverified"
+                OverlayCueLifecycleOutcome.BrowserReportedEndUnverified
             );
             Advance(identity, state, notices);
             outcome = new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled();

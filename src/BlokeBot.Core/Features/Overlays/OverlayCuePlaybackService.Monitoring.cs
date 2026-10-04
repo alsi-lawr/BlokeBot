@@ -228,7 +228,7 @@ internal sealed partial class OverlayCuePlaybackService
                 identity,
                 expired,
                 OverlayCueLifecycleKind.Finished,
-                "time-derived-end-unconfirmed"
+                OverlayCueLifecycleOutcome.TimeDerivedEndUnconfirmed
             );
         }
         while (state.Pending.TryPeek(out var pending) && pending.ExpiresAtUtc <= now)
@@ -240,7 +240,7 @@ internal sealed partial class OverlayCuePlaybackService
                 identity,
                 pending,
                 OverlayCueLifecycleKind.Interrupted,
-                "queue-expired-unavailable"
+                OverlayCueLifecycleOutcome.QueueExpiredUnavailable
             );
         }
         Advance(identity, state, notices);
@@ -287,7 +287,7 @@ internal sealed partial class OverlayCuePlaybackService
             identity,
             running,
             OverlayCueLifecycleKind.Started,
-            "server-started-unconfirmed"
+            OverlayCueLifecycleOutcome.ServerStartedUnconfirmed
         );
     }
 
@@ -305,7 +305,7 @@ internal sealed partial class OverlayCuePlaybackService
                 identity,
                 active,
                 OverlayCueLifecycleKind.Interrupted,
-                "cancelled-or-target-unavailable"
+                OverlayCueLifecycleOutcome.CancelledOrTargetUnavailable
             );
             transport.Stop(active.Target, active.Plan.RunId);
         }
@@ -317,7 +317,7 @@ internal sealed partial class OverlayCuePlaybackService
                 identity,
                 pending,
                 OverlayCueLifecycleKind.Interrupted,
-                "cancelled-while-queued"
+                OverlayCueLifecycleOutcome.CancelledWhileQueued
             );
         }
         state.Active.Clear();

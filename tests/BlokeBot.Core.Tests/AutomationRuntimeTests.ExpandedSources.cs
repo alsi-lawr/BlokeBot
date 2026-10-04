@@ -6,6 +6,7 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Functional;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -31,12 +32,7 @@ public sealed partial class AutomationRuntimeTests
                 lifecycle.ToString()
             );
         }
-        var run = new AutomationManualRunService(
-            f.Database,
-            new ExpandedServices { Runtime = f.Runtime },
-            f.Catalog,
-            f.Clock
-        );
+        var run = new AutomationManualRunService(f.Database, f.Runtime, f.Catalog, f.Clock);
         _ = (
             await run.RunAsync(new(f.HostId), flow, CancellationToken.None)
         ).ShouldBeOfType<AutomationManualRunOutcome.Dispatched>();
@@ -78,11 +74,7 @@ public sealed partial class AutomationRuntimeTests
         );
         await f.Runtime.ResumeDueAsync(CancellationToken.None);
         var before = f.Chat.Messages.Count;
-        var restarted = new AutomationCountdownService(
-            f.Database,
-            f.Clock,
-            new ExpandedServices { Runtime = f.Runtime }
-        );
+        var restarted = new AutomationCountdownService(f.Database, f.Clock, () => f.Runtime);
         await restarted.InitializeAsync(CancellationToken.None);
         f.Clock.Advance(TimeSpan.FromSeconds(3));
         await restarted.TickAsync(
@@ -218,12 +210,7 @@ public sealed partial class AutomationRuntimeTests
                 ),
             ]
         );
-        var run = new AutomationManualRunService(
-            f.Database,
-            new ExpandedServices { Runtime = f.Runtime },
-            f.Catalog,
-            f.Clock
-        );
+        var run = new AutomationManualRunService(f.Database, f.Runtime, f.Catalog, f.Clock);
         _ = (
             await run.RunAsync(new(f.HostId + 1000), flow, CancellationToken.None)
         ).ShouldBeOfType<AutomationManualRunOutcome.Unavailable>();
@@ -766,11 +753,7 @@ public sealed partial class AutomationRuntimeTests
         await f.Runtime.ResumeDueAsync(CancellationToken.None);
         f.Chat.Messages.Count.ShouldBe(7);
         _ = await SaveExpandedChatAsync(f, "cue-lifecycle", """{"event":"Finished"}""", "cue");
-        var observer = new AutomationCueLifecycleObserver(
-            f.Database,
-            new ExpandedServices { Runtime = f.Runtime, Expanded = x.Runtime },
-            f.Clock
-        );
+        var observer = new AutomationCueLifecycleObserver(f.Database, () => f.Runtime, f.Clock);
         await observer.CueChangedAsync(
             new(
                 f.HostId,
@@ -778,7 +761,7 @@ public sealed partial class AutomationRuntimeTests
                 Guid.NewGuid(),
                 Guid.NewGuid(),
                 OverlayCueLifecycleKind.Finished,
-                "time-derived-end-unconfirmed",
+                OverlayCueLifecycleOutcome.TimeDerivedEndUnconfirmed,
                 f.Clock.GetUtcNow()
             ),
             CancellationToken.None
@@ -908,7 +891,8 @@ public sealed partial class AutomationRuntimeTests
             f.Database,
             f.Catalog,
             f.Runtime,
-            x.Tokens
+            x.Tokens,
+            x.Runtime
         );
         var scopes = await readiness.AuthorizationScopesAsync(f.HostId, CancellationToken.None);
         scopes.ShouldContain("moderator:read:warnings");
@@ -1071,11 +1055,7 @@ public sealed partial class AutomationRuntimeTests
         );
         _ = await SaveExpandedChatAsync(f, "cue-lifecycle", """{"event":"Started"}""", "cue");
         var x = ExpandedFixtureFor(f);
-        var observer = new AutomationCueLifecycleObserver(
-            f.Database,
-            new ExpandedServices { Runtime = f.Runtime, Expanded = x.Runtime },
-            f.Clock
-        );
+        var observer = new AutomationCueLifecycleObserver(f.Database, () => f.Runtime, f.Clock);
         async Task Observe(string occurrence)
         {
             await x.Runtime.FeatureAsync(
@@ -1094,7 +1074,7 @@ public sealed partial class AutomationRuntimeTests
                     Guid.NewGuid(),
                     Guid.NewGuid(),
                     OverlayCueLifecycleKind.Started,
-                    "server-started-unconfirmed",
+                    OverlayCueLifecycleOutcome.ServerStartedUnconfirmed,
                     f.Clock.GetUtcNow()
                 ),
                 CancellationToken.None
@@ -1240,6 +1220,28 @@ public sealed partial class AutomationRuntimeTests
         );
     }
 
+    internal static ExpandedAutomationRuntime ObservationRuntimeFor(
+        IDbContextFactory<BlokeBotDbContext> database,
+        AutomationRuntimeService runtime,
+        AutomationCatalogService catalog,
+        TimeProvider clock,
+        IHostBroadcasterTokenStatusProvider tokens
+    ) =>
+        new(
+            database,
+            runtime,
+            catalog,
+            new AutomationCountdownService(database, clock, () => runtime),
+            clock,
+            new ExpandedStreams(),
+            new ExpandedAccounts(),
+            tokens,
+            new HelixClient(new ExpandedHttp(), TwitchEndpointPolicy.Default),
+            BotSettings.FromOptions(new BotOptions()),
+            new ExpandedConnection(),
+            NullLogger<ExpandedAutomationRuntime>.Instance
+        );
+
     private sealed record ExpandedFixture(
         ExpandedAutomationRuntime Runtime,
         ExpandedStreams Streams,
@@ -1247,19 +1249,6 @@ public sealed partial class AutomationRuntimeTests
         ExpandedHttp Http,
         ExpandedConnection Connection
     );
-
-    private sealed class ExpandedServices : IServiceProvider
-    {
-        internal AutomationRuntimeService Runtime { get; set; } = null!;
-        internal AutomationCountdownService Countdowns { get; set; } = null!;
-        internal ExpandedAutomationRuntime Expanded { get; set; } = null!;
-
-        public object? GetService(Type type) =>
-            type == typeof(AutomationRuntimeService) ? Runtime
-            : type == typeof(AutomationCountdownService) ? Countdowns
-            : type == typeof(ExpandedAutomationRuntime) ? Expanded
-            : null;
-    }
 
     private sealed class ExpandedStreams : IHostStreamLivenessProvider
     {
