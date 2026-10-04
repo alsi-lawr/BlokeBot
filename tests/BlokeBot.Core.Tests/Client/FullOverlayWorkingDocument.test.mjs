@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createEditorDocument } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/EditorDocument.js';
 import { createSourceSession, EditorFocus } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceSession.js';
 import { targetElement } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/VisualStyles.js';
+import { cssRanges } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceRanges.js';
 
 const id='91c902f7-4020-416c-8b99-a5bdf008e55b';
 const widget={id:{value:id},kind:{value:'giveaway'},configuration:{appearance:{css:'.card { opacity: .7; }'},secretSetting:'EDITOR ONLY'},authoring:{isVisible:true,isLocked:false,clipOverflow:false,x:'0px',y:'0px',width:'100px',height:'50px',rotationDegrees:0,scaleX:1,scaleY:1,horizontalAnchor:0,verticalAnchor:0},audio:{isMuted:false,volume:.3}};
@@ -151,11 +152,13 @@ test('Pending manipulation cannot commit over a newer source revision or a chang
  const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;owner.select(key);
  const command={kind:'move',dx:16,dy:8,computed:{left:'40px',top:'20px'}};
  const sourcePending=owner.planGesture(command,key,owner.view().revision);
- owner.source('css',owner.candidate().css+'\n/* newer source */');const newer=owner.candidate();
- assert.match(owner.commitGesture(sourcePending).feedback,/newer work/);assert.deepEqual(owner.candidate(),newer);
+ owner.source('css',owner.candidate().css+'\n/* newer source */');const newer=owner.candidate(),sourceView=owner.view();
+ owner.commitGesture(sourcePending);assert.deepEqual(owner.candidate(),newer);
+ assert.equal(owner.view().revision,sourceView.revision);assert.equal(owner.view().selected,sourceView.selected);
  const selectionPending=owner.planGesture(command,key,owner.view().revision);
- owner.select(owner.view().layers.find(layer=>layer.tag==='p').key);
- assert.match(owner.commitGesture(selectionPending).feedback,/newer work/);assert.deepEqual(owner.candidate(),newer);
+ owner.select(owner.view().layers.find(layer=>layer.tag==='p').key);const selectedView=owner.view();
+ owner.commitGesture(selectionPending);assert.deepEqual(owner.candidate(),newer);
+ assert.equal(owner.view().revision,selectedView.revision);assert.equal(owner.view().selected,selectedView.selected);
 });
 
 
@@ -166,7 +169,15 @@ test('Layout planning preserves authored value trivia and separates an untermina
  const first=owner.planGesture(command,key,owner.view().revision);owner.commitGesture(first);
  assert.equal(owner.candidate().css,first.presentation.css);
  assert.match(owner.candidate().css,/left: \/\* position \*\/ var\(--blokebot-x\) !important/);
- assert.match(owner.candidate().css,/--unknown:future\(x\) ;\n  position: absolute;/);
+ const actualCss=owner.candidate().css,parsed=cssRanges(actualCss);
+ assert.deepEqual(parsed.diagnostics,[]);
+ const unknown=parsed.declarations.find(item=>item.property==='--unknown');
+ const authoredUnknown='--unknown:future(x) ';
+ assert.equal(actualCss.slice(unknown.start,unknown.start+authoredUnknown.length),authoredUnknown);
+ assert.equal(actualCss.slice(unknown.value.start,unknown.value.end).trim(),'future(x)');
+ const position=parsed.declarations.find(item=>item.property==='position');
+ assert.equal(actualCss.slice(position.value.start,position.value.end),'absolute');
+ assert(position.start>=unknown.end);
  assert.match(owner.candidate().css,/@supports \(display:grid\) \{ .unfamiliar \{ unknown:future\(y\) \} \}/);
  assert.deepEqual(owner.view().diagnostics.filter(item=>item.buffer==='css'),[]);
  owner.source('css',owner.candidate().css.replace('--blokebot-x: 64px','--blokebot-x: 100px'));

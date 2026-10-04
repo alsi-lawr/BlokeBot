@@ -56,6 +56,10 @@ export function createCanvas(root, readView, command, manipulation) {
         const dx=snap((event.clientX-gesture.x)/gesture.scale),dy=snap((event.clientY-gesture.y)/gesture.scale);
         if(dx===gesture.dx&&dy===gesture.dy)return;
         gesture.dx=dx;gesture.dy=dy;
+        if(!dx&&!dy){
+            gesture.planned=null;gesture.rendered=null;gesture.id=crypto.randomUUID();
+            manipulation.clear();draw();return;
+        }
         const item=gesture.item;
         const planned=manipulation.plan({kind:gesture.mode,handle:gesture.handle,dx,dy,computed:item.styles,layoutX:item.layoutX,layoutY:item.layoutY,observedWidth:item.width,observedHeight:item.height},gesture.selection,gesture.revision);
         if(planned.kind!=='planned'){cancel();return;}
