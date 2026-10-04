@@ -1,12 +1,12 @@
 import { createSourceSession, EditorFocus, htmlRanges, cssRanges, attributeEdit } from './FullOverlayEditorCore.js';
-import { planStyles, styleValues, elementKey, targetElement } from './VisualStyles.js';
+import { planStyles, prepareStyles, styleValues, elementKey, targetElement } from './VisualStyles.js';
 import { parsedCss } from './SourceRanges.js';
 import { motionPreset } from './MotionCommands.js';
 import { addLayer, removeLayer, duplicateLayer, reorderLayer } from './LayerCommands.js';
 
 export function createEditorDocument(document) {
     const session = createSourceSession(document);
-    let selected = null, saved = JSON.stringify({...document,diagnostics:[]}), feedback = '', focus = EditorFocus.Visual, externalRevision=0;
+    let selected = null, saved = JSON.stringify({...document,diagnostics:[]}), feedback = '', focus = EditorFocus.Visual, externalRevision=0, gestureStyles=null;
     const candidate = () => { const value = session.snapshot(); return { ...document, html:value.html, css:value.css, widgets:value.widgets, diagnostics:[] }; };
     function view() {
         const snapshot = session.snapshot(), parsed = htmlRanges(snapshot.html);
@@ -39,8 +39,59 @@ export function createEditorDocument(document) {
         const id=selected?.startsWith('widget:')?selected.slice(7):null;
         return id ? finish(session.apply(EditorFocus.Visual,session.snapshot().revision,[],[{path:['widgets',id,...path],value}])) : view();
     }
+    function layoutPlan(snapshot,command,prepared=prepareStyles(snapshot,selected)) {
+        const id=selected?.startsWith('widget:')?selected.slice(7):null;
+        const values={...command.computed,...styleValues(snapshot,selected,prepared)},widget=snapshot.widgets.find(w=>w.id.value===id);
+        const properties={position:'absolute'},metadata=[];
+        const axes=command.kind==='move'||command.kind==='resize'?['x','y']:[command.axis];
+        if(command.kind==='resize') {
+            const size=(axis,negative,positive,fallback,movement)=>{
+                if(command[axis])return {value:command[axis],movement};
+                const base=parseFloat(command.computed?.[axis])||fallback;
+                const value=`${Math.max(1,Math.round(base+(negative?-movement:positive?movement:0)))}px`;
+                return {value,movement:negative?base-parseFloat(value):positive?parseFloat(value)-base:0};
+            };
+            const width=size('width',command.handle.includes('w'),command.handle.includes('e'),command.observedWidth,command.dx);
+            const height=size('height',command.handle.includes('n'),command.handle.includes('s'),command.observedHeight,command.dy);
+            command={...command,width:width.value,height:height.value,dx:width.movement,dy:height.movement};
+            Object.assign(properties,{width:command.width,height:command.height});
+            if(id)metadata.push(...['width','height'].map(axis=>({path:['widgets',id,'authoring',axis],value:command[axis]})));
+        }
+        for(const axis of axes) {
+            const horizontal=axis==='x';if(!horizontal&&axis!=='y')return {kind:'invalid'};
+            const anchor=command.kind==='anchor'?command.value:Number(values[`--blokebot-anchor-${axis}`]??widget?.authoring[horizontal?'horizontalAnchor':'verticalAnchor']??0);
+            let value=command.kind==='position'?command.value:values[`--blokebot-${axis}`]??values[horizontal?(anchor===2?'right':'left'):(anchor===2?'bottom':'top')]??widget?.authoring[axis]??'0px';
+            if(command.kind==='move'||command.kind==='resize') {
+                const negative=command.handle?.includes(horizontal?'w':'n'),positive=command.handle?.includes(horizontal?'e':'s');
+                const movement=horizontal?command.dx:command.dy;
+                const delta=(command.kind==='resize'?anchor===1?(negative||positive?movement/2:0):anchor===2?(positive?movement:0):(negative?movement:0):movement)*(anchor===2?-1:1);if(!delta)continue;
+                if(value==='auto')value=`${horizontal?command.layoutX??0:command.layoutY??0}px`;
+                const parsed=parsedCss(value,'value'),dimension=parsed.tree?.children.first;
+                value=dimension?.type==='Dimension'&&dimension.unit==='px'&&parsed.tree.children.size===1?`${Number(dimension.value)+delta}px`:`calc(${value} + ${delta}px)`;
+            }
+            Object.assign(properties,{[`--blokebot-${axis}`]:value,[`--blokebot-anchor-${axis}`]:String(anchor),
+                [horizontal?'left':'top']:anchor===2?'auto':anchor===1?`calc(50% + var(--blokebot-${axis}))`:`var(--blokebot-${axis})`,
+                [horizontal?'right':'bottom']:anchor===2?`var(--blokebot-${axis})`:'auto',
+                [`--blokebot-translate-${axis}`]:anchor===1?'-50%':'0px',translate:'var(--blokebot-translate-x, 0px) var(--blokebot-translate-y, 0px)'});
+            if(id)metadata.push({path:['widgets',id,'authoring',axis],value},{path:['widgets',id,'authoring',horizontal?'horizontalAnchor':'verticalAnchor'],value:anchor});
+        }
+        const planned=planStyles(snapshot,selected,properties,prepared);
+        return planned.kind==='planned'?{...planned,metadata,revision:snapshot.revision,selection:selected}:planned;
+    }
     return {
         candidate,view,session,
+        planGesture(command,selection,revision){
+            if(selection!==selected||revision!==session.snapshot().revision)return {kind:'conflict'};
+            const snapshot=session.snapshot();
+            if(gestureStyles?.revision!==revision||gestureStyles.selection!==selection)
+                gestureStyles={revision,selection,prepared:prepareStyles(snapshot,selection)};
+            return layoutPlan(snapshot,command,gestureStyles.prepared);
+        },
+        commitGesture(planned){
+            if(planned.selection!==selected||planned.revision!==session.snapshot().revision)return this.stale();
+            focus=EditorFocus.Visual;
+            return plan(planned);
+        },
         stale(){feedback='The source or selection changed while this control was pending. Your newer work is kept; retry.';return view();},
         select(key){selected=key;focus=EditorFocus.Visual;feedback='';return view();},
         focus(value){focus=value;return view();},
@@ -61,29 +112,7 @@ export function createEditorDocument(document) {
             if(command.kind==='duplicate')return plan(duplicateLayer(snapshot,selected));
             if(command.kind==='reorder')return plan(reorderLayer(snapshot,selected,command.direction));
             if(command.kind==='position'||command.kind==='anchor'||command.kind==='move'||command.kind==='resize') {
-                const values={...command.computed,...styleValues(snapshot,selected)},widget=snapshot.widgets.find(w=>w.id.value===id);
-                const properties={position:'absolute'},metadata=[];
-                const axes=command.kind==='move'||command.kind==='resize'?['x','y']:[command.axis];
-                if(command.kind==='resize') { Object.assign(properties,{width:command.width,height:command.height});if(id)metadata.push(...['width','height'].map(axis=>({path:['widgets',id,'authoring',axis],value:command[axis]}))); }
-                for(const axis of axes) {
-                    const horizontal=axis==='x';if(!horizontal&&axis!=='y')return finish({kind:'invalid'});
-                    const anchor=command.kind==='anchor'?command.value:Number(values[`--blokebot-anchor-${axis}`]??widget?.authoring[horizontal?'horizontalAnchor':'verticalAnchor']??0);
-                    let value=command.kind==='position'?command.value:values[`--blokebot-${axis}`]??values[horizontal?(anchor===2?'right':'left'):(anchor===2?'bottom':'top')]??widget?.authoring[axis]??'0px';
-                    if(command.kind==='move'||command.kind==='resize') {
-                        const negative=command.handle?.includes(horizontal?'w':'n'),positive=command.handle?.includes(horizontal?'e':'s');
-                        const movement=horizontal?command.dx:command.dy;
-                        const delta=(command.kind==='resize'?anchor===1?(negative||positive?movement/2:0):anchor===2?(positive?movement:0):(negative?movement:0):movement)*(anchor===2?-1:1);if(!delta)continue;
-                        if(value==='auto')value=`${horizontal?command.layoutX??0:command.layoutY??0}px`;
-                        const parsed=parsedCss(value,'value'),dimension=parsed.tree?.children.first;
-                        value=dimension?.type==='Dimension'&&dimension.unit==='px'&&parsed.tree.children.size===1?`${Number(dimension.value)+delta}px`:`calc(${value} + ${delta}px)`;
-                    }
-                    Object.assign(properties,{[`--blokebot-${axis}`]:value,[`--blokebot-anchor-${axis}`]:String(anchor),
-                        [horizontal?'left':'top']:anchor===2?'auto':anchor===1?`calc(50% + var(--blokebot-${axis}))`:`var(--blokebot-${axis})`,
-                        [horizontal?'right':'bottom']:anchor===2?`var(--blokebot-${axis})`:'auto',
-                        [`--blokebot-translate-${axis}`]:anchor===1?'-50%':'0px',translate:'var(--blokebot-translate-x, 0px) var(--blokebot-translate-y, 0px)'});
-                    if(id)metadata.push({path:['widgets',id,'authoring',axis],value},{path:['widgets',id,'authoring',horizontal?'horizontalAnchor':'verticalAnchor'],value:anchor});
-                }
-                return style(properties,metadata);
+                return plan(layoutPlan(snapshot,command));
             }
             if(command.kind==='configuration-field')return widgetValue(['configuration',...command.path],command.value);
             if(command.kind==='configuration')return widgetValue(['configuration'],command.value);
