@@ -16,6 +16,7 @@ public partial class FullOverlayInspector
 
     [Parameter]
     public EventCallback Find { get; set; }
+    private bool _positionOpen;
     private bool _motionOpen;
     private bool _styleOpen = true;
     private bool _audioOpen;

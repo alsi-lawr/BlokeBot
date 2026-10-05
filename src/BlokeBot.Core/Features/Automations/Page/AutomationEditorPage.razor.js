@@ -1,6 +1,5 @@
 import { revealNode } from "./AutomationFlowCanvas.js";
 let dirtyNavigation = null;
-let fullscreenState = null;
 let historyKeyboard = null;
 let toolboxKeyboard = null;
 
@@ -56,25 +55,6 @@ export function disposeDirtyNavigation() {
 
 export function navigateDocument(target) {
     requestAnimationFrame(() => window.location.assign(target));
-}
-
-export function initializeFullscreen(dotnet) {
-    disposeFullscreen();
-    const change = () => {
-        void dotnet.invokeMethodAsync(
-            "BrowserFullscreenChangedAsync",
-            document.fullscreenElement !== null,
-        );
-    };
-    fullscreenState = { change };
-    document.addEventListener("fullscreenchange", change);
-    change();
-}
-
-export function disposeFullscreen() {
-    if (fullscreenState === null) return;
-    document.removeEventListener("fullscreenchange", fullscreenState.change);
-    fullscreenState = null;
 }
 
 function isEditable(target) {
@@ -147,15 +127,6 @@ export function disposeToolboxKeyboard() {
     if (toolboxKeyboard === null) return;
     document.removeEventListener("keydown", toolboxKeyboard.keydown, true);
     toolboxKeyboard = null;
-}
-
-export async function toggleBrowserFullscreen() {
-    if (document.fullscreenElement) {
-        await document.exitFullscreen();
-        return;
-    }
-
-    await document.documentElement.requestFullscreen();
 }
 
 export function focusInspector() {

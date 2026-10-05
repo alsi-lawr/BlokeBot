@@ -81,7 +81,7 @@ public partial class FullOverlayEditorPage
             codes.Contains("audio-blocked", StringComparer.Ordinal)
                 ? "Audio blocked by browser autoplay"
             : codes.Length > 0 ? "Preview ready · some widgets need attention"
-            : state == "ready" ? "Private unsaved preview"
+            : state == "ready" ? "Unsaved"
             : "Preview reconnecting";
         return InvokeAsync(StateHasChanged);
     }

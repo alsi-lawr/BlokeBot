@@ -1,0 +1,67 @@
+.editor-workspace{position:relative;min-width:0;}
+.editor-workspace--focus {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    height: 100dvh;
+    inset: 0;
+    min-height: 0;
+    position: fixed;
+    width: 100vw;
+    z-index: 300;
+}
+
+
+.editor-workspace-controls {
+    align-items: center;
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.55rem;
+    box-shadow: var(--app-shadow-sm);
+    display: flex;
+    gap: 0.15rem;
+    padding: 0.18rem;
+    position: absolute;
+    right: 0.7rem;
+    top: 0.7rem;
+    z-index: 45;
+}
+
+.editor-workspace-controls button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.38rem;
+    color: var(--app-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    height: 2.2rem;
+    justify-content: center;
+    padding: 0;
+    width: 2.2rem;
+}
+
+.editor-workspace-controls button:hover {
+    background: var(--app-control-hover);
+    color: var(--app-text-strong);
+}
+
+.editor-workspace-controls button:focus-visible {
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 3px var(--tone-blue-ring);
+    outline: 0;
+}
+
+.editor-workspace-controls button[aria-pressed="true"] {
+    background: var(--tone-blue-bg);
+    border-color: var(--tone-blue-ring);
+    color: var(--tone-blue-fg);
+}
+
+
+.editor-icon{height:1rem;width:1rem;flex:none;}
+.editor-workspace-error{position:absolute;top:3.5rem;right:.7rem;z-index:46;max-width:24rem;padding:.6rem;border:1px solid var(--tone-red-ring);background:var(--app-surface-solid);color:var(--tone-red-fg);font-size:.8rem;}
+.editor-action{position:relative;display:inline-flex;flex:none;}
+.editor-action-button{display:inline-flex;align-items:center;justify-content:center;min-width:2.25rem;min-height:2.25rem;padding:.45rem;}
+.editor-action-tip{position:absolute;top:calc(100% + .35rem);right:0;z-index:100;display:none;width:max-content;max-width:min(17rem,80vw);padding:.45rem .65rem;border:1px solid var(--app-border);border-radius:.5rem;background:var(--app-text-strong);color:var(--app-surface-solid);box-shadow:var(--app-shadow-surface);font-size:.82rem;font-weight:700;line-height:1.4;pointer-events:none;}
+.editor-action:not([data-tip-dismissed]):hover>.editor-action-tip,.editor-action:not([data-tip-dismissed]):focus-within>.editor-action-tip{display:block;}

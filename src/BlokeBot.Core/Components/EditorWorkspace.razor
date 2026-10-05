@@ -1,0 +1,13 @@
+@implements IAsyncDisposable
+@inject IJSRuntime _js
+
+<section class="@($"{Class} editor-workspace{(FocusMode ? " editor-workspace--focus" : "")}")" @ref="Element" @attributes="Attributes">
+    @ChildContent
+    <div class="editor-workspace-controls" role="group" aria-label="Editor focus controls">
+        <EditorAction Class="" Label='@(FocusMode ? "Exit Focus" : "Focus")' Icon="focus" Pressed="FocusMode" Click="ToggleFocusAsync" />
+        <EditorAction Class="" Label='@(_fullscreen ? "Exit Full screen" : "Full screen")' Icon="fullscreen" Pressed="_fullscreen" Click="FullscreenAsync" />
+    </div>
+    @if (_failure is not null) {
+        <p class="editor-workspace-error" role="alert">@_failure</p>
+    }
+</section>
