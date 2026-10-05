@@ -14,8 +14,18 @@ public partial class EditorWorkspace
     [Parameter]
     public EventCallback<bool> FocusChanged { get; set; }
 
+    [Inject]
+    private ILogger<EditorWorkspace> _logger { get; set; } = default!;
+
     [Parameter]
-    public EventCallback<JSException> BrowserFailure { get; set; }
+    public EventCallback<JSException> InteropFailure { get; set; }
+
+    internal enum FullscreenResult
+    {
+        Completed,
+        EnterRefused,
+        ExitRefused,
+    }
 
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? Attributes { get; set; }
@@ -61,7 +71,7 @@ public partial class EditorWorkspace
         catch (JSDisconnectedException) { }
         catch (JSException exception)
         {
-            await FailedAsync(exception);
+            await InteropFailedAsync(exception);
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -77,23 +87,36 @@ public partial class EditorWorkspace
         _failure = null;
         if (_browser is null)
         {
-            _failure = "Browser full screen did not start. Try again.";
+            _failure = "Browser full screen controls are unavailable. Try again.";
             return;
         }
         try
         {
-            await _browser.InvokeVoidAsync("toggleFullscreen");
+            var result = await _browser.InvokeAsync<FullscreenResult>("toggleFullscreen");
+            _failure = result switch
+            {
+                FullscreenResult.Completed => null,
+                FullscreenResult.EnterRefused => "Browser full screen did not start. Try again.",
+                FullscreenResult.ExitRefused => "Browser full screen did not exit. Try again.",
+            };
         }
         catch (JSException exception)
         {
-            await FailedAsync(exception);
+            await InteropFailedAsync(exception);
         }
     }
 
-    private async Task FailedAsync(JSException exception)
+    private async Task InteropFailedAsync(JSException exception)
     {
-        _failure = "Browser full screen did not start. Try again.";
-        await BrowserFailure.InvokeAsync(exception);
+        _failure = "Browser full screen controls are unavailable. Try again.";
+        if (InteropFailure.HasDelegate)
+        {
+            await InteropFailure.InvokeAsync(exception);
+        }
+        else
+        {
+            _logger.LogWarning(exception, "Editor workspace browser interop failed");
+        }
     }
 
     [JSInvokable]

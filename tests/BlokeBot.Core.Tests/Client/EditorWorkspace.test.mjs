@@ -36,16 +36,36 @@ test('incoming workspace observes actual fullscreen and outgoing disposal cannot
     assert.deepEqual(incoming.changes, [true, false, true]);
 });
 
-test('denied fullscreen request rejects without inventing an active state and can be retried', async () => {
+test('native Promise refusal retains actual enter/exit state and both operations can be retried', async () => {
     globalThis.document = browserDocument();
     const state = owner(), workspace = createWorkspace(state.root, state.dotnet);
     const request = document.documentElement.requestFullscreen;
     document.documentElement.requestFullscreen = async () => { throw new TypeError('Denied by browser'); };
-    await assert.rejects(workspace.toggleFullscreen(), TypeError);
+    assert.equal(await workspace.toggleFullscreen(), 1);
     assert.deepEqual(state.changes, [false]);
     assert.equal(document.fullscreenElement, null);
     document.documentElement.requestFullscreen = request;
     await workspace.toggleFullscreen();
     assert.deepEqual(state.changes, [false, true]);
+    const exit = document.exitFullscreen;
+    document.exitFullscreen = () => Promise.reject(new TypeError('Native exit refused'));
+    assert.equal(await workspace.toggleFullscreen(), 2);
+    assert.equal(document.fullscreenElement, document.documentElement);
+    assert.deepEqual(state.changes, [false, true]);
+    document.exitFullscreen = exit;
+    assert.equal(await workspace.toggleFullscreen(), 0);
+    assert.equal(document.fullscreenElement, null);
+    assert.deepEqual(state.changes, [false, true, false]);
+    workspace.dispose();
+});
+
+test('unexpected native faults and synchronous API invocation faults remain exceptional', async () => {
+    globalThis.document = browserDocument();
+    const state = owner(), workspace = createWorkspace(state.root, state.dotnet);
+    document.documentElement.requestFullscreen = () => Promise.reject(new Error('Unexpected failure'));
+    await assert.rejects(workspace.toggleFullscreen(), Error);
+    document.documentElement.requestFullscreen = () => { throw new TypeError('Broken invocation'); };
+    await assert.rejects(workspace.toggleFullscreen(), TypeError);
+    assert.deepEqual(state.changes, [false]);
     workspace.dispose();
 });

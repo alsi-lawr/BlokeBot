@@ -91,6 +91,28 @@ local succeeded, failure = pcall(function()
   js([[ const name = document.getElementById('full-overlay-name'); name.value='Community night'; name.dispatchEvent(new Event('input',{bubbles:true})); ]])
   js([[ document.querySelector('button[aria-label="Save draft"]').click(); ]])
   wait("document.querySelector('.full-editor-feedback')?.textContent.includes('Draft saved.') === true")
+  js([[
+    window.captureFullPreview = null;
+    window.addEventListener('message', event => {
+      const preview = document.querySelector('[data-preview-frame]');
+      const value = event.data;
+      if (event.source === preview?.contentWindow && event.origin === location.origin
+          && value?.kind === 'blokebot-full-observations'
+          && preview.getAttribute('src') === '/full-overlays/preview/' + value.previewId)
+        window.captureFullPreview = value;
+    });
+    document.querySelector('button[aria-label="Replay preview"]').click();
+  ]])
+  wait([[(() => {
+    const preview = document.querySelector('[data-preview-frame]');
+    const current = window.captureFullPreview;
+    const selected = document.querySelector('[data-selection]');
+    return current && preview.getAttribute('src') === '/full-overlays/preview/' + current.previewId
+      && current.viewport.width > 0 && current.viewport.height > 0
+      && current.items.filter(item => item.key.startsWith('widget:') && item.width > 0 && item.height > 0).length === 4
+      && current.items.some(item => item.styles['font-size'] === '48px' && item.width > 0 && item.height > 0)
+      && selected && !selected.hidden && selected.getBoundingClientRect().width > 0;
+  })()]])
   if viset.context.device.name == "phone" then
     js([[ document.getElementById('full-mode-source-tab').click(); ]])
     wait("document.querySelector('[data-source=html]').getBoundingClientRect().height > 0")

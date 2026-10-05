@@ -71,7 +71,7 @@ export function createClient(root, document, dotnet) {
         pan:value=>canvas.pan(value),
         viewport(width,height){canvas.viewport(width,height);preview.query();},
         zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),
-        focusEditor(buffer){view=owner.focus(buffer);publish();(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});},
+        focusEditor(buffer){if(disposed)return;view=owner.focus(buffer);publish();(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});},
         find(selection){if(selection!==view.selected)return;const position=owner.command({kind:'find'}).sourcePosition;if(position!==null){html.focus();html.setSelectionRange(position,position);}},
         dispose(){disposed=true;clearTimeout(previewTimer);abort.abort();layout.disconnect();preview.dispose();canvas.dispose();}
     };

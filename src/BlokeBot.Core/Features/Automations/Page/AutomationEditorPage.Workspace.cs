@@ -111,7 +111,7 @@ public partial class AutomationEditorPage
 
     private void WorkspaceFocusChanged(bool _) => StateHasChanged();
 
-    private void WorkspaceBrowserFailure(JSException exception) =>
+    private void WorkspaceInteropFailure(JSException exception) =>
         ReportUiFault("EditorWorkspace.Fullscreen", exception);
 
     private void ToggleFlowRail() => _flowRailCollapsed = !_flowRailCollapsed;
