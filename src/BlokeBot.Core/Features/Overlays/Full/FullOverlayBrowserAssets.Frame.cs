@@ -16,6 +16,15 @@ internal static partial class FullOverlayBrowserAssets
           const widgets = new Map();
           let observation = null;
           let privatePreview = false;
+          let diagnosticRequestId = null;
+          let currentDiagnostics = [];
+          const reportCurrent = () => {
+            if (!port) return;
+            port.postMessage({ kind: "diagnostics", lifetime, requestId: diagnosticRequestId,
+              items: [...currentDiagnostics, ...[...widgets].flatMap(([widgetId, widget]) =>
+                widget.anchor.isConnected && document.querySelector(`[data-blokebot-widget="${CSS.escape(widgetId)}"]`) === widget.anchor
+                  ? [...widget.renderer.diagnostics].map(code => ({ widgetId, code })) : [])] });
+          };
           const observe = () => {
             if (!observation || !port) return;
             const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow"];
@@ -32,13 +41,17 @@ internal static partial class FullOverlayBrowserAssets
               viewport: { width: innerWidth, height: innerHeight }, items });
           };
           const measure = () => privatePreview ? observe() : requestAnimationFrame(observe);
-          const dispose = () => { for (const widget of widgets.values()) widget.dispose(); widgets.clear(); };
+          const dispose = () => { for (const widget of widgets.values()) widget.renderer.dispose(); widgets.clear(); };
           const restorePresentation = () => {
             if (!presentation) return;
             for (const [key, value] of Object.entries(presentation.attributes))
               if (value === null) presentation.node.removeAttribute(key); else presentation.node.setAttribute(key, value);
             authored.textContent = presentation.css;
             presentation = null;
+          };
+          const disconnect = () => {
+            restorePresentation(); dispose(); port?.close();
+            if (privatePreview) { port = null; lifetime = null; }
           };
           window.addEventListener("message", (event) => {
             if (port || event.source !== parent || parent === window || event.ports.length !== 1) return;
@@ -50,6 +63,7 @@ internal static partial class FullOverlayBrowserAssets
               if (data?.kind === "observe" && data.lifetime === lifetime && typeof data.requestId === "string" && Array.isArray(data.selectors)) {
                 restorePresentation();
                 observation = { requestId: data.requestId, selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
+                if (privatePreview) { diagnosticRequestId = data.requestId; reportCurrent(); }
                 measure(); return;
               }
               if (data?.kind === "present" && data.lifetime === lifetime) {
@@ -76,9 +90,11 @@ internal static partial class FullOverlayBrowserAssets
               if (privatePreview && typeof data.requestId === "string" && Array.isArray(data.selectors))
                 observation = { requestId: data.requestId, selectors: data.selectors };
               const diagnostics = [];
+              if (privatePreview) { currentDiagnostics = diagnostics; diagnosticRequestId = data.requestId; }
               const report = (widgetId, code) => {
                 diagnostics.push({ widgetId, code });
-                port.postMessage({ kind: "diagnostics", lifetime, requestId: data.requestId, items: diagnostics });
+                if (privatePreview) reportCurrent();
+                else port.postMessage({ kind: "diagnostics", lifetime, requestId: data.requestId, items: diagnostics });
               };
               if (source !== data.html + "\0" + data.css) {
                 restorePresentation();
@@ -88,6 +104,7 @@ internal static partial class FullOverlayBrowserAssets
                 } else {
                   dispose(); html = data.html;
                   document.open(); document.write(data.html); document.close();
+                  if (privatePreview) window.addEventListener("pagehide", disconnect, { once: true });
                   const baseline = document.createElement("style");
                   baseline.textContent = "html,body{margin:0;background:transparent} [data-full-widget-renderer]{position:relative;width:100%;height:100%} [data-full-widget-renderer]>iframe{width:100%;height:100%;border:0} [data-full-widget-renderer] svg{display:block;width:100%;height:100%;overflow:visible} [data-full-widget-renderer] .cue-run,[data-full-widget-renderer] .cue-layer{position:absolute;border:0} [data-full-widget-renderer] .cue-run{inset:0}";
                   const sheet = document.createElement("link"); sheet.rel = "stylesheet";
@@ -97,26 +114,41 @@ internal static partial class FullOverlayBrowserAssets
                 }
               }
               const current = new Set(data.widgets.map(widget => widget.id));
-              for (const [id, widget] of widgets) if (!current.has(id)) { widget.dispose(); widgets.delete(id); }
+              for (const [id, widget] of widgets) if (!current.has(id)) { widget.renderer.dispose(); widgets.delete(id); }
               for (const widget of data.widgets) {
                 if (!widget || typeof widget.id !== "string" || typeof widget.kind !== "string") continue;
                 const anchor = document.querySelector(`[data-blokebot-widget="${CSS.escape(widget.id)}"]`);
+                if (privatePreview && widgets.has(widget.id) && widgets.get(widget.id).anchor !== anchor) {
+                  widgets.get(widget.id).renderer.dispose(); widgets.delete(widget.id);
+                }
                 if (!anchor) { report(widget.id, "missing-anchor"); continue; }
                 try {
-                  if (!widgets.has(widget.id)) widgets.set(widget.id, mount(anchor, widget, report));
-                  widgets.get(widget.id).update(widget);
+                  if (!widgets.has(widget.id)) {
+                    const entry = { anchor, renderer: null };
+                    const identity = lifetime;
+                    const mountedReport = privatePreview ? () => {
+                      if (lifetime === identity && widgets.get(widget.id) === entry && anchor.isConnected
+                        && document.querySelector(`[data-blokebot-widget="${CSS.escape(widget.id)}"]`) === anchor) reportCurrent();
+                    } : report;
+                    entry.renderer = mount(anchor, widget, mountedReport, privatePreview);
+                    widgets.set(widget.id, entry);
+                  }
+                  widgets.get(widget.id).renderer.update(widget);
                 } catch {
-                  widgets.get(widget.id)?.dispose(); widgets.delete(widget.id);
+                  widgets.get(widget.id)?.renderer.dispose(); widgets.delete(widget.id);
                   report(widget.id, "widget-unavailable");
                 }
               }
-              port.postMessage({ kind: "diagnostics", lifetime, requestId: data.requestId, items: diagnostics });
+              if (privatePreview) reportCurrent();
+              else port.postMessage({ kind: "diagnostics", lifetime, requestId: data.requestId, items: diagnostics });
               measure();
+              if (privatePreview && data.sourceUpdate === true)
+                port.postMessage({ kind: "source-complete", lifetime, requestId: data.requestId });
             };
             port.start(); port.postMessage({ kind: "ready", lifetime });
           });
           window.addEventListener("resize", measure);
-          window.addEventListener("pagehide", () => { restorePresentation(); dispose(); port?.close(); }, { once: true });
+          window.addEventListener("pagehide", disconnect, { once: true });
         })();
         """;
 }

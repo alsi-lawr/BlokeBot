@@ -19,16 +19,26 @@ internal static partial class FullOverlayBrowserAssets
           let retry = 500;
           let observation = null;
           let localSource = null;
+          let sourceCompletion = null;
+          let authorizedWidgetIds = null;
+          let authorizationRevision = -1;
+          let currentDiagnostics = [];
           let presentationSequence = 0;
           let presentation = null;
           const completions = new Map();
           const finished = new Set();
           const clear = () => {
-            port?.close(); port = null; loaded = false; pending = null; lifetime = null; presentation = null;
+            port?.close(); port = null; loaded = false; pending = null; lifetime = null; presentation = null; sourceCompletion = null; currentDiagnostics = [];
             for (const timer of completions.values()) clearTimeout(timer);
             completions.clear(); finished.clear();
           };
-          const notice = (state, diagnostics = []) => {
+          const notice = (state, diagnostics = preview ? currentDiagnostics : []) => {
+            if (preview) {
+              const allowed = new Set(pending ? renderWidgets().map(widget => widget.id) : []);
+              diagnostics = diagnostics.filter(item => allowed.has(item.widgetId));
+              currentDiagnostics = diagnostics;
+              if (state === "ready") status.textContent = "";
+            }
             document.body.dataset.status = state;
             document.body.dataset.diagnostics = JSON.stringify(diagnostics);
             if (diagnostics.some(item => item.code === "audio-blocked"))
@@ -42,12 +52,14 @@ internal static partial class FullOverlayBrowserAssets
             if (preview && !page.signal.aborted && loaded && observation && !presentation)
               port.postMessage({ kind: "observe", lifetime, ...observation });
           };
-          const renderWidgets = () => localSource ? pending.widgets.filter(widget => localSource.widgetIds.includes(widget.id)) : pending.widgets;
-          const render = () => {
+          const renderWidgets = () => authorizedWidgetIds ? pending.widgets.filter(widget => authorizedWidgetIds.includes(widget.id)) : pending.widgets;
+          const render = (completion = null) => {
             if (!loaded || !pending) return;
             port.postMessage({ kind: "render", lifetime, ...pending,
               ...(preview && observation ? { requestId: observation.requestId, selectors: observation.selectors } : {}),
-              ...(localSource ? { html: localSource.html, css: localSource.css, widgets: renderWidgets() } : {}) });
+              ...(completion ? { sourceUpdate: true } : {}),
+              ...(preview && authorizedWidgetIds ? { widgets: renderWidgets() } : {}),
+              ...(localSource ? { html: localSource.html, css: localSource.css } : {}) });
           };
           if (preview) window.addEventListener("resize", observe, { signal: page.signal });
           window.addEventListener("message", (event) => {
@@ -56,13 +68,20 @@ internal static partial class FullOverlayBrowserAssets
             if (data?.previewId !== location.pathname.split("/").pop()) return;
             if (data.kind === "blokebot-full-source") {
               if (typeof data.requestId !== "string" || !Number.isSafeInteger(data.revision) || data.revision < (localSource?.revision ?? -1)
-                || typeof data.html !== "string" || typeof data.css !== "string" || !Array.isArray(data.widgetIds)
-                || !data.widgetIds.every(id => typeof id === "string") || !Array.isArray(data.selectors)) return;
+                || data.revision < authorizationRevision || data.lifetime !== lifetime || !Array.isArray(data.widgetIds)
+                || !data.widgetIds.every(id => typeof id === "string")) return;
+              if (data.authorizationOnly === true) {
+                authorizedWidgetIds = data.widgetIds; authorizationRevision = data.revision;
+                render(); notice("ready"); return;
+              }
+              if (typeof data.html !== "string" || typeof data.css !== "string" || !Array.isArray(data.selectors)) return;
               presentation = null;
-              localSource = { revision: data.revision, html: data.html, css: data.css, widgetIds: data.widgetIds };
+              localSource = { revision: data.revision, html: data.html, css: data.css };
+              authorizedWidgetIds = data.widgetIds; authorizationRevision = data.revision;
               observation = { requestId: data.requestId, revision: data.revision,
                 selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
-              render(); notice("ready"); return;
+              sourceCompletion = { requestId: data.requestId, revision: data.revision };
+              render(sourceCompletion); notice("ready"); return;
             }
             if (data.kind === "blokebot-full-present") {
               if (!loaded || !observation || data.requestId !== observation.requestId || data.revision !== observation.revision
@@ -93,7 +112,11 @@ internal static partial class FullOverlayBrowserAssets
               if (lifetime !== identity || value?.lifetime !== identity) return;
               if (value.kind === "ready") {
                 loaded = true;
-                render();
+                render(sourceCompletion);
+              } else if (preview && value.kind === "source-complete" && value.requestId === sourceCompletion?.requestId) {
+                const completed = sourceCompletion; sourceCompletion = null;
+                parent.postMessage({ kind: "blokebot-full-source-complete", previewId: location.pathname.split("/").pop(),
+                  lifetime, ...completed }, location.origin);
               } else if (preview && value.kind === "observations" && value.requestId === observation?.requestId && Array.isArray(value.items)) {
                 if (value.gestureId !== undefined) {
                   if (value.gestureId !== presentation?.gestureId || !Number.isSafeInteger(value.sequence)
