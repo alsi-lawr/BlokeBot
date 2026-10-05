@@ -37,7 +37,11 @@ internal static partial class FullOverlayBrowserAssets
               state, diagnostics, lifetime,
             }, location.origin);
           };
-          const observe = () => { if (preview && loaded && observation) port.postMessage({ kind: "observe", lifetime, ...observation }); };
+          const observe = () => {
+            if (preview && !page.signal.aborted && loaded && observation && !presentation)
+              port.postMessage({ kind: "observe", lifetime, ...observation });
+          };
+          if (preview) window.addEventListener("resize", () => requestAnimationFrame(observe), { signal: page.signal });
           window.addEventListener("message", (event) => {
             if (!preview || parent === window || event.source !== parent || event.origin !== location.origin) return;
             const data = event.data;

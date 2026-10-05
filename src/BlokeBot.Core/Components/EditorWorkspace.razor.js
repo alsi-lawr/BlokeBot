@@ -12,8 +12,15 @@ export function createWorkspace(root, dotnet) {
     change();
     return {
         async toggleFullscreen() {
-            if (document.fullscreenElement) await document.exitFullscreen();
-            else await document.documentElement.requestFullscreen();
+            const exiting = document.fullscreenElement !== null;
+            const operation = exiting ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+            try {
+                await operation;
+                return 0;
+            } catch (error) {
+                if (!(error instanceof TypeError)) throw error;
+                return exiting ? 2 : 1;
+            }
         },
         dispose() { abort.abort(); }
     };
