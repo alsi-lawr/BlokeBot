@@ -119,7 +119,7 @@ public partial class FullOverlayEditorPage
                 await _client.InvokeVoidAsync("dispose");
                 return;
             }
-            await RefreshPreviewAsync(0);
+            await RefreshPreviewAsync(0, false);
         }
     }
 

@@ -83,7 +83,7 @@ public partial class FullOverlayEditorPage
             await _client.InvokeVoidAsync("saved", candidate);
         }
 
-        await RefreshPreviewAsync(_view.Revision);
+        await RefreshPreviewAsync(_view.Revision, false);
     }
 
     private void Rejected(FullOverlayRejection rejection)

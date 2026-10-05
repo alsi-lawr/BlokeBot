@@ -20,8 +20,12 @@ public sealed partial class FullOverlayServiceTests
         EditorInstallationRaceAsync(InstallationRace.Replay);
 
     [Test]
-    public Task EditorDelayedReleaseRejectsChangedSourceAndStaleSameRevisionNotifications() =>
+    public Task EditorAcceptedPreviewRetainsLaterLocalSourceAndRejectsStaleSameRevisionNotifications() =>
         EditorInstallationRaceAsync(InstallationRace.SourceEdit);
+
+    [Test]
+    public Task EditorRefusedInstallationReclaimsOnlyCandidateAndKeepsCurrentLease() =>
+        EditorInstallationRaceAsync(InstallationRace.Refused);
 
     [Test]
     public Task EditorDelayedReleaseCannotInstallAfterPageDisposal() =>
@@ -81,7 +85,7 @@ public sealed partial class FullOverlayServiceTests
         _ = client
             .Setup<IJSStreamReference>("candidateStream", _ => true)
             .SetResult(new CandidateStream(created.Overlay.Draft));
-        var installs = client.SetupVoid("preview", _ => true).SetVoidResult();
+        var installs = client.Setup<bool>("preview", _ => true).SetResult(true);
         var page = context.Render<FullOverlayEditorPage>(parameters =>
             parameters.Add(component => component.OverlayId, created.Overlay.Id)
         );
@@ -95,6 +99,23 @@ public sealed partial class FullOverlayServiceTests
                 _ct
             )
         );
+        if (race == InstallationRace.Refused)
+        {
+            _ = client
+                .Setup<bool>(
+                    "preview",
+                    invocation => (string)invocation.Arguments[0]! == stale.ToString()
+                )
+                .SetResult(false);
+            await page.InvokeAsync(async () =>
+                (await page.Instance.InstallPreviewAsync(stale, 1, 0)).ShouldBeFalse()
+            );
+            (await delivery.MayOpenPreviewAsync(stale, session, _ct)).ShouldBeFalse();
+            (await delivery.MayOpenPreviewAsync(initial, session, _ct)).ShouldBeTrue();
+            await page.InvokeAsync(() => page.Instance.DisposeAsync().AsTask());
+            (await delivery.MayOpenPreviewAsync(initial, session, _ct)).ShouldBeFalse();
+            return;
+        }
         gate.PauseNext = true;
         Task<bool> pending = null!;
         await page.InvokeAsync(() =>
@@ -106,7 +127,7 @@ public sealed partial class FullOverlayServiceTests
         switch (race)
         {
             case InstallationRace.Replay:
-                await page.InvokeAsync(() => page.Instance.RefreshPreviewAsync(0));
+                await page.InvokeAsync(() => page.Instance.RefreshPreviewAsync(0, false));
                 latest = Guid.Parse((string)installs.Invocations.Last().Arguments[0]!);
                 latest.ShouldNotBe(initial);
                 break;
@@ -141,16 +162,18 @@ public sealed partial class FullOverlayServiceTests
                 break;
         }
         gate.Continue.SetResult();
-        (await pending.WaitAsync(TimeSpan.FromSeconds(10))).ShouldBeFalse();
-        (await delivery.MayOpenPreviewAsync(stale, session, _ct)).ShouldBeFalse();
+        (await pending.WaitAsync(TimeSpan.FromSeconds(10))).ShouldBe(
+            race == InstallationRace.SourceEdit
+        );
+        (await delivery.MayOpenPreviewAsync(stale, session, _ct)).ShouldBe(
+            race == InstallationRace.SourceEdit
+        );
         (await delivery.MayOpenPreviewAsync(initial, session, _ct)).ShouldBeFalse();
-        installs
-            .Invocations.Select(invocation => (string)invocation.Arguments[0]!)
-            .ShouldNotContain(stale.ToString());
         if (race == InstallationRace.SourceEdit)
         {
-            await page.InvokeAsync(() => page.Instance.RefreshPreviewAsync(1));
+            await page.InvokeAsync(() => page.Instance.RefreshPreviewAsync(1, false));
             latest = Guid.Parse((string)installs.Invocations.Last().Arguments[0]!);
+            (await delivery.MayOpenPreviewAsync(stale, session, _ct)).ShouldBeFalse();
         }
         if (latest is { } retained)
         {
@@ -161,7 +184,7 @@ public sealed partial class FullOverlayServiceTests
         }
         else
         {
-            installs.Invocations.Count.ShouldBe(1);
+            (await delivery.MayOpenPreviewAsync(stale, session, _ct)).ShouldBeFalse();
         }
     }
 
@@ -170,6 +193,7 @@ public sealed partial class FullOverlayServiceTests
         Replay,
         SourceEdit,
         Disposal,
+        Refused,
     }
 
     private sealed class DelayedModerator : IModeratorAuthorityService

@@ -78,7 +78,7 @@ export function createCanvas(root, readView, command, manipulation) {
     const key=event=>{if(event.key==='Escape'&&gesture){event.preventDefault();cancel();}};
     area.addEventListener('pointerdown',down);area.addEventListener('pointermove',move);area.addEventListener('pointerup',up);area.addEventListener('pointercancel',interrupted);area.addEventListener('lostpointercapture',interrupted);
     root.addEventListener('keydown',key);window.addEventListener('blur',cancel);
-    return { observed(next,size){items=next;if(size)viewport=size;fit();},draw,cancel,
+    return { observed(next,size){items=next;if(size)viewport=size;fit();},draw,cancel,refresh:fit,
         presented(id,item){if(gesture?.id!==id||gesture.revision!==readView().revision)return;gesture.rendered=item;draw();},
         pan(value){cancel();panMode=value;},
         viewport(width,height){cancel();viewport={width,height};fit();},
