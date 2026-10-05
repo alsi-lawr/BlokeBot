@@ -21,6 +21,25 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class FullOverlayServiceTests
 {
     [Test, Explicit]
+    public async Task BrowserPreview_PreservedDiagnosticsRejectObsoleteMountCallbacks()
+    {
+        var driver =
+            Environment.GetEnvironmentVariable("BLOKEBOT_FULL_PREVIEW_DRIVER")
+            ?? throw new InvalidOperationException(
+                "Set BLOKEBOT_FULL_PREVIEW_DRIVER to the owned browser driver."
+            );
+        await using var fixture = await Fixture.CreateAsync();
+        await using var environment = new WidgetEnvironment(fixture);
+        await using var runtime = new DeliveryRuntime(fixture, environment);
+        await using var app = BrowserApp(fixture, environment, runtime);
+        _ = app.MapGet(
+            "/fixture",
+            () => Results.Json(new { frameUrl = "/full-overlay/assets/frame" })
+        );
+        await RunBrowserAsync(app, driver);
+    }
+
+    [Test, Explicit]
     public async Task BrowserDelivery_DeclaredRelativeAssetsAndTopLevelExecutableDocumentStayOpaque()
     {
         var driver =
