@@ -184,3 +184,23 @@ test('Layout planning preserves authored value trivia and separates an untermina
  const revision=owner.view().revision,second=owner.planGesture({...command,dx:8},key,revision);owner.commitGesture(second);
  assert.match(owner.candidate().css,/--blokebot-x:\s*108px/);
 });
+
+test('Current view follows metadata-only edits, source diagnostics, selection and saved baseline without losing focused history',()=>{
+ const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;
+ owner.select(key);assert.equal(owner.view().dirty,false);assert.equal(owner.view().styles.color,'red');
+ owner.command({kind:'audio',property:'volume',value:.8});owner.command({kind:'lock',value:true});
+ assert.equal(owner.view().widget.audio.volume,.8);assert.equal(owner.view().locked,true);assert.equal(owner.view().dirty,true);
+ const saved=owner.candidate();owner.saved(saved);assert.equal(owner.view().dirty,false);
+ owner.source('css','[broken');assert(owner.view().diagnostics.some(d=>d.buffer==='css'));assert.equal(owner.view().focus,'css');
+ owner.stale();const revision=owner.view().revision;owner.focus('html');
+ assert.equal(owner.view().revision,revision);assert.equal(owner.view().focus,'html');assert.match(owner.view().feedback,/newer work/);
+ owner.focus('css');owner.history('undo');assert.equal(owner.candidate().css,saved.css);assert.equal(owner.view().dirty,false);
+ assert.deepEqual(owner.view().diagnostics.filter(d=>d.buffer==='css'),[]);assert.equal(owner.view().styles.color,'red');
+ owner.focus('visual');owner.history('undo');assert.equal(owner.view().locked,false);assert.equal(owner.view().dirty,true);
+ owner.history('redo');assert.equal(owner.view().locked,true);assert.equal(owner.view().dirty,false);
+ owner.source('html',owner.candidate().html.replace('<p>Ordinary','<p data-blokebot-locked="true">Updated'));
+ owner.select(owner.view().layers.find(layer=>layer.tag==='p').key);
+ assert.equal(owner.view().widget,null);assert.equal(owner.view().locked,true);assert.deepEqual(owner.view().styles,{});
+ assert.match(owner.candidate().html,/Updated/);
+ owner.select(key);assert.equal(owner.view().styles.color,'red');assert.equal(owner.view().widget.audio.volume,.8);
+});
