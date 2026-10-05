@@ -7,7 +7,7 @@
     <PageState Kind='@(_loading ? PageStateKind.Loading : PageStateKind.Failure)' Title='@(_loading ? "Loading full overlay" : _message)' />
 } else {
     var controlView = _view;
-    <EditorWorkspace Class="full-overlay-editor" @ref="_workspace" data-full-editor inert='@(_client is null)' aria-busy='@(_client is null ? "true" : "false")' data-sticky-save-scope data-pane='@_pane' data-mode='@_editorMode'>
+    <EditorWorkspace Class="full-overlay-editor" @ref="_workspace" data-full-editor inert='@(_client is null)' aria-busy='@(_client is null ? "true" : "false")' data-sticky-save-scope data-pane="preview" data-mode="visual">
         <header class="full-editor-header">
             <a href="/full-overlays" class="btn-secondary full-editor-back" aria-label="Back to full overlays"><EditorIcon Name="arrow-left" /></a>
             <div class="full-editor-title"><Field Id="full-overlay-name" Label="Overlay name" MaxLength="128" @bind-Value="_name" /><span class="text-muted-foreground">@(_row.IsArchived ? "Archived" : _row.PublishedVersion is { } liveVersion ? $"Live · v{liveVersion.Value}" : "Unpublished draft")</span></div>
@@ -16,9 +16,9 @@
             <EditorAction Label="History & live URL" Icon="history" Click="OpenManagementAsync" />
         </header>
         <div class="full-editor-toolbar">
-            <SegmentedTabs Id="full-mode" AriaLabel="Editor mode" Items="_modeTabs" ActiveKey="@_editorMode" ActiveKeyChanged="ModeChanged" />
+            <SegmentedTabs Id="full-mode" AriaLabel="Editor mode" Items="_modeTabs" ActiveKey="visual" BrowserOwned="true" data-editor-tabs="mode" />
             <div role="group" aria-label="Focused editor history"><EditorAction Label="Undo" Icon="arrow-left" Click='() => HistoryAsync("undo")' /><EditorAction Label="Redo" Icon="arrow-right" Click='() => HistoryAsync("redo")' /><span class="text-muted-foreground">@FocusLabel()</span></div>
-            <div class="full-editor-view-controls" hidden='@(_editorMode != "visual")'>
+            <div class="full-editor-view-controls" data-visual-region>
                 <label class="full-editor-inline"><input type="checkbox" data-snap checked />Snap <span class="full-editor-desktop text-muted-foreground">· Shift bypass</span></label>
                 <EditorAction Label="Pan view" Icon="direction" Pressed="_pan" Click="PanAsync" />
                 <EditorAction Label="Preview viewport" Tip='@($"Preview viewport · {_viewportWidth} × {_viewportHeight}")' Icon="grid" Click="OpenViewportAsync" />
@@ -27,11 +27,11 @@
                 <EditorAction Label="Replay preview" Icon="test" Click="ReplayAsync" />
             </div>
         </div>
-        <nav class="full-editor-mobile-tabs" aria-label="Editor panels" hidden='@(_editorMode != "visual")'>
-            @foreach (var pane in new[] { "layers", "preview", "inspector" }) { <button class="btn-secondary" aria-pressed='@(pane == _pane ? "true" : "false")' @onclick='() => SelectPane(pane)'>@(pane == "preview" ? "Canvas" : char.ToUpperInvariant(pane[0]) + pane[1..])</button> }
+        <nav class="full-editor-mobile-tabs" aria-label="Editor panels" data-visual-region>
+            @foreach (var pane in new[] { "layers", "preview", "inspector" }) { <button class="btn-secondary" aria-pressed='@(pane == "preview" ? "true" : "false")' data-editor-pane="@pane">@(pane == "preview" ? "Canvas" : char.ToUpperInvariant(pane[0]) + pane[1..])</button> }
         </nav>
         <div class="full-editor-workspace">
-            <aside class="full-editor-layers" aria-label="Layers and widget palette" hidden='@(_editorMode != "visual")'>
+            <aside class="full-editor-layers" aria-label="Layers and widget palette" data-visual-region>
                 <h2>Layers</h2>
                 <FullOverlayLayerTree View="_view" Selected="SelectAsync" />
                 <StudioFold Key="full-palette" Label="Add widget" @bind-Open="_paletteOpen" Bare="true">
@@ -42,20 +42,20 @@
                 </StudioFold>
             </aside>
             <div class="full-editor-centre">
-                <section class="full-editor-canvas" hidden='@(_editorMode != "visual")' role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Alt drag pans the view.">
+                <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Alt drag pans the view.">
                     <div class="full-editor-canvas-stage" data-canvas-stage>
                         <div class="full-editor-canvas-scene" data-canvas-scene><iframe data-preview-frame title="Private unsaved overlay preview" referrerpolicy="no-referrer" allow="autoplay"></iframe></div>
                         <div data-selection class="full-editor-selection" hidden>@foreach (var handle in new[] { "nw", "n", "ne", "e", "se", "s", "sw", "w" }) { <button data-resize="@handle" type="button" tabindex="-1" aria-label="@($"Resize {handle}. Keyboard alternatives are in Position and size.")"></button> }</div>
                     </div>
                     <span class="full-editor-preview-state" role="status">@_previewState</span>
                 </section>
-                <section class="full-editor-source" hidden='@(_editorMode != "source")' role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "source")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "source")'>
-                    <header class="full-editor-source-header"><SegmentedTabs Id="full-source" AriaLabel="Source editor" Items="_sourceTabs" ActiveKey="@_sourceTab" ActiveKeyChanged="SourceTabChanged" /><span class="text-muted-foreground">Includes your visual edits</span><span class="full-editor-source-selection">@SelectedLabel()</span></header>
-                    <div class="full-editor-source-pane" data-source-pane="html" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "html")' aria-labelledby='@SegmentedTabs.TabId("full-source", "html")' hidden='@(_sourceTab != "html")'><textarea id="full-source-html" data-source="html" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay HTML source"></textarea></div>
-                    <div class="full-editor-source-pane" data-source-pane="css" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "css")' aria-labelledby='@SegmentedTabs.TabId("full-source", "css")' hidden='@(_sourceTab != "css")'><textarea id="full-source-css" data-source="css" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay CSS source"></textarea></div>
+                <section class="full-editor-source" data-source-region hidden role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "source")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "source")'>
+                    <header class="full-editor-source-header"><SegmentedTabs Id="full-source" AriaLabel="Source editor" Items="_sourceTabs" ActiveKey="html" BrowserOwned="true" data-editor-tabs="source" /><span class="text-muted-foreground">Includes your visual edits</span><span class="full-editor-source-selection">@SelectedLabel()</span></header>
+                    <div class="full-editor-source-pane" data-source-pane="html" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "html")' aria-labelledby='@SegmentedTabs.TabId("full-source", "html")' ><textarea id="full-source-html" data-source="html" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay HTML source"></textarea></div>
+                    <div class="full-editor-source-pane" data-source-pane="css" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "css")' aria-labelledby='@SegmentedTabs.TabId("full-source", "css")' hidden><textarea id="full-source-css" data-source="css" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay CSS source"></textarea></div>
                 </section>
             </div>
-            <aside class="full-editor-inspector" aria-label="Selected layer inspector" hidden='@(_editorMode != "visual")'>
+            <aside class="full-editor-inspector" aria-label="Selected layer inspector" data-visual-region>
                 <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" />
                 @if (_view.Widget is { } widget) {
                     <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">

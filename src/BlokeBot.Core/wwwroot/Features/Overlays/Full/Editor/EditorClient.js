@@ -1,13 +1,14 @@
 import { createEditorDocument } from './EditorDocument.js';
 import { createCanvas } from './EditorCanvas.js';
 import { createPreviewBridge } from './EditorPreview.js';
+import { createPresentation } from './EditorPresentation.js';
 
 export function createClient(root, document, dotnet) {
     const owner=createEditorDocument(document), abort=new AbortController(), options={signal:abort.signal};
     const html=root.querySelector('[data-source=html]'),css=root.querySelector('[data-source=css]');
-    let view=owner.view(),disposed=false, previewTimer=null,measurements=[],measuredRevision=-1;
+    let view=owner.view(),disposed=false, previewTimer=null,measurements=[],measuredRevision=-1,notification=0;
     const measured=value=>{const item=measuredRevision===value.revision?measurements.find(item=>item.key===value.selected):null;return item?{...value,styles:{...item.styles,...value.styles}}:value;};
-    const publish=()=>{if(!disposed)void dotnet.invokeMethodAsync('EditorChangedAsync',view);};
+    const publish=()=>{if(!disposed)void dotnet.invokeMethodAsync('EditorChangedAsync',view,++notification);};
     const changed=(next,retainPresentation=false)=>{
         const previous=view.revision;view=measured(next);
         if(previous!==view.revision){preview.invalidate(retainPresentation);clearTimeout(previewTimer);
@@ -28,6 +29,8 @@ export function createClient(root, document, dotnet) {
         (items,size,revision)=>{if(revision===view.revision){measurements=items;measuredRevision=revision;view=measured(owner.view());canvas.observed(items,size);publish();}},
         (state,diagnostics)=>{if(!disposed)void dotnet.invokeMethodAsync('PreviewStatusAsync',state,diagnostics.map(d=>d.code));},
         (id,item)=>canvas.presented(id,item),()=>canvas.cancel());
+    const focusEditor=(buffer,moveFocus=true)=>{if(disposed)return;view=owner.focus(buffer);publish();if(moveFocus)(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});};
+    const presentation=createPresentation(root,focusEditor,()=>canvas.cancel());
     html.value=document.html;css.value=document.css;
     for(const input of [html,css]){
         input.addEventListener('focus',()=>{view=owner.focus(input.dataset.source);publish();},options);
@@ -71,9 +74,8 @@ export function createClient(root, document, dotnet) {
         pan:value=>canvas.pan(value),
         viewport(width,height){canvas.viewport(width,height);preview.query();},
         zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),
-        focusEditor(buffer){if(disposed)return;view=owner.focus(buffer);publish();(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});},
-        find(selection){if(selection!==view.selected)return;const position=owner.command({kind:'find'}).sourcePosition;if(position!==null){html.focus();html.setSelectionRange(position,position);}},
-        dispose(){disposed=true;clearTimeout(previewTimer);abort.abort();layout.disconnect();preview.dispose();canvas.dispose();}
+        find(selection){if(disposed||selection!==view.selected)return;const position=owner.command({kind:'find'}).sourcePosition;if(position!==null){presentation.revealHtml();html.setSelectionRange(position,position);}},
+        dispose(){disposed=true;clearTimeout(previewTimer);abort.abort();presentation.dispose();layout.disconnect();preview.dispose();canvas.dispose();}
     };
 }
 

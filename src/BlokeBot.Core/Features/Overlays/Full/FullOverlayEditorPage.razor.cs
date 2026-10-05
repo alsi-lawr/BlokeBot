@@ -41,42 +41,23 @@ public partial class FullOverlayEditorPage
     private ImmutableArray<FullOverlayDiagnostic> _publicationDiagnostics = [];
     private string _name = "Full overlay";
     private string _message = "";
-    private string _pane = "preview";
     private bool _loading = true;
     private bool _busy;
     private bool _disposed;
     private bool _initializing;
+    private long _editorNotification;
     private bool _paletteOpen;
-    private string _sourceTab = "html";
     private static readonly IReadOnlyList<SegmentedTabItem> _sourceTabs =
     [
         new("html", "HTML"),
         new("css", "CSS"),
     ];
 
-    private string _editorMode = "visual";
-    private bool _focusEditorAfterRender;
-    private string? _findAfterRender;
     private static readonly IReadOnlyList<SegmentedTabItem> _modeTabs =
     [
         new("visual", "Visual"),
         new("source", "HTML/CSS"),
     ];
-
-    private void SelectPane(string pane) => _pane = pane;
-
-    private void ModeChanged(string mode)
-    {
-        _editorMode = mode;
-        _pane = "preview";
-        _focusEditorAfterRender = true;
-    }
-
-    private void SourceTabChanged(string tab)
-    {
-        _sourceTab = tab;
-        _focusEditorAfterRender = true;
-    }
 
     private string SelectedLabel() =>
         _view.Layers.FirstOrDefault(layer => layer.Key == _view.Selected)?.Label ?? "";
@@ -140,30 +121,17 @@ public partial class FullOverlayEditorPage
             }
             await RefreshPreviewAsync(0);
         }
-        if (_findAfterRender is { } selection)
-        {
-            _findAfterRender = null;
-            _focusEditorAfterRender = false;
-            await _client.InvokeVoidAsync("find", selection);
-        }
-        else if (_focusEditorAfterRender)
-        {
-            _focusEditorAfterRender = false;
-            await _client.InvokeVoidAsync(
-                "focusEditor",
-                _editorMode == "visual" ? "visual" : _sourceTab
-            );
-        }
     }
 
     [JSInvokable]
-    public Task EditorChangedAsync(FullOverlayEditorView view)
+    public Task EditorChangedAsync(FullOverlayEditorView view, long notification)
     {
-        if (_disposed || view.Revision < _view.Revision)
+        if (_disposed || notification <= _editorNotification || view.Revision < _view.Revision)
         {
             return Task.CompletedTask;
         }
 
+        _editorNotification = notification;
         var selected = _view.Selected;
         var priorConfiguration = _view.Widget?.Configuration.GetRawText() ?? "";
         _view = view;
@@ -193,17 +161,10 @@ public partial class FullOverlayEditorPage
             ? Task.CompletedTask
             : _client.InvokeVoidAsync("history", direction).AsTask();
 
-    private void FindAsync(string? selection)
-    {
-        if (_view.Selected != selection || selection is null)
-        {
-            return;
-        }
-        _editorMode = "source";
-        _sourceTab = "html";
-        _pane = "preview";
-        _findAfterRender = selection;
-    }
+    private Task FindAsync(string? selection) =>
+        _client is null || selection is null
+            ? Task.CompletedTask
+            : _client.InvokeVoidAsync("find", selection).AsTask();
 
     private Task AddAsync(FullOverlayWidgetKind kind) =>
         _registry.Create(kind, OverlayId) is { } widget

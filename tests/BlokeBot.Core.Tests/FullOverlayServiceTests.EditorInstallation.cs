@@ -5,6 +5,7 @@ using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
 using Bunit;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
@@ -19,7 +20,7 @@ public sealed partial class FullOverlayServiceTests
         EditorInstallationRaceAsync(InstallationRace.Replay);
 
     [Test]
-    public Task EditorDelayedReleaseRejectsChangedSourceEvenWithoutNewPreviewRequest() =>
+    public Task EditorDelayedReleaseRejectsChangedSourceAndStaleSameRevisionNotifications() =>
         EditorInstallationRaceAsync(InstallationRace.SourceEdit);
 
     [Test]
@@ -116,9 +117,24 @@ public sealed partial class FullOverlayServiceTests
                         {
                             Revision = 1,
                             Dirty = true,
-                        }
+                            Focus = "css",
+                        },
+                        2
                     )
                 );
+                await page.InvokeAsync(() =>
+                    page.Instance.EditorChangedAsync(
+                        FullOverlayEditorView.Empty with
+                        {
+                            Revision = 1,
+                            Focus = "html",
+                        },
+                        1
+                    )
+                );
+                page.FindComponent<FullOverlayInspector>().Instance.View.Focus.ShouldBe("css");
+                page.FindComponent<NavigationLock>()
+                    .Instance.ConfirmExternalNavigation.ShouldBeTrue();
                 break;
             case InstallationRace.Disposal:
                 await page.InvokeAsync(() => page.Instance.DisposeAsync().AsTask());
