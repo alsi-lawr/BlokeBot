@@ -37,17 +37,24 @@ export function planStyles(snapshot, key, properties, prepared=prepareStyles(sna
         if(!attribute||!snapshot.html.slice(attribute.start,attribute.end).includes(element.values.style))return {kind:'unmapped',code:'encoded-inline-css'};
         const inline=parsedCss(element.values.style,'declarationList');
         if(!inline.tree||inline.diagnostics.length)return {kind:'unmapped',code:'incomplete-inline-css'};
-        const changes=[];
+        const changes=[],appended=[];
         for(const [property,value] of Object.entries(properties)){
-            const declaration=inline.tree.children.toArray().findLast(node=>node.type==='Declaration'&&node.property===property);
+            const declarations=inline.tree.children.toArray();
+            const declaration=declarations.findLast(node=>node.type==='Declaration'&&node.property===property);
+            const shorthand=['background-color','background-image'].includes(property)?declarations.findLast(node=>node.type==='Declaration'&&node.property==='background'):null;
+            if(shorthand&&(!declaration||declarations.indexOf(shorthand)>declarations.indexOf(declaration)||shorthand.important&&!declaration.important)) {
+                appended.push(`${property}: ${value}${shorthand.important||declaration?.important?' !important':''};`);
+                delete properties[property];continue;
+            }
             if(!declaration?.value.loc)continue;
             const first=declaration.value.children?.first??declaration.value,last=declaration.value.children?.last??declaration.value;
             changes.push({start:first.loc.start.offset,end:last.loc.end.offset,after:String(value)});
             delete properties[property];
         }
-        if(changes.length){
+        if(changes.length||appended.length){
             let value=element.values.style;
             for(const change of changes.sort((a,b)=>b.start-a.start))value=value.slice(0,change.start)+change.after+value.slice(change.end);
+            if(appended.length)value+=`; ${appended.join(' ')}`;
             const change=attributeEdit(snapshot.html,element.start,'style',value);
             if(change.kind!=='patch')return change;
             edits.push(change.edit);
@@ -63,7 +70,12 @@ export function planStyles(snapshot, key, properties, prepared=prepareStyles(sna
     const rule = rules.findLast(rule => tree.children.toArray().includes(rule));
     const additions = [];
     for (const [property, value] of Object.entries(properties)) {
-        const declaration = rule?.block.children.toArray().findLast(node => node.type === 'Declaration' && node.property === property);
+        const declarations=rule?.block.children.toArray()??[];
+        const declaration=declarations.findLast(node=>node.type==='Declaration'&&node.property===property);
+        const shorthand=['background-color','background-image'].includes(property)?declarations.findLast(node=>node.type==='Declaration'&&node.property==='background'):null;
+        if(shorthand&&(!declaration||declarations.indexOf(shorthand)>declarations.indexOf(declaration)||shorthand.important&&!declaration.important)) {
+            additions.push(`${property}: ${value}${shorthand.important||declaration?.important?' !important':''};`);continue;
+        }
         if (declaration?.value.loc) {
             const first=declaration.value.children?.first??declaration.value,last=declaration.value.children?.last??declaration.value;
             const start=first.loc.start.offset,end=last.loc.end.offset;

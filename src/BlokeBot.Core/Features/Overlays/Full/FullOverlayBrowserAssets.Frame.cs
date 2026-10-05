@@ -27,7 +27,7 @@ internal static partial class FullOverlayBrowserAssets
           };
           const observe = () => {
             if (!observation || !port) return;
-            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow"];
+            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow"];
             const items = observation.selectors.flatMap(item => {
               let node;
               try { node = document.querySelector(item.selector); } catch { return []; }
