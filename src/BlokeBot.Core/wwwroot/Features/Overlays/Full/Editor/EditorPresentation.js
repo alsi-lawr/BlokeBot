@@ -1,7 +1,8 @@
-export function createPresentation(root, focusEditor, cancelGesture) {
+export function createPresentation(root, focusEditor, cancelGesture, layout) {
     const abort = new AbortController(), options = {signal:abort.signal};
     const modeTabs = root.querySelector('[data-editor-tabs=mode]');
     const sourceTabs = root.querySelector('[data-editor-tabs=source]');
+    const canvas = root.querySelector('[data-canvas-area]');
     let mode = 'visual', source = 'html', pane = 'preview', disposed = false;
 
     function tabs(strip, selected) {
@@ -17,12 +18,15 @@ export function createPresentation(root, focusEditor, cancelGesture) {
     function render() {
         root.dataset.mode = mode;
         root.dataset.pane = pane;
-        for (const region of root.querySelectorAll('[data-visual-region]')) region.hidden = mode !== 'visual';
+        for (const region of root.querySelectorAll('[data-visual-region]')) if (region !== canvas) region.hidden = mode !== 'visual';
+        canvas.inert = mode !== 'visual';
+        canvas.setAttribute('aria-hidden', String(mode !== 'visual'));
         root.querySelector('[data-source-region]').hidden = mode !== 'source';
         for (const region of root.querySelectorAll('[data-source-pane]')) region.hidden = region.dataset.sourcePane !== source;
         for (const button of root.querySelectorAll('[data-editor-pane]')) button.setAttribute('aria-pressed', String(button.dataset.editorPane===pane));
         tabs(modeTabs, mode);
         tabs(sourceTabs, source);
+        layout();
     }
     function select(strip, key, moveFocus) {
         if (disposed || (strip === modeTabs ? key === mode : key === source)) return;

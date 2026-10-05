@@ -98,7 +98,7 @@ public partial class FullOverlayEditorPage
                     _row = selected.Value.Overlay;
                     _publicationDiagnostics = selected.Value.Warnings;
                     _message = $"Version {version.Value} is live. Your working draft is unchanged.";
-                    await RefreshPreviewAsync(_view.Revision);
+                    await RefreshPreviewAsync(_view.Revision, false);
                 },
                 rejected =>
                 {
@@ -149,7 +149,7 @@ public partial class FullOverlayEditorPage
                     return false;
                 }
             );
-            await RefreshPreviewAsync(_view.Revision);
+            await RefreshPreviewAsync(_view.Revision, false);
         }
         finally
         {
@@ -225,7 +225,7 @@ public partial class FullOverlayEditorPage
                     return false;
                 }
             );
-            await RefreshPreviewAsync(_view.Revision);
+            await RefreshPreviewAsync(_view.Revision, false);
         }
         finally
         {

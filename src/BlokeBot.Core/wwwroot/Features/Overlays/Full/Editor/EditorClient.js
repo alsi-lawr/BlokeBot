@@ -6,17 +6,17 @@ import { createPresentation } from './EditorPresentation.js';
 export function createClient(root, document, dotnet) {
     const owner=createEditorDocument(document), abort=new AbortController(), options={signal:abort.signal};
     const html=root.querySelector('[data-source=html]'),css=root.querySelector('[data-source=css]');
-    let view=owner.view(),disposed=false, previewTimer=null,measurements=[],measuredRevision=-1,notification=0;
+    let view=owner.view(),disposed=false,measurements=[],measuredRevision=-1,notification=0,previewRequest=0;
     const measured=value=>{const item=measuredRevision===value.revision?measurements.find(item=>item.key===value.selected):null;return item?{...value,styles:{...item.styles,...value.styles}}:value;};
-    const publish=()=>{if(!disposed)void dotnet.invokeMethodAsync('EditorChangedAsync',view,++notification);};
+    const publish=()=>disposed?Promise.resolve():dotnet.invokeMethodAsync('EditorChangedAsync',view,++notification);
     const changed=(next,retainPresentation=false)=>{
         const previous=view.revision;view=measured(next);
-        if(previous!==view.revision){preview.invalidate(retainPresentation);clearTimeout(previewTimer);
-            previewTimer=setTimeout(()=>{if(!disposed)void dotnet.invokeMethodAsync('RefreshPreviewAsync',view.revision);},200);}
+        const authorize=previous!==view.revision&&preview.render(owner.candidate(),view.revision,retainPresentation);
         const snapshot=owner.session.snapshot();
         if(html.value!==snapshot.html)html.value=snapshot.html;
         if(css.value!==snapshot.css)css.value=snapshot.css;
-        canvas.draw();publish();return view;
+        canvas.draw();const revision=view.revision;
+        void publish().then(()=>{if(authorize&&!disposed&&revision===view.revision)void dotnet.invokeMethodAsync('RefreshPreviewAsync',revision,true);});return view;
     };
     const command=(value,selection=view.selected,revision=view.revision)=>changed(owner.control(value.kind==='visible'&&!value.value?{...value,display:view.styles.display}:value.kind==='position'||value.kind==='anchor'||value.kind==='move'||value.kind==='resize'?{...value,computed:{...value.computed,...view.styles}}:value,selection,revision));
     const canvas=createCanvas(root,()=>view,command,{
@@ -30,7 +30,7 @@ export function createClient(root, document, dotnet) {
         (state,diagnostics)=>{if(!disposed)void dotnet.invokeMethodAsync('PreviewStatusAsync',state,diagnostics.map(d=>d.code));},
         (id,item)=>canvas.presented(id,item),()=>canvas.cancel());
     const focusEditor=(buffer,moveFocus=true)=>{if(disposed)return;view=owner.focus(buffer);publish();if(moveFocus)(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});};
-    const presentation=createPresentation(root,focusEditor,()=>canvas.cancel());
+    const presentation=createPresentation(root,focusEditor,()=>canvas.cancel(),()=>canvas.refresh());
     html.value=document.html;css.value=document.css;
     for(const input of [html,css]){
         input.addEventListener('focus',()=>{view=owner.focus(input.dataset.source);publish();},options);
@@ -70,12 +70,12 @@ export function createClient(root, document, dotnet) {
         export(form,name){form.elements.namedItem('document').value=JSON.stringify(owner.candidate());form.elements.namedItem('name').value=name;form.requestSubmit();},
         history:direction=>changed(owner.history(direction)),
         saved:value=>changed(owner.saved(value)),
-        preview(id,revision){if(revision===view.revision)preview.set(id,revision);},
+        preview(id,revision,request){if(disposed||request<=previewRequest)return false;previewRequest=request;return revision===view.revision&&preview.set(id,revision,owner.candidate());},
         pan:value=>canvas.pan(value),
         viewport(width,height){canvas.viewport(width,height);preview.query();},
         zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),
         find(selection){if(disposed||selection!==view.selected)return;const position=owner.command({kind:'find'}).sourcePosition;if(position!==null){presentation.revealHtml();html.setSelectionRange(position,position);}},
-        dispose(){disposed=true;clearTimeout(previewTimer);abort.abort();presentation.dispose();layout.disconnect();preview.dispose();canvas.dispose();}
+        dispose(){disposed=true;abort.abort();presentation.dispose();layout.disconnect();preview.dispose();canvas.dispose();}
     };
 }
 

@@ -4,10 +4,37 @@ import { createEditorDocument } from '../../../src/BlokeBot.Core/wwwroot/Feature
 import { createSourceSession, EditorFocus } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceSession.js';
 import { targetElement } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/VisualStyles.js';
 import { cssRanges } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceRanges.js';
+import { createPreviewBridge } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/EditorPreview.js';
 
 const id='91c902f7-4020-416c-8b99-a5bdf008e55b';
 const widget={id:{value:id},kind:{value:'giveaway'},configuration:{appearance:{css:'.card { opacity: .7; }'},secretSetting:'EDITOR ONLY'},authoring:{isVisible:true,isLocked:false,clipOverflow:false,x:'0px',y:'0px',width:'100px',height:'50px',rotationDegrees:0,scaleX:1,scaleY:1,horizontalAnchor:0,verticalAnchor:0},audio:{isMuted:false,volume:.3}};
 const document={id:crypto.randomUUID(),html:`<!-- untouched --><main><section data-blokebot-widget="${id}"></section><p>Ordinary</p><script>const raw = "<section>";</script></main>`,css:`/* untouched */[data-blokebot-widget="${id}"] { color: red; unknown-prop: future(x); } @media (width > 30rem) { [data-blokebot-widget="${id}"] { opacity: .8; } }`,widgets:[widget],diagnostics:[]};
+
+test('Local preview keeps authorized widgets only and rejects obsolete or nested-frame geometry',()=>{
+ const previousWindow=globalThis.window,previousLocation=globalThis.location;
+ const host=new EventTarget(),frame=new EventTarget(),sent=[],accepted=[];
+ globalThis.window=host;globalThis.location={origin:'https://editor.example'};
+ frame.contentWindow={postMessage:value=>sent.push(value)};
+ frame.removeAttribute=()=>{};
+ let view={revision:0,selected:'element:target',layers:[{key:'element:target',selector:'#target'}]};
+ const bridge=createPreviewBridge(frame,()=>view,(...args)=>accepted.push(args),()=>{},()=>{},()=>{});
+ const receive=(data,source=frame.contentWindow)=>{const event=new Event('message');Object.assign(event,{data,source,origin:location.origin});host.dispatchEvent(event);};
+ try {
+  bridge.set('approved',0,structuredClone(document));frame.dispatchEvent(new Event('load'));
+  const first=sent.at(-1);assert.deepEqual(first.widgetIds,[id]);
+  const edited={...structuredClone(document),html:'<section id="target">new local source</section>'};
+  view={...view,revision:1};assert.equal(bridge.render(edited,1),false);
+  const current=sent.at(-1);assert.equal(current.html,edited.html);assert.deepEqual(current.widgetIds,[id]);
+  bridge.set('late-reply',0,document);assert.equal(frame.src,'/full-overlays/preview/approved');
+  const geometry=request=>({kind:'blokebot-full-observations',previewId:'approved',requestId:request.requestId,revision:request.revision,viewport:{width:1920,height:1080},items:[{key:'element:target',x:1,y:2,width:30,height:40,layoutX:1,layoutY:2,styles:{left:'1px'}}]});
+  const before=accepted.length;receive(geometry(first));receive(geometry(current),{});receive({...geometry(current),revision:0});assert.equal(accepted.length,before);
+  receive(geometry(current));assert.equal(accepted.at(-1)[0][0].x,1);
+  edited.widgets[0].configuration={sourceId:'new binding'};view={...view,revision:2};assert.equal(bridge.render(edited,2),true);assert.deepEqual(sent.at(-1).widgetIds,[]);
+  view={...view,revision:3};assert.equal(bridge.render(structuredClone(document),3),true);
+  view={...view,revision:4};assert.equal(bridge.render({...edited,widgets:[]},4),true);assert.deepEqual(sent.at(-1).widgetIds,[]);
+  bridge.dispose();const disposed=accepted.length;receive(geometry(sent.at(-1)));assert.equal(accepted.length,disposed);
+ } finally {bridge.dispose();globalThis.window=previousWindow;globalThis.location=previousLocation;}
+});
 
 test('Grouped source and audio metadata undo preserves newer CSS and retries atomically',()=>{
  const owner=createEditorDocument(structuredClone(document));owner.select(`widget:${id}`);
