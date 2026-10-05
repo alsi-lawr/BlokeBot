@@ -13,6 +13,8 @@ internal static class FullOverlayEditorImportMap
                 {
                     ["/Features/Overlays/Full/Editor/"] = new Dictionary<string, string>
                     {
+                        ["@melloware/coloris"] =
+                            $"/{assets["vendor/full-overlay-editor/coloris/coloris.js"]}",
                         ["parse5"] = $"/{assets["vendor/full-overlay-editor/parse5/index.js"]}",
                         ["css-tree"] =
                             $"/{assets["vendor/full-overlay-editor/css-tree/csstree.esm.js"]}",

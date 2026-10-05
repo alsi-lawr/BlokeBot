@@ -18,8 +18,11 @@ await collectModules(join(root, 'node_modules/parse5/dist'), join(destination, '
 await collectModules(join(root, 'node_modules/entities/dist'), join(destination, 'entities'));
 files.set(join(destination, 'css-tree/csstree.esm.js'), await readFile(join(root, 'node_modules/css-tree/dist/csstree.esm.js')));
 
+for (const [from, to] of [['dist/esm/coloris.js', 'coloris.js'], ['dist/coloris.css', 'coloris.css']])
+    files.set(join(destination, 'coloris', to), await readFile(join(root, 'node_modules/@melloware/coloris', from)));
+
 const notices = [];
-for (const name of ['parse5', 'entities', 'css-tree', 'mdn-data', 'source-map-js']) {
+for (const name of ['parse5', 'entities', 'css-tree', 'mdn-data', 'source-map-js', '@melloware/coloris']) {
     const directory = join(root, 'node_modules', name);
     const manifest = JSON.parse(await readFile(join(directory, 'package.json'), 'utf8'));
     const license = (await readdir(directory)).find(file => /^licen[cs]e(?:\.|$)/i.test(file));

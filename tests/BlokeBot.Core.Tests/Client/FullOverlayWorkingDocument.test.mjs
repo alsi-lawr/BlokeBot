@@ -266,3 +266,45 @@ test('Current view follows metadata-only edits, source diagnostics, selection an
  assert.match(owner.candidate().html,/Updated/);
  owner.select(key);assert.equal(owner.view().styles.color,'red');assert.equal(owner.view().widget.audio.volume,.8);
 });
+
+test('A held styling plan preserves source until completion and cannot overwrite newer Visual work',()=>{
+ const owner=createEditorDocument(structuredClone(document));owner.select(`widget:${id}`);
+ const original=owner.candidate(),revision=owner.view().revision;
+ const first=owner.planStyle({color:'rgba(20, 40, 60, .5)'},`widget:${id}`,revision);
+ const last=owner.planStyle({color:'rgba(80, 40, 60, .8)'},`widget:${id}`,revision);
+ assert.deepEqual(owner.candidate(),original);
+ owner.commitGesture(last);assert.equal(owner.view().revision,revision+1);
+ assert.equal(owner.view().styles.color,'rgba(80, 40, 60, .8)');
+ owner.commitGesture(first);assert.equal(owner.view().styles.color,'rgba(80, 40, 60, .8)');
+ owner.history('undo');assert.deepEqual(owner.candidate(),original);
+});
+
+test('Background longhands override inline important shorthand without rewriting its other components',()=>{
+ const html='<section data-blokebot-element="paint" style="background: url(image.png) 20% 30% / cover no-repeat red !important; /* keep */ transform:rotateX(20deg)">Paint</section>';
+ const original={...structuredClone(document),html,widgets:[]},owner=createEditorDocument(original);owner.select('element:paint');
+ const plan=owner.planStyle({'background-color':'rgba(30, 60, 90, .5)'},'element:paint',0);owner.commitGesture(plan);
+ const result=targetElement(owner.candidate(),'element:paint');
+ assert.equal(result.values.style,'background: url(image.png) 20% 30% / cover no-repeat red !important; /* keep */ transform:rotateX(20deg); background-color: rgba(30, 60, 90, .5) !important;');
+ assert.equal(owner.candidate().css,original.css);
+ owner.history('undo');assert.deepEqual(owner.candidate(),original);
+});
+
+test('Completed individual transform styling keeps unrelated transforms and atomic widget authoring history',()=>{
+ const owner=createEditorDocument({...structuredClone(document),css:document.css+`[data-blokebot-widget="${id}"] { transform: rotateX(25deg) skewY(5deg); }`});owner.select(`widget:${id}`);
+ const before=owner.candidate(),planned=owner.planStyle({rotate:'-40deg'},`widget:${id}`,owner.view().revision);
+ owner.commitGesture({...planned,metadata:[{path:['widgets',id,'authoring','rotationDegrees'],value:-40}]});
+ assert.equal(owner.view().styles.transform,'rotateX(25deg) skewY(5deg)');assert.equal(owner.view().widget.authoring.rotationDegrees,-40);
+ owner.history('undo');assert.deepEqual(owner.candidate(),before);
+ owner.history('redo');assert.equal(owner.view().styles.rotate,'-40deg');assert.equal(owner.view().widget.authoring.rotationDegrees,-40);
+});
+
+test('Background longhand edits remain effective after later or important authored stylesheet shorthand',()=>{
+ for(const declarations of ['background-image: url(old.png); background: red;', 'background: red !important; background-image: url(old.png);']){
+  const original={...structuredClone(document),html:'<section data-blokebot-element="paint">Paint</section>',css:`/* keep */ [data-blokebot-element="paint"] { ${declarations} transform: skewY(5deg); }`,widgets:[]};
+  const owner=createEditorDocument(original);owner.select('element:paint');
+  owner.commitGesture(owner.planStyle({'background-image':'linear-gradient(red, blue)'},'element:paint',0));
+  assert(owner.candidate().css.includes(declarations));assert.match(owner.candidate().css,/transform: skewY\(5deg\);/);
+  assert.match(owner.candidate().css,new RegExp(`background-image: linear-gradient\\(red, blue\\)${declarations.includes('!important')?' !important':''};`));
+  owner.history('undo');assert.deepEqual(owner.candidate(),original);
+ }
+});

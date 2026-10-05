@@ -16,22 +16,26 @@ public partial class FullOverlayInspector
 
     [Parameter]
     public EventCallback Find { get; set; }
+
+    [Parameter]
+    public EventCallback Replay { get; set; }
+
+    private bool _effectsOpen;
     private bool _positionOpen;
     private bool _motionOpen;
     private bool _styleOpen = true;
     private bool _audioOpen;
     private string _motionPhase = "entrance";
-    private string _motionPreset = "fade";
     private string _duration = "300";
     private string _easing = "ease-out";
-    private static readonly (string Property, string Label)[] _styleFields =
+    private static readonly (string Property, string Label)[] _textFields =
     [
-        ("color", "Text colour"),
-        ("background", "Background"),
         ("font-family", "Font"),
         ("font-size", "Text size"),
         ("font-weight", "Weight"),
-        ("text-align", "Text align"),
+    ];
+    private static readonly (string Property, string Label)[] _effectFields =
+    [
         ("padding", "Padding"),
         ("gap", "Gap"),
         ("border-radius", "Corners"),
@@ -103,32 +107,6 @@ public partial class FullOverlayInspector
             }
         );
 
-    private Task RotateAsync(string value) =>
-        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var degrees)
-        && double.IsFinite(degrees)
-            ? Send(
-                new
-                {
-                    kind = "layout",
-                    properties = new { rotate = $"{value}deg" },
-                    metadata = new { rotationDegrees = degrees },
-                }
-            )
-            : Task.CompletedTask;
-
-    private Task ScaleAsync(string value) =>
-        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale)
-        && double.IsFinite(scale)
-            ? Send(
-                new
-                {
-                    kind = "layout",
-                    properties = new { scale = value },
-                    metadata = new { scaleX = scale, scaleY = scale },
-                }
-            )
-            : Task.CompletedTask;
-
     private Task VolumeAsync(ChangeEventArgs args) =>
         Send(
             new
@@ -139,7 +117,7 @@ public partial class FullOverlayInspector
             }
         );
 
-    private Task MotionAsync() =>
+    private Task MotionAsync(FullOverlayMotionPreset preset) =>
         double.TryParse(
             _duration,
             NumberStyles.Float,
@@ -153,7 +131,7 @@ public partial class FullOverlayInspector
                 {
                     kind = "motion",
                     phase = _motionPhase,
-                    preset = _motionPreset,
+                    preset = preset.ToString().ToLowerInvariant(),
                     duration,
                     easing = _easing,
                 }
