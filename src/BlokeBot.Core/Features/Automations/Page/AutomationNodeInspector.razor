@@ -31,7 +31,7 @@ else
                     @if (Node.Definition.Id.Value != AutomationSubflowDefinitions.Invoke && !_isSubflowBoundary) { <small class="automation-inspector-purpose">@Node.Definition.Display.Description</small> }
                 </div>
             </div>
-            <button class="automation-icon-button" type="button" aria-label="Close Inspector" title="Close Inspector" @onclick="ClearSelection"><AutomationIcon Name="close" /></button>
+            <button class="automation-icon-button" type="button" aria-label="Close Inspector" title="Close Inspector" @onclick="ClearSelection"><EditorIcon Name="close" /></button>
         </header>
 
         @if (Node.Definition.Id.Value == AutomationSubflowDefinitions.Invoke)
@@ -63,7 +63,7 @@ else
                 <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
             </div>
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">
-                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><button class="automation-icon-button" type="button" aria-label="Add input" title="Add input" @onclick="AddTransformInputAsync"><AutomationIcon Name="add" /></button></div>
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><button class="automation-icon-button" type="button" aria-label="Add input" title="Add input" @onclick="AddTransformInputAsync"><EditorIcon Name="add" /></button></div>
                 @foreach (var input in Node.TransformInputs)
                 {
                     <div class="automation-transform-declaration" @key="input.PortId">
@@ -71,7 +71,7 @@ else
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "type")">Type</label><select class="field__input" id="@DeclarationFieldId(input.PortId, "type")" value="@input.ValueType" @onchange="args => UpdateTransformInputAsync(input, valueType: args.Value?.ToString())">@foreach (var type in _inputTypes){<option value="@type">@type</option>}</select></div>
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(input.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(input.PortId, "required")" value="@input.Nullability" @onchange="args => UpdateTransformInputAsync(input, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
                         <div class="field automation-declaration-cel-name"><label class="field__label" for="@DeclarationFieldId(input.PortId, "cel-name")">CEL name</label><input class="field__input" @key="(input.PortId, _renameAttempt)" id="@DeclarationFieldId(input.PortId, "cel-name")" type="text" value="@input.Identifier.Value" aria-invalid="@(RenameDiagnostic(input.PortId) is null ? null : "true")" @onchange="args => RenameTransformInputAsync(input, args.Value?.ToString())" />@if (RenameDiagnostic(input.PortId) is { } renameDiagnostic){<span class="automation-field-error" role="alert">@renameDiagnostic</span>}</div>
-                        <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove input @input.DisplayName" title="Remove input @input.DisplayName" @onclick="() => RemoveTransformInputAsync(input.PortId)"><AutomationIcon Name="delete" /></button>
+                        <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove input @input.DisplayName" title="Remove input @input.DisplayName" @onclick="() => RemoveTransformInputAsync(input.PortId)"><EditorIcon Name="delete" /></button>
                     </div>
                 }
             </section>
@@ -219,7 +219,7 @@ else
         @if (Node.IsCelTransform)
         {
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-outputs-heading">
-                <div class="automation-inspector-section-heading"><h3 id="automation-transform-outputs-heading">Outputs</h3><button class="automation-icon-button" type="button" aria-label="Add output" title="Add output" @onclick="AddTransformOutputAsync"><AutomationIcon Name="add" /></button></div>
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-outputs-heading">Outputs</h3><button class="automation-icon-button" type="button" aria-label="Add output" title="Add output" @onclick="AddTransformOutputAsync"><EditorIcon Name="add" /></button></div>
                 @foreach (var output in Node.TransformOutputs)
                 {
                     <div class="automation-transform-declaration" @key="output.PortId">
@@ -227,7 +227,7 @@ else
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "type")">Type</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "type")" value="@output.ValueType" @onchange="args => UpdateTransformOutputAsync(output, valueType: args.Value?.ToString())">@foreach (var type in _outputTypes){<option value="@type">@type</option>}</select></div>
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "required")" value="@output.Nullability" @onchange="args => UpdateTransformOutputAsync(output, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
                         <div class="field automation-transform-cel"><label class="field__label" for="@DeclarationFieldId(output.PortId, "expression")">CEL expression</label><textarea class="field__input" id="@DeclarationFieldId(output.PortId, "expression")" value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></div>
-                        <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove output @output.DisplayName" title="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><AutomationIcon Name="delete" /></button>
+                        <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove output @output.DisplayName" title="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><EditorIcon Name="delete" /></button>
                     </div>
                 }
                 <div class="automation-cel-completions" aria-label="Available output CEL names">
@@ -262,13 +262,13 @@ else
             <div class="automation-field"><label for="automation-failure-policy">If this node fails</label><select id="automation-failure-policy" @bind="Node.FailurePolicy" @bind:after="ChangedAsync"><option value="@AutomationNodeFailurePolicy.Stop">Stop this run</option><option value="@AutomationNodeFailurePolicy.Continue">Continue this branch</option></select></div>
         }
 
-        <footer class="automation-inspector-footer"><button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)"><AutomationIcon Name="delete" />Delete node</button><button class="btn-primary" type="button" @onclick="ChangedAsync"><AutomationIcon Name="apply" />Apply</button></footer>
+        <footer class="automation-inspector-footer"><button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)"><EditorIcon Name="delete" />Delete node</button><button class="btn-primary" type="button" @onclick="ChangedAsync"><EditorIcon Name="apply" />Apply</button></footer>
 
         @if (_pickerInputId is not null)
         {
             <div class="automation-source-picker-backdrop" @onclick="CancelSourcePickerAsync">
                 <section class="automation-source-picker" role="dialog" aria-modal="true" aria-labelledby="automation-source-picker-title" @onkeydown="HandlePickerKeyAsync" @onclick:stopPropagation="true">
-                    <header><div><span class="automation-inspector-eyebrow">Use another node</span><h3 id="automation-source-picker-title">Choose a source and port</h3></div><button class="automation-icon-button" type="button" aria-label="Cancel source choice" @onclick="CancelSourcePickerAsync"><AutomationIcon Name="close" /></button></header>
+                    <header><div><span class="automation-inspector-eyebrow">Use another node</span><h3 id="automation-source-picker-title">Choose a source and port</h3></div><button class="automation-icon-button" type="button" aria-label="Cancel source choice" @onclick="CancelSourcePickerAsync"><EditorIcon Name="close" /></button></header>
                     <div class="automation-source-picker-options" role="radiogroup" aria-label="Available source ports">
                         @foreach (var choice in SourceChoices())
                         {

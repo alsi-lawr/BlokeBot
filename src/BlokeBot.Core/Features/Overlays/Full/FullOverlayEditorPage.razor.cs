@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
@@ -29,7 +30,7 @@ public partial class FullOverlayEditorPage
     [Inject]
     private NavigationManager _navigation { get; set; } = default!;
     private readonly CancellationTokenSource _lifetime = new();
-    private ElementReference _root;
+    private EditorWorkspace? _workspace;
     private ElementReference _managementDialog;
     private ElementReference _deleteDialog;
     private IJSObjectReference? _module;
@@ -43,7 +44,6 @@ public partial class FullOverlayEditorPage
     private string _pane = "preview";
     private bool _loading = true;
     private bool _busy;
-    private bool _fullscreen;
     private bool _disposed;
     private bool _initializing;
     private bool _paletteOpen;
@@ -54,20 +54,32 @@ public partial class FullOverlayEditorPage
         new("css", "CSS"),
     ];
 
-    private void SelectPane(string pane)
+    private string _editorMode = "visual";
+    private bool _focusEditorAfterRender;
+    private string? _findAfterRender;
+    private static readonly IReadOnlyList<SegmentedTabItem> _modeTabs =
+    [
+        new("visual", "Visual"),
+        new("source", "HTML/CSS"),
+    ];
+
+    private void SelectPane(string pane) => _pane = pane;
+
+    private void ModeChanged(string mode)
     {
-        _pane = pane;
-        if (pane is "html" or "css")
-        {
-            _sourceTab = pane;
-        }
+        _editorMode = mode;
+        _pane = "preview";
+        _focusEditorAfterRender = true;
     }
 
-    private Task SourceTabChanged(string tab)
+    private void SourceTabChanged(string tab)
     {
         _sourceTab = tab;
-        return Task.CompletedTask;
+        _focusEditorAfterRender = true;
     }
+
+    private string SelectedLabel() =>
+        _view.Layers.FirstOrDefault(layer => layer.Key == _view.Selected)?.Label ?? "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -94,34 +106,54 @@ public partial class FullOverlayEditorPage
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_row is null || _client is not null || _initializing || _disposed)
+        if (_row is null || _disposed)
         {
             return;
         }
-
-        _initializing = true;
-        _module = await _js.InvokeAsync<IJSObjectReference>(
-            "import",
-            "/Features/Overlays/Full/Editor/EditorClient.js"
-        );
-        if (_disposed)
+        if (_client is null)
         {
-            await _module.DisposeAsync();
-            return;
+            if (_initializing)
+            {
+                return;
+            }
+            _initializing = true;
+            _module = await _js.InvokeAsync<IJSObjectReference>(
+                "import",
+                "/Features/Overlays/Full/Editor/EditorClient.js"
+            );
+            if (_disposed)
+            {
+                await _module.DisposeAsync();
+                return;
+            }
+            _reference = DotNetObjectReference.Create(this);
+            _client = await _module.InvokeAsync<IJSObjectReference>(
+                "createClient",
+                _workspace!.Element,
+                _row.Draft,
+                _reference
+            );
+            if (_disposed)
+            {
+                await _client.InvokeVoidAsync("dispose");
+                return;
+            }
+            await RefreshPreviewAsync(0);
         }
-        _reference = DotNetObjectReference.Create(this);
-        _client = await _module.InvokeAsync<IJSObjectReference>(
-            "createClient",
-            _root,
-            _row.Draft,
-            _reference
-        );
-        if (_disposed)
+        if (_findAfterRender is { } selection)
         {
-            await _client.InvokeVoidAsync("dispose");
-            return;
+            _findAfterRender = null;
+            _focusEditorAfterRender = false;
+            await _client.InvokeVoidAsync("find", selection);
         }
-        await RefreshPreviewAsync(0);
+        else if (_focusEditorAfterRender)
+        {
+            _focusEditorAfterRender = false;
+            await _client.InvokeVoidAsync(
+                "focusEditor",
+                _editorMode == "visual" ? "visual" : _sourceTab
+            );
+        }
     }
 
     [JSInvokable]
@@ -161,19 +193,16 @@ public partial class FullOverlayEditorPage
             ? Task.CompletedTask
             : _client.InvokeVoidAsync("history", direction).AsTask();
 
-    private async Task FindAsync(string? selection)
+    private void FindAsync(string? selection)
     {
-        if (_view.Selected != selection)
+        if (_view.Selected != selection || selection is null)
         {
             return;
         }
+        _editorMode = "source";
         _sourceTab = "html";
-        _pane = "html";
-        await InvokeAsync(StateHasChanged);
-        if (_client is not null)
-        {
-            await _client.InvokeVoidAsync("find", selection);
-        }
+        _pane = "preview";
+        _findAfterRender = selection;
     }
 
     private Task AddAsync(FullOverlayWidgetKind kind) =>
@@ -208,31 +237,6 @@ public partial class FullOverlayEditorPage
             "css" => "CSS history",
             _ => "Visual history",
         };
-
-    [JSInvokable]
-    public Task BrowserFullscreenChangedAsync(bool active)
-    {
-        _fullscreen = active;
-        return InvokeAsync(StateHasChanged);
-    }
-
-    private async Task FullscreenAsync()
-    {
-        if (_client is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await _client.InvokeVoidAsync("fullscreen");
-        }
-        catch (JSException)
-        {
-            _message =
-                "The browser could not enter full screen. The editor still uses the available window.";
-        }
-    }
 
     private async Task BeforeNavigationAsync(LocationChangingContext context)
     {

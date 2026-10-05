@@ -1,7 +1,6 @@
 import { createEditorDocument } from './EditorDocument.js';
 import { createCanvas } from './EditorCanvas.js';
 import { createPreviewBridge } from './EditorPreview.js';
-import { initializeFullscreen, disposeFullscreen, toggleBrowserFullscreen } from '/Features/Automations/Page/AutomationEditorPage.razor.js';
 
 export function createClient(root, document, dotnet) {
     const owner=createEditorDocument(document), abort=new AbortController(), options={signal:abort.signal};
@@ -58,9 +57,9 @@ export function createClient(root, document, dotnet) {
     },options);
     const beforeUnload=event=>{if(view.dirty){event.preventDefault();event.returnValue='';}};
     window.addEventListener('beforeunload',beforeUnload,options);
-    initializeFullscreen(dotnet);
     document = null;
     const height=()=>root.style.setProperty('--editor-height',`${Math.max(300,window.innerHeight-root.getBoundingClientRect().top)}px`);
+    const layout=new MutationObserver(height);layout.observe(root,{attributes:true,attributeFilter:['class']});
     window.addEventListener('resize',height,options);height();publish();
     return {
         candidate:()=>owner.candidate(),view:()=>view,command,
@@ -71,9 +70,10 @@ export function createClient(root, document, dotnet) {
         preview(id,revision){if(revision===view.revision)preview.set(id,revision);},
         pan:value=>canvas.pan(value),
         viewport(width,height){canvas.viewport(width,height);preview.query();},
-        zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),fullscreen:toggleBrowserFullscreen,
+        zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),
+        focusEditor(buffer){view=owner.focus(buffer);publish();(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});},
         find(selection){if(selection!==view.selected)return;const position=owner.command({kind:'find'}).sourcePosition;if(position!==null){html.focus();html.setSelectionRange(position,position);}},
-        dispose(){disposed=true;clearTimeout(previewTimer);abort.abort();preview.dispose();canvas.dispose();disposeFullscreen();}
+        dispose(){disposed=true;clearTimeout(previewTimer);abort.abort();layout.disconnect();preview.dispose();canvas.dispose();}
     };
 }
 

@@ -53,8 +53,8 @@ public partial class AutomationEditorPage
     private bool _dirtyDialogOpen;
     private IJSObjectReference? _pageModule;
     private DotNetObjectReference<AutomationEditorPage>? _pageReference;
-    private bool _focusMode;
-    private bool _browserFullscreen;
+    private EditorWorkspace? _workspace;
+    private bool _focusMode => _workspace?.FocusMode ?? false;
     private bool _flowRailCollapsed;
     private bool _editorToolsCollapsed;
     private bool _runDrawerCollapsed;
@@ -90,7 +90,6 @@ public partial class AutomationEditorPage
                     _pageReference,
                     _hasChanges
                 );
-                await _pageModule.InvokeVoidAsync("initializeFullscreen", _pageReference);
                 await _pageModule.InvokeVoidAsync("initializeHistoryKeyboard", _pageReference);
                 await _pageModule.InvokeVoidAsync("initializeToolboxKeyboard", _pageReference);
             }
@@ -157,7 +156,6 @@ public partial class AutomationEditorPage
             try
             {
                 await _pageModule.InvokeVoidAsync("disposeDirtyNavigation");
-                await _pageModule.InvokeVoidAsync("disposeFullscreen");
                 await _pageModule.InvokeVoidAsync("disposeHistoryKeyboard");
                 await _pageModule.InvokeVoidAsync("disposeToolboxKeyboard");
             }

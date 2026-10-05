@@ -58,8 +58,7 @@ public sealed record NavMenuDirectFeatureVisibility(
     bool ShowBingo,
     bool ShowCompetitions,
     bool ShowPlayQueues,
-    bool ShowMoments,
-    bool ShowOverlays
+    bool ShowMoments
 );
 
 public sealed record NavMenuFeatureGroupVisibility(bool Visible, NavMenuGroupBindings Group);

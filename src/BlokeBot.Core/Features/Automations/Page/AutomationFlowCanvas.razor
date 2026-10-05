@@ -9,12 +9,12 @@
      data-edge-style="@EdgeStyleToken(Settings.EdgeStyle)">
     <div class="automation-canvas-tools" role="toolbar" aria-label="Canvas controls">
         <div class="automation-canvas-tool-group" role="group" aria-label="Move selected nodes">
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes left" title="Move selected nodes left" @onclick="() => NudgeSelectedAsync(-24, 0)"><AutomationIcon Name="arrow-left" /></button>
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes up" title="Move selected nodes up" @onclick="() => NudgeSelectedAsync(0, -24)"><AutomationIcon Name="arrow-up" /></button>
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" title="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)"><AutomationIcon Name="arrow-down" /></button>
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" title="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)"><AutomationIcon Name="arrow-right" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes left" title="Move selected nodes left" @onclick="() => NudgeSelectedAsync(-24, 0)"><EditorIcon Name="arrow-left" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes up" title="Move selected nodes up" @onclick="() => NudgeSelectedAsync(0, -24)"><EditorIcon Name="arrow-up" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" title="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)"><EditorIcon Name="arrow-down" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" title="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)"><EditorIcon Name="arrow-right" /></button>
         </div>
-        <button type="button" data-canvas-zoom-reset><AutomationIcon Name="zoom-reset" /><span data-canvas-zoom-label>100%</span></button>
+        <button type="button" data-canvas-zoom-reset><EditorIcon Name="zoom-reset" /><span data-canvas-zoom-label>100%</span></button>
     </div>
 
     <div class="automation-canvas-viewport"
