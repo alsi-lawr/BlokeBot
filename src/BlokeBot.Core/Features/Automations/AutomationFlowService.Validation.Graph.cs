@@ -24,6 +24,15 @@ public sealed partial class AutomationFlowService
                 )
             )
             {
+                var incoming = dataIncoming.GetValueOrDefault((node.Id, input.Id));
+                if (
+                    AutomationDelayDurationBinding.IsInput(definition, input)
+                    && AutomationDelayDurationBinding.Admit(node.InputBindings, incoming)
+                        is AutomationDelayDurationBinding.Admission.LegacyLiteral
+                )
+                {
+                    continue;
+                }
                 if (
                     input.BindingFieldId is not { } fieldId
                     || !node.InputBindings.TryGetValue(fieldId, out var binding)
@@ -40,7 +49,6 @@ public sealed partial class AutomationFlowService
                     continue;
                 }
 
-                var incoming = dataIncoming.GetValueOrDefault((node.Id, input.Id));
                 if (binding.Mode == AutomationInputBindingMode.Connected && incoming != 1)
                 {
                     errors.Add(

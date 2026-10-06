@@ -229,12 +229,14 @@ public sealed partial class AutomationEditorNode
                                     .FixedValue
                             )
             ),
-            definition.Configuration.ToDictionary(
-                static field => field.Id,
-                field =>
-                    node.InputBindings.GetValueOrDefault(field.Id)
-                    ?? new(AutomationInputBindingMode.Fixed, null)
-            ),
+            definition.Id == AutomationDefinitionIds.DelayControl
+                ? node.InputBindings.ToDictionary()
+                : definition.Configuration.ToDictionary(
+                    static field => field.Id,
+                    field =>
+                        node.InputBindings.GetValueOrDefault(field.Id)
+                        ?? new(AutomationInputBindingMode.Fixed, null)
+                ),
             transform,
             subflow
         );
@@ -253,7 +255,13 @@ public sealed partial class AutomationEditorNode
         return restored;
     }
 
-    internal string Value(AutomationConfigurationFieldId fieldId) => _values[fieldId];
+    internal string Value(AutomationConfigurationFieldId fieldId) => _values[ValueField(fieldId)];
+
+    private AutomationConfigurationFieldId ValueField(AutomationConfigurationFieldId fieldId) =>
+        Definition.Id == AutomationDefinitionIds.DelayControl
+        && fieldId == AutomationDelayDurationBinding.ValueField
+            ? AutomationDelayDurationBinding.LiteralField
+            : fieldId;
 
     internal void SetValue(AutomationConfigurationFieldId fieldId, string value)
     {
@@ -262,7 +270,7 @@ public sealed partial class AutomationEditorNode
             _ = TrySetSubflowFixedValue(new(fieldId.Value), value);
             return;
         }
-        _values[fieldId] = value;
+        _values[ValueField(fieldId)] = value;
     }
 
     internal bool SetComplexFixedValue(AutomationPortId portId, string source)
@@ -310,17 +318,21 @@ public sealed partial class AutomationEditorNode
     }
 
     internal AutomationInputBinding Binding(AutomationConfigurationFieldId fieldId) =>
-        _bindings[fieldId];
+        Definition.Id == AutomationDefinitionIds.DelayControl
+        && fieldId == AutomationDelayDurationBinding.ValueField
+        && !_bindings.ContainsKey(fieldId)
+            ? new(AutomationInputBindingMode.Fixed, null)
+            : _bindings[fieldId];
 
     internal void SetBindingMode(
         AutomationConfigurationFieldId fieldId,
         AutomationInputBindingMode mode
-    ) => _bindings[fieldId] = _bindings[fieldId] with { Mode = mode };
+    ) => _bindings[fieldId] = Binding(fieldId) with { Mode = mode };
 
     internal void SetExpression(
         AutomationConfigurationFieldId fieldId,
         AutomationExpressionSource expression
-    ) => _bindings[fieldId] = _bindings[fieldId] with { Expression = expression };
+    ) => _bindings[fieldId] = Binding(fieldId) with { Expression = expression };
 
     internal void SetDisplayAlias(string? value) => DisplayAlias = value;
 }
