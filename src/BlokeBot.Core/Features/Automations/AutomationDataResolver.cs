@@ -155,6 +155,21 @@ internal sealed class AutomationDataResolver(
             )
         )
         {
+            if (AutomationDelayDurationBinding.IsInput(valid.Definition, input))
+            {
+                var incoming = flow.Edges.Count(edge =>
+                    edge.Kind == AutomationEdgeKind.Data
+                    && edge.TargetNodeId == consumer.Id
+                    && edge.TargetPortId == input.Id.Value
+                );
+                switch (AutomationDelayDurationBinding.Admit(bindings.Bindings, incoming))
+                {
+                    case AutomationDelayDurationBinding.Admission.LegacyLiteral:
+                        continue;
+                    case AutomationDelayDurationBinding.Admission.Invalid:
+                        return new AutomationInputResolution.Failed("binding-invalid");
+                }
+            }
             if (!bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding))
             {
                 return new AutomationInputResolution.Failed("binding-invalid");
@@ -475,6 +490,10 @@ internal sealed class AutomationDataResolver(
             ),
             (SendChatActionConfiguration sendChat, "message") => new(
                 new AutomationValue.Text(sendChat.Message),
+                [AutomationValueProvenance.Generated]
+            ),
+            (DelayControlConfiguration delay, "duration") => new(
+                new AutomationValue.Number(delay.Duration.Ticks / TimeSpan.TicksPerMillisecond),
                 [AutomationValueProvenance.Generated]
             ),
             (ConditionControlConfiguration condition, "predicate") => new(
