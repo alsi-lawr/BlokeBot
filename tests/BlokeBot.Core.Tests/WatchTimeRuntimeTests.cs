@@ -7,7 +7,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class WatchTimeRuntimeTests
+public sealed partial class WatchTimeRuntimeTests
 {
     [Test, Explicit]
     public async Task PostgreSql_ActualWorkerCreditsSnapshotOnlyOncePerOpportunity()

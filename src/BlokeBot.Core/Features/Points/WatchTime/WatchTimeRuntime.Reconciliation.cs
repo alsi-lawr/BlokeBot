@@ -92,6 +92,7 @@ internal sealed partial class WatchTimeRuntime
             {
                 _ = _epochs.Remove(id);
                 _ = _observations.Remove(id);
+                _ = _settingsReceipts.Remove(id);
                 _statuses[id] = hosts.FirstOrDefault(value => value.HostId == id) is { } enabled
                     ? new(WatchTimeStatusKind.Waiting, enabled.Amount, null)
                     : new(WatchTimeStatusKind.Off, null, null);
@@ -105,6 +106,7 @@ internal sealed partial class WatchTimeRuntime
                     .ToArray()
             )
             {
+                _ = _settingsReceipts.Remove(id);
                 _statuses[id] = new(WatchTimeStatusKind.Off, null, null);
             }
         }

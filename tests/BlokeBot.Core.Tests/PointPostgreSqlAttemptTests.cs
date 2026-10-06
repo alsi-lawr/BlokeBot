@@ -11,7 +11,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class PointPostgreSqlAttemptTests
+public sealed partial class PointPostgreSqlAttemptTests : PointsGiveawaySchedulerTestBase
 {
     [Test, Explicit]
     public async Task PostgreSql_ActualSerializationAbortRestartsWholeManualCredit()

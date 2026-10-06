@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Studio;
+using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Commands;
 using BlokeBot.Core.Features.Points.Replies;
 using BlokeBot.Core.Features.Points.WatchTime;
@@ -804,7 +805,9 @@ public partial class PointsConfigurationPage
             ? kind != WatchTimeStatusKind.Off
             : _savedWatchEnabled;
         var amount = status?.Amount ?? _savedWatchAmount;
-        return enabled ? $"Saved: On · {amount} points per person" : "Saved: Off";
+        return enabled
+            ? $"Saved: On · {PointAmount.ParseAbsolute(amount).ToDisplayString()} points per person"
+            : "Saved: Off";
     }
 
     private string WatchStatusSummary()

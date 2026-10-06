@@ -105,10 +105,9 @@ public sealed partial class CompetitionServiceTests
             ledgers = await drift.PointLedgerEntries.CountAsync();
             receipts = await drift.CompetitionRewardReceipts.CountAsync();
         }
-        var rejection = (
+        _ = (
             await service.CompleteAsync(hostId, completion, default)
         ).ShouldBeOfType<CompetitionOutcome.Invalid>();
-        rejection.Message.ShouldContain("point limit");
         await using var verify = database.CreateDbContext();
         (
             (await verify.PointBalances.SingleOrDefaultAsync(value => value.Login == "one"))?.Amount

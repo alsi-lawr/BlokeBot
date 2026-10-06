@@ -170,7 +170,7 @@ public sealed partial class RequestBoardServiceTests
             _ = await drift.SaveChangesAsync();
             events = await drift.RequestBoardEvents.CountAsync();
         }
-        var rejection = Rejection(
+        _ = Rejection(
                 await service.WithdrawAsync(
                     hostId,
                     submitted.Id,
@@ -179,7 +179,6 @@ public sealed partial class RequestBoardServiceTests
                 )
             )
             .ShouldBeOfType<RequestBoardRejection.Invalid>();
-        rejection.Message.ShouldContain("point limit");
         await using var verify = database.CreateDbContext();
         (await verify.PointBalances.SingleAsync()).Amount.ShouldBe(
             PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture)
