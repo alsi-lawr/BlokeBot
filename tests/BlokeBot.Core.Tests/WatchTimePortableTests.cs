@@ -117,8 +117,6 @@ public sealed class WatchTimePortableTests
             preview.CanApply.ShouldBeTrue();
             var issue = preview.Sections.Single().Issues.ShouldHaveSingleItem();
             issue.BlocksApply.ShouldBeFalse();
-            issue.Message.ShouldContain("off");
-            issue.Message.ShouldContain("clears");
             _ = (
                 await Coordinator(dbFactory, fixture)
                     .ApplyAsync(

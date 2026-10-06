@@ -1232,7 +1232,6 @@ internal sealed partial class BountyService(
         CancellationToken ct
     )
     {
-        var normalized = CommunityInput.NormalizeLogin(login);
         await MainDatabaseStatements.EnsurePointBalanceAsync(db, new(hostId, login), now, ct);
         return await db
             .PointBalances.AsNoTracking()

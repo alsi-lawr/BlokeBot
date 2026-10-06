@@ -409,7 +409,19 @@ public sealed partial class PointBalanceService(
                             return new PointBalanceMutation(debit.Balance, amount);
                         });
                     },
-                    failure => ValueTask.FromResult(Failure(failure))
+                    async failure =>
+                    {
+                        if (!creditFirst)
+                        {
+                            return Failure(failure);
+                        }
+                        var current = await ReadCurrentAmountAsync(db, hostId, from, ct);
+                        return current < amount
+                            ? Failure(
+                                new PointBalanceMutationFailure.InsufficientBalance(current, amount)
+                            )
+                            : Failure(failure);
+                    }
                 );
             },
             ct
@@ -456,9 +468,12 @@ public sealed partial class PointBalanceService(
                     : PointAmount.MaximumValue;
                 if (maximum.Sign < 0)
                 {
-                    return Failure(
-                        new PointBalanceMutationFailure.CapExceeded(PointAmount.Zero, stake)
-                    );
+                    var current = await ReadCurrentAmountAsync(db, hostId, normalized, ct);
+                    return current < stake
+                        ? Failure(
+                            new PointBalanceMutationFailure.InsufficientBalance(current, stake)
+                        )
+                        : Failure(new PointBalanceMutationFailure.CapExceeded(current, stake));
                 }
                 var target = new PointBalanceTarget(hostId, normalized);
                 await MainDatabaseStatements.EnsurePointBalanceAsync(db, target, now, ct);
@@ -676,11 +691,29 @@ public sealed partial class PointBalanceService(
                         )
                 );
             },
-            _ =>
-                ValueTask.FromResult(
-                    Failure(new PointBalanceMutationFailure.CapExceeded(PointAmount.Zero, amount))
+            async _ =>
+                Failure(
+                    new PointBalanceMutationFailure.CapExceeded(
+                        await ReadCurrentAmountAsync(db, hostId, login, ct),
+                        amount
+                    )
                 )
         );
+    }
+
+    private static async Task<PointAmount> ReadCurrentAmountAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        string login,
+        CancellationToken ct
+    )
+    {
+        var amount = await db
+            .PointBalances.AsNoTracking()
+            .Where(value => value.HostId == hostId && value.Login == login)
+            .Select(value => value.Amount)
+            .SingleOrDefaultAsync(ct);
+        return amount is null ? PointAmount.Zero : PointAmount.ParseAbsolute(amount);
     }
 
     private sealed record CommittedPointMutation(PointBalanceMutation Mutation, int LedgerId);

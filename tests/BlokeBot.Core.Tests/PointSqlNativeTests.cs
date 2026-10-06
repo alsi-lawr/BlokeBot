@@ -245,7 +245,9 @@ internal sealed class PointProviderFixture(
         );
     }
 
-    internal static async Task<PointProviderFixture> SqliteFileAsync()
+    internal static async Task<PointProviderFixture> SqliteFileAsync(
+        params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors
+    )
     {
         var directory = Directory.CreateTempSubdirectory("b322-point-file-");
         var connection = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
@@ -257,6 +259,7 @@ internal sealed class PointProviderFixture(
         var fixture = new PointProviderFixture(
             new DbContextOptionsBuilder<BlokeBotDbContext>()
                 .UseSqlite(connection.ConnectionString)
+                .AddInterceptors(interceptors)
                 .Options,
             new FileDatabaseLease(directory),
             null,
