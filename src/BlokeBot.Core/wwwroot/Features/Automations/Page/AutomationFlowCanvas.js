@@ -275,6 +275,24 @@ export function focusNode(root, nodeId) {
   )?.focus({ preventScroll: true });
 }
 
+export function contextSelection(root, target, point) {
+  const state = states.get(root);
+  if (!state) return null;
+  if (target.closest('[data-automation-canvas]')) {
+    const node = target.closest('[data-automation-node]');
+    const edge = target.closest('[data-automation-edge]');
+    const ids = selectionIds(root);
+    if (node && !ids.includes(node.dataset.automationNode)) {
+      setLocalSelection(state, [node.dataset.automationNode]);
+    } else if (edge) {
+      setLocalSelection(state, [], edge.dataset.automationEdge);
+    } else if (!node && point) {
+      setLocalSelection(state, []);
+    }
+  }
+  return { nodeIds: selectionIds(root), edgeId: selectedEdgeId(root) };
+}
+
 export function dispose(root) {
   const state = states.get(root);
   if (state === undefined) return;

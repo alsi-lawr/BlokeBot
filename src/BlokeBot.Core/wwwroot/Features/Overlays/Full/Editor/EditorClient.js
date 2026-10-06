@@ -3,11 +3,12 @@ import { createCanvas } from './EditorCanvas.js';
 import { createPreviewBridge } from './EditorPreview.js';
 import { createGuidedStyling } from './GuidedStyling.js';
 import { createPresentation } from './EditorPresentation.js';
+import { createEditorMenu } from '../../../../Components/EditorContextMenu.js';
 
 export function createClient(root, document, dotnet) {
     const owner=createEditorDocument(document), abort=new AbortController(), options={signal:abort.signal};
     const html=root.querySelector('[data-source=html]'),css=root.querySelector('[data-source=css]');
-    let view=owner.view(),disposed=false,measurements=[],measuredRevision=-1,notification=0,previewRequest=0,styling;
+    let view=owner.view(),disposed=false,measurements=[],measuredRevision=-1,notification=0,previewRequest=0,styling,menu;
     const measured=value=>{const item=measuredRevision===value.revision?measurements.find(item=>item.key===value.selected):null;return item?{...value,styles:{...item.styles,...value.styles}}:value;};
     const publish=()=>disposed?Promise.resolve():dotnet.invokeMethodAsync('EditorChangedAsync',view,++notification);
     const changed=(next,retainPresentation=false)=>{
@@ -17,7 +18,7 @@ export function createClient(root, document, dotnet) {
         const snapshot=owner.session.snapshot();
         if(html.value!==snapshot.html)html.value=snapshot.html;
         if(css.value!==snapshot.css)css.value=snapshot.css;
-        canvas.draw();styling?.refresh();const revision=view.revision;
+        canvas.draw();styling?.refresh();menu?.refresh();const revision=view.revision;
         void publish().then(()=>{if(authorize&&!disposed&&revision===view.revision)void dotnet.invokeMethodAsync('RefreshPreviewAsync',revision,true);});return view;
     };
     const command=(value,selection=view.selected,revision=view.revision)=>{styling?.cancel();return changed(owner.control(value.kind==='visible'&&!value.value?{...value,display:view.styles.display}:value.kind==='position'||value.kind==='anchor'||value.kind==='move'||value.kind==='resize'?{...value,computed:{...value.computed,...view.styles}}:value,selection,revision));};
@@ -39,9 +40,31 @@ export function createClient(root, document, dotnet) {
         clear:()=>preview.clear(),
         commit(planned){const next=owner.commitGesture(planned);if(next.revision===view.revision)preview.clear();changed(next,next.revision!==view.revision);}
     });
+    const visibleCanvas=()=>{const node=root.querySelector('[data-canvas-area]');return node.getClientRects().length?node:root.querySelector('[data-editor-menu-open]');};
+    menu=createEditorMenu(root,{
+        beforeOpen:()=>{canvas.cancel();styling.handoff();},
+        accepts:target=>!!target.closest('[data-canvas-area],[data-layer-key]'),
+        fallback:visibleCanvas,
+        prepare(target,point){
+            const layer=target.closest('[data-layer-key]');
+            if(layer)changed(owner.select(layer.dataset.layerKey));
+            else if(point&&target.closest('[data-canvas-area]'))changed(owner.select(canvas.contextTarget(point)));
+            const current=owner.view();
+            return {selection:current.selected,revision:current.revision,focus:current.focus,
+                target:current.layers.find(layer=>layer.key===current.selected)?.label??'No selection',
+                history:`${current.focus==='html'?'HTML':current.focus==='css'?'CSS':'Visual'} history`,
+                ...current.history,delete:!!current.selected,
+                note:current.history.undo||current.history.redo?'Selection Delete is undoable.':'No edits in this history.'};
+        },
+        current:captured=>{const current=owner.view();return captured.selection===current.selected&&captured.revision===current.revision&&captured.focus===current.focus;},
+        execute(action,captured){
+            styling.handoff();
+            changed(action==='delete'?owner.contextualDelete(captured.selection,captured.revision):owner.history(action));
+        }
+    });
     html.value=document.html;css.value=document.css;
     for(const input of [html,css]){
-        input.addEventListener('focus',()=>{view=owner.focus(input.dataset.source);publish();},options);
+        input.addEventListener('focus',()=>{view=owner.focus(input.dataset.source);menu.refresh();publish();},options);
         input.addEventListener('input',()=>changed(owner.source(input.dataset.source,input.value)),options);
     }
     root.addEventListener('keydown',event=>{
@@ -83,7 +106,7 @@ export function createClient(root, document, dotnet) {
         viewport(width,height){canvas.viewport(width,height);preview.query();},
         zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),
         find(selection){if(disposed||selection!==view.selected)return;const position=owner.command({kind:'find'}).sourcePosition;if(position!==null){presentation.revealHtml();html.setSelectionRange(position,position);}},
-        dispose(){disposed=true;abort.abort();styling.dispose();presentation.dispose();layout.disconnect();preview.dispose();canvas.dispose();}
+        dispose(){disposed=true;abort.abort();menu.dispose();styling.dispose();presentation.dispose();layout.disconnect();preview.dispose();canvas.dispose();}
     };
 }
 

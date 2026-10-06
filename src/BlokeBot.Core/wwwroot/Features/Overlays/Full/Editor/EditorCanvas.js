@@ -79,6 +79,10 @@ export function createCanvas(root, readView, command, manipulation) {
     area.addEventListener('pointerdown',down);area.addEventListener('pointermove',move);area.addEventListener('pointerup',up);area.addEventListener('pointercancel',interrupted);area.addEventListener('lostpointercapture',interrupted);
     root.addEventListener('keydown',key);window.addEventListener('blur',cancel);
     return { observed(next,size){items=next;if(size)viewport=size;fit();},draw,cancel,refresh:fit,
+        contextTarget(point){
+            const bounds=stage.getBoundingClientRect(),x=(point.x-bounds.left)/scale,y=(point.y-bounds.top)/scale;
+            return items.findLast(item=>item.width>0&&item.height>0&&x>=item.x&&x<=item.x+item.width&&y>=item.y&&y<=item.y+item.height)?.key??null;
+        },
         presented(id,item){if(gesture?.id!==id||gesture.revision!==readView().revision)return;gesture.rendered=item;draw();},
         pan(value){cancel();panMode=value;},
         viewport(width,height){cancel();viewport={width,height};fit();},

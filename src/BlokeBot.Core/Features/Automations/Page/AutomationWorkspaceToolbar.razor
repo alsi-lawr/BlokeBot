@@ -9,6 +9,7 @@
     <label><span class="sr-only">Connection style</span><select value="@Settings.EdgeStyle" @onchange="EdgeStyleChanged"><option value="@AutomationEdgeStyle.Angular">Angular</option><option value="@AutomationEdgeStyle.Smooth">Smooth</option></select></label>
     <span class="automation-connection-legend automation-connection-legend--flow">Flow schedules</span>
     <span class="automation-connection-legend automation-connection-legend--data">Data supplies values</span>
+    <EditorContextMenu />
 </div>
 @if (SelectedNode is not null)
 {
