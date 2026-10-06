@@ -73,5 +73,6 @@ export function createSourceSession({ html, css, widgets = [] }) {
     }
 
     return Object.freeze({ snapshot, apply, replaceSource,
+        availability(focus) { const history = histories.get(focus); return { undo: history.undo.length > 0, redo: history.redo.length > 0 }; },
         undo: focus => moveHistory(focus, 'undo'), redo: focus => moveHistory(focus, 'redo') });
 }

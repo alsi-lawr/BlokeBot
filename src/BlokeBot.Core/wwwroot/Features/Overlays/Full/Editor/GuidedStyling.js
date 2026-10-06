@@ -4,7 +4,7 @@ import { gradient, fillValue, editStop, stopPosition, individualNumber, solidCol
 const swatches=['#ffffff','#111827','#8b5cf6','#3b82f6','#14b8a6','#f59e0b','#ef4444'];
 export function createGuidedStyling(root,readView,authored,actions) {
     const abort=new AbortController(),options={signal:abort.signal},bound=new WeakSet(),pending=new WeakMap();
-    let active=null,stop=0,selected=null,disposed=false;
+    let active=null,stop=0,selected=null,disposed=false,focusEpoch=0;
     Coloris.init();
     const input=name=>root.querySelector(`[data-guided-color=${name}]`);
     const image=()=>(readView().styles['background-image']??'none').trim();
@@ -12,9 +12,13 @@ export function createGuidedStyling(root,readView,authored,actions) {
     const custom=()=>!!authored().background&&!('background-image' in authored())&&!solidColor(authored().background)&&!gradient(authored().background)||(image()!=='none'&&!fill());
     const set=(selector,value)=>{const node=root.querySelector(selector);if(node&&node!==window.document.activeElement&&node.value!==String(value))node.value=value;};
     const paint=(name,value)=>{const node=input(name);if(!node)return;if(active?.input!==node)node.value=value;root.querySelector(`[data-color-open=${name}]`)?.style.setProperty('--fill-color',value);};
-    function cancel() {
+    function returnFocus(opener) {
+        const epoch=focusEpoch;
+        queueMicrotask(()=>epoch===focusEpoch&&!disposed&&opener?.isConnected&&opener.focus({preventScroll:true}));
+    }
+    function cancel(restoreFocus=true) {
         const previous=active;active=null;
-        if(previous){actions.clear();Coloris.close(true);queueMicrotask(()=>previous.opener?.isConnected&&previous.opener.focus({preventScroll:true}));}
+        if(previous){actions.clear();Coloris.close(true);if(restoreFocus)returnFocus(previous.opener);}
     }
     function refresh() {
         if(disposed)return;
@@ -36,7 +40,7 @@ export function createGuidedStyling(root,readView,authored,actions) {
             field.addEventListener('close',()=>{
                 const current=active;if(!current||current.input!==field)return;active=null;
                 if(current.planned&&current.selection===readView().selected&&current.revision===readView().revision)actions.commit(current.planned);else actions.clear();
-                queueMicrotask(()=>current.opener?.isConnected&&current.opener.focus({preventScroll:true}));
+                returnFocus(current.opener);
             },options);
         }
         paint('text',view.styles.color??'#ffffff');paint('solid',view.styles['background-color']??'transparent');
@@ -117,5 +121,5 @@ export function createGuidedStyling(root,readView,authored,actions) {
     const observer=new MutationObserver(()=>{if(root.dataset.mode!=='visual'||!root.isConnected)cancel();refresh();});
     observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['data-mode','class']});
     refresh();
-    return {refresh,cancel,dispose(){cancel();disposed=true;abort.abort();observer.disconnect();Coloris({parent:window.document.body});}};
+    return {refresh,cancel,handoff(){focusEpoch++;cancel(false);refresh();},dispose(){focusEpoch++;cancel(false);disposed=true;abort.abort();observer.disconnect();Coloris({parent:window.document.body});}};
 }

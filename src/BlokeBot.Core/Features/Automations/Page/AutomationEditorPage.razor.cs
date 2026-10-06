@@ -97,6 +97,21 @@ public partial class AutomationEditorPage
             {
                 await _pageModule.InvokeVoidAsync("setDirtyNavigation", _hasChanges);
             }
+            if (_pageModule is not null)
+            {
+                if (_workspace is not null)
+                {
+                    await _pageModule.InvokeVoidAsync(
+                        "initializeEditorMenu",
+                        _workspace.Element,
+                        _pageReference
+                    );
+                }
+                else
+                {
+                    await _pageModule.InvokeVoidAsync("disposeEditorMenu");
+                }
+            }
         }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
@@ -158,6 +173,7 @@ public partial class AutomationEditorPage
                 await _pageModule.InvokeVoidAsync("disposeDirtyNavigation");
                 await _pageModule.InvokeVoidAsync("disposeHistoryKeyboard");
                 await _pageModule.InvokeVoidAsync("disposeToolboxKeyboard");
+                await _pageModule.InvokeVoidAsync("disposeEditorMenu");
             }
             catch (JSDisconnectedException) { }
             catch (JSException) { }

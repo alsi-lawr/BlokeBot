@@ -1,4 +1,22 @@
 import { revealNode } from "./AutomationFlowCanvas.js";
+import { createAutomationMenu } from './AutomationEditorMenu.js';
+let editorMenu = null;
+let menuRoot = null;
+
+export function initializeEditorMenu(root, dotnet) {
+    if (root !== menuRoot) {
+        disposeEditorMenu();
+        menuRoot = root;
+        editorMenu = createAutomationMenu(root, dotnet);
+    }
+    editorMenu.refresh();
+}
+
+export function disposeEditorMenu() {
+    editorMenu?.dispose();
+    editorMenu = null;
+    menuRoot = null;
+}
 let dirtyNavigation = null;
 let historyKeyboard = null;
 let toolboxKeyboard = null;
@@ -66,6 +84,9 @@ function isEditable(target) {
 
 function historyAction(event) {
     if (
+        event.defaultPrevented
+        || event.target?.closest?.('[data-editor-menu]')
+        ||
         !event.ctrlKey
         || event.altKey
         || event.metaKey
@@ -106,6 +127,9 @@ export function initializeToolboxKeyboard(dotnet) {
     disposeToolboxKeyboard();
     const keydown = (event) => {
         if (
+            event.defaultPrevented
+            || event.target?.closest?.('[data-editor-menu]')
+            ||
             event.key !== "/"
             || event.altKey
             || event.ctrlKey

@@ -35,6 +35,7 @@ public partial class PageHelpButton
                 [
                     "Zoom, pan and preview viewport only change your authoring view. Shift bypasses optional snapping.",
                     "On narrow screens use Layers, Canvas and Inspector. HTML/CSS remains a separate mode. Action tips appear on keyboard focus; Escape dismisses them.",
+                    "Right-click a layer or canvas, or use the ⋯ action button. Context Menu or Shift+F10 opens actions from the keyboard; arrows select actions and Escape closes the menu. Text fields keep browser menus. Delete selected is undoable, not permanent overlay deletion.",
                     "Help stays beside the theme button in the normal app topbar. Exit Focus to return to that topbar.",
                 ]
             ),
