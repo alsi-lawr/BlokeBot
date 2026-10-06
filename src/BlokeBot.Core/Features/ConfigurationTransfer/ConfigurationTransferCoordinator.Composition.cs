@@ -1,5 +1,6 @@
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Features.CustomCommands;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,7 @@ public sealed partial class ConfigurationTransferCoordinator
     private readonly IModeratorAuthorityService _moderatorAuthority;
     private readonly ConfigurationActivationQueue _activationQueue;
     private readonly TimeProvider _timeProvider;
+    private readonly IWatchTimeSettingsCommitObserver? _watchTime;
     private readonly ILogger<ConfigurationTransferCoordinator> _logger;
     private readonly ConfigurationImportPreviewService _previews;
     private readonly IOverlayConfigurationTransferAdapter _overlays;
@@ -25,7 +27,8 @@ public sealed partial class ConfigurationTransferCoordinator
         IModeratorAuthorityService moderatorAuthority,
         ConfigurationActivationQueue activationQueue,
         TimeProvider timeProvider,
-        ILogger<ConfigurationTransferCoordinator> logger
+        ILogger<ConfigurationTransferCoordinator> logger,
+        IWatchTimeSettingsCommitObserver? watchTime = null
     )
         : this(
             dbFactory,
@@ -38,7 +41,8 @@ public sealed partial class ConfigurationTransferCoordinator
             UnavailableOverlayConfigurationTransferAdapter.Instance,
             UnavailableAutomationConfigurationTransferAdapter.Instance,
             UnavailableConfigurationImportObserverDispatcher.Instance,
-            new(1, 1)
+            new(1, 1),
+            watchTime
         ) { }
 
     internal ConfigurationTransferCoordinator(
@@ -52,9 +56,11 @@ public sealed partial class ConfigurationTransferCoordinator
         IOverlayConfigurationTransferAdapter overlays,
         IAutomationConfigurationTransferAdapter automations,
         IConfigurationImportObserverDispatcher importObservers,
-        SemaphoreSlim overlayMediaGate
+        SemaphoreSlim overlayMediaGate,
+        IWatchTimeSettingsCommitObserver? watchTime = null
     )
     {
+        _watchTime = watchTime;
         _dbFactory = dbFactory;
         _customCommands = customCommands;
         _moderatorAuthority = moderatorAuthority;

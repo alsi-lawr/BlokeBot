@@ -108,9 +108,11 @@ internal sealed partial class BountyService(
         }
 
         var normalized = command with { Actor = Normalize(command.Actor) };
+        var pointPhase = new PointAttemptPhase();
         var result = await RetryPersistenceAsync(
-            () => TransitionAttemptAsync(hostId, normalized, ct),
-            ct
+            () => TransitionAttemptAsync(hostId, normalized, pointPhase, ct),
+            ct,
+            pointPhase.CanRetry
         );
         if (result is BountyResult<BountyView>.Succeeded { WasIdempotent: false })
         {
@@ -586,8 +588,28 @@ internal sealed partial class BountyService(
         bounty.Revision++;
         bounty.UpdatedAtUtc = now;
         var nextBalance = current.Subtract(amount);
-        balance.Amount = nextBalance.ToString();
-        balance.UpdatedAtUtc = now;
+        var debit = await MainDatabaseStatements.ApplyPointDeltaAsync(
+            db,
+            new(hostId, command.Contributor.Login),
+            CanonicalPointInteger.From(-amount.Value),
+            new(
+                CanonicalPointInteger.From(amount.Value),
+                CanonicalPointInteger.From(PointAmount.MaximumValue)
+            ),
+            now,
+            ct
+        );
+        var returnedDebit = debit.Match<PointAmount?>(
+            value => new PointAmount(value.After.ToBigInteger()),
+            _ => null
+        );
+        if (returnedDebit is null)
+        {
+            return Rejected<BountyPledgeView>(
+                new BountyRejection.InsufficientPoints(current, amount)
+            );
+        }
+        nextBalance = returnedDebit.Value;
         _ = await db.SaveChangesAsync(ct);
 
         AddLedger(
@@ -640,131 +662,147 @@ internal sealed partial class BountyService(
     private async Task<BountyResult<BountyView>> TransitionAttemptAsync(
         int hostId,
         TransitionBountyCommand command,
+        PointAttemptPhase phase,
         CancellationToken ct
     )
     {
+        phase.Reset();
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
-            db,
-            ct
-        );
-        if (!await FeatureIsEnabledAsync(db, hostId, ct))
+        await using var transaction =
+            await MainDatabaseWriteTransaction.StartImmediateSerializableAsync(db, ct);
+        phase.Acquired = true;
+        try
         {
-            return Rejected<BountyView>(new BountyRejection.FeatureDisabled());
-        }
-        var fingerprint = CommandFingerprint(command);
-        var existingAudit = await db
-            .BountyModerationAudits.Include(value => value.Bounty)
-            .SingleOrDefaultAsync(
-                value => value.HostId == hostId && value.OperationId == command.OperationId,
-                ct
-            );
-        if (existingAudit is not null)
-        {
-            return existingAudit.CommandFingerprint == fingerprint
-                ? new BountyResult<BountyView>.Succeeded(
-                    await ToViewAsync(db, existingAudit.Bounty, ct),
-                    true
-                )
-                : Rejected<BountyView>(
-                    new BountyRejection.Conflict(
-                        "That operation ID belongs to another bounty transition."
-                    )
-                );
-        }
-
-        var bounty = await db
-            .Bounties.Include(value => value.Pledges)
-            .SingleOrDefaultAsync(
-                value => value.HostId == hostId && value.PublicId == command.BountyPublicId,
-                ct
-            );
-        if (bounty is null)
-        {
-            return Rejected<BountyView>(new BountyRejection.NotFound());
-        }
-
-        if (bounty.Revision != command.ExpectedRevision)
-        {
-            return Rejected<BountyView>(new BountyRejection.StaleRevision(bounty.Revision));
-        }
-
-        var target = BountyLifecycle.Target(bounty.Status, command.Action);
-        if (target is null)
-        {
-            return Rejected<BountyView>(
-                new BountyRejection.InvalidTransition(bounty.Status, command.Action)
-            );
-        }
-
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (command.Action == BountyTransitionAction.OpenFunding && bounty.ExpiresAtUtc <= now)
-        {
-            return Rejected<BountyView>(
-                new BountyRejection.Invalid("An expired bounty cannot open for funding.")
-            );
-        }
-        if (command.Action == BountyTransitionAction.Expire && bounty.ExpiresAtUtc > now)
-        {
-            return Rejected<BountyView>(
-                new BountyRejection.Invalid("The bounty has not reached its expiry time.")
-            );
-        }
-        if (command.Action == BountyTransitionAction.Accept && bounty.ExpiresAtUtc <= now)
-        {
-            return Rejected<BountyView>(
-                new BountyRejection.Invalid("An expired bounty cannot be accepted.")
-            );
-        }
-
-        var accounting = await ApplyTerminalAccountingAsync(db, bounty, target.Value, now, ct);
-        if (accounting is not null)
-        {
-            return Rejected<BountyView>(accounting);
-        }
-
-        var previous = bounty.Status;
-        bounty.Status = target.Value;
-        bounty.Revision++;
-        bounty.UpdatedAtUtc = now;
-        if (target == BountyStatus.Accepted)
-        {
-            bounty.AcceptedAtUtc = now;
-        }
-        if (IsTerminal(target.Value))
-        {
-            bounty.ResolvedAtUtc = now;
-        }
-
-        AddAudit(
-            db,
-            bounty,
-            command.OperationId,
-            AuditAction(command.Action),
-            previous,
-            target.Value,
-            command.Actor,
-            command.Reason,
-            fingerprint,
-            now
-        );
-        AddEvent(
-            db,
-            bounty,
-            $"transition:{command.OperationId:N}",
-            EventKind(command.Action),
-            new
+            if (!await FeatureIsEnabledAsync(db, hostId, ct))
             {
-                bounty.PublicId,
-                PreviousStatus = previous,
-                Status = target.Value,
-                bounty.Revision,
-            },
-            now
-        );
-        _ = await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return Succeeded(await ToViewAsync(db, bounty, ct));
+                return Rejected<BountyView>(new BountyRejection.FeatureDisabled());
+            }
+            var fingerprint = CommandFingerprint(command);
+            var existingAudit = await db
+                .BountyModerationAudits.Include(value => value.Bounty)
+                .SingleOrDefaultAsync(
+                    value => value.HostId == hostId && value.OperationId == command.OperationId,
+                    ct
+                );
+            if (existingAudit is not null)
+            {
+                return existingAudit.CommandFingerprint == fingerprint
+                    ? new BountyResult<BountyView>.Succeeded(
+                        await ToViewAsync(db, existingAudit.Bounty, ct),
+                        true
+                    )
+                    : Rejected<BountyView>(
+                        new BountyRejection.Conflict(
+                            "That operation ID belongs to another bounty transition."
+                        )
+                    );
+            }
+
+            var bounty = await db
+                .Bounties.Include(value => value.Pledges)
+                .SingleOrDefaultAsync(
+                    value => value.HostId == hostId && value.PublicId == command.BountyPublicId,
+                    ct
+                );
+            if (bounty is null)
+            {
+                return Rejected<BountyView>(new BountyRejection.NotFound());
+            }
+
+            if (bounty.Revision != command.ExpectedRevision)
+            {
+                return Rejected<BountyView>(new BountyRejection.StaleRevision(bounty.Revision));
+            }
+
+            var target = BountyLifecycle.Target(bounty.Status, command.Action);
+            if (target is null)
+            {
+                return Rejected<BountyView>(
+                    new BountyRejection.InvalidTransition(bounty.Status, command.Action)
+                );
+            }
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            if (command.Action == BountyTransitionAction.OpenFunding && bounty.ExpiresAtUtc <= now)
+            {
+                return Rejected<BountyView>(
+                    new BountyRejection.Invalid("An expired bounty cannot open for funding.")
+                );
+            }
+            if (command.Action == BountyTransitionAction.Expire && bounty.ExpiresAtUtc > now)
+            {
+                return Rejected<BountyView>(
+                    new BountyRejection.Invalid("The bounty has not reached its expiry time.")
+                );
+            }
+            if (command.Action == BountyTransitionAction.Accept && bounty.ExpiresAtUtc <= now)
+            {
+                return Rejected<BountyView>(
+                    new BountyRejection.Invalid("An expired bounty cannot be accepted.")
+                );
+            }
+
+            var accounting = await ApplyTerminalAccountingAsync(db, bounty, target.Value, now, ct);
+            if (accounting is not null)
+            {
+                return Rejected<BountyView>(accounting);
+            }
+
+            var previous = bounty.Status;
+            bounty.Status = target.Value;
+            bounty.Revision++;
+            bounty.UpdatedAtUtc = now;
+            if (target == BountyStatus.Accepted)
+            {
+                bounty.AcceptedAtUtc = now;
+            }
+            if (IsTerminal(target.Value))
+            {
+                bounty.ResolvedAtUtc = now;
+            }
+
+            AddAudit(
+                db,
+                bounty,
+                command.OperationId,
+                AuditAction(command.Action),
+                previous,
+                target.Value,
+                command.Actor,
+                command.Reason,
+                fingerprint,
+                now
+            );
+            AddEvent(
+                db,
+                bounty,
+                $"transition:{command.OperationId:N}",
+                EventKind(command.Action),
+                new
+                {
+                    bounty.PublicId,
+                    PreviousStatus = previous,
+                    Status = target.Value,
+                    bounty.Revision,
+                },
+                now
+            );
+            _ = await db.SaveChangesAsync(ct);
+            var view = await ToViewAsync(db, bounty, ct);
+            await transaction.CommitAsync(ct);
+            phase.Committed = true;
+            return Succeeded(view);
+        }
+        catch (Exception exception)
+            when (!phase.Committed
+                && !ct.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
+        {
+            await db.Database.CurrentTransaction!.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
+        }
     }
 
     private async Task<BountyResult<BountyView>> ExtendAttemptAsync(
@@ -976,17 +1014,23 @@ internal sealed partial class BountyService(
             foreach (var pledge in reserved)
             {
                 var amount = PointAmount.ParseAbsolute(pledge.Amount);
-                var balance = await LoadBalanceAsync(
+                var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
                     db,
-                    bounty.HostId,
-                    pledge.ContributorLogin,
+                    new(bounty.HostId, pledge.ContributorLogin),
+                    CanonicalPointInteger.From(amount.Value),
+                    CanonicalPointInteger.From(PointAmount.MaximumValue),
                     now,
                     ct
                 );
-                var current = PointAmount.ParseAbsolute(balance.Amount);
-                var next = current.Add(amount);
-                balance.Amount = next.ToString();
-                balance.UpdatedAtUtc = now;
+                var returned = credit.Match<PointAmount?>(
+                    value => new PointAmount(value.After.ToBigInteger()),
+                    _ => null
+                );
+                if (returned is null)
+                {
+                    return new BountyRejection.PointCapExceeded(pledge.ContributorLogin);
+                }
+                var next = returned.Value;
                 pledge.State = BountyPledgeState.Refunded;
                 pledge.UpdatedAtUtc = now;
                 AddLedger(
@@ -1101,28 +1145,6 @@ internal sealed partial class BountyService(
             reward.Value,
             bounty.RewardDistribution
         );
-        var balances = new Dictionary<string, PointBalance>(StringComparer.Ordinal);
-        foreach (var group in shares.GroupBy(share => share.Login, StringComparer.Ordinal))
-        {
-            var balance = await LoadBalanceAsync(db, bounty.HostId, group.Key, now, ct);
-            var current = PointAmount.ParseAbsolute(balance.Amount);
-            var total = group.Aggregate(BigInteger.Zero, (sum, share) => sum + share.Amount);
-            if (
-                !await PointCreditCapacity.CanCreditAsync(
-                    db,
-                    bounty.HostId,
-                    group.Key,
-                    current,
-                    total,
-                    ct
-                )
-            )
-            {
-                return new BountyRejection.PointCapExceeded(group.Key);
-            }
-            balances[group.Key] = balance;
-        }
-
         var rewards = shares
             .Select(share => new BountyContributorReward
             {
@@ -1142,11 +1164,34 @@ internal sealed partial class BountyService(
             var amount = new PointAmount(
                 BigInteger.Parse(contributorReward.Amount, CultureInfo.InvariantCulture)
             );
-            var balance = balances[contributorReward.Login];
-            var current = PointAmount.ParseAbsolute(balance.Amount);
-            var next = current.Add(amount);
-            balance.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
+            var ceiling = await PointCreditCapacity.LoadCeilingAsync(
+                db,
+                bounty.HostId,
+                contributorReward.Login,
+                ct
+            );
+            var maximum = ceiling.Match<BigInteger?>(value => value.Amount.Value, _ => null);
+            if (maximum is null)
+            {
+                return new BountyRejection.PointCapExceeded(contributorReward.Login);
+            }
+            var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                db,
+                new(bounty.HostId, contributorReward.Login),
+                CanonicalPointInteger.From(amount.Value),
+                CanonicalPointInteger.From(maximum.Value),
+                now,
+                ct
+            );
+            var returned = credit.Match<PointAmount?>(
+                value => new PointAmount(value.After.ToBigInteger()),
+                _ => null
+            );
+            if (returned is null)
+            {
+                return new BountyRejection.PointCapExceeded(contributorReward.Login);
+            }
+            var next = returned.Value;
             AddLedger(
                 db,
                 bounty.HostId,
@@ -1188,24 +1233,10 @@ internal sealed partial class BountyService(
     )
     {
         var normalized = CommunityInput.NormalizeLogin(login);
-        var balance = await db.PointBalances.SingleOrDefaultAsync(
-            value => value.HostId == hostId && value.Login == normalized,
-            ct
-        );
-        if (balance is not null)
-        {
-            return balance;
-        }
-
-        balance = new PointBalance
-        {
-            HostId = hostId,
-            Login = normalized,
-            Amount = PointAmount.Zero.ToString(),
-            UpdatedAtUtc = now,
-        };
-        _ = db.PointBalances.Add(balance);
-        return balance;
+        await MainDatabaseStatements.EnsurePointBalanceAsync(db, new(hostId, login), now, ct);
+        return await db
+            .PointBalances.AsNoTracking()
+            .SingleAsync(value => value.HostId == hostId && value.Login == login, ct);
     }
 
     private static void AddLedger(
@@ -1530,7 +1561,8 @@ internal sealed partial class BountyService(
 
     private static async Task<T> RetryPersistenceAsync<T>(
         Func<Task<T>> action,
-        CancellationToken ct
+        CancellationToken ct,
+        Func<Exception, bool>? retryAllowed = null
     )
     {
         for (var attempt = 1; ; attempt++)
@@ -1540,7 +1572,9 @@ internal sealed partial class BountyService(
                 return await action();
             }
             catch (Exception exception)
-                when (attempt < _persistenceRetryCount && IsPersistenceCollision(exception))
+                when (attempt < _persistenceRetryCount
+                    && (retryAllowed?.Invoke(exception) ?? IsPersistenceCollision(exception))
+                )
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
             }
@@ -1557,4 +1591,23 @@ internal sealed partial class BountyService(
 
     private static HostFeatureFlags _requiredFeatures =>
         HostFeatureFlags.Bounties | HostFeatureFlags.Points;
+
+    private sealed class PointAttemptPhase
+    {
+        public bool Acquired { get; set; }
+        public bool Committed { get; set; }
+        public bool RolledBack { get; set; }
+
+        public void Reset()
+        {
+            Acquired = false;
+            Committed = false;
+            RolledBack = false;
+        }
+
+        public bool CanRetry(Exception exception) =>
+            !Committed
+            && (!Acquired || RolledBack)
+            && MainDatabaseFailureClassifier.IsContention(exception);
+    }
 }

@@ -7520,7 +7520,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("point_ledger_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "\"Kind\" IN ('Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
+                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "\"Kind\" IN ('WatchTimeReward', 'Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
                         });
                 });
 
@@ -7775,6 +7775,19 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("WatchTimeConfigurationRevision")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WatchTimeEnableGeneration")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WatchTimePointAmount")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("WatchTimePointsEnabled")
+                        .HasColumnType("boolean");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HostId")
@@ -7783,6 +7796,8 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("points_settings", null, t =>
                         {
                             t.HasCheckConstraint("CK_points_settings_GiveawayEligibility", "\"GiveawayEligibility\" IN ('everyone', 'followers', 'subscribers')");
+
+                            t.HasCheckConstraint("CK_points_settings_WatchTimeEnabled", "NOT \"WatchTimePointsEnabled\" OR (\"WatchTimePointAmount\" IS NOT NULL AND \"WatchTimeEnableGeneration\" <> '00000000-0000-0000-0000-000000000000')");
                         });
                 });
 

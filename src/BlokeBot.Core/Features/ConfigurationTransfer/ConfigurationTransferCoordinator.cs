@@ -4,6 +4,9 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Points.Configuration;
+using BlokeBot.Core.Features.Points.WatchTime;
+using BlokeBot.Functional;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -77,6 +80,7 @@ public sealed partial class ConfigurationTransferCoordinator
                 );
             }
 
+            var watchWrite = Option<WatchTimeConfigurationWrite>.None;
             var planned = new Dictionary<ConfigurationSectionId, ConfigurationSectionPreview>();
             var references = await ConfigurationImportReferencePlan.BuildAsync(
                 db,
@@ -185,14 +189,14 @@ public sealed partial class ConfigurationTransferCoordinator
                 );
                 if (!(pointsSelection.Strategy == ImportConflictStrategy.AddMissing && exists))
                 {
-                    issues.AddRange(
-                        await PointsConfigurationTransferAdapter.StageAsync(
-                            db,
-                            host.Id,
-                            points,
-                            cancellationToken
-                        )
+                    var pointsStage = await PointsConfigurationTransferAdapter.StageAsync(
+                        db,
+                        host.Id,
+                        points,
+                        cancellationToken
                     );
+                    issues.AddRange(pointsStage.Issues);
+                    watchWrite = pointsStage.WatchWrite;
                 }
             }
             if (issues.Count > 0)
@@ -228,7 +232,21 @@ public sealed partial class ConfigurationTransferCoordinator
                 }
             );
             _ = await db.SaveChangesAsync(cancellationToken);
+            var watchResult = await watchWrite.Match<Task<WatchTimeSettingsWriteResult?>>(
+                async write =>
+                    await PointsConfigurationService.ApplyWatchTimeAsync(
+                        db,
+                        host.Id,
+                        write.Configuration,
+                        cancellationToken
+                    ),
+                () => Task.FromResult<WatchTimeSettingsWriteResult?>(null)
+            );
             await transaction.CommitAsync(cancellationToken);
+            if (watchResult is not null)
+            {
+                _watchTime?.SettingsCommitted(host.Id, watchResult, _timeProvider.GetUtcNow());
+            }
 
             if (activation is not null)
             {
