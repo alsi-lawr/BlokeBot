@@ -6,6 +6,14 @@ public sealed class PointsSettings
 
     public int HostId { get; set; }
 
+    public bool WatchTimePointsEnabled { get; set; }
+
+    public string? WatchTimePointAmount { get; set; }
+
+    public Guid WatchTimeConfigurationRevision { get; set; }
+
+    public Guid WatchTimeEnableGeneration { get; set; }
+
     public string PointLabel { get; set; } = "points";
 
     public int GamblingWinRatePercent { get; set; } = 50;

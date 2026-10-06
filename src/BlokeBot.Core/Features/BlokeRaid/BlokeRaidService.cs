@@ -227,9 +227,11 @@ public sealed partial class BlokeRaidService(
 
         command = command with { Viewer = Normalize(command.Viewer) };
         int? resolvedOutcome = null;
+        var pointPhase = new PointAttemptPhase();
         var result = await RetryAsync(
-            () => ActAttemptAsync(hostId, command, ResolveOutcome, cancellationToken),
-            cancellationToken
+            () => ActAttemptAsync(hostId, command, ResolveOutcome, pointPhase, cancellationToken),
+            cancellationToken,
+            pointPhase.CanRetry
         );
         if (result is BlokeRaidActionOutcome.Succeeded { WasIdempotent: false } succeeded)
         {
@@ -268,9 +270,12 @@ public sealed partial class BlokeRaidService(
             );
         }
 
+        var pointPhase = new PointAttemptPhase();
         var outcome = await RetryAsync(
-            () => ApplyGuessingAttemptAsync(hostId, result, distinct, cancellationToken),
-            cancellationToken
+            () =>
+                ApplyGuessingAttemptAsync(hostId, result, distinct, pointPhase, cancellationToken),
+            cancellationToken,
+            pointPhase.CanRetry
         );
         if (outcome is BlokeRaidActionOutcome.Succeeded { WasIdempotent: false } succeeded)
         {
@@ -588,332 +593,394 @@ public sealed partial class BlokeRaidService(
         int hostId,
         BlokeRaidActionCommand command,
         Func<int, int, int> resolveOutcome,
+        PointAttemptPhase phase,
         CancellationToken cancellationToken
     )
     {
+        phase.Reset();
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
-            db,
-            cancellationToken
-        );
-        if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
-        {
-            return new BlokeRaidActionOutcome.FeatureDisabled();
-        }
-
-        var prior = await db.BlokeRaidActions.SingleOrDefaultAsync(
-            value => value.HostId == hostId && value.OperationKey == command.OperationKey,
-            cancellationToken
-        );
-        if (prior is not null)
-        {
-            var priorCampaign = await CampaignQuery(db, hostId)
-                .SingleAsync(value => value.Id == prior.CampaignId, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return new BlokeRaidActionOutcome.Succeeded(
-                ToActionView(prior),
-                ToCampaignView(priorCampaign),
-                true
-            );
-        }
-
-        var campaign = await CampaignQuery(db, hostId)
-            .SingleOrDefaultAsync(
-                value => value.Status == BlokeRaidCampaignStatus.Active,
-                cancellationToken
-            );
-        if (campaign is null)
-        {
-            return new BlokeRaidActionOutcome.NoActiveCampaign();
-        }
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (campaign.EndsAtUtc <= now)
-        {
-            return new BlokeRaidActionOutcome.NoActiveCampaign();
-        }
-        var configuration =
-            await db.BlokeRaidConfigurations.SingleOrDefaultAsync(
-                value => value.HostId == hostId,
-                cancellationToken
-            ) ?? NewConfiguration(hostId, now);
-        var rule = Rule(configuration, command.Kind);
-        var lastAction = await db
-            .BlokeRaidActions.Where(value =>
-                value.HostId == hostId
-                && value.CampaignId == campaign.Id
-                && value.ViewerTwitchUserId == command.Viewer.TwitchUserId
-                && value.Kind == command.Kind
-                && value.Source == BlokeRaidActionSource.Chat
-            )
-            .OrderByDescending(value => value.OccurredAtUtc)
-            .Select(value => (DateTime?)value.OccurredAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (lastAction is { } last)
-        {
-            var availableAt = last.AddSeconds(rule.CooldownSeconds);
-            if (availableAt > now)
-            {
-                return new BlokeRaidActionOutcome.Cooldown(availableAt - now);
-            }
-        }
-        var streamCount = await db.BlokeRaidActions.CountAsync(
-            value =>
-                value.HostId == hostId
-                && value.CampaignId == campaign.Id
-                && value.ViewerTwitchUserId == command.Viewer.TwitchUserId
-                && value.Kind == command.Kind
-                && value.Source == BlokeRaidActionSource.Chat
-                && value.StreamKey == command.StreamKey,
-            cancellationToken
-        );
-        if (streamCount >= rule.PerStreamLimit)
-        {
-            return new BlokeRaidActionOutcome.PerStreamLimitReached();
-        }
-        if (
-            command.Kind == BlokeRaidActionKind.Mend
-            && campaign.CurrentWard >= campaign.MaximumWard
-        )
-        {
-            return new BlokeRaidActionOutcome.Invalid("The raid ward is already full.");
-        }
-
-        var pointCost = rule.PointCost;
-        if (!pointCost.IsZero)
-        {
-            var balance = await db.PointBalances.SingleOrDefaultAsync(
-                value => value.HostId == hostId && value.Login == command.Viewer.Login,
-                cancellationToken
-            );
-            var current = balance is null
-                ? PointAmount.Zero
-                : PointAmount.ParseAbsolute(balance.Amount);
-            if (current < pointCost)
-            {
-                return new BlokeRaidActionOutcome.InsufficientPoints(current, pointCost);
-            }
-            var next = current.Subtract(pointCost);
-            balance!.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
-            _ = db.PointLedgerEntries.Add(
-                new PointLedgerEntry
-                {
-                    HostId = hostId,
-                    CreatedAtUtc = now,
-                    Kind = PointLedgerKind.BlokeRaidSpecialSpend,
-                    Login = command.Viewer.Login,
-                    Delta = (-pointCost.Value).ToString(CultureInfo.InvariantCulture),
-                    BalanceAfter = next.ToString(),
-                    Note = $"BlokeRaid special against {campaign.BossName}",
-                    OperationKey = $"blokeraid:special:{command.OperationKey}",
-                }
-            );
-        }
-
-        var rolled = resolveOutcome(rule.Minimum, rule.Maximum);
-        var beforeHealth = campaign.CurrentHealth;
-        var beforeWard = campaign.CurrentWard;
-        var applied =
-            command.Kind == BlokeRaidActionKind.Mend
-                ? Math.Min(rolled, campaign.MaximumWard - campaign.CurrentWard)
-                : Math.Min(rolled, campaign.CurrentHealth);
-        if (command.Kind == BlokeRaidActionKind.Mend)
-        {
-            campaign.CurrentWard += applied;
-        }
-        else
-        {
-            campaign.CurrentHealth -= applied;
-        }
-
-        var previousPhase = campaign.CurrentPhase;
-        campaign.CurrentPhase = NextPhase(configuration, campaign);
-        campaign.Revision++;
-        var contribution = Contribution(campaign, command.Viewer, now);
-        contribution.ActionCount++;
-        contribution.LastContributedAtUtc = now;
-        if (command.Kind == BlokeRaidActionKind.Mend)
-        {
-            contribution.WardRestored += applied;
-        }
-        else
-        {
-            contribution.Damage += applied;
-            if (command.Kind == BlokeRaidActionKind.Special)
-            {
-                contribution.SpecialCount++;
-            }
-        }
-
-        var response = Response(configuration, command.Kind, applied, campaign, previousPhase);
-        var action = new BlokeRaidAction
-        {
-            HostId = hostId,
-            CampaignId = campaign.Id,
-            OperationKey = command.OperationKey,
-            Kind = command.Kind,
-            Source = BlokeRaidActionSource.Chat,
-            ViewerTwitchUserId = command.Viewer.TwitchUserId,
-            ViewerLogin = command.Viewer.Login,
-            ViewerDisplayName = command.Viewer.DisplayName,
-            StreamKey = command.StreamKey,
-            Outcome = applied,
-            PointCost = pointCost.ToString(),
-            BossHealthBefore = beforeHealth,
-            BossHealthAfter = campaign.CurrentHealth,
-            WardBefore = beforeWard,
-            WardAfter = campaign.CurrentWard,
-            PhaseAfter = campaign.CurrentPhase,
-            Response = response,
-            OccurredAtUtc = now,
-        };
-        _ = db.BlokeRaidActions.Add(action);
-        AddActionEvents(db, campaign, action, previousPhase, response, now);
-        if (campaign.CurrentHealth == 0)
-        {
-            var rewarded = await CompleteVictoryAsync(
+        await using var transaction =
+            await MainDatabaseWriteTransaction.StartImmediateSerializableAsync(
                 db,
-                campaign,
-                configuration,
-                now,
                 cancellationToken
             );
-            if (!rewarded)
+        phase.Acquired = true;
+        try
+        {
+            if (!await FeatureIsEnabledAsync(db, hostId, cancellationToken))
             {
-                return new BlokeRaidActionOutcome.PointCapacityExceeded();
+                return new BlokeRaidActionOutcome.FeatureDisabled();
             }
+
+            var prior = await db.BlokeRaidActions.SingleOrDefaultAsync(
+                value => value.HostId == hostId && value.OperationKey == command.OperationKey,
+                cancellationToken
+            );
+            if (prior is not null)
+            {
+                var priorCampaign = await CampaignQuery(db, hostId)
+                    .SingleAsync(value => value.Id == prior.CampaignId, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                phase.Committed = true;
+                return new BlokeRaidActionOutcome.Succeeded(
+                    ToActionView(prior),
+                    ToCampaignView(priorCampaign),
+                    true
+                );
+            }
+
+            var campaign = await CampaignQuery(db, hostId)
+                .SingleOrDefaultAsync(
+                    value => value.Status == BlokeRaidCampaignStatus.Active,
+                    cancellationToken
+                );
+            if (campaign is null)
+            {
+                return new BlokeRaidActionOutcome.NoActiveCampaign();
+            }
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            if (campaign.EndsAtUtc <= now)
+            {
+                return new BlokeRaidActionOutcome.NoActiveCampaign();
+            }
+            var configuration =
+                await db.BlokeRaidConfigurations.SingleOrDefaultAsync(
+                    value => value.HostId == hostId,
+                    cancellationToken
+                ) ?? NewConfiguration(hostId, now);
+            var rule = Rule(configuration, command.Kind);
+            var lastAction = await db
+                .BlokeRaidActions.Where(value =>
+                    value.HostId == hostId
+                    && value.CampaignId == campaign.Id
+                    && value.ViewerTwitchUserId == command.Viewer.TwitchUserId
+                    && value.Kind == command.Kind
+                    && value.Source == BlokeRaidActionSource.Chat
+                )
+                .OrderByDescending(value => value.OccurredAtUtc)
+                .Select(value => (DateTime?)value.OccurredAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (lastAction is { } last)
+            {
+                var availableAt = last.AddSeconds(rule.CooldownSeconds);
+                if (availableAt > now)
+                {
+                    return new BlokeRaidActionOutcome.Cooldown(availableAt - now);
+                }
+            }
+            var streamCount = await db.BlokeRaidActions.CountAsync(
+                value =>
+                    value.HostId == hostId
+                    && value.CampaignId == campaign.Id
+                    && value.ViewerTwitchUserId == command.Viewer.TwitchUserId
+                    && value.Kind == command.Kind
+                    && value.Source == BlokeRaidActionSource.Chat
+                    && value.StreamKey == command.StreamKey,
+                cancellationToken
+            );
+            if (streamCount >= rule.PerStreamLimit)
+            {
+                return new BlokeRaidActionOutcome.PerStreamLimitReached();
+            }
+            if (
+                command.Kind == BlokeRaidActionKind.Mend
+                && campaign.CurrentWard >= campaign.MaximumWard
+            )
+            {
+                return new BlokeRaidActionOutcome.Invalid("The raid ward is already full.");
+            }
+
+            var pointCost = rule.PointCost;
+            if (!pointCost.IsZero)
+            {
+                var target = new PointBalanceTarget(hostId, command.Viewer.Login);
+                var debit = await MainDatabaseStatements.ApplyPointDeltaAsync(
+                    db,
+                    target,
+                    CanonicalPointInteger.From(-pointCost.Value),
+                    new(
+                        CanonicalPointInteger.From(pointCost.Value),
+                        CanonicalPointInteger.From(PointAmount.MaximumValue)
+                    ),
+                    now,
+                    cancellationToken
+                );
+                var returned = debit.Match<PointAmount?>(
+                    value => new PointAmount(value.After.ToBigInteger()),
+                    _ => null
+                );
+                if (returned is null)
+                {
+                    return debit.Match(
+                        _ => throw new System.Diagnostics.UnreachableException(),
+                        rejected => new BlokeRaidActionOutcome.InsufficientPoints(
+                            rejected.Current.Match(
+                                value => new PointAmount(value.Amount.ToBigInteger()),
+                                _ => PointAmount.Zero
+                            ),
+                            pointCost
+                        )
+                    );
+                }
+                var next = returned.Value;
+                _ = db.PointLedgerEntries.Add(
+                    new PointLedgerEntry
+                    {
+                        HostId = hostId,
+                        CreatedAtUtc = now,
+                        Kind = PointLedgerKind.BlokeRaidSpecialSpend,
+                        Login = command.Viewer.Login,
+                        Delta = (-pointCost.Value).ToString(CultureInfo.InvariantCulture),
+                        BalanceAfter = next.ToString(),
+                        Note = $"BlokeRaid special against {campaign.BossName}",
+                        OperationKey = $"blokeraid:special:{command.OperationKey}",
+                    }
+                );
+            }
+
+            var rolled = resolveOutcome(rule.Minimum, rule.Maximum);
+            var beforeHealth = campaign.CurrentHealth;
+            var beforeWard = campaign.CurrentWard;
+            var applied =
+                command.Kind == BlokeRaidActionKind.Mend
+                    ? Math.Min(rolled, campaign.MaximumWard - campaign.CurrentWard)
+                    : Math.Min(rolled, campaign.CurrentHealth);
+            if (command.Kind == BlokeRaidActionKind.Mend)
+            {
+                campaign.CurrentWard += applied;
+            }
+            else
+            {
+                campaign.CurrentHealth -= applied;
+            }
+
+            var previousPhase = campaign.CurrentPhase;
+            campaign.CurrentPhase = NextPhase(configuration, campaign);
+            campaign.Revision++;
+            var contribution = Contribution(campaign, command.Viewer, now);
+            contribution.ActionCount++;
+            contribution.LastContributedAtUtc = now;
+            if (command.Kind == BlokeRaidActionKind.Mend)
+            {
+                contribution.WardRestored += applied;
+            }
+            else
+            {
+                contribution.Damage += applied;
+                if (command.Kind == BlokeRaidActionKind.Special)
+                {
+                    contribution.SpecialCount++;
+                }
+            }
+
+            var response = Response(configuration, command.Kind, applied, campaign, previousPhase);
+            var action = new BlokeRaidAction
+            {
+                HostId = hostId,
+                CampaignId = campaign.Id,
+                OperationKey = command.OperationKey,
+                Kind = command.Kind,
+                Source = BlokeRaidActionSource.Chat,
+                ViewerTwitchUserId = command.Viewer.TwitchUserId,
+                ViewerLogin = command.Viewer.Login,
+                ViewerDisplayName = command.Viewer.DisplayName,
+                StreamKey = command.StreamKey,
+                Outcome = applied,
+                PointCost = pointCost.ToString(),
+                BossHealthBefore = beforeHealth,
+                BossHealthAfter = campaign.CurrentHealth,
+                WardBefore = beforeWard,
+                WardAfter = campaign.CurrentWard,
+                PhaseAfter = campaign.CurrentPhase,
+                Response = response,
+                OccurredAtUtc = now,
+            };
+            _ = db.BlokeRaidActions.Add(action);
+            AddActionEvents(db, campaign, action, previousPhase, response, now);
+            if (campaign.CurrentHealth == 0)
+            {
+                var rewarded = await CompleteVictoryAsync(
+                    db,
+                    campaign,
+                    configuration,
+                    now,
+                    cancellationToken
+                );
+                if (!rewarded)
+                {
+                    return new BlokeRaidActionOutcome.PointCapacityExceeded();
+                }
+            }
+            _ = await db.SaveChangesAsync(cancellationToken);
+            var prepared = new BlokeRaidActionOutcome.Succeeded(
+                ToActionView(action),
+                ToCampaignView(campaign)
+            );
+            await transaction.CommitAsync(cancellationToken);
+            phase.Committed = true;
+            return prepared;
         }
-        _ = await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return new BlokeRaidActionOutcome.Succeeded(ToActionView(action), ToCampaignView(campaign));
+        catch (Exception exception)
+            when (!phase.Committed
+                && !cancellationToken.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
+        {
+            await db.Database.CurrentTransaction!.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
+        }
     }
 
     private async Task<BlokeRaidActionOutcome> ApplyGuessingAttemptAsync(
         int hostId,
         BlokeRaidGuessingResult source,
         IReadOnlyList<BlokeRaidViewer> correctGuessers,
+        PointAttemptPhase phase,
         CancellationToken cancellationToken
     )
     {
+        phase.Reset();
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
-            db,
-            cancellationToken
-        );
-        var host = await db.Hosts.SingleOrDefaultAsync(
-            value => value.Id == hostId,
-            cancellationToken
-        );
-        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.CooperativeGame))
-        {
-            return new BlokeRaidActionOutcome.FeatureDisabled();
-        }
-        if (
-            host.BlokeRaidAcceptWorkAfterUtc is { } acceptAfter
-            && source.OccurredAtUtc.UtcDateTime < acceptAfter
-        )
-        {
-            return new BlokeRaidActionOutcome.SourceSuppressed();
-        }
-
-        var operationKey = $"guess:{source.RoundId}";
-        var prior = await db.BlokeRaidActions.SingleOrDefaultAsync(
-            value => value.HostId == hostId && value.OperationKey == operationKey,
-            cancellationToken
-        );
-        if (prior is not null)
-        {
-            var priorCampaign = await CampaignQuery(db, hostId)
-                .SingleAsync(value => value.Id == prior.CampaignId, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return new BlokeRaidActionOutcome.Succeeded(
-                ToActionView(prior),
-                ToCampaignView(priorCampaign),
-                true
-            );
-        }
-
-        var campaign = await CampaignQuery(db, hostId)
-            .SingleOrDefaultAsync(
-                value => value.Status == BlokeRaidCampaignStatus.Active,
-                cancellationToken
-            );
-        if (
-            campaign is null
-            || source.OccurredAtUtc.UtcDateTime < campaign.StartedAtUtc
-            || source.OccurredAtUtc.UtcDateTime >= campaign.EndsAtUtc
-        )
-        {
-            return new BlokeRaidActionOutcome.NoActiveCampaign();
-        }
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var configuration =
-            await db.BlokeRaidConfigurations.SingleOrDefaultAsync(
-                value => value.HostId == hostId,
-                cancellationToken
-            ) ?? NewConfiguration(hostId, now);
-        var beforeHealth = campaign.CurrentHealth;
-        var remaining = campaign.CurrentHealth;
-        foreach (var viewer in correctGuessers)
-        {
-            var applied = Math.Min(configuration.CorrectGuessDamage, remaining);
-            var contribution = Contribution(campaign, viewer, now);
-            contribution.ActionCount++;
-            contribution.CorrectGuessCount++;
-            contribution.Damage += applied;
-            contribution.LastContributedAtUtc = now;
-            remaining -= applied;
-        }
-        campaign.CurrentHealth = remaining;
-        var totalDamage = beforeHealth - remaining;
-        var previousPhase = campaign.CurrentPhase;
-        campaign.CurrentPhase = NextPhase(configuration, campaign);
-        campaign.Revision++;
-        var response = Response(
-            configuration,
-            BlokeRaidActionKind.CorrectGuess,
-            totalDamage,
-            campaign,
-            previousPhase
-        );
-        var action = new BlokeRaidAction
-        {
-            HostId = hostId,
-            CampaignId = campaign.Id,
-            OperationKey = operationKey,
-            Kind = BlokeRaidActionKind.CorrectGuess,
-            Source = BlokeRaidActionSource.Guessing,
-            StreamKey = $"guessing:{source.RoundId}",
-            Outcome = totalDamage,
-            PointCost = "0",
-            BossHealthBefore = beforeHealth,
-            BossHealthAfter = campaign.CurrentHealth,
-            WardBefore = campaign.CurrentWard,
-            WardAfter = campaign.CurrentWard,
-            PhaseAfter = campaign.CurrentPhase,
-            GuessRoundId = source.RoundId,
-            Response = response,
-            OccurredAtUtc = source.OccurredAtUtc.UtcDateTime,
-        };
-        _ = db.BlokeRaidActions.Add(action);
-        AddActionEvents(db, campaign, action, previousPhase, response, now);
-        if (campaign.CurrentHealth == 0)
-        {
-            var rewarded = await CompleteVictoryAsync(
+        await using var transaction =
+            await MainDatabaseWriteTransaction.StartImmediateSerializableAsync(
                 db,
-                campaign,
-                configuration,
-                now,
                 cancellationToken
             );
-            if (!rewarded)
+        phase.Acquired = true;
+        try
+        {
+            var host = await db.Hosts.SingleOrDefaultAsync(
+                value => value.Id == hostId,
+                cancellationToken
+            );
+            if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.CooperativeGame))
             {
-                return new BlokeRaidActionOutcome.PointCapacityExceeded();
+                return new BlokeRaidActionOutcome.FeatureDisabled();
             }
+            if (
+                host.BlokeRaidAcceptWorkAfterUtc is { } acceptAfter
+                && source.OccurredAtUtc.UtcDateTime < acceptAfter
+            )
+            {
+                return new BlokeRaidActionOutcome.SourceSuppressed();
+            }
+
+            var operationKey = $"guess:{source.RoundId}";
+            var prior = await db.BlokeRaidActions.SingleOrDefaultAsync(
+                value => value.HostId == hostId && value.OperationKey == operationKey,
+                cancellationToken
+            );
+            if (prior is not null)
+            {
+                var priorCampaign = await CampaignQuery(db, hostId)
+                    .SingleAsync(value => value.Id == prior.CampaignId, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                phase.Committed = true;
+                return new BlokeRaidActionOutcome.Succeeded(
+                    ToActionView(prior),
+                    ToCampaignView(priorCampaign),
+                    true
+                );
+            }
+
+            var campaign = await CampaignQuery(db, hostId)
+                .SingleOrDefaultAsync(
+                    value => value.Status == BlokeRaidCampaignStatus.Active,
+                    cancellationToken
+                );
+            if (
+                campaign is null
+                || source.OccurredAtUtc.UtcDateTime < campaign.StartedAtUtc
+                || source.OccurredAtUtc.UtcDateTime >= campaign.EndsAtUtc
+            )
+            {
+                return new BlokeRaidActionOutcome.NoActiveCampaign();
+            }
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var configuration =
+                await db.BlokeRaidConfigurations.SingleOrDefaultAsync(
+                    value => value.HostId == hostId,
+                    cancellationToken
+                ) ?? NewConfiguration(hostId, now);
+            var beforeHealth = campaign.CurrentHealth;
+            var remaining = campaign.CurrentHealth;
+            foreach (var viewer in correctGuessers)
+            {
+                var applied = Math.Min(configuration.CorrectGuessDamage, remaining);
+                var contribution = Contribution(campaign, viewer, now);
+                contribution.ActionCount++;
+                contribution.CorrectGuessCount++;
+                contribution.Damage += applied;
+                contribution.LastContributedAtUtc = now;
+                remaining -= applied;
+            }
+            campaign.CurrentHealth = remaining;
+            var totalDamage = beforeHealth - remaining;
+            var previousPhase = campaign.CurrentPhase;
+            campaign.CurrentPhase = NextPhase(configuration, campaign);
+            campaign.Revision++;
+            var response = Response(
+                configuration,
+                BlokeRaidActionKind.CorrectGuess,
+                totalDamage,
+                campaign,
+                previousPhase
+            );
+            var action = new BlokeRaidAction
+            {
+                HostId = hostId,
+                CampaignId = campaign.Id,
+                OperationKey = operationKey,
+                Kind = BlokeRaidActionKind.CorrectGuess,
+                Source = BlokeRaidActionSource.Guessing,
+                StreamKey = $"guessing:{source.RoundId}",
+                Outcome = totalDamage,
+                PointCost = "0",
+                BossHealthBefore = beforeHealth,
+                BossHealthAfter = campaign.CurrentHealth,
+                WardBefore = campaign.CurrentWard,
+                WardAfter = campaign.CurrentWard,
+                PhaseAfter = campaign.CurrentPhase,
+                GuessRoundId = source.RoundId,
+                Response = response,
+                OccurredAtUtc = source.OccurredAtUtc.UtcDateTime,
+            };
+            _ = db.BlokeRaidActions.Add(action);
+            AddActionEvents(db, campaign, action, previousPhase, response, now);
+            if (campaign.CurrentHealth == 0)
+            {
+                var rewarded = await CompleteVictoryAsync(
+                    db,
+                    campaign,
+                    configuration,
+                    now,
+                    cancellationToken
+                );
+                if (!rewarded)
+                {
+                    return new BlokeRaidActionOutcome.PointCapacityExceeded();
+                }
+            }
+            _ = await db.SaveChangesAsync(cancellationToken);
+            var prepared = new BlokeRaidActionOutcome.Succeeded(
+                ToActionView(action),
+                ToCampaignView(campaign)
+            );
+            await transaction.CommitAsync(cancellationToken);
+            phase.Committed = true;
+            return prepared;
         }
-        _ = await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return new BlokeRaidActionOutcome.Succeeded(ToActionView(action), ToCampaignView(campaign));
+        catch (Exception exception)
+            when (!phase.Committed
+                && !cancellationToken.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
+        {
+            await db.Database.CurrentTransaction!.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
+        }
     }
 
     private async Task<DueWorkOutcome> ProcessDueWorkAttemptAsync(
@@ -1069,38 +1136,37 @@ public sealed partial class BlokeRaidService(
             {
                 continue;
             }
-            var balance = await db.PointBalances.SingleOrDefaultAsync(
-                value => value.HostId == campaign.HostId && value.Login == contribution.ViewerLogin,
+            var ceiling = await PointCreditCapacity.LoadCeilingAsync(
+                db,
+                campaign.HostId,
+                contribution.ViewerLogin,
                 cancellationToken
             );
-            if (balance is null)
-            {
-                balance = new PointBalance
-                {
-                    HostId = campaign.HostId,
-                    Login = contribution.ViewerLogin,
-                    Amount = "0",
-                    UpdatedAtUtc = now,
-                };
-                _ = db.PointBalances.Add(balance);
-            }
-            var current = PointAmount.ParseAbsolute(balance.Amount);
-            if (
-                !await PointCreditCapacity.CanCreditAsync(
-                    db,
-                    campaign.HostId,
-                    contribution.ViewerLogin,
-                    current,
-                    reward.Value,
-                    cancellationToken
-                )
-            )
+            var maximum = ceiling.Match<System.Numerics.BigInteger?>(
+                value => value.Amount.Value,
+                _ => null
+            );
+            if (maximum is null)
             {
                 return false;
             }
-            var next = current.Add(reward);
-            balance.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
+            var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                db,
+                new(campaign.HostId, contribution.ViewerLogin),
+                CanonicalPointInteger.From(reward.Value),
+                CanonicalPointInteger.From(maximum.Value),
+                now,
+                cancellationToken
+            );
+            var returned = credit.Match<PointAmount?>(
+                value => new PointAmount(value.After.ToBigInteger()),
+                _ => null
+            );
+            if (returned is null)
+            {
+                return false;
+            }
+            var next = returned.Value;
             _ = db.PointLedgerEntries.Add(
                 new PointLedgerEntry
                 {
@@ -1601,7 +1667,8 @@ public sealed partial class BlokeRaidService(
 
     private static async Task<T> RetryAsync<T>(
         Func<Task<T>> operation,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        Func<Exception, bool>? retryAllowed = null
     )
     {
         for (var attempt = 1; ; attempt++)
@@ -1611,7 +1678,9 @@ public sealed partial class BlokeRaidService(
                 return await operation();
             }
             catch (Exception exception)
-                when (attempt < _persistenceRetryCount && IsPersistenceCollision(exception))
+                when (attempt < _persistenceRetryCount
+                    && (retryAllowed?.Invoke(exception) ?? IsPersistenceCollision(exception))
+                )
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), cancellationToken);
             }
@@ -1622,4 +1691,23 @@ public sealed partial class BlokeRaidService(
         MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
 
     private sealed record DueWorkOutcome(bool Changed, bool PointsChanged);
+
+    private sealed class PointAttemptPhase
+    {
+        public bool Acquired { get; set; }
+        public bool Committed { get; set; }
+        public bool RolledBack { get; set; }
+
+        public void Reset()
+        {
+            Acquired = false;
+            Committed = false;
+            RolledBack = false;
+        }
+
+        public bool CanRetry(Exception exception) =>
+            !Committed
+            && (!Acquired || RolledBack)
+            && MainDatabaseFailureClassifier.IsContention(exception);
+    }
 }

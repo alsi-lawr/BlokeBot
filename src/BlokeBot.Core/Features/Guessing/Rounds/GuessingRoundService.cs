@@ -47,142 +47,49 @@ public sealed class GuessingRoundService(
         CancellationToken ct
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var round = await GuessingRoundQueries.LoadTrackedUnresolvedAsync(db, hostId, ct);
-        var resolution = round is null
-            ? await GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId, ct)
-            : await GuessingReplySettingsQueries.LoadForRoundAsync(
-                db,
-                hostId,
-                round.GuessRoundProfileId,
-                ct
-            );
-        var settings = resolution.Settings;
-        var delivery = resolution.ReplyDelivery;
-        var submittedName = GuessName.Parse(name);
-
-        if (round is null)
+        int? originalRoundId = null;
+        GuessWork work;
+        for (var attempt = 1; ; attempt++)
         {
-            return Completed(
-                new GuessingOperationOutcome.Rejected(
-                    settings.NoOpenRoundReply,
-                    delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
-                )
-            );
-        }
-
-        var optionNames = await db
-            .GuessOptions.AsNoTracking()
-            .Where(option => option.GuessRoundProfileId == round.GuessRoundProfileId)
-            .Select(option => option.Name)
-            .ToListAsync(ct);
-        var matchingAnswer = optionNames
-            .Select(GuessAnswerNames.Parse)
-            .FirstOrDefault(answer => answer.Contains(submittedName));
-        if (matchingAnswer is null)
-        {
-            return Completed(
-                new GuessingOperationOutcome.Rejected(
-                    Format(settings.InvalidGuessReply, submittedName.Value, string.Empty),
-                    delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
-                )
-            );
-        }
-
-        var canonicalName = matchingAnswer.Canonical.Value;
-
-        var winners = await db
-            .Votes.AsNoTracking()
-            .Where(x => x.GuessRoundId == round.Id && x.GuessName == canonicalName)
-            .OrderBy(x => x.GuessedAtUtc)
-            .Select(x => x.Login)
-            .ToListAsync(ct);
-        var reward = await db
-            .Profiles.AsNoTracking()
-            .Where(x => x.Id == round.GuessRoundProfileId)
-            .Select(x => x.WinningGuessPointReward)
-            .SingleAsync(ct);
-        var rewardAmount = PointAmount.ParseAbsolute(reward);
-        var pointLabel =
-            await db
-                .PointsSettings.AsNoTracking()
-                .Where(x => x.HostId == hostId)
-                .Select(x => x.PointLabel)
-                .SingleOrDefaultAsync(ct)
-            ?? "points";
-        var roundName = await db
-            .Profiles.AsNoTracking()
-            .Where(x => x.Id == round.GuessRoundProfileId)
-            .Select(x => x.Name)
-            .SingleAsync(ct);
-        var now = DateTime.UtcNow;
-
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        round.Status = GuessRoundStatus.Completed;
-        round.ClosedAtUtc ??= now;
-        round.WinningName = canonicalName;
-        Result<List<PointBalanceMutation>, PointBalanceMutationFailure> payoutAttempt = Result<
-            List<PointBalanceMutation>,
-            PointBalanceMutationFailure
-        >.Success([]);
-        if (!rewardAmount.IsZero)
-        {
-            foreach (var winner in winners)
+            var phase = new GuessAttemptPhase();
+            try
             {
-                payoutAttempt = await payoutAttempt.Match(
-                    async mutations =>
-                    {
-                        var result = await balances
-                            .AwardGuessWin(db, hostId, round.Id, winner, rewardAmount, now)
-                            .ExecuteAsync(ct);
-                        return result.Match(
-                            mutation =>
-                            {
-                                mutations.Add(mutation);
-                                return Result<
-                                    List<PointBalanceMutation>,
-                                    PointBalanceMutationFailure
-                                >.Success(mutations);
-                            },
-                            Result<List<PointBalanceMutation>, PointBalanceMutationFailure>.Error
-                        );
-                    },
-                    failure =>
-                        Task.FromResult(
-                            Result<List<PointBalanceMutation>, PointBalanceMutationFailure>.Error(
-                                failure
-                            )
-                        )
+                work = await DeclareWinnerAttemptAsync(
+                    hostId,
+                    name,
+                    originalRoundId,
+                    id => originalRoundId ??= id,
+                    phase,
+                    ct
                 );
+                break;
+            }
+            catch (Exception exception)
+                when (attempt < 20 && !ct.IsCancellationRequested && phase.CanRetry(exception))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
             }
         }
-
-        return await payoutAttempt.Match(CommitAsync, PayoutFailedAsync);
-
-        async Task<GuessingWinnerDeclarationOutcome> CommitAsync(
-            List<PointBalanceMutation> mutations
-        )
+        if (work.Presentation is { } data)
         {
-            _ = await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
             if (automations is not null)
             {
                 await automations.EmitAsync(
                     hostId,
                     FeatureLifecycleKind.GuessingFinished,
-                    round.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    round.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    data.RoundId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    data.RoundId.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     DateTime.UtcNow,
                     "",
                     ct
                 );
             }
             await changes.NotifyChangedAsync(hostId, ct);
-            if (mutations.Count > 0)
+            if (data.PointsChanged)
             {
                 _ = await pointsChanges.NotifyChangedAsync(ct);
             }
-            if (winners.Count > 0)
+            if (data.Winners.Count > 0)
             {
                 foreach (var presenter in eventPresenters)
                 {
@@ -190,44 +97,252 @@ public sealed class GuessingRoundService(
                         new OverlayEventPresentation.GuessingWinner
                         {
                             HostId = hostId,
-                            SourceKey = round.Id.ToString(
+                            SourceKey = data.RoundId.ToString(
                                 System.Globalization.CultureInfo.InvariantCulture
                             ),
-                            RoundName = roundName,
-                            WinningAnswer = canonicalName,
-                            Winners = winners.ToImmutableArray(),
-                            Amount = rewardAmount.ToDisplayString(),
-                            PointLabel = pointLabel,
+                            RoundName = data.RoundName,
+                            WinningAnswer = data.CanonicalName,
+                            Winners = data.Winners.ToImmutableArray(),
+                            Amount = data.RewardAmount.ToDisplayString(),
+                            PointLabel = data.PointLabel,
                         },
                         ct
                     );
                 }
             }
-
-            var message = MessageTemplateFormatter.Format(
-                winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["name"] = canonicalName,
-                    ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
-                    ["count"] = winners.Count.ToString(CultureInfo.InvariantCulture),
-                    ["reward"] = rewardAmount.ToDisplayString(),
-                    ["label"] = pointLabel,
-                    ["reward_text"] =
-                        rewardAmount.IsZero || winners.Count == 0
-                            ? string.Empty
-                            : $" Each winner gets {rewardAmount.ToDisplayString()} {pointLabel}.",
-                }
-            );
-            return Completed(new GuessingOperationOutcome.Succeeded(message));
         }
+        return work.Outcome;
+    }
 
-        static Task<GuessingWinnerDeclarationOutcome> PayoutFailedAsync(
-            PointBalanceMutationFailure failure
-        ) =>
-            Task.FromResult<GuessingWinnerDeclarationOutcome>(
-                new GuessingWinnerDeclarationOutcome.PayoutFailed(failure)
-            );
+    private async Task<GuessWork> DeclareWinnerAttemptAsync(
+        int hostId,
+        string name,
+        int? originalRoundId,
+        Action<int> retainRoundId,
+        GuessAttemptPhase phase,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            ct
+        );
+        phase.Acquired = true;
+        try
+        {
+            var round = originalRoundId is null
+                ? await GuessingRoundQueries.LoadTrackedUnresolvedAsync(db, hostId, ct)
+                : await db.Rounds.SingleOrDefaultAsync(
+                    value =>
+                        value.HostId == hostId
+                        && value.Id == originalRoundId
+                        && (
+                            value.Status == GuessRoundStatus.Open
+                            || value.Status == GuessRoundStatus.Closed
+                        ),
+                    ct
+                );
+            if (round is not null)
+            {
+                retainRoundId(round.Id);
+            }
+            var resolution = round is null
+                ? await GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId, ct)
+                : await GuessingReplySettingsQueries.LoadForRoundAsync(
+                    db,
+                    hostId,
+                    round.GuessRoundProfileId,
+                    ct
+                );
+            var settings = resolution.Settings;
+            var delivery = resolution.ReplyDelivery;
+            var submittedName = GuessName.Parse(name);
+
+            if (round is null)
+            {
+                return new GuessWork(
+                    Completed(
+                        new GuessingOperationOutcome.Rejected(
+                            settings.NoOpenRoundReply,
+                            delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
+                        )
+                    ),
+                    null
+                );
+            }
+
+            var optionNames = await db
+                .GuessOptions.AsNoTracking()
+                .Where(option => option.GuessRoundProfileId == round.GuessRoundProfileId)
+                .Select(option => option.Name)
+                .ToListAsync(ct);
+            var matchingAnswer = optionNames
+                .Select(GuessAnswerNames.Parse)
+                .FirstOrDefault(answer => answer.Contains(submittedName));
+            if (matchingAnswer is null)
+            {
+                return new GuessWork(
+                    Completed(
+                        new GuessingOperationOutcome.Rejected(
+                            Format(settings.InvalidGuessReply, submittedName.Value, string.Empty),
+                            delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
+                        )
+                    ),
+                    null
+                );
+            }
+
+            var canonicalName = matchingAnswer.Canonical.Value;
+
+            var winners = await db
+                .Votes.AsNoTracking()
+                .Where(x => x.GuessRoundId == round.Id && x.GuessName == canonicalName)
+                .OrderBy(x => x.GuessedAtUtc)
+                .Select(x => x.Login)
+                .ToListAsync(ct);
+            var reward = await db
+                .Profiles.AsNoTracking()
+                .Where(x => x.Id == round.GuessRoundProfileId)
+                .Select(x => x.WinningGuessPointReward)
+                .SingleAsync(ct);
+            var rewardAmount = PointAmount.ParseAbsolute(reward);
+            var pointLabel =
+                await db
+                    .PointsSettings.AsNoTracking()
+                    .Where(x => x.HostId == hostId)
+                    .Select(x => x.PointLabel)
+                    .SingleOrDefaultAsync(ct)
+                ?? "points";
+            var roundName = await db
+                .Profiles.AsNoTracking()
+                .Where(x => x.Id == round.GuessRoundProfileId)
+                .Select(x => x.Name)
+                .SingleAsync(ct);
+            var now = DateTime.UtcNow;
+
+            round.Status = GuessRoundStatus.Completed;
+            round.ClosedAtUtc ??= now;
+            round.WinningName = canonicalName;
+            Result<List<PointBalanceMutation>, PointBalanceMutationFailure> payoutAttempt = Result<
+                List<PointBalanceMutation>,
+                PointBalanceMutationFailure
+            >.Success([]);
+            if (!rewardAmount.IsZero)
+            {
+                foreach (var winner in winners)
+                {
+                    payoutAttempt = await payoutAttempt.Match(
+                        async mutations =>
+                        {
+                            var result = await balances
+                                .AwardGuessWin(db, hostId, round.Id, winner, rewardAmount, now)
+                                .ExecuteAsync(ct);
+                            return result.Match(
+                                mutation =>
+                                {
+                                    mutations.Add(mutation);
+                                    return Result<
+                                        List<PointBalanceMutation>,
+                                        PointBalanceMutationFailure
+                                    >.Success(mutations);
+                                },
+                                Result<
+                                    List<PointBalanceMutation>,
+                                    PointBalanceMutationFailure
+                                >.Error
+                            );
+                        },
+                        failure =>
+                            Task.FromResult(
+                                Result<
+                                    List<PointBalanceMutation>,
+                                    PointBalanceMutationFailure
+                                >.Error(failure)
+                            )
+                    );
+                }
+            }
+
+            return await payoutAttempt.Match(CommitAsync, PayoutFailedAsync);
+
+            async Task<GuessWork> CommitAsync(List<PointBalanceMutation> mutations)
+            {
+                _ = await db.SaveChangesAsync(ct);
+                var message = MessageTemplateFormatter.Format(
+                    winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["name"] = canonicalName,
+                        ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
+                        ["count"] = winners.Count.ToString(CultureInfo.InvariantCulture),
+                        ["reward"] = rewardAmount.ToDisplayString(),
+                        ["label"] = pointLabel,
+                        ["reward_text"] =
+                            rewardAmount.IsZero || winners.Count == 0
+                                ? string.Empty
+                                : $" Each winner gets {rewardAmount.ToDisplayString()} {pointLabel}.",
+                    }
+                );
+                var prepared = new GuessWork(
+                    Completed(new GuessingOperationOutcome.Succeeded(message)),
+                    new(
+                        round.Id,
+                        roundName,
+                        canonicalName,
+                        winners,
+                        rewardAmount,
+                        pointLabel,
+                        mutations.Count > 0
+                    )
+                );
+                await tx.CommitAsync(ct);
+                phase.Committed = true;
+                return prepared;
+            }
+
+            static Task<GuessWork> PayoutFailedAsync(PointBalanceMutationFailure failure) =>
+                Task.FromResult(
+                    new GuessWork(new GuessingWinnerDeclarationOutcome.PayoutFailed(failure), null)
+                );
+        }
+        catch (Exception exception)
+            when (!phase.Committed
+                && !ct.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
+        {
+            await tx.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
+        }
+    }
+
+    private sealed record GuessWork(
+        GuessingWinnerDeclarationOutcome Outcome,
+        GuessPresentation? Presentation
+    );
+
+    private sealed record GuessPresentation(
+        int RoundId,
+        string RoundName,
+        string CanonicalName,
+        IReadOnlyList<string> Winners,
+        PointAmount RewardAmount,
+        string PointLabel,
+        bool PointsChanged
+    );
+
+    private sealed class GuessAttemptPhase
+    {
+        public bool Acquired { get; set; }
+        public bool Committed { get; set; }
+        public bool RolledBack { get; set; }
+
+        public bool CanRetry(Exception exception) =>
+            !Committed
+            && (!Acquired || RolledBack)
+            && MainDatabaseFailureClassifier.IsContention(exception);
     }
 
     public IO<GuessingWinnerDeclarationOutcome, Never> DeclareWinner(

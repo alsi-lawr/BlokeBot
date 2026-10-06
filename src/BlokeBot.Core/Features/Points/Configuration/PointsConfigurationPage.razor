@@ -1,3 +1,4 @@
+@using BlokeBot.Core.Features.Points.Balances
 @page "/points/settings"
 @using BlokeBot.Eventing
 @using BlokeBot.Core.Features.ConfigurationTransfer
@@ -9,6 +10,7 @@
 @inject HostFeatureService _features
 @inject EventBus<AppEventKind> _events
 @inject ToastService _toasts
+@inject BlokeBot.Core.Features.Points.WatchTime.WatchTimeRuntime _watchTime
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
 <div class="mx-auto max-w-7xl space-y-6" data-sticky-save-scope>
@@ -57,8 +59,44 @@
                 </div>
             </StudioStage>
 
+            <StudioStage Key="watch-time" Number="2" Title="Watch-time points"
+                         Summary="@(_config.WatchTimePointsEnabled ? "On" : "Off")"
+                         Open="@_openStages.IsOpen(PointsStage.WatchTime)"
+                         FocusElementId="@_validationFocusId" FocusRequest="@_watchTimeFocusRequest"
+                         OpenChanged="@(open => _openStages.Set(PointsStage.WatchTime, open))">
+                <div class="space-y-4">
+                    <div>
+                        <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
+                            <span id="watch-enable-label">Enable watch-time points</span>
+                            <button id="watch-enabled" type="button" role="switch" class="studio-toggle"
+                                    aria-checked="@_config.WatchTimePointsEnabled.ToString().ToLowerInvariant()" aria-labelledby="watch-enable-label"
+                                    @onclick="() => _config.WatchTimePointsEnabled = !_config.WatchTimePointsEnabled"></button>
+                        </div>
+                        <p class="mt-2 text-sm text-muted-foreground">Give points every 5 minutes to people connected to chat while your stream is live and the bot is connected.</p>
+                    </div>
+                    <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                        <label class="label" for="watch-amount">Points per person</label>
+                        <StudioStepper Id="watch-amount" AriaLabel="Points per person" Unit="points"
+                                       Step="1" Minimum="1" Maximum="@PointAmount.MaximumValue"
+                                       DecrementLabel="Less points per person" IncrementLabel="More points per person"
+                                       Invalid="@(_watchTimeAmountError is not null)" InvalidDescriptionId="watch-error"
+                                       Value="@(_config.WatchTimePointAmount ?? string.Empty)"
+                                       ValueChanged="@(value => _config.WatchTimePointAmount = value)" />
+                    </div>
+                    <p class="text-xs text-muted-foreground">Choose a positive whole amount, up to 10^100. Required when on; optional when off. Buttons change it by 1.</p>
+                    @if (_watchTimeAmountError is not null)
+                    {
+                        <p id="watch-error" class="text-sm font-semibold text-red-700" role="alert">@_watchTimeAmountError.Message</p>
+                    }
+                    <div class="surface-muted rounded-lg p-3" id="watch-saved-region" aria-live="polite" aria-atomic="true">
+                        <p class="text-sm font-bold text-[var(--app-text-strong)]">@WatchSavedSummary()</p>
+                        <p class="mt-1 text-sm text-muted-foreground">@WatchStatusSummary()</p>
+                    </div>
+                </div>
+            </StudioStage>
+
             <StudioStage Key="gambling"
-                         Number="2"
+                         Number="3"
                          Title="Gambling"
                          Summary="@GamblingSummary()"
                          Open="@_openStages.IsOpen(PointsStage.Gambling)"
@@ -106,7 +144,7 @@
             </StudioStage>
 
             <StudioStage Key="giveaways"
-                         Number="3"
+                         Number="4"
                          Title="Giveaways"
                          Summary="@GiveawaysSummary()"
                          Open="@_openStages.IsOpen(PointsStage.Giveaways)"
@@ -201,7 +239,7 @@
             </StudioStage>
 
             <StudioStage Key="chat-commands"
-                         Number="4"
+                         Number="5"
                          Title="Chat commands"
                          Summary="@CommandsSummary()"
                          Open="@_openStages.IsOpen(PointsStage.Commands)"
@@ -235,7 +273,7 @@
             </StudioStage>
 
             <StudioStage Key="bot-replies"
-                         Number="5"
+                         Number="6"
                          Title="Bot replies"
                          Summary="@RepliesSummary()"
                          Open="@_openStages.IsOpen(PointsStage.Replies)"

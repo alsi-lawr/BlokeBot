@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
@@ -11,7 +12,8 @@ internal sealed class HostedChannelLifecycleNotifier(
     PollService polls,
     ClipMarkerService clipsMarkers,
     ChannelPointsService? channelPoints = null,
-    PredictionService? predictions = null
+    PredictionService? predictions = null,
+    WatchTimeRuntime? watchTime = null
 ) : IBotChannelLifecycleNotifier
 {
     public async Task ChannelStartedAsync(
@@ -24,6 +26,7 @@ internal sealed class HostedChannelLifecycleNotifier(
             return;
         }
 
+        watchTime?.AcceptedStarted(target);
         var channel = target.Channel;
         await polls.ReconcileChannelAsync(channel, cancellationToken);
         await clipsMarkers.ReconcileChannelAsync(channel, cancellationToken);
@@ -40,5 +43,11 @@ internal sealed class HostedChannelLifecycleNotifier(
     public async Task ChannelStoppedAsync(
         BotChannelTarget target,
         CancellationToken cancellationToken
-    ) => await lifecycle.MarkStoppedAsync(target, cancellationToken);
+    )
+    {
+        if (await lifecycle.MarkStoppedAsync(target, cancellationToken))
+        {
+            watchTime?.AcceptedStopped(target);
+        }
+    }
 }
