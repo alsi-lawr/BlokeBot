@@ -7,7 +7,7 @@ export function createEditorMenu(root, owner) {
     const popup = root.querySelector('[data-editor-menu]');
     const buttons = [...popup.querySelectorAll('[role=menuitem]')];
     const abort = new AbortController(), options = { signal: abort.signal };
-    let invocation = null, origin = null, anchor = null, generation = 0, disposed = false;
+    let invocation = null, origin = null, anchor = null, generation = 0, opening = false, disposed = false;
     const visible = node => node?.isConnected && node.getClientRects().length > 0 && !node.closest('[hidden],[inert]');
     const fallback = () => owner.fallback?.() ?? opener;
 
@@ -17,6 +17,7 @@ export function createEditorMenu(root, owner) {
     }
     function close(returnFocus = true) {
         generation++;
+        opening = false;
         invocation = null;
         popup.hidden = true;
         opener.setAttribute('aria-expanded', 'false');
@@ -28,9 +29,10 @@ export function createEditorMenu(root, owner) {
         popup.style.top = `${Math.max(8, Math.min(anchor.y, window.innerHeight - bounds.height - 8))}px`;
     }
     function refresh() {
-        if (!invocation) return;
-        if (!root.isConnected || !owner.current(invocation)) close();
-        else position();
+        if (!invocation && !opening) return;
+        if (!root.isConnected) close(false);
+        else if (invocation && !owner.current(invocation)) close();
+        else if (invocation) position();
     }
     async function open(target, point) {
         close(false);
@@ -39,8 +41,11 @@ export function createEditorMenu(root, owner) {
         origin = target.closest?.('[role=treeitem],[data-automation-node-select],[data-automation-edge],[data-canvas-area],[data-automation-canvas]') ?? target;
         if (!origin?.hasAttribute('tabindex') && !(origin instanceof HTMLButtonElement)) origin = fallback();
         anchor = point ?? (() => { const r = origin.getBoundingClientRect(); return { x: r.left, y: r.bottom }; })();
+        opening = true;
         const prepared = await owner.prepare(target, point);
-        if (disposed || request !== generation || !prepared || !owner.current(prepared)) return;
+        if (disposed || request !== generation) return;
+        opening = false;
+        if (!root.isConnected || !prepared || !owner.current(prepared)) return;
         invocation = prepared;
         popup.querySelector('[data-editor-menu-target]').textContent = prepared.target;
         popup.querySelector('[data-editor-menu-history]').textContent = prepared.history;
@@ -94,11 +99,14 @@ export function createEditorMenu(root, owner) {
         if (button) { event.stopPropagation(); void activate(button); }
     }, options);
     window.document.addEventListener('pointerdown', event => {
-        if (invocation && !popup.contains(event.target) && !opener.contains(event.target)) close(false);
+        if ((invocation || opening) && !popup.contains(event.target) && !opener.contains(event.target)) close(false);
     }, { capture: true, ...options });
     window.document.addEventListener('focusin', event => {
-        if (invocation && !popup.contains(event.target)) close(false);
+        if ((invocation || opening) && !popup.contains(event.target)) close(false);
     }, options);
+    window.document.addEventListener('keydown', event => {
+        if (opening && (event.key === 'Escape' || event.key === 'Tab')) close(false);
+    }, { capture: true, ...options });
     window.addEventListener('resize', refresh, options);
     window.document.addEventListener('fullscreenchange', refresh, options);
     return { refresh, dispose() { disposed = true; close(false); abort.abort(); } };
