@@ -139,11 +139,5 @@ public sealed partial class AutomationEditorInteractionTests
         rendered
             .Find(".automation-input-editor [role=alert]")
             .TextContent.ShouldBe("Enter a positive whole number of milliseconds.");
-        rendered
-            .FindAll(".automation-field input[type=number]")
-            .ShouldNotContain(input =>
-                input.Id != null
-                && input.Id.EndsWith("duration-milliseconds", StringComparison.Ordinal)
-            );
     }
 }

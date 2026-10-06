@@ -27,14 +27,10 @@ internal static class AutomationDelayDurationBinding
                 : new Admission.Invalid()
             : binding.Mode switch
             {
-                AutomationInputBindingMode.Fixed when incoming == 0 => new Admission.Bound(binding),
+                AutomationInputBindingMode.Fixed when incoming == 0 => new Admission.Bound(),
                 AutomationInputBindingMode.Expression
-                    when incoming == 0 && binding.Expression is not null => new Admission.Bound(
-                    binding
-                ),
-                AutomationInputBindingMode.Connected when incoming == 1 => new Admission.Bound(
-                    binding
-                ),
+                    when incoming == 0 && binding.Expression is not null => new Admission.Bound(),
+                AutomationInputBindingMode.Connected when incoming == 1 => new Admission.Bound(),
                 _ => new Admission.Invalid(),
             };
 
@@ -52,21 +48,75 @@ internal static class AutomationDelayDurationBinding
     {
         private Admission() { }
 
-        internal sealed record LegacyLiteral : Admission;
+        internal abstract TResult Match<TResult>(
+            Func<LegacyLiteral, TResult> legacyLiteral,
+            Func<Bound, TResult> bound,
+            Func<Invalid, TResult> invalid
+        );
 
-        internal sealed record Bound(AutomationInputBinding Binding) : Admission;
+        internal sealed record LegacyLiteral : Admission
+        {
+            internal override TResult Match<TResult>(
+                Func<LegacyLiteral, TResult> legacyLiteral,
+                Func<Bound, TResult> bound,
+                Func<Invalid, TResult> invalid
+            ) => legacyLiteral(this);
+        }
 
-        internal sealed record Invalid : Admission;
+        internal sealed record Bound : Admission
+        {
+            internal override TResult Match<TResult>(
+                Func<LegacyLiteral, TResult> legacyLiteral,
+                Func<Bound, TResult> bound,
+                Func<Invalid, TResult> invalid
+            ) => bound(this);
+        }
+
+        internal sealed record Invalid : Admission
+        {
+            internal override TResult Match<TResult>(
+                Func<LegacyLiteral, TResult> legacyLiteral,
+                Func<Bound, TResult> bound,
+                Func<Invalid, TResult> invalid
+            ) => invalid(this);
+        }
     }
 
     internal abstract record Duration
     {
         private Duration() { }
 
-        internal sealed record LegacyLiteral(TimeSpan Value) : Duration;
+        internal abstract TResult Match<TResult>(
+            Func<LegacyLiteral, TResult> legacyLiteral,
+            Func<ResolvedMilliseconds, TResult> resolvedMilliseconds,
+            Func<Invalid, TResult> invalid
+        );
 
-        internal sealed record ResolvedMilliseconds(decimal Value) : Duration;
+        internal sealed record LegacyLiteral(TimeSpan Value) : Duration
+        {
+            internal override TResult Match<TResult>(
+                Func<LegacyLiteral, TResult> legacyLiteral,
+                Func<ResolvedMilliseconds, TResult> resolvedMilliseconds,
+                Func<Invalid, TResult> invalid
+            ) => legacyLiteral(this);
+        }
 
-        internal sealed record Invalid : Duration;
+        internal sealed record ResolvedMilliseconds(decimal Value) : Duration
+        {
+            internal override TResult Match<TResult>(
+                Func<LegacyLiteral, TResult> legacyLiteral,
+                Func<ResolvedMilliseconds, TResult> resolvedMilliseconds,
+                Func<Invalid, TResult> invalid
+            ) => resolvedMilliseconds(this);
+        }
+
+        internal sealed record Invalid : Duration
+        {
+            internal override TResult Match<TResult>(
+                Func<LegacyLiteral, TResult> legacyLiteral,
+                Func<ResolvedMilliseconds, TResult> resolvedMilliseconds,
+                Func<Invalid, TResult> invalid
+            ) => invalid(this);
+        }
     }
 }

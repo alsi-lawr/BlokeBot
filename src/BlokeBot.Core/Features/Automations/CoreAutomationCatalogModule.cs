@@ -448,7 +448,10 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             : Invalid("predicate", "Choose a Boolean predicate.");
 
     private static AutomationConfigurationParseResult ParseDelay(JsonElement json) =>
-        TryReadInt64(json, "duration-milliseconds", out var milliseconds)
+        json.ValueKind == JsonValueKind.Object
+        && json.TryGetProperty("duration-milliseconds", out var duration)
+        && duration.ValueKind == JsonValueKind.Number
+        && TryReadInt64(json, "duration-milliseconds", out var milliseconds)
         && milliseconds >= TimeSpan.MinValue.Ticks / TimeSpan.TicksPerMillisecond
         && milliseconds <= TimeSpan.MaxValue.Ticks / TimeSpan.TicksPerMillisecond
             ? Parsed(

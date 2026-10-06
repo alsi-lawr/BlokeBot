@@ -162,12 +162,26 @@ internal sealed class AutomationDataResolver(
                     && edge.TargetNodeId == consumer.Id
                     && edge.TargetPortId == input.Id.Value
                 );
-                switch (AutomationDelayDurationBinding.Admit(bindings.Bindings, incoming))
+                var admission = AutomationDelayDurationBinding.Admit(bindings.Bindings, incoming);
+                if (
+                    admission.Match(
+                        legacyLiteral: static _ => true,
+                        bound: static _ => false,
+                        invalid: static _ => false
+                    )
+                )
                 {
-                    case AutomationDelayDurationBinding.Admission.LegacyLiteral:
-                        continue;
-                    case AutomationDelayDurationBinding.Admission.Invalid:
-                        return new AutomationInputResolution.Failed("binding-invalid");
+                    continue;
+                }
+                if (
+                    admission.Match(
+                        legacyLiteral: static _ => false,
+                        bound: static _ => false,
+                        invalid: static _ => true
+                    )
+                )
+                {
+                    return new AutomationInputResolution.Failed("binding-invalid");
                 }
             }
             if (!bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding))
