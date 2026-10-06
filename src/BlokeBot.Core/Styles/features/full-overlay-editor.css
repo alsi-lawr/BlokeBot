@@ -111,7 +111,6 @@
 
 .full-inspector-actions .editor-action-tip,.full-inspector-align .editor-action-tip{left:0;right:auto;}
 
-.full-overlay-editor{position:relative;}
 .full-editor-inspector .field{margin-bottom:.5rem;}
 .full-fill-heading{margin:.6rem 0 .4rem;font-size:.8rem;}
 .full-fill-kinds,.full-motion-presets{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;}
