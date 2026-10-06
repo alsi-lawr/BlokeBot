@@ -8,16 +8,20 @@ internal static class AutomationNodeEvaluation
         DateTime now
     )
     {
-        TimeSpan? duration = AutomationDelayDurationBinding.Resolve(configuration, inputs) switch
-        {
-            AutomationDelayDurationBinding.Duration.LegacyLiteral literal => literal.Value,
-            AutomationDelayDurationBinding.Duration.ResolvedMilliseconds milliseconds
-                when milliseconds.Value > 0
+        var duration = AutomationDelayDurationBinding
+            .Resolve(configuration, inputs)
+            .Match<TimeSpan?>(
+                literal => literal.Value,
+                milliseconds =>
+                    milliseconds.Value > 0
                     && milliseconds.Value <= AutomationDelayDurationBinding.MaximumMilliseconds
-                    && decimal.Truncate(milliseconds.Value) == milliseconds.Value =>
-                TimeSpan.FromTicks((long)milliseconds.Value * TimeSpan.TicksPerMillisecond),
-            _ => null,
-        };
+                    && decimal.Truncate(milliseconds.Value) == milliseconds.Value
+                        ? TimeSpan.FromTicks(
+                            (long)milliseconds.Value * TimeSpan.TicksPerMillisecond
+                        )
+                        : null,
+                invalid => null
+            );
         return duration is not { } wait
                 ? new AutomationNodeExecution.Failed("delay-invalid-duration")
             : wait <= DateTime.MaxValue - now

@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Automations.Page;
+using Bunit;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
@@ -7,6 +9,71 @@ namespace BlokeBot.Core.Tests;
 
 public sealed partial class AutomationRuntimeTests
 {
+    [Test]
+    [Arguments("1.5")]
+    [Arguments("")]
+    [Arguments("9223372036854775808")]
+    public async Task DelayBinding_RealFixedEditorValidationRejectsInvalidTextAndRecovers(
+        string text
+    )
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        fixture
+            .Catalog.TryDescribe(AutomationDefinitionIds.DelayControl, out var definition)
+            .ShouldBeTrue();
+        var node = AutomationEditorNode.Create(definition, default);
+        var inspector = context.Render<AutomationNodeInspector>(parameters =>
+            parameters
+                .Add(component => component.Node, node)
+                .Add(component => component.Nodes, [node])
+        );
+        var input = inspector.Find(".automation-input-editor input[type=number]");
+        input.Input(text);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        AutomationFlowDraft CurrentDraft() =>
+            Draft(fixture.HostId, [source, node.Draft()], [Edge(source, "flow", node.Draft())]);
+        var invalid = (
+            await fixture.Flows.ValidateDraftAsync(CurrentDraft(), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        var diagnostic = invalid.Errors.Single(error =>
+            error.NodeId == node.Id && error.FieldId == AutomationDelayDurationBinding.LiteralField
+        );
+        inspector.Render(parameters =>
+            parameters
+                .Add(component => component.Node, node)
+                .Add(component => component.Nodes, [node])
+                .Add(component => component.Errors, [diagnostic])
+        );
+        inspector
+            .Find(".automation-input-editor [role=alert]")
+            .TextContent.ShouldBe(diagnostic.Message);
+        _ = (
+            await fixture.Flows.SaveAsync(CurrentDraft(), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (await db.AutomationFlows.CountAsync()).ShouldBe(0);
+        }
+
+        inspector.Find(".automation-input-editor input[type=number]").Input("1001");
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(CurrentDraft(), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+        var saved = (
+            await fixture.Flows.SaveAsync(CurrentDraft(), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var restored = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == saved.FlowId)
+            .Draft.Nodes.Single(value => value.Id == node.Id);
+        fixture
+            .Catalog.ValidatePersistedDefinition(restored.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>()
+            .Configuration.ShouldBe(new DelayControlConfiguration(TimeSpan.FromMilliseconds(1001)));
+    }
+
     [Test]
     [Arguments(false, AutomationInputBindingMode.Fixed, 1)]
     [Arguments(true, AutomationInputBindingMode.Fixed, 1)]
