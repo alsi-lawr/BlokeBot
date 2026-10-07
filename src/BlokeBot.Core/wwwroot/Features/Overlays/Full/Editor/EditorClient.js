@@ -70,7 +70,9 @@ export function createClient(root, document, dotnet) {
         input.addEventListener('input',()=>changed(owner.source(input.dataset.source,input.value)),options);
     }
     root.addEventListener('keydown',event=>{
-        if(!(event.target instanceof Element)||containToolboxKeyboard(event))return;
+        if(!(event.target instanceof Element))return;
+        if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key.toLowerCase()==='s'){event.preventDefault();void dotnet.invokeMethodAsync('SaveShortcutAsync');return;}
+        if(containToolboxKeyboard(event))return;
         const tree=event.target.closest('[role=tree]');if(tree&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End',' '].includes(event.key))event.preventDefault();
         const source=event.target.closest('[data-source]');
         const editable=event.target.closest('input,textarea,select,[contenteditable=true]');
@@ -80,7 +82,6 @@ export function createClient(root, document, dotnet) {
                 event.preventDefault();if(source)owner.focus(source.dataset.source);
                 changed(owner.history(key==='y'||event.shiftKey?'redo':'undo'));return;
             }
-            if(key==='s'){event.preventDefault();void dotnet.invokeMethodAsync('SaveShortcutAsync');return;}
         }
         if(editable)return;
         if(event.key==='Delete'&&view.selected){event.preventDefault();command({kind:'remove'});}
