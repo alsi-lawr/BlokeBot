@@ -48,11 +48,11 @@
 
 .editor-workspace-header {
     flex-shrink: 0;
-    position: relative;
 }
 
 .editor-workspace-header .editor-workspace-error {
-    top: 100%;
+    position: static;
+    margin: 0 0.7rem 0.7rem auto;
     max-width: min(24rem, calc(100vw - 1.4rem));
 }
 
