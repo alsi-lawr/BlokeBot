@@ -51,6 +51,7 @@ public partial class FullOverlayEditorPage
     private bool _focusToolboxAfterRender;
     private string? _insertedSelection;
     private long _insertedRevision;
+    private long _insertedSelectionVersion;
     private FullOverlayToolbox? _toolbox;
     private EditorToolboxToggle? _toolboxToggle;
     private static readonly IReadOnlyList<SegmentedTabItem> _sourceTabs =
@@ -135,7 +136,12 @@ public partial class FullOverlayEditorPage
         if (_insertedSelection is { } selected)
         {
             _insertedSelection = null;
-            await _client.InvokeVoidAsync("focusInsertedLayer", selected, _insertedRevision);
+            await _client.InvokeVoidAsync(
+                "focusInsertedLayer",
+                selected,
+                _insertedRevision,
+                _insertedSelectionVersion
+            );
         }
     }
 
@@ -160,17 +166,36 @@ public partial class FullOverlayEditorPage
     }
 
     private Task CommandAsync(object command) =>
-        CommandAtAsync(command, _view.Selected, _view.Revision);
+        CommandAtAsync(command, _view.Selected, _view.Revision, _view.SelectionVersion);
 
-    private async Task CommandAtAsync(object command, string? selection, long revision)
+    private async Task CommandAtAsync(
+        object command,
+        string? selection,
+        long revision,
+        long selectionVersion
+    )
     {
         if (_client is not null)
         {
-            await _client.InvokeVoidAsync("command", command, selection, revision);
+            await _client.InvokeVoidAsync(
+                "command",
+                command,
+                selection,
+                revision,
+                selectionVersion
+            );
         }
     }
 
-    private Task SelectAsync(string key) => CommandAsync(new { kind = "select", key });
+    private Task SelectAsync(FullOverlayLayerSelection value) =>
+        CommandAsync(
+            new
+            {
+                kind = "select",
+                key = value.Key,
+                toggle = value.Mode == FullOverlaySelectionMode.Toggle,
+            }
+        );
 
     private Task HistoryAsync(string direction) =>
         _client is null
@@ -182,7 +207,12 @@ public partial class FullOverlayEditorPage
             ? Task.CompletedTask
             : _client.InvokeVoidAsync("find", selection).AsTask();
 
-    private sealed record ToolboxInsertion(string? Inserted, long Revision, string Feedback);
+    private sealed record ToolboxInsertion(
+        string? Inserted,
+        long Revision,
+        string Feedback,
+        long SelectionVersion
+    );
 
     private async Task AddAsync(FullOverlayWidgetKind kind)
     {
@@ -206,11 +236,13 @@ public partial class FullOverlayEditorPage
         }
         var revision = _view.Revision;
         var selection = _view.Selected;
+        var selectionVersion = _view.SelectionVersion;
         var result = await _client.InvokeAsync<ToolboxInsertion>(
             "insert",
             command,
             selection,
-            revision
+            revision,
+            selectionVersion
         );
         if (_disposed)
         {
@@ -221,6 +253,7 @@ public partial class FullOverlayEditorPage
             _toolboxOpen = false;
             _insertedSelection = inserted;
             _insertedRevision = result.Revision;
+            _insertedSelectionVersion = result.SelectionVersion;
         }
         else
         {
