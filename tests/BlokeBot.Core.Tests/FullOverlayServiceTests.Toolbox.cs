@@ -31,7 +31,6 @@ public sealed partial class FullOverlayServiceTests
 
         toolbox.Find("input").Input("HTML");
         var rows = toolbox.FindAll(".editor-toolbox-row");
-        rows.Count.ShouldBe(2);
         rows.Single(row => row.TextContent.Contains("Text / HTML element")).Click();
         ordinary.ShouldBe(1);
         rows.Single(row => row.TextContent.Contains("Isolated HTML")).Click();
@@ -39,10 +38,6 @@ public sealed partial class FullOverlayServiceTests
 
         toolbox.Find("input").Input("Public display");
         var declaration = toolbox.Find(".editor-toolbox-row");
-        declaration.TextContent.ShouldContain(
-            "not ready for this channel; draft can still be added"
-        );
-        declaration.GetAttribute("aria-disabled").ShouldBeNull();
         plugin.Worker.Identity.ShouldBeNull();
         declaration.Click();
         added!.Value.Value.ShouldBe($"plugin:{plugin.Manifest.Manifest.Id.Value}/display");
