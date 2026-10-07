@@ -27,12 +27,19 @@ internal static partial class FullOverlayBrowserAssets
           };
           const observe = () => {
             if (!observation || !port) return;
-            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow"];
+            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow","--blokebot-x","--blokebot-y","--blokebot-anchor-x","--blokebot-anchor-y"];
             const items = observation.selectors.flatMap(item => {
               let node;
               try { const nodes = document.querySelectorAll(item.selector); if (nodes.length !== 1) return []; node = nodes[0]; } catch { return []; }
               const rect = node.getBoundingClientRect(); const computed = getComputedStyle(node);
+              const parent = node.offsetParent;
+              const parentStyle = parent ? getComputedStyle(parent) : null;
+              const initialContainingBlock = parent === document.body && parentStyle.position === "static"
+                && parentStyle.transform === "none" && parentStyle.perspective === "none" && parentStyle.filter === "none"
+                && parentStyle.contain === "none" && parentStyle.willChange === "auto";
               return [{ key: item.key, x: rect.x, y: rect.y, width: rect.width, height: rect.height, layoutX: node.offsetLeft, layoutY: node.offsetTop,
+                containingWidth: initialContainingBlock ? innerWidth : parent?.clientWidth ?? innerWidth,
+                containingHeight: initialContainingBlock ? innerHeight : parent?.clientHeight ?? innerHeight,
                 visible: computed.display !== "none" && !["hidden", "collapse"].includes(computed.visibility),
                 styles: Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)])) }];
             });

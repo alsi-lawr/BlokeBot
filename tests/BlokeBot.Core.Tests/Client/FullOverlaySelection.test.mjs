@@ -108,3 +108,28 @@ test('Explicit movement scopes inline importance to edited placement, preserves 
  owner.select(key('b'));owner.command({kind:'resize',handle:'se',dx:16,dy:8,observedWidth:100,observedHeight:50,computed:{width:'100px',height:'50px'}});
  const resized=parse(targetElement(owner.candidate(),key('b')).values.style,{context:'declarationList'}).children.toArray();assert(resized.every(node=>!node.important));owner.history('undo');assert.deepEqual(owner.candidate(),original);
 });
+
+test('Move and nudge displace from winning native positions, not losing inline values, in singleton and atomic mixed selections',()=>{
+ for(const plural of [false,true])for(const [dx,dy] of [[16,8],[1,0]]){
+  const id=crypto.randomUUID(),other=`widget:${id}`,original=fixture(`<div id="a" data-blokebot-element="a" style="left:20px;top:9px;color:red!important; /* retained */ opacity:.5">A</div><section data-blokebot-widget="${id}"></section>`,'#a{position:absolute;left:100px!important;top:50px!important;width:100px;height:50px}',[widget(id)]);
+  const owner=createEditorDocument(original),keys=plural?[key('a'),other]:[key('a')];owner.selectSet(keys);
+  const targets=keys.map(k=>({...geometry(k,k===key('a')?100:300),layoutY:50,styles:{left:k===key('a')?'100px':'300px',top:'50px',translate:'none'}}));
+  const view=owner.view(),planned=owner.planGesture({kind:'move',dx,dy,targets},view.selected,view.revision,view.selectionVersion);
+  assert.equal(planned.kind,'planned');assert.deepEqual(owner.candidate(),original);owner.commitGesture(planned);assert.equal(owner.view().revision,1);
+  owner.select(key('a'));assert.equal(owner.view().styles['--blokebot-x'].trim(),`${100+dx}px`);
+  if(dy)assert.equal(owner.view().styles['--blokebot-y'].trim(),`${50+dy}px`);
+  assert.equal(owner.candidate().css,original.css);assert(targetElement(owner.candidate(),key('a')).values.style.includes('color:red!important; /* retained */ opacity:.5'));
+  if(plural){assert.equal(owner.candidate().widgets[0].authoring.x,`${300+dx}px`);assert.equal(owner.candidate().widgets[0].authoring.y,dy?`${50+dy}px`:'0px');assert.deepEqual(owner.candidate().widgets[0].configuration,original.widgets[0].configuration);assert.deepEqual(owner.candidate().widgets[0].audio,original.widgets[0].audio);}
+  owner.history('undo');assert.deepEqual(owner.candidate(),original);assert.equal(owner.view().history.undo,false);
+ }
+});
+
+test('Native effective center and end anchors retain offsets and independent translation while rejecting an incomplete later root',()=>{
+ const original=fixture('<div data-blokebot-element="center" style="--blokebot-anchor-x:1;--blokebot-anchor-y:1;--blokebot-x:5px;--blokebot-y:2px;rotate:15deg;color:red!important"></div><div data-blokebot-element="end" style="--blokebot-anchor-x:2;--blokebot-anchor-y:2;--blokebot-x:8px;--blokebot-y:4px;transform:scale(.8)"></div>'),owner=createEditorDocument(original),keys=[key('center'),key('end')];owner.selectSet(keys);
+ const targets=[{...geometry(keys[0],650),containingWidth:1200,containingHeight:800,styles:{left:'650px',top:'410px','--blokebot-anchor-x':'1','--blokebot-anchor-y':'1',translate:'-50% -50% 7px'}},{...geometry(keys[1],100),styles:{right:'120px',bottom:'80px','--blokebot-anchor-x':'2','--blokebot-anchor-y':'2',translate:'12px -6px 9px'}}];
+ const incomplete=[targets[1],{...targets[0],containingWidth:undefined}];assert.equal(move(owner,incomplete).kind,'unmapped');assert.deepEqual(owner.candidate(),original);assert.equal(owner.view().history.undo,false);
+ const planned=move(owner,targets);assert.equal(planned.kind,'planned');owner.commitGesture(planned);assert.equal(owner.view().revision,1);
+ owner.select(keys[0]);assert.equal(owner.view().styles['--blokebot-x'].trim(),'66px');assert.equal(owner.view().styles['--blokebot-y'].trim(),'18px');assert.equal(owner.view().styles.translate.trim(),'-50% -50% 7px');assert.equal(owner.view().styles.rotate,'15deg');
+ owner.select(keys[1]);assert.equal(owner.view().styles['--blokebot-x'].trim(),'104px');assert.equal(owner.view().styles['--blokebot-y'].trim(),'72px');assert.equal(owner.view().styles.translate.trim(),'12px -6px 9px');assert.equal(owner.view().styles.transform,'scale(.8)');
+ owner.history('undo');assert.deepEqual(owner.candidate(),original);assert.equal(owner.view().history.undo,false);
+});
