@@ -15,7 +15,8 @@ public partial class PageHelpButton
                 "Visual and HTML/CSS edit the same unsaved document. Switch modes to see your visual edits already in the source; there is no Apply or Sync step.",
                 [
                     "Open the Toolbox icon in Visual mode to search widgets and ordinary Text / HTML. Layers only lists the document hierarchy. Adding selects the new layer and opens its inspector; Escape closes Toolbox and returns to its button.",
-                    "Select a layer to move or resize it and change its style, motion or widget settings.",
+                    "Ctrl-click canvas layers or Layers rows to toggle the selection. Alt-drag selects every visible mapped layer intersecting the rectangle, including parents and children. A plain click selects one layer; dragging a selected layer keeps the set.",
+                    "Move and arrow-key nudge affect unlocked selected roots. Delete removes the selection, including locked layers. Style, resize, motion, widget settings, duplicate and sibling order affect only the active layer.",
                     "Find HTML opens HTML/CSS and places the caret at the selected layer.",
                     "HTML and CSS keep separate histories. Undo and Redo follow the history named in the toolbar. Incomplete source is retained, and newer overlapping edits are not overwritten.",
                 ]
@@ -34,7 +35,7 @@ public partial class PageHelpButton
                 "Your workspace",
                 "Focus fills the application window. Full screen uses the browser's fullscreen mode; Escape or the same control exits full screen.",
                 [
-                    "Zoom, pan and preview viewport only change your authoring view. Shift bypasses optional snapping.",
+                    "Middle-drag pans the view; use Pan view for touch. Zoom, pan and preview viewport only change your authoring view. Shift bypasses optional snapping.",
                     "On narrow screens use Layers, Canvas and Inspector. HTML/CSS remains a separate mode. Action tips appear on keyboard focus; Escape dismisses them.",
                     "Right-click a layer or canvas, or use the ⋯ action button. Context Menu or Shift+F10 opens actions from the keyboard; arrows select actions and Escape closes the menu. Text fields keep browser menus. Delete selected is undoable, not permanent overlay deletion.",
                     "Help stays beside the theme button in the normal app topbar. Exit Focus to return to that topbar.",

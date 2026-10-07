@@ -59,13 +59,12 @@ export function createPreviewBridge(frame, readView, observed, status, presented
             if(!viewport||![viewport.width,viewport.height].every(size=>Number.isFinite(size)&&size>0))return;
             const keys=new Set(readView().layers.map(layer=>layer.key));
             const items=value.items.filter(item=>keys.has(item?.key)&&[item.x,item.y,item.width,item.height,item.layoutX,item.layoutY].every(Number.isFinite)
-                &&item.width>=0&&item.height>=0&&item.styles&&Object.values(item.styles).every(v=>typeof v==='string'));
+                &&item.width>=0&&item.height>=0&&typeof item.visible==='boolean'&&item.styles&&Object.values(item.styles).every(v=>typeof v==='string'));
             if(value.gestureId!==undefined){
                 if(!transient||value.gestureId!==transient.gestureId||!Number.isSafeInteger(value.sequence)
                     ||value.sequence<=renderedSequence||value.sequence>transient.sequence)return;
                 renderedSequence=value.sequence;
-                const item=items.find(item=>item.key===readView().selected);
-                if(item)presented(value.gestureId,item);
+                presented(value.gestureId,items);
             } else if(!transient)observed(items,viewport,request.revision);
         }
     };

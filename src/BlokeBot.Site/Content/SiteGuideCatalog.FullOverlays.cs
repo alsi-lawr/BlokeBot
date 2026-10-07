@@ -60,9 +60,10 @@ internal static partial class SiteGuideCatalog
                     Heading = "Edit canvas and source together",
                     Steps =
                     [
-                        "Select a widget or ordinary HTML element in the layer tree. On a larger screen, the canvas also supports selection, move and resize handles.",
+                        "Ctrl-click canvas layers or Layers rows to toggle the selection. Alt-drag selects every visible mapped layer intersecting the rectangle, including parents and children. A plain click selects one layer; dragging a selected layer keeps the set.",
+                        "Move and arrow-key nudge affect unlocked selected roots. Delete removes the selection, including locked layers, in one undoable Visual change. Style, resize, widget configuration, audio, duplicate and sibling order affect only the active layer. Selecting a parent and child moves the parent once; a locked descendant can travel with it without changing its own placement settings.",
                         "Use the inspector for position, size, anchors, transforms, order, visibility, locking and optional clipping. Alignment and keyboard controls are alternatives to dragging.",
-                        "Use view-only zoom and pan to inspect the scene. Shift temporarily bypasses optional snapping. Focus fills the application window; the same control restores the normal app shell. Full screen enters the browser's fullscreen mode; Escape or the same button exits it.",
+                        "Middle-drag pans the view; use Pan view for touch. Zoom and pan only inspect the scene. Shift temporarily bypasses optional snapping. Focus fills the application window; the same control restores the normal app shell. Full screen enters the browser's fullscreen mode; Escape or the same button exits it.",
                         "Choose HTML/CSS, then HTML or CSS, to edit the authoritative source. Your visual edits are already included; there is no Apply or Sync step. Return to Visual without losing unsaved or incomplete source, the selected source buffer or its caret. Visual edits change only intended source ranges; comments, scripts and unfamiliar syntax remain yours.",
                         "The toolbar names the current Visual, HTML or CSS history. Undo and Redo follow that history. Each editor has its own history. A newer overlapping edit is kept and reported as a conflict; undo that edit in its editor before retrying.",
                     ],

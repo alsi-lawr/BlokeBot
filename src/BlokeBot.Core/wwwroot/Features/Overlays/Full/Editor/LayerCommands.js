@@ -21,11 +21,20 @@ export function addLayer(snapshot, widget) {
         metadata: [{ path: widgetPath(id), value: widget }, { path: ['order'], value: [...snapshot.widgets.map(w => w.id.value), id] }], selected: `widget:${id}` };
 }
 export function removeLayer(snapshot, key) {
-    const node = targetElement(snapshot, key);
-    if (!node) return { kind: 'unmapped', code: 'selection-changed' };
-    const removed = htmlRanges(snapshot.html).elements.filter(n => n.start >= node.start && n.end <= node.end)
-        .map(n => n.values['data-blokebot-widget']).filter(Boolean);
-    return { kind: 'planned', edits: [patch('html', snapshot.html, node.start, node.end, '')], selected: null,
+    return removeLayers(snapshot,[key]);
+}
+export function selectionRoots(nodes) {
+    return nodes.filter(node=>!nodes.some(parent=>parent!==node&&node.start>=parent.start&&node.end<=parent.end));
+}
+export function removeLayers(snapshot, keys) {
+    const elements=htmlRanges(snapshot.html).elements;
+    const nodes=keys.map(key=>{const matches=elements.filter(node=>elementKey(node)===key);return matches.length===1?matches[0]:null;});
+    if(nodes.some(node=>!node))return {kind:'unmapped',code:'selection-changed'};
+    if(!nodes.length)return {kind:'unchanged'};
+    const roots=selectionRoots(nodes);
+    const removed=[...new Set(elements.filter(n=>roots.some(node=>n.start>=node.start&&n.end<=node.end))
+        .map(n=>n.values['data-blokebot-widget']).filter(Boolean))];
+    return { kind: 'planned', edits: roots.map(node=>patch('html',snapshot.html,node.start,node.end,'')), selected: null,
         metadata: [...removed.filter(id => snapshot.widgets.some(w => w.id.value === id)).map(id => ({ path: widgetPath(id), remove: true })),
             { path: ['order'], value: snapshot.widgets.filter(w => !removed.includes(w.id.value)).map(w => w.id.value) }] };
 }

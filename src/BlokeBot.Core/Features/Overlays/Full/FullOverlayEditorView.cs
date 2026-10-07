@@ -9,6 +9,14 @@ public sealed record FullOverlayEditorLayer(
     string? WidgetId
 );
 
+public enum FullOverlaySelectionMode
+{
+    Replace,
+    Toggle,
+}
+
+public sealed record FullOverlayLayerSelection(string Key, FullOverlaySelectionMode Mode);
+
 public sealed record FullOverlayEditorSourceDiagnostic(string Code, string Buffer, int Offset);
 
 public sealed record FullOverlayEditorView(
@@ -24,6 +32,9 @@ public sealed record FullOverlayEditorView(
     IReadOnlyList<FullOverlayEditorSourceDiagnostic> Diagnostics
 )
 {
+    public IReadOnlyList<string> Members { get; init; } = [];
+    public long SelectionVersion { get; init; }
+
     internal static FullOverlayEditorView Empty { get; } =
         new(0, false, null, [], null, false, new Dictionary<string, string>(), "", "visual", []);
 }

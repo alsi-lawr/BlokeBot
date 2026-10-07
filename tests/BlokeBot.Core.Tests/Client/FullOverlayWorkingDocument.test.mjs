@@ -29,7 +29,7 @@ test('Local preview keeps authorized widgets only and rejects obsolete or nested
   view={...view,revision:1};assert.equal(bridge.render(edited,1),false);
   const current=sent.at(-1);assert.equal(current.html,edited.html);assert.deepEqual(current.widgetIds,[id]);
   bridge.set('late-reply',0,document);assert.equal(frame.src,'/full-overlays/preview/approved');
-  const geometry=request=>({kind:'blokebot-full-observations',previewId:'approved',requestId:request.requestId,revision:request.revision,viewport:{width:1920,height:1080},items:[{key:'element:target',x:1,y:2,width:30,height:40,layoutX:1,layoutY:2,styles:{left:'1px'}}]});
+  const geometry=request=>({kind:'blokebot-full-observations',previewId:'approved',requestId:request.requestId,revision:request.revision,viewport:{width:1920,height:1080},items:[{key:'element:target',x:1,y:2,width:30,height:40,layoutX:1,layoutY:2,visible:true,styles:{left:'1px'}}]});
   const before=accepted.length;receive(geometry(first));receive(geometry(current),{});receive({...geometry(current),revision:0});assert.equal(accepted.length,before);
   receive(geometry(current));assert.equal(accepted.at(-1)[0][0].x,1);
   complete(current);
@@ -71,14 +71,14 @@ test('Newest pending source drains once while authorization, reconnect and repla
  } finally {bridge.dispose();globalThis.window=previousWindow;globalThis.location=previousLocation;}
 });
 
-test('Grouped source and audio metadata undo preserves newer CSS and retries atomically',()=>{
+test('Grouped placement and audio metadata undo preserves newer authored source and retries atomically',()=>{
  const owner=createEditorDocument(structuredClone(document));owner.select(`widget:${id}`);
- owner.command({kind:'layout',properties:{color:'green'},metadata:{width:'200px'}});
- const after=owner.candidate();owner.source('css',after.css.replace('green','purple'));owner.focus(EditorFocus.Visual);
+ owner.command({kind:'layout',properties:{width:'200px'},metadata:{width:'200px'}});
+ const after=owner.candidate();owner.source('html',after.html.replace('200px','300px'));owner.focus(EditorFocus.Visual);
  assert.match(owner.history('undo').feedback,/newer overlapping/);
- assert.equal(owner.candidate().widgets[0].authoring.width,'200px');assert.match(owner.candidate().css,/purple/);
- owner.focus(EditorFocus.Css);owner.history('undo');owner.focus(EditorFocus.Visual);owner.history('undo');
- assert.equal(owner.candidate().widgets[0].authoring.width,'100px');assert.equal(owner.candidate().css,document.css);
+ assert.equal(owner.candidate().widgets[0].authoring.width,'200px');assert.match(owner.candidate().html,/300px/);
+ owner.focus(EditorFocus.Html);owner.history('undo');owner.focus(EditorFocus.Visual);owner.history('undo');
+ assert.equal(owner.candidate().widgets[0].authoring.width,'100px');assert.equal(owner.candidate().html,document.html);assert.equal(owner.candidate().css,document.css);
  owner.command({kind:'audio',property:'volume',value:.8});owner.source('html','<!-- new -->'+owner.candidate().html);owner.focus(EditorFocus.Visual);owner.history('undo');
  assert.equal(owner.candidate().widgets[0].audio.volume,.3);assert.equal(owner.candidate().html,'<!-- new -->'+document.html);
 });
@@ -190,7 +190,7 @@ test('Held manipulation plans stay transient and one final apply preserves newer
  owner.commitGesture(last);
  assert.equal(owner.view().revision,revision+1);assert.equal(owner.candidate().css,last.presentation.css);
  assert.equal(owner.candidate().widgets[0].authoring.x,'64px');assert.equal(owner.candidate().widgets[0].authoring.y,'28px');
- assert.equal(targetElement(owner.session.snapshot(),key).values.style,last.presentation.attributes.style);
+ assert.equal(targetElement(owner.session.snapshot(),key).values.style,last.presentation.patches[0].attributes.style);
  assert.match(owner.candidate().html,/inline kept/);
  assert.match(owner.candidate().html,/const raw = '<section>'/);
  owner.source('css',owner.candidate().css+'\n/* unrelated newer edit */');owner.focus(EditorFocus.Visual);owner.history('undo');
@@ -224,27 +224,18 @@ test('Pending manipulation cannot commit over a newer source revision or a chang
 });
 
 
-test('Layout planning preserves authored value trivia and separates an unterminated final custom declaration',()=>{
- const css=`/* retained */[data-blokebot-widget="${id}"] { left: /* position */ 40px !important; top:20px; --unknown:future(x) } @supports (display:grid) { .unfamiliar { unknown:future(y) } }`;
- const owner=createEditorDocument({...structuredClone(document),css}),key=`widget:${id}`;owner.select(key);
- const command={kind:'move',dx:24,dy:8,computed:{left:'40px',top:'20px'}};
- const first=owner.planGesture(command,key,owner.view().revision);owner.commitGesture(first);
- assert.equal(owner.candidate().css,first.presentation.css);
- assert.match(owner.candidate().css,/left: \/\* position \*\/ var\(--blokebot-x\) !important/);
- const actualCss=owner.candidate().css,parsed=cssRanges(actualCss);
- assert.deepEqual(parsed.diagnostics,[]);
- const unknown=parsed.declarations.find(item=>item.property==='--unknown');
- const authoredUnknown='--unknown:future(x) ';
- assert.equal(actualCss.slice(unknown.start,unknown.start+authoredUnknown.length),authoredUnknown);
- assert.equal(actualCss.slice(unknown.value.start,unknown.value.end).trim(),'future(x)');
- const position=parsed.declarations.find(item=>item.property==='position');
- assert.equal(actualCss.slice(position.value.start,position.value.end),'absolute');
- assert(position.start>=unknown.end);
- assert.match(owner.candidate().css,/@supports \(display:grid\) \{ .unfamiliar \{ unknown:future\(y\) \} \}/);
- assert.deepEqual(owner.view().diagnostics.filter(item=>item.buffer==='css'),[]);
- owner.source('css',owner.candidate().css.replace('--blokebot-x: 64px','--blokebot-x: 100px'));
- const revision=owner.view().revision,second=owner.planGesture({...command,dx:8},key,revision);owner.commitGesture(second);
- assert.match(owner.candidate().css,/--blokebot-x:\s*108px/);
+test('Placement keeps authored stylesheet priority and losslessly updates effective inline declarations',()=>{
+ const css=`/* retained */#panel { left:40px !important; top:20px; --unknown:future(x) } @supports (display:grid) { .unfamiliar { unknown:future(y) } }`;
+ const html=`<section id="panel" data-blokebot-widget="${id}" style='left: /* position */ 40px !important; left:90px; top:20px; --unknown:future(x) '></section>`;
+ const owner=createEditorDocument({...structuredClone(document),html,css}),key=`widget:${id}`;owner.select(key);
+ const original=owner.candidate(),first=owner.planGesture({kind:'move',dx:24,dy:8,computed:{left:'40px',top:'20px'}},key,owner.view().revision);
+ assert.deepEqual(owner.candidate(),original);owner.commitGesture(first);
+ assert.equal(owner.candidate().css,css);
+ const inline=targetElement(owner.candidate(),key).values.style;
+ assert.match(inline,/left: \/\* position \*\/ var\(--blokebot-x\) !important; left:90px/);
+ assert.equal(owner.candidate().widgets[0].authoring.x,'64px');
+ assert(inline.includes('--unknown:future(x) '));assert.equal(first.presentation.patches[0].attributes.style,inline);
+ owner.history('undo');assert.deepEqual(owner.candidate(),original);
 });
 
 test('Current view follows metadata-only edits, source diagnostics, selection and saved baseline without losing focused history',()=>{
