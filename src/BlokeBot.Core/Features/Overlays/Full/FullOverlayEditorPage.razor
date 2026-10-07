@@ -9,13 +9,19 @@
 } else {
     var controlView = _view;
     <EditorWorkspace Class="full-overlay-editor" @ref="_workspace" data-full-editor inert='@(_client is null)' aria-busy='@(_client is null ? "true" : "false")' data-sticky-save-scope data-pane="preview" data-mode="visual">
+        <Header Context="focusControls">
         <header class="full-editor-header">
             <a href="/full-overlays" class="btn-secondary full-editor-back" aria-label="Back to full overlays"><EditorIcon Name="arrow-left" /></a>
             <div class="full-editor-title"><Field Id="full-overlay-name" Label="Overlay name" MaxLength="128" @bind-Value="_name" /><span class="text-muted-foreground">@(_row.IsArchived ? "Archived" : _row.PublishedVersion is { } liveVersion ? $"Live · v{liveVersion.Value}" : "Unpublished draft")</span></div>
+            <div class="full-editor-header-actions">
             <span class="full-editor-state">@(_hasChanges ? "Unsaved" : "Saved")</span>
             <StickySaveRegion Scope="StickySaveScope.Editor"><div class="full-editor-save"><EditorAction Label="Save draft" Icon="save" Disabled="_busy" Click="SaveAsync" /><EditorAction Label="Save & publish" Icon="arrow-up" Class="btn-primary" Disabled="@(_busy || _row.IsArchived)" Click="PublishAsync" /></div></StickySaveRegion>
             <EditorAction Label="History & live URL" Icon="history" Click="OpenManagementAsync" />
+            @focusControls
+            </div>
         </header>
+        </Header>
+        <ChildContent>
         <div class="full-editor-toolbar">
             <SegmentedTabs Id="full-mode" AriaLabel="Editor mode" Items="_modeTabs" ActiveKey="visual" BrowserOwned="true" data-editor-tabs="mode" />
             <div role="group" aria-label="Focused editor history"><EditorAction Label="Undo" Icon="arrow-left" Click='() => HistoryAsync("undo")' /><EditorAction Label="Redo" Icon="arrow-right" Click='() => HistoryAsync("redo")' /><span class="text-muted-foreground">@FocusLabel()</span></div>
@@ -100,5 +106,6 @@
         </dialog>
         <dialog class="full-editor-dialog" @ref="_viewportDialog" aria-labelledby="full-viewport-title"><header><h2 id="full-viewport-title">Preview viewport</h2><button class="btn-secondary" @onclick="CloseViewportAsync">Close</button></header><p>This changes your authoring view, not the document or OBS Browser Source size. Responsive authored CSS stays authoritative.</p><div class="full-inspector-grid"><Field Id="full-viewport-width" Label="Preview width" @bind-Value="_viewportWidth" /><Field Id="full-viewport-height" Label="Preview height" @bind-Value="_viewportHeight" /></div><button class="btn-primary" @onclick="ApplyViewportAsync">Apply viewport</button></dialog>
         <dialog class="full-editor-dialog" @ref="_deleteDialog" aria-labelledby="full-delete-title"><h2 id="full-delete-title">Permanently delete @_name?</h2><p>This deletes the overlay, draft, history and live URL. It cannot be undone.</p><button class="btn-secondary" @onclick="CancelDeleteAsync">Cancel</button><button class="btn-danger" @onclick="DeleteAsync">Delete permanently</button></dialog>
+        </ChildContent>
     </EditorWorkspace>
 }
