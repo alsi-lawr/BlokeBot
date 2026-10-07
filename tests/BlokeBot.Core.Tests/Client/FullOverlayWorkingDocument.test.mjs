@@ -155,9 +155,9 @@ test('Responsive direct movement and grouped resize preserve independent transfo
  owner.command({kind:'anchor',axis:'x',value:2,computed:{left:'96px',right:'48px'}});
  owner.command({kind:'style',property:'rotate',value:'25deg'});
  owner.command({kind:'move',dx:16,dy:0,computed:{right:'96px'}});
- assert.equal(owner.candidate().widgets[0].authoring.x,'32px');assert.match(owner.candidate().css,/rotate: 25deg/);
+ assert.equal(owner.candidate().widgets[0].authoring.x,'80px');assert.match(owner.candidate().css,/rotate: 25deg/);
  const before=owner.candidate();owner.command({kind:'resize',width:'180px',height:'50px',handle:'e',dx:80,dy:0,computed:{right:'80px'}});
- assert.equal(owner.candidate().widgets[0].authoring.width,'180px');assert.equal(owner.candidate().widgets[0].authoring.x,'-48px');
+ assert.equal(owner.candidate().widgets[0].authoring.width,'180px');assert.equal(owner.candidate().widgets[0].authoring.x,'0px');
  owner.history('undo');assert.deepEqual(owner.candidate(),before);
 });
 

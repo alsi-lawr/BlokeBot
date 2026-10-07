@@ -63,6 +63,12 @@ export function createEditorDocument(document) {
         const values={...command.computed,...styleValues(snapshot,key,prepared)},widget=snapshot.widgets.find(w=>w.id.value===id);
         const properties={position:'absolute'},metadata=[];
         const axes=command.kind==='move'||command.kind==='resize'?['x','y']:[command.axis];
+        const nativeTranslate=command.kind==='move'&&command.computed?.translate!==undefined
+            ? parsedCss(command.computed.translate,'value').tree?.children.toArray()??[]:null;
+        const translateComponent=index=>{
+            const part=nativeTranslate?.[index];
+            return part?.loc&&part.type!=='Identifier'?command.computed.translate.slice(part.loc.start.offset,part.loc.end.offset):'0px';
+        };
         if(command.kind==='resize') {
             const size=(axis,negative,positive,fallback,movement)=>{
                 if(command[axis])return {value:command[axis],movement};
@@ -78,8 +84,18 @@ export function createEditorDocument(document) {
         }
         for(const axis of axes) {
             const horizontal=axis==='x';if(!horizontal&&axis!=='y')return {kind:'invalid'};
-            const anchor=command.kind==='anchor'?command.value:Number(values[`--blokebot-anchor-${axis}`]??widget?.authoring[horizontal?'horizontalAnchor':'verticalAnchor']??0);
+            if(command.kind==='move'&&!(horizontal?command.dx:command.dy))continue;
+            const nativeAnchor=command.kind==='move'?command.computed?.[`--blokebot-anchor-${axis}`]?.trim():null;
+            const anchor=command.kind==='anchor'?command.value:Number(nativeAnchor||(values[`--blokebot-anchor-${axis}`]??widget?.authoring[horizontal?'horizontalAnchor':'verticalAnchor']??0));
             let value=command.kind==='position'?command.value:values[`--blokebot-${axis}`]??values[horizontal?(anchor===2?'right':'left'):(anchor===2?'bottom':'top')]??widget?.authoring[axis]??'0px';
+            if(command.kind==='move') {
+                const edge=command.computed?.[horizontal?(anchor===2?'right':'left'):(anchor===2?'bottom':'top')];
+                const parsed=parsedCss(edge??'','value'),dimension=parsed.tree?.children.first;
+                let base=dimension?.type==='Dimension'&&dimension.unit==='px'&&parsed.tree.children.size===1?Number(dimension.value):edge==='auto'&&anchor===0?horizontal?command.layoutX:command.layoutY:null;
+                if(anchor===1){const size=horizontal?command.containingWidth:command.containingHeight;if(!Number.isFinite(size)||size<0)return {kind:'unmapped',code:'missing-native-geometry'};base=base===null?null:base-size/2;}
+                if(![0,1,2].includes(anchor)||!Number.isFinite(base))return {kind:'unmapped',code:'missing-native-geometry'};
+                value=`${base}px`;
+            }
             if(command.kind==='move'||command.kind==='resize') {
                 const negative=command.handle?.includes(horizontal?'w':'n'),positive=command.handle?.includes(horizontal?'e':'s');
                 const movement=horizontal?command.dx:command.dy;
@@ -91,7 +107,8 @@ export function createEditorDocument(document) {
             Object.assign(properties,{[`--blokebot-${axis}`]:value,[`--blokebot-anchor-${axis}`]:String(anchor),
                 [horizontal?'left':'top']:anchor===2?'auto':anchor===1?`calc(50% + var(--blokebot-${axis}))`:`var(--blokebot-${axis})`,
                 [horizontal?'right':'bottom']:anchor===2?`var(--blokebot-${axis})`:'auto',
-                [`--blokebot-translate-${axis}`]:anchor===1?'-50%':'0px',translate:'var(--blokebot-translate-x, 0px) var(--blokebot-translate-y, 0px)'});
+                [`--blokebot-translate-${axis}`]:nativeTranslate?translateComponent(horizontal?0:1):anchor===1?'-50%':'0px',
+                translate:nativeTranslate?command.computed.translate:'var(--blokebot-translate-x, 0px) var(--blokebot-translate-y, 0px)'});
             if(id)metadata.push({path:['widgets',id,'authoring',axis],value},{path:['widgets',id,'authoring',horizontal?'horizontalAnchor':'verticalAnchor'],value:anchor});
         }
         const planned=planStyles(snapshot,key,properties,prepared,command.kind==='move'?'move':'layout');
@@ -112,7 +129,7 @@ export function createEditorDocument(document) {
                 ||command.targets&&(!item.styles||![item.width,item.height].every(value=>Number.isFinite(value)&&value>0));}))return {kind:'unmapped',code:'missing-native-geometry'};
             const plans=selectionRoots(eligible).map(node=>{
                 const item=observations.get(elementKey(node));
-                return layoutPlan(snapshot,{...command,computed:item.styles??item.computed,layoutX:item.layoutX,layoutY:item.layoutY},elementKey(node));
+                return layoutPlan(snapshot,{...command,computed:item.styles??item.computed,layoutX:item.layoutX,layoutY:item.layoutY,containingWidth:item.containingWidth,containingHeight:item.containingHeight},elementKey(node));
             });
             if(plans.length&&plans.every(plan=>plan.kind==='unchanged'))return {kind:'unchanged'};
             return {...combineStyles(snapshot,plans),context:captured};
