@@ -66,6 +66,11 @@ export function createPresentation(root, focusEditor, cancelGesture, layout) {
         next.focus({preventScroll:true});
     }, options);
     return {
+        revealInspector() {
+            if (disposed || mode !== 'visual') return;
+            pane = 'inspector'; render();
+            root.querySelector('.full-editor-inspector')?.focus({preventScroll:true});
+        },
         revealHtml() {
             if (disposed) return;
             cancelGesture(); mode = 'source'; source = 'html'; pane = 'preview';

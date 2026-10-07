@@ -13,6 +13,7 @@
 @import "./components/studio.css";
 @import "./components/editor-workspace.css";
 @import "./components/editor-context-menu.css";
+@import "./components/editor-toolbox.css";
 @import "./features/home-and-feature-cards.css";
 @import "./features/points-dashboard.css";
 @import "./features/responsive-data-cards.css";

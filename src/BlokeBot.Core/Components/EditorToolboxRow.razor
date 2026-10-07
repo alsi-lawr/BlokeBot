@@ -1,0 +1,23 @@
+<button type="button" class="@($"editor-toolbox-row {Class}")" aria-disabled="@(!Available ? "true" : null)"
+        aria-label="@AccessibleLabel" @onclick="ActivateAsync">
+    @Icon
+    <span class="editor-toolbox-row-copy">
+        <span class="editor-toolbox-row-title"><strong>@Name</strong>@if (Badge is not null) { <em>@Badge</em> }</span>
+        <span class="editor-toolbox-row-purpose">@Purpose</span>
+        @if (Status is not null) { <span class="@($"editor-toolbox-availability{(StatusWarning ? " editor-toolbox-availability--warning" : string.Empty)}")">@Status</span> }
+    </span>
+</button>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter, EditorRequired] public required string Name { get; set; }
+    [Parameter, EditorRequired] public required string Purpose { get; set; }
+    [Parameter, EditorRequired] public required string AccessibleLabel { get; set; }
+    [Parameter] public RenderFragment? Icon { get; set; }
+    [Parameter] public string? Badge { get; set; }
+    [Parameter] public string? Status { get; set; }
+    [Parameter] public bool StatusWarning { get; set; }
+    [Parameter] public bool Available { get; set; } = true;
+    [Parameter] public EventCallback Activate { get; set; }
+    private Task ActivateAsync() => Available ? Activate.InvokeAsync() : Task.CompletedTask;
+}

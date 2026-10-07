@@ -1,3 +1,4 @@
+import { containToolboxKeyboard } from '../../../Components/EditorToolboxKeyboard.js';
 import { revealNode } from "./AutomationFlowCanvas.js";
 import { createAutomationMenu } from './AutomationEditorMenu.js';
 let editorMenu = null;
@@ -85,7 +86,7 @@ function isEditable(target) {
 function historyAction(event) {
     if (
         event.defaultPrevented
-        || event.target?.closest?.('[data-editor-menu]')
+        || event.target?.closest?.('[data-editor-menu],[data-editor-toolbox]')
         ||
         !event.ctrlKey
         || event.altKey
@@ -107,6 +108,7 @@ function historyAction(event) {
 export function initializeHistoryKeyboard(dotnet) {
     disposeHistoryKeyboard();
     const keydown = (event) => {
+        if (containToolboxKeyboard(event)) return;
         const action = historyAction(event);
         if (action === null) return;
 
@@ -128,7 +130,7 @@ export function initializeToolboxKeyboard(dotnet) {
     const keydown = (event) => {
         if (
             event.defaultPrevented
-            || event.target?.closest?.('[data-editor-menu]')
+            || event.target?.closest?.('[data-editor-menu],[data-editor-toolbox]')
             ||
             event.key !== "/"
             || event.altKey
