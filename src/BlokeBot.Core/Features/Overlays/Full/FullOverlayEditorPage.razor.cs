@@ -46,7 +46,13 @@ public partial class FullOverlayEditorPage
     private bool _disposed;
     private bool _initializing;
     private long _editorNotification;
-    private bool _paletteOpen;
+    private bool _toolboxOpen;
+    private string _toolboxFeedback = string.Empty;
+    private bool _focusToolboxAfterRender;
+    private string? _insertedSelection;
+    private long _insertedRevision;
+    private FullOverlayToolbox? _toolbox;
+    private EditorToolboxToggle? _toolboxToggle;
     private static readonly IReadOnlyList<SegmentedTabItem> _sourceTabs =
     [
         new("html", "HTML"),
@@ -121,6 +127,16 @@ public partial class FullOverlayEditorPage
             }
             await RefreshPreviewAsync(0, false);
         }
+        if (_focusToolboxAfterRender && _toolbox is not null)
+        {
+            _focusToolboxAfterRender = false;
+            await _toolbox.FocusSearchAsync();
+        }
+        if (_insertedSelection is { } selected)
+        {
+            _insertedSelection = null;
+            await _client.InvokeVoidAsync("focusInsertedLayer", selected, _insertedRevision);
+        }
     }
 
     [JSInvokable]
@@ -166,10 +182,85 @@ public partial class FullOverlayEditorPage
             ? Task.CompletedTask
             : _client.InvokeVoidAsync("find", selection).AsTask();
 
-    private Task AddAsync(FullOverlayWidgetKind kind) =>
-        _registry.Create(kind, OverlayId) is { } widget
-            ? CommandAsync(new { kind = "add", widget })
-            : Task.CompletedTask;
+    private sealed record ToolboxInsertion(string? Inserted, long Revision, string Feedback);
+
+    private async Task AddAsync(FullOverlayWidgetKind kind)
+    {
+        if (_registry.Create(kind, OverlayId) is { } widget)
+        {
+            await InsertAsync(new { kind = "add", widget });
+        }
+        else
+        {
+            _toolboxFeedback =
+                "This widget is no longer declared. Choose an item from the current Toolbox.";
+            _focusToolboxAfterRender = true;
+        }
+    }
+
+    private async Task InsertAsync(object command)
+    {
+        if (_client is null || _disposed)
+        {
+            return;
+        }
+        var revision = _view.Revision;
+        var selection = _view.Selected;
+        var result = await _client.InvokeAsync<ToolboxInsertion>(
+            "insert",
+            command,
+            selection,
+            revision
+        );
+        if (_disposed)
+        {
+            return;
+        }
+        if (result.Inserted is { } inserted)
+        {
+            _toolboxOpen = false;
+            _insertedSelection = inserted;
+            _insertedRevision = result.Revision;
+        }
+        else
+        {
+            _toolboxFeedback = result.Feedback;
+            _focusToolboxAfterRender = true;
+        }
+        // The document owner's notification owns the view, including any insertion refusal.
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleToolboxAsync()
+    {
+        if (_toolboxOpen)
+        {
+            await CloseToolboxAsync();
+            return;
+        }
+        _toolboxFeedback = string.Empty;
+        _toolboxOpen = true;
+        _focusToolboxAfterRender = true;
+    }
+
+    private async Task CloseToolboxAsync()
+    {
+        _toolboxOpen = false;
+        _focusToolboxAfterRender = false;
+        await InvokeAsync(StateHasChanged);
+        if (_toolboxToggle is not null)
+        {
+            await _toolboxToggle.FocusAsync();
+        }
+    }
+
+    [JSInvokable]
+    public Task CloseToolboxForModeAsync()
+    {
+        _toolboxOpen = false;
+        _focusToolboxAfterRender = false;
+        return InvokeAsync(StateHasChanged);
+    }
 
     private Task AlignAsync((string Axis, int Edge) value, string? selection, long revision) =>
         _client is null

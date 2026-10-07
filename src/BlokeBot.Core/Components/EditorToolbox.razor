@@ -1,0 +1,48 @@
+<section id="@Id" class="@($"editor-toolbox {Class}")" role="dialog" aria-labelledby="@($"{Id}-title")"
+         @onkeydown="HandleKeyAsync" @onkeydown:stopPropagation="true" @onclick:stopPropagation="true"
+         data-editor-toolbox @attributes="AdditionalAttributes">
+    <header class="editor-toolbox-heading">
+        <div><span class="editor-toolbox-eyebrow">@Purpose</span><h2 id="@($"{Id}-title")">Toolbox</h2></div>
+        <EditorAction Label="Close Toolbox" Icon="close" Click="Close" />
+    </header>
+    <label class="editor-toolbox-search">
+        <span class="sr-only">@SearchPlaceholder</span><EditorIcon Name="search" />
+        <input type="search" placeholder="@SearchPlaceholder" value="@Search" @ref="_searchInput"
+               @oninput="SearchChangedAsync" aria-keyshortcuts="@SearchShortcut"
+               data-editor-toolbox-search @attributes="SearchAttributes" />
+        @if (SearchShortcut is not null) { <kbd>@SearchShortcut</kbd> }
+    </label>
+    @Tabs
+    <div id="@($"{Id}-panel")" class="editor-toolbox-results" role="@ResultsRole" aria-labelledby="@ResultsLabelledBy">
+        <div class="editor-toolbox-results-heading"><strong>@ResultsTitle</strong><span>@Count items</span></div>
+        @if (Count == 0) { <p class="editor-toolbox-empty" role="status">@EmptyMessage</p> }
+        else { @ChildContent }
+    </div>
+    @if (!string.IsNullOrEmpty(Feedback)) { <p class="editor-toolbox-feedback" role="alert">@Feedback</p> }
+</section>
+
+@code {
+    private ElementReference _searchInput;
+    [Parameter, EditorRequired] public required string Id { get; set; }
+    [Parameter, EditorRequired] public required string Purpose { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search Toolbox";
+    [Parameter] public string? SearchShortcut { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, object>? SearchAttributes { get; set; }
+    [Parameter] public RenderFragment? Tabs { get; set; }
+    [Parameter] public string? ResultsRole { get; set; }
+    [Parameter] public string? ResultsLabelledBy { get; set; }
+    [Parameter, EditorRequired] public required string ResultsTitle { get; set; }
+    [Parameter] public int Count { get; set; }
+    [Parameter, EditorRequired] public required string EmptyMessage { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Feedback { get; set; }
+    [Parameter] public EventCallback Close { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public ValueTask FocusSearchAsync() => _searchInput.FocusAsync();
+    private Task SearchChangedAsync(ChangeEventArgs args) => SearchChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private Task HandleKeyAsync(KeyboardEventArgs args) => args.Key == "Escape" ? Close.InvokeAsync() : Task.CompletedTask;
+}

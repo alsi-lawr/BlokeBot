@@ -6,8 +6,8 @@
     <div id="@_id" class="editor-menu surface" data-editor-menu hidden>
         <header><strong id="@($"{_id}-target")" data-editor-menu-target></strong><span id="@($"{_id}-history")" data-editor-menu-history></span></header>
         <div role="menu" aria-label="Editor actions" aria-describedby="@($"{_id}-target {_id}-history {_id}-note")">
-            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="undo"><EditorIcon Name="arrow-left" /><span>Undo</span><kbd>Ctrl Z</kbd></button>
-            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="redo"><EditorIcon Name="arrow-right" /><span>Redo</span><kbd>Ctrl Y</kbd></button>
+            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="undo"><EditorIcon Name="undo" /><span>Undo</span><kbd>Ctrl Z</kbd></button>
+            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="redo"><EditorIcon Name="redo" /><span>Redo</span><kbd>Ctrl Y</kbd></button>
             <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="delete"><EditorIcon Name="delete" /><span>Delete selected</span><kbd>Del</kbd></button>
         </div>
         <p id="@($"{_id}-note")" data-editor-menu-note></p>

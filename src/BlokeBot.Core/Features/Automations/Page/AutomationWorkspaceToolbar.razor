@@ -1,14 +1,11 @@
 <div class="automation-workspace-toolbar" role="toolbar" aria-label="Automation editor tools" @onclick:stopPropagation="true">
-    <button class="automation-toolbox-button"
-            type="button"
-            aria-expanded="@ToolboxOpen"
-            data-automation-toolbox-toggle
-            @ref="_toolboxButton"
-            @onclick="ToggleToolbox"><EditorIcon Name="add" />Toolbox</button>
+    <EditorToolboxToggle @ref="_toolboxButton" Open="ToolboxOpen" Controls="automation-toolbox" Toggle="ToggleToolbox" data-automation-toolbox-toggle />
+    <div class="automation-workspace-toolbar-scroll">
     <label><span class="sr-only">Flow direction</span><select value="@Settings.Orientation" @onchange="OrientationChanged"><option value="@AutomationFlowOrientation.Horizontal">Horizontal</option><option value="@AutomationFlowOrientation.Vertical">Vertical</option></select></label>
     <label><span class="sr-only">Connection style</span><select value="@Settings.EdgeStyle" @onchange="EdgeStyleChanged"><option value="@AutomationEdgeStyle.Angular">Angular</option><option value="@AutomationEdgeStyle.Smooth">Smooth</option></select></label>
     <span class="automation-connection-legend automation-connection-legend--flow">Flow schedules</span>
     <span class="automation-connection-legend automation-connection-legend--data">Data supplies values</span>
+    </div>
     <EditorContextMenu />
 </div>
 @if (SelectedNode is not null)
