@@ -12,6 +12,9 @@ public partial class EditorWorkspace
     public RenderFragment? ChildContent { get; set; }
 
     [Parameter]
+    public RenderFragment<RenderFragment>? Header { get; set; }
+
+    [Parameter]
     public EventCallback<bool> FocusChanged { get; set; }
 
     [Inject]

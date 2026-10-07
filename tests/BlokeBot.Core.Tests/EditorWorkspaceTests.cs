@@ -1,5 +1,6 @@
 using BlokeBot.Core.Components;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Shouldly;
 
@@ -8,13 +9,22 @@ namespace BlokeBot.Core.Tests;
 public sealed class EditorWorkspaceTests
 {
     [Test]
-    public async Task ActualBrowserExitUpdatesControlsWithoutExitingApplicationFocus()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ActualBrowserExitUpdatesControlsWithoutExitingApplicationFocus(
+        bool inlineHeader
+    )
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         bool? focus = null;
+        RenderFragment<RenderFragment>? header = inlineHeader
+            ? controls => builder => builder.AddContent(0, controls)
+            : null;
         var workspace = context.Render<EditorWorkspace>(parameters =>
-            parameters.Add(component => component.FocusChanged, value => focus = value)
+            parameters
+                .Add(component => component.FocusChanged, value => focus = value)
+                .Add(component => component.Header, header)
         );
         workspace.Find("button[aria-label='Focus']").Click();
         focus.ShouldBe(true);
@@ -35,7 +45,11 @@ public sealed class EditorWorkspaceTests
     }
 
     [Test]
-    public async Task RefusalKeepsBrowserStateAndRetryClearsFeedbackWithoutReportingAnInteropFault()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RefusalKeepsBrowserStateAndRetryClearsFeedbackWithoutReportingAnInteropFault(
+        bool inlineHeader
+    )
     {
         using var context = new BunitContext();
         var module = context.JSInterop.SetupModule("./Components/EditorWorkspace.razor.js");
@@ -43,8 +57,13 @@ public sealed class EditorWorkspaceTests
         var operation = browser.Setup<EditorWorkspace.FullscreenResult>("toggleFullscreen");
         _ = operation.SetResult(EditorWorkspace.FullscreenResult.EnterRefused);
         var faults = 0;
+        RenderFragment<RenderFragment>? header = inlineHeader
+            ? controls => builder => builder.AddContent(0, controls)
+            : null;
         var workspace = context.Render<EditorWorkspace>(parameters =>
-            parameters.Add(component => component.InteropFailure, _ => faults++)
+            parameters
+                .Add(component => component.InteropFailure, _ => faults++)
+                .Add(component => component.Header, header)
         );
         workspace.Find("button[aria-label='Focus']").Click();
         workspace.Find("button[aria-label='Full screen']").Click();
