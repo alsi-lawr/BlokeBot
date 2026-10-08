@@ -146,49 +146,64 @@ public partial class AutomationEditorPage
         var revision = _sourceRevision;
         var text = _sourceText;
         _busy = true;
+        _sourceValidatedRevision = -1;
+        _sourceStatus =
+            "Validation has not completed. Check your selected channel and access before trying again.";
         try
         {
-            var outcome = await _flowsService.ValidateSourceAsync(
-                new(host),
-                id,
-                text,
-                CancellationToken.None
-            );
-            if (!SourceRequestCurrent(host, id, generation, revision, text))
-            {
-                return;
-            }
+            await RunSelectedHostMutationAsync(
+                host,
+                async () =>
+                {
+                    _ = await LoadPageContextAsync();
+                    if (!SourceRequestCurrent(host, id, generation, revision, text))
+                    {
+                        return;
+                    }
 
-            _sourceValidatedRevision = -1;
-            var focusSource = outcome.Match(
-                _ =>
-                {
-                    _sourceErrors = [];
-                    _sourceValidatedRevision = revision;
-                    _sourceStatus = "The candidate is valid. Save to replace the stored flow.";
-                    return false;
-                },
-                invalid =>
-                {
-                    _sourceErrors = invalid
-                        .Errors.Select(error => error.Path + ": " + error.Message)
-                        .ToArray();
-                    _sourceStatus = "Validation failed. The original is unchanged.";
-                    return true;
-                },
-                _ =>
-                {
-                    _sourceErrors =
-                    [
-                        "This flow or channel is no longer available. Reopen it before saving.",
-                    ];
-                    return false;
+                    var outcome = await _flowsService.ValidateSourceAsync(
+                        new(host),
+                        id,
+                        text,
+                        CancellationToken.None
+                    );
+                    if (!SourceRequestCurrent(host, id, generation, revision, text))
+                    {
+                        return;
+                    }
+
+                    var focusSource = outcome.Match(
+                        _ =>
+                        {
+                            _sourceErrors = [];
+                            _sourceValidatedRevision = revision;
+                            _sourceStatus =
+                                "The candidate is valid. Save to replace the stored flow.";
+                            return false;
+                        },
+                        invalid =>
+                        {
+                            _sourceErrors = invalid
+                                .Errors.Select(error => error.Path + ": " + error.Message)
+                                .ToArray();
+                            _sourceStatus = "Validation failed. The original is unchanged.";
+                            return true;
+                        },
+                        _ =>
+                        {
+                            _sourceErrors =
+                            [
+                                "This flow or channel is no longer available. Reopen it before saving.",
+                            ];
+                            return false;
+                        }
+                    );
+                    if (focusSource)
+                    {
+                        _sourceFocusRequest++;
+                    }
                 }
             );
-            if (focusSource)
-            {
-                _sourceFocusRequest++;
-            }
         }
         finally
         {
@@ -220,34 +235,51 @@ public partial class AutomationEditorPage
         var generation = _sourceGeneration;
         var revision = _sourceRevision;
         var text = _sourceText;
+        var succeeded = false;
         _busy = true;
+        _sourceValidatedRevision = -1;
+        _sourceStatus =
+            "Save was not submitted. Check your selected channel and access before trying again. The candidate is retained.";
         try
         {
-            var outcome = await _flowsService.SaveSourceAsync(
-                new(host),
-                id,
-                text,
-                CancellationToken.None
-            );
-            if (!SourceRequestCurrent(host, id, generation, revision, text))
-            {
-                return false;
-            }
+            await RunSelectedHostMutationAsync(
+                host,
+                async () =>
+                {
+                    _ = await LoadPageContextAsync();
+                    if (!SourceRequestCurrent(host, id, generation, revision, text))
+                    {
+                        return;
+                    }
 
-            if (outcome is AutomationFlowSaveOutcome.Saved saved)
-            {
-                _hasChanges = false;
-                await LoadCoreAsync(saved.FlowId);
-                _feedback = "Flow saved.";
-                return true;
-            }
-            _sourceValidatedRevision = -1;
-            _sourceErrors = outcome is AutomationFlowSaveOutcome.Invalid invalid
-                ? invalid.Errors.Select(error => error.Message).ToArray()
-                : ["This flow or channel is no longer available."];
-            _sourceStatus = "Save failed. The candidate is retained and the original is unchanged.";
-            _sourceFocusRequest++;
-            return false;
+                    var outcome = await _flowsService.SaveSourceAsync(
+                        new(host),
+                        id,
+                        text,
+                        CancellationToken.None
+                    );
+                    if (!SourceRequestCurrent(host, id, generation, revision, text))
+                    {
+                        return;
+                    }
+
+                    if (outcome is AutomationFlowSaveOutcome.Saved saved)
+                    {
+                        _hasChanges = false;
+                        await LoadCoreAsync(saved.FlowId);
+                        _feedback = "Flow saved.";
+                        succeeded = true;
+                        return;
+                    }
+                    _sourceErrors = outcome is AutomationFlowSaveOutcome.Invalid invalid
+                        ? invalid.Errors.Select(error => error.Message).ToArray()
+                        : ["This flow or channel is no longer available."];
+                    _sourceStatus =
+                        "Save failed. The candidate is retained and the original is unchanged.";
+                    _sourceFocusRequest++;
+                }
+            );
+            return succeeded;
         }
         finally
         {
