@@ -29,7 +29,7 @@ test('Local preview keeps authorized widgets only and rejects obsolete or nested
   view={...view,revision:1};assert.equal(bridge.render(edited,1),false);
   const current=sent.at(-1);assert.equal(current.html,edited.html);assert.deepEqual(current.widgetIds,[id]);
   bridge.set('late-reply',0,document);assert.equal(frame.src,'/full-overlays/preview/approved');
-  const geometry=request=>({kind:'blokebot-full-observations',previewId:'approved',requestId:request.requestId,revision:request.revision,viewport:{width:1920,height:1080},items:[{key:'element:target',x:1,y:2,width:30,height:40,layoutX:1,layoutY:2,visible:true,styles:{left:'1px'}}]});
+  const geometry=request=>({kind:'blokebot-full-observations',previewId:'approved',requestId:request.requestId,revision:request.revision,viewport:{width:1920,height:1080},items:[{key:'element:target',x:1,y:2,width:30,height:40,layoutX:1,layoutY:2,visible:true,styles:{position:'absolute',left:'1px'}}]});
   const before=accepted.length;receive(geometry(first));receive(geometry(current),{});receive({...geometry(current),revision:0});assert.equal(accepted.length,before);
   receive(geometry(current));assert.equal(accepted.at(-1)[0][0].x,1);
   complete(current);
@@ -152,11 +152,11 @@ test('Inspector latency accepts sequential visual intent but fences newer source
 
 test('Responsive direct movement and grouped resize preserve independent transforms and layout metadata',()=>{
  const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;owner.select(key);
- owner.command({kind:'anchor',axis:'x',value:2,computed:{left:'96px',right:'48px'}});
+ owner.command({kind:'anchor',axis:'x',value:2,computed:{position:'absolute',left:'96px',right:'48px'}});
  owner.command({kind:'style',property:'rotate',value:'25deg'});
- owner.command({kind:'move',dx:16,dy:0,computed:{right:'96px'}});
+ owner.command({kind:'move',dx:16,dy:0,computed:{position:'absolute',right:'96px'}});
  assert.equal(owner.candidate().widgets[0].authoring.x,'80px');assert.match(owner.candidate().css,/rotate: 25deg/);
- const before=owner.candidate();owner.command({kind:'resize',width:'180px',height:'50px',handle:'e',dx:80,dy:0,computed:{right:'80px'}});
+ const before=owner.candidate();owner.command({kind:'resize',width:'180px',height:'50px',handle:'e',dx:80,dy:0,computed:{position:'absolute',right:'80px'}});
  assert.equal(owner.candidate().widgets[0].authoring.width,'180px');assert.equal(owner.candidate().widgets[0].authoring.x,'0px');
  owner.history('undo');assert.deepEqual(owner.candidate(),before);
 });
@@ -184,7 +184,7 @@ test('Held manipulation plans stay transient and one final apply preserves newer
  const html=`<!-- kept --><section data-blokebot-widget="${id}" style='left:40px; /* inline kept */ top:20px; width:100px; height:50px'></section><script>const raw = '<section>';</script>`;
  const owner=createEditorDocument({...structuredClone(document),html});const key=`widget:${id}`;owner.select(key);
  const before=owner.candidate(),revision=owner.view().revision;
- const move=dx=>owner.planGesture({kind:'move',dx,dy:8,computed:{left:'40px',top:'20px',width:'100px',height:'50px'},layoutX:40,layoutY:20},key,revision);
+ const move=dx=>owner.planGesture({kind:'move',dx,dy:8,computed:{position:'absolute',left:'40px',top:'20px',width:'100px',height:'50px'},layoutX:40,layoutY:20},key,revision);
  move(8);move(16);const last=move(24);
  assert.deepEqual(owner.candidate(),before);assert.equal(owner.view().revision,revision);
  owner.commitGesture(last);
@@ -212,7 +212,7 @@ test('Held west resize clamps displacement with size and commits its exact ancho
 
 test('Pending manipulation cannot commit over a newer source revision or a changed selection',()=>{
  const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;owner.select(key);
- const command={kind:'move',dx:16,dy:8,computed:{left:'40px',top:'20px'}};
+ const command={kind:'move',dx:16,dy:8,computed:{position:'absolute',left:'40px',top:'20px'}};
  const sourcePending=owner.planGesture(command,key,owner.view().revision);
  owner.source('css',owner.candidate().css+'\n/* newer source */');const newer=owner.candidate(),sourceView=owner.view();
  owner.commitGesture(sourcePending);assert.deepEqual(owner.candidate(),newer);
@@ -228,7 +228,7 @@ test('Placement keeps authored stylesheet priority and losslessly updates effect
  const css=`/* retained */#panel { left:40px !important; top:20px; --unknown:future(x) } @supports (display:grid) { .unfamiliar { unknown:future(y) } }`;
  const html=`<section id="panel" data-blokebot-widget="${id}" style='left: /* position */ 40px !important; left:90px; top:20px; --unknown:future(x) '></section>`;
  const owner=createEditorDocument({...structuredClone(document),html,css}),key=`widget:${id}`;owner.select(key);
- const original=owner.candidate(),first=owner.planGesture({kind:'move',dx:24,dy:8,computed:{left:'40px',top:'20px'}},key,owner.view().revision);
+ const original=owner.candidate(),first=owner.planGesture({kind:'move',dx:24,dy:8,computed:{position:'absolute',left:'40px',top:'20px'}},key,owner.view().revision);
  assert.deepEqual(owner.candidate(),original);owner.commitGesture(first);
  assert.equal(owner.candidate().css,css);
  const inline=targetElement(owner.candidate(),key).values.style;

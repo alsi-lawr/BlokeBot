@@ -139,3 +139,24 @@
 .full-editor-toolbox{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;max-width:none;height:min(52dvh,28rem);border-radius:1rem 1rem 0 0;z-index:480;}
 .full-editor-toolbox-backdrop{display:block;position:fixed;inset:0;background:rgb(15 23 42 / .58);z-index:470;}
 }
+
+.full-editor-layer-grip{color:var(--app-text-muted);font-size:.8rem;cursor:grab;}
+.full-editor-layer[data-drop-relation],.full-hierarchy-root button[data-drop-relation]{position:relative;}
+.full-editor-layer[data-drop-relation=inside][data-drop-valid=true],.full-hierarchy-root button[data-drop-valid=true]{outline:2px solid var(--tone-violet-solid);outline-offset:-2px;background:var(--tone-violet-bg);}
+.full-editor-layer[data-drop-relation=before][data-drop-valid=true]{border-top:2px solid var(--tone-violet-solid);}
+.full-editor-layer[data-drop-relation=after][data-drop-valid=true]{border-bottom:2px solid var(--tone-violet-solid);}
+.full-editor-layer[data-drop-valid=false],.full-hierarchy-root button[data-drop-valid=false]{outline:2px dashed var(--app-text-muted);outline-offset:-2px;cursor:not-allowed;}
+.full-editor-layer[data-drop-relation]::after,.full-hierarchy-root button[data-drop-relation]::after{content:attr(data-drop-label);position:absolute;right:.2rem;top:-.6rem;z-index:1;padding:.1rem .3rem;background:var(--app-surface);border:1px solid var(--app-border);border-radius:.3rem;font-size:.65rem;color:var(--app-text-strong);pointer-events:none;}
+.full-hierarchy-root{margin-top:.7rem;padding-top:.7rem;border-top:1px dashed var(--app-border);}
+.full-hierarchy-root button,.full-hierarchy-open{width:100%;font-size:.75rem;justify-content:center;}
+.full-hierarchy-open{margin-top:.5rem;}
+.full-hierarchy-hint{margin-top:.5rem;}
+.full-inspector-placement{margin:.7rem 0;padding:.65rem 0;border-block:1px solid var(--app-border);}
+.full-inspector-placement h3{font-size:.8rem;margin-bottom:.35rem;}
+.full-placement-status{font-size:.78rem;font-weight:650;overflow-wrap:anywhere;}
+.full-return-layout{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;font-size:.78rem;margin:.6rem 0;}
+.full-hierarchy-relations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem;margin:.5rem 0;}
+.full-hierarchy-relations button{font-size:.75rem;padding:.4rem;}
+.full-hierarchy-relations [aria-pressed=true]{border-color:var(--tone-violet-solid);background:var(--tone-violet-bg);}
+.full-hierarchy-plan{font-size:.75rem;color:var(--app-text-muted);overflow-wrap:anywhere;min-height:2.2rem;margin:.45rem 0;}
+.full-hierarchy-apply{width:100%;font-size:.78rem;}

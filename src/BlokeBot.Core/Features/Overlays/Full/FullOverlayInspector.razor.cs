@@ -20,6 +20,124 @@ public partial class FullOverlayInspector
     [Parameter]
     public EventCallback Replay { get; set; }
 
+    [Parameter, EditorRequired]
+    public required Func<object, Task<FullOverlayHierarchyFeedback>> HierarchyPreview { get; set; }
+
+    private bool _hierarchyOpen;
+    private bool _hierarchyPending;
+    private bool _focusDestination;
+    private string _relation = "inside";
+    private string? _destination;
+    private ElementReference _destinationElement;
+    private FullOverlayHierarchyFeedback _hierarchyFeedback = new(false, "Choose a destination.");
+    private FullOverlayEditorView? _hierarchyView;
+    private long _hierarchyRequest;
+
+    protected override void OnParametersSet()
+    {
+        if (
+            _hierarchyView is { } prior
+            && prior.Revision == View.Revision
+            && prior.SelectionVersion == View.SelectionVersion
+            && prior.Selected == View.Selected
+            && prior.Focus == View.Focus
+            && prior.Members.SequenceEqual(View.Members)
+        )
+        {
+            return;
+        }
+        _hierarchyView = View;
+        _hierarchyRequest++;
+        _hierarchyPending = _hierarchyOpen;
+        _hierarchyFeedback = new(false, "Checking the current destination…");
+        if (!View.Layers.Any(layer => layer.Key == _destination))
+        {
+            _destination = View.Layers.FirstOrDefault(layer => layer.Key != View.Selected)?.Key;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_hierarchyPending)
+        {
+            _hierarchyPending = false;
+            await RefreshHierarchyAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        if (_focusDestination)
+        {
+            _focusDestination = false;
+            await _destinationElement.FocusAsync();
+        }
+    }
+
+    public async Task OpenHierarchyAsync()
+    {
+        _hierarchyOpen = true;
+        _hierarchyPending = true;
+        _focusDestination = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HierarchyOpenAsync(bool open)
+    {
+        _hierarchyOpen = open;
+        if (open)
+        {
+            await RefreshHierarchyAsync();
+        }
+    }
+
+    private async Task RelationAsync(string relation)
+    {
+        _relation = relation;
+        await RefreshHierarchyAsync();
+    }
+
+    private async Task DestinationAsync(ChangeEventArgs args)
+    {
+        _destination = args.Value?.ToString();
+        await RefreshHierarchyAsync();
+    }
+
+    private async Task RefreshHierarchyAsync()
+    {
+        _hierarchyFeedback = new(false, "Checking the current destination…");
+        var request = ++_hierarchyRequest;
+        var result = await HierarchyPreview(new { relation = _relation, target = _destination });
+        if (request == _hierarchyRequest)
+        {
+            _hierarchyFeedback = result;
+        }
+    }
+
+    private Task MoveHierarchyAsync() =>
+        Send(
+            new
+            {
+                kind = "hierarchy",
+                relation = _relation,
+                target = _destination,
+            }
+        );
+
+    private string PlacementStatus()
+    {
+        var position = View.NativeStyles.GetValueOrDefault("position");
+        if (position is null)
+        {
+            return "Measuring placement…";
+        }
+        if (position is "absolute" or "fixed")
+        {
+            return $"{char.ToUpperInvariant(position[0]) + position[1..]} positioning · outside normal flow";
+        }
+        var translate = View.NativeStyles.GetValueOrDefault("translate", "none");
+        return translate == "none"
+            ? "Normal layout · no visual offset"
+            : $"Layout slot kept · offset {translate}";
+    }
+
     private bool _effectsOpen;
     private bool _positionOpen;
     private bool _motionOpen;
