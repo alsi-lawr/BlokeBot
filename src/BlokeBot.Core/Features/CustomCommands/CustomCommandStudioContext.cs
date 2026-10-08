@@ -23,6 +23,7 @@ public sealed class CustomCommandStudioContext
     public required Func<string> EmptyInspectorMessage { get; init; }
     public required Func<bool> HasChanges { get; init; }
     public required EventCallback Save { get; init; }
+    public required EventCallback SingleArgumentChanged { get; init; }
     public required CustomCommandValidationBindings Validation { get; init; }
     public required Func<bool> BasicsOpen { get; init; }
     public required Action<bool> SetBasicsOpen { get; init; }

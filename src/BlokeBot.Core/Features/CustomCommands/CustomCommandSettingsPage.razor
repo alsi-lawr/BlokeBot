@@ -117,6 +117,7 @@
                 EmptyInspectorMessage = () => _emptyInspectorMessage,
                 HasChanges = () => _hasChanges,
                 Save = EventCallback.Factory.Create(this, SaveAsync),
+                SingleArgumentChanged = EventCallback.Factory.Create(this, StateHasChanged),
                 Validation = new(
                     ValidationMessage,
                     FocusRequestFor,
