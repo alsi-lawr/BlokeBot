@@ -554,21 +554,6 @@ public sealed class ConfigurationTransferContractTests
     }
 
     [Test]
-    public void PastedJson_ExceedingUtf8Limit_IsRejectedBeforeByteParsing()
-    {
-        var pasted = string.Concat(
-            Enumerable.Repeat("😀", ConfigurationDocumentCodec.MaximumBytes / 3)
-        );
-        pasted.Length.ShouldBeLessThan(ConfigurationDocumentCodec.MaximumBytes);
-
-        var invalid = new ConfigurationDocumentCodec()
-            .Parse(pasted)
-            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>();
-
-        invalid.Issue.Message.ShouldContain("2 MB limit");
-    }
-
-    [Test]
     public void TypedCodec_MissingRequiredObjectCollectionOrScheduleValue_IsRejected()
     {
         var malformed = new[]

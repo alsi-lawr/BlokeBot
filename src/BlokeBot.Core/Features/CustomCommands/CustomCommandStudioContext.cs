@@ -7,6 +7,8 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 public sealed class CustomCommandStudioContext
 {
+    public int HostId { get; init; }
+    public string Channel { get; init; } = string.Empty;
     public required CustomCommandConfiguration Configuration { get; init; }
     public required CustomCommandSettingsTab ActiveTab { get; init; }
     public required Func<IReadOnlyList<StudioRailGroup>> RailGroups { get; init; }

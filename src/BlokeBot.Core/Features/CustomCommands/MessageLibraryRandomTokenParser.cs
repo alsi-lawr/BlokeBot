@@ -208,7 +208,7 @@ internal static class MessageLibraryRandomTokenParser
             out number
         );
 
-    private static ImmutableArray<string> SplitParameters(string value)
+    internal static ImmutableArray<string> SplitParameters(string value)
     {
         var parts = ImmutableArray.CreateBuilder<string>();
         var depth = 0;

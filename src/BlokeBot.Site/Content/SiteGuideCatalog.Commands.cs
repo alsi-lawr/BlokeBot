@@ -77,6 +77,59 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Declare and edit saved values",
+                    Steps =
+                    [
+                        "Open Custom commands. Select Variables.",
+                        "Select New variable or open Dictionaries and select New dictionary.",
+                        "Enter a name. Select User for each viewer or Global for this channel.",
+                        "For a variable, select Number or Text. Enter its default. For a dictionary, enter the missing entry value.",
+                        "Select Save changes.",
+                        "Select the definition. For User scope, enter a viewer login. Select Select viewer. Check the displayed viewer ID.",
+                        "Change the value. Select Save changes.",
+                        "For a dictionary, select Edit beside an entry. To add a key, select Add entry. Enter the key. Select Open entry.",
+                        "Select the entry type and change its value. Select Save changes.",
+                    ],
+                    Bullets =
+                    [
+                        "User values belong to a stable Twitch ID in one channel. A changed login does not change the owner. Global values are shared only within the selected channel.",
+                        "A variable uses its default until you save a value. Get does not create a dictionary entry. An absent entry returns the missing entry value.",
+                        "Set keeps an existing entry's type. Set creates an absent entry as Text. Increment creates an absent Number entry from zero.",
+                        "Number values are signed 64-bit whole numbers. Text stays literal. Names and keys have no feature-specific cap. Stored text and record counts have no feature-specific cap. Database storage remains finite. Chat-send limits are separate.",
+                        "Saved values have no automatic expiry. Reset restores one variable value to its default. Delete entry removes one dictionary key. Other viewers and keys do not change.",
+                        "Save definition changes a name or default, not live values. Scope and type are fixed. Delete definition removes its saved data across viewers. Commands that reference a deleted or renamed definition fail until you change their tokens.",
+                        "A stale edit does not overwrite a newer command update. Your edit stays on screen. Reload the current value before you save again.",
+                        "Configuration packages contain definitions, defaults and the command's single-argument setting. They do not contain live values, dictionary entries or invocation results. Fresh imports use defaults and empty dictionaries. Omission does not reset existing destination data.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Use saved values in replies",
+                    Steps =
+                    [
+                        "Open Message library. Select a reply.",
+                        "Open Insert a saved-value token. Select a definition and operation.",
+                        "For a dictionary, supply a key or a nested token such as {arg1}.",
+                        "For Set, supply text or a token. For Increment, supply a whole-number amount or a token.",
+                        "Select Insert token. Open Sandbox preview. Check the result without a live save.",
+                        "Save the reply. Select it for a command.",
+                    ],
+                    Bullets =
+                    [
+                        "{var_get|user|hugs} returns a viewer's saved number. {var_inc|user|hugs|1} adds one and returns the new total.",
+                        "{var_set|user|bio|{args}} saves text and returns it. {var_get|global|hugs_total} returns a channel-wide value.",
+                        "{dict_get|user|profile|{arg1}} reads the key from the first argument. {dict_set|user|profile|{arg1}|{arg2}} saves an entry. {dict_inc|user|scores|{arg1}|{arg2}} adds the second argument to a Number entry.",
+                        "Nested tokens resolve inside before outside. Selected occurrences resolve once, from left to right. Reads after writes see the new value. Unselected variants and random choices do not write.",
+                        "Arguments, saved text and chatter text remain literal. Braces and pipes in those values do not become more tokens.",
+                        "With Whole remaining text is one argument on, !bio uses its one-argument reply for a nonempty phrase. {arg1} and {args} contain the exact literal phrase. !bio without text uses its zero-argument reply. Other commands keep word parsing.",
+                        "Changes require a message ID. User-scoped values require a stable viewer ID. Missing references and keys, incorrect Number input or overflow produce an explanation without private values. A failed transaction does not save partial changes.",
+                        "Access, feature, cooldown and invocation limits apply before new effects. A repeated committed message ID does not repeat effects.",
+                        "If chat delivery fails after commit, values and the computed reply remain. A retry of the same message ID reuses that reply without another increment or random choice. This does not guarantee exactly-once chat delivery or add a retry schedule.",
+                        "Sandbox previews use a copy of saved values. They do not send chat or save changes. They do not claim invocations or advance real variants.",
+                    ],
+                },
+                new SiteGuideSection
+                {
                     Heading = "Other chat tools",
                     LegacyAnchor = "add-a-counter-scheduled-message-or-twitch-announcement",
                     Bullets =

@@ -33,6 +33,7 @@
                                             </ul>
                                         }
                                     </div>
+                                    <div class="studio-span-12"><label class="flex items-center gap-2"><input type="checkbox" @bind="Command.SingleArgument" />Whole remaining text is one argument</label></div>
                                     @if (Context.CommandPreviewLines(Command) is { Count: > 0 } previewLines)
                                     {
                                         <div class="studio-span-12">

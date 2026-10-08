@@ -10,9 +10,7 @@ public partial class ConfigurationTransferPage
         _busy = true;
         try
         {
-            await using var stream = args.File.OpenReadStream(
-                ConfigurationDocumentCodec.MaximumBytes
-            );
+            await using var stream = args.File.OpenReadStream(long.MaxValue);
             using var memory = new MemoryStream();
             await stream.CopyToAsync(memory);
             _pastedJson = Encoding.UTF8.GetString(memory.ToArray());
@@ -20,7 +18,17 @@ public partial class ConfigurationTransferPage
         }
         catch (IOException)
         {
-            _parseIssue = ConfigurationDocumentCodec.TooLarge().Issue;
+            _parseIssue = new(
+                "$",
+                "The file could not be read. Select it again or paste its contents."
+            );
+        }
+        catch (OutOfMemoryException)
+        {
+            _parseIssue = new(
+                "$",
+                "There is not enough memory to read this file. Close other work or use a host with more available memory."
+            );
         }
         finally
         {

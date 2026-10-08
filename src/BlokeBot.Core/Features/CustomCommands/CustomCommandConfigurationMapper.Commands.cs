@@ -17,6 +17,7 @@ internal static partial class CustomCommandConfigurationMapper
                     .Select(static x => x.Alias)
             ),
             Enabled = command.Enabled,
+            SingleArgument = command.SingleArgument,
             AllowEveryone = command.AllowEveryone,
             AllowModerators = command.AllowModerators,
             AllowedUsers = command

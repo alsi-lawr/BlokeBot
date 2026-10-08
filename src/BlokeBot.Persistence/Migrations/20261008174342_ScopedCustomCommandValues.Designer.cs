@@ -3,69 +3,65 @@ using System;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BlokeBot.Persistence.PostgreSql.Migrations
+namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    partial class BlokeBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261008174342_ScopedCustomCommandValues")]
+    partial class ScopedCustomCommandValues
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.9")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
-
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.ActivePublicChatPin", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Feature")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("OwnerId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("PinnedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PinnerTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReplyKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchMessageId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("UnpinOnOwnerCompletion")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -79,36 +75,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ApprovedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ApprovedClipId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -122,23 +116,21 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ClaimedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProviderMessageId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -149,7 +141,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("automatic_raid_processed_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_automatic_raid_processed_events_Expiry", "\"ExpiresAtUtc\" >= \"ClaimedAtUtc\"");
+                            t.HasCheckConstraint("CK_automatic_raid_processed_events_Expiry", "ExpiresAtUtc >= ClaimedAtUtc");
                         });
                 });
 
@@ -157,53 +149,51 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ClaimedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("MessageTimestampUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderMessageId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResultCode")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceDisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ViewerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -214,11 +204,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("automatic_raid_shoutout_outcomes", null, t =>
                         {
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_ResultCode", "\"ResultCode\" IS NULL OR \"ResultCode\" IN ('Ambiguous', 'AuthorityRequired', 'Cooldown', 'Delivered', 'Invalid', 'NotReady', 'PartialFailure', 'Queued', 'RateLimited', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_ResultCode", "ResultCode IS NULL OR ResultCode IN ('Ambiguous', 'AuthorityRequired', 'Cooldown', 'Delivered', 'Invalid', 'NotReady', 'PartialFailure', 'Queued', 'RateLimited', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')");
 
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_State", "(\"Status\" = 'Processing' AND \"ResultCode\" IS NULL AND \"CompletedAtUtc\" IS NULL) OR (\"Status\" = 'Queued' AND \"ResultCode\" = 'Queued' AND \"CompletedAtUtc\" IS NULL) OR (\"Status\" = 'Delivered' AND \"ResultCode\" = 'Delivered' AND \"CompletedAtUtc\" IS NOT NULL) OR (\"Status\" = 'NotDelivered' AND \"ResultCode\" IS NOT NULL AND \"ResultCode\" NOT IN ('Queued', 'Delivered', 'Ambiguous') AND \"CompletedAtUtc\" IS NOT NULL) OR (\"Status\" = 'Ambiguous' AND \"ResultCode\" = 'Ambiguous' AND \"CompletedAtUtc\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_State", "(Status = 'Processing' AND ResultCode IS NULL AND CompletedAtUtc IS NULL) OR (Status = 'Queued' AND ResultCode = 'Queued' AND CompletedAtUtc IS NULL) OR (Status = 'Delivered' AND ResultCode = 'Delivered' AND CompletedAtUtc IS NOT NULL) OR (Status = 'NotDelivered' AND ResultCode IS NOT NULL AND ResultCode NOT IN ('Queued', 'Delivered', 'Ambiguous') AND CompletedAtUtc IS NOT NULL) OR (Status = 'Ambiguous' AND ResultCode = 'Ambiguous' AND CompletedAtUtc IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_Status", "\"Status\" IN ('Ambiguous', 'Delivered', 'NotDelivered', 'Processing', 'Queued')");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_Status", "Status IN ('Ambiguous', 'Delivered', 'NotDelivered', 'Processing', 'Queued')");
                         });
                 });
 
@@ -226,61 +216,59 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AnnouncementColor")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Primary");
 
                     b.Property<string>("ChatPresentation")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Regular");
 
                     b.Property<bool>("Enabled")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false);
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Mechanism")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Native");
 
                     b.Property<string>("MessageTemplate")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Welcome {display_name}! Check them out at {channel_url}");
 
                     b.Property<int>("MinimumViewerCount")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(1);
 
                     b.Property<bool>("OnlyApprovedChannels")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false);
 
                     b.Property<int?>("PinDurationSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -289,50 +277,50 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("automatic_raid_shoutout_settings", null, t =>
                         {
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_AnnouncementColor", "\"AnnouncementColor\" IN ('Blue', 'Green', 'Orange', 'Primary', 'Purple')");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_AnnouncementColor", "AnnouncementColor IN ('Blue', 'Green', 'Orange', 'Primary', 'Purple')");
 
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_ChatPresentation", "\"ChatPresentation\" IN ('Announcement', 'Pinned', 'Regular')");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_ChatPresentation", "ChatPresentation IN ('Announcement', 'Pinned', 'Regular')");
 
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_Mechanism", "\"Mechanism\" IN ('Chat', 'Native')");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_Mechanism", "Mechanism IN ('Chat', 'Native')");
 
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_MinimumViewerCount", "\"MinimumViewerCount\" >= 1");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_MinimumViewerCount", "MinimumViewerCount >= 1");
 
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_PinDuration", "\"PinDurationSeconds\" IS NULL OR (\"PinDurationSeconds\" >= 30 AND \"PinDurationSeconds\" <= 1800)");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_PinDuration", "PinDurationSeconds IS NULL OR (PinDurationSeconds >= 30 AND PinDurationSeconds <= 1800)");
                         });
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationCountdown", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("AutomationGeneration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("DeadlineUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsRunning")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ObservedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OccurrenceId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProcessId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("WasCancelled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("HostId", "Name");
 
@@ -342,21 +330,21 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationEventReceipt", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SourceDefinitionId")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderMessageId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ClaimedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId", "SourceDefinitionId", "ProviderMessageId");
 
@@ -369,37 +357,37 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("UnavailableReason")
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("UseSmoothEdges")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("UseVerticalLayout")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -412,31 +400,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SourceNodeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourcePortId")
                         .IsRequired()
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("TargetNodeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetPortId")
                         .IsRequired()
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -449,45 +437,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CanvasX")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CanvasY")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("ContinueOnFailure")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DefinitionId")
                         .IsRequired()
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DefinitionSchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DisplayAlias")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ExpressionLanguageVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InputBindingsJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PluginProvenanceJson")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -500,55 +488,55 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("AutomationGeneration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ContextJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ContextSchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DefinitionJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ExecutionLeaseId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("RequiredFeatures")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SourceDefinitionId")
                         .IsRequired()
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SourceNodeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SourceOccurrenceId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -563,14 +551,14 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalMilestone", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GoalId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Amount")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("HostId", "GoalId", "Amount");
 
@@ -580,23 +568,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalObservation", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GoalId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ConnectionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CurrentAmount")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsEnded")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ObservedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId", "GoalId");
 
@@ -607,39 +595,37 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("AvailableAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OutcomeCode")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OutputJson")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RunId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Sequence")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -655,22 +641,22 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FixtureJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("FlowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Slot")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -683,11 +669,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ViewerId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId", "ViewerId");
 
@@ -697,10 +683,10 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSourceAdmission", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("AcceptEventsAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId");
 
@@ -710,21 +696,21 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationStreamObservation", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ObservedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StreamId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("SuppressUptimeBeforeUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId");
 
@@ -734,13 +720,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("LastRevision")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("HostId", "Id");
 
@@ -750,13 +736,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowCallerReference", b =>
                 {
                     b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("SubflowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("NodeId");
 
@@ -768,16 +754,16 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowNestedCallerReference", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("CallerSubflowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SubflowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId", "CallerSubflowId", "NodeId");
 
@@ -789,20 +775,20 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Revision")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SnapshotJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SubflowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId", "Id");
 
@@ -815,13 +801,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRunReference", b =>
                 {
                     b.Property<Guid>("RunId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RevisionId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("RunId", "RevisionId");
 
@@ -834,34 +820,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ByteCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("EventCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("FlowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("ProductionRunId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Truncation")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -878,14 +864,14 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationTraceEvent", b =>
                 {
                     b.Property<Guid>("TraceId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EventJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("TraceId", "Sequence");
 
@@ -896,36 +882,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AssignmentKey")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AssignmentName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("IssuedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IssuedLayout")
                         .HasMaxLength(16000)
-                        .HasColumnType("character varying(16000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -942,36 +926,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -985,31 +967,29 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceEventId")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1023,59 +1003,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EventKind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("MarkId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ParticipantDisplayName")
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ParticipantLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ParticipantTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1088,91 +1066,89 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ArchivedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("CreationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Dimension")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("FullCardAchievementKey")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FullCardPointsReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("FullCardWinEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("IssuedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LineAchievementKey")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LinePointsReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ParticipantCap")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("RosterRevision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Seed")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("TeamCap")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TemplateName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("TemplateRevisionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("TemplateRevisionNumber")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1192,7 +1168,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bingo_games", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bingo_games_Dimension", "\"Dimension\" IN (3, 4, 5)");
+                            t.HasCheckConstraint("CK_bingo_games_Dimension", "Dimension IN (3, 4, 5)");
                         });
                 });
 
@@ -1200,35 +1176,33 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ChangedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("FirstMarkedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SquareKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1242,47 +1216,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("CardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("MarkId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateNote")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1296,39 +1268,37 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("JoinedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("TeamId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1346,45 +1316,43 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("FilterToken")
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateModeratorNote")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("TemplateRevisionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("Threshold")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1401,27 +1369,25 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1438,33 +1404,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("CreationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CurrentRevision")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1481,58 +1445,56 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedByLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedByTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Dimension")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("FullCardAchievementKey")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FullCardPointsReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("FullCardWinEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("LineAchievementKey")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LinePointsReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Revision")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("TemplateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1544,9 +1506,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bingo_template_revisions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bingo_template_revisions_Dimension", "\"Dimension\" IN (3, 4, 5)");
+                            t.HasCheckConstraint("CK_bingo_template_revisions_Dimension", "Dimension IN (3, 4, 5)");
 
-                            t.HasCheckConstraint("CK_bingo_template_revisions_Revision", "\"Revision\" > 0");
+                            t.HasCheckConstraint("CK_bingo_template_revisions_Revision", "Revision > 0");
                         });
                 });
 
@@ -1554,50 +1516,48 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AchievementKey")
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("GameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PointsReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RewardsCompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("RuleIndex")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("RuleKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1616,36 +1576,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("AchievementGranted")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("PointsGranted")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("WinId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1659,81 +1617,79 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BossHealthAfter")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BossHealthBefore")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CampaignId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("GuessRoundId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Outcome")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PhaseAfter")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PointCost")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Response")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StreamKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerDisplayName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WardAfter")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("WardBefore")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1744,9 +1700,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bloke_raid_actions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bloke_raid_actions_Kind", "\"Kind\" IN ('Attack', 'CorrectGuess', 'Mend', 'Special')");
+                            t.HasCheckConstraint("CK_bloke_raid_actions_Kind", "Kind IN ('Attack', 'CorrectGuess', 'Mend', 'Special')");
 
-                            t.HasCheckConstraint("CK_bloke_raid_actions_Source", "\"Source\" IN ('Chat', 'Guessing')");
+                            t.HasCheckConstraint("CK_bloke_raid_actions_Source", "Source IN ('Chat', 'Guessing')");
                         });
                 });
 
@@ -1754,72 +1710,70 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BossName")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CurrentHealth")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CurrentPhase")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CurrentWard")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("EndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MaximumHealth")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MaximumWard")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResetPolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StartOperationKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VictoryPointReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("VictoryRewardedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1835,9 +1789,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bloke_raid_campaigns", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bloke_raid_campaigns_ResetPolicy", "\"ResetPolicy\" IN ('Manual', 'Weekly')");
+                            t.HasCheckConstraint("CK_bloke_raid_campaigns_ResetPolicy", "ResetPolicy IN ('Manual', 'Weekly')");
 
-                            t.HasCheckConstraint("CK_bloke_raid_campaigns_Status", "\"Status\" IN ('Active', 'Ended', 'Expired', 'Victory')");
+                            t.HasCheckConstraint("CK_bloke_raid_campaigns_Status", "Status IN ('Active', 'Ended', 'Expired', 'Victory')");
                         });
                 });
 
@@ -1845,127 +1799,125 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AttackCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AttackMaximum")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AttackMinimum")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AttackPerStreamLimit")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BossName")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CampaignDurationHours")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CorrectGuessDamage")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ExpiryResponse")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MaximumHealth")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MaximumWard")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MendCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MendMaximum")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MendMinimum")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MendPerStreamLimit")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("NextWeeklyResetAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PhaseOneResponse")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("PhaseThreeHealthPercent")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PhaseThreeResponse")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("PhaseTwoHealthPercent")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PhaseTwoResponse")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResetPolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SpecialCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SpecialMaximum")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SpecialMinimum")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SpecialPerStreamLimit")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SpecialPointCost")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VictoryPointReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VictoryResponse")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WeeklyResetDay")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("WeeklyResetHourUtc")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1974,7 +1926,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bloke_raid_configurations", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bloke_raid_configurations_ResetPolicy", "\"ResetPolicy\" IN ('Manual', 'Weekly')");
+                            t.HasCheckConstraint("CK_bloke_raid_configurations_ResetPolicy", "ResetPolicy IN ('Manual', 'Weekly')");
                         });
                 });
 
@@ -1982,48 +1934,46 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ActionCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CampaignId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CorrectGuessCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Damage")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastContributedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SpecialCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ViewerDisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WardRestored")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2037,33 +1987,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CampaignId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2074,7 +2022,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bloke_raid_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bloke_raid_events_Kind", "\"Kind\" IN ('ActionResolved', 'CampaignEnded', 'CampaignExpired', 'CampaignReset', 'CampaignStarted', 'CampaignVictorious', 'PhaseChanged')");
+                            t.HasCheckConstraint("CK_bloke_raid_events_Kind", "Kind IN ('ActionResolved', 'CampaignEnded', 'CampaignExpired', 'CampaignReset', 'CampaignStarted', 'CampaignVictorious', 'PhaseChanged')");
                         });
                 });
 
@@ -2082,114 +2030,112 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AutomationGeneration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("BingoAcceptEventsAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("BingoPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("BlokeRaidAcceptWorkAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("BlokeRaidPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("BotRuntimeState")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("BotRuntimeStateChangedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("BountiesPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ChannelBotAuthorizedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ChannelBotAuthorizedScopes")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CollectivesAcceptWorkAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CollectivesPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("CommandsAliasesConfigured")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CommandsDefaultConflictAlias")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CommunityProgressionAcceptEventsAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CommunityProgressionPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompetitionsAcceptWorkAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompetitionsPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("EnabledFeatures")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0L);
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RaidCollaborationAcceptEventsAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RaidCollaborationPausedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("StartupMessageEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StartupMessageText")
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TimeZoneId")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("UTC");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ViewerPassportContinuityGeneration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2203,64 +2149,62 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AvailableGuessesReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GuessRoundProfileId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GuessUsageReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GuessingAlreadyStoppedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GuessingClosedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GuessingStoppedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InvalidGuessReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ModeratorOnlyReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NoOpenRoundReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NoWinnersReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RoundAlreadyOpenReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RoundStartedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WinUsageReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WinnerReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2274,91 +2218,89 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AcceptedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CompletionReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ContributorCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CreationFingerprint")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("CreationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FailurePledgePolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FundingTarget")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PledgedAmount")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ResolvedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("RewardDistribution")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Visibility")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2372,17 +2314,17 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bounties", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bounties_ContributorCount", "\"ContributorCount\" >= 0");
+                            t.HasCheckConstraint("CK_bounties_ContributorCount", "ContributorCount >= 0");
 
-                            t.HasCheckConstraint("CK_bounties_FailurePledgePolicy", "\"FailurePledgePolicy\" IN ('Refund', 'Spend')");
+                            t.HasCheckConstraint("CK_bounties_FailurePledgePolicy", "FailurePledgePolicy IN ('Refund', 'Spend')");
 
-                            t.HasCheckConstraint("CK_bounties_Revision", "\"Revision\" > 0");
+                            t.HasCheckConstraint("CK_bounties_Revision", "Revision > 0");
 
-                            t.HasCheckConstraint("CK_bounties_RewardDistribution", "\"RewardDistribution\" IN ('Equal', 'Proportional')");
+                            t.HasCheckConstraint("CK_bounties_RewardDistribution", "RewardDistribution IN ('Equal', 'Proportional')");
 
-                            t.HasCheckConstraint("CK_bounties_Status", "\"Status\" IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
+                            t.HasCheckConstraint("CK_bounties_Status", "Status IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
 
-                            t.HasCheckConstraint("CK_bounties_Visibility", "\"Visibility\" IN ('Private', 'Public')");
+                            t.HasCheckConstraint("CK_bounties_Visibility", "Visibility IN ('Private', 'Public')");
                         });
                 });
 
@@ -2390,33 +2332,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Amount")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("BountyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2431,39 +2371,37 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("BountyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BountyPublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2475,7 +2413,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bounty_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bounty_events_Kind", "\"Kind\" IN ('Accepted', 'Cancelled', 'Completed', 'Created', 'Expired', 'Extended', 'Failed', 'FundingOpened', 'FundingTargetReached', 'Pledged', 'PledgesConsumed', 'PledgesRefunded', 'RewardsDistributed')");
+                            t.HasCheckConstraint("CK_bounty_events_Kind", "Kind IN ('Accepted', 'Cancelled', 'Completed', 'Created', 'Expired', 'Extended', 'Failed', 'FundingOpened', 'FundingTargetReached', 'Pledged', 'PledgesConsumed', 'PledgesRefunded', 'RewardsDistributed')");
                         });
                 });
 
@@ -2483,59 +2421,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("BountyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("BountyRevision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CommandFingerprint")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FromStatus")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ToStatus")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2546,11 +2482,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bounty_moderation_audit", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bounty_moderation_audit_Action", "\"Action\" IN ('Accepted', 'Cancelled', 'Completed', 'Created', 'Expired', 'Extended', 'Failed', 'FundingOpened', 'PauseAdjusted', 'Rejected')");
+                            t.HasCheckConstraint("CK_bounty_moderation_audit_Action", "Action IN ('Accepted', 'Cancelled', 'Completed', 'Created', 'Expired', 'Extended', 'Failed', 'FundingOpened', 'PauseAdjusted', 'Rejected')");
 
-                            t.HasCheckConstraint("CK_bounty_moderation_audit_FromStatus", "\"FromStatus\" IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
+                            t.HasCheckConstraint("CK_bounty_moderation_audit_FromStatus", "FromStatus IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
 
-                            t.HasCheckConstraint("CK_bounty_moderation_audit_ToStatus", "\"ToStatus\" IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
+                            t.HasCheckConstraint("CK_bounty_moderation_audit_ToStatus", "ToStatus IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
                         });
                 });
 
@@ -2558,49 +2494,47 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Amount")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("BountyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CommandFingerprint")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ContributorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ContributorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2613,7 +2547,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("bounty_pledges", null, t =>
                         {
-                            t.HasCheckConstraint("CK_bounty_pledges_State", "\"State\" IN ('Consumed', 'Refunded', 'Reserved')");
+                            t.HasCheckConstraint("CK_bounty_pledges_State", "State IN ('Consumed', 'Refunded', 'Reserved')");
                         });
                 });
 
@@ -2621,29 +2555,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("CreationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("PublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2660,41 +2592,39 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ActingHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("AffectedHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationId")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2708,42 +2638,40 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Current")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("DeadlineUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Target")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("UnitName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2757,24 +2685,22 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveGoalId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastSourceEventAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SourceBountyPublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Total")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2790,26 +2716,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Notification")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2823,37 +2747,35 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("AcceptWorkAfterUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CollectiveId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("InvitedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RespondedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2869,37 +2791,35 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AggregateViewerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveRaidRelayId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("FromHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationId")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ToHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2913,40 +2833,38 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AggregateViewerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CurrentHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastSourceEventAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("NextHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2960,51 +2878,49 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CollectiveId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("CompetitionPublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ConfirmedResultCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("EntrantCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Format")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastSourceEventAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("OwnerHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Round")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3020,25 +2936,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Alias")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("GuessRoundProfileId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3054,7 +2968,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("command_aliases", null, t =>
                         {
-                            t.HasCheckConstraint("CK_command_aliases_Kind", "\"Kind\" IN ('AddPoints', 'CancelGiveaway', 'Commands', 'EndGiveaway', 'Gamble', 'Giveaway', 'GivePoints', 'Guess', 'Guesses', 'Join', 'Points', 'RemovePoints', 'Start', 'Stop', 'Win')");
+                            t.HasCheckConstraint("CK_command_aliases_Kind", "Kind IN ('AddPoints', 'CancelGiveaway', 'Commands', 'EndGiveaway', 'Gamble', 'Giveaway', 'GivePoints', 'Guess', 'Guesses', 'Join', 'Points', 'RemovePoints', 'Start', 'Stop', 'Win')");
                         });
                 });
 
@@ -3062,46 +2976,44 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("DefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateNote")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -3119,73 +3031,71 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("DefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DefinitionKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DefinitionName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PeriodKey")
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PointsGranted")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("PublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RewardSnapshot")
                         .IsRequired()
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SourceOperationKey")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SubjectKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerDisplayName")
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3204,89 +3114,87 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CompletionMode")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("EventRule")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FilterToken")
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Increment")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PointsReward")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("PublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResetCadence")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResetLocalTime")
                         .IsRequired()
                         .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ResetWeekday")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ScheduleRevision")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Scope")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Target")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -3304,10 +3212,10 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDefinitionReward", b =>
                 {
                     b.Property<long>("DefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("RewardDefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("DefinitionId", "RewardDefinitionId");
 
@@ -3320,33 +3228,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -3362,36 +3268,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("EquippedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("LastOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("RewardDefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ViewerLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3407,33 +3311,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CompletionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Fingerprint")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ProcessedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3449,48 +3351,46 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Amount")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CompletionCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("DefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PeriodKey")
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SubjectKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerDisplayName")
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3506,39 +3406,37 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("DefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PeriodKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RolloverKind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3557,41 +3455,39 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PresentationToken")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("PublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -3610,36 +3506,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CompletionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("GrantedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("RewardDefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ViewerDisplayName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3657,67 +3551,65 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ArchivedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("CreationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("EndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ModeratorNotes")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("OpenedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("PublicId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("StartsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Visibility")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3736,42 +3628,40 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CompletedCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("ProgressAmount")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Rank")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("SeasonId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("SnapshottedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerDisplayName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3787,25 +3677,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ProcessedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceEventId")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceKind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3819,139 +3707,137 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AlgorithmVersion")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ArchivedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Capacity")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("CreationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DrawPoints")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EntryKind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Format")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LossPoints")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MinimumPoints")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateLobbyInformation")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RegistrationOpenedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ReminderHoursBefore")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReminderMessage")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("RunnerUpAchievementKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RunnerUpPoints")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Seed")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Seeding")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("TeamSize")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Tiebreak")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WinPoints")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("WinnerAchievementKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WinnerPoints")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3965,17 +3851,17 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("competitions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_competitions_Capacity", "\"Capacity\" BETWEEN 2 AND 128");
+                            t.HasCheckConstraint("CK_competitions_Capacity", "Capacity BETWEEN 2 AND 128");
 
-                            t.HasCheckConstraint("CK_competitions_DrawPoints", "\"DrawPoints\" >= 0");
+                            t.HasCheckConstraint("CK_competitions_DrawPoints", "DrawPoints >= 0");
 
-                            t.HasCheckConstraint("CK_competitions_LossPoints", "\"LossPoints\" >= 0");
+                            t.HasCheckConstraint("CK_competitions_LossPoints", "LossPoints >= 0");
 
-                            t.HasCheckConstraint("CK_competitions_Revision", "\"Revision\" > 0");
+                            t.HasCheckConstraint("CK_competitions_Revision", "Revision > 0");
 
-                            t.HasCheckConstraint("CK_competitions_TeamSize", "\"TeamSize\" BETWEEN 1 AND 32");
+                            t.HasCheckConstraint("CK_competitions_TeamSize", "TeamSize BETWEEN 1 AND 32");
 
-                            t.HasCheckConstraint("CK_competitions_WinPoints", "\"WinPoints\" >= 0");
+                            t.HasCheckConstraint("CK_competitions_WinPoints", "WinPoints >= 0");
                         });
                 });
 
@@ -3983,62 +3869,60 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CompetitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("MatchId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("NewScoreA")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("NewScoreB")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("NewWinnerEntrantId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("PreviousScoreA")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("PreviousScoreB")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("PreviousWinnerEntrantId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PrivateReason")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4054,40 +3938,38 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CompetitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CompetitionPublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -4103,33 +3985,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CompetitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RegisteredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RegistrationOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("SeedRank")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -4150,35 +4030,33 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CompetitionEntrantId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateContact")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4193,60 +4071,58 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CompetitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ConfirmedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("EntrantAId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("EntrantBId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ReminderDeliveredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ReminderDueAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ReminderSuppressedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Round")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ScheduledAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ScoreA")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ScoreB")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("WinnerEntrantId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -4266,13 +4142,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("competition_matches", null, t =>
                         {
-                            t.HasCheckConstraint("CK_competition_matches_Position", "\"Position\" >= 0");
+                            t.HasCheckConstraint("CK_competition_matches_Position", "Position >= 0");
 
-                            t.HasCheckConstraint("CK_competition_matches_Round", "\"Round\" > 0");
+                            t.HasCheckConstraint("CK_competition_matches_Round", "Round > 0");
 
-                            t.HasCheckConstraint("CK_competition_matches_ScoreA", "\"ScoreA\" IS NULL OR \"ScoreA\" >= 0");
+                            t.HasCheckConstraint("CK_competition_matches_ScoreA", "ScoreA IS NULL OR ScoreA >= 0");
 
-                            t.HasCheckConstraint("CK_competition_matches_ScoreB", "\"ScoreB\" IS NULL OR \"ScoreB\" >= 0");
+                            t.HasCheckConstraint("CK_competition_matches_ScoreB", "ScoreB IS NULL OR ScoreB >= 0");
                         });
                 });
 
@@ -4280,28 +4156,26 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AchievementKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CompetitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Points")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WinsRequired")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -4310,7 +4184,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("competition_milestone_reward_rules", null, t =>
                         {
-                            t.HasCheckConstraint("CK_competition_milestone_reward_rules_WinsRequired", "\"WinsRequired\" > 0");
+                            t.HasCheckConstraint("CK_competition_milestone_reward_rules_WinsRequired", "WinsRequired > 0");
                         });
                 });
 
@@ -4318,60 +4192,58 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AchievementGrantedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AchievementKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CompetitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("EntrantId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("GrantedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("Placement")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PointsGranted")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RewardKey")
                         .IsRequired()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("WinsRequired")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -4380,9 +4252,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("competition_reward_receipts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_competition_reward_receipts_Placement", "\"Placement\" IS NULL OR \"Placement\" > 0");
+                            t.HasCheckConstraint("CK_competition_reward_receipts_Placement", "Placement IS NULL OR Placement > 0");
 
-                            t.HasCheckConstraint("CK_competition_reward_receipts_WinsRequired", "\"WinsRequired\" IS NULL OR \"WinsRequired\" > 0");
+                            t.HasCheckConstraint("CK_competition_reward_receipts_WinsRequired", "WinsRequired IS NULL OR WinsRequired > 0");
                         });
                 });
 
@@ -4390,40 +4262,40 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("AttemptCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("DisabledChanges")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("EnabledChanges")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IssuesJson")
                         .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4431,7 +4303,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("configuration_activations", null, t =>
                         {
-                            t.HasCheckConstraint("CK_configuration_activations_Status", "\"Status\" IN ('Complete', 'Failed', 'ManualFollowUp', 'Pending', 'Processing')");
+                            t.HasCheckConstraint("CK_configuration_activations_Status", "Status IN ('Complete', 'Failed', 'ManualFollowUp', 'Pending', 'Processing')");
                         });
                 });
 
@@ -4439,37 +4311,35 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SourceFormatVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SummaryJson")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4485,86 +4355,84 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AnnouncementColor")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Primary");
 
                     b.Property<int>("ChatMessagesSinceLastSent")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DeliveryPolicyId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DeliveryType")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("ChatMessage");
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastOccurrenceAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastSentAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LatestDeliveryResult")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("None");
 
                     b.Property<int>("MessageLibraryEntryId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("OccurrenceAttemptCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("OccurrenceCompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("OccurrenceDueAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("OccurrenceExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OccurrenceMessage")
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("OccurrenceNextAttemptAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OccurrenceStatus")
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4578,15 +4446,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("custom_announcements", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcements_AnnouncementColor", "\"AnnouncementColor\" IN ('Blue', 'Green', 'Orange', 'Primary', 'Purple')");
+                            t.HasCheckConstraint("CK_custom_announcements_AnnouncementColor", "AnnouncementColor IN ('Blue', 'Green', 'Orange', 'Primary', 'Purple')");
 
-                            t.HasCheckConstraint("CK_custom_announcements_DeliveryType", "\"DeliveryType\" IN ('ChatMessage', 'TwitchAnnouncement')");
+                            t.HasCheckConstraint("CK_custom_announcements_DeliveryType", "DeliveryType IN ('ChatMessage', 'TwitchAnnouncement')");
 
-                            t.HasCheckConstraint("CK_custom_announcements_LatestDeliveryResult", "\"LatestDeliveryResult\" IN ('Ambiguous', 'Invalid', 'None', 'Permission', 'RateLimitRetry', 'Success', 'Unexpected')");
+                            t.HasCheckConstraint("CK_custom_announcements_LatestDeliveryResult", "LatestDeliveryResult IN ('Ambiguous', 'Invalid', 'None', 'Permission', 'RateLimitRetry', 'Success', 'Unexpected')");
 
-                            t.HasCheckConstraint("CK_custom_announcements_OccurrenceState", "(\"OccurrenceStatus\" = 'None' AND \"OccurrenceDueAtUtc\" IS NULL AND \"OccurrenceExpiresAtUtc\" IS NULL AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NULL AND \"OccurrenceAttemptCount\" = 0 AND \"OccurrenceMessage\" IS NULL) OR (\"OccurrenceStatus\" = 'Pending' AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" IS NOT NULL AND \"OccurrenceNextAttemptAtUtc\" <= \"OccurrenceExpiresAtUtc\" AND \"OccurrenceCompletedAtUtc\" IS NULL AND \"OccurrenceAttemptCount\" = 0 AND \"OccurrenceMessage\" IS NULL) OR (\"OccurrenceStatus\" = 'Attempting' AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NULL AND \"OccurrenceAttemptCount\" > 0 AND length(\"OccurrenceMessage\") > 0) OR (\"OccurrenceStatus\" = 'RetryScheduled' AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" >= \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" <= \"OccurrenceExpiresAtUtc\" AND \"OccurrenceCompletedAtUtc\" IS NULL AND \"OccurrenceAttemptCount\" > 0 AND length(\"OccurrenceMessage\") > 0) OR (\"OccurrenceStatus\" IN ('Accepted', 'TerminalRejected', 'TerminalAmbiguous', 'TerminalUnexpected') AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL AND \"OccurrenceAttemptCount\" > 0 AND \"OccurrenceMessage\" IS NULL) OR (\"OccurrenceStatus\" = 'SkippedExpired' AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL AND \"OccurrenceAttemptCount\" >= 0 AND \"OccurrenceMessage\" IS NULL) OR (\"OccurrenceStatus\" = 'TerminalMissingMessage' AND \"OccurrenceDueAtUtc\" IS NOT NULL AND \"OccurrenceExpiresAtUtc\" > \"OccurrenceDueAtUtc\" AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL AND \"OccurrenceAttemptCount\" = 0 AND \"OccurrenceMessage\" IS NULL) OR (\"OccurrenceStatus\" = 'TerminalInvalidTimeZone' AND \"OccurrenceDueAtUtc\" IS NULL AND \"OccurrenceExpiresAtUtc\" IS NULL AND \"OccurrenceNextAttemptAtUtc\" IS NULL AND \"OccurrenceCompletedAtUtc\" IS NOT NULL AND \"OccurrenceAttemptCount\" = 0 AND \"OccurrenceMessage\" IS NULL)");
+                            t.HasCheckConstraint("CK_custom_announcements_OccurrenceState", "(OccurrenceStatus = 'None' AND OccurrenceDueAtUtc IS NULL AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR (OccurrenceStatus = 'Pending' AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc IS NOT NULL AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR (OccurrenceStatus = 'Attempting' AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount > 0 AND length(OccurrenceMessage) > 0) OR (OccurrenceStatus = 'RetryScheduled' AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc >= OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount > 0 AND length(OccurrenceMessage) > 0) OR (OccurrenceStatus IN ('Accepted', 'TerminalRejected', 'TerminalAmbiguous', 'TerminalUnexpected') AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount > 0 AND OccurrenceMessage IS NULL) OR (OccurrenceStatus = 'SkippedExpired' AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount >= 0 AND OccurrenceMessage IS NULL) OR (OccurrenceStatus = 'TerminalMissingMessage' AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR (OccurrenceStatus = 'TerminalInvalidTimeZone' AND OccurrenceDueAtUtc IS NULL AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL)");
 
-                            t.HasCheckConstraint("CK_custom_announcements_OccurrenceStatus", "\"OccurrenceStatus\" IN ('Accepted', 'Attempting', 'None', 'Pending', 'RetryScheduled', 'SkippedExpired', 'TerminalAmbiguous', 'TerminalInvalidTimeZone', 'TerminalMissingMessage', 'TerminalRejected', 'TerminalUnexpected')");
+                            t.HasCheckConstraint("CK_custom_announcements_OccurrenceStatus", "OccurrenceStatus IN ('Accepted', 'Attempting', 'None', 'Pending', 'RetryScheduled', 'SkippedExpired', 'TerminalAmbiguous', 'TerminalInvalidTimeZone', 'TerminalMissingMessage', 'TerminalRejected', 'TerminalUnexpected')");
                         });
                 });
 
@@ -4594,25 +4462,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PolicyType")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
                     b.ToTable("custom_announcement_delivery_policies", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_Payload", "\"PolicyType\" = 'RetryUntilExpiredThenSkip' AND \"RetryDelayTicks\" IS NOT NULL AND \"RetryDelayTicks\" > 0 AND \"OccurrenceLifetimeTicks\" IS NOT NULL AND \"OccurrenceLifetimeTicks\" <= 600000000 AND \"RetryDelayTicks\" < \"OccurrenceLifetimeTicks\"");
+                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_Payload", "PolicyType = 'RetryUntilExpiredThenSkip' AND RetryDelayTicks IS NOT NULL AND RetryDelayTicks > 0 AND OccurrenceLifetimeTicks IS NOT NULL AND OccurrenceLifetimeTicks <= 600000000 AND RetryDelayTicks < OccurrenceLifetimeTicks");
 
-                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_PolicyType", "\"PolicyType\" IN ('RetryUntilExpiredThenSkip')");
+                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_PolicyType", "PolicyType IN ('RetryUntilExpiredThenSkip')");
                         });
 
                     b.HasDiscriminator<string>("PolicyType");
@@ -4623,15 +4489,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomAnnouncementSchedule", b =>
                 {
                     b.Property<int>("CustomAnnouncementId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ScheduleType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("CustomAnnouncementId");
 
@@ -4640,9 +4506,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("custom_announcement_schedules", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(\"ScheduleType\" = 'Interval' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'IntervalAfterChat' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" >= 1 AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'Weekly' AND \"IntervalMinutes\" IS NULL AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" BETWEEN 0 AND 6 AND \"WeeklyTime\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'IntervalAfterChat' AND IntervalMinutes >= 1 AND RequiredChatMessages >= 1 AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'Weekly' AND IntervalMinutes IS NULL AND RequiredChatMessages IS NULL AND WeeklyDay BETWEEN 0 AND 6 AND WeeklyTime IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "\"ScheduleType\" IN ('Interval', 'IntervalAfterChat', 'Weekly')");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "ScheduleType IN ('Interval', 'IntervalAfterChat', 'Weekly')");
                         });
 
                     b.HasDiscriminator<string>("ScheduleType").HasValue("CustomAnnouncementSchedule");
@@ -4654,52 +4520,50 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("AllowEveryone")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
 
                     b.Property<bool>("AllowModerators")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CooldownScope")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("InvocationLimit")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Unlimited");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("SingleArgument")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4708,33 +4572,33 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("custom_commands", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_commands_CooldownScope", "\"CooldownScope\" IN ('Global', 'User')");
+                            t.HasCheckConstraint("CK_custom_commands_CooldownScope", "CooldownScope IN ('Global', 'User')");
 
-                            t.HasCheckConstraint("CK_custom_commands_InvocationLimit", "\"InvocationLimit\" IN ('OncePerStream', 'OncePerStreamPerUser', 'OncePerUser', 'Unlimited')");
+                            t.HasCheckConstraint("CK_custom_commands_InvocationLimit", "InvocationLimit IN ('OncePerStream', 'OncePerStreamPerUser', 'OncePerUser', 'Unlimited')");
                         });
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandAction", b =>
                 {
                     b.Property<int>("CustomCommandId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActionType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("OneArgumentMessageLibraryEntryId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("TwoArgumentMessageLibraryEntryId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ZeroArgumentMessageLibraryEntryId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CustomCommandId");
 
@@ -4749,13 +4613,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("custom_command_actions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "\"ActionType\" IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "ActionType IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(\"ActionType\" IN ('Message', 'Automation') AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'Counter' AND \"CounterId\" IS NOT NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'OverlayCue' AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NOT NULL AND \"CuePublicId\" IS NOT NULL AND \"QueuePolicy\" IS NOT NULL AND \"ReplyOrder\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'Counter' AND CounterId IS NOT NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'OverlayCue' AND CounterId IS NULL AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "\"QueuePolicy\" IS NULL OR \"QueuePolicy\" IN ('concurrent', 'enqueue', 'ignore', 'replace')");
+                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "QueuePolicy IS NULL OR QueuePolicy IN ('concurrent', 'enqueue', 'ignore', 'replace')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "\"ReplyOrder\" IS NULL OR \"ReplyOrder\" IN ('after', 'before')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "ReplyOrder IS NULL OR ReplyOrder IN ('after', 'before')");
                         });
 
                     b.HasDiscriminator<string>("ActionType").HasValue("CustomCommandAction");
@@ -4767,23 +4631,21 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Alias")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CustomCommandId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -4801,24 +4663,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandAllowedUser", b =>
                 {
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CustomCommandId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("HostId", "CustomCommandId", "TwitchUserId");
 
@@ -4829,35 +4691,33 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CommandId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("InvocationHash")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InvocationId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Reply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("ReplyEligible")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ViewerId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4871,46 +4731,42 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ClaimedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CustomCommandId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TwitchStreamId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
                     b.HasIndex("HostId", "CustomCommandId", "TwitchStreamId")
                         .IsUnique()
-                        .HasFilter("\"TwitchUserId\" IS NULL AND \"TwitchStreamId\" IS NOT NULL");
+                        .HasFilter("TwitchUserId IS NULL AND TwitchStreamId IS NOT NULL");
 
                     b.HasIndex("HostId", "CustomCommandId", "TwitchUserId")
                         .IsUnique()
-                        .HasDatabaseName("IX_custom_command_invocation_claims_HostId_CustomCommandId_Tw~1")
-                        .HasFilter("\"TwitchUserId\" IS NOT NULL AND \"TwitchStreamId\" IS NULL");
+                        .HasFilter("TwitchUserId IS NOT NULL AND TwitchStreamId IS NULL");
 
                     b.HasIndex("HostId", "CustomCommandId", "TwitchUserId", "TwitchStreamId")
                         .IsUnique()
-                        .HasDatabaseName("IX_custom_command_invocation_claims_HostId_CustomCommandId_Tw~2")
-                        .HasFilter("\"TwitchUserId\" IS NOT NULL AND \"TwitchStreamId\" IS NOT NULL");
+                        .HasFilter("TwitchUserId IS NOT NULL AND TwitchStreamId IS NOT NULL");
 
                     b.ToTable("custom_command_invocation_claims", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_invocation_claims_Scope", "(\"TwitchUserId\" IS NULL AND \"TwitchStreamId\" IS NOT NULL) OR (\"TwitchUserId\" IS NOT NULL AND \"TwitchStreamId\" IS NULL) OR (\"TwitchUserId\" IS NOT NULL AND \"TwitchStreamId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_command_invocation_claims_Scope", "(TwitchUserId IS NULL AND TwitchStreamId IS NOT NULL) OR (TwitchUserId IS NOT NULL AND TwitchStreamId IS NULL) OR (TwitchUserId IS NOT NULL AND TwitchStreamId IS NOT NULL)");
                         });
                 });
 
@@ -4918,49 +4774,47 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("AffectedClaimCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CommandName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("CustomCommandId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ResetAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Scope")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetLogin")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetTwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4970,7 +4824,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("custom_command_invocation_reset_audits", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_invocation_reset_audits_Scope", "\"Scope\" IN ('AllViewers', 'OneViewer')");
+                            t.HasCheckConstraint("CK_custom_command_invocation_reset_audits_Scope", "Scope IN ('AllViewers', 'OneViewer')");
                         });
                 });
 
@@ -4978,26 +4832,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5011,31 +4863,29 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CurrentVariantIndex")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SelectionMode")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5044,7 +4894,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("custom_message_library_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_custom_message_library_entries_SelectionMode", "\"SelectionMode\" IN ('First', 'Random', 'Sequential')");
+                            t.HasCheckConstraint("CK_custom_message_library_entries_SelectionMode", "SelectionMode IN ('First', 'Random', 'Sequential')");
                         });
                 });
 
@@ -5052,20 +4902,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CustomMessageLibraryEntryId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5079,44 +4927,42 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("DefinitionId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EntryKey")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Kind")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Number")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("Revision")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetHash")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Text")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ViewerId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5132,37 +4978,35 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("DefaultNumber")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DefaultText")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Kind")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NameHash")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("Revision")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Scope")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5176,59 +5020,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AcknowledgedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AcknowledgedByLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastOccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LinkPath")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("OccurrenceCount")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(1);
 
                     b.Property<string>("Severity")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceKey")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5240,7 +5082,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("durable_alerts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_durable_alerts_Severity", "\"Severity\" IN ('Critical', 'Info', 'Warning')");
+                            t.HasCheckConstraint("CK_durable_alerts_Severity", "Severity IN ('Critical', 'Info', 'Warning')");
                         });
                 });
 
@@ -5248,52 +5090,50 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte[]>("AccessKeyDigest")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DraftDocumentJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProtectedAccessKey")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("PublicationSequence")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("PublishedVersion")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5312,28 +5152,26 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("BindingId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("FullOverlayId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("PublishedVersion")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5348,27 +5186,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
                 {
                     b.Property<long>("OverlayId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Version")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AuthorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AuthorUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DocumentJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("PublishedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("OverlayId", "Version");
 
@@ -5379,32 +5217,30 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("GuessRoundProfileId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReplyTarget")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("chat");
 
                     b.Property<string>("ReplyText")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0);
 
                     b.HasKey("Id");
@@ -5414,7 +5250,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("guess_options", null, t =>
                         {
-                            t.HasCheckConstraint("CK_guess_options_ReplyTarget", "\"ReplyTarget\" IN ('chat', 'whisper')");
+                            t.HasCheckConstraint("CK_guess_options_ReplyTarget", "ReplyTarget IN ('chat', 'whisper')");
                         });
                 });
 
@@ -5422,30 +5258,28 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GuessRoundProfileId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WinningName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5457,7 +5291,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("guess_rounds", null, t =>
                         {
-                            t.HasCheckConstraint("CK_guess_rounds_Status", "\"Status\" IN ('Closed', 'Completed', 'Open')");
+                            t.HasCheckConstraint("CK_guess_rounds_Status", "Status IN ('Closed', 'Completed', 'Open')");
                         });
                 });
 
@@ -5465,43 +5299,41 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0L);
 
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WinningGuessPointReward")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("0");
 
                     b.HasKey("Id");
 
                     b.HasIndex("HostId")
                         .IsUnique()
-                        .HasFilter("\"IsDefault\"");
+                        .HasFilter("\"IsDefault\" = 1");
 
                     b.HasIndex("HostId", "Slug")
                         .IsUnique();
@@ -5513,25 +5345,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GuessName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GuessRoundId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("GuessedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5545,47 +5375,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AuthorizedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AuthorizedScopes")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("OverrideEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte[]>("ProtectedTokenPayload")
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("WhisperResponsesEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5599,33 +5427,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AuthorizedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AuthorizedScopes")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte[]>("ProtectedTokenPayload")
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5639,25 +5465,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5666,7 +5490,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("host_mod_access_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_host_mod_access_entries_Kind", "\"Kind\" IN ('blacklist', 'whitelist')");
+                            t.HasCheckConstraint("CK_host_mod_access_entries_Kind", "Kind IN ('blacklist', 'whitelist')");
                         });
                 });
 
@@ -5674,20 +5498,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("AllowModsByDefault")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("ModsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5701,27 +5523,25 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("AttachedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("BountyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CommunityDefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CompetitionMatchId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("MomentCandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5741,7 +5561,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("moment_attachments", null, t =>
                         {
-                            t.HasCheckConstraint("CK_moment_attachments_OneDestination", "(\"BountyId\" IS NOT NULL AND \"CommunityDefinitionId\" IS NULL AND \"CompetitionMatchId\" IS NULL) OR (\"BountyId\" IS NULL AND \"CommunityDefinitionId\" IS NOT NULL AND \"CompetitionMatchId\" IS NULL) OR (\"BountyId\" IS NULL AND \"CommunityDefinitionId\" IS NULL AND \"CompetitionMatchId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_moment_attachments_OneDestination", "(BountyId IS NOT NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NULL) OR (BountyId IS NULL AND CommunityDefinitionId IS NOT NULL AND CompetitionMatchId IS NULL) OR (BountyId IS NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NOT NULL)");
                         });
                 });
 
@@ -5749,67 +5569,65 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ApprovedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CapturedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastCapturedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("MergedIntoCandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PrivateRejectionReason")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderFailureReason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicCategory")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicTitle")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RejectedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StreamIdentity")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("TwitchClipId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("TwitchStreamMarkerId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -5826,7 +5644,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("moment_candidates", null, t =>
                         {
-                            t.HasCheckConstraint("CK_moment_candidates_State", "\"State\" IN ('Approved', 'ClipReady', 'Failed', 'MarkerReady', 'Merged', 'ProviderPending', 'Rejected')");
+                            t.HasCheckConstraint("CK_moment_candidates_State", "State IN ('Approved', 'ClipReady', 'Failed', 'MarkerReady', 'Merged', 'ProviderPending', 'Rejected')");
                         });
                 });
 
@@ -5834,20 +5652,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CapturedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5860,40 +5676,38 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CaptureCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("FirstCapturedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastCapturedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5912,40 +5726,38 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StreamIdentity")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -5959,7 +5771,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("moment_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_moment_events_Kind", "\"Kind\" IN ('Approved', 'Captured', 'Winner')");
+                            t.HasCheckConstraint("CK_moment_events_Kind", "Kind IN ('Approved', 'Captured', 'Winner')");
                         });
                 });
 
@@ -5967,31 +5779,29 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("MarkerFallbackEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MergeWindowSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("RewardAmount")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RewardPolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6000,9 +5810,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("moment_hub_settings", null, t =>
                         {
-                            t.HasCheckConstraint("CK_moment_hub_settings_MergeWindowSeconds", "\"MergeWindowSeconds\" BETWEEN 15 AND 300");
+                            t.HasCheckConstraint("CK_moment_hub_settings_MergeWindowSeconds", "MergeWindowSeconds BETWEEN 15 AND 300");
 
-                            t.HasCheckConstraint("CK_moment_hub_settings_RewardPolicy", "\"RewardPolicy\" IN ('AllContributors', 'FirstRequester', 'None')");
+                            t.HasCheckConstraint("CK_moment_hub_settings_RewardPolicy", "RewardPolicy IN ('AllContributors', 'FirstRequester', 'None')");
                         });
                 });
 
@@ -6010,31 +5820,29 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("MergedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateText")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SourceCandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("TargetCandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6052,33 +5860,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateText")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6093,30 +5899,28 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SuggestedCategory")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SuggestedTitle")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6129,29 +5933,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6168,21 +5970,19 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("FinalizedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("WeekStartsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("WinningCandidateId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6198,47 +5998,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
                         .HasMaxLength(32768)
-                        .HasColumnType("character varying(32768)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DurationMilliseconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("QueuePolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6249,28 +6047,28 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("overlay_cues", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_cues_ConfigurationJson", "length(\"ConfigurationJson\") BETWEEN 1 AND 32768 AND jsonb_typeof(\"ConfigurationJson\"::jsonb) = 'object' AND jsonb_typeof((\"ConfigurationJson\"::jsonb)->'schemaVersion') = 'number' AND (\"ConfigurationJson\"::jsonb)->>'schemaVersion' = '1'");
+                            t.HasCheckConstraint("CK_overlay_cues_ConfigurationJson", "length(ConfigurationJson) BETWEEN 1 AND 32768 AND json_valid(ConfigurationJson) AND json_type(ConfigurationJson, '$.schemaVersion') = 'integer' AND json_extract(ConfigurationJson, '$.schemaVersion') = 1");
 
-                            t.HasCheckConstraint("CK_overlay_cues_Duration", "\"DurationMilliseconds\" BETWEEN 100 AND 300000");
+                            t.HasCheckConstraint("CK_overlay_cues_Duration", "DurationMilliseconds BETWEEN 100 AND 300000");
 
-                            t.HasCheckConstraint("CK_overlay_cues_Name", "length(\"Name\") BETWEEN 1 AND 128");
+                            t.HasCheckConstraint("CK_overlay_cues_Name", "length(Name) BETWEEN 1 AND 128");
 
-                            t.HasCheckConstraint("CK_overlay_cues_QueuePolicy", "\"QueuePolicy\" IN ('concurrent', 'enqueue', 'ignore', 'replace')");
+                            t.HasCheckConstraint("CK_overlay_cues_QueuePolicy", "QueuePolicy IN ('concurrent', 'enqueue', 'ignore', 'replace')");
 
-                            t.HasCheckConstraint("CK_overlay_cues_Revision", "\"Revision\" > 0");
+                            t.HasCheckConstraint("CK_overlay_cues_Revision", "Revision > 0");
                         });
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayCueMediaAssetReference", b =>
                 {
                     b.Property<long>("CueId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("AssetId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CueId", "AssetId");
 
@@ -6287,59 +6085,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Body")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("DisplayDeadlineUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DurationSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("EnqueuedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("FullOverlayEventFeedBindingId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Lifecycle")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("OverlayInstanceId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("TombstoneExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6355,19 +6151,19 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("overlay_event_feed_items", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Duration", "\"DurationSeconds\" BETWEEN 1 AND 30");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Duration", "DurationSeconds BETWEEN 1 AND 30");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "\"Kind\" IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "\"Lifecycle\" IN ('active', 'consumed', 'queued', 'suppressed')");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "Lifecycle IN ('active', 'consumed', 'queued', 'suppressed')");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Owner", "(\"OverlayInstanceId\" IS NULL) <> (\"FullOverlayEventFeedBindingId\" IS NULL)");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Owner", "(OverlayInstanceId IS NULL) <> (FullOverlayEventFeedBindingId IS NULL)");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Priority", "\"Priority\" IN ('high', 'normal')");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Priority", "Priority IN ('high', 'normal')");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_SourceKey", "length(\"SourceKey\") BETWEEN 1 AND 160");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_SourceKey", "length(SourceKey) BETWEEN 1 AND 160");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Text", "length(\"Title\") BETWEEN 1 AND 160 AND length(\"Body\") >= 1");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Text", "length(Title) BETWEEN 1 AND 160 AND length(Body) >= 1");
                         });
                 });
 
@@ -6375,55 +6171,53 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte[]>("AccessKeyDigest")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
                         .HasMaxLength(8192)
-                        .HasColumnType("character varying(8192)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("KeyVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("RequiresAccessKeyRegeneration")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6437,15 +6231,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("overlay_instances", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_instances_AccessKeyDigest", "length(\"AccessKeyDigest\") = 32");
+                            t.HasCheckConstraint("CK_overlay_instances_AccessKeyDigest", "length(AccessKeyDigest) = 32");
 
-                            t.HasCheckConstraint("CK_overlay_instances_ConfigurationJson", "length(\"ConfigurationJson\") BETWEEN 1 AND 8192 AND jsonb_typeof(\"ConfigurationJson\"::jsonb) = 'object' AND jsonb_typeof((\"ConfigurationJson\"::jsonb)->'schemaVersion') = 'number' AND (\"ConfigurationJson\"::jsonb)->>'schemaVersion' = '1'");
+                            t.HasCheckConstraint("CK_overlay_instances_ConfigurationJson", "length(ConfigurationJson) BETWEEN 1 AND 8192 AND json_valid(ConfigurationJson) AND json_type(ConfigurationJson, '$.schemaVersion') = 'integer' AND json_extract(ConfigurationJson, '$.schemaVersion') = 1");
 
-                            t.HasCheckConstraint("CK_overlay_instances_Name", "length(\"Name\") BETWEEN 1 AND 128");
+                            t.HasCheckConstraint("CK_overlay_instances_Name", "length(Name) BETWEEN 1 AND 128");
 
-                            t.HasCheckConstraint("CK_overlay_instances_Type", "\"Type\" IN ('community-goal', 'cue-player', 'empty', 'event-feed', 'giveaway', 'guessing', 'viewer-funded-bounty', 'viewer-queue')");
+                            t.HasCheckConstraint("CK_overlay_instances_Type", "Type IN ('community-goal', 'cue-player', 'empty', 'event-feed', 'giveaway', 'guessing', 'viewer-funded-bounty', 'viewer-queue')");
 
-                            t.HasCheckConstraint("CK_overlay_instances_Versions", "\"KeyVersion\" > 0 AND \"Revision\" > 0");
+                            t.HasCheckConstraint("CK_overlay_instances_Versions", "KeyVersion > 0 AND Revision > 0");
                         });
                 });
 
@@ -6453,43 +6247,41 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActorLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActorUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("KeyVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OverlayPublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("OverlayRevision")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6497,7 +6289,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("overlay_instance_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_instance_events_Kind", "\"Kind\" IN ('configured', 'created', 'deleted', 'disabled', 'enabled', 'key-rotated', 'renamed')");
+                            t.HasCheckConstraint("CK_overlay_instance_events_Kind", "Kind IN ('configured', 'created', 'deleted', 'disabled', 'enabled', 'key-rotated', 'renamed')");
                         });
                 });
 
@@ -6505,34 +6297,32 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ContentRevision")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DocumentId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6545,9 +6335,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("overlay_media_assets", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_media_assets_Length", "\"ContentRevision\" > 0");
+                            t.HasCheckConstraint("CK_overlay_media_assets_Length", "ContentRevision > 0");
 
-                            t.HasCheckConstraint("CK_overlay_media_assets_Name", "length(\"Name\") BETWEEN 1 AND 128");
+                            t.HasCheckConstraint("CK_overlay_media_assets_Name", "length(Name) BETWEEN 1 AND 128");
                         });
                 });
 
@@ -6555,41 +6345,41 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("ByteLength")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("LegacyHostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("LegacyStorageKey")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("OrphanedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StorageKey")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6600,15 +6390,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("overlay_media_documents", null, t =>
                         {
-                            t.HasCheckConstraint("CK_overlay_media_documents_ContentType", "\"ContentType\" LIKE 'image/%' OR \"ContentType\" LIKE 'audio/%' OR \"ContentType\" LIKE 'video/%'");
+                            t.HasCheckConstraint("CK_overlay_media_documents_ContentType", "ContentType LIKE 'image/%' OR ContentType LIKE 'audio/%' OR ContentType LIKE 'video/%'");
 
-                            t.HasCheckConstraint("CK_overlay_media_documents_Legacy", "(\"LegacyHostId\" IS NULL AND \"LegacyStorageKey\" IS NULL) OR (\"LegacyHostId\" IS NOT NULL AND length(\"LegacyStorageKey\") = 32)");
+                            t.HasCheckConstraint("CK_overlay_media_documents_Legacy", "(LegacyHostId IS NULL AND LegacyStorageKey IS NULL) OR (LegacyHostId IS NOT NULL AND length(LegacyStorageKey) = 32)");
 
-                            t.HasCheckConstraint("CK_overlay_media_documents_Length", "\"ByteLength\" > 0");
+                            t.HasCheckConstraint("CK_overlay_media_documents_Length", "ByteLength > 0");
 
-                            t.HasCheckConstraint("CK_overlay_media_documents_State", "\"State\" IN ('available', 'orphaned', 'publishing', 'unavailable')");
+                            t.HasCheckConstraint("CK_overlay_media_documents_State", "State IN ('available', 'orphaned', 'publishing', 'unavailable')");
 
-                            t.HasCheckConstraint("CK_overlay_media_documents_StorageKey", "length(\"StorageKey\") = 32");
+                            t.HasCheckConstraint("CK_overlay_media_documents_StorageKey", "length(StorageKey) = 32");
                         });
                 });
 
@@ -6616,59 +6406,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActivityName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Capacity")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("CurrentPartyNumber")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HistoryRetentionDays")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsOpen")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ReadinessTimeoutSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SelectionMode")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("ShowParticipantNames")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SkipExclusionMinutes")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6677,7 +6465,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("play_queues", null, t =>
                         {
-                            t.HasCheckConstraint("CK_play_queues_SelectionMode", "\"SelectionMode\" IN ('JoinOrder', 'LeastRecentParticipation')");
+                            t.HasCheckConstraint("CK_play_queues_SelectionMode", "SelectionMode IN ('JoinOrder', 'LeastRecentParticipation')");
                         });
                 });
 
@@ -6685,34 +6473,32 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("EntryId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("QueueId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6722,7 +6508,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("play_queue_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_play_queue_events_Kind", "\"Kind\" IN ('Joined', 'Left', 'NoShow', 'PartySelected', 'QueueClosed', 'QueueConfigured', 'Ready', 'ReadyCheckStarted', 'Skipped')");
+                            t.HasCheckConstraint("CK_play_queue_events_Kind", "Kind IN ('Joined', 'Left', 'NoShow', 'PartySelected', 'QueueClosed', 'QueueConfigured', 'Ready', 'ReadyCheckStarted', 'Skipped')");
                         });
                 });
 
@@ -6730,59 +6516,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("JoinedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("PartyNumber")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Priority")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PrivateModeratorNote")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("QueueId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ReadyExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6795,7 +6579,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("play_queue_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_play_queue_entries_Status", "\"Status\" IN ('AwaitingReady', 'Left', 'NoShow', 'Ready', 'Selected', 'Skipped', 'Waiting')");
+                            t.HasCheckConstraint("CK_play_queue_entries_Status", "Status IN ('AwaitingReady', 'Left', 'NoShow', 'Ready', 'Selected', 'Skipped', 'Waiting')");
                         });
                 });
 
@@ -6803,20 +6587,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("EntryId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("FieldId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6832,28 +6614,26 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateReason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("QueueId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6868,30 +6648,28 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Choices")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("QueueId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6908,23 +6686,21 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ParticipatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("QueueId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -6939,20 +6715,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MinimumCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("QueueId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -6966,64 +6740,64 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Diagnostic")
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("EnableOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FeatureId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("FlowId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ManifestVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MutableTag")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PluginId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PluginVersion")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TemplateHash")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TemplateId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -7043,22 +6817,22 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FeatureId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ValuesJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId", "FeatureId", "HostId");
 
@@ -7068,7 +6842,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         {
                             t.HasCheckConstraint("CK_plugin_feature_configurations_Revision", "\"Revision\" >= 0");
 
-                            t.HasCheckConstraint("CK_plugin_feature_configurations_ValuesJson", "jsonb_typeof(\"ValuesJson\"::jsonb) = 'array' AND octet_length(\"ValuesJson\") <= 65536");
+                            t.HasCheckConstraint("CK_plugin_feature_configurations_ValuesJson", "json_valid(\"ValuesJson\") AND json_type(\"ValuesJson\") = 'array' AND length(CAST(\"ValuesJson\" AS BLOB)) <= 65536");
                         });
                 });
 
@@ -7076,22 +6850,22 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FeatureId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SettingId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte[]>("ProtectedValue")
                         .IsRequired()
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.HasKey("PluginId", "FeatureId", "HostId", "SettingId");
 
@@ -7105,41 +6879,41 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FeatureId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("FeatureGeneration")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("LifecycleOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Readiness")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReasonCode")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReasonDetail")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RecoveryAction")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("WorkerGeneration")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("PluginId", "FeatureId", "HostId");
 
@@ -7167,15 +6941,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ValuesJson")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId");
 
@@ -7183,7 +6957,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         {
                             t.HasCheckConstraint("CK_plugin_installation_configurations_Revision", "\"Revision\" >= 0");
 
-                            t.HasCheckConstraint("CK_plugin_installation_configurations_ValuesJson", "jsonb_typeof(\"ValuesJson\"::jsonb) = 'array' AND octet_length(\"ValuesJson\") <= 65536");
+                            t.HasCheckConstraint("CK_plugin_installation_configurations_ValuesJson", "json_valid(\"ValuesJson\") AND json_type(\"ValuesJson\") = 'array' AND length(CAST(\"ValuesJson\" AS BLOB)) <= 65536");
                         });
                 });
 
@@ -7191,15 +6965,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SettingId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte[]>("ProtectedValue")
                         .IsRequired()
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.HasKey("PluginId", "SettingId");
 
@@ -7213,86 +6987,86 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("ActiveGeneration")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("ActiveOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ActivePackageOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActiveTag")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActiveVersion")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("AutomaticRestartConsumed")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("FailureCode")
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FaultedFrom")
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKind")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OutcomeCode")
                         .IsRequired()
                         .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OutcomeDetail")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OutcomeOccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Phase")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RestartNotBeforeUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("SelectedGeneration")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("SelectedPackageOperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SelectedTag")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SelectedVersion")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId");
 
@@ -7322,62 +7096,62 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeclaredVersion")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MutableTag")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Author")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CompatibilityBlokeBot")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CompatibilityLua")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("character varying(8)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CompatibilityPluginApi")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IconUrl")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PackagePath")
                         .IsRequired()
                         .HasMaxLength(240)
-                        .HasColumnType("character varying(240)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RepositoryUrl")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SnapshotId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId", "DeclaredVersion", "MutableTag");
 
@@ -7393,23 +7167,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeclaredVersion")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MutableTag")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId", "DeclaredVersion", "MutableTag", "Position");
 
@@ -7419,27 +7193,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.PluginMarketplaceCatalogStateRecord", b =>
                 {
                     b.Property<int>("Id")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("FailureCode")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("FetchedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastAttemptAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SourceETag")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("SourceModifiedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -7457,23 +7231,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeclaredVersion")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MutableTag")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId", "DeclaredVersion", "MutableTag", "Position");
 
@@ -7484,23 +7258,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeclaredVersion")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MutableTag")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId", "DeclaredVersion", "MutableTag", "Position");
 
@@ -7511,32 +7285,32 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<string>("PluginId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeclaredVersion")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MutableTag")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Operation")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OutcomeCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SafeDetail")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("PluginId");
 
@@ -7552,25 +7326,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Amount")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -7584,66 +7356,64 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ActorLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BalanceAfter")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("BountyPledgeId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("BountyRewardId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CommunityCompletionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CounterpartyLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Delta")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("GiveawayId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Note")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OperationKey")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("RequestSubmissionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -7662,7 +7432,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("point_ledger_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "\"Kind\" IN ('WatchTimeReward', 'Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
+                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "Kind IN ('WatchTimeReward', 'Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
                         });
                 });
 
@@ -7670,44 +7440,42 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Eligibility")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("EndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MaximumPayout")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MinimumPayout")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WinnerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -7717,9 +7485,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("points_giveaways", null, t =>
                         {
-                            t.HasCheckConstraint("CK_points_giveaways_Eligibility", "\"Eligibility\" IN ('everyone', 'followers', 'subscribers')");
+                            t.HasCheckConstraint("CK_points_giveaways_Eligibility", "Eligibility IN ('everyone', 'followers', 'subscribers')");
 
-                            t.HasCheckConstraint("CK_points_giveaways_Status", "\"Status\" IN ('Active', 'Cancelled', 'Completed', 'Expired')");
+                            t.HasCheckConstraint("CK_points_giveaways_Status", "Status IN ('Active', 'Cancelled', 'Completed', 'Expired')");
                         });
                 });
 
@@ -7727,20 +7495,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("GiveawayId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("JoinedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -7754,22 +7520,20 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("GiveawayId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Payout")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -7782,153 +7546,151 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AddReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BalanceReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FollowerEligibilityUnavailableReply")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("FollowerChecksUnavailableReply");
 
                     b.Property<int>("GamblingCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GamblingLoseReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GamblingWinRatePercent")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GamblingWinReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayAlreadyActiveReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayAlreadyJoinedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayCancelledReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayCooldownReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GiveawayCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("GiveawayDurationSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GiveawayEligibility")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayEndedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayJoinedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayMaximumPayout")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayMinimumPayout")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayNoEntrantsReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayNotActiveReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayStartedReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GiveawayUpdateReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GiveawayWinnerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("InsufficientBalanceReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InvalidAmountReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ModeratorOnlyReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NotEligibleReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OtherBalanceReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PointLabel")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RemoveReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StreamOfflineReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TransferReply")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("WatchTimeConfigurationRevision")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("WatchTimeEnableGeneration")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WatchTimePointAmount")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("WatchTimePointsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -7937,7 +7699,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("points_settings", null, t =>
                         {
-                            t.HasCheckConstraint("CK_points_settings_GiveawayEligibility", "\"GiveawayEligibility\" IN ('everyone', 'followers', 'subscribers')");
+                            t.HasCheckConstraint("CK_points_settings_GiveawayEligibility", "GiveawayEligibility IN ('everyone', 'followers', 'subscribers')");
 
                             t.HasCheckConstraint("CK_points_settings_WatchTimeEnabled", "NOT \"WatchTimePointsEnabled\" OR (\"WatchTimePointAmount\" IS NOT NULL AND \"WatchTimeEnableGeneration\" <> '00000000-0000-0000-0000-000000000000')");
                         });
@@ -7947,71 +7709,69 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AttemptCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ClaimExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ClaimSlot")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("ClaimToken")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeduplicationKey")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FailurePhase")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FailureType")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("HttpStatusCode")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Message")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("NextAttemptAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RejectionCode")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SafePreSendFailureCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("SendStartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8031,19 +7791,19 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("public_chat_outbox", null, t =>
                         {
-                            t.HasCheckConstraint("CK_public_chat_outbox_AttemptCount", "\"AttemptCount\" >= 0");
+                            t.HasCheckConstraint("CK_public_chat_outbox_AttemptCount", "AttemptCount >= 0");
 
-                            t.HasCheckConstraint("CK_public_chat_outbox_Channel", "length(trim(\"Channel\")) > 0");
+                            t.HasCheckConstraint("CK_public_chat_outbox_Channel", "length(trim(Channel)) > 0");
 
-                            t.HasCheckConstraint("CK_public_chat_outbox_DeduplicationKey", "\"DeduplicationKey\" IS NULL OR length(\"DeduplicationKey\") = 64");
+                            t.HasCheckConstraint("CK_public_chat_outbox_DeduplicationKey", "DeduplicationKey IS NULL OR length(DeduplicationKey) = 64");
 
-                            t.HasCheckConstraint("CK_public_chat_outbox_FailurePhase", "\"FailurePhase\" IS NULL OR \"FailurePhase\" IN ('Preparation', 'Send')");
+                            t.HasCheckConstraint("CK_public_chat_outbox_FailurePhase", "FailurePhase IS NULL OR FailurePhase IN ('Preparation', 'Send')");
 
-                            t.HasCheckConstraint("CK_public_chat_outbox_SafePreSendFailureCount", "\"SafePreSendFailureCount\" >= 0");
+                            t.HasCheckConstraint("CK_public_chat_outbox_SafePreSendFailureCount", "SafePreSendFailureCount >= 0");
 
-                            t.HasCheckConstraint("CK_public_chat_outbox_State", "(\"Status\" = 'Pending' AND length(\"Message\") > 0 AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NULL AND \"AttemptCount\" = 0 AND \"SafePreSendFailureCount\" = 0 AND length(\"DeduplicationKey\") = 64 AND \"NextAttemptAtUtc\" IS NOT NULL AND \"FailurePhase\" IS NULL AND \"FailureType\" IS NULL AND \"HttpStatusCode\" IS NULL AND \"RejectionCode\" IS NULL) OR (\"Status\" = 'Claimed' AND length(\"Message\") > 0 AND \"ClaimToken\" IS NOT NULL AND \"ClaimSlot\" = 1 AND \"ClaimExpiresAtUtc\" IS NOT NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NULL AND \"AttemptCount\" = 0 AND length(\"DeduplicationKey\") = 64 AND \"NextAttemptAtUtc\" IS NOT NULL AND ((\"SafePreSendFailureCount\" = 0 AND \"FailurePhase\" IS NULL AND \"FailureType\" IS NULL AND \"HttpStatusCode\" IS NULL AND \"RejectionCode\" IS NULL) OR (\"SafePreSendFailureCount\" > 0 AND \"FailurePhase\" = 'Preparation' AND length(\"FailureType\") > 0 AND \"RejectionCode\" IS NULL))) OR (\"Status\" = 'Sending' AND length(\"Message\") > 0 AND \"ClaimToken\" IS NOT NULL AND \"ClaimSlot\" = 1 AND \"ClaimExpiresAtUtc\" IS NOT NULL AND \"SendStartedAtUtc\" IS NOT NULL AND \"CompletedAtUtc\" IS NULL AND \"AttemptCount\" > 0 AND length(\"DeduplicationKey\") = 64 AND \"NextAttemptAtUtc\" IS NOT NULL AND \"FailurePhase\" IS NULL AND \"FailureType\" IS NULL AND \"HttpStatusCode\" IS NULL AND \"RejectionCode\" IS NULL) OR (\"Status\" = 'SafePreSendTransient' AND length(\"Message\") > 0 AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NULL AND \"AttemptCount\" = 0 AND length(\"DeduplicationKey\") = 64 AND \"NextAttemptAtUtc\" IS NOT NULL AND \"SafePreSendFailureCount\" > 0 AND \"FailurePhase\" = 'Preparation' AND length(\"FailureType\") > 0 AND \"RejectionCode\" IS NULL) OR (\"Status\" = 'SafePreSendExhausted' AND \"Message\" IS NULL AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NOT NULL AND \"AttemptCount\" = 0 AND \"SafePreSendFailureCount\" > 0 AND \"DeduplicationKey\" IS NULL AND \"NextAttemptAtUtc\" IS NULL AND \"FailurePhase\" = 'Preparation' AND length(\"FailureType\") > 0 AND \"RejectionCode\" IS NULL) OR (\"Status\" IN ('MissingChannel', 'MissingBot') AND \"Message\" IS NULL AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NOT NULL AND \"AttemptCount\" = 0 AND \"SafePreSendFailureCount\" = 0 AND \"DeduplicationKey\" IS NULL AND \"NextAttemptAtUtc\" IS NULL AND \"FailurePhase\" = 'Preparation' AND \"FailureType\" IS NULL AND \"HttpStatusCode\" IS NULL AND \"RejectionCode\" IS NULL) OR (\"Status\" = 'Rejected' AND \"Message\" IS NULL AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NOT NULL AND \"CompletedAtUtc\" IS NOT NULL AND \"FailurePhase\" = 'Send' AND \"AttemptCount\" > 0 AND \"DeduplicationKey\" IS NULL AND \"NextAttemptAtUtc\" IS NULL AND \"FailureType\" IS NULL AND \"HttpStatusCode\" IS NULL AND (\"RejectionCode\" IS NULL OR length(\"RejectionCode\") > 0)) OR (\"Status\" = 'Ambiguous' AND \"Message\" IS NULL AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NOT NULL AND \"CompletedAtUtc\" IS NOT NULL AND \"FailurePhase\" = 'Send' AND \"AttemptCount\" > 0 AND \"DeduplicationKey\" IS NULL AND \"NextAttemptAtUtc\" IS NULL AND length(\"FailureType\") > 0 AND \"RejectionCode\" IS NULL) OR (\"Status\" = 'Unexpected' AND \"Message\" IS NULL AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NOT NULL AND \"AttemptCount\" = 0 AND \"DeduplicationKey\" IS NULL AND \"NextAttemptAtUtc\" IS NULL AND \"FailurePhase\" = 'Preparation' AND length(\"FailureType\") > 0 AND \"RejectionCode\" IS NULL) OR (\"Status\" = 'Expired' AND \"Message\" IS NULL AND \"DeduplicationKey\" IS NULL AND \"NextAttemptAtUtc\" IS NULL AND \"ClaimToken\" IS NULL AND \"ClaimSlot\" IS NULL AND \"ClaimExpiresAtUtc\" IS NULL AND \"SendStartedAtUtc\" IS NULL AND \"CompletedAtUtc\" IS NOT NULL AND \"FailurePhase\" IS NULL AND \"FailureType\" IS NULL AND \"HttpStatusCode\" IS NULL AND \"RejectionCode\" IS NULL)");
+                            t.HasCheckConstraint("CK_public_chat_outbox_State", "(Status = 'Pending' AND length(Message) > 0 AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL AND AttemptCount = 0 AND SafePreSendFailureCount = 0 AND length(DeduplicationKey) = 64 AND NextAttemptAtUtc IS NOT NULL AND FailurePhase IS NULL AND FailureType IS NULL AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR (Status = 'Claimed' AND length(Message) > 0 AND ClaimToken IS NOT NULL AND ClaimSlot = 1 AND ClaimExpiresAtUtc IS NOT NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL AND AttemptCount = 0 AND length(DeduplicationKey) = 64 AND NextAttemptAtUtc IS NOT NULL AND ((SafePreSendFailureCount = 0 AND FailurePhase IS NULL AND FailureType IS NULL AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR (SafePreSendFailureCount > 0 AND FailurePhase = 'Preparation' AND length(FailureType) > 0 AND RejectionCode IS NULL))) OR (Status = 'Sending' AND length(Message) > 0 AND ClaimToken IS NOT NULL AND ClaimSlot = 1 AND ClaimExpiresAtUtc IS NOT NULL AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NULL AND AttemptCount > 0 AND length(DeduplicationKey) = 64 AND NextAttemptAtUtc IS NOT NULL AND FailurePhase IS NULL AND FailureType IS NULL AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR (Status = 'SafePreSendTransient' AND length(Message) > 0 AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL AND AttemptCount = 0 AND length(DeduplicationKey) = 64 AND NextAttemptAtUtc IS NOT NULL AND SafePreSendFailureCount > 0 AND FailurePhase = 'Preparation' AND length(FailureType) > 0 AND RejectionCode IS NULL) OR (Status = 'SafePreSendExhausted' AND Message IS NULL AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 AND SafePreSendFailureCount > 0 AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL AND FailurePhase = 'Preparation' AND length(FailureType) > 0 AND RejectionCode IS NULL) OR (Status IN ('MissingChannel', 'MissingBot') AND Message IS NULL AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 AND SafePreSendFailureCount = 0 AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL AND FailurePhase = 'Preparation' AND FailureType IS NULL AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR (Status = 'Rejected' AND Message IS NULL AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' AND AttemptCount > 0 AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL AND FailureType IS NULL AND HttpStatusCode IS NULL AND (RejectionCode IS NULL OR length(RejectionCode) > 0)) OR (Status = 'Ambiguous' AND Message IS NULL AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' AND AttemptCount > 0 AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL AND length(FailureType) > 0 AND RejectionCode IS NULL) OR (Status = 'Unexpected' AND Message IS NULL AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL AND FailurePhase = 'Preparation' AND length(FailureType) > 0 AND RejectionCode IS NULL) OR (Status = 'Expired' AND Message IS NULL AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL AND ClaimToken IS NULL AND ClaimSlot IS NULL AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NOT NULL AND FailurePhase IS NULL AND FailureType IS NULL AND HttpStatusCode IS NULL AND RejectionCode IS NULL)");
 
-                            t.HasCheckConstraint("CK_public_chat_outbox_Status", "\"Status\" IN ('Ambiguous', 'Claimed', 'Expired', 'MissingBot', 'MissingChannel', 'Pending', 'Rejected', 'SafePreSendExhausted', 'SafePreSendTransient', 'Sending', 'Unexpected')");
+                            t.HasCheckConstraint("CK_public_chat_outbox_Status", "Status IN ('Ambiguous', 'Claimed', 'Expired', 'MissingBot', 'MissingChannel', 'Pending', 'Rejected', 'SafePreSendExhausted', 'SafePreSendTransient', 'Sending', 'Unexpected')");
                         });
                 });
 
@@ -8051,71 +7811,69 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("AttemptStartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("DurationSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Feature")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("OutboxMessageId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Outcome")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("OwnerId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PinnerTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReplyKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchMessageId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("UnpinOnOwnerCompletion")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8129,35 +7887,35 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("public_chat_pin_operations", null, t =>
                         {
-                            t.HasCheckConstraint("CK_public_chat_pin_operations_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" BETWEEN 30 AND 1800");
+                            t.HasCheckConstraint("CK_public_chat_pin_operations_DurationSeconds", "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800");
 
-                            t.HasCheckConstraint("CK_public_chat_pin_operations_Kind", "\"Kind\" IN ('Pin', 'Unpin')");
+                            t.HasCheckConstraint("CK_public_chat_pin_operations_Kind", "Kind IN ('Pin', 'Unpin')");
 
-                            t.HasCheckConstraint("CK_public_chat_pin_operations_Status", "\"Status\" IN ('Attempting', 'AwaitingDelivery', 'NoOp', 'Ready', 'Succeeded', 'Terminal')");
+                            t.HasCheckConstraint("CK_public_chat_pin_operations_Status", "Status IN ('Attempting', 'AwaitingDelivery', 'NoOp', 'Ready', 'Succeeded', 'Terminal')");
                         });
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.PublicChatSendReceipt", b =>
                 {
                     b.Property<long>("OutboxMessageId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("AttemptedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("DeliveredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeliveredDeduplicationKey")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchMessageId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("OutboxMessageId");
 
@@ -8167,7 +7925,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("public_chat_send_receipts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_public_chat_send_receipts_Delivery", "(\"DeliveredDeduplicationKey\" IS NULL AND \"DeliveredAtUtc\" IS NULL) OR (length(\"DeliveredDeduplicationKey\") = 64 AND \"DeliveredAtUtc\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_public_chat_send_receipts_Delivery", "(DeliveredDeduplicationKey IS NULL AND DeliveredAtUtc IS NULL) OR (length(DeliveredDeduplicationKey) = 64 AND DeliveredAtUtc IS NOT NULL)");
                         });
                 });
 
@@ -8175,64 +7933,62 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Category")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Direction")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OtherDisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OtherLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OtherTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderMessageId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderStreamId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ShoutoutOutcome")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ViewerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("WelcomeOutcome")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8243,11 +7999,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("raid_collaboration_history", null, t =>
                         {
-                            t.HasCheckConstraint("CK_raid_collaboration_history_Direction", "\"Direction\" IN ('Incoming', 'Outgoing')");
+                            t.HasCheckConstraint("CK_raid_collaboration_history_Direction", "Direction IN ('Incoming', 'Outgoing')");
 
-                            t.HasCheckConstraint("CK_raid_collaboration_history_ShoutoutOutcome", "\"ShoutoutOutcome\" IN ('Cooldown', 'Deduplicated', 'NotConfigured', 'NotEligible', 'Queued', 'Rejected', 'Sent', 'Suppressed')");
+                            t.HasCheckConstraint("CK_raid_collaboration_history_ShoutoutOutcome", "ShoutoutOutcome IN ('Cooldown', 'Deduplicated', 'NotConfigured', 'NotEligible', 'Queued', 'Rejected', 'Sent', 'Suppressed')");
 
-                            t.HasCheckConstraint("CK_raid_collaboration_history_WelcomeOutcome", "\"WelcomeOutcome\" IN ('Deduplicated', 'Delivered', 'NotConfigured', 'Rejected', 'Suppressed')");
+                            t.HasCheckConstraint("CK_raid_collaboration_history_WelcomeOutcome", "WelcomeOutcome IN ('Deduplicated', 'Delivered', 'NotConfigured', 'Rejected', 'Suppressed')");
                         });
                 });
 
@@ -8255,53 +8011,51 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("DeduplicationWindowMinutes")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(60);
 
                     b.Property<string>("EligibleCategories")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IncludeFollowedLiveChannels")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false);
 
                     b.Property<string>("Language")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("en");
 
                     b.Property<int>("RelationshipCooldownHours")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(336);
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("WelcomeEnabled")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
 
                     b.Property<string>("WelcomeMessage")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Welcome {display_name} and community!");
 
                     b.HasKey("Id");
@@ -8316,30 +8070,28 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Feature")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReplyKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ScopeId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Target")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8348,9 +8100,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("reply_delivery_settings", null, t =>
                         {
-                            t.HasCheckConstraint("CK_reply_delivery_settings_Feature", "\"Feature\" IN ('guessing', 'points')");
+                            t.HasCheckConstraint("CK_reply_delivery_settings_Feature", "Feature IN ('guessing', 'points')");
 
-                            t.HasCheckConstraint("CK_reply_delivery_settings_Target", "\"Target\" IN ('chat', 'whisper')");
+                            t.HasCheckConstraint("CK_reply_delivery_settings_Target", "Target IN ('chat', 'whisper')");
                         });
                 });
 
@@ -8358,28 +8110,26 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("DurationSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Feature")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReplyKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("UnpinOnOwnerCompletion")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8388,7 +8138,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("reply_pin_policies", null, t =>
                         {
-                            t.HasCheckConstraint("CK_reply_pin_policies_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" BETWEEN 30 AND 1800");
+                            t.HasCheckConstraint("CK_reply_pin_policies_DurationSeconds", "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800");
                         });
                 });
 
@@ -8396,63 +8146,61 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsOpen")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("OrderingDescription")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PointCost")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RefundPolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SubmissionCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SubmissionLimitPerUser")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("VoteLimitPerUser")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("VotingEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8461,7 +8209,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("request_boards", null, t =>
                         {
-                            t.HasCheckConstraint("CK_request_boards_RefundPolicy", "\"RefundPolicy\" IN ('AnyUnfulfilledClosure', 'Never', 'RejectedOrWithdrawn')");
+                            t.HasCheckConstraint("CK_request_boards_RefundPolicy", "RefundPolicy IN ('AnyUnfulfilledClosure', 'Never', 'RejectedOrWithdrawn')");
                         });
                 });
 
@@ -8469,34 +8217,32 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BoardId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("SubmissionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8506,7 +8252,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("request_board_events", null, t =>
                         {
-                            t.HasCheckConstraint("CK_request_board_events_Kind", "\"Kind\" IN ('BoardConfigured', 'Merged', 'PointsRefunded', 'PointsReserved', 'StatusChanged', 'Submitted', 'Voted')");
+                            t.HasCheckConstraint("CK_request_board_events_Kind", "Kind IN ('BoardConfigured', 'Merged', 'PointsRefunded', 'PointsReserved', 'StatusChanged', 'Submitted', 'Voted')");
                         });
                 });
 
@@ -8514,47 +8260,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BoardId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ChoiceOptions")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("MaximumLength")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("MaximumNumber")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("MinimumNumber")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8566,7 +8310,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("request_board_fields", null, t =>
                         {
-                            t.HasCheckConstraint("CK_request_board_fields_Kind", "\"Kind\" IN ('Choice', 'Number', 'Text', 'TwitchClip', 'Url')");
+                            t.HasCheckConstraint("CK_request_board_fields_Kind", "Kind IN ('Choice', 'Number', 'Text', 'TwitchClip', 'Url')");
                         });
                 });
 
@@ -8574,94 +8318,92 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BoardId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("MergedIntoSubmissionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("NormalizedTitle")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedUrl")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OperationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PointReservationState")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Priority")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PrivateModeratorNote")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PrivateRejectionReason")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PublicNote")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("QueuePosition")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SubmitterLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SubmitterTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Tags")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("VoteCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8682,9 +8424,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("request_submissions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_request_submissions_PointReservationState", "\"PointReservationState\" IN ('Consumed', 'None', 'Refunded', 'Reserved')");
+                            t.HasCheckConstraint("CK_request_submissions_PointReservationState", "PointReservationState IN ('Consumed', 'None', 'Refunded', 'Reserved')");
 
-                            t.HasCheckConstraint("CK_request_submissions_Status", "\"Status\" IN ('Accepted', 'Approved', 'Completed', 'Merged', 'Pending', 'Queued', 'Rejected', 'Withdrawn')");
+                            t.HasCheckConstraint("CK_request_submissions_Status", "Status IN ('Accepted', 'Approved', 'Completed', 'Merged', 'Pending', 'Queued', 'Rejected', 'Withdrawn')");
                         });
                 });
 
@@ -8692,20 +8434,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("FieldId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("SubmissionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8721,24 +8461,22 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SubmissionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("VoterLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VoterTwitchUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8752,29 +8490,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GlobalEligibleAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("TargetEligibleAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetTwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8788,51 +8524,49 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("CooldownEndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Direction")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderMessageId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("TargetCooldownEndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ViewerCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8848,22 +8582,20 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8872,7 +8604,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("site_access_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_site_access_entries_Kind", "\"Kind\" IN ('blacklist', 'whitelist')");
+                            t.HasCheckConstraint("CK_site_access_entries_Kind", "Kind IN ('blacklist', 'whitelist')");
                         });
                 });
 
@@ -8880,12 +8612,10 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("WhitelistEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -8896,67 +8626,65 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BroadcasterLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BroadcasterTwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CreatorLogin")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CreatorTwitchUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("EditUrl")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FinalUrl")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastCheckedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderClipId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RequestedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ResolvedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VideoId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -8967,7 +8695,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("twitch_clips", null, t =>
                         {
-                            t.HasCheckConstraint("CK_twitch_clips_Status", "\"Status\" IN ('Ambiguous', 'Available', 'Expired', 'Failed', 'Pending')");
+                            t.HasCheckConstraint("CK_twitch_clips_Status", "Status IN ('Ambiguous', 'Available', 'Expired', 'Failed', 'Pending')");
                         });
                 });
 
@@ -8975,69 +8703,67 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BackgroundColor")
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Cost")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("GlobalCooldownSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsGlobalCooldownEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsManageable")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsMaxPerStreamEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsMaxPerUserPerStreamEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsPaused")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsUserInputRequired")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("MaxPerStream")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("MaxPerUserPerStream")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Prompt")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderRewardId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("ShouldRedemptionsSkipRequestQueue")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9051,47 +8777,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ChoicesJson")
                         .IsRequired()
                         .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("EndedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("EndsAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsExternallyStarted")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProviderPollId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9106,7 +8830,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("twitch_polls", null, t =>
                         {
-                            t.HasCheckConstraint("CK_twitch_polls_Status", "\"Status\" IN ('Active', 'Archived', 'Completed', 'Terminated')");
+                            t.HasCheckConstraint("CK_twitch_polls_Status", "Status IN ('Active', 'Archived', 'Completed', 'Terminated')");
                         });
                 });
 
@@ -9114,29 +8838,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ChannelPointsPerVote")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("ChannelPointsVotingEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DurationSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9149,20 +8871,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(25)
-                        .HasColumnType("character varying(25)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("TwitchPollTemplateId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -9176,47 +8896,45 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("EndedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsExternallyStarted")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LocksAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OutcomesJson")
                         .IsRequired()
                         .HasMaxLength(16384)
-                        .HasColumnType("character varying(16384)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderPredictionId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9231,7 +8949,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("twitch_predictions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_twitch_predictions_Status", "\"Status\" IN ('Active', 'Archived', 'Canceled', 'Locked', 'Resolved')");
+                            t.HasCheckConstraint("CK_twitch_predictions_Status", "Status IN ('Active', 'Archived', 'Canceled', 'Locked', 'Resolved')");
                         });
                 });
 
@@ -9239,23 +8957,21 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PredictionWindowSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9268,20 +8984,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(25)
-                        .HasColumnType("character varying(25)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("TwitchPredictionTemplateId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -9295,53 +9009,51 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProviderRedemptionId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderRewardId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("RedeemedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RewardTitle")
                         .IsRequired()
                         .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("UserInput")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("UserLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9352,7 +9064,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("twitch_reward_redemptions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_twitch_reward_redemptions_Status", "\"Status\" IN ('Canceled', 'Fulfilled', 'Unfulfilled')");
+                            t.HasCheckConstraint("CK_twitch_reward_redemptions_Status", "Status IN ('Canceled', 'Fulfilled', 'Unfulfilled')");
                         });
                 });
 
@@ -9360,55 +9072,53 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(140)
-                        .HasColumnType("character varying(140)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("EnrichedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("MarkerUrl")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("PositionSeconds")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProviderMarkerId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ResolvedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VideoId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9419,7 +9129,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("twitch_stream_markers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_twitch_stream_markers_Status", "\"Status\" IN ('Ambiguous', 'Failed', 'Succeeded')");
+                            t.HasCheckConstraint("CK_twitch_stream_markers_Status", "Status IN ('Ambiguous', 'Failed', 'Succeeded')");
                         });
                 });
 
@@ -9427,52 +9137,50 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("HideAttendance")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProfileLine")
                         .IsRequired()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("SelectedBadgeRewardDefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("SelectedTitleRewardDefinitionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Visibility")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9494,20 +9202,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("DetectedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9521,26 +9227,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("FirstSeenAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastSeenAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("PassportId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -9558,24 +9262,22 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ContinuityGeneration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("FirstSeenAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("PassportId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("StreamSessionId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -9591,26 +9293,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ContinuityGeneration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TwitchStreamId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9626,29 +9326,27 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BotTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("DayUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("Exhausted")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -9662,25 +9360,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("FirstSentAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RecipientLogin")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RecipientTwitchUserId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("WhisperQuotaBucketId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -9695,18 +9391,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasBaseType("BlokeBot.Persistence.Models.CustomAnnouncementDeliveryPolicy");
 
                     b.Property<long>("OccurrenceLifetime")
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("OccurrenceLifetimeTicks");
 
                     b.Property<long>("RetryDelay")
-                        .HasColumnType("bigint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("RetryDelayTicks");
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_Payload", "\"PolicyType\" = 'RetryUntilExpiredThenSkip' AND \"RetryDelayTicks\" IS NOT NULL AND \"RetryDelayTicks\" > 0 AND \"OccurrenceLifetimeTicks\" IS NOT NULL AND \"OccurrenceLifetimeTicks\" <= 600000000 AND \"RetryDelayTicks\" < \"OccurrenceLifetimeTicks\"");
+                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_Payload", "PolicyType = 'RetryUntilExpiredThenSkip' AND RetryDelayTicks IS NOT NULL AND RetryDelayTicks > 0 AND OccurrenceLifetimeTicks IS NOT NULL AND OccurrenceLifetimeTicks <= 600000000 AND RetryDelayTicks < OccurrenceLifetimeTicks");
 
-                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_PolicyType", "\"PolicyType\" IN ('RetryUntilExpiredThenSkip')");
+                            t.HasCheckConstraint("CK_custom_announcement_delivery_policies_PolicyType", "PolicyType IN ('RetryUntilExpiredThenSkip')");
                         });
 
                     b.HasDiscriminator().HasValue("RetryUntilExpiredThenSkip");
@@ -9718,18 +9414,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.Property<int>("IntervalMinutes")
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("IntervalMinutes");
 
                     b.Property<int>("RequiredChatMessages")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("RequiredChatMessages");
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(\"ScheduleType\" = 'Interval' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'IntervalAfterChat' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" >= 1 AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'Weekly' AND \"IntervalMinutes\" IS NULL AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" BETWEEN 0 AND 6 AND \"WeeklyTime\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'IntervalAfterChat' AND IntervalMinutes >= 1 AND RequiredChatMessages >= 1 AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'Weekly' AND IntervalMinutes IS NULL AND RequiredChatMessages IS NULL AND WeeklyDay BETWEEN 0 AND 6 AND WeeklyTime IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "\"ScheduleType\" IN ('Interval', 'IntervalAfterChat', 'Weekly')");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "ScheduleType IN ('Interval', 'IntervalAfterChat', 'Weekly')");
                         });
 
                     b.HasDiscriminator().HasValue("IntervalAfterChat");
@@ -9741,14 +9437,14 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.Property<int>("IntervalMinutes")
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("IntervalMinutes");
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(\"ScheduleType\" = 'Interval' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'IntervalAfterChat' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" >= 1 AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'Weekly' AND \"IntervalMinutes\" IS NULL AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" BETWEEN 0 AND 6 AND \"WeeklyTime\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'IntervalAfterChat' AND IntervalMinutes >= 1 AND RequiredChatMessages >= 1 AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'Weekly' AND IntervalMinutes IS NULL AND RequiredChatMessages IS NULL AND WeeklyDay BETWEEN 0 AND 6 AND WeeklyTime IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "\"ScheduleType\" IN ('Interval', 'IntervalAfterChat', 'Weekly')");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "ScheduleType IN ('Interval', 'IntervalAfterChat', 'Weekly')");
                         });
 
                     b.HasDiscriminator().HasValue("Interval");
@@ -9759,18 +9455,18 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasBaseType("BlokeBot.Persistence.Models.CustomAnnouncementSchedule");
 
                     b.Property<int>("Day")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("WeeklyDay");
 
                     b.Property<TimeOnly>("Time")
-                        .HasColumnType("time without time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("WeeklyTime");
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(\"ScheduleType\" = 'Interval' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'IntervalAfterChat' AND \"IntervalMinutes\" >= 1 AND \"RequiredChatMessages\" >= 1 AND \"WeeklyDay\" IS NULL AND \"WeeklyTime\" IS NULL) OR (\"ScheduleType\" = 'Weekly' AND \"IntervalMinutes\" IS NULL AND \"RequiredChatMessages\" IS NULL AND \"WeeklyDay\" BETWEEN 0 AND 6 AND \"WeeklyTime\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_Payload", "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'IntervalAfterChat' AND IntervalMinutes >= 1 AND RequiredChatMessages >= 1 AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR (ScheduleType = 'Weekly' AND IntervalMinutes IS NULL AND RequiredChatMessages IS NULL AND WeeklyDay BETWEEN 0 AND 6 AND WeeklyTime IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "\"ScheduleType\" IN ('Interval', 'IntervalAfterChat', 'Weekly')");
+                            t.HasCheckConstraint("CK_custom_announcement_schedules_ScheduleType", "ScheduleType IN ('Interval', 'IntervalAfterChat', 'Weekly')");
                         });
 
                     b.HasDiscriminator().HasValue("Weekly");
@@ -9782,13 +9478,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "\"ActionType\" IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "ActionType IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(\"ActionType\" IN ('Message', 'Automation') AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'Counter' AND \"CounterId\" IS NOT NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'OverlayCue' AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NOT NULL AND \"CuePublicId\" IS NOT NULL AND \"QueuePolicy\" IS NOT NULL AND \"ReplyOrder\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'Counter' AND CounterId IS NOT NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'OverlayCue' AND CounterId IS NULL AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "\"QueuePolicy\" IS NULL OR \"QueuePolicy\" IN ('concurrent', 'enqueue', 'ignore', 'replace')");
+                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "QueuePolicy IS NULL OR QueuePolicy IN ('concurrent', 'enqueue', 'ignore', 'replace')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "\"ReplyOrder\" IS NULL OR \"ReplyOrder\" IN ('after', 'before')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "ReplyOrder IS NULL OR ReplyOrder IN ('after', 'before')");
                         });
 
                     b.HasDiscriminator().HasValue("Automation");
@@ -9799,19 +9495,19 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasBaseType("BlokeBot.Persistence.Models.CustomCommandAction");
 
                     b.Property<int>("CounterId")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasIndex("HostId", "CounterId");
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "\"ActionType\" IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "ActionType IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(\"ActionType\" IN ('Message', 'Automation') AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'Counter' AND \"CounterId\" IS NOT NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'OverlayCue' AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NOT NULL AND \"CuePublicId\" IS NOT NULL AND \"QueuePolicy\" IS NOT NULL AND \"ReplyOrder\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'Counter' AND CounterId IS NOT NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'OverlayCue' AND CounterId IS NULL AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "\"QueuePolicy\" IS NULL OR \"QueuePolicy\" IN ('concurrent', 'enqueue', 'ignore', 'replace')");
+                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "QueuePolicy IS NULL OR QueuePolicy IN ('concurrent', 'enqueue', 'ignore', 'replace')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "\"ReplyOrder\" IS NULL OR \"ReplyOrder\" IN ('after', 'before')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "ReplyOrder IS NULL OR ReplyOrder IN ('after', 'before')");
                         });
 
                     b.HasDiscriminator().HasValue("Counter");
@@ -9823,13 +9519,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "\"ActionType\" IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "ActionType IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(\"ActionType\" IN ('Message', 'Automation') AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'Counter' AND \"CounterId\" IS NOT NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'OverlayCue' AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NOT NULL AND \"CuePublicId\" IS NOT NULL AND \"QueuePolicy\" IS NOT NULL AND \"ReplyOrder\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'Counter' AND CounterId IS NOT NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'OverlayCue' AND CounterId IS NULL AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "\"QueuePolicy\" IS NULL OR \"QueuePolicy\" IN ('concurrent', 'enqueue', 'ignore', 'replace')");
+                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "QueuePolicy IS NULL OR QueuePolicy IN ('concurrent', 'enqueue', 'ignore', 'replace')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "\"ReplyOrder\" IS NULL OR \"ReplyOrder\" IN ('after', 'before')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "ReplyOrder IS NULL OR ReplyOrder IN ('after', 'before')");
                         });
 
                     b.HasDiscriminator().HasValue("Message");
@@ -9841,31 +9537,31 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("CuePublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("QueuePolicy")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReplyOrder")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetOverlayPublicId")
                         .IsRequired()
-                        .HasColumnType("character varying(36)");
+                        .HasColumnType("TEXT");
 
                     b.ToTable(t =>
                         {
-                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "\"ActionType\" IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ActionType", "ActionType IN ('Automation', 'Counter', 'Message', 'OverlayCue')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(\"ActionType\" IN ('Message', 'Automation') AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'Counter' AND \"CounterId\" IS NOT NULL AND \"TargetOverlayPublicId\" IS NULL AND \"CuePublicId\" IS NULL AND \"QueuePolicy\" IS NULL AND \"ReplyOrder\" IS NULL) OR (\"ActionType\" = 'OverlayCue' AND \"CounterId\" IS NULL AND \"TargetOverlayPublicId\" IS NOT NULL AND \"CuePublicId\" IS NOT NULL AND \"QueuePolicy\" IS NOT NULL AND \"ReplyOrder\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_custom_command_actions_Payload", "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'Counter' AND CounterId IS NOT NULL AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR (ActionType = 'OverlayCue' AND CounterId IS NULL AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "\"QueuePolicy\" IS NULL OR \"QueuePolicy\" IN ('concurrent', 'enqueue', 'ignore', 'replace')");
+                            t.HasCheckConstraint("CK_custom_command_actions_QueuePolicy", "QueuePolicy IS NULL OR QueuePolicy IN ('concurrent', 'enqueue', 'ignore', 'replace')");
 
-                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "\"ReplyOrder\" IS NULL OR \"ReplyOrder\" IN ('after', 'before')");
+                            t.HasCheckConstraint("CK_custom_command_actions_ReplyOrder", "ReplyOrder IS NULL OR ReplyOrder IN ('after', 'before')");
                         });
 
                     b.HasDiscriminator().HasValue("OverlayCue");
@@ -10079,8 +9775,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .WithMany()
                         .HasForeignKey("HostId", "SubflowId")
                         .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired()
-                        .HasConstraintName("FK_automation_subflow_nested_callers_automation_subflows_Host~1");
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflowRevisionRecord", b =>
@@ -10961,15 +10656,13 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .WithMany()
                         .HasForeignKey("HostId", "TwoArgumentMessageLibraryEntryId")
                         .HasPrincipalKey("HostId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("FK_custom_command_actions_custom_message_library_entries_Host~1");
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BlokeBot.Persistence.Models.CustomMessageLibraryEntry", "ZeroArgumentMessageLibraryEntry")
                         .WithMany()
                         .HasForeignKey("HostId", "ZeroArgumentMessageLibraryEntryId")
                         .HasPrincipalKey("HostId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("FK_custom_command_actions_custom_message_library_entries_Host~2");
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Command");
 

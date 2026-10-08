@@ -13,6 +13,8 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 public partial class CustomCommandSettingsPage
 {
+    private CustomStoredValueSession? _sandbox;
+
     private enum CustomCommandEditorKind
     {
         Reply,
@@ -228,6 +230,9 @@ public partial class CustomCommandSettingsPage
         _config = _featureEnabled
             ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
+        _sandbox = _featureEnabled
+            ? await _storedValues.SandboxAsync(HostId, string.Empty, CancellationToken.None)
+            : null;
         _nextTemporaryId = -1;
         _validationErrors = [];
         _activeTab = TabForKey(_fragment.Canonical);
@@ -290,6 +295,11 @@ public partial class CustomCommandSettingsPage
                         {
                             _config = await _configuration.LoadConfigurationAsync(
                                 HostId,
+                                CancellationToken.None
+                            );
+                            _sandbox = await _storedValues.SandboxAsync(
+                                HostId,
+                                string.Empty,
                                 CancellationToken.None
                             );
                             _nextTemporaryId = -1;
@@ -815,7 +825,8 @@ public partial class CustomCommandSettingsPage
                 && _config?.Counters.FirstOrDefault(x => x.Id == counterAction.CounterId)
                     is { } counter
                     ? counter.Value + 1
-                    : null
+                    : null,
+                _sandbox
             ),
         };
     }
@@ -871,6 +882,7 @@ public partial class CustomCommandSettingsPage
             Append(result, command.CooldownSeconds);
             Append(result, command.CooldownScope);
             Append(result, command.InvocationLimit);
+            Append(result, command.SingleArgument);
             Append(result, command.ActionKind);
             Append(result, command.Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId);
             Append(result, command.Action.ReplyRoutes.OneArgumentMessageLibraryEntryId);
