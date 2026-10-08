@@ -126,14 +126,14 @@ internal sealed class AutomationDataResolver(
     )
     {
         if (
-            AutomationRuntimeSerialization.RestoreInputBindings(consumer.InputBindingsJson)
+            AutomationRuntimeSerialization.RestoreInputBindings(
+                consumer.InputBindingsJson,
+                new(consumer.DefinitionId)
+            )
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
             || AutomationFrozenSubflows.WithContract(
                 consumer,
-                AutomationFrozenSubflows.ValidateDefinition(
-                    catalog,
-                    AutomationRuntimeSerialization.Definition(consumer)
-                )
+                AutomationFrozenSubflows.ValidateDefinition(catalog, consumer, bindings.Bindings)
             )
                 is not AutomationConfigurationCheck.Valid valid
         )
@@ -295,10 +295,7 @@ internal sealed class AutomationDataResolver(
         if (
             AutomationFrozenSubflows.WithContract(
                 producer,
-                AutomationFrozenSubflows.ValidateDefinition(
-                    catalog,
-                    AutomationRuntimeSerialization.Definition(producer)
-                )
+                AutomationFrozenSubflows.ValidateDefinition(catalog, producer)
             )
             is not AutomationConfigurationCheck.Valid valid
         )
@@ -384,15 +381,12 @@ internal sealed class AutomationDataResolver(
         }
 
         var check = fixtures is not null
-            ? AutomationFrozenSubflows.ValidateDefinition(
-                catalog,
-                AutomationRuntimeSerialization.Definition(producer)
-            )
+            ? AutomationFrozenSubflows.ValidateDefinition(catalog, producer)
             : await AutomationFrozenSubflows.ValidateBeforeExecutionAsync(
                 catalog,
                 hostId,
                 context,
-                AutomationRuntimeSerialization.Definition(producer),
+                producer,
                 cancellationToken
             );
         if (check is not AutomationConfigurationCheck.Valid valid)
@@ -595,6 +589,11 @@ internal sealed class AutomationDataResolver(
         AutomationContext context
     )
     {
+        if (string.IsNullOrWhiteSpace(expression.Source))
+        {
+            return null;
+        }
+
         var evaluation =
             port.ValueType == AutomationPortValueType.Text
             && expression.Source.Contains("${", StringComparison.Ordinal)

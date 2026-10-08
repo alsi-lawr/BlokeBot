@@ -876,7 +876,7 @@ public sealed partial class AutomationRuntimeService(
                     catalog,
                     new(run.HostId),
                     available.Context,
-                    AutomationRuntimeSerialization.Definition(node),
+                    node,
                     cancellationToken
                 )
             );
@@ -1715,7 +1715,10 @@ public sealed partial class AutomationRuntimeService(
     )
     {
         if (
-            AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+            AutomationRuntimeSerialization.RestoreInputBindings(
+                node.InputBindingsJson,
+                new(node.DefinitionId)
+            )
             is not AutomationInputBindingsRestoreOutcome.Available restored
         )
         {

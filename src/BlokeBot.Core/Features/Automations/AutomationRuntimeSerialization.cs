@@ -59,7 +59,42 @@ internal static class AutomationRuntimeSerialization
             _options
         );
 
-    internal static AutomationInputBindingsRestoreOutcome RestoreInputBindings(string json)
+    internal static AutomationInputBindingsRestoreOutcome RestoreInputBindings(string json) =>
+        RestoreInputBindings(
+            json,
+            retainInactiveExpression: false,
+            allowInvalidActiveExpression: false
+        );
+
+    internal static AutomationInputBindingsRestoreOutcome RestoreInputBindings(
+        string json,
+        AutomationDefinitionId definitionId
+    ) =>
+        RestoreInputBindings(
+            json,
+            RetainsInactiveExpression(definitionId),
+            allowInvalidActiveExpression: false
+        );
+
+    internal static AutomationInputBindingsRestoreOutcome RestoreAuthoringInputBindings(
+        string json,
+        AutomationDefinitionId definitionId
+    ) =>
+        RestoreInputBindings(
+            json,
+            RetainsInactiveExpression(definitionId),
+            RetainsInactiveExpression(definitionId)
+        );
+
+    internal static bool RetainsInactiveExpression(AutomationDefinitionId definitionId) =>
+        definitionId == AutomationDefinitionIds.SendChatAction
+        || definitionId == AutomationDefinitionIds.CelTransform;
+
+    private static AutomationInputBindingsRestoreOutcome RestoreInputBindings(
+        string json,
+        bool retainInactiveExpression,
+        bool allowInvalidActiveExpression
+    )
     {
         Dictionary<string, PersistedInputBinding>? persisted;
         try
@@ -100,7 +135,15 @@ internal static class AutomationRuntimeSerialization
                     binding.Expression is { } expression
                     && (
                         expression.LanguageVersion <= 0
-                        || string.IsNullOrWhiteSpace(expression.Source)
+                        || expression.Source is null
+                        || (
+                            string.IsNullOrWhiteSpace(expression.Source)
+                            && !(
+                                mode == AutomationInputBindingMode.Expression
+                                    ? allowInvalidActiveExpression
+                                    : retainInactiveExpression
+                            )
+                        )
                     )
                 )
             )
@@ -238,7 +281,7 @@ internal static class AutomationRuntimeSerialization
             )
             || flow.Nodes.Select(static node => node.Id).Distinct().Count() != flow.Nodes.Length
             || flow.Nodes.Any(static node =>
-                RestoreInputBindings(node.InputBindingsJson)
+                RestoreInputBindings(node.InputBindingsJson, new(node.DefinitionId))
                 is AutomationInputBindingsRestoreOutcome.Invalid
             )
             || flow.Edges.Any(static edge => edge.Id == Guid.Empty)

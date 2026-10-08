@@ -11,7 +11,8 @@ public sealed partial class AutomationCatalogService
         AutomationSchemaVersion schemaVersion,
         JsonElement configuration,
         AutomationPluginProvenance? persistedProvenance,
-        bool requireCurrentExecution
+        bool requireCurrentExecution,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding>? bindings = null
     ) =>
         !_catalog.TryResolve(hostId, definitionId, out var definition)
             ? new AutomationConfigurationCheck.DefinitionMissing(definitionId)
@@ -20,7 +21,8 @@ public sealed partial class AutomationCatalogService
                 schemaVersion,
                 configuration,
                 persistedProvenance,
-                requireCurrentExecution
+                requireCurrentExecution,
+                bindings
             );
 
     private AutomationConfigurationCheck ValidateEnabledPersisted(
@@ -28,7 +30,8 @@ public sealed partial class AutomationCatalogService
         AutomationSchemaVersion schemaVersion,
         JsonElement configuration,
         AutomationPluginProvenance? persistedProvenance,
-        bool requireCurrentExecution
+        bool requireCurrentExecution,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding>? bindings = null
     ) =>
         !_catalog.TryResolve(definitionId, out var definition)
             ? new AutomationConfigurationCheck.DefinitionMissing(definitionId)
@@ -37,7 +40,8 @@ public sealed partial class AutomationCatalogService
                 schemaVersion,
                 configuration,
                 persistedProvenance,
-                requireCurrentExecution
+                requireCurrentExecution,
+                bindings
             );
 
     private AutomationConfigurationCheck ValidateResolvedPersisted(
@@ -45,7 +49,10 @@ public sealed partial class AutomationCatalogService
         AutomationSchemaVersion schemaVersion,
         JsonElement configuration,
         AutomationPluginProvenance? persistedProvenance,
-        bool requireCurrentExecution
+        bool requireCurrentExecution,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding>? bindings =
+            null,
+        bool authoringDescriptor = false
     )
     {
         var currentProvenance = definition.Descriptor.PluginProvenance;
@@ -73,17 +80,41 @@ public sealed partial class AutomationCatalogService
                 schemaVersion,
                 compatibility
             )
-            : definition.Parse(configuration) switch
+            : (
+                bindings is not null && definition is IAutomationInputBindingDefinition bound
+                    ? bound.ParseForInputBindings(configuration)
+                    : definition.Parse(configuration)
+            ) switch
             {
                 AutomationConfigurationParseResult.Invalid invalid =>
                     new AutomationConfigurationCheck.Invalid(invalid.Errors),
                 AutomationConfigurationParseResult.Parsed parsed => ValidateDefinition(
                     definition,
-                    parsed.Configuration
+                    parsed.Configuration,
+                    bindings,
+                    authoringDescriptor
                 ),
                 _ => throw new UnreachableException(),
             };
     }
+
+    internal AutomationConfigurationCheck DescribeForAuthoring(
+        AutomationHostId hostId,
+        AutomationFlowDraftNode node
+    ) =>
+        !_catalog.TryResolve(hostId, new(node.Definition.TypeId), out var definition)
+            ? new AutomationConfigurationCheck.DefinitionMissing(new(node.Definition.TypeId))
+            : ValidateResolvedPersisted(
+                definition,
+                new(node.Definition.SchemaVersion),
+                node.Definition.Configuration,
+                node.Definition.PluginProvenance,
+                requireCurrentExecution: false,
+                bindings: node.InputBindings,
+                authoringDescriptor: AutomationRuntimeSerialization.RetainsInactiveExpression(
+                    new(node.Definition.TypeId)
+                )
+            );
 
     private AutomationConfigurationCheck ValidateEnabled(
         AutomationHostId hostId,
@@ -122,10 +153,21 @@ public sealed partial class AutomationCatalogService
 
     private static AutomationConfigurationCheck ValidateDefinition(
         IAutomationDefinition definition,
-        AutomationConfiguration configuration
+        AutomationConfiguration configuration,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding>? bindings =
+            null,
+        bool authoringDescriptor = false
     )
     {
-        var validation = definition.Validate(configuration);
+        var validation =
+            authoringDescriptor && configuration is AutomationCelTransformConfiguration transform
+                ? AutomationCelTransform.ValidateDeclarations(transform)
+            : authoringDescriptor
+            && definition.Descriptor.Id == AutomationDefinitionIds.SendChatAction
+                ? AutomationValidationResult.Valid
+            : bindings is not null && definition is IAutomationInputBindingDefinition bound
+                ? bound.ValidateForInputBindings(configuration, bindings)
+            : definition.Validate(configuration);
         if (!validation.IsValid)
         {
             return new AutomationConfigurationCheck.Invalid(validation.Errors);

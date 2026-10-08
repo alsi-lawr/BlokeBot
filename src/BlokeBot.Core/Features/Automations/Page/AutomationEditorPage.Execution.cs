@@ -4,6 +4,11 @@ public partial class AutomationEditorPage
 {
     private async Task SaveAsync()
     {
+        if (_sourceFlowId is not null)
+        {
+            _ = await SaveSourceCoreAsync();
+            return;
+        }
         if (_editor?.Subflow is not null)
         {
             await ReviewSubflowAsync();
@@ -24,16 +29,25 @@ public partial class AutomationEditorPage
         _busy = true;
         var succeeded = false;
         var requestedHostId = HostId;
+        var requestedEditor = _editor;
+        var requestedRevision = _draftRevision;
+        var candidate = requestedEditor.Draft(new(requestedHostId));
         try
         {
             await RunSelectedHostMutationAsync(
                 requestedHostId,
                 async () =>
                 {
-                    var outcome = await _flowsService.SaveAsync(
-                        _editor.Draft(new(requestedHostId)),
-                        CancellationToken.None
-                    );
+                    var outcome = await _flowsService.SaveAsync(candidate, CancellationToken.None);
+                    if (
+                        HostId != requestedHostId
+                        || !ReferenceEquals(_editor, requestedEditor)
+                        || _draftRevision != requestedRevision
+                    )
+                    {
+                        return;
+                    }
+
                     switch (outcome)
                     {
                         case AutomationFlowSaveOutcome.Saved saved:
@@ -81,6 +95,9 @@ public partial class AutomationEditorPage
         }
         _busy = true;
         var requestedHostId = HostId;
+        var requestedEditor = _editor;
+        var requestedRevision = _draftRevision;
+        var candidate = requestedEditor.Draft(new(requestedHostId));
         try
         {
             await RunSelectedHostMutationAsync(
@@ -88,9 +105,18 @@ public partial class AutomationEditorPage
                 async () =>
                 {
                     var outcome = await _flowsService.ValidateDraftAsync(
-                        _editor.Draft(new(requestedHostId)),
+                        candidate,
                         CancellationToken.None
                     );
+                    if (
+                        HostId != requestedHostId
+                        || !ReferenceEquals(_editor, requestedEditor)
+                        || _draftRevision != requestedRevision
+                    )
+                    {
+                        return;
+                    }
+
                     switch (outcome)
                     {
                         case AutomationFlowValidationOutcome.Valid:
