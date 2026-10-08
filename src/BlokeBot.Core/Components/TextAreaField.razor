@@ -2,11 +2,12 @@
     <label class="field__label" for="@_inputId">@Label</label>
     <textarea class="field__input min-h-24 resize-y"
               id="@_inputId"
-              value="@Value"
+              @bind:get="Value"
+              @bind:set="OnInput"
+              @bind:event="oninput"
               aria-describedby="@_errorId"
               aria-invalid="@(_hasError ? "true" : "false")"
-              @ref="_input"
-              @oninput="OnInput"></textarea>
+              @ref="_input"></textarea>
     @if (_hasError)
     {
         <p id="@_errorId" class="text-sm font-semibold text-red-700" role="alert">@ErrorMessage</p>
