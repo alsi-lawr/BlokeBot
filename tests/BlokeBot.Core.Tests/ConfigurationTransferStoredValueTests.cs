@@ -17,7 +17,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class ConfigurationTransferStoredValueTests
+public sealed partial class ConfigurationTransferStoredValueTests
 {
     [Test]
     public async Task Sqlite_LargeDefaultsRoundTripWithoutLiveStateAndOmissionPreservesDestination()

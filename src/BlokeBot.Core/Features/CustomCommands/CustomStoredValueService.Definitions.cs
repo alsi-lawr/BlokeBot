@@ -74,11 +74,17 @@ internal sealed partial class CustomStoredValueService
                 );
             }
             var hash = CustomValueIdentity.Hash(draft.Name);
+            var dictionary = draft.Kind == CustomValueKind.Dictionary;
             if (
                 await db.CustomValueDefinitions.AnyAsync(
                     x =>
                         x.HostId == hostId
                         && x.Scope == draft.Scope
+                        && (
+                            dictionary
+                                ? x.Kind == CustomValueKind.Dictionary
+                                : x.Kind != CustomValueKind.Dictionary
+                        )
                         && x.NameHash == hash
                         && x.Id != draft.Id,
                     ct
@@ -86,7 +92,7 @@ internal sealed partial class CustomStoredValueService
             )
             {
                 return CustomValueEditOutcome.Invalid(
-                    "This scope already has a definition with that name."
+                    "This scope already has a definition of the same category with that name."
                 );
             }
             if (definition is null)

@@ -18,12 +18,29 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasKey(x => x.Id);
             _ = b.HasAlternateKey(x => new { x.HostId, x.Id });
             _ = b.Property(x => x.NameHash).HasMaxLength(64);
-            _ = b.HasIndex(x => new
-                {
-                    x.HostId,
-                    x.Scope,
-                    x.NameHash,
-                })
+            _ = b.HasIndex(
+                    x => new
+                    {
+                        x.HostId,
+                        x.Scope,
+                        x.NameHash,
+                    },
+                    "ScalarName"
+                )
+                .HasDatabaseName("IX_custom_value_definitions_ScalarName")
+                .HasFilter($"\"Kind\" <> {(int)CustomValueKind.Dictionary}")
+                .IsUnique();
+            _ = b.HasIndex(
+                    x => new
+                    {
+                        x.HostId,
+                        x.Scope,
+                        x.NameHash,
+                    },
+                    "DictionaryName"
+                )
+                .HasDatabaseName("IX_custom_value_definitions_DictionaryName")
+                .HasFilter($"\"Kind\" = {(int)CustomValueKind.Dictionary}")
                 .IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()

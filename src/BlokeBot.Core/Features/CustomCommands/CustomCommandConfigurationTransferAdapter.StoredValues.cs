@@ -51,7 +51,9 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
             }
             var hash = CustomValueIdentity.Hash(imported.Name);
             var matched = existing.SingleOrDefault(x =>
-                x.Scope == imported.Scope && x.NameHash == hash
+                x.Scope == imported.Scope
+                && x.NameHash == hash
+                && CustomValueIdentity.SameNamespace(x.Kind, imported.Kind)
             );
             if (matched is not null && strategy == ImportConflictStrategy.AddMissing)
             {

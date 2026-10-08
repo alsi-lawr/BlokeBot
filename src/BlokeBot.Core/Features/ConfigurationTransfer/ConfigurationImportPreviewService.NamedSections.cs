@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
+using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -184,7 +185,9 @@ public sealed partial class ConfigurationImportPreviewService
             foreach (var definition in definitions)
             {
                 var matched = storedDefinitions.SingleOrDefault(x =>
-                    x.Scope == definition.Scope && x.Name == definition.Name
+                    x.Scope == definition.Scope
+                    && x.Name == definition.Name
+                    && CustomValueIdentity.SameNamespace(x.Kind, definition.Kind)
                 );
                 if (matched is null)
                 {

@@ -12,7 +12,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class VariablesPageTests
+public sealed partial class VariablesPageTests
 {
     [Test]
     public async Task StaleManualEditAndChangedChannelRetainInputWithoutOverwritingValues()

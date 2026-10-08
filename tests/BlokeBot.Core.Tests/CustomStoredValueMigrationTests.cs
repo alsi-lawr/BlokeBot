@@ -6,7 +6,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class CustomStoredValueMigrationTests
+public sealed partial class CustomStoredValueMigrationTests
 {
     [Test]
     public async Task Sqlite_UpgradePreservesLegacyCountersAndDefaultsNewModeBeforeScopedWrites()
