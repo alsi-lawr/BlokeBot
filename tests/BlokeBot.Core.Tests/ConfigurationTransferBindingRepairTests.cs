@@ -1,5 +1,6 @@
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -7,7 +8,11 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class ConfigurationTransferAutomationTests
 {
     [Test]
-    public async Task BindingRepair_PortableConnectedTargetsRetainUnsetFixedAndInactiveExpressionAcrossApplyAndReimport()
+    [Arguments(AutomationInputBindingMode.Fixed)]
+    [Arguments(AutomationInputBindingMode.Connected)]
+    public async Task BindingRepair_PortableTargetsRetainFixedConfigurationAndInactiveExpressionAcrossApplyAndReimport(
+        AutomationInputBindingMode sendMode
+    )
     {
         var configuration = JsonSerializer.Deserialize<JsonElement>(
             """
@@ -26,8 +31,12 @@ public sealed partial class ConfigurationTransferAutomationTests
         var send = Node(
             "send",
             "send-chat",
-            JsonSerializer.Deserialize<JsonElement>("""{"message":""}"""),
-            [new("message", AutomationInputBindingMode.Connected, 1, "(")]
+            JsonSerializer.Deserialize<JsonElement>(
+                sendMode == AutomationInputBindingMode.Fixed
+                    ? """{"message":"Fixed tea"}"""
+                    : """{"message":""}"""
+            ),
+            [new("message", sendMode, 1, "(")]
         );
         var delay = Node(
             "delay",
@@ -35,7 +44,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             JsonSerializer.Deserialize<JsonElement>("""{"duration-milliseconds":17}""")
         );
         var document = AutomationDocument(
-            "Connected tea",
+            "Portable tea",
             [
                 Node("source", "follow", EmptyObject()),
                 Node(
@@ -58,14 +67,19 @@ public sealed partial class ConfigurationTransferAutomationTests
                     "transform",
                     "tea-index"
                 ),
-                new(
-                    "text-wire",
-                    AutomationEdgeKind.Data,
-                    "transform",
-                    "message",
-                    "send",
-                    "message"
-                ),
+                .. sendMode == AutomationInputBindingMode.Connected
+                    ? new AutomationEdgeV2[]
+                    {
+                        new(
+                            "text-wire",
+                            AutomationEdgeKind.Data,
+                            "transform",
+                            "message",
+                            "send",
+                            "message"
+                        ),
+                    }
+                    : [],
             ]
         );
         var imported = await DelayTransferCycle(await DelayTransferCycle(document));
@@ -78,6 +92,9 @@ public sealed partial class ConfigurationTransferAutomationTests
             .ValueKind.ShouldBe(JsonValueKind.Null);
         var actualSend = nodes.Single(node => node.DefinitionId == "send-chat");
         actualSend.InputBindings.ShouldBe(send.InputBindings);
-        actualSend.Configuration.GetProperty("message").GetString().ShouldBeEmpty();
+        actualSend
+            .Configuration.GetProperty("message")
+            .GetString()
+            .ShouldBe(send.Configuration.GetProperty("message").GetString());
     }
 }

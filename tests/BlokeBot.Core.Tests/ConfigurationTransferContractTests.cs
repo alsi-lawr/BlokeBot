@@ -47,8 +47,12 @@ public sealed class ConfigurationTransferContractTests
                 Message: "require one expression and language version"
             ),
             (
-                Bindings: [new("message", AutomationInputBindingMode.Fixed, 1, "actor.login")],
-                Message: "must omit both"
+                Bindings: [new("message", AutomationInputBindingMode.Fixed, 1)],
+                Message: "require one expression and language version"
+            ),
+            (
+                Bindings: [new("message", AutomationInputBindingMode.Fixed, null, "actor.login")],
+                Message: "require one expression and language version"
             ),
             (
                 Bindings: Enumerable
