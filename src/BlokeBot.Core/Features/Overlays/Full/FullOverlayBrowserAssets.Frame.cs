@@ -36,7 +36,7 @@ internal static partial class FullOverlayBrowserAssets
               const parentStyle = parent ? getComputedStyle(parent) : null;
               const initialContainingBlock = parent === document.body && parentStyle.position === "static"
                 && parentStyle.transform === "none" && parentStyle.perspective === "none" && parentStyle.filter === "none"
-                && parentStyle.contain === "none" && parentStyle.willChange === "auto";
+                && parentStyle.contain === "none" && ["auto", "opacity"].includes(parentStyle.willChange);
               return [{ key: item.key, x: rect.x, y: rect.y, width: rect.width, height: rect.height, layoutX: node.offsetLeft, layoutY: node.offsetTop,
                 containingWidth: initialContainingBlock ? innerWidth : parent?.clientWidth ?? innerWidth,
                 containingHeight: initialContainingBlock ? innerHeight : parent?.clientHeight ?? innerHeight,
