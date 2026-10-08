@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createEditorDocument } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/EditorDocument.js';
-import { targetElement } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/VisualStyles.js';
+import { targetElement, planStyles } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/VisualStyles.js';
 const fixture=(html,css='',widgets=[])=>({id:crypto.randomUUID(),html,css,widgets,diagnostics:[]});
 const byLabel=(owner,label)=>owner.view().layers.find(layer=>layer.label===label).key;
 const widget=id=>({id:{value:id},kind:{value:'giveaway'},configuration:{title:'Retained'},audio:{isMuted:true,volume:.3},authoring:{isLocked:true,x:'18px',y:'8px'}});
@@ -69,4 +69,22 @@ test('Return writes only its finite fields after later important inset without r
  const style=targetElement(owner.candidate(),'element:a').values.style;assert(style.includes('left:20px;left:40px!important;inset:10px 30px!important;inset-inline:15px!important'));
  assert(style.indexOf('left: auto !important')>style.indexOf('inset-inline:15px!important'));assert(style.includes('/* keep */color:red!important;--blokebot-x:88px'));
  assert.equal(owner.candidate().css,original.css);assert.equal(owner.view().revision,1);owner.history('undo');assert.deepEqual(owner.candidate(),original);
+});
+
+
+test('Mixed-case standard placement edits its actual effective duplicate while custom-variable case, losing bytes, ordinary priority and one Undo stay independent',()=>{
+ const id=crypto.randomUUID(),style='position:relative;translate:10px!important; /* losing */ TRANSLATE:20px 9px 7px!important;--X:11px;--x:22px;color:red!important;rotate:9deg',original=fixture(`<main><p data-blokebot-element="a" style="${style}">A</p><section data-blokebot-widget="${id}" style="translate:3px!important; TrAnSlAtE:8px 4px!important"></section></main>`,'/* unchanged */',[{...widget(id),authoring:{...widget(id).authoring,isLocked:false}}]),owner=createEditorDocument(original);owner.selectSet(['element:a',`widget:${id}`]);
+ const plan=move(owner,[native('element:a','relative','20px 9px 7px'),native(`widget:${id}`,'static','8px 4px')]);assert.equal(plan.kind,'planned');assert.deepEqual(owner.candidate(),original);owner.commitGesture(plan);
+ const changed=targetElement(owner.candidate(),'element:a').values.style;assert.equal(changed,style.replace('TRANSLATE:20px 9px 7px','TRANSLATE:36px 17px 7px'));assert.equal(targetElement(owner.candidate(),`widget:${id}`).values.style,'translate:3px!important; TrAnSlAtE:24px 12px!important');assert.deepEqual(owner.candidate().widgets,original.widgets);assert.equal(owner.candidate().css,original.css);owner.history('undo');assert.deepEqual(owner.candidate(),original);assert.equal(owner.view().history.undo,false);
+ owner.selectSet(['element:a',`widget:${id}`]);owner.commitGesture(owner.planReturn([native('element:a','relative','20px 9px 7px'),native(`widget:${id}`,'static','8px 4px')],owner.context()));assert.equal(targetElement(owner.candidate(),'element:a').values.style,style.replace('TRANSLATE:20px 9px 7px','TRANSLATE:none'));assert.deepEqual(owner.candidate().widgets,original.widgets);owner.history('undo');assert.deepEqual(owner.candidate(),original);
+ const positioned=fixture('<p data-blokebot-element="a" style="position:absolute;left:100px;top:50px;--BLOKEBOT-X:91px;--blokebot-x:98px">A</p>'),positionedOwner=createEditorDocument(positioned);positionedOwner.select('element:a');const item={...native('element:a','absolute'),styles:{position:'absolute',translate:'none',left:'100px',top:'50px'}};positionedOwner.commitGesture(move(positionedOwner,[item],16,0));const placed=targetElement(positionedOwner.candidate(),'element:a').values.style;assert(placed.includes('--BLOKEBOT-X:91px;--blokebot-x:116px !important'));positionedOwner.history('undo');assert.deepEqual(positionedOwner.candidate(),positioned);
+ const ordinary=fixture('<p data-blokebot-element="a" style="WIDTH:100px!important;color:red!important">A</p>'),resize=planStyles(ordinary,'element:a',{width:'116px'},undefined,'layout');assert.equal(resize.presentation.patches[0].attributes.style,'WIDTH:116px!important;color:red!important');
+ const normal=planStyles(ordinary,'element:a',{color:'blue'});assert.equal(normal.presentation.patches[0].attributes.style,'WIDTH:100px!important;color:blue!important');
+});
+
+test('Return resolves later uppercase inset shorthand and logical longhand without rewriting raw names, source or metadata beyond its finite fields',()=>{
+ for(const inset of ['INSET:10px 30px!important','INSET-INLINE:15px!important','INSET-INLINE-START:18px!important']){
+  const id=crypto.randomUUID(),style=`left:20px;LEFT:40px!important;${inset};POSITION:absolute;TRANSLATE:8px 4px;--X:11px;--x:22px;/* keep */color:red!important`,original=fixture(`<section data-blokebot-widget="${id}" style="${style}"></section>`,'/* unchanged */',[widget(id)]),owner=createEditorDocument(original);owner.select(`widget:${id}`);const planned=owner.planReturn([native(`widget:${id}`,'absolute','8px 4px')],owner.context());assert.equal(planned.kind,'planned');owner.commitGesture(planned);const changed=targetElement(owner.candidate(),`widget:${id}`).values.style;
+  assert(changed.includes(`left:20px;LEFT:40px!important;${inset}`));assert(changed.indexOf('left: auto !important')>changed.indexOf(inset));assert(changed.includes('POSITION:static !important;TRANSLATE:none !important;--X:11px;--x:22px;/* keep */color:red!important'));assert.deepEqual(owner.candidate().widgets,original.widgets);assert.equal(owner.candidate().css,original.css);assert.equal(owner.view().revision,1);owner.history('undo');assert.deepEqual(owner.candidate(),original);assert.equal(owner.view().history.undo,false);
+ }
 });
