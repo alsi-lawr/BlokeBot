@@ -115,7 +115,8 @@ public sealed record CustomCommandValue
         int cooldownSeconds,
         CustomCommandCooldownScope cooldownScope,
         CustomCommandInvocationLimit invocationLimit,
-        CustomCommandActionValue action
+        CustomCommandActionValue action,
+        bool singleArgument = false
     )
     {
         Id = id;
@@ -129,6 +130,7 @@ public sealed record CustomCommandValue
         CooldownScope = cooldownScope;
         InvocationLimit = invocationLimit;
         Action = action;
+        SingleArgument = singleArgument;
     }
 
     public int Id { get; }
@@ -152,6 +154,8 @@ public sealed record CustomCommandValue
     public CustomCommandInvocationLimit InvocationLimit { get; }
 
     public CustomCommandActionValue Action { get; }
+
+    public bool SingleArgument { get; }
 }
 
 public sealed record CustomCounterValue(int Id, string Name, long Value);

@@ -27,6 +27,7 @@ public sealed class CustomCommandSettingsUiTests
 
         cut.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("message-library");
         _ = cut.Find("[data-selected-editor='reply']").ShouldNotBeNull();
+        cut.FindComponent<StoredTokenPreview>().Instance.Channel.ShouldBe("streamer");
         context
             .Services.GetRequiredService<NavigationManager>()
             .Uri.ShouldEndWith("#message-library");

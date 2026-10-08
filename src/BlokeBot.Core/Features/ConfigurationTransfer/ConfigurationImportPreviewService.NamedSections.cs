@@ -174,6 +174,41 @@ public sealed partial class ConfigurationImportPreviewService
                 selection.Strategy
             )
         );
+        var definitionIssues = new List<ConfigurationValidationIssue>();
+        if (section.StoredDefinitions is { } definitions)
+        {
+            var storedDefinitions = await db
+                .CustomValueDefinitions.AsNoTracking()
+                .Where(x => x.HostId == hostId)
+                .ToArrayAsync(cancellationToken);
+            foreach (var definition in definitions)
+            {
+                var matched = storedDefinitions.SingleOrDefault(x =>
+                    x.Scope == definition.Scope && x.Name == definition.Name
+                );
+                if (matched is null)
+                {
+                    counts = counts with { Add = counts.Add + 1 };
+                }
+                else if (selection.Strategy == ImportConflictStrategy.AddMissing)
+                {
+                    counts = counts with { Skip = counts.Skip + 1 };
+                }
+                else
+                {
+                    counts = counts with { Update = counts.Update + 1 };
+                    if (matched.Kind != definition.Kind)
+                    {
+                        definitionIssues.Add(
+                            new(
+                                "sections.customCommands.storedDefinitions",
+                                "A stored-value definition has a different type. Explicitly delete its destination data in Variables before importing the new type."
+                            )
+                        );
+                    }
+                }
+            }
+        }
         var retainedRemovals =
             selection.Strategy == ImportConflictStrategy.ReplaceSection
                 ? existingReplies.Count(x =>
@@ -233,7 +268,7 @@ public sealed partial class ConfigurationImportPreviewService
                     ),
                 Remove = counts.Remove - retainedRemovals,
             },
-            commandConflicts.Issues,
+            commandConflicts.Issues.Concat(definitionIssues).ToArray(),
             conflicts
         );
     }

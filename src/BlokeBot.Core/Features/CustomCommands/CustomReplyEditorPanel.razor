@@ -55,14 +55,6 @@
                                             @onclick="() => Context.AddVariant(Entry)">Add message</button>
                                     @(Context.Validation.MessageFor(CustomCommandEditorIds.AddMessageVariant(Entry), CustomCommandEditorIds.ReplyTarget(Entry.Id, CustomCommandValidationFieldKind.VariantText)))
                                 </div>
-                                <p class="text-xs leading-5 text-muted-foreground">
-                                    Pick fresh values with <code>{random_from|one|two}</code>,
-                                    <code>{random_between|1|10}</code>, or <code>{random_viewer}</code>.
-                                    Nest existing tokens, such as <code>{random_between|1|{arg1}}</code> or
-                                    <code>{random_from|Hello {user}|{random_between|1|10}}</code>.
-                                    Arguments use <code>{arg1}</code>–<code>{arg9}</code> or <code>{args}</code>.
-                                    Invalid resolved number bounds send an explanation instead of this reply.
-                                </p>
                                 @for (var i = 0; i < Entry.Variants.Count; i++)
                                 {
                                     var index = i;
@@ -79,6 +71,7 @@
                                             <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == Entry.Variants.Count - 1)" @onclick="() => Context.MoveVariant(Entry, index, 1)">Down</button>
                                             <button class="btn-secondary h-9 px-3 text-xs" @onclick="() => Context.RemoveVariant(Entry, variant)">Remove</button>
                                         </div>
+                                        <div class="w-full min-w-0"><StoredTokenPreview Id="@($"reply-{Entry.Id}-{variant.Id}")" HostId="Context.HostId" Channel="@Context.Channel" @bind-Text="variant.Text" /></div>
                                     </div>
                                 }
                             </div>

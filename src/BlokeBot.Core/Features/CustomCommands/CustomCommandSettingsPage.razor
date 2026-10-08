@@ -14,6 +14,7 @@
 @inject CustomCommandInvocationResetService _invocationResets
 @inject CustomCommandExecutionService _execution
 @inject IOverlayCueAdmissionService _overlayCues
+@inject CustomStoredValueService _storedValues
 @inject ICustomCommandViewerResolver _viewers
 @inject NavigationManager _navigation
 @inject DashboardFragmentState _fragmentState
@@ -23,6 +24,7 @@
 <div class="custom-command-page mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Custom commands"
                 Description="Create chat commands, choose what the bot says, keep counters, and schedule messages.">
+        <a class="btn-secondary" href="/custom-commands/variables">Variables</a>
         <ConfigurationTransferActions Section="ConfigurationSectionId.CustomCommands" />
     </PageHeader>
 
@@ -100,6 +102,8 @@
             var studioContext = new CustomCommandStudioContext
             {
                 Configuration = _config,
+                HostId = HostId,
+                Channel = HostLogin,
                 ActiveTab = _activeTab,
                 RailGroups = () => _railGroups,
                 AddMessageEntry = EventCallback.Factory.Create(this, AddMessageEntry),

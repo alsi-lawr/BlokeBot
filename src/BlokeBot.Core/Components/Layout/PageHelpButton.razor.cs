@@ -108,6 +108,7 @@ public partial class PageHelpButton
             "/points" => new(_pointsDashboardHelp, "/points"),
             "/points/settings" => new(_pointsSettingsHelp, "/points"),
             "/custom-commands/settings" => new(_customCommandsHelp, "/commands"),
+            "/custom-commands/variables" => new(_variablesHelp, "/commands"),
             "/automations" => new(_automationsHelp, "/automations"),
             "/automations/events" => new(_automationEventsHelp, "/automations/events"),
             "/host" => new(_hostConfigHelp, "/channels"),
