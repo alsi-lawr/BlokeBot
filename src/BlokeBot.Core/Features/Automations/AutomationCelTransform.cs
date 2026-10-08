@@ -50,7 +50,9 @@ internal static partial class AutomationCelTransform
             Parse,
             Validate,
             configuration => Descriptor(id, display, configuration),
-            configurationShapeOwnedByParser: true
+            configurationShapeOwnedByParser: true,
+            parseForInputBindings: ParseForInputBindings,
+            validateForInputBindings: ValidateForInputBindings
         );
 
     internal static AutomationPureHandlerContract HandlerContract(AutomationDefinitionId id) =>
@@ -63,7 +65,13 @@ internal static partial class AutomationCelTransform
             SupportsScenarios: true
         );
 
-    private static AutomationConfigurationParseResult Parse(JsonElement json)
+    private static AutomationConfigurationParseResult Parse(JsonElement json) =>
+        Parse(json, allowUnsetFixed: false);
+
+    internal static AutomationConfigurationParseResult ParseForInputBindings(JsonElement json) =>
+        Parse(json, allowUnsetFixed: true);
+
+    private static AutomationConfigurationParseResult Parse(JsonElement json, bool allowUnsetFixed)
     {
         if (
             !AutomationCelTransformDocumentSerializer.TryDeserialize<AutomationCelTransformDocument>(
@@ -78,7 +86,10 @@ internal static partial class AutomationCelTransform
         var inputs = ImmutableArray.CreateBuilder<AutomationCelTransformInput>();
         foreach (var inputDocument in document.Inputs)
         {
-            if (!TryParseInput(inputDocument, out var input))
+            if (
+                inputDocument is null
+                || !TryParseInput(inputDocument, allowUnsetFixed, out var input)
+            )
             {
                 return Invalid("schema", "Repair the persisted Transform input schema.");
             }
@@ -89,7 +100,7 @@ internal static partial class AutomationCelTransform
         var outputs = ImmutableArray.CreateBuilder<AutomationCelTransformOutput>();
         foreach (var outputDocument in document.Outputs)
         {
-            if (!TryParseOutput(outputDocument, out var output))
+            if (outputDocument is null || !TryParseOutput(outputDocument, out var output))
             {
                 return Invalid("schema", "Repair the persisted Transform output schema.");
             }
@@ -103,6 +114,71 @@ internal static partial class AutomationCelTransform
     }
 
     private static AutomationValidationResult Validate(
+        AutomationCelTransformConfiguration configuration
+    ) => ValidateSelected(configuration, null);
+
+    private static AutomationValidationResult ValidateForInputBindings(
+        AutomationCelTransformConfiguration configuration,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
+    ) => ValidateSelected(configuration, bindings);
+
+    private static AutomationValidationResult ValidateSelected(
+        AutomationCelTransformConfiguration configuration,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding>? bindings
+    )
+    {
+        var declarations = ValidateDeclarations(configuration);
+        if (!declarations.IsValid)
+        {
+            return declarations;
+        }
+
+        foreach (var input in configuration.Inputs)
+        {
+            if (
+                bindings is not null
+                && (
+                    !bindings.TryGetValue(input.BindingFieldId, out var binding)
+                    || !Enum.IsDefined(binding.Mode)
+                )
+            )
+            {
+                return InvalidResult(
+                    input.BindingFieldId.Value,
+                    "Choose Fixed, Connected, or Expression for this input."
+                );
+            }
+            if (
+                (
+                    bindings is null
+                    || bindings[input.BindingFieldId].Mode == AutomationInputBindingMode.Fixed
+                ) && !Matches(input.ValueType, input.Nullability, input.FixedValue)
+            )
+            {
+                return InvalidResult(
+                    input.BindingFieldId.Value,
+                    "Enter a compatible Fixed value, or connect this input."
+                );
+            }
+        }
+        var declaredInputs = configuration.Inputs.ToImmutableDictionary(
+            static input => input.Identifier.Value,
+            StringComparer.Ordinal
+        );
+        foreach (var output in configuration.Outputs)
+        {
+            if (!AutomationTransformCelService.ValidateOutput(output, declaredInputs))
+            {
+                return AutomationValidationResult.Invalid(
+                    new AutomationValidationTarget.Port(output.PortId),
+                    "Repair this Transform output expression."
+                );
+            }
+        }
+        return AutomationValidationResult.Valid;
+    }
+
+    internal static AutomationValidationResult ValidateDeclarations(
         AutomationCelTransformConfiguration configuration
     )
     {
@@ -136,7 +212,6 @@ internal static partial class AutomationCelTransform
                 || input.ValueType == AutomationPortValueType.Flow
                 || !Enum.IsDefined(input.ValueType)
                 || !Enum.IsDefined(input.Nullability)
-                || !Matches(input.ValueType, input.Nullability, input.FixedValue)
             )
             {
                 return InvalidResult(
@@ -146,18 +221,12 @@ internal static partial class AutomationCelTransform
             }
         }
 
-        var declaredInputs = configuration.Inputs.ToImmutableDictionary(
-            static input => input.Identifier.Value,
-            StringComparer.Ordinal
-        );
         foreach (var output in configuration.Outputs)
         {
             if (
                 string.IsNullOrWhiteSpace(output.DisplayName)
                 || !Scalar(output.ValueType)
                 || !Enum.IsDefined(output.Nullability)
-                || string.IsNullOrWhiteSpace(output.Source)
-                || !AutomationTransformCelService.ValidateOutput(output, declaredInputs)
             )
             {
                 return AutomationValidationResult.Invalid(

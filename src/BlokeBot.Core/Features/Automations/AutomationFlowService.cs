@@ -40,27 +40,38 @@ public sealed partial class AutomationFlowService(
             .ThenBy(static value => value.Name)
             .ToArrayAsync(cancellationToken);
         var snapshots = ImmutableArray.CreateBuilder<AutomationFlowSnapshot>();
+        var repairEntries = ImmutableArray.CreateBuilder<AutomationFlowAuthoringEntry>();
         foreach (var flow in flows)
         {
-            if (RestoreDraft(flow) is not AutomationFlowDraftRestoreOutcome.Available available)
-            {
-                return new AutomationFlowQueryOutcome.Invalid(
-                    new(flow.Id),
-                    [MalformedGraphError()]
-                );
-            }
-
-            snapshots.Add(
-                new(
-                    available.Draft,
-                    new DateTimeOffset(flow.CreatedAtUtc, TimeSpan.Zero),
-                    new DateTimeOffset(flow.UpdatedAtUtc, TimeSpan.Zero),
-                    flow.UnavailableReason
-                )
+            var authoring = await AuthoringReadAsync(flow, cancellationToken);
+            var entry = authoring.Match<AutomationFlowAuthoringEntry?>(
+                editor =>
+                {
+                    if (editor.Errors.IsEmpty)
+                    {
+                        snapshots.Add(editor.Snapshot);
+                        return null;
+                    }
+                    return new(
+                        new(flow.Id),
+                        flow.Name,
+                        flow.IsEnabled,
+                        false,
+                        editor.Errors[0].Message
+                    );
+                },
+                json => new(new(flow.Id), flow.Name, flow.IsEnabled, true, json.Errors[0].Message),
+                _ => null
             );
+            if (entry is not null)
+            {
+                repairEntries.Add(entry);
+            }
         }
-
-        return new AutomationFlowQueryOutcome.Available(snapshots.ToImmutable());
+        return new AutomationFlowQueryOutcome.Available(snapshots.ToImmutable())
+        {
+            AuthoringEntries = repairEntries.ToImmutable(),
+        };
     }
 
     public async Task<AutomationFlowValidationOutcome> ValidateDraftAsync(

@@ -11,6 +11,11 @@ internal sealed partial class AutomationTransformCelService
         IReadOnlyDictionary<string, AutomationCelTransformInput> inputs
     )
     {
+        if (string.IsNullOrWhiteSpace(output.Source))
+        {
+            return false;
+        }
+
         if (
             Segments(output.Source, output.ValueType == AutomationPortValueType.Text)
             is not { } segments

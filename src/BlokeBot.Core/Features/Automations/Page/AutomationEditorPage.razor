@@ -79,13 +79,18 @@
             @CreationActions
         }
 
-        @if (_flowRecoveryMessage is not null)
+        @if (_sourceFlowId is not null)
         {
-            <PageState Kind="PageStateKind.Unavailable"
-                       Title="This flow needs a node provider"
-                       Description="@_flowRecoveryMessage">
-                <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
-            </PageState>
+            <EditorWorkspace @ref="_workspace" Class="automation-editor automation-editor--repair automation-editor--source"
+                             FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure" aria-label="Flow JSON repair">
+                <header class="automation-editor-bar"><div class="automation-flow-name"><h2>@_sourceName</h2><span>JSON repair · @(_sourceEnabled ? "Enabled" : "Disabled") · @(_hasChanges ? "Unsaved changes" : "Original stored values")</span><span>Flow @_sourceFlowId.Value.Value · @_sourceProviderStatus</span></div></header>
+                <div class="automation-editor-body">
+                    @RepairRail
+                    <AutomationFlowSource Text="@_sourceText" TextChanged="ChangeSourceAsync" Status="@_sourceStatus" Errors="_sourceErrors"
+                                          Busy="_busy" Enabled="_sourceEnabled" Validated="_sourceValidated" FocusRequest="_sourceFocusRequest"
+                                          Parse="ParseSource" Validate="ValidateSourceAsync" Save="SaveAsync" />
+                </div>
+            </EditorWorkspace>
         }
         else if (_editor is null)
         {
@@ -97,7 +102,7 @@
         }
         else
         {
-            <EditorWorkspace @ref="_workspace" Class="@_editorClass" FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure"
+            <EditorWorkspace @ref="_workspace" Class="@($"{_editorClass}{(_authoringEntries.IsEmpty ? "" : " automation-editor--repair")}")" FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure"
                      aria-label="Visual automation editor"
                      data-editor-mode="@ModeToken(_mode)"
                      data-editor-menu-context="@_menuContext"
@@ -166,6 +171,7 @@
                     <AutomationFlowRail Visible="@(!_focusMode || !_flowRailCollapsed)"
                                         FocusMode="_focusMode"
                                         Flows="_flowSnapshots"
+                                        RepairItems="RepairItems"
                                         CurrentFlowId="_editor.Id"
                                         CurrentName="@_editor.Name"
                                         CurrentNodeCount="_editor.Nodes.Count"
@@ -359,6 +365,24 @@
                        Save="SaveDirtyTransitionAsync" />
 
 @code {
+    private RenderFragment RepairItems => @<text>
+        @foreach (var entry in _authoringEntries)
+        {
+            <button @key="entry.Id" type="button" class="@($"automation-flow-item automation-flow-item--repair{(entry.Id == (_sourceFlowId ?? _editor?.Id) ? " automation-flow-item--active" : "")}")"
+                    title="@entry.Reason" @onclick="() => RequestRepairFlowAsync(entry.Id)">
+                <strong>@(string.IsNullOrWhiteSpace(entry.Name) ? "Untitled flow" : entry.Name)</strong>
+                <span>Needs repair · @(entry.RequiresJson ? "JSON" : "Visual editor")</span>
+            </button>
+        }
+    </text>;
+
+    private RenderFragment RepairRail => @<AutomationFlowRail Visible="true" FocusMode="_focusMode" Flows="_flowSnapshots" RepairItems="RepairItems"
+        CurrentFlowId="_sourceFlowId" CurrentName="@_sourceName" CurrentNodeCount="0" ShowDraft="false" ShowActions="false"
+        Library="_libraryKind" LibraryChanged="ChangeLibraryAsync" Subflows="_subflowPage" CurrentSubflowId="_editor?.Subflow?.Id"
+        SubflowSearch="@_subflowSearch" SubflowOffset="_subflowOffset" SubflowsLoading="_subflowLoading"
+        SearchSubflows="SearchSubflowsAsync" PageSubflows="LoadSubflowPageAsync" SelectSubflow="SelectLibrarySubflowAsync"
+        Select="RequestSelectFlowAsync" Toggle="ToggleFlowRail" />;
+
     private RenderFragment CreationActions => @<div class="automation-page-actions">
         <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><EditorIcon Name="new-flow" />New flow</button>
         <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><EditorIcon Name="new-subflow" />New subflow</button>

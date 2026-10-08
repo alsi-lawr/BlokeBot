@@ -140,7 +140,7 @@
 }
 
 .automation-run-summary strong,
-.automation-run-summary span {
+.automation-run-summary > div span {
     display: block;
 }
 

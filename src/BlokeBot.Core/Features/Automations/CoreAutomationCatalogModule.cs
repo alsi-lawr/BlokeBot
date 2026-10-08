@@ -225,7 +225,15 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationActionRetrySafety.Unsafe
             ),
             ParseSendChat,
-            ValidateSendChat
+            ValidateSendChat,
+            parseForInputBindings: ParseSendChat,
+            validateForInputBindings: (configuration, bindings) =>
+                bindings.TryGetValue(new("message"), out var binding)
+                && binding.Mode
+                    is AutomationInputBindingMode.Connected
+                        or AutomationInputBindingMode.Expression
+                    ? AutomationValidationResult.Valid
+                    : ValidateSendChat(configuration)
         );
 
     private static AutomationDefinition<AutomationRandomNumberConfiguration> RandomNumber() =>
