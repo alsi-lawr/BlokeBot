@@ -16,6 +16,11 @@ internal static class CustomValueIdentity
     public static string Target(string viewerId, string key) =>
         Hash($"{viewerId.Length}:{viewerId}{key}");
 
+    public static bool SameNamespace(CustomValueKind left, CustomValueKind right) =>
+        left == CustomValueKind.Dictionary
+            ? right == CustomValueKind.Dictionary
+            : right != CustomValueKind.Dictionary;
+
     public static bool Valid(string value) => !string.IsNullOrWhiteSpace(value);
 
     public static bool TryNumber(string value, out long number) =>
@@ -112,9 +117,15 @@ internal sealed class CustomStoredValueSession(
             return Failure(TemplateRenderFailure.InvocationIdentity);
         }
         var definition = definitions.SingleOrDefault(x =>
-            x.Scope == scope && x.Name == operands[1]
+            x.Scope == scope
+            && x.Name == operands[1]
+            && (
+                dictionary
+                    ? x.Kind == CustomValueKind.Dictionary
+                    : x.Kind != CustomValueKind.Dictionary
+            )
         );
-        if (definition is null || dictionary != (definition.Kind == CustomValueKind.Dictionary))
+        if (definition is null)
         {
             return Failure(TemplateRenderFailure.StoredReference);
         }

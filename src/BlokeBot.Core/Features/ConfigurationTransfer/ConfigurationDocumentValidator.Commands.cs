@@ -25,7 +25,7 @@ internal static partial class ConfigurationDocumentValidator
 
         if (section.StoredDefinitions is { } definitions)
         {
-            var names = new HashSet<(BlokeBot.Persistence.Models.CustomValueScope, string)>();
+            var names = new HashSet<(BlokeBot.Persistence.Models.CustomValueScope, bool, string)>();
             foreach (var definition in definitions)
             {
                 if (
@@ -39,7 +39,15 @@ internal static partial class ConfigurationDocumentValidator
                             Guid.Empty
                         ),
                         out _
-                    ) || !names.Add((definition.Scope, definition.Name))
+                    )
+                    || !names.Add(
+                        (
+                            definition.Scope,
+                            definition.Kind
+                                == BlokeBot.Persistence.Models.CustomValueKind.Dictionary,
+                            definition.Name
+                        )
+                    )
                 )
                 {
                     return new(

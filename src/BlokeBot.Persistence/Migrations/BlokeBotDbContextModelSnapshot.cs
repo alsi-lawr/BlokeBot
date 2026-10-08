@@ -5007,8 +5007,15 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("HostId", "Scope", "NameHash")
-                        .IsUnique();
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "DictionaryName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_DictionaryName")
+                        .HasFilter("\"Kind\" = 2");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "ScalarName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_ScalarName")
+                        .HasFilter("\"Kind\" <> 2");
 
                     b.ToTable("custom_value_definitions", (string)null);
                 });

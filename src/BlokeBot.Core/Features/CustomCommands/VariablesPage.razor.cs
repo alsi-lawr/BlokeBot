@@ -331,7 +331,9 @@ public partial class VariablesPage
             var editKind = _editKind;
             _definitions = await _values.DefinitionsAsync(_loadedHostId, default);
             await SelectAsync(
-                _definitions.Single(x => x.Scope == draft.Scope && x.Name == draft.Name)
+                _definitions.Single(x =>
+                    x.Scope == draft.Scope && x.Name == draft.Name && x.Kind == draft.Kind
+                )
             );
             if (original is not null)
             {

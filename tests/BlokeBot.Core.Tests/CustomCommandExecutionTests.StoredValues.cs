@@ -456,7 +456,7 @@ public sealed partial class CustomCommandExecutionTests
             )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
         return (await values.DefinitionsAsync(hostId, default)).Single(x =>
-            x.Name == name && x.Scope == scope
+            x.Name == name && x.Scope == scope && x.Kind == kind
         );
     }
 
