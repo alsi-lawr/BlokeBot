@@ -488,6 +488,69 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
+    public async Task SingleArgumentFlagOnly_SaveAndReopen_PersistsOnAndOffWithoutChangingOtherCommands()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        int otherCommandId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var other = new CustomCommand
+            {
+                HostId = seeded.HostId,
+                Name = "Other command",
+                SingleArgument = true,
+                Action = new MessageCustomCommandAction
+                {
+                    HostId = seeded.HostId,
+                    ZeroArgumentMessageLibraryEntryId = seeded.MessageEntryId,
+                },
+                Aliases = [new CustomCommandAlias { HostId = seeded.HostId, Alias = "other" }],
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.CustomCommands.Add(other);
+            _ = await db.SaveChangesAsync();
+            otherCommandId = other.Id;
+        }
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+        var checkbox = "[data-selected-editor='command'] input[type='checkbox']";
+        var saveSelector = "button[aria-label='Save custom commands']";
+        cut.Find(saveSelector).HasAttribute("disabled").ShouldBeTrue();
+
+        foreach (var enabled in new[] { true, false })
+        {
+            cut.Find(checkbox).Change(enabled);
+
+            var save = cut.Find(saveSelector);
+            save.HasAttribute("disabled").ShouldBeFalse();
+            save.GetAttribute("data-save-state").ShouldBe("dirty");
+            save.Click();
+            cut.WaitForAssertion(() =>
+            {
+                cut.Find(saveSelector).HasAttribute("disabled").ShouldBeTrue();
+                cut.Find(saveSelector).GetAttribute("data-save-state").ShouldBe("clean");
+            });
+            await using (var db = await dbFactory.CreateDbContextAsync())
+            {
+                (
+                    await db.CustomCommands.SingleAsync(x => x.Id == seeded.CommandId)
+                ).SingleArgument.ShouldBe(enabled);
+                (
+                    await db.CustomCommands.SingleAsync(x => x.Id == otherCommandId)
+                ).SingleArgument.ShouldBeTrue();
+            }
+
+            cut.Dispose();
+            cut = context.Render<CustomCommandSettingsPage>();
+            cut.Find($"#command-{seeded.CommandId}-name").GetAttribute("value").ShouldBe("Command");
+            cut.Find(checkbox).HasAttribute("checked").ShouldBe(enabled);
+            cut.Find(saveSelector).HasAttribute("disabled").ShouldBeTrue();
+        }
+    }
+
+    [Test]
     public async Task AdvancedValidation_SelectsItemRevealsSectionAndFocusesField()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
