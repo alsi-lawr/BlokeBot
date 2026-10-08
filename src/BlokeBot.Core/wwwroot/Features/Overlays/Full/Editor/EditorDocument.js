@@ -1,6 +1,7 @@
 import { createSourceSession, EditorFocus, htmlRanges, attributeEdit } from './FullOverlayEditorCore.js';
 import { planStyles, combineStyles, styleValues, elementKey, targetElement } from './VisualStyles.js';
 import { parsedCss } from './SourceRanges.js';
+import { planHierarchy, hierarchyTarget, hierarchyRootLabel } from './HierarchyCommands.js';
 import { motionPreset } from './MotionCommands.js';
 import { addLayer, removeLayers, selectionRoots, duplicateLayer, reorderLayer } from './LayerCommands.js';
 
@@ -30,14 +31,14 @@ export function createEditorDocument(document) {
     function view() {
         const {snapshot,parsed,stylesheet,layers}=sourceData(),node=element(selected),widget=snapshot.widgets.find(w=>`widget:${w.id.value}`===selected)??null;
         return {revision:snapshot.revision,dirty:JSON.stringify({...document,html:snapshot.html,css:snapshot.css,widgets:snapshot.widgets,diagnostics:[]})!==saved,
-            selected,members:[...members],selectionVersion,layers,widget,locked:!!node&&locked(node),styles:styleValues(snapshot,selected,{element:node,stylesheet}),
+            selected,members:[...members],selectionVersion,layers,hierarchyRoot:hierarchyRootLabel(parsed),widget,locked:!!node&&locked(node),styles:styleValues(snapshot,selected,{element:node,stylesheet}),
             diagnostics:[...parsed.diagnostics.filter(d=>d.code!=='missing-doctype').map(d=>({code:d.code,buffer:'html',offset:d.start})),
                 ...stylesheet.diagnostics.map(d=>({code:d.code,buffer:'css',offset:d.start}))],feedback,focus,history:session.availability(focus)};
     }
-    function finish(result,previousHtml=session.snapshot().html,mapping=[],singleton=undefined) {
+    function finish(result,previousHtml=session.snapshot().html,mapping=[],singleton=undefined,ownedOrigins=false) {
         if(result.kind==='applied') {
             const identities=new Map(mapping),htmlChanged=previousHtml!==session.snapshot().html;
-            const retained=members.map(key=>identities.get(key)??key).filter(key=>!htmlChanged||!key.startsWith('source:'));
+            const retained=members.filter(key=>!htmlChanged||!(identities.get(key)??key).startsWith('source:')||ownedOrigins&&identities.has(key)).map(key=>identities.get(key)??key);
             const active=identities.get(selected)??selected;
             setSelection(singleton===undefined?retained:singleton?[singleton]:[],singleton===undefined?active:singleton);feedback='';
         } else if(result.kind==='conflict')feedback='Undo kept a newer overlapping edit. Undo that edit in its editor, then retry.';
@@ -47,7 +48,7 @@ export function createEditorDocument(document) {
     function plan(planned,singleton=false) {
         if(planned.kind!=='planned')return finish(planned);
         const snapshot=session.snapshot(),mapping=planned.selectionMap??[[selected,planned.selected??selected]];
-        return finish(session.apply(EditorFocus.Visual,snapshot.revision,planned.edits,planned.metadata??[]),snapshot.html,mapping,singleton?planned.selected:undefined);
+        return finish(session.apply(EditorFocus.Visual,snapshot.revision,planned.edits,planned.metadata??[]),snapshot.html,mapping,singleton?planned.selected:undefined,planned.ownedOrigins===true);
     }
     function style(properties,metadata=[],placement=null) {
         const snapshot=session.snapshot(),planned=planStyles(snapshot,selected,properties,{element:element(selected),stylesheet:sourceData().stylesheet},placement);
@@ -59,6 +60,30 @@ export function createEditorDocument(document) {
     }
     function layoutPlan(snapshot,command,key=selected,prepared={element:element(key),stylesheet:sourceData().stylesheet}) {
         if(command.kind==='move'&&!command.dx&&!command.dy)return {kind:'unchanged'};
+        if(command.kind==='move') {
+            const position=command.computed?.position;
+            if(!['static','relative','sticky','absolute','fixed'].includes(position))return {kind:'unmapped',code:'missing-native-position'};
+            if(position!=='absolute'&&position!=='fixed') {
+                const basis=command.movementBasis;
+                if(!Array.isArray(basis)||basis.length!==4||!basis.every(Number.isFinite))return {kind:'unmapped',code:'unsafe-movement-basis'};
+                const [a,b,c,d]=basis,determinant=a*d-b*c;
+                const dx=(d*command.dx-c*command.dy)/determinant,dy=(a*command.dy-b*command.dx)/determinant;
+                if(!Number.isFinite(dx)||!Number.isFinite(dy))return {kind:'unmapped',code:'unsafe-movement-basis'};
+                const value=command.computed.translate;
+                const parsed=parsedCss(value??'','value'),parts=parsed.tree?.children.toArray();
+                if(!parts?.length||parsed.diagnostics.length||parts.length>3)return {kind:'unmapped',code:'missing-native-translate'};
+                if(parts.some(part=>part.type==='Identifier')&&value!=='none')return {kind:'unmapped',code:'missing-native-translate'};
+                const component=index=>value==='none'?'0px':parts[index]?.loc?value.slice(parts[index].loc.start.offset,parts[index].loc.end.offset):'0px';
+                const shifted=(index,delta)=>{
+                    const part=parts[index],raw=component(index);
+                    if(!delta)return raw;
+                    return part?.type==='Dimension'&&part.unit==='px'?`${Number(part.value)+delta}px`:`calc(${raw} + ${delta}px)`;
+                };
+                const translate=`${shifted(0,dx)} ${shifted(1,dy)}${parts.length===3?' '+component(2):''}`;
+                const planned=planStyles(snapshot,key,{translate},prepared,'move');
+                return planned.kind==='planned'?{...planned,selection:key}:planned;
+            }
+        }
         const id=key?.startsWith('widget:')?key.slice(7):null;
         const values={...command.computed,...styleValues(snapshot,key,prepared)},widget=snapshot.widgets.find(w=>w.id.value===id);
         const properties={position:'absolute'},metadata=[];
@@ -129,9 +154,31 @@ export function createEditorDocument(document) {
                 ||command.targets&&(!item.styles||![item.width,item.height].every(value=>Number.isFinite(value)&&value>0));}))return {kind:'unmapped',code:'missing-native-geometry'};
             const plans=selectionRoots(eligible).map(node=>{
                 const item=observations.get(elementKey(node));
-                return layoutPlan(snapshot,{...command,computed:item.styles??item.computed,layoutX:item.layoutX,layoutY:item.layoutY,containingWidth:item.containingWidth,containingHeight:item.containingHeight},elementKey(node));
+                return layoutPlan(snapshot,{...command,computed:item.styles??item.computed,layoutX:item.layoutX,layoutY:item.layoutY,containingWidth:item.containingWidth,containingHeight:item.containingHeight,movementBasis:item.movementBasis},elementKey(node));
             });
             if(plans.length&&plans.every(plan=>plan.kind==='unchanged'))return {kind:'unchanged'};
+            return {...combineStyles(snapshot,plans),context:captured};
+        },
+        hierarchyTarget(command,captured){
+            if(!matches(captured))return {kind:'conflict'};
+            return hierarchyTarget(sourceData().parsed,members,command.relation,command.target,session.snapshot().html.length);
+        },
+        planHierarchy(command,captured){
+            if(!matches(captured))return {kind:'conflict'};
+            return {...planHierarchy(session.snapshot(),members,command.relation,command.target,sourceData().parsed),context:captured};
+        },
+        planReturn(targets,captured){
+            if(!matches(captured))return {kind:'conflict'};
+            const snapshot=session.snapshot(),nodes=members.map(element);
+            if(nodes.some(node=>!node))return {kind:'unmapped'};
+            const plans=selectionRoots(nodes).map(node=>{
+                const key=elementKey(node),matches=targets.filter(item=>item.key===key);
+                if(matches.length!==1||!['static','relative','sticky','absolute','fixed'].includes(matches[0].styles?.position))return {kind:'unmapped',code:'missing-native-position'};
+                const position=matches[0].styles.position,properties={translate:'none'};
+                if(position==='absolute'||position==='fixed')Object.assign(properties,{position:'static',left:'auto',right:'auto',top:'auto',bottom:'auto'});
+                const planned=planStyles(snapshot,key,properties,{element:node,stylesheet:sourceData().stylesheet},'move');
+                return planned.kind==='planned'?{...planned,selection:key}:planned;
+            });
             return {...combineStyles(snapshot,plans),context:captured};
         },
         planStyle(properties,selection,revision){

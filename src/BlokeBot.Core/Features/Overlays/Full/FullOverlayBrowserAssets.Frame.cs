@@ -25,9 +25,24 @@ internal static partial class FullOverlayBrowserAssets
                 widget.anchor.isConnected && document.querySelector(`[data-blokebot-widget="${CSS.escape(widgetId)}"]`) === widget.anchor
                   ? [...widget.renderer.diagnostics].map(code => ({ widgetId, code })) : [])] });
           };
+          const movementBasis = (node) => {
+            if (getComputedStyle(node).zoom !== "1") return null;
+            let basis = new DOMMatrix();
+            for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+              const style = getComputedStyle(parent);
+              if (style.perspective !== "none" || style.zoom !== "1" || style.offsetPath !== "none") return null;
+              const transform = style.transform === "none" ? new DOMMatrix() : new DOMMatrix(style.transform);
+              const rotation = style.rotate === "none" ? 0 : style.rotate.endsWith("deg") ? Number(style.rotate.slice(0, -3)) : NaN;
+              const scale = style.scale === "none" ? [1, 1] : style.scale.split(/\s+/).map(Number);
+              if (!transform.is2D || !Number.isFinite(rotation) || scale.length > 2 || !scale.every(Number.isFinite)) return null;
+              basis = new DOMMatrix().rotate(rotation).scale(scale[0], scale[1] ?? scale[0]).multiply(transform).multiply(basis);
+            }
+            const result = [basis.a, basis.b, basis.c, basis.d];
+            return result.every(Number.isFinite) && basis.a * basis.d - basis.b * basis.c !== 0 ? result : null;
+          };
           const observe = () => {
             if (!observation || !port) return;
-            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow","--blokebot-x","--blokebot-y","--blokebot-anchor-x","--blokebot-anchor-y"];
+            const properties = ["position","left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow","--blokebot-x","--blokebot-y","--blokebot-anchor-x","--blokebot-anchor-y"];
             const items = observation.selectors.flatMap(item => {
               let node;
               try { const nodes = document.querySelectorAll(item.selector); if (nodes.length !== 1) return []; node = nodes[0]; } catch { return []; }
@@ -40,6 +55,7 @@ internal static partial class FullOverlayBrowserAssets
               return [{ key: item.key, x: rect.x, y: rect.y, width: rect.width, height: rect.height, layoutX: node.offsetLeft, layoutY: node.offsetTop,
                 containingWidth: initialContainingBlock ? innerWidth : parent?.clientWidth ?? innerWidth,
                 containingHeight: initialContainingBlock ? innerHeight : parent?.clientHeight ?? innerHeight,
+                movementBasis: movementBasis(node),
                 visible: computed.display !== "none" && !["hidden", "collapse"].includes(computed.visibility),
                 styles: Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)])) }];
             });

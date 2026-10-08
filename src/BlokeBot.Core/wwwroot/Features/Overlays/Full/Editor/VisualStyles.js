@@ -44,6 +44,12 @@ export function planStyles(snapshot, key, properties, prepared=prepareStyles(sna
             const declarations=inline.tree.children.toArray();
             const matching=declarations.filter(node=>node.type==='Declaration'&&node.property===property);
             const declaration=placement?matching.findLast(node=>node.important)??matching.at(-1):matching.at(-1);
+            // A later inset (including logical placement) can win after an earlier longhand.
+            // Explicit movement/Return overrides only the physical edge it actually edits.
+            const laterInset=placement==='move'&&['left','right','top','bottom'].includes(property)
+                &&declarations.some((node,index)=>node.type==='Declaration'&&index>declarations.indexOf(declaration)
+                    &&/^inset(?:-(?:inline|block)(?:-(?:start|end))?)?$/.test(node.property));
+            if(laterInset){appended.push(`${property}: ${value} !important;`);delete properties[property];continue;}
             const shorthand=['background-color','background-image'].includes(property)?declarations.findLast(node=>node.type==='Declaration'&&node.property==='background'):null;
             if(shorthand&&(!declaration||declarations.indexOf(shorthand)>declarations.indexOf(declaration)||shorthand.important&&!declaration.important)) {
                 appended.push(`${property}: ${value}${shorthand.important||declaration?.important?' !important':''};`);

@@ -34,7 +34,12 @@ public sealed record FullOverlayEditorView(
 {
     public IReadOnlyList<string> Members { get; init; } = [];
     public long SelectionVersion { get; init; }
+    public string HierarchyRoot { get; init; } = "Overlay root";
+    public IReadOnlyDictionary<string, string> NativeStyles { get; init; } =
+        new Dictionary<string, string>();
 
     internal static FullOverlayEditorView Empty { get; } =
         new(0, false, null, [], null, false, new Dictionary<string, string>(), "", "visual", []);
 }
+
+public sealed record FullOverlayHierarchyFeedback(bool Valid, string Message);
