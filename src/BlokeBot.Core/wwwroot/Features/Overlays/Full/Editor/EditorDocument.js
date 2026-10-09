@@ -95,6 +95,11 @@ export function createEditorDocument(document) {
                 gestureStyles={revision,selection,prepared:prepareStyles(snapshot,selection)};
             return layoutPlan(snapshot,command,gestureStyles.prepared);
         },
+        planStyle(properties,selection,revision){
+            if(selection!==selected||revision!==session.snapshot().revision)return {kind:'conflict'};
+            const planned=planStyles(session.snapshot(),selection,properties);
+            return {...planned,revision,selection};
+        },
         commitGesture(planned){
             if(planned.selection!==selected||planned.revision!==session.snapshot().revision)return this.stale();
             focus=EditorFocus.Visual;

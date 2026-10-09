@@ -20,6 +20,16 @@ public partial class PageHelpButton
                 ]
             ),
             new(
+                "Style the selected layer",
+                "Choose a colour, opacity or swatch. Solid and Gradient style the background; gradient stops have their own colour, opacity and percentage position.",
+                [
+                    "Colour changes preview while the picker is open. Done keeps one Visual change; Escape cancels the open picker. A newer edit or selection cancels an obsolete picker.",
+                    "Custom backgrounds remain in source until you explicitly replace their image. Rotation and scale edit individual properties, not authored transform matrices.",
+                    "Layer arrows move one HTML sibling, not z-index. Anchors use the CSS containing block; Align now uses the preview viewport.",
+                    "Motion exposes entrance, exit and state-change presets. Replay entrance uses the private preview and does not consume production cues.",
+                ]
+            ),
+            new(
                 "Your workspace",
                 "Focus fills the application window. Full screen uses the browser's fullscreen mode; Escape or the same control exits full screen.",
                 [
