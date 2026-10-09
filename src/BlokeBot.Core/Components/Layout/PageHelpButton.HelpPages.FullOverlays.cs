@@ -16,7 +16,8 @@ public partial class PageHelpButton
                 [
                     "Open the Toolbox icon in Visual mode to search widgets and ordinary Text / HTML. Layers only lists the document hierarchy. Adding selects the new layer and opens its inspector; Escape closes Toolbox and returns to its button.",
                     "Ctrl-click canvas layers or Layers rows to toggle the selection. Alt-drag selects every visible mapped layer intersecting the rectangle, including parents and children. A plain click selects one layer; dragging a selected layer keeps the set.",
-                    "Move and arrow-key nudge affect unlocked selected roots. Delete removes the selection, including locked layers. Style, resize, motion, widget settings, duplicate and sibling order affect only the active layer.",
+                    "Move and arrow-key nudge affect unlocked selected roots. Delete removes the selection, including locked layers. Style, resize, motion, widget settings and duplicate affect only the active layer.",
+                    "Canvas drag and nudge keep in-flow layout space and never re-nest a layer. Return to layout removes current placement, not historical styling: flow keeps its layout mode and edges; absolute/fixed returns to static with neutral edges and translate.",
                     "Find HTML opens HTML/CSS and places the caret at the selected layer.",
                     "HTML and CSS keep separate histories. Undo and Redo follow the history named in the toolbar. Incomplete source is retained, and newer overlapping edits are not overwritten.",
                 ]
@@ -27,7 +28,7 @@ public partial class PageHelpButton
                 [
                     "Colour changes preview while the picker is open. Done keeps one Visual change; Escape cancels the open picker. A newer edit or selection cancels an obsolete picker.",
                     "Custom backgrounds remain in source until you explicitly replace their image. Rotation and scale edit individual properties, not authored transform matrices.",
-                    "Layer arrows move one HTML sibling, not z-index. Anchors use the CSS containing block; Align now uses the preview viewport.",
+                    "Drag a Layers row before, inside or after another layer, or use Move in HTML with keyboard controls. At root moves selected roots to the named authored container. Invalid or ambiguous destinations leave your source unchanged. Anchors use the CSS containing block; Align now uses the preview viewport.",
                     "Motion exposes entrance, exit and state-change presets. Replay entrance uses the private preview and does not consume production cues.",
                 ]
             ),

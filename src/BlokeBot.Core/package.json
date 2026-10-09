@@ -2,7 +2,7 @@
   "type": "module",
   "scripts": {
     "editor:assets": "node scripts/full-overlay-editor-assets.mjs",
-    "editor:test": "node --test ../../tests/BlokeBot.Core.Tests/Client/EditorWorkspace.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayEditor.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayWorkingDocument.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlaySelection.test.mjs ../../tests/BlokeBot.Core.Tests/Client/GuidedFill.test.mjs",
+    "editor:test": "node --test ../../tests/BlokeBot.Core.Tests/Client/EditorWorkspace.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayEditor.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayWorkingDocument.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlaySelection.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayHierarchy.test.mjs ../../tests/BlokeBot.Core.Tests/Client/GuidedFill.test.mjs",
     "css:build": "tailwindcss -i ./Styles/app.css -o ./wwwroot/app.css --minify",
     "css:watch": "tailwindcss -i ./Styles/app.css -o ./wwwroot/app.css --watch"
   },
