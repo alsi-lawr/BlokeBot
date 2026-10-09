@@ -33,7 +33,7 @@ public sealed class DatabaseCutoverIntegrationTests
             CutoverPreparationCheckpoint.BeforeReceipt
         );
 
-        _ = beforeReceipt.ShouldBeOfType<DatabaseCutoverResult.Failed>();
+        _ = beforeReceipt.ShouldBeOfType<DatabaseCutoverResult.Failed>(beforeReceipt.ToString());
         (await fixture.SqliteMigrationsAsync())
             .Last()
             .ShouldBe(DatabaseCutoverIntegrationFixture.CurrentSqliteMigration);
