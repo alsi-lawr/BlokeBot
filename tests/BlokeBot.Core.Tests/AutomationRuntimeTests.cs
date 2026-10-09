@@ -2121,7 +2121,7 @@ public sealed partial class AutomationRuntimeTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("test-number-source", "{}");
         var transform = Node(
-            "test-cel-transform",
+            AutomationDefinitionIds.CelTransform.Value,
             TransformJson(
                 [
                     new(
@@ -2191,7 +2191,7 @@ public sealed partial class AutomationRuntimeTests
                 .Draft.Nodes.Select(node =>
                     node.Id == transform.Id
                         ? Node(
-                            "test-cel-transform",
+                            AutomationDefinitionIds.CelTransform.Value,
                             replacementConfiguration,
                             bindings: Bindings(bindingFieldId, AutomationInputBindingMode.Connected)
                         ) with

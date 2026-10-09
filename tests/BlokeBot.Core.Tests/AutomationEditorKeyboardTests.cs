@@ -67,7 +67,9 @@ registerHooks({
       context.parentURL === pageModule && specifier === "./AutomationFlowCanvas.js"
         ? canvasModule
         : context.parentURL === pageModule && specifier === "./AutomationEditorMenu.js"
-          ? new URL("AutomationEditorMenu.js", canvasModule).href : specifier,
+          ? new URL("AutomationEditorMenu.js", canvasModule).href
+          : context.parentURL === pageModule && specifier === "../../../Components/EditorToolboxKeyboard.js"
+            ? new URL("../../../Components/EditorToolboxKeyboard.js", canvasModule).href : specifier,
       context,
     );
   },
@@ -89,11 +91,13 @@ class FakeElement {
   }
 
   closest(selector) {
+    const selectors = selector.split(",").map(value => value.trim());
     for (let current = this; current !== null; current = current.parentElement) {
-      if (selector === "input, textarea, select"
-        && ["input", "textarea", "select"].includes(current.tagName)) return current;
-      if (selector === "[data-editor-menu]" && current.menu) return current;
-      if (selector === "[data-automation-editor-history]" && current.historyRoot) return current;
+      if (["input", "textarea", "select"].includes(current.tagName)
+        && selectors.includes(current.tagName)) return current;
+      if (selectors.includes("[contenteditable=true]") && current.isContentEditable) return current;
+      if (selectors.includes("[data-editor-menu]") && current.menu) return current;
+      if (selectors.includes("[data-automation-editor-history]") && current.historyRoot) return current;
     }
     return null;
   }
