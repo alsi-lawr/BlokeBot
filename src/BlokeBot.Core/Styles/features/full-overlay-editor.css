@@ -116,6 +116,7 @@
 .full-editor-inspector>[data-fold],.full-editor-inspector>div>[data-fold]{padding-top:.75rem;margin-top:.5rem;border-top:1px solid var(--app-border);}
 
 .full-inspector-actions .editor-action-tip,.full-inspector-align .editor-action-tip,.full-fill-kinds .editor-action-tip,.full-return-layout .editor-action-tip,.full-hierarchy-root .editor-action-tip,.full-editor-inspector [data-fill-custom] .editor-action-tip,.full-editor-inspector [data-fold=full-hierarchy] .editor-action-tip,.full-editor-inspector [data-fold=full-motion] .editor-action-tip,.full-editor-inspector [data-fold=widget-settings] .editor-action-tip,.full-editor-dialog>.editor-action .editor-action-tip,.full-editor-dialog form .editor-action-tip,.full-editor-lifecycle .editor-action-tip{left:0;right:auto;}
+.full-editor-inspector [data-fold=full-hierarchy] .editor-action-tip,.full-editor-inspector [data-fold=full-motion] .editor-action-tip,.full-editor-inspector [data-fold=widget-settings] .editor-action-tip{top:auto;bottom:calc(100% + .35rem);}
 .full-hierarchy-root .editor-action-tip{max-width:11.5rem;}
 .full-editor-inspector [data-fill-custom] .editor-action-tip{max-width:15rem;}
 
