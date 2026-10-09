@@ -65,7 +65,9 @@ registerHooks({
   resolve(specifier, context, nextResolve) {
     return nextResolve(
       context.parentURL === pageModule && specifier === "./AutomationFlowCanvas.js"
-        ? canvasModule : specifier,
+        ? canvasModule
+        : context.parentURL === pageModule && specifier === "./AutomationEditorMenu.js"
+          ? new URL("AutomationEditorMenu.js", canvasModule).href : specifier,
       context,
     );
   },
@@ -83,12 +85,14 @@ class FakeElement {
     this.parentElement = parent;
     this.isContentEditable = options.isContentEditable ?? false;
     this.historyRoot = options.historyRoot ?? false;
+    this.menu = options.menu ?? false;
   }
 
   closest(selector) {
     for (let current = this; current !== null; current = current.parentElement) {
       if (selector === "input, textarea, select"
         && ["input", "textarea", "select"].includes(current.tagName)) return current;
+      if (selector === "[data-editor-menu]" && current.menu) return current;
       if (selector === "[data-automation-editor-history]" && current.historyRoot) return current;
     }
     return null;
@@ -129,6 +133,7 @@ function keydown(target, key, modifiers = {}) {
 
     private const string _scenario = """
 const calls = [];
+
 const dotnet = {
   invokeMethodAsync(method, action) {
     calls.push({ method, action });
@@ -159,6 +164,9 @@ assert.deepEqual(calls, [
   { method: "ApplyEditorHistoryShortcutAsync", action: "redo" },
 ]);
 
+const menuTarget = new FakeElement("button", editor, { menu: true });
+assert.equal(keydown(menuTarget, "z"), 0, "menu owns history keys before document capture");
+assert.equal(keydown(background, "z", { defaultPrevented: true }), 0, "already owned events stay owned");
 assert.equal(keydown(outside, "z"), 0, "outside targets are ignored");
 assert.equal(keydown(background, "z", { shiftKey: true }), 0, "modified shortcuts are ignored");
 assert.equal(keydown(background, "x"), 0, "unrelated keys are ignored");
@@ -177,6 +185,7 @@ assert.deepEqual(calls.at(-1), {
 for (const target of editableTargets) {
   assert.equal(keydown(target, "/", { ctrlKey: false }), 0, "slash remains available in editable controls");
 }
+assert.equal(keydown(menuTarget, "/", { ctrlKey: false }), 0, "menu keys do not open the toolbox");
 assert.equal(keydown(background, "/", { altKey: true, ctrlKey: false }), 0, "modified slash is ignored");
 assert.equal(calls.length, 3);
 disposeToolboxKeyboard();

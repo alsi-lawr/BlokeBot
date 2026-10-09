@@ -100,6 +100,7 @@
             <EditorWorkspace @ref="_workspace" Class="@_editorClass" FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure"
                      aria-label="Visual automation editor"
                      data-editor-mode="@ModeToken(_mode)"
+                     data-editor-menu-context="@_menuContext"
                      data-automation-editor-history>
                 @if (_focusMode)
                 {

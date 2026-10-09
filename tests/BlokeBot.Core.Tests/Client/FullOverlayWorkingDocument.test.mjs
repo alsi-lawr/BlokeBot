@@ -308,3 +308,50 @@ test('Background longhand edits remain effective after later or important author
   owner.history('undo');assert.deepEqual(owner.candidate(),original);
  }
 });
+
+test('Contextual subtree deletion rejects a moved source offset and preserves exact widget metadata on undo',()=>{
+ const owner=createEditorDocument(structuredClone(document));
+ const selected=owner.view().layers.find(layer=>layer.tag==='main').key;
+ owner.select(selected);
+ const captured=owner.view();
+ owner.source(EditorFocus.Html,'<!-- newer -->'+document.html);
+ const newer=owner.candidate();
+ owner.contextualDelete(selected,captured.revision);
+ assert.deepEqual(owner.candidate(),newer);
+ assert(owner.view().feedback);
+ const fresh=owner.view().layers.find(layer=>layer.tag==='main').key;
+ owner.select(fresh);
+ const current=owner.view();
+ owner.contextualDelete(fresh,current.revision);
+ assert.equal(owner.candidate().widgets.length,0);
+ assert.equal(owner.candidate().css,document.css);
+ owner.history('undo');
+ assert.deepEqual(owner.candidate(),newer);
+ owner.history('redo');
+ assert.equal(owner.candidate().widgets.length,0);
+});
+
+test('Focused availability survives menu observation and a newer overlap stays recoverable in its owner',()=>{
+ const owner=createEditorDocument(structuredClone(document));
+ owner.select(`widget:${id}`);
+ owner.command({kind:'style',property:'color',value:'green'});
+ const visual=owner.view();
+ assert.equal(visual.history.undo,true);
+ const revision=visual.revision;
+ assert.equal(owner.view().revision,revision);
+ owner.source(EditorFocus.Css,owner.candidate().css.replace('green','purple'));
+ owner.focus(EditorFocus.Visual);
+ assert.equal(owner.view().history.undo,true);
+ const newer=owner.candidate();
+ owner.history('undo');
+ assert.deepEqual(owner.candidate(),newer);
+ assert.equal(owner.view().history.undo,true);
+ owner.focus(EditorFocus.Css);
+ owner.history('undo');
+ assert.equal(owner.view().history.redo,true);
+ owner.focus(EditorFocus.Visual);
+ owner.history('undo');
+ assert.equal(owner.candidate().css,document.css);
+ assert.equal(owner.view().history.undo,false);
+ assert.equal(owner.view().history.redo,true);
+});

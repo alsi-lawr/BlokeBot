@@ -27,6 +27,7 @@
                 <label class="full-editor-inline"><span class="sr-only">Data</span><select aria-label="Private preview data" @onchange="DataModeAsync"><option value="Sample">Sample</option><option value="Live">Live</option></select></label>
                 <EditorAction Label="Replay preview" Icon="test" Click="ReplayAsync" />
             </div>
+            <EditorContextMenu />
         </div>
         <nav class="full-editor-mobile-tabs" aria-label="Editor panels" data-visual-region>
             @foreach (var pane in new[] { "layers", "preview", "inspector" }) { <button class="btn-secondary" aria-pressed='@(pane == "preview" ? "true" : "false")' data-editor-pane="@pane">@(pane == "preview" ? "Canvas" : char.ToUpperInvariant(pane[0]) + pane[1..])</button> }

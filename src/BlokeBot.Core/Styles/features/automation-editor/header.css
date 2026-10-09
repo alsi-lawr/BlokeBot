@@ -14,7 +14,6 @@
     height: var(--automation-editor-height, min(52rem, calc(100dvh - 14rem)));
     min-height: 36rem;
     overflow: hidden;
-    position: relative;
     transform: none !important;
 }
 
