@@ -118,11 +118,13 @@ internal sealed partial class CustomAnnouncementScheduler
         var message =
             announcement.OccurrenceStatus == AnnouncementOccurrenceStatus.Pending
             && selectedMessage is not null
-                ? await templates.RenderScheduledAsync(
-                    selectedMessage,
-                    new(candidate.HostId, candidate.HostLogin, candidate.TwitchUserId),
-                    cancellationToken
-                )
+                ? (
+                    await templates.RenderScheduledAsync(
+                        selectedMessage,
+                        new(candidate.HostId, candidate.HostLogin, candidate.TwitchUserId),
+                        cancellationToken
+                    )
+                ).Match(static text => text, static failure => failure.ChatMessage())
                 : selectedMessage;
         if (string.IsNullOrWhiteSpace(message))
         {
