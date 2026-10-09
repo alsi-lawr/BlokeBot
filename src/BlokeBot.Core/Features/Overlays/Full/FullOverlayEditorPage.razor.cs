@@ -53,6 +53,7 @@ public partial class FullOverlayEditorPage
     private long _insertedRevision;
     private long _insertedSelectionVersion;
     private FullOverlayToolbox? _toolbox;
+    private FullOverlayInspector? _inspector;
     private EditorToolboxToggle? _toolboxToggle;
     private static readonly IReadOnlyList<SegmentedTabItem> _sourceTabs =
     [
@@ -172,7 +173,8 @@ public partial class FullOverlayEditorPage
         object command,
         string? selection,
         long revision,
-        long selectionVersion
+        long selectionVersion,
+        FullOverlayEditorView? captured = null
     )
     {
         if (_client is not null)
@@ -182,8 +184,50 @@ public partial class FullOverlayEditorPage
                 command,
                 selection,
                 revision,
-                selectionVersion
+                selectionVersion,
+                captured is null
+                    ? null
+                    : new
+                    {
+                        captured.Members,
+                        captured.Selected,
+                        captured.SelectionVersion,
+                        captured.Revision,
+                        captured.Focus,
+                    }
             );
+        }
+    }
+
+    private Task<FullOverlayHierarchyFeedback> HierarchyPreviewAsync(
+        object command,
+        FullOverlayEditorView captured
+    ) =>
+        _client is null || _disposed
+            ? Task.FromResult(
+                new FullOverlayHierarchyFeedback(false, "The editor is no longer available.")
+            )
+            : _client
+                .InvokeAsync<FullOverlayHierarchyFeedback>(
+                    "hierarchyPreview",
+                    command,
+                    new
+                    {
+                        captured.Members,
+                        captured.Selected,
+                        captured.SelectionVersion,
+                        captured.Revision,
+                        captured.Focus,
+                    }
+                )
+                .AsTask();
+
+    private async Task OpenHierarchyAsync()
+    {
+        if (_client is not null && _inspector is not null)
+        {
+            await _client.InvokeVoidAsync("revealHierarchy");
+            await _inspector.OpenHierarchyAsync();
         }
     }
 

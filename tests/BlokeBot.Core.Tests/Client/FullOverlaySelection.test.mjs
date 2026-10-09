@@ -6,7 +6,7 @@ import { insertedLayer } from '../../../src/BlokeBot.Core/wwwroot/Features/Overl
 
 const key=id=>`element:${id}`;
 const fixture=(html,css='',widgets=[])=>({id:crypto.randomUUID(),html,css,widgets,diagnostics:[]});
-const geometry=(key,left=0)=>({key,visible:true,x:left,y:0,width:100,height:50,layoutX:left,layoutY:0,styles:{left:`${left}px`,top:'0px',width:'100px',height:'50px'}});
+const geometry=(key,left=0)=>({key,visible:true,x:left,y:0,width:100,height:50,layoutX:left,layoutY:0,styles:{position:'absolute',left:`${left}px`,top:'0px',width:'100px',height:'50px'}});
 const move=(owner,targets,dx=16)=>{const view=owner.view();return owner.planGesture({kind:'move',dx,dy:8,targets},view.selected,view.revision,view.selectionVersion);};
 const widget=id=>({id:{value:id},kind:{value:'giveaway'},configuration:{title:id},authoring:{isVisible:true,isLocked:false,clipOverflow:false,x:'0px',y:'0px',width:'100px',height:'50px',rotationDegrees:0,scaleX:1,scaleY:1,horizontalAnchor:0,verticalAnchor:0},audio:{isMuted:false,volume:.3}});
 
@@ -113,7 +113,7 @@ test('Move and nudge displace from winning native positions, not losing inline v
  for(const plural of [false,true])for(const [dx,dy] of [[16,8],[1,0]]){
   const id=crypto.randomUUID(),other=`widget:${id}`,original=fixture(`<div id="a" data-blokebot-element="a" style="left:20px;top:9px;color:red!important; /* retained */ opacity:.5">A</div><section data-blokebot-widget="${id}"></section>`,'#a{position:absolute;left:100px!important;top:50px!important;width:100px;height:50px}',[widget(id)]);
   const owner=createEditorDocument(original),keys=plural?[key('a'),other]:[key('a')];owner.selectSet(keys);
-  const targets=keys.map(k=>({...geometry(k,k===key('a')?100:300),layoutY:50,styles:{left:k===key('a')?'100px':'300px',top:'50px',translate:'none'}}));
+  const targets=keys.map(k=>({...geometry(k,k===key('a')?100:300),layoutY:50,styles:{position:'absolute',left:k===key('a')?'100px':'300px',top:'50px',translate:'none'}}));
   const view=owner.view(),planned=owner.planGesture({kind:'move',dx,dy,targets},view.selected,view.revision,view.selectionVersion);
   assert.equal(planned.kind,'planned');assert.deepEqual(owner.candidate(),original);owner.commitGesture(planned);assert.equal(owner.view().revision,1);
   owner.select(key('a'));assert.equal(owner.view().styles['--blokebot-x'].trim(),`${100+dx}px`);
@@ -126,7 +126,7 @@ test('Move and nudge displace from winning native positions, not losing inline v
 
 test('Native effective center and end anchors retain offsets and independent translation while rejecting an incomplete later root',()=>{
  const original=fixture('<div data-blokebot-element="center" style="--blokebot-anchor-x:1;--blokebot-anchor-y:1;--blokebot-x:5px;--blokebot-y:2px;rotate:15deg;color:red!important"></div><div data-blokebot-element="end" style="--blokebot-anchor-x:2;--blokebot-anchor-y:2;--blokebot-x:8px;--blokebot-y:4px;transform:scale(.8)"></div>'),owner=createEditorDocument(original),keys=[key('center'),key('end')];owner.selectSet(keys);
- const targets=[{...geometry(keys[0],650),containingWidth:1200,containingHeight:800,styles:{left:'650px',top:'410px','--blokebot-anchor-x':'1','--blokebot-anchor-y':'1',translate:'-50% -50% 7px'}},{...geometry(keys[1],100),styles:{right:'120px',bottom:'80px','--blokebot-anchor-x':'2','--blokebot-anchor-y':'2',translate:'12px -6px 9px'}}];
+ const targets=[{...geometry(keys[0],650),containingWidth:1200,containingHeight:800,styles:{position:'absolute',left:'650px',top:'410px','--blokebot-anchor-x':'1','--blokebot-anchor-y':'1',translate:'-50% -50% 7px'}},{...geometry(keys[1],100),styles:{position:'absolute',right:'120px',bottom:'80px','--blokebot-anchor-x':'2','--blokebot-anchor-y':'2',translate:'12px -6px 9px'}}];
  const incomplete=[targets[1],{...targets[0],containingWidth:undefined}];assert.equal(move(owner,incomplete).kind,'unmapped');assert.deepEqual(owner.candidate(),original);assert.equal(owner.view().history.undo,false);
  const planned=move(owner,targets);assert.equal(planned.kind,'planned');owner.commitGesture(planned);assert.equal(owner.view().revision,1);
  owner.select(keys[0]);assert.equal(owner.view().styles['--blokebot-x'].trim(),'66px');assert.equal(owner.view().styles['--blokebot-y'].trim(),'18px');assert.equal(owner.view().styles.translate.trim(),'-50% -50% 7px');assert.equal(owner.view().styles.rotate,'15deg');

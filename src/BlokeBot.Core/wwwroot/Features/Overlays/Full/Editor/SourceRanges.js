@@ -24,7 +24,7 @@ export function htmlRanges(source) {
         if (node.content) visit(node.content, authored, currentPath);
     }
     visit(tree);
-    return { elements, diagnostics };
+    return { elements, diagnostics, tree };
 }
 
 export function parsedCss(source, context = "stylesheet") {

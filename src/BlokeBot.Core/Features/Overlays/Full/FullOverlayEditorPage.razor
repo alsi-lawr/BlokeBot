@@ -48,6 +48,9 @@
                 <h2>Layers</h2>
                 @if (_view.Members.Count > 1) { <p class="form-help" role="status">@_view.Members.Count selected · Active: @SelectedLabel()</p> }
                 <FullOverlayLayerTree View="_view" Selected="SelectAsync" />
+                <div class="full-hierarchy-root"><button type="button" class="btn-secondary" data-hierarchy-root disabled="@(_view.Selected is null)" @onclick='() => CommandAtAsync(new { kind = "hierarchy", relation = "root" }, controlView.Selected, controlView.Revision, controlView.SelectionVersion, controlView)'>Move to @controlView.HierarchyRoot.ToLowerInvariant()</button></div>
+                <button type="button" class="btn-secondary full-hierarchy-open" disabled="@(_view.Selected is null)" @onclick="OpenHierarchyAsync">Move in HTML…</button>
+                <p class="form-help full-hierarchy-hint">Drag a row before, inside or after another layer. Or use Move in HTML.</p>
             </aside>
             <div class="full-editor-centre">
                 <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Ctrl toggles layers. Alt drag selects all intersecting layers. Middle drag pans the view.">
@@ -64,7 +67,7 @@
                 </section>
             </div>
             <aside class="full-editor-inspector" aria-label="Selected layer inspector" tabindex="-1" data-visual-region>
-                <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
+                <FullOverlayInspector @ref="_inspector" @key="controlView.Selected" View="controlView" HierarchyPreview="command => HierarchyPreviewAsync(command, controlView)" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion, controlView)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
                 @if (_view.Widget is { } widget) {
                     <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">
                         @if (widget.Kind.Value is "image" or "audio" or "video") {
