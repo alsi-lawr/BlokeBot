@@ -79,6 +79,171 @@ public sealed class TwitchEventAutomationTests
             CancellationToken.None
         );
         (await fixture.RunCountAsync()).ShouldBe(1);
+
+        await fixture.Runtime.CheerReceivedAsync(
+            fixture.Cheer("cheer-3", bits: 1000001),
+            CancellationToken.None
+        );
+        (await fixture.RunCountAsync()).ShouldBe(2);
+    }
+
+    [Test]
+    [Arguments(200, 2, 3, 3)]
+    [Arguments(100, 1, 1, 1)]
+    public async Task Cheer_InclusiveBoundsRejectOutsideAndEqualBoundsMatchOneAmount(
+        int maximum,
+        int runsAt150,
+        int runsAt200,
+        int runsAt201
+    )
+    {
+        await using var fixture = await EventFixture.CreateAsync();
+        var source = Node("cheer", $$"""{"minimum-bits":100,"maximum-bits":{{maximum}}}""");
+        var action = Node("send-chat", """{"message":"Cheers!"}""");
+        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+
+        foreach (
+            var (bits, expectedRuns) in new[]
+            {
+                (99, 0),
+                (100, 1),
+                (150, runsAt150),
+                (200, runsAt200),
+                (201, runsAt201),
+            }
+        )
+        {
+            await fixture.Runtime.CheerReceivedAsync(
+                fixture.Cheer($"cheer-{bits}", bits),
+                CancellationToken.None
+            );
+            (await fixture.RunCountAsync()).ShouldBe(expectedRuns);
+            fixture.Chat.Messages.Count.ShouldBe(expectedRuns);
+        }
+    }
+
+    [Test]
+    [Arguments("null")]
+    [Arguments("\"200\"")]
+    [Arguments("true")]
+    [Arguments("{}")]
+    [Arguments("[]")]
+    [Arguments("100.5")]
+    [Arguments("2147483648")]
+    [Arguments("9223372036854775808")]
+    [Arguments("0")]
+    [Arguments("-1")]
+    [Arguments("99")]
+    public async Task Cheer_InvalidMaximumSavePreservesTheFlowAndRecoversWithoutAnArbitraryCap(
+        string maximumJson
+    )
+    {
+        await using var fixture = await EventFixture.CreateAsync();
+        const string Original = """{"minimum-bits":100,"maximum-bits":200}""";
+        var source = Node("cheer", Original);
+        var flowId = await fixture.SaveAsync([source], []);
+        var invalidSource = source with
+        {
+            Definition = Node(
+                "cheer",
+                $$"""{"minimum-bits":100,"maximum-bits":{{maximumJson}}}"""
+            ).Definition,
+        };
+        var invalid = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [invalidSource], []) with
+                {
+                    Id = flowId,
+                },
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
+        invalid.Errors.ShouldContain(error =>
+            error.NodeId == source.Id
+            && error.FieldId == new AutomationConfigurationFieldId("maximum-bits")
+        );
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (await db.AutomationFlowNodes.SingleAsync()).ConfigurationJson.ShouldBe(Original);
+        }
+
+        var corrected = source with
+        {
+            Definition = Node(
+                "cheer",
+                """{"minimum-bits":100,"maximum-bits":2147483647}"""
+            ).Definition,
+        };
+        _ = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [corrected], []) with
+                {
+                    Id = flowId,
+                },
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        await fixture.Runtime.CheerReceivedAsync(
+            fixture.Cheer("corrected", int.MaxValue),
+            CancellationToken.None
+        );
+        (await fixture.RunCountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    [Arguments("""{"minimum-bits":100}""")]
+    [Arguments("""{"minimum-bits":100,"maximum-bits":200}""")]
+    public async Task Cheer_SavedAndFrozenConfigurationResumesAfterTheLiveBoundsChange(string json)
+    {
+        await using var fixture = await EventFixture.CreateAsync();
+        var source = Node("cheer", json);
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"Frozen cheer"}""");
+        var edges = ImmutableArray.Create(
+            Edge(source, "flow", delay),
+            Edge(delay, "complete", action)
+        );
+        var flowId = await fixture.SaveAsync([source, delay, action], edges);
+
+        await fixture.Runtime.CheerReceivedAsync(
+            fixture.Cheer("frozen", 150),
+            CancellationToken.None
+        );
+        fixture.Chat.Messages.ShouldBeEmpty();
+        AutomationRunId runId;
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (
+                await db.AutomationFlowNodes.SingleAsync(node => node.Id == source.Id.Value)
+            ).ConfigurationJson.ShouldBe(json);
+            var run = await db.AutomationFlowRuns.SingleAsync();
+            runId = new(run.Id);
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            frozen
+                .Flow.Nodes.Single(node => node.Id == source.Id.Value)
+                .ConfigurationJson.ShouldBe(json);
+        }
+        var changedSource = source with
+        {
+            Definition = Node("cheer", """{"minimum-bits":100,"maximum-bits":100}""").Definition,
+        };
+        _ = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [changedSource, delay, action], edges) with
+                {
+                    Id = flowId,
+                },
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        (await fixture.FlowRuntime.ResumeAsync(runId, CancellationToken.None)).Status.ShouldBe(
+            AutomationResumeStatus.Completed
+        );
+        fixture.Chat.Messages.ShouldBe(["Frozen cheer"]);
     }
 
     [Test]

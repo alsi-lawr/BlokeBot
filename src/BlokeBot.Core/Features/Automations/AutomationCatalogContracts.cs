@@ -254,7 +254,8 @@ public sealed record SubscriptionSourceConfiguration : AutomationConfiguration;
 public sealed record SubscriptionGiftSourceConfiguration(int MinimumGiftCount)
     : AutomationConfiguration;
 
-public sealed record CheerSourceConfiguration(int MinimumBits) : AutomationConfiguration;
+public sealed record CheerSourceConfiguration(int MinimumBits, int? MaximumBits = null)
+    : AutomationConfiguration;
 
 public sealed record IncomingRaidSourceConfiguration(int MinimumViewerCount)
     : AutomationConfiguration;
