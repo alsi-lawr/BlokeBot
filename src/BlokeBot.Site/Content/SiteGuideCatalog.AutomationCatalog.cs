@@ -143,7 +143,7 @@ internal static partial class SiteGuideCatalog
                         "Actions can play overlay cues.",
                         "Actions can complete Channel Points redemptions.",
                         "Actions can run Native Twitch operations.",
-                        "Send chat message sends up to 500 characters in the channel. The message can include automation variables from the source event.",
+                        "Send chat message sends up to 500 characters in the channel. Choose Fixed to enter the exact message, or Connected to use a Text output. Use CEL Transform to build a message from event data.",
                         "Play overlay cue plays a saved Cue through a chosen Cue player Browser Source.",
                         "For playback, enable the cue.",
                         "For playback, enable Cue player.",

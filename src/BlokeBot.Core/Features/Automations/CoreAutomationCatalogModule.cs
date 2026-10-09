@@ -216,7 +216,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                     new(
                         new("message"),
                         "Message",
-                        "The chat message can contain automation variables.",
+                        "Enter the exact chat message, or connect a Text output.",
                         new AutomationConfigurationFieldType.Text(500, true),
                         true
                     ),
@@ -229,10 +229,22 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             parseForInputBindings: ParseSendChat,
             validateForInputBindings: (configuration, bindings) =>
                 bindings.TryGetValue(new("message"), out var binding)
-                && binding.Mode
-                    is AutomationInputBindingMode.Connected
-                        or AutomationInputBindingMode.Expression
-                    ? AutomationValidationResult.Valid
+                    ? !Enum.IsDefined(binding.Mode)
+                        ? AutomationValidationResult.Invalid(
+                            new AutomationValidationTarget.Field(new("message")),
+                            "Choose Fixed or Connected for the chat message."
+                        )
+                        : binding.Mode switch
+                        {
+                            AutomationInputBindingMode.Fixed => ValidateSendChat(configuration),
+                            AutomationInputBindingMode.Connected =>
+                                AutomationValidationResult.Valid,
+                            AutomationInputBindingMode.Expression =>
+                                AutomationValidationResult.Invalid(
+                                    new AutomationValidationTarget.Field(new("message")),
+                                    "Send chat message supports Fixed or Connected. Choose Fixed to enter a message, or connect a Text output from CEL Transform."
+                                ),
+                        }
                     : ValidateSendChat(configuration)
         );
 

@@ -93,20 +93,23 @@ public sealed partial class AutomationRuntimeTests
             bindings: Bindings("message", AutomationInputBindingMode.Connected)
         );
         var expression = Node(
-            "send-chat",
-            """{"message":"fallback"}""",
+            "condition",
+            """{"predicate":false}""",
             bindings: Bindings(
-                "message",
+                "predicate",
                 AutomationInputBindingMode.Expression,
-                new(AutomationExpressionLanguage.CurrentVersion, "actor.display_name")
+                new(
+                    AutomationExpressionLanguage.CurrentVersion,
+                    "actor.display_name == 'Fixture viewer'"
+                )
             )
         );
         var draft = Draft(
             fixture.HostId,
             [source, projection, connected, expression],
             [
-                Edge(source, "flow", connected),
-                Edge(connected, "complete", expression),
+                Edge(source, "flow", expression),
+                Edge(expression, "yes", connected),
                 Edge(source, "actor", projection, "actor", AutomationEdgeKind.Data),
                 Edge(projection, "value", connected, "message", AutomationEdgeKind.Data),
             ]
@@ -145,7 +148,12 @@ public sealed partial class AutomationRuntimeTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
-        result.Nodes[^1].ResolvedInputs.ShouldHaveSingleItem().DisplayValue.ShouldBe(Viewer);
+        result
+            .Nodes.Single(node => node.NodeId == expression.Id)
+            .OutcomeCode.ShouldBe("condition-true");
+        result
+            .Nodes.Single(node => node.NodeId == connected.Id)
+            .State.ShouldBe(AutomationNodeRunState.Succeeded);
         projector.Calls.ShouldBe(1);
         var injected = new Dictionary<AutomationVariableName, AutomationVariable>
         {

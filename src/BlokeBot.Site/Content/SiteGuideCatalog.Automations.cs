@@ -234,7 +234,7 @@ internal static partial class SiteGuideCatalog
                         "Source values can include the viewer and command text.",
                         "Source values can include the channel and event time.",
                         "Source values can include live stream identity.",
-                        "Chat messages can include automation variables that carry those values.",
+                        "For chat messages, connect event data to CEL Transform and connect its Text output to Send chat message.",
                         "Marker descriptions can include automation variables that carry those values.",
                         "Poll questions can include automation variables that carry those values.",
                         "Prediction questions can include automation variables that carry those values.",
