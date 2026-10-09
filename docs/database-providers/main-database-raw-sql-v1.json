@@ -215,7 +215,7 @@
     {
       "id": "postgresql-bounded-write-admission",
       "path": "src/BlokeBot.Persistence/MainDatabaseWriteTransaction.cs",
-      "source_line": 112,
+      "source_line": 120,
       "api": "ExecuteSqlInterpolatedAsync",
       "source_marker": "SELECT set_config('lock_timeout'",
       "sql_verb": "SELECT",
@@ -225,7 +225,7 @@
     {
       "id": "postgresql-immediate-write-admission-lock",
       "path": "src/BlokeBot.Persistence/MainDatabaseWriteTransaction.cs",
-      "source_line": 117,
+      "source_line": 125,
       "api": "ExecuteSqlInterpolatedAsync",
       "source_marker": "SELECT pg_advisory_xact_lock(",
       "sql_verb": "SELECT",
@@ -241,6 +241,26 @@
       "sql_verb": "UPDATE; DELETE",
       "purpose": "Execute the already-selected provider-specific host-lock or bounded-cleanup statement within the caller transaction.",
       "dialect_dependency": "closed_sqlite_postgresql_dispatch"
+    },
+    {
+      "id": "point-current-row-sql-dispatch",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.Points.cs",
+      "source_line": 231,
+      "api": "DbCommand.CommandText",
+      "source_marker": "command.CommandText = sql;",
+      "sql_verb": "INSERT; UPDATE; DELETE; SELECT",
+      "purpose": "Execute typed current-row point balance and idempotent watch-time ledger statements within the caller-owned transaction.",
+      "dialect_dependency": "closed_postgresql_numeric_sqlite_point_functions_dispatch"
+    },
+    {
+      "id": "watch-time-settings-current-row-update",
+      "path": "src/BlokeBot.Persistence/MainDatabaseStatements.WatchTimeSettings.cs",
+      "source_line": 36,
+      "api": "DbCommand.CommandText",
+      "source_marker": "UPDATE points_settings SET",
+      "sql_verb": "UPDATE",
+      "purpose": "Apply current-row watch-time settings with authoritative configuration revision and enable generation, returning applied current-row values within the caller-owned transaction.",
+      "dialect_dependency": "postgresql_distinct_from_sqlite_is_not_with_provider_guid_parameters"
     },
     {
       "id": "cutover-sequence-advancement",
