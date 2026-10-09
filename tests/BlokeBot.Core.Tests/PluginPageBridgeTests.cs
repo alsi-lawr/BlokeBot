@@ -411,6 +411,7 @@ public sealed class PluginPageBridgeTests
             _ = builder.Services.AddSingleton<IPluginPackageAssetResolver>(
                 new PackageResolver(setup.Manifest, packageRoot)
             );
+            _ = builder.Services.AddSingleton<PluginDeclaredAssetReader>();
             _ = builder.Services.AddSingleton<PluginPageAssetService>();
             _ = builder
                 .Services.AddAuthentication(TestAuthenticationHandler.SchemeName)

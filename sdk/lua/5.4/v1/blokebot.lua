@@ -33,6 +33,10 @@
 ---@field ["hostId"] integer # The selected BlokeBot host ID.
 ---@field ["sessionId"] string # The generated page session ID.
 
+---Input delivered to a public widget projection handler. No page session or private host state is supplied.
+---@class BlokeBotWidgetInput
+---@field ["configuration"] table<string, BlokeBotValue> # The public widget instance configuration.
+
 ---Input delivered for a declared BlokeBot event.
 ---@class BlokeBotEventInput
 ---@field ["event_id"] string # The stable event correlation ID.
@@ -170,6 +174,21 @@
 ---@field ["featureId"] string # The admitted plugin feature ID.
 ---@field ["page"] BlokeBotPageContext # The page identity.
 
+---The admitted full overlay/widget identity, not management authority.
+---@class BlokeBotWidgetContext
+---@field ["id"] string # The declared widget ID.
+---@field ["overlayId"] string # The resolved full overlay ID.
+---@field ["documentId"] string # The resolved full document identity.
+---@field ["instanceId"] string # The instance ID within the full document.
+---@field ["mode"] "live"|"preview-live"|"preview-sample" # The server projection intent. Preview handlers must not admit or consume production work.
+
+---A trusted server-side public widget projection invocation.
+---@class BlokeBotWidgetInvocationContext: BlokeBotContextBase
+---@field ["kind"] "widget" # The context kind.
+---@field ["hostId"] integer # The selected BlokeBot host ID.
+---@field ["featureId"] string # The admitted plugin feature ID.
+---@field ["widget"] BlokeBotWidgetContext # The full widget identity.
+
 ---An outbound HTTP request.
 ---@class BlokeBotHttpRequest
 ---@field ["method"] "GET"|"POST"|"PUT"|"PATCH"|"DELETE"|"HEAD" # The HTTP method.
@@ -195,7 +214,7 @@
 ---@field ["code"] string # The stable HTTP failure code.
 
 ---The exact admitted invocation context.
----@alias BlokeBotContext BlokeBotInstallationContext|BlokeBotChannelContext|BlokeBotAutomationInvocationContext|BlokeBotMigrationInvocationContext|BlokeBotPageInvocationContext
+---@alias BlokeBotContext BlokeBotInstallationContext|BlokeBotChannelContext|BlokeBotAutomationInvocationContext|BlokeBotMigrationInvocationContext|BlokeBotPageInvocationContext|BlokeBotWidgetInvocationContext
 
 ---The typed outbound HTTP outcome.
 ---@alias BlokeBotHttpOutcome BlokeBotHttpResponse|BlokeBotHttpRejected|BlokeBotHttpFailed

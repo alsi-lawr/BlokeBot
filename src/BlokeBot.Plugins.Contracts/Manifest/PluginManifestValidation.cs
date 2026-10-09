@@ -25,6 +25,7 @@ public enum PluginManifestErrorCode
     InvalidAutomationDefinition,
     InvalidAutomationTemplate,
     InvalidPage,
+    InvalidWidget,
     InvalidPluginValue,
     IncompatibleDeclaration,
 }

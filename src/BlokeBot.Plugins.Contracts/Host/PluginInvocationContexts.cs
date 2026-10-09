@@ -24,6 +24,7 @@ public sealed record PluginHostId
 [JsonDerivedType(typeof(PluginInvocationContext.Automation), "automation")]
 [JsonDerivedType(typeof(PluginInvocationContext.Migration), "migration")]
 [JsonDerivedType(typeof(PluginInvocationContext.Page), "page")]
+[JsonDerivedType(typeof(PluginInvocationContext.Widget), "widget")]
 public abstract record PluginInvocationContext
 {
     private PluginInvocationContext() { }
@@ -93,6 +94,20 @@ public abstract record PluginInvocationContext
     {
         [JsonIgnore]
         public override PluginInvocationContextKind Kind => PluginInvocationContextKind.Migration;
+    }
+
+    public sealed record Widget(
+        PluginInstallationIdentity Plugin,
+        PluginHostId Host,
+        PluginWidgetId WidgetId,
+        Guid OverlayId,
+        Guid DocumentId,
+        Guid InstanceId,
+        PluginWidgetProjectionMode Mode
+    ) : PluginInvocationContext
+    {
+        [JsonIgnore]
+        public override PluginInvocationContextKind Kind => PluginInvocationContextKind.Widget;
     }
 
     public sealed record Page(
@@ -165,4 +180,12 @@ internal sealed class PluginHostIdJsonConverter : JsonConverter<PluginHostId>
         PluginHostId value,
         JsonSerializerOptions options
     ) => writer.WriteNumberValue(value.Value);
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<PluginWidgetProjectionMode>))]
+public enum PluginWidgetProjectionMode
+{
+    Live,
+    PreviewLive,
+    PreviewSample,
 }

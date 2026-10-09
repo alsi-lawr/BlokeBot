@@ -68,15 +68,23 @@ internal sealed partial class OverlayCueService
                     if (
                         OverlayMediaTypes.Kind(previousDocument.ContentType)
                             != OverlayMediaTypes.Kind(declaredContentType)
-                        && await db.OverlayCueMediaAssetReferences.AnyAsync(
-                            value => value.HostId == hostId && value.AssetId == asset.Id,
-                            cancellationToken
+                        && (
+                            await db.OverlayCueMediaAssetReferences.AnyAsync(
+                                value => value.HostId == hostId && value.AssetId == asset.Id,
+                                cancellationToken
+                            )
+                            || await FullOverlayReferencesMediaAsync(
+                                db,
+                                hostId,
+                                asset.PublicId,
+                                cancellationToken
+                            )
                         )
                     )
                     {
                         return Reject<OverlayMediaAssetView>(
                             new OverlayCueRejection.Invalid(
-                                "Remove this asset from every cue before replacing it with a different media type."
+                                "Remove this asset from every cue and full overlay before replacing it with a different media type."
                             )
                         );
                     }

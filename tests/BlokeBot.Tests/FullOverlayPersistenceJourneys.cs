@@ -24,7 +24,7 @@ public sealed partial class FullOverlayPersistenceJourneys
             Directory.GetCurrentDirectory(),
             ".agent-workspace",
             "overlay-composition-20261001",
-            "285",
+            "286",
             "provider-fixtures",
             Guid.NewGuid().ToString("N")
         );

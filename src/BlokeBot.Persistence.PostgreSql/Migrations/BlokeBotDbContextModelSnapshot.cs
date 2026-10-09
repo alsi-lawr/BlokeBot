@@ -5031,6 +5031,43 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("full_overlays", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("BindingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FullOverlayId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("PublishedVersion")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.HasIndex("FullOverlayId", "BindingId")
+                        .IsUnique();
+
+                    b.ToTable("full_overlay_event_feed_bindings", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
                 {
                     b.Property<long>("OverlayId")
@@ -5990,6 +6027,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<DateTime>("EnqueuedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long?>("FullOverlayEventFeedBindingId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("HostId")
                         .HasColumnType("integer");
 
@@ -6003,7 +6043,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<long>("OverlayInstanceId")
+                    b.Property<long?>("OverlayInstanceId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Priority")
@@ -6026,6 +6066,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Kind", "SourceKey")
+                        .IsUnique();
+
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Lifecycle", "EnqueuedAtUtc");
+
                     b.HasIndex("OverlayInstanceId", "Kind", "SourceKey")
                         .IsUnique();
 
@@ -6038,6 +6083,8 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "\"Kind\" IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "\"Lifecycle\" IN ('active', 'consumed', 'queued', 'suppressed')");
+
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Owner", "(\"OverlayInstanceId\" IS NULL) <> (\"FullOverlayEventFeedBindingId\" IS NULL)");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Priority", "\"Priority\" IN ('high', 'normal')");
 
@@ -10686,6 +10733,23 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", "FullOverlay")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FullOverlay");
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.FullOverlay", null)
@@ -10992,6 +11056,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayEventFeedItem", b =>
                 {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", "FullOverlayEventFeedBinding")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayEventFeedBindingId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
@@ -11001,8 +11070,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasOne("BlokeBot.Persistence.Models.OverlayInstance", "OverlayInstance")
                         .WithMany()
                         .HasForeignKey("OverlayInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("FullOverlayEventFeedBinding");
 
                     b.Navigation("OverlayInstance");
                 });
