@@ -10,6 +10,8 @@ public sealed class CustomCommand
 
     public bool Enabled { get; set; } = true;
 
+    public bool SingleArgument { get; set; }
+
     public bool AllowEveryone { get; set; } = true;
 
     public bool AllowModerators { get; set; }

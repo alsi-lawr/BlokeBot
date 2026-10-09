@@ -107,6 +107,17 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
         IReadOnlyList<CustomCommandEditor> changedCommands = [];
         if (customSelection is not null && document.Sections.CustomCommands is { } custom)
         {
+            var definitionIssues = await StageStoredDefinitionsAsync(
+                db,
+                hostId,
+                custom.StoredDefinitions,
+                customSelection.Strategy,
+                cancellationToken
+            );
+            if (definitionIssues.Count != 0)
+            {
+                return definitionIssues;
+            }
             var imported = MapCustomCommands(custom, customSelection, referencePlan, ref nextId);
             if (imported.Issues.Count > 0)
             {

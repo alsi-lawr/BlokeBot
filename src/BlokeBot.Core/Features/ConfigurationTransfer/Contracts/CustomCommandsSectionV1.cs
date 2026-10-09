@@ -8,7 +8,8 @@ public sealed record CustomCommandsSectionV1(
     [property: JsonRequired] string TimeZoneId,
     [property: JsonRequired] IReadOnlyList<MessageEntryV1> Replies,
     [property: JsonRequired] IReadOnlyList<CounterV1> Counters,
-    [property: JsonRequired] IReadOnlyList<CustomCommandV1> Commands
+    [property: JsonRequired] IReadOnlyList<CustomCommandV1> Commands,
+    IReadOnlyList<StoredDefinitionV1>? StoredDefinitions = null
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -37,7 +38,8 @@ public sealed record CustomCommandV1(
     [property: JsonRequired] int CooldownSeconds,
     [property: JsonRequired] CustomCommandCooldownScope CooldownScope,
     [property: JsonRequired] CustomCommandInvocationLimit InvocationLimit,
-    [property: JsonRequired] CustomCommandActionV1 Action
+    [property: JsonRequired] CustomCommandActionV1 Action,
+    bool SingleArgument = false
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -62,3 +64,11 @@ public enum CustomCommandActionTypeV1
     Automation,
     OverlayCue,
 }
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record StoredDefinitionV1(
+    [property: JsonRequired] string Name,
+    [property: JsonRequired] CustomValueScope Scope,
+    [property: JsonRequired] CustomValueKind Kind,
+    [property: JsonRequired] string Default
+);

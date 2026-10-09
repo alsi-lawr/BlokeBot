@@ -44,6 +44,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         >();
         services.TryAddSingleton<IMessageLibraryChatterSource, MessageLibraryChatterSource>();
         _ = services.AddSingleton<CustomCommandTemplateRenderer>();
+        _ = services.AddSingleton<CustomStoredValueService>();
         _ = services.AddSingleton<CustomCommandConfigurationGraphWriter>();
         _ = services.AddSingleton<CustomCommandConfigurationService>();
         _ = services.AddSingleton<HostCustomCommandSettingsService>();

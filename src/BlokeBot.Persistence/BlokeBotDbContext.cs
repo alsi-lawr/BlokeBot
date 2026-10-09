@@ -219,6 +219,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureReplyDelivery(modelBuilder);
         ConfigureAccess(modelBuilder);
         ConfigureCommands(modelBuilder);
+        ConfigureStoredValues(modelBuilder);
         ConfigureAnnouncements(modelBuilder);
         ConfigureAlertsAndPublicChat(modelBuilder);
         ConfigurePoints(modelBuilder);
