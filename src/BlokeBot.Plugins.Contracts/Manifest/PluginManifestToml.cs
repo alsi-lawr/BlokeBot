@@ -153,6 +153,7 @@ public static class PluginManifestToml
                 new PluginManifestEnumTomlConverter<PluginSettingScope>(),
                 new PluginManifestEnumTomlConverter<PluginAutomationDefinitionKind>(),
                 new PluginManifestEnumTomlConverter<PluginValueKind>(),
+                new PluginManifestEnumTomlConverter<PluginWidgetFieldPortability>(),
                 new PluginManifestEnumTomlConverter<PluginTwitchEventKind>(),
                 new PluginManifestEnumTomlConverter<PluginBlokeBotEventKind>(),
             ],

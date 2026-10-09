@@ -1,9 +1,17 @@
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.Overlays.Full;
 
 public partial class FullOverlayEditorPage
 {
+    private ElementReference _exportForm;
+
+    private Task ExportAsync() =>
+        _client is null
+            ? Task.CompletedTask
+            : _client.InvokeVoidAsync("export", _exportForm, _name).AsTask();
+
     private IReadOnlyList<FullOverlayPublicationView> _history = [];
     private string _liveUrl = "";
     private string _savedName = "";

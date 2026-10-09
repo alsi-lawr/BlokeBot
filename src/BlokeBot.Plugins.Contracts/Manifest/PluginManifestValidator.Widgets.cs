@@ -36,6 +36,7 @@ public static partial class PluginManifestValidator
                     || string.IsNullOrWhiteSpace(field.Title)
                     || !Enum.IsDefined(field.ValueKind)
                     || field.ValueKind == PluginValueKind.Nil
+                    || (field.Portability is { } portability && !Enum.IsDefined(portability))
                 )
                 || widget
                     .ConfigurationFields.Select(field => field.Name)

@@ -19,7 +19,7 @@ public partial class FullOverlayEditorPage
         }
 
         var request = ++_previewRequest;
-        var candidate = await _client.InvokeAsync<FullOverlayDocument>("candidate");
+        var candidate = await ReadCandidateAsync();
         var result = await _delivery.CreatePreviewAsync(
             PageContext.Session,
             candidate,

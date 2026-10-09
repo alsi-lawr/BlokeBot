@@ -53,8 +53,10 @@ internal sealed partial class FullOverlayWidgetRegistry(
             FullOverlayWidgetOutput output;
             try
             {
-                output = _builtins.TryGetValue(widget.Kind, out var registration)
-                    ? await registration.Project(this, context, widget, ct)
+                output =
+                    widget.RequiresSetup ? Unavailable(widget, "destination-setup-required")
+                    : _builtins.TryGetValue(widget.Kind, out var registration)
+                        ? await registration.Project(this, context, widget, ct)
                     : await ProjectPluginAsync(context, widget, ct);
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)

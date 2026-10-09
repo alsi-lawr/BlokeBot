@@ -34,6 +34,7 @@ else {
             break;
     }
     @foreach (var field in PluginFields) {
+        @if (Widget.RequiresSetup && field.Portability == PluginWidgetFieldPortability.DestinationBinding) { <p class="text-muted-foreground">@field.Title · enter its destination value for this channel.</p> }
         @if (field.ValueKind == PluginValueKind.Boolean) { <label class="full-editor-inline"><input type="checkbox" checked='@Boolean(field.Name)' @onchange='args => ChangeAsync([field.Name], (bool)args.Value!)' />@field.Title@(field.Required ? " *" : "")</label> }
         else if (field.ValueKind == PluginValueKind.Number) { <Field Id='@($"full-plugin-{field.Name}")' Label='@field.Title' Value='@Text(field.Name)' ValueChanged='value => NumberAsync([field.Name], value)' /> }
         else if (field.ValueKind == PluginValueKind.String) { <Field Id='@($"full-plugin-{field.Name}")' Label='@field.Title' Value='@Text(field.Name)' ValueChanged='value => ChangeAsync([field.Name], value)' /> }

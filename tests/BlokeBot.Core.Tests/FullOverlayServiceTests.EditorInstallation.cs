@@ -7,6 +7,7 @@ using BlokeBot.Core.Hosts;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -77,8 +78,8 @@ public sealed partial class FullOverlayServiceTests
         );
         var client = module.SetupModule("createClient", _ => true);
         _ = client
-            .Setup<FullOverlayDocument>("candidate", _ => true)
-            .SetResult(created.Overlay.Draft);
+            .Setup<IJSStreamReference>("candidateStream", _ => true)
+            .SetResult(new CandidateStream(created.Overlay.Draft));
         var installs = client.SetupVoid("preview", _ => true).SetVoidResult();
         var page = context.Render<FullOverlayEditorPage>(parameters =>
             parameters.Add(component => component.OverlayId, created.Overlay.Id)
@@ -177,5 +178,20 @@ public sealed partial class FullOverlayServiceTests
             }
             return new ModeratorAuthorityOutcome.Granted();
         }
+    }
+
+    private sealed class CandidateStream(FullOverlayDocument document) : IJSStreamReference
+    {
+        private readonly byte[] _json = System.Text.Encoding.UTF8.GetBytes(
+            FullOverlayDocuments.Serialize(document)
+        );
+        public long Length => _json.Length;
+
+        public ValueTask<Stream> OpenReadStreamAsync(
+            long maxAllowedSize = 512000,
+            CancellationToken cancellationToken = default
+        ) => new(new MemoryStream(_json));
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

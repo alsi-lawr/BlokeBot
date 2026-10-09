@@ -11,13 +11,20 @@
         <section class="surface-card full-overlay-collection">
             <div class="flex flex-wrap items-end gap-3">
                 <Field Id="full-overlay-name" Label="New overlay name" @bind-Value="_name" MaxLength="128" />
+                <label class="full-editor-field">Start from<select aria-label="Start from" @bind="_template"><option value="Blank">Blank document</option><option value="StreamCompanion">Stream companion</option><option value="CommunityProgress">Community progress</option></select></label>
                 <button class="btn-primary" disabled='@_busy' @onclick="CreateAsync">Create overlay</button>
             </div>
+            <StudioFold Key="full-import" Label="Import document / template" Bare="true" @bind-Open="_importOpen">
+                <label class="full-editor-field">Overlay package<InputFile OnChange="ImportAsync" accept=".zip,application/zip" disabled='@_busy' /></label>
+                <p class="text-muted-foreground">Creates a new unpublished overlay. Current packaged media is uploaded for this channel; source widgets need destination setup.</p>
+                @if (_import is not null) { <button class="btn-secondary" @onclick="() => _import.Cancel()">Cancel import</button> }
+            </StudioFold>
             <div class="flex flex-wrap gap-3" role="group" aria-label="Overlay collection">
                 <button class="btn-secondary" aria-pressed='@(!_archived ? "true" : "false")' @onclick='() => SelectCollectionAsync(false)'>Active</button>
                 <button class="btn-secondary" aria-pressed='@(_archived ? "true" : "false")' @onclick='() => SelectCollectionAsync(true)'>Archived</button>
             </div>
             @if (_message.Length > 0) { <p role="status">@_message</p> }
+            @if (_importedId is { } imported) { <a class="btn-secondary" href="@($"/full-overlays/{imported}/edit")">Edit imported overlay</a> }
             @if (_items.Count == 0) { <p class="text-muted-foreground">No @(_archived ? "archived" : "active") full overlays.</p> }
             @foreach (var item in _items) {
                 <article class="full-overlay-list-row">

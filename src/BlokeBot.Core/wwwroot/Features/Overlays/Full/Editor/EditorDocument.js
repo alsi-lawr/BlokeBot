@@ -87,6 +87,7 @@ export function createEditorDocument(document) {
             }
             if(command.kind==='configuration-field')return widgetValue(['configuration',...command.path],command.value);
             if(command.kind==='configuration')return widgetValue(['configuration'],command.value);
+            if(command.kind==='setup')return widgetValue(['requiresSetup'],command.value);
             if(command.kind==='audio')return widgetValue(['audio',command.property],command.value);
             if(command.kind==='lock') {
                 if(id)return widgetValue(['authoring','isLocked'],command.value);
