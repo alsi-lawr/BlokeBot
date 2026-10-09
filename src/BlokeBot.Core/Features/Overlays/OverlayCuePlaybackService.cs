@@ -66,6 +66,31 @@ internal sealed partial class OverlayCuePlaybackService(
             .OrderBy(value => value.Name)
             .Select(value => new OverlayCueTargetChoice(value.PublicId, value.Name))
             .ToArrayAsync(cancellationToken);
+        var fullTargets = await (
+            from overlay in db.FullOverlays.AsNoTracking()
+            join publication in db.FullOverlayPublications.AsNoTracking()
+                on new { OverlayId = overlay.Id, Version = overlay.PublishedVersion } equals new
+                {
+                    publication.OverlayId,
+                    Version = (long?)publication.Version,
+                }
+            where overlay.HostId == hostId && !overlay.IsArchived
+            select new
+            {
+                overlay.PublicId,
+                overlay.Name,
+                publication.DocumentJson,
+            }
+        ).ToArrayAsync(cancellationToken);
+        targets = targets
+            .Concat(
+                fullTargets
+                    .Where(value =>
+                        HasCuePlayer(Full.FullOverlayDocuments.Deserialize(value.DocumentJson))
+                    )
+                    .Select(value => new OverlayCueTargetChoice(value.PublicId, value.Name))
+            )
+            .ToArray();
         var cues = await db
             .OverlayCues.AsNoTracking()
             .Where(value => value.HostId == hostId && value.IsEnabled)
@@ -110,6 +135,18 @@ internal sealed partial class OverlayCuePlaybackService(
         var state = _targets.GetOrAdd(identity, _ => new TargetState());
         lock (state.Gate)
         {
+            if (ready.Target is OverlayCueTarget.Full full)
+            {
+                if (state.Selection is { } selection && full.Generation.Value < selection.Value)
+                {
+                    return new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled();
+                }
+                if (state.Selection is { } previous && previous != full.Generation)
+                {
+                    CancelAll(identity, state);
+                }
+                state.Selection = full.Generation;
+            }
             PruneTerminal(state);
             var connected =
                 presence.Read(request.HostId, request.TargetOverlayId).ActiveConnectionCount > 0;

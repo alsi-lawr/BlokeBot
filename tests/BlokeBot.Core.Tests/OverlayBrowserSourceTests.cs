@@ -9,14 +9,18 @@ using System.Text.Json;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Plugins.Features;
+using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.EntityFrameworkCore;
@@ -905,6 +909,28 @@ public sealed class OverlayBrowserSourceTests
                 IAuthorizationHandler,
                 AuthSessionCapabilityHandler
             >();
+            _ = builder.Services.AddSingleton<IDataProtectionProvider>(
+                new EphemeralDataProtectionProvider()
+            );
+            var declarations = new PluginFeatureDeclarationRegistry();
+            var features = new PluginFeatureSnapshotRegistry();
+            var runtime = new PluginRuntimeSnapshotRegistry();
+            var plugins = new PluginWidgetCatalog(declarations, features, runtime);
+            _ = builder.Services.AddSingleton(plugins);
+            _ = builder.Services.AddSingleton<IPluginWidgetInvoker>(
+                new PluginDispatchInvoker(
+                    new PluginFeatureAdmissionService(features, runtime),
+                    runtime,
+                    new PluginDispatchWorkRegistry(),
+                    time
+                )
+            );
+            _ = builder.Services.AddSingleton(
+                new PluginWidgetAssetService(
+                    plugins,
+                    new PluginDeclaredAssetReader(new UnavailablePluginPackageAssetResolver())
+                )
+            );
             _ = builder.Services.AddBlokeBotOverlays();
             _ = builder.Services.AddSingleton<IOverlayDnsResolver>(new PublicOverlayDnsResolver());
 

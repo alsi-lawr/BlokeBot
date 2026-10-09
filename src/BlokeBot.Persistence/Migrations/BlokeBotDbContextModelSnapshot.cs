@@ -4844,6 +4844,9 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ProtectedAccessKey")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PublicId")
                         .IsRequired()
                         .HasColumnType("TEXT");

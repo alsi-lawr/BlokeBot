@@ -23,18 +23,15 @@ internal sealed partial class OverlayCuePlaybackService
     {
         foreach (var pair in _targets)
         {
-            OverlayCuePlaybackPlan[] plans;
+            AdmittedRun[] runs;
             lock (pair.Value.Gate)
             {
-                plans = pair
-                    .Value.Active.Values.Select(value => value.Plan)
-                    .Concat(pair.Value.Pending.Select(value => value.Plan))
-                    .ToArray();
+                runs = pair.Value.Active.Values.Concat(pair.Value.Pending).ToArray();
             }
             bool valid;
             try
             {
-                valid = await StateStillEnabledAsync(pair.Key, plans, cancellationToken);
+                valid = await StateStillEnabledAsync(pair.Key, runs, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -43,15 +40,24 @@ internal sealed partial class OverlayCuePlaybackService
             catch (Exception exception)
             {
                 logger.LogWarning(
-                    exception,
-                    "Cue target validation failed for host {HostId} and overlay {OverlayId}.",
+                    "Cue target validation failed for host {HostId} and overlay {OverlayId} ({FailureType}).",
                     pair.Key.HostId,
-                    pair.Key.OverlayId
+                    pair.Key.OverlayId,
+                    exception.GetType().Name
                 );
                 continue;
             }
             lock (pair.Value.Gate)
             {
+                if (
+                    !pair
+                        .Value.Active.Values.Concat(pair.Value.Pending)
+                        .Select(run => run.Plan.RunId)
+                        .SequenceEqual(runs.Select(run => run.Plan.RunId))
+                )
+                {
+                    continue;
+                }
                 if (!valid)
                 {
                     CancelAll(pair.Key, pair.Value);
@@ -64,7 +70,7 @@ internal sealed partial class OverlayCuePlaybackService
 
     private async Task<bool> StateStillEnabledAsync(
         OverlayTargetIdentity identity,
-        IReadOnlyCollection<OverlayCuePlaybackPlan> plans,
+        IReadOnlyCollection<AdmittedRun> runs,
         CancellationToken cancellationToken
     )
     {
@@ -87,11 +93,29 @@ internal sealed partial class OverlayCuePlaybackService
                 features => (features & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays,
                 cancellationToken
             );
+        if (!targetEnabled && runs.FirstOrDefault()?.Target is OverlayCueTarget.Full full)
+        {
+            var current = await ResolveFullTargetAsync(
+                db,
+                identity.HostId,
+                identity.OverlayId,
+                cancellationToken
+            );
+            targetEnabled =
+                current is not null
+                && current.Generation == full.Generation
+                && runs.All(run =>
+                    run.Target is OverlayCueTarget.Full target
+                    && target.Generation == current.Generation
+                )
+                && await ParentEnabledAsync(identity.HostId, cancellationToken);
+        }
         if (!targetEnabled)
         {
             return false;
         }
-        if (plans.Count == 0)
+        var plans = runs.Select(run => run.Plan).ToArray();
+        if (plans.Length == 0)
         {
             return true;
         }

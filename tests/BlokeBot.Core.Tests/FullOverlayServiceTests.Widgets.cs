@@ -359,7 +359,7 @@ public sealed partial class FullOverlayServiceTests
     {
         private readonly string _root = Path.Combine(
             Directory.GetCurrentDirectory(),
-            ".agent-workspace/overlay-composition-20261001/286/widgets",
+            ".agent-workspace/overlay-composition-20261001/writer287/widgets",
             Guid.NewGuid().ToString("N")
         );
         private readonly Fixture _fixture;
@@ -370,6 +370,8 @@ public sealed partial class FullOverlayServiceTests
             TestEventBus.Create<FullOverlayEventFeedIdentity>();
         internal OverlayCueService Media { get; }
         internal FullOverlayWidgetRegistry Registry { get; }
+        internal OverlayStateProvider Sources { get; }
+        internal OverlayRemoteUrlPolicy Urls { get; }
         internal OverlayMediaMaintenanceService Maintenance { get; }
 
         internal WidgetEnvironment(
@@ -393,6 +395,7 @@ public sealed partial class FullOverlayServiceTests
                 NullLogger<OverlayEventFeedService>.Instance
             );
             var urls = new OverlayRemoteUrlPolicy(dns ?? new PublicDns(), options);
+            Urls = urls;
             var deletion = new SystemOverlayMediaFileDeletion();
             Maintenance = new(
                 fixture.Database,
@@ -422,18 +425,19 @@ public sealed partial class FullOverlayServiceTests
                         ?? new UnavailablePluginPackageAssetResolver()
                 )
             );
-            Registry = new(
-                new(
+            Sources = new(
+                fixture.Database,
+                new(),
+                Clock,
+                Events,
+                new BlokeBot.Core.Features.PlayWithViewers.PlayQueueService(
                     fixture.Database,
-                    new(),
-                    Clock,
-                    Events,
-                    new BlokeBot.Core.Features.PlayWithViewers.PlayQueueService(
-                        fixture.Database,
-                        fixture.Events,
-                        Clock
-                    )
-                ),
+                    fixture.Events,
+                    Clock
+                )
+            );
+            Registry = new(
+                Sources,
                 Events,
                 Media,
                 urls,

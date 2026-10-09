@@ -9,6 +9,7 @@ using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -78,10 +79,12 @@ public sealed partial class FullOverlayPersistenceJourneys
         await using var provider = services.BuildServiceProvider();
         var events = provider.GetRequiredService<EventBus<AppEventKind>>();
         var moderator = new Moderator();
+        var protection = new EphemeralDataProtectionProvider();
         var full = new FullOverlayService(
             factory,
             new(factory, moderator),
             new CryptographicOverlayAccessKeyGenerator(),
+            new(protection),
             new Admission(),
             events,
             TimeProvider.System
@@ -122,10 +125,23 @@ public sealed partial class FullOverlayPersistenceJourneys
             factory,
             new(factory, moderator),
             new CryptographicOverlayAccessKeyGenerator(),
+            new(protection),
             new Admission(),
             events,
             TimeProvider.System
         );
+        var recovered = Value(
+            await restarted.ReadAccessAsync(session, selected.Id, CancellationToken.None)
+        );
+        recovered.AccessKey.ShouldBe(created.PrivateAccess.AccessKey);
+        await using (var stored = factory.CreateDbContext())
+        {
+            var row = await stored
+                .FullOverlays.AsNoTracking()
+                .SingleAsync(value => value.PublicId == selected.Id);
+            _ = row.ProtectedAccessKey.ShouldNotBeNull();
+            row.ProtectedAccessKey.ShouldNotContain(created.PrivateAccess.AccessKey);
+        }
         var reloaded = Value(
             await restarted.GetAsync(session, selected.Id, CancellationToken.None)
         );
