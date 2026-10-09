@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\src\BlokeBot.Core\BlokeBot.Core.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot.Functional\BlokeBot.Functional.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Persistence.PostgreSql\BlokeBot.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot.Plugins.Features\BlokeBot.Plugins.Features.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />

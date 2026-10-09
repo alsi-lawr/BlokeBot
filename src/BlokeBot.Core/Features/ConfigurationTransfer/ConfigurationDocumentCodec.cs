@@ -9,7 +9,6 @@ public sealed class ConfigurationDocumentCodec
 {
     public const string Format = "blokebot.channel-configuration";
     public const int CurrentVersion = 2;
-    public const int MaximumBytes = 2 * 1024 * 1024;
     public const int MaximumRecordsPerCollection = 1_000;
 
     private static readonly JsonSerializerOptions _headerOptions = CreateOptions(
@@ -19,18 +18,20 @@ public sealed class ConfigurationDocumentCodec
         JsonUnmappedMemberHandling.Disallow
     );
 
-    public ConfigurationDocumentParseOutcome Parse(string json) =>
-        Encoding.UTF8.GetByteCount(json) > MaximumBytes
-            ? TooLarge()
-            : Parse(Encoding.UTF8.GetBytes(json));
+    public ConfigurationDocumentParseOutcome Parse(string json)
+    {
+        try
+        {
+            return Parse(Encoding.UTF8.GetBytes(json));
+        }
+        catch (OutOfMemoryException)
+        {
+            return InsufficientMemory();
+        }
+    }
 
     public ConfigurationDocumentParseOutcome Parse(ReadOnlyMemory<byte> json)
     {
-        if (json.Length > MaximumBytes)
-        {
-            return TooLarge();
-        }
-
         try
         {
             var header = JsonSerializer.Deserialize<ConfigurationDocumentHeader>(
@@ -74,6 +75,10 @@ public sealed class ConfigurationDocumentCodec
                 ? new ConfigurationDocumentParseOutcome.Valid(document)
                 : new ConfigurationDocumentParseOutcome.Invalid(validationIssue);
         }
+        catch (OutOfMemoryException)
+        {
+            return InsufficientMemory();
+        }
         catch (JsonException exception)
         {
             return new ConfigurationDocumentParseOutcome.Invalid(
@@ -88,8 +93,13 @@ public sealed class ConfigurationDocumentCodec
     public byte[] Serialize(ConfigurationDocumentV2 document) =>
         JsonSerializer.SerializeToUtf8Bytes(document, _documentOptions);
 
-    public static ConfigurationDocumentParseOutcome.Invalid TooLarge() =>
-        new(new("$", $"The configuration file exceeds the {MaximumBytes / 1024 / 1024} MB limit."));
+    private static ConfigurationDocumentParseOutcome.Invalid InsufficientMemory() =>
+        new(
+            new(
+                "$",
+                "There is not enough memory to read this configuration. Close other work or use a host with more available memory."
+            )
+        );
 
     private static JsonSerializerOptions CreateOptions(JsonUnmappedMemberHandling handling) =>
         new(JsonSerializerDefaults.Web)

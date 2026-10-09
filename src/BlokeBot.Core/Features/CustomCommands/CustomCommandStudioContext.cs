@@ -7,6 +7,8 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 public sealed class CustomCommandStudioContext
 {
+    public int HostId { get; init; }
+    public string Channel { get; init; } = string.Empty;
     public required CustomCommandConfiguration Configuration { get; init; }
     public required CustomCommandSettingsTab ActiveTab { get; init; }
     public required Func<IReadOnlyList<StudioRailGroup>> RailGroups { get; init; }
@@ -21,6 +23,7 @@ public sealed class CustomCommandStudioContext
     public required Func<string> EmptyInspectorMessage { get; init; }
     public required Func<bool> HasChanges { get; init; }
     public required EventCallback Save { get; init; }
+    public required EventCallback SingleArgumentChanged { get; init; }
     public required CustomCommandValidationBindings Validation { get; init; }
     public required Func<bool> BasicsOpen { get; init; }
     public required Action<bool> SetBasicsOpen { get; init; }

@@ -1,0 +1,28 @@
+@using BlokeBot.Persistence.Models
+@inject CustomStoredValueService _values
+@inject ICustomCommandViewerResolver _viewers
+
+<section class="space-y-3" aria-label="Token picker and sandbox preview">
+    <details>
+        <summary class="font-semibold">Insert a saved-value token</summary>
+        <div class="studio-grid pt-3">
+            <div class="studio-span-6 field"><label class="field__label" for="@($"{Id}-definition")">Definition</label><select id="@($"{Id}-definition")" class="field__input" @bind="_definitionId" @bind:after="SelectDefinition"><option value="0">Choose a definition</option>@foreach (var definition in _definitions) { <option value="@definition.Id">@definition.Name · @definition.Scope · @definition.Kind</option> }</select></div>
+            <div class="studio-span-6 field"><label class="field__label" for="@($"{Id}-operation")">Operation</label><select id="@($"{Id}-operation")" class="field__input" @bind="_operation"><option value="get">Get</option><option value="set">Set</option><option value="inc">Increment</option></select></div>
+            @if (_selected is not null) { <div class="studio-span-6"><Field Id="@($"{Id}-name")" Label="Name token or text" @bind-Value="_nameOperand" /></div> }
+            @if (_selected?.Kind == CustomValueKind.Dictionary) { <div class="studio-span-6"><Field Id="@($"{Id}-key")" Label="Entry key token or text" @bind-Value="_key" /></div> }
+            @if (_operation != "get") { <div class="studio-span-6"><Field Id="@($"{Id}-operand")" Label="@(_operation == "inc" ? "Amount token or number" : "Value token or text")" @bind-Value="_operand" /></div> }
+            <div class="studio-span-12"><code class="block wrap-anywhere">@_token</code><button class="btn-secondary mt-2" disabled="@(_selected is null)" @onclick="InsertAsync">Insert token</button></div>
+        </div>
+    </details>
+    <details>
+        <summary class="font-semibold">Sandbox preview · does not save values</summary>
+        <div class="space-y-3 pt-3">
+            <div class="flex flex-wrap items-end gap-3"><Field Id="@($"{Id}-viewer")" Label="Sample viewer login" @bind-Value="_viewerLogin" /><button class="btn-secondary" @onclick="SelectViewerAsync">Load sample viewer</button></div>
+            <Field Id="@($"{Id}-args")" Label="Sample argument text" @bind-Value="_args" />
+            <label class="flex gap-2"><input type="checkbox" @bind="_singleArgument" />Whole text is one argument</label>
+            <p class="text-sm text-muted-foreground">@_sampleContext</p>
+            <output class="block rounded-xl border border-[var(--app-border)] p-3 wrap-anywhere whitespace-pre-wrap" aria-live="polite">@_preview</output>
+        </div>
+    </details>
+    @if (_error is not null) { <p role="alert" class="text-sm">@_error</p> }
+</section>

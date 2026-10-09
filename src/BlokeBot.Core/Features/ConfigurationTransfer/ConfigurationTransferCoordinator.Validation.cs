@@ -25,7 +25,11 @@ public sealed partial class ConfigurationTransferCoordinator
         section switch
         {
             ConfigurationSectionId.CustomCommands => document.Sections.CustomCommands is { } custom
-                ? custom.Replies.Count + custom.Counters.Count + custom.Commands.Count + 1
+                ? custom.Replies.Count
+                    + custom.Counters.Count
+                    + custom.Commands.Count
+                    + (custom.StoredDefinitions?.Count ?? 0)
+                    + 1
                 : 0,
             ConfigurationSectionId.Announcements => document.Sections.Announcements?.Items.Count
                 ?? 0,

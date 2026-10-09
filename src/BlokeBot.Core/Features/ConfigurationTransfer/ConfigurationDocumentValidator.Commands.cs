@@ -23,6 +23,40 @@ internal static partial class ConfigurationDocumentValidator
             return issue;
         }
 
+        if (section.StoredDefinitions is { } definitions)
+        {
+            var names = new HashSet<(BlokeBot.Persistence.Models.CustomValueScope, bool, string)>();
+            foreach (var definition in definitions)
+            {
+                if (
+                    !BlokeBot.Core.Features.CustomCommands.CustomStoredValueService.ValidDefinition(
+                        new(
+                            0,
+                            definition.Name,
+                            definition.Scope,
+                            definition.Kind,
+                            definition.Default,
+                            Guid.Empty
+                        ),
+                        out _
+                    )
+                    || !names.Add(
+                        (
+                            definition.Scope,
+                            definition.Kind
+                                == BlokeBot.Persistence.Models.CustomValueKind.Dictionary,
+                            definition.Name
+                        )
+                    )
+                )
+                {
+                    return new(
+                        "sections.customCommands.storedDefinitions",
+                        "Check stored-value names, unique scopes, types and defaults."
+                    );
+                }
+            }
+        }
         var replies = section.Replies.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
         var counters = section.Counters.Select(x => x.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var reply in section.Replies)

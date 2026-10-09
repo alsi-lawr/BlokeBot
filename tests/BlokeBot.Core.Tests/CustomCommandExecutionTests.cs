@@ -1280,7 +1280,7 @@ public sealed partial class CustomCommandExecutionTests
     }
 
     private static ServiceProvider BuildServices(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         int minimumCooldownSeconds = 0,
         TimeProvider? clock = null,
         IHostStreamLivenessProvider? streams = null,
@@ -1553,7 +1553,7 @@ public sealed partial class CustomCommandExecutionTests
     }
 
     private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         string login,
         HostFeatureFlags enabledFeatures = HostFeatureFlags.All
     )
@@ -1573,7 +1573,7 @@ public sealed partial class CustomCommandExecutionTests
     }
 
     private static async Task<CommandSeed> SeedCommandAsync(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         int hostId,
         string alias,
         string[] variants,

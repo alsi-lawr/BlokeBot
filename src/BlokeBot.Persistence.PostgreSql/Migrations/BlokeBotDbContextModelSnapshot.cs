@@ -4695,6 +4695,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<bool>("SingleArgument")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -4820,6 +4823,48 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasKey("HostId", "CustomCommandId", "TwitchUserId");
 
                     b.ToTable("custom_command_allowed_users", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CommandId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InvocationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("InvocationId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reply")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ReplyEligible")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "InvocationHash")
+                        .IsUnique();
+
+                    b.ToTable("custom_command_computed_results", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
@@ -5028,6 +5073,110 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsUnique();
 
                     b.ToTable("custom_message_variants", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DefinitionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EntryKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId", "TargetHash")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "DefinitionId");
+
+                    b.ToTable("custom_stored_values", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<long>("DefaultNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DefaultText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NameHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "DictionaryName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_DictionaryName")
+                        .HasFilter("\"Kind\" = 2");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "ScalarName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_ScalarName")
+                        .HasFilter("\"Kind\" <> 2");
+
+                    b.ToTable("custom_value_definitions", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
@@ -10862,6 +11011,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Navigation("Command");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.CustomCommand", "Command")
@@ -10917,6 +11075,25 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Entry");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CustomValueDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "DefinitionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>

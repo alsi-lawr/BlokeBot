@@ -4556,6 +4556,9 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("SingleArgument")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -4679,6 +4682,46 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasKey("HostId", "CustomCommandId", "TwitchUserId");
 
                     b.ToTable("custom_command_allowed_users", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CommandId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InvocationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvocationId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reply")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ReplyEligible")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "InvocationHash")
+                        .IsUnique();
+
+                    b.ToTable("custom_command_computed_results", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
@@ -4875,6 +4918,106 @@ namespace BlokeBot.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("custom_message_variants", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EntryKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId", "TargetHash")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "DefinitionId");
+
+                    b.ToTable("custom_stored_values", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("DefaultNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DefaultText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NameHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "DictionaryName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_DictionaryName")
+                        .HasFilter("\"Kind\" = 2");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "ScalarName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_ScalarName")
+                        .HasFilter("\"Kind\" <> 2");
+
+                    b.ToTable("custom_value_definitions", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
@@ -10558,6 +10701,15 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Command");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.CustomCommand", "Command")
@@ -10613,6 +10765,25 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Entry");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CustomValueDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "DefinitionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
