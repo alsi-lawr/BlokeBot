@@ -10,6 +10,69 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationRuntimeTests
 {
     [Test]
+    public async Task SendChat_UndefinedDraftModeIsInvalidAndCannotOverwriteStoredFlow()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var trigger = Node("custom-command", """{"custom-command-id":7}""");
+        var send = Node("send-chat", """{"message":"Retained fixed message"}""");
+        var id = await fixture.SaveAsync([trigger, send], [Edge(trigger, "flow", send)]);
+        var original = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.ShouldHaveSingleItem();
+        string originalConfiguration;
+        string originalBindings;
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var row = await db.AutomationFlowNodes.SingleAsync(node => node.Id == send.Id.Value);
+            originalConfiguration = row.ConfigurationJson;
+            originalBindings = row.InputBindingsJson;
+        }
+        fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        var candidate = original.Draft with
+        {
+            Name = "Must not overwrite the stored flow",
+            IsEnabled = false,
+            Nodes =
+            [
+                trigger,
+                send with
+                {
+                    Definition = Persisted("send-chat", """{"message":"Must not be saved"}"""),
+                    InputBindings = Bindings("message", (AutomationInputBindingMode)99),
+                },
+            ],
+        };
+        var validation = (
+            await fixture.Flows.ValidateDraftAsync(candidate, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        validation.Errors.ShouldContain(error =>
+            error.NodeId == send.Id
+            && error.FieldId == new AutomationConfigurationFieldId("message")
+        );
+        var save = (
+            await fixture.Flows.SaveAsync(candidate, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
+        save.Errors.ShouldContain(error =>
+            error.NodeId == send.Id
+            && error.FieldId == new AutomationConfigurationFieldId("message")
+        );
+        var retained = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.ShouldHaveSingleItem();
+        retained.Draft.Id.ShouldBe(id);
+        retained.Draft.Name.ShouldBe(original.Draft.Name);
+        retained.Draft.IsEnabled.ShouldBe(original.Draft.IsEnabled);
+        retained.UpdatedAtUtc.ShouldBe(original.UpdatedAtUtc);
+        retained.Draft.Edges.ShouldBe(original.Draft.Edges);
+        await using var verify = await fixture.Database.CreateDbContextAsync();
+        var retainedSend = await verify.AutomationFlowNodes.SingleAsync(node =>
+            node.Id == send.Id.Value
+        );
+        retainedSend.ConfigurationJson.ShouldBe(originalConfiguration);
+        retainedSend.InputBindingsJson.ShouldBe(originalBindings);
+    }
+
+    [Test]
     public async Task SendChat_UnsupportedStoredExpressionRemainsInspectableAndRequiresExplicitRepair()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
