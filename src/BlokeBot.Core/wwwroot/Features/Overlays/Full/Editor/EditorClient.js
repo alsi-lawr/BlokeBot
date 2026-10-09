@@ -9,9 +9,9 @@ export function createClient(root, document, dotnet) {
     let view=owner.view(),disposed=false, previewTimer=null,measurements=[],measuredRevision=-1;
     const measured=value=>{const item=measuredRevision===value.revision?measurements.find(item=>item.key===value.selected):null;return item?{...value,styles:{...item.styles,...value.styles}}:value;};
     const publish=()=>{if(!disposed)void dotnet.invokeMethodAsync('EditorChangedAsync',view);};
-    const changed=next=>{
+    const changed=(next,retainPresentation=false)=>{
         const previous=view.revision;view=measured(next);
-        if(previous!==view.revision){preview.invalidate();clearTimeout(previewTimer);
+        if(previous!==view.revision){preview.invalidate(retainPresentation);clearTimeout(previewTimer);
             previewTimer=setTimeout(()=>{if(!disposed)void dotnet.invokeMethodAsync('RefreshPreviewAsync',view.revision);},200);}
         const snapshot=owner.session.snapshot();
         if(html.value!==snapshot.html)html.value=snapshot.html;
@@ -19,10 +19,16 @@ export function createClient(root, document, dotnet) {
         canvas.draw();publish();return view;
     };
     const command=(value,selection=view.selected,revision=view.revision)=>changed(owner.control(value.kind==='visible'&&!value.value?{...value,display:view.styles.display}:value.kind==='position'||value.kind==='anchor'||value.kind==='move'||value.kind==='resize'?{...value,computed:{...value.computed,...view.styles}}:value,selection,revision));
-    const canvas=createCanvas(root,()=>view,command);
+    const canvas=createCanvas(root,()=>view,command,{
+        plan:(value,selection,revision)=>owner.planGesture(value,selection,revision),
+        present:(id,presentation,revision)=>preview.present(id,presentation,revision),
+        clear:()=>preview.clear(),
+        commit(planned){const next=owner.commitGesture(planned);if(next.revision===view.revision)preview.clear();changed(next,next.revision!==view.revision);}
+    });
     const preview=createPreviewBridge(root.querySelector('[data-preview-frame]'),()=>view,
         (items,size,revision)=>{if(revision===view.revision){measurements=items;measuredRevision=revision;view=measured(owner.view());canvas.observed(items,size);publish();}},
-        (state,diagnostics)=>{if(!disposed)void dotnet.invokeMethodAsync('PreviewStatusAsync',state,diagnostics.map(d=>d.code));});
+        (state,diagnostics)=>{if(!disposed)void dotnet.invokeMethodAsync('PreviewStatusAsync',state,diagnostics.map(d=>d.code));},
+        (id,item)=>canvas.presented(id,item),()=>canvas.cancel());
     html.value=document.html;css.value=document.css;
     for(const input of [html,css]){
         input.addEventListener('focus',()=>{view=owner.focus(input.dataset.source);publish();},options);
