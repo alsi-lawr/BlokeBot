@@ -76,7 +76,8 @@ internal static partial class ConfigurationExportMappers
             settings.GiveawayMaximumPayout,
             settings.GiveawayWinnerCount,
             settings.GiveawayEligibility,
-            settings.GiveawayCooldownSeconds
+            settings.GiveawayCooldownSeconds,
+            new WatchTimePointsV1(settings.WatchTimePointsEnabled, settings.WatchTimePointAmount)
         );
     }
 

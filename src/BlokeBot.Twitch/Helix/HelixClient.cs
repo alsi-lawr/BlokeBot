@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class HelixClient(
+public sealed partial class HelixClient(
     IHttpClientFactory httpClientFactory,
     TwitchEndpointPolicy endpointPolicy
 )

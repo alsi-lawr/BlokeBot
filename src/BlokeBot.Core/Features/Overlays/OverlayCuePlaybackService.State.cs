@@ -9,6 +9,7 @@ internal sealed partial class OverlayCuePlaybackService
     private sealed class TargetState
     {
         internal object Gate { get; } = new();
+        internal Full.FullOverlayGeneration? Selection { get; set; }
 
         internal Dictionary<Guid, AdmittedRun> Active { get; } = [];
 
@@ -20,10 +21,11 @@ internal sealed partial class OverlayCuePlaybackService
     }
 
     private sealed record AdmittedRun(
-        ResolvedOverlayInstance Target,
+        OverlayCueTarget Target,
         OverlayCuePlaybackPlan Plan,
         OverlayCueQueuePolicy QueuePolicy,
         DateTimeOffset ExpiresAtUtc,
+        OverlayCueAdmissionOrigin Origin,
         DateTimeOffset? StartedAtUtc = null
     );
 
@@ -31,7 +33,7 @@ internal sealed partial class OverlayCuePlaybackService
     {
         private PlanResolution() { }
 
-        internal sealed record Ready(ResolvedOverlayInstance Target, OverlayCuePlaybackPlan Plan)
+        internal sealed record Ready(OverlayCueTarget Target, OverlayCuePlaybackPlan Plan)
             : PlanResolution;
 
         internal sealed record Missing : PlanResolution;
@@ -45,7 +47,7 @@ internal sealed partial class OverlayCuePlaybackService
     {
         private ReferenceResolution() { }
 
-        internal sealed record Available(OverlayInstance Target, OverlayCue Cue)
+        internal sealed record Available(OverlayCueTarget Target, OverlayCue Cue)
             : ReferenceResolution;
 
         internal sealed record Missing(OverlayCueReferencePart Part) : ReferenceResolution;

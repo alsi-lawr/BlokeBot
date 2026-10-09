@@ -1,0 +1,56 @@
+namespace BlokeBot.Core.Components.Layout;
+
+public partial class PageHelpButton
+{
+    private static readonly HelpPage _fullOverlaysHelp = new(
+        "Overlay editor",
+        [
+            new(
+                "Choose your editor",
+                "Overlays → Simple keeps independent browser sources. Overlays → Editor opens full HTML/CSS documents with separate drafts and publication history.",
+                ["Create a blank document or an editable starter, or open a saved document."]
+            ),
+            new(
+                "One working document",
+                "Visual and HTML/CSS edit the same unsaved document. Switch modes to see your visual edits already in the source; there is no Apply or Sync step.",
+                [
+                    "Open the Toolbox icon in Visual mode to search widgets and ordinary Text / HTML. Layers only lists the document hierarchy. Adding selects the new layer and opens its inspector; Escape closes Toolbox and returns to its button.",
+                    "Ctrl-click canvas layers or Layers rows to toggle the selection. Alt-drag selects every visible mapped layer intersecting the rectangle, including parents and children. A plain click selects one layer; dragging a selected layer keeps the set.",
+                    "Move and arrow-key nudge affect unlocked selected roots. Delete removes the selection, including locked layers. Style, resize, motion, widget settings and duplicate affect only the active layer.",
+                    "Canvas drag and nudge keep in-flow layout space and never re-nest a layer. Return to layout removes current placement, not historical styling: flow keeps its layout mode and edges; absolute/fixed returns to static with neutral edges and translate.",
+                    "Find HTML opens HTML/CSS and places the caret at the selected layer.",
+                    "HTML and CSS keep separate histories. Undo and Redo follow the history named in the toolbar. Incomplete source is retained, and newer overlapping edits are not overwritten.",
+                ]
+            ),
+            new(
+                "Style the selected layer",
+                "Choose a colour, opacity or swatch. Solid and Gradient style the background; gradient stops have their own colour, opacity and percentage position.",
+                [
+                    "Colour changes preview while the picker is open. Done keeps one Visual change; Escape cancels the open picker. A newer edit or selection cancels an obsolete picker.",
+                    "Custom backgrounds remain in source until you explicitly replace their image. Rotation and scale edit individual properties, not authored transform matrices.",
+                    "Drag a Layers row before, inside or after another layer, or use Move in HTML with keyboard controls. At root moves selected roots to the named authored container. Invalid or ambiguous destinations leave your source unchanged. Anchors use the CSS containing block; Align now uses the preview viewport.",
+                    "Motion exposes entrance, exit and state-change presets. Replay entrance uses the private preview and does not consume production cues.",
+                ]
+            ),
+            new(
+                "Your workspace",
+                "Focus fills the application window. Full screen uses the browser's fullscreen mode; Escape or the same control exits full screen.",
+                [
+                    "Middle-drag pans the view; use Pan view for touch. Zoom, pan and preview viewport only change your authoring view. Shift bypasses optional snapping.",
+                    "On narrow screens use Layers, Canvas and Inspector. HTML/CSS remains a separate mode. Action tips appear on keyboard focus; Escape dismisses them.",
+                    "Right-click a layer or canvas, or use the ⋯ action button. Context Menu or Shift+F10 opens actions from the keyboard; arrows select actions and Escape closes the menu. Text fields keep browser menus. Delete selected is undoable, not permanent overlay deletion.",
+                    "Help stays beside the theme button in the normal app topbar. Exit Focus to return to that topbar.",
+                ]
+            ),
+            new(
+                "Preview, save and publish",
+                "Unsaved is the current private preview, not the live browser source. Sample and Live preview data do not consume production cue or feed work.",
+                [
+                    "Save draft stores your work without changing the live publication. Ctrl+S also saves the draft.",
+                    "Save & publish saves and makes the candidate live. Review any publication diagnostics.",
+                    "History & live URL opens your stable browser-source URL and retained publications. Treat that URL as a credential.",
+                ]
+            ),
+        ]
+    );
+}

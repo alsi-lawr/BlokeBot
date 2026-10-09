@@ -33,7 +33,7 @@
                         }
                     </div>
                     <div class="automation-list-status"><strong>Status</strong><span>@(unavailable ? "Unavailable" : issue is null ? "✓ Available" : "! Needs repair")</span>@if (issue is not null){<small>@issue</small>}</div>
-                    <div class="automation-list-actions"><strong>Actions</strong><button type="button" aria-label="Select @node.EffectiveName" @onclick="() => SelectNode.InvokeAsync(node.Id)"><AutomationIcon Name="node" /></button><button type="button" aria-label="Delete @node.EffectiveName" @onclick="() => DeleteNode.InvokeAsync(node.Id)"><AutomationIcon Name="delete" /></button></div>
+                    <div class="automation-list-actions"><strong>Actions</strong><button type="button" aria-label="Select @node.EffectiveName" @onclick="() => SelectNode.InvokeAsync(node.Id)"><EditorIcon Name="node" /></button><button type="button" aria-label="Delete @node.EffectiveName" @onclick="() => DeleteNode.InvokeAsync(node.Id)"><EditorIcon Name="delete" /></button></div>
                 </article>
             }
         </div>

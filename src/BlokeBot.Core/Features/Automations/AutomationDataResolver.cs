@@ -126,14 +126,14 @@ internal sealed class AutomationDataResolver(
     )
     {
         if (
-            AutomationRuntimeSerialization.RestoreInputBindings(consumer.InputBindingsJson)
+            AutomationRuntimeSerialization.RestoreInputBindings(
+                consumer.InputBindingsJson,
+                new(consumer.DefinitionId)
+            )
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
             || AutomationFrozenSubflows.WithContract(
                 consumer,
-                AutomationFrozenSubflows.ValidateDefinition(
-                    catalog,
-                    AutomationRuntimeSerialization.Definition(consumer)
-                )
+                AutomationFrozenSubflows.ValidateDefinition(catalog, consumer, bindings.Bindings)
             )
                 is not AutomationConfigurationCheck.Valid valid
         )
@@ -155,6 +155,35 @@ internal sealed class AutomationDataResolver(
             )
         )
         {
+            if (AutomationDelayDurationBinding.IsInput(valid.Definition, input))
+            {
+                var incoming = flow.Edges.Count(edge =>
+                    edge.Kind == AutomationEdgeKind.Data
+                    && edge.TargetNodeId == consumer.Id
+                    && edge.TargetPortId == input.Id.Value
+                );
+                var admission = AutomationDelayDurationBinding.Admit(bindings.Bindings, incoming);
+                if (
+                    admission.Match(
+                        legacyLiteral: static _ => true,
+                        bound: static _ => false,
+                        invalid: static _ => false
+                    )
+                )
+                {
+                    continue;
+                }
+                if (
+                    admission.Match(
+                        legacyLiteral: static _ => false,
+                        bound: static _ => false,
+                        invalid: static _ => true
+                    )
+                )
+                {
+                    return new AutomationInputResolution.Failed("binding-invalid");
+                }
+            }
             if (!bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding))
             {
                 return new AutomationInputResolution.Failed("binding-invalid");
@@ -266,10 +295,7 @@ internal sealed class AutomationDataResolver(
         if (
             AutomationFrozenSubflows.WithContract(
                 producer,
-                AutomationFrozenSubflows.ValidateDefinition(
-                    catalog,
-                    AutomationRuntimeSerialization.Definition(producer)
-                )
+                AutomationFrozenSubflows.ValidateDefinition(catalog, producer)
             )
             is not AutomationConfigurationCheck.Valid valid
         )
@@ -355,15 +381,12 @@ internal sealed class AutomationDataResolver(
         }
 
         var check = fixtures is not null
-            ? AutomationFrozenSubflows.ValidateDefinition(
-                catalog,
-                AutomationRuntimeSerialization.Definition(producer)
-            )
+            ? AutomationFrozenSubflows.ValidateDefinition(catalog, producer)
             : await AutomationFrozenSubflows.ValidateBeforeExecutionAsync(
                 catalog,
                 hostId,
                 context,
-                AutomationRuntimeSerialization.Definition(producer),
+                producer,
                 cancellationToken
             );
         if (check is not AutomationConfigurationCheck.Valid valid)
@@ -477,6 +500,10 @@ internal sealed class AutomationDataResolver(
                 new AutomationValue.Text(sendChat.Message),
                 [AutomationValueProvenance.Generated]
             ),
+            (DelayControlConfiguration delay, "duration") => new(
+                new AutomationValue.Number(delay.Duration.Ticks / TimeSpan.TicksPerMillisecond),
+                [AutomationValueProvenance.Generated]
+            ),
             (ConditionControlConfiguration condition, "predicate") => new(
                 new AutomationValue.Boolean(condition.Predicate),
                 [AutomationValueProvenance.Generated]
@@ -562,6 +589,11 @@ internal sealed class AutomationDataResolver(
         AutomationContext context
     )
     {
+        if (string.IsNullOrWhiteSpace(expression.Source))
+        {
+            return null;
+        }
+
         var evaluation =
             port.ValueType == AutomationPortValueType.Text
             && expression.Source.Contains("${", StringComparison.Ordinal)

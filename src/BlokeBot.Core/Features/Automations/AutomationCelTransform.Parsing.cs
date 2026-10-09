@@ -4,8 +4,45 @@ namespace BlokeBot.Core.Features.Automations;
 
 internal static partial class AutomationCelTransform
 {
+    internal static bool TryReadInputIdentities(
+        JsonElement configuration,
+        out Dictionary<AutomationPortId, AutomationConfigurationFieldId> identities
+    )
+    {
+        identities = [];
+        if (
+            configuration.ValueKind != JsonValueKind.Object
+            || !configuration.TryGetProperty("inputs", out var inputs)
+            || inputs.ValueKind != JsonValueKind.Array
+        )
+        {
+            return false;
+        }
+
+        var fields = new HashSet<AutomationConfigurationFieldId>();
+        foreach (var input in inputs.EnumerateArray())
+        {
+            if (
+                input.ValueKind != JsonValueKind.Object
+                || !input.TryGetProperty("port-id", out var port)
+                || port.ValueKind != JsonValueKind.String
+                || !input.TryGetProperty("binding-field-id", out var field)
+                || field.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(port.GetString())
+                || string.IsNullOrWhiteSpace(field.GetString())
+                || !identities.TryAdd(new(port.GetString()!), new(field.GetString()!))
+                || !fields.Add(new(field.GetString()!))
+            )
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static bool TryParseInput(
         AutomationCelTransformInputDocument document,
+        bool allowUnsetFixed,
         out AutomationCelTransformInput input
     )
     {
@@ -13,8 +50,16 @@ internal static partial class AutomationCelTransform
         if (
             !TryEnum(document.ValueType, out AutomationPortValueType valueType)
             || !TryEnum(document.Nullability, out AutomationPortNullability nullability)
-            || !TryValue(document.FixedValue, valueType, nullability, out var fixedValue)
         )
+        {
+            return false;
+        }
+        AutomationValue fixedValue;
+        if (allowUnsetFixed && document.FixedValue.ValueKind == JsonValueKind.Null)
+        {
+            fixedValue = new AutomationValue.Null(valueType);
+        }
+        else if (!TryValue(document.FixedValue, valueType, nullability, out fixedValue))
         {
             return false;
         }
@@ -78,7 +123,8 @@ internal static partial class AutomationCelTransform
         {
             AutomationPortValueType.Text when json.ValueKind == JsonValueKind.String =>
                 new AutomationValue.Text(json.GetString()!),
-            AutomationPortValueType.Number when json.TryGetDecimal(out var number) =>
+            AutomationPortValueType.Number
+                when json.ValueKind == JsonValueKind.Number && json.TryGetDecimal(out var number) =>
                 new AutomationValue.Number(number),
             AutomationPortValueType.Boolean
                 when json.ValueKind is JsonValueKind.True or JsonValueKind.False =>

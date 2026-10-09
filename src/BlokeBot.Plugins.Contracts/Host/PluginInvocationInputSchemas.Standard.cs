@@ -58,6 +58,23 @@ public static class PluginInvocationInputSchemas
             PageSessionId
         );
 
+    public static PluginLuaFieldDescriptor WidgetConfiguration { get; } =
+        Field(
+            "configuration",
+            PluginLuaFieldShape.Map,
+            "The public widget instance configuration."
+        );
+
+    public static PluginLuaSchemaDescriptor Widget { get; } =
+        Schema(
+            "BlokeBotWidgetInput",
+            "Input delivered to a public widget projection handler. No page session or private host state is supplied.",
+            WidgetConfiguration
+        );
+
+    public static PluginValue.Map WidgetInput(PluginValue.Map configuration) =>
+        Widget.Create(WidgetConfiguration.Value(configuration));
+
     public static PluginLuaFieldDescriptor EventId { get; } =
         Field("event_id", PluginLuaFieldShape.String, "The stable event correlation ID.");
 
@@ -143,6 +160,7 @@ public static class PluginInvocationInputSchemas
         Command,
         Web,
         Page,
+        Widget,
         BlokeBotEvent,
         TwitchEvent,
         TwitchRawSubscription,

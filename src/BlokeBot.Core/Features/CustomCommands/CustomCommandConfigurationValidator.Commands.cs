@@ -133,7 +133,8 @@ public static partial class CustomCommandConfigurationValidator
                     editor.CooldownSeconds,
                     editor.CooldownScope,
                     editor.InvocationLimit,
-                    action
+                    action,
+                    editor.SingleArgument
                 )
             );
         }

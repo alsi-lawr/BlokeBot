@@ -29,7 +29,10 @@ public sealed class AutomationExpressionService
 
     internal AutomationExpressionCheck Validate(AutomationExpressionSource expression)
     {
-        if (expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion)
+        if (
+            expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
+            || string.IsNullOrWhiteSpace(expression.Source)
+        )
         {
             return new AutomationExpressionCheck.Invalid();
         }
@@ -50,7 +53,10 @@ public sealed class AutomationExpressionService
         AutomationContext context
     )
     {
-        if (expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion)
+        if (
+            expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
+            || string.IsNullOrWhiteSpace(expression.Source)
+        )
         {
             return new AutomationExpressionResult.Invalid();
         }
@@ -75,6 +81,11 @@ public sealed class AutomationExpressionService
 
     internal AutomationExpressionResult Interpolate(string template, AutomationContext context)
     {
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            return new AutomationExpressionResult.Invalid();
+        }
+
         var output = new System.Text.StringBuilder();
         var usesSensitiveValues = false;
         var offset = 0;
@@ -114,6 +125,11 @@ public sealed class AutomationExpressionService
 
     internal AutomationExpressionCheck ValidateTemplate(string template)
     {
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            return new AutomationExpressionCheck.Invalid();
+        }
+
         var offset = 0;
         while (offset < template.Length)
         {

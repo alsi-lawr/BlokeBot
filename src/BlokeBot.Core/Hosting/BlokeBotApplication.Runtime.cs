@@ -6,6 +6,7 @@ using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.Core.Features.Plugins;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Core.Features.ViewerPortal.Boundary;
@@ -48,12 +49,14 @@ public static partial class BlokeBotApplication
 
         _ = app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
         _ = app.UseHttpsRedirection();
+        app.UseAuthCookieRequestBoundary();
         _ = app.UseAntiforgery();
         _ = app.UseAuthentication();
         _ = app.UseMiddleware<PublicDocumentMiddleware>();
         _ = app.UseAuthorization();
 
         app.MapOverlayBrowserSourceEndpoints();
+        app.MapFullOverlayEndpoints();
         app.MapPluginWebEndpoints();
         app.MapPluginPageAssetEndpoints();
         _ = app.MapMethods(

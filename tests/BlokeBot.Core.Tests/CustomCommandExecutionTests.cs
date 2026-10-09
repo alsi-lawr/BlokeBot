@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Data.Common;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
@@ -18,7 +19,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class CustomCommandExecutionTests
+public sealed partial class CustomCommandExecutionTests
 {
     [Test]
     public async Task ContextualBuiltInRoute_DispatchingUnavailableOrHandled_ControlsCustomFallback()
@@ -354,7 +355,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer", HostFeatureFlags.Points);
-        _ = await SeedCommandAsync(dbFactory, hostId, "choose", ["{random_viewer}"]);
+        _ = await SeedCommandAsync(dbFactory, hostId, "choose", ["{random_from|{random_viewer}}"]);
         var chatters = new CountingChatterSource();
         await using var services = BuildServices(dbFactory, chatters: chatters);
         var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
@@ -1279,7 +1280,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     private static ServiceProvider BuildServices(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         int minimumCooldownSeconds = 0,
         TimeProvider? clock = null,
         IHostStreamLivenessProvider? streams = null,
@@ -1289,7 +1290,8 @@ public sealed class CustomCommandExecutionTests
         bool realAutomations = false,
         IMessageLibraryRandomSource? random = null,
         IMessageLibraryChatterSource? chatters = null,
-        Action<IChatBotBuilder>? configureBuiltIns = null
+        Action<IChatBotBuilder>? configureBuiltIns = null,
+        IBingoCounterEventSink? counterObserver = null
     )
     {
         var services = new ServiceCollection();
@@ -1332,6 +1334,10 @@ public sealed class CustomCommandExecutionTests
         _ = services.AddSingleton<IMessageLibraryChatterSource>(
             chatters ?? new UnavailableMessageLibraryChatterSource()
         );
+        if (counterObserver is not null)
+        {
+            _ = services.AddSingleton(counterObserver);
+        }
         _ = services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         if (realAutomations)
         {
@@ -1547,7 +1553,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         string login,
         HostFeatureFlags enabledFeatures = HostFeatureFlags.All
     )
@@ -1567,7 +1573,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     private static async Task<CommandSeed> SeedCommandAsync(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         int hostId,
         string alias,
         string[] variants,

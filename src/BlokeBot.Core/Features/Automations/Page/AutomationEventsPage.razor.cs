@@ -48,7 +48,11 @@ public partial class AutomationEventsPage
 
     private static bool RequiresReconnect(TwitchEventSourceReadinessOutcome.Available available) =>
         available.Sources.Any(static source =>
-            source.State is not TwitchEventSourceReadinessState.Ready
+            source.State is TwitchEventSourceReadinessState.BroadcasterNotConnected
+            || (
+                source.State is TwitchEventSourceReadinessState.MissingScopes
+                && source.UsedByEnabledFlow
+            )
         );
 
     private static string ReconnectDescription(
@@ -75,6 +79,7 @@ public partial class AutomationEventsPage
         {
             TwitchEventSourceReadinessState.Ready => "ready",
             TwitchEventSourceReadinessState.MissingScopes => "missing-scopes",
+            TwitchEventSourceReadinessState.ObservationUnavailable => "observation-unavailable",
             _ => "not-connected",
         };
 
@@ -83,6 +88,7 @@ public partial class AutomationEventsPage
         {
             TwitchEventSourceReadinessState.Ready => "Ready",
             TwitchEventSourceReadinessState.MissingScopes => "Reconnect needed",
+            TwitchEventSourceReadinessState.ObservationUnavailable => "Observation unavailable",
             _ => "Twitch connection needed",
         };
 

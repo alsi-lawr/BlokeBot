@@ -22,7 +22,8 @@ public sealed record EventSubRewardRedemptionEvent(
     HelixRewardRedemptionStatus Status,
     DateTimeOffset RedeemedAt,
     string MessageId,
-    bool IsNewRedemption
+    bool IsNewRedemption,
+    DateTimeOffset? MessageTimestamp = null
 )
 {
     public HelixRewardRedemption ToHelix() =>

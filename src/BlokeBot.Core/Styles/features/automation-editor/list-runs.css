@@ -60,12 +60,6 @@
     padding: 0.4rem 0.65rem;
 }
 
-.automation-icon {
-    display: block;
-    height: 1.05rem;
-    width: 1.05rem;
-}
-
 .automation-node-icon {
     color: var(--tone-blue-fg);
     display: block;
@@ -77,64 +71,6 @@
 .automation-inspector-identity > .automation-node-icon {
     height: 1.65rem;
     width: 1.65rem;
-}
-
-.automation-focus-controls {
-    align-items: center;
-    background: var(--app-surface-solid);
-    border: 1px solid var(--app-control-border);
-    border-radius: 0.55rem;
-    box-shadow: var(--app-shadow-sm);
-    display: flex;
-    gap: 0.15rem;
-    padding: 0.18rem;
-    position: absolute;
-    right: 0.7rem;
-    top: 0.7rem;
-    z-index: 45;
-}
-
-.automation-focus-controls button {
-    align-items: center;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 0.38rem;
-    color: var(--app-text-muted);
-    cursor: pointer;
-    display: inline-flex;
-    height: 2.2rem;
-    justify-content: center;
-    padding: 0;
-    width: 2.2rem;
-}
-
-.automation-focus-controls button:hover {
-    background: var(--app-control-hover);
-    color: var(--app-text-strong);
-}
-
-.automation-focus-controls button:focus-visible {
-    border-color: var(--tone-blue-solid);
-    box-shadow: 0 0 0 3px var(--tone-blue-ring);
-    outline: 0;
-}
-
-.automation-focus-controls button[aria-pressed="true"] {
-    background: var(--tone-blue-bg);
-    border-color: var(--tone-blue-ring);
-    color: var(--tone-blue-fg);
-}
-
-.automation-editor--focus {
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    height: 100dvh;
-    inset: 0;
-    min-height: 0;
-    position: fixed;
-    width: 100vw;
-    z-index: 300;
 }
 
 .automation-editor--focus .automation-editor-bar {
@@ -204,7 +140,7 @@
 }
 
 .automation-run-summary strong,
-.automation-run-summary span {
+.automation-run-summary > div span {
     display: block;
 }
 

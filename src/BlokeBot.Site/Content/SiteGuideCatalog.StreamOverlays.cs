@@ -360,6 +360,7 @@ internal static partial class SiteGuideCatalog
             ],
             Next =
             [
+                new SiteLink("Compose a full overlay", "full-overlays"),
                 new SiteLink("Build and trigger reusable Cues", "overlays/cues"),
                 new SiteLink("Manage media for Cues", "overlays/media"),
             ],

@@ -11,6 +11,7 @@
 @implements IAsyncDisposable
 @inject AutomationCatalogService _catalogService
 @inject AutomationFlowService _flowsService
+@inject AutomationManualRunService _manualRuns
 @inject AutomationScenarioService _scenariosService
 @inject AutomationTraceStore _tracesService
 @inject AutomationSubflowService _subflowsService
@@ -33,7 +34,7 @@
     {
         <PageState Kind="PageStateKind.Failure"
                    Title="BlokeBot cannot load automations">
-            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync"><AutomationIcon Name="history" />Retry</button></Actions>
+            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync"><EditorIcon Name="history" />Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
@@ -78,27 +79,33 @@
             @CreationActions
         }
 
-        @if (_flowRecoveryMessage is not null)
+        @if (_sourceFlowId is not null)
         {
-            <PageState Kind="PageStateKind.Unavailable"
-                       Title="This flow needs a node provider"
-                       Description="@_flowRecoveryMessage">
-                <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
-            </PageState>
+            <EditorWorkspace @ref="_workspace" Class="automation-editor automation-editor--repair automation-editor--source"
+                             FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure" aria-label="Flow JSON repair">
+                <header class="automation-editor-bar"><div class="automation-flow-name"><h2>@_sourceName</h2><span>JSON repair · @(_sourceEnabled ? "Enabled" : "Disabled") · @(_hasChanges ? "Unsaved changes" : "Original stored values")</span><span>Flow @_sourceFlowId.Value.Value · @_sourceProviderStatus</span></div></header>
+                <div class="automation-editor-body">
+                    @RepairRail
+                    <AutomationFlowSource Text="@_sourceText" TextChanged="ChangeSourceAsync" Status="@_sourceStatus" Errors="_sourceErrors"
+                                          Busy="_busy" Enabled="_sourceEnabled" Validated="_sourceValidated" FocusRequest="_sourceFocusRequest"
+                                          Parse="ParseSource" Validate="ValidateSourceAsync" Save="SaveAsync" />
+                </div>
+            </EditorWorkspace>
         }
         else if (_editor is null)
         {
             <section class="automation-empty card">
                 <span class="automation-empty-icon" aria-hidden="true">⌘</span>
                 <h2>Create your first visual automation</h2>
-                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" />Create flow</button>
+                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><EditorIcon Name="add" />Create flow</button>
             </section>
         }
         else
         {
-            <section class="@_editorClass"
+            <EditorWorkspace @ref="_workspace" Class="@($"{_editorClass}{(_authoringEntries.IsEmpty ? "" : " automation-editor--repair")}")" FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure"
                      aria-label="Visual automation editor"
                      data-editor-mode="@ModeToken(_mode)"
+                     data-editor-menu-context="@_menuContext"
                      data-automation-editor-history>
                 @if (_focusMode)
                 {
@@ -123,27 +130,12 @@
                                         SelectList="@(() => SetMode(AutomationEditorMode.List))"
                                         Validate="ValidateAsync"
                                         Test="OpenScenariosAsync"
+                                        CanRun="@_editor.Nodes.Any(n=>n.Definition.Id==AutomationDefinitionIds.ManualSource)"
+                                        Run="RunSavedFlowAsync"
                                         Subflow="@(_editor.Subflow is not null)"
                                         Save="SaveAsync"
                                         Hide="ToggleEditorTools"
                                         ToggleEnabled="ToggleEnabledAsync" />
-
-                <div class="automation-focus-controls" role="group" aria-label="Editor focus controls" data-automation-focus-controls>
-                    <button type="button"
-                            aria-label="@(_focusMode ? "Exit Focus" : "Focus")"
-                            aria-pressed="@(_focusMode ? "true" : "false")"
-                            title="@(_focusMode ? "Exit Focus" : "Focus")"
-                            @onclick="ToggleFocusMode">
-                        <AutomationIcon Name="focus" />
-                    </button>
-                    <button type="button"
-                            aria-label="@(_browserFullscreen ? "Exit Full screen" : "Full screen")"
-                            aria-pressed="@(_browserFullscreen ? "true" : "false")"
-                            title="@(_browserFullscreen ? "Exit Full screen" : "Full screen")"
-                            @onclick="ToggleBrowserFullscreenAsync">
-                        <AutomationIcon Name="fullscreen" />
-                    </button>
-                </div>
 
                 <div class="automation-editor-notices">
                     @if (_feedback is not null)
@@ -165,7 +157,7 @@
                                 <strong>This flow can affect your live channel</strong>
                                 <span>@_impactWarning</span>
                             </div>
-                            <button type="button" @onclick="CancelEnable"><AutomationIcon Name="cancel" />Cancel</button>
+                            <button type="button" @onclick="CancelEnable"><EditorIcon Name="cancel" />Cancel</button>
                         </div>
                     }
                 </div>
@@ -179,6 +171,7 @@
                     <AutomationFlowRail Visible="@(!_focusMode || !_flowRailCollapsed)"
                                         FocusMode="_focusMode"
                                         Flows="_flowSnapshots"
+                                        RepairItems="RepairItems"
                                         CurrentFlowId="_editor.Id"
                                         CurrentName="@_editor.Name"
                                         CurrentNodeCount="_editor.Nodes.Count"
@@ -347,18 +340,18 @@
                 {
                     @if (_flowRailCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--flows" type="button" @onclick="ToggleFlowRail"><AutomationIcon Name="flow-list" />Flows</button>
+                        <button class="automation-restore-tab automation-restore-tab--flows" type="button" @onclick="ToggleFlowRail"><EditorIcon Name="flow-list" />Flows</button>
                     }
                     @if (_editorToolsCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--tools" type="button" @onclick="ToggleEditorTools"><AutomationIcon Name="tools" />Tools</button>
+                        <button class="automation-restore-tab automation-restore-tab--tools" type="button" @onclick="ToggleEditorTools"><EditorIcon Name="tools" />Tools</button>
                     }
                     @if (_runDrawerCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--runs" type="button" @onclick="ToggleRunDrawer"><AutomationIcon Name="history" />Runs</button>
+                        <button class="automation-restore-tab automation-restore-tab--runs" type="button" @onclick="ToggleRunDrawer"><EditorIcon Name="history" />Runs</button>
                     }
                 }
-            </section>
+            </EditorWorkspace>
         }
 
     }
@@ -372,8 +365,26 @@
                        Save="SaveDirtyTransitionAsync" />
 
 @code {
+    private RenderFragment RepairItems => @<text>
+        @foreach (var entry in _authoringEntries)
+        {
+            <button @key="entry.Id" type="button" class="@($"automation-flow-item automation-flow-item--repair{(entry.Id == (_sourceFlowId ?? _editor?.Id) ? " automation-flow-item--active" : "")}")"
+                    title="@entry.Reason" @onclick="() => RequestRepairFlowAsync(entry.Id)">
+                <strong>@(string.IsNullOrWhiteSpace(entry.Name) ? "Untitled flow" : entry.Name)</strong>
+                <span>Needs repair · @(entry.RequiresJson ? "JSON" : "Visual editor")</span>
+            </button>
+        }
+    </text>;
+
+    private RenderFragment RepairRail => @<AutomationFlowRail Visible="true" FocusMode="_focusMode" Flows="_flowSnapshots" RepairItems="RepairItems"
+        CurrentFlowId="_sourceFlowId" CurrentName="@_sourceName" CurrentNodeCount="0" ShowDraft="false" ShowActions="false"
+        Library="_libraryKind" LibraryChanged="ChangeLibraryAsync" Subflows="_subflowPage" CurrentSubflowId="_editor?.Subflow?.Id"
+        SubflowSearch="@_subflowSearch" SubflowOffset="_subflowOffset" SubflowsLoading="_subflowLoading"
+        SearchSubflows="SearchSubflowsAsync" PageSubflows="LoadSubflowPageAsync" SelectSubflow="SelectLibrarySubflowAsync"
+        Select="RequestSelectFlowAsync" Toggle="ToggleFlowRail" />;
+
     private RenderFragment CreationActions => @<div class="automation-page-actions">
-        <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="new-flow" />New flow</button>
-        <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><AutomationIcon Name="new-subflow" />New subflow</button>
+        <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><EditorIcon Name="new-flow" />New flow</button>
+        <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><EditorIcon Name="new-subflow" />New subflow</button>
     </div>;
 }

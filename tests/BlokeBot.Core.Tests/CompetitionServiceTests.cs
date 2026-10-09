@@ -10,7 +10,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class CompetitionServiceTests
+public sealed partial class CompetitionServiceTests
 {
     private static readonly DateTimeOffset _now = new(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
 

@@ -1,6 +1,11 @@
-<svg class="automation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+<svg class="editor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
     @switch (Name)
     {
+        case "menu":
+            <circle cx="5" cy="12" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="19" cy="12" r="1" />
+            break;
         case "new-flow":
             <circle cx="5" cy="6" r="2.5" />
             <path d="M7.5 6H12v11h3M19 13v8M15 17h8" />
@@ -9,8 +14,27 @@
             <rect x="4" y="5" width="13" height="14" rx="2" />
             <path d="M1 9h3M1 15h3M8 9h5M8 13h3M20 12v8M16 16h8" />
             break;
+        case "toolbox":
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M2 12h8m4 0h8" />
+            <rect x="10" y="10" width="4" height="4" rx="1" />
+            break;
+        case "undo":
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" />
+            break;
+        case "redo":
+            <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
+            break;
         case "add":
             <path d="M12 5v14M5 12h14" />
+            break;
+        case "minus":
+            <path d="M5 12h14" />
+            break;
+        case "archive":
+            <rect x="3" y="3" width="18" height="4" rx="1" />
+            <path d="M5 7v14h14V7M10 11h4" />
             break;
         case "apply":
         case "validate":

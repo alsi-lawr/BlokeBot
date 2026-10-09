@@ -5,13 +5,38 @@ namespace BlokeBot.Persistence;
 
 public sealed partial class BlokeBotDbContext
 {
-    private static void ConfigureOverlayEventFeed(ModelBuilder modelBuilder) =>
+    private static void ConfigureOverlayEventFeed(ModelBuilder modelBuilder)
+    {
+        _ = modelBuilder.Entity<FullOverlayEventFeedBinding>(binding =>
+        {
+            _ = binding.ToTable("full_overlay_event_feed_bindings");
+            _ = binding.HasKey(value => value.Id);
+            _ = binding.HasIndex(value => new { value.FullOverlayId, value.BindingId }).IsUnique();
+            _ = binding
+                .HasOne(value => value.FullOverlay)
+                .WithMany()
+                .HasForeignKey(value => value.FullOverlayId)
+                .OnDelete(DeleteBehavior.Cascade);
+            _ = binding
+                .HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(value => value.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         _ = modelBuilder.Entity<OverlayEventFeedItem>(b =>
         {
             _ = b.ToTable(
                 "overlay_event_feed_items",
                 t =>
                 {
+                    _ = t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_Owner",
+                        ProviderSql(
+                            modelBuilder,
+                            "(OverlayInstanceId IS NULL) <> (FullOverlayEventFeedBindingId IS NULL)",
+                            "(\"OverlayInstanceId\" IS NULL) <> (\"FullOverlayEventFeedBindingId\" IS NULL)"
+                        )
+                    );
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Kind",
                         KindIn(modelBuilder, "Kind", _overlayEventFeedKinds)
@@ -85,6 +110,23 @@ public sealed partial class BlokeBotDbContext
                 x.Lifecycle,
                 x.EnqueuedAtUtc,
             });
+            _ = b.HasIndex(x => new
+                {
+                    x.FullOverlayEventFeedBindingId,
+                    x.Kind,
+                    x.SourceKey,
+                })
+                .IsUnique();
+            _ = b.HasIndex(x => new
+            {
+                x.FullOverlayEventFeedBindingId,
+                x.Lifecycle,
+                x.EnqueuedAtUtc,
+            });
+            _ = b.HasOne(x => x.FullOverlayEventFeedBinding)
+                .WithMany()
+                .HasForeignKey(x => x.FullOverlayEventFeedBindingId)
+                .OnDelete(DeleteBehavior.Cascade);
             _ = b.HasOne(static x => x.OverlayInstance)
                 .WithMany()
                 .HasForeignKey(static x => x.OverlayInstanceId)
@@ -94,4 +136,5 @@ public sealed partial class BlokeBotDbContext
                 .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
 }

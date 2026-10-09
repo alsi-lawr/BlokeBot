@@ -54,7 +54,8 @@ internal sealed class AutomationSafeTriggerExpressionService
         references = [];
         invalidField = null;
         if (
-            expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
+            string.IsNullOrWhiteSpace(expression.Source)
+            || expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
             || !AutomationCelSyntax.TryAnalyze(expression.Source, out var analysis)
             || analysis.HasCompositeConstructor
             || !AutomationCelSyntax.AllowedFunctions(analysis)

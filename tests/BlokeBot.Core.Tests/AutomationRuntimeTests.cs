@@ -31,11 +31,7 @@ public sealed partial class AutomationRuntimeTests
         {
             Position = new(new(600), new(72)),
             DisplayAlias = "Welcome the viewer in chat",
-            InputBindings = Bindings(
-                "message",
-                AutomationInputBindingMode.Expression,
-                new(AutomationExpressionLanguage.CurrentVersion, "actor.display_name")
-            ),
+            InputBindings = Bindings("message", AutomationInputBindingMode.Fixed),
         };
         var saved = (
             await fixture.Flows.SaveAsync(
@@ -399,7 +395,7 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task UnifiedSendBinding_AllModesUseOnlyTheActivePayloadAndRoundTripInactiveState()
+    public async Task SendChat_FixedAndConnectedExecuteOnlyActivePayloadAndRoundTripInactiveState()
     {
         var connectedValue = TextValueHandler("test-counting-text-value", "connected");
         await using var fixture = await RuntimeFixture.CreateAsync(handlers: [connectedValue]);
@@ -407,50 +403,54 @@ public sealed partial class AutomationRuntimeTests
         var value = Node("test-counting-text-value", "{}");
         var fixedSend = Node(
             "send-chat",
-            """{"message":"fixed"}""",
+            """{"message":"fixed\n${literal}"}""",
             bindings: Bindings(
                 "message",
                 AutomationInputBindingMode.Fixed,
                 new(AutomationExpressionLanguage.CurrentVersion, "'inactive fixed expression'")
             )
         );
-        var expressionSend = Node(
-            "send-chat",
-            """{"message":"inactive expression fixed"}""",
-            bindings: Bindings(
-                "message",
-                AutomationInputBindingMode.Expression,
-                new(AutomationExpressionLanguage.CurrentVersion, "'expression'")
-            )
-        );
         var connectedSend = Node(
             "send-chat",
-            """{"message":"inactive connected fixed"}""",
+            """{"message":""}""",
             bindings: Bindings(
                 "message",
                 AutomationInputBindingMode.Connected,
                 new(AutomationExpressionLanguage.CurrentVersion, "'inactive connected expression'")
             )
         );
-        _ = await fixture.SaveAsync(
-            [source, value, fixedSend, expressionSend, connectedSend],
+        var flowId = await fixture.SaveAsync(
+            [source, value, fixedSend, connectedSend],
             [
                 Edge(source, "flow", fixedSend),
-                Edge(source, "flow", expressionSend),
                 Edge(source, "flow", connectedSend),
                 Edge(value, "value", connectedSend, "message", AutomationEdgeKind.Data),
             ]
         );
+
+        var saved = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == flowId);
+        var scenario = (
+            await fixture.Scenarios.RunDefaultAsync(saved.Draft, source.Id, CancellationToken.None)
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
+        scenario
+            .Nodes.Single(node => node.NodeId == fixedSend.Id)
+            .ResolvedInputs.ShouldHaveSingleItem()
+            .DisplayValue.ShouldBe("fixed\n${literal}");
+        scenario
+            .Nodes.Single(node => node.NodeId == connectedSend.Id)
+            .ResolvedInputs.ShouldHaveSingleItem()
+            .DisplayValue.ShouldBe("connected");
+        fixture.Chat.Calls.ShouldBe(0);
 
         _ = await fixture.Runtime.DispatchAsync(
             new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
             CancellationToken.None
         );
 
-        fixture
-            .Chat.Messages.Order()
-            .ShouldBe(new[] { "connected", "expression", "fixed" }.Order());
-        connectedValue.Calls.ShouldBe(1);
+        fixture.Chat.Messages.Order().ShouldBe(new[] { "connected", "fixed\n${literal}" }.Order());
+        connectedValue.Calls.ShouldBe(2);
         var roundTrip = (
             await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
@@ -459,16 +459,13 @@ public sealed partial class AutomationRuntimeTests
             .Single(node => node.Id == fixedSend.Id)
             .InputBindings.ShouldBe(fixedSend.InputBindings);
         restored
-            .Single(node => node.Id == expressionSend.Id)
-            .InputBindings.ShouldBe(expressionSend.InputBindings);
-        restored
             .Single(node => node.Id == connectedSend.Id)
             .InputBindings.ShouldBe(connectedSend.InputBindings);
         restored
             .Single(node => node.Id == connectedSend.Id)
             .Definition.Configuration.GetProperty("message")
             .GetString()
-            .ShouldBe("inactive connected fixed");
+            .ShouldBe(string.Empty);
     }
 
     [Test]
@@ -1599,7 +1596,7 @@ public sealed partial class AutomationRuntimeTests
         await using var stableId = await RuntimeFixture.CreateAsync();
         var idSource = Node("custom-command", """{"custom-command-id":7}""");
         var idAction = Node(
-            "send-chat",
+            "test-text-consumer",
             """{"message":"fallback"}""",
             bindings: Bindings(
                 "message",
@@ -1617,7 +1614,7 @@ public sealed partial class AutomationRuntimeTests
         await using var privateValue = await RuntimeFixture.CreateAsync();
         var privateSource = Node("custom-command", """{"custom-command-id":7}""");
         var privateAction = Node(
-            "send-chat",
+            "test-text-consumer",
             """{"message":"fallback"}""",
             bindings: Bindings(
                 "message",
@@ -1643,7 +1640,7 @@ public sealed partial class AutomationRuntimeTests
         {
             var source = Node("custom-command", """{"custom-command-id":7}""");
             var action = Node(
-                "send-chat",
+                "test-text-consumer",
                 """{"message":"fallback"}""",
                 bindings: Bindings(
                     "message",
@@ -2124,7 +2121,7 @@ public sealed partial class AutomationRuntimeTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("test-number-source", "{}");
         var transform = Node(
-            "test-cel-transform",
+            AutomationDefinitionIds.CelTransform.Value,
             TransformJson(
                 [
                     new(
@@ -2194,7 +2191,7 @@ public sealed partial class AutomationRuntimeTests
                 .Draft.Nodes.Select(node =>
                     node.Id == transform.Id
                         ? Node(
-                            "test-cel-transform",
+                            AutomationDefinitionIds.CelTransform.Value,
                             replacementConfiguration,
                             bindings: Bindings(bindingFieldId, AutomationInputBindingMode.Connected)
                         ) with
@@ -3860,7 +3857,7 @@ public sealed partial class AutomationRuntimeTests
             )
         );
         var matched = Node(
-            "send-chat",
+            "test-text-consumer",
             """{"message":"fallback"}""",
             bindings: Bindings(
                 "message",
@@ -4652,7 +4649,7 @@ public sealed partial class AutomationRuntimeTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("custom-command", """{"custom-command-id":7}""");
         var action = Node(
-            "send-chat",
+            "test-text-consumer",
             """{"message":"fallback"}""",
             fields: ImmutableDictionary<
                 AutomationConfigurationFieldId,
@@ -4954,23 +4951,16 @@ public sealed partial class AutomationRuntimeTests
                         pair.Value
                     )
                 )
-                ?? DefaultBindings(type, document.RootElement)
+                ?? DefaultBindings(type)
         );
     }
 
     private static ImmutableDictionary<
         AutomationConfigurationFieldId,
         AutomationInputBinding
-    > DefaultBindings(string type, JsonElement configuration) =>
+    > DefaultBindings(string type) =>
         type switch
         {
-            "send-chat"
-                when configuration.GetProperty("message").GetString() is { } message
-                    && message.Contains("${", StringComparison.Ordinal) => Bindings(
-                "message",
-                AutomationInputBindingMode.Expression,
-                new(AutomationExpressionLanguage.CurrentVersion, message)
-            ),
             "send-chat" => Bindings("message", AutomationInputBindingMode.Fixed),
             "condition" => Bindings("predicate", AutomationInputBindingMode.Fixed),
             _ => ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty,
@@ -5813,6 +5803,7 @@ public sealed partial class AutomationRuntimeTests
         internal AutomationScenarioService Scenarios => new(Database, Catalog, Flows, Clock);
         internal AutomationRunQueryService Queries { get; }
         internal int HostId { get; }
+        internal AutomationCountdownService Countdowns { get; private init; } = null!;
 
         internal static async Task<RuntimeFixture> CreateAsync(
             IEnumerable<bool>? chatAdmissions = null,
@@ -5856,6 +5847,7 @@ public sealed partial class AutomationRuntimeTests
             var catalog = new AutomationCatalogService(
                 new([
                     new CoreAutomationCatalogModule(),
+                    new ExpandedAutomationCatalogModule(),
                     new TwitchEventAutomationCatalogModule(),
                     new DataContractAutomationModule(),
                 ]),
@@ -5868,9 +5860,17 @@ public sealed partial class AutomationRuntimeTests
                 integerEntropy
             );
             overlays ??= new NoOverlayCues();
-            var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
+            AutomationRuntimeService runtime = null!;
+            var countdowns = new AutomationCountdownService(database, clock, () => runtime);
+            var actions = new AutomationActionExecutor(
+                features,
+                chat,
+                overlays,
+                expressions,
+                countdowns
+            );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
+            runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
             var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
                 database,
@@ -5903,7 +5903,10 @@ public sealed partial class AutomationRuntimeTests
                 flows,
                 queries,
                 hostId
-            );
+            )
+            {
+                Countdowns = countdowns,
+            };
         }
 
         internal AutomationRuntimeService NewRuntime() =>
@@ -6004,10 +6007,15 @@ public sealed partial class AutomationRuntimeTests
         );
         private int _armed;
         private int _intercepted;
+        private int _skip;
 
         internal Task Entered => _entered.Task;
 
-        internal void Arm() => Volatile.Write(ref _armed, 1);
+        internal void Arm(int skipTransactions = 0)
+        {
+            Volatile.Write(ref _skip, skipTransactions);
+            Volatile.Write(ref _armed, 1);
+        }
 
         internal void Release() => _release.TrySetResult();
 
@@ -6018,6 +6026,11 @@ public sealed partial class AutomationRuntimeTests
             CancellationToken cancellationToken = default
         )
         {
+            if (Volatile.Read(ref _armed) != 0 && Volatile.Read(ref _skip) > 0)
+            {
+                _ = Interlocked.Decrement(ref _skip);
+                return result;
+            }
             if (
                 Volatile.Read(ref _armed) == 0
                 || Interlocked.CompareExchange(ref _intercepted, 1, 0) != 0

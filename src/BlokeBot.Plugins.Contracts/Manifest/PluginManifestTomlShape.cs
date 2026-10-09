@@ -27,6 +27,7 @@ internal static class PluginManifestTomlShape
                 "automationTemplates",
                 "generatedPages",
                 "embeddedPages",
+                "widgets",
             ]
         )
         && Child(manifest, "marketplace", Marketplace)
@@ -42,7 +43,8 @@ internal static class PluginManifestTomlShape
         && Children(manifest, "automationDefinitions", AutomationDefinition)
         && Children(manifest, "automationTemplates", AutomationTemplate)
         && Children(manifest, "generatedPages", GeneratedPage)
-        && Children(manifest, "embeddedPages", EmbeddedPage);
+        && Children(manifest, "embeddedPages", EmbeddedPage)
+        && OptionalChildren(manifest, "widgets", Widget);
 
     private static bool Release(TomlTable table) => Table(table, ["declaredVersion", "tag"]);
 
@@ -230,6 +232,27 @@ internal static class PluginManifestTomlShape
             table,
             ["id", "featureId", "route", "title", "documentAsset", "assets", "messageOrigins"]
         );
+
+    private static bool Widget(TomlTable table) =>
+        Table(
+            table,
+            [
+                "id",
+                "featureId",
+                "title",
+                "module",
+                "renderEntryPoint",
+                "documentAsset",
+                "assets",
+                "configurationFields",
+                "defaultConfiguration",
+            ]
+        )
+        && Children(table, "configurationFields", WidgetField)
+        && Child(table, "defaultConfiguration", PluginValue);
+
+    private static bool WidgetField(TomlTable table) =>
+        Table(table, ["name", "title", "valueKind", "required", "portability"]);
 
     private static bool Table(TomlTable table, IReadOnlyList<string> fields) =>
         table.Keys.All(fields.Contains);

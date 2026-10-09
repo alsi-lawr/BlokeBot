@@ -451,12 +451,7 @@ public sealed class AutomationEditorHistoryTests
 
         send.SetValue(sendField, "Fixed message");
         history.Record(editor).ShouldBeTrue();
-        send.SetExpression(
-            sendField,
-            new(AutomationExpressionLanguage.CurrentVersion, "\"Expression message\"")
-        );
-        history.Record(editor).ShouldBeTrue();
-        send.SetBindingMode(sendField, AutomationInputBindingMode.Expression);
+        send.SetBindingMode(sendField, AutomationInputBindingMode.Connected);
         history.Record(editor).ShouldBeTrue();
         condition.SetValue(conditionField, bool.TrueString);
         history.Record(editor).ShouldBeTrue();
@@ -468,7 +463,7 @@ public sealed class AutomationEditorHistoryTests
         condition.SetBindingMode(conditionField, AutomationInputBindingMode.Connected);
         history.Record(editor).ShouldBeTrue();
 
-        for (var index = 0; index < 6; index++)
+        for (var index = 0; index < 5; index++)
         {
             editor = history.Undo(editor).ShouldNotBeNull();
         }
@@ -480,7 +475,7 @@ public sealed class AutomationEditorHistoryTests
         condition.Value(conditionField).ShouldBe(bool.FalseString);
         condition.Binding(conditionField).ShouldBe(new(AutomationInputBindingMode.Fixed, null));
 
-        for (var index = 0; index < 6; index++)
+        for (var index = 0; index < 5; index++)
         {
             editor = history.Redo(editor).ShouldNotBeNull();
         }
@@ -488,13 +483,7 @@ public sealed class AutomationEditorHistoryTests
         send = editor.Nodes.Single(node => node.Id == send.Id);
         condition = editor.Nodes.Single(node => node.Id == condition.Id);
         send.Value(sendField).ShouldBe("Fixed message");
-        send.Binding(sendField)
-            .ShouldBe(
-                new(
-                    AutomationInputBindingMode.Expression,
-                    new(AutomationExpressionLanguage.CurrentVersion, "\"Expression message\"")
-                )
-            );
+        send.Binding(sendField).ShouldBe(new(AutomationInputBindingMode.Connected, null));
         condition.Value(conditionField).ShouldBe(bool.TrueString);
         condition
             .Binding(conditionField)

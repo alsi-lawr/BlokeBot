@@ -12,7 +12,8 @@ internal static partial class ConfigurationExportMappers
         IReadOnlyList<CustomMessageLibraryEntry> Replies,
         IReadOnlyList<CustomCounter> Counters,
         IReadOnlyList<CustomCommand> Commands,
-        IReadOnlyList<CustomAnnouncement> Announcements
+        IReadOnlyList<CustomAnnouncement> Announcements,
+        IReadOnlyList<CustomValueDefinition> StoredDefinitions
     );
 
     internal static async Task<CommandGraph> LoadCommandGraphAsync(
@@ -46,6 +47,11 @@ internal static partial class ConfigurationExportMappers
                 .Include(x => x.DeliveryPolicy)
                 .Where(x => x.HostId == hostId)
                 .OrderBy(x => x.Name)
+                .ToArrayAsync(cancellationToken),
+            await db
+                .CustomValueDefinitions.AsNoTracking()
+                .Where(x => x.HostId == hostId)
+                .OrderBy(x => x.Name)
                 .ToArrayAsync(cancellationToken)
         );
 
@@ -65,6 +71,18 @@ internal static partial class ConfigurationExportMappers
                 .Commands.Select(x =>
                     Command(x, references.Commands[x.Id].Id, replyIds, counterIds, references)
                 )
+                .ToArray(),
+            graph
+                .StoredDefinitions.Select(x => new StoredDefinitionV1(
+                    x.Name,
+                    x.Scope,
+                    x.Kind,
+                    x.Kind == CustomValueKind.Number
+                        ? x.DefaultNumber.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture
+                        )
+                        : x.DefaultText
+                ))
                 .ToArray()
         );
     }
@@ -112,7 +130,8 @@ internal static partial class ConfigurationExportMappers
             value.CooldownSeconds,
             value.CooldownScope,
             value.InvocationLimit,
-            Action(value.Action, replyIds, counterIds, references)
+            Action(value.Action, replyIds, counterIds, references),
+            value.SingleArgument
         );
 
     private static CustomCommandActionV1 Action(

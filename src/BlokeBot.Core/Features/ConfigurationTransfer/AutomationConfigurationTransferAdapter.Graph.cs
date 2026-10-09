@@ -106,13 +106,24 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 configuration,
                 provenance
             );
-            var check = catalog.ValidatePersistedDefinition(persisted);
+            var bindings = node.InputBindings.ToImmutableDictionary(
+                binding => new AutomationConfigurationFieldId(binding.FieldId),
+                binding => new AutomationInputBinding(
+                    binding.Mode,
+                    binding.Expression is { } expression
+                    && binding.ExpressionLanguageVersion is { } version
+                        ? new(new(version), expression)
+                        : null
+                )
+            );
+            var check = catalog.ValidatePersistedDefinition(persisted, bindings);
             if (check is not AutomationConfigurationCheck.Valid valid)
             {
                 issues.Add(
                     new(
                         "sections.automations",
-                        $"Node '{node.Id}' requires an available compatible schema and plugin contract."
+                        AutomationPortableConfiguration.Rejection(node.DefinitionId, configuration)
+                            ?? $"Node '{node.Id}' requires an available compatible schema and plugin contract."
                     )
                 );
             }
@@ -132,16 +143,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     persisted,
                     new(node.ExpressionLanguageVersion),
                     node.FailurePolicy,
-                    node.InputBindings.ToImmutableDictionary(
-                        binding => new AutomationConfigurationFieldId(binding.FieldId),
-                        binding => new AutomationInputBinding(
-                            binding.Mode,
-                            binding.Expression is { } expression
-                            && binding.ExpressionLanguageVersion is { } version
-                                ? new(new(version), expression)
-                                : null
-                        )
-                    ),
+                    bindings,
                     new(new(node.CanvasX), new(node.CanvasY)),
                     node.DisplayAlias
                 )

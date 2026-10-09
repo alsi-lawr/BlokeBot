@@ -55,9 +55,9 @@ public sealed partial class AutomationCatalogService
                                 .DescriptorsForHost(hostId)
                                 .Where(descriptor =>
                                     enabled.Contains(
-                                        NativeOperationAutomations.BackingFeature(
-                                            descriptor.Id.Value
-                                        )
+                                        AutomationRequiredFeatures.ForDefinitions([
+                                            descriptor.Id.Value,
+                                        ])
                                     )
                                 ),
                         ],
@@ -127,6 +127,63 @@ public sealed partial class AutomationCatalogService
             persisted.PluginProvenance,
             requireCurrentExecution: true
         );
+
+    internal AutomationConfigurationCheck ValidatePersistedDefinition(
+        PersistedAutomationNodeDefinition persisted,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
+    ) =>
+        ValidateEnabledPersisted(
+            new(persisted.TypeId),
+            new(persisted.SchemaVersion),
+            persisted.Configuration,
+            persisted.PluginProvenance,
+            requireCurrentExecution: false,
+            bindings: bindings
+        );
+
+    internal AutomationConfigurationCheck ValidatePreparedDefinition(
+        AutomationHostId hostId,
+        PersistedAutomationNodeDefinition persisted,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
+    ) =>
+        ValidateEnabledPersisted(
+            hostId,
+            new(persisted.TypeId),
+            new(persisted.SchemaVersion),
+            persisted.Configuration,
+            persisted.PluginProvenance,
+            requireCurrentExecution: false,
+            bindings: bindings
+        );
+
+    internal AutomationConfigurationCheck ValidateAdmittedDefinition(
+        AutomationHostId hostId,
+        PersistedAutomationNodeDefinition persisted,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
+    ) =>
+        ValidateEnabledPersisted(
+            hostId,
+            new(persisted.TypeId),
+            new(persisted.SchemaVersion),
+            persisted.Configuration,
+            persisted.PluginProvenance,
+            requireCurrentExecution: true,
+            bindings: bindings
+        );
+
+    internal async Task<AutomationConfigurationCheck> ValidateFrozenBeforeExecutionAsync(
+        AutomationHostId hostId,
+        AutomationContext context,
+        PersistedAutomationNodeDefinition persisted,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings,
+        CancellationToken cancellationToken
+    ) =>
+        hostId != context.HostId
+            ? new AutomationConfigurationCheck.HostMismatch(hostId, context.HostId)
+        : !await HostExistsAsync(hostId, cancellationToken)
+            ? new AutomationConfigurationCheck.HostNotFound()
+        : AutomationSubflowDefinitions.CheckFrozen(persisted)
+            ?? ValidateAdmittedDefinition(hostId, persisted, bindings);
 
     public bool TryDescribe(
         AutomationDefinitionId definitionId,

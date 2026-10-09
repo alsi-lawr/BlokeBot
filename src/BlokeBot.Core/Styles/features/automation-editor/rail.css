@@ -139,3 +139,22 @@
     color: var(--tone-red-fg);
     min-height: 2.35rem;
 }
+
+/* Repair keeps every stored identity reachable, including the 48rem seam. */
+.automation-editor--repair .automation-flow-item--repair > span {
+    color: var(--app-text-muted);
+    font-size: 0.7rem;
+}
+.automation-flow-source { min-width: 0; padding: 1.1rem; overflow: auto; }
+.automation-source-heading { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.automation-source-heading h2 { margin: 0; font-size: 1rem; }
+.automation-source-heading p, .automation-flow-source > p { color: var(--app-text-muted); font-size: 0.8rem; }
+.automation-flow-source textarea { min-height: 27rem; font-family: monospace; font-size: 0.8rem; }
+.automation-editor--source .automation-editor-body { grid-template-columns: 11.5rem minmax(0, 1fr); }
+@media (max-width: 48rem) {
+    .automation-editor--repair .automation-flow-rail { max-height: 24rem; }
+    .automation-editor--repair .automation-flow-rail-heading { display: flex; }
+    .automation-editor--repair .automation-flow-rail .automation-flow-item:not(.automation-flow-item--active) { display: block; }
+    .automation-editor--source .automation-editor-body { display: block; }
+    .automation-flow-source { padding: 0.8rem; }
+}

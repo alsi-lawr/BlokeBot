@@ -1,5 +1,6 @@
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Commands;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 
@@ -15,6 +16,18 @@ public static class PointsConfigurationValidator
     > Validate(PointsConfiguration draft)
     {
         var errors = new List<PointsConfigurationValidationError>();
+        var watchTime = WatchTimeConfiguration
+            .Create(draft.WatchTimePointsEnabled, draft.WatchTimePointAmount)
+            .Match<WatchTimeConfiguration?>(
+                value => value,
+                error =>
+                {
+                    errors.Add(
+                        new PointsConfigurationValidationError.InvalidWatchTimeAmount(error)
+                    );
+                    return null;
+                }
+            );
         var minimumPayout = ParsePayout(draft.GiveawayMinimumPayout, minimum: true, errors);
         var maximumPayout = ParsePayout(draft.GiveawayMaximumPayout, minimum: false, errors);
         if (minimumPayout is { } minimum && maximumPayout is { } maximum)
@@ -92,7 +105,8 @@ public static class PointsConfigurationValidator
                     maximumPayout!.Value,
                     draft.GiveawayWinnerCount,
                     draft.GiveawayEligibility,
-                    draft.GiveawayCooldownSeconds
+                    draft.GiveawayCooldownSeconds,
+                    watchTime!
                 )
             );
     }
@@ -189,6 +203,15 @@ public abstract record PointsConfigurationValidationError
     private PointsConfigurationValidationError() { }
 
     public abstract string Message { get; }
+
+    public sealed record InvalidWatchTimeAmount(WatchTimeConfigurationError Error)
+        : PointsConfigurationValidationError
+    {
+        public override string Message =>
+            Error == WatchTimeConfigurationError.AmountOutOfRange
+                ? "Point amounts cannot exceed 10^100."
+                : "Enter a positive whole point amount.";
+    }
 
     public sealed record InvalidMinimumPayout : PointsConfigurationValidationError
     {

@@ -3,7 +3,7 @@
     <aside class="automation-flow-rail" aria-label="Automation library">
         @if (FocusMode)
         {
-            <div class="automation-flow-rail-controls"><button class="automation-icon-button" type="button" aria-label="Hide library" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button></div>
+            <div class="automation-flow-rail-controls"><button class="automation-icon-button" type="button" aria-label="Hide library" @onclick="Toggle"><EditorIcon Name="collapse-left" /></button></div>
         }
         <div class="automation-flow-rail-heading">
             <SegmentedTabs Items="_libraryTabs" ActiveKey="@(Library == AutomationLibraryKind.Flows ? "flows" : "subflows")" AriaLabel="Automation library" Id="automation-library" OwnsFragment="false" ActiveKeyChanged="SelectLibraryAsync" />
@@ -27,18 +27,19 @@
                 <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
             </button>
         }
-        @if (CurrentFlowId is null && !EditingSubflow)
+        @RepairItems
+        @if (CurrentFlowId is null && !EditingSubflow && ShowDraft)
         {
             <div class="automation-flow-item automation-flow-item--active">
                 <strong>@CurrentName</strong>
                 <span><span><i class="automation-status-dot automation-status-dot--draft"></i>Not saved</span><span>@CurrentNodeCount nodes</span></span>
             </div>
         }
-        @if (CurrentFlowId is not null && !EditingSubflow)
+        @if (CurrentFlowId is not null && !EditingSubflow && ShowActions)
         {
             <div class="automation-flow-rail-actions">
-                <button class="btn-secondary" type="button" @onclick="Duplicate"><AutomationIcon Name="duplicate" />Duplicate</button>
-                <button class="automation-danger-button" type="button" @onclick="Delete"><AutomationIcon Name="delete" />@(DeleteConfirmation ? "Confirm delete" : "Delete")</button>
+                <button class="btn-secondary" type="button" @onclick="Duplicate"><EditorIcon Name="duplicate" />Duplicate</button>
+                <button class="automation-danger-button" type="button" @onclick="Delete"><EditorIcon Name="delete" />@(DeleteConfirmation ? "Confirm delete" : "Delete")</button>
             </div>
         }
         </div>
@@ -48,6 +49,9 @@
 
 @code {
     private static readonly SegmentedTabItem[] _libraryTabs = [new("flows", "Flows"), new("subflows", "Subflows")];
+    [Parameter] public RenderFragment? RepairItems { get; set; }
+    [Parameter] public bool ShowDraft { get; set; } = true;
+    [Parameter] public bool ShowActions { get; set; } = true;
     [Parameter] public AutomationLibraryKind Library { get; set; }
     [Parameter] public EventCallback<AutomationLibraryKind> LibraryChanged { get; set; }
     [Parameter] public bool EditingSubflow { get; set; }

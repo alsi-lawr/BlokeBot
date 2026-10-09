@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -11,7 +12,8 @@ public sealed partial class PlayQueueService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
-    PlayQueueChangeNotifier? changes = null
+    PlayQueueChangeNotifier? changes = null,
+    AutomationFeatureLifecycle? automations = null
 ) : IPlayQueueProjectionReader
 {
     private const int _eventSchemaVersion = 1;
@@ -1858,7 +1860,7 @@ public sealed partial class PlayQueueService(
             ))
             .ToArray();
 
-    private static IReadOnlyList<PlayQueueCommittedChange> CommittedChanges(
+    private IReadOnlyList<PlayQueueCommittedChange> CommittedChanges(
         BlokeBotDbContext db,
         int hostId
     )
@@ -1890,7 +1892,22 @@ public sealed partial class PlayQueueService(
             .Select(queueId => new PlayQueueCommittedChange(
                 hostId,
                 queueId,
-                eventsByQueue.GetValueOrDefault(queueId)
+                eventsByQueue.GetValueOrDefault(queueId),
+                db
+                    .ChangeTracker.Entries<PlayQueueDomainEvent>()
+                    .Select(e => e.Entity)
+                    .Where(e =>
+                        e.HostId == hostId
+                        && e.QueueId == queueId
+                        && e.Kind
+                            is PlayQueueEventKind.Joined
+                                or PlayQueueEventKind.ReadyCheckStarted
+                    )
+                    .Select(e => new PlayQueueAutomationNotice(e.Id, e.Kind, e.OccurredAtUtc))
+                    .ToArray()
+                    is { Length: > 0 } notices
+                    ? notices
+                    : null
             ))
             .ToArray();
     }
@@ -1919,6 +1936,23 @@ public sealed partial class PlayQueueService(
         foreach (var change in committedChanges)
         {
             await _changes.NotifyAsync(change, cancellationToken);
+            if (automations is not null)
+            {
+                foreach (var notice in change.AutomationNotices ?? [])
+                {
+                    await automations.EmitAsync(
+                        change.HostId,
+                        notice.Kind == PlayQueueEventKind.Joined
+                            ? FeatureLifecycleKind.QueueJoined
+                            : FeatureLifecycleKind.QueueCalled,
+                        change.QueueId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        notice.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        notice.AtUtc,
+                        "",
+                        cancellationToken
+                    );
+                }
+            }
         }
     }
 

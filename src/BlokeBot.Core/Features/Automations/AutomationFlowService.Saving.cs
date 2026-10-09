@@ -10,8 +10,24 @@ public sealed partial class AutomationFlowService
     public async Task<AutomationFlowSaveOutcome> SaveAsync(
         AutomationFlowDraft draft,
         CancellationToken cancellationToken
+    ) => await SaveCoreAsync(draft, null, cancellationToken);
+
+    private async Task<AutomationFlowSaveOutcome> SaveCoreAsync(
+        AutomationFlowDraft draft,
+        AutomationAuthoredFlowSource? source,
+        CancellationToken cancellationToken
     )
     {
+        if (source is not null && !SourcePayloadMatches(draft, source))
+        {
+            return new AutomationFlowSaveOutcome.Invalid([
+                new(
+                    null,
+                    "source-payload-mismatch",
+                    "The source no longer matches the validated candidate. Validate it again."
+                ),
+            ]);
+        }
         var validation = await ValidateAsync(draft, cancellationToken);
         if (validation.Gate is { } gate)
         {
@@ -83,15 +99,46 @@ public sealed partial class AutomationFlowService
                 return new AutomationFlowSaveOutcome.FlowNotFound();
             }
 
-            if (RestoreDraft(existing) is not AutomationFlowDraftRestoreOutcome.Available restored)
-            {
-                return new AutomationFlowSaveOutcome.Invalid([MalformedGraphError()]);
-            }
-
-            var bindingFieldErrors = TransformInputBindingFieldErrors(restored.Draft, draft);
+            var bindingFieldErrors = TransformInputBindingFieldErrors(existing, draft);
             if (!bindingFieldErrors.IsEmpty)
             {
                 return new AutomationFlowSaveOutcome.Invalid(bindingFieldErrors);
+            }
+            if (source is not null)
+            {
+                foreach (var node in draft.Nodes)
+                {
+                    var old = existing.Nodes.SingleOrDefault(value =>
+                        value.Id == node.Id.Value && value.DefinitionId == node.Definition.TypeId
+                    );
+                    if (old is null)
+                    {
+                        continue;
+                    }
+
+                    var validProvenance = PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                        old.PluginProvenanceJson,
+                        out var provenance
+                    );
+                    if (
+                        (old.PluginProvenanceJson is not null && !validProvenance)
+                        || (provenance is null) != (node.Definition.PluginProvenance is null)
+                        || (
+                            provenance is not null
+                            && !provenance.SameCode(node.Definition.PluginProvenance!)
+                        )
+                    )
+                    {
+                        return new AutomationFlowSaveOutcome.Invalid([
+                            new(
+                                node.Id,
+                                "source-provider-changed",
+                                "The stored node provider changed. Reopen the source before saving."
+                            ),
+                        ]);
+                    }
+                }
+                draft = draft with { IsEnabled = existing.IsEnabled };
             }
 
             flow = await db.AutomationFlows.SingleAsync(
@@ -122,7 +169,19 @@ public sealed partial class AutomationFlowService
         flow.UseVerticalLayout = draft.Canvas.Orientation == AutomationFlowOrientation.Vertical;
         flow.UseSmoothEdges = draft.Canvas.EdgeStyle == AutomationEdgeStyle.Smooth;
         flow.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
-        db.AutomationFlowNodes.AddRange(draft.Nodes.Select(node => Persist(flow.Id, node)));
+        var persistedNodes = draft.Nodes.Select(node => Persist(flow.Id, node)).ToArray();
+        if (source is not null)
+        {
+            // These exact strings produced the validated draft; do not serialize a different payload.
+            foreach (var node in persistedNodes)
+            {
+                var authored = source.Nodes.Single(value => value.Id == node.Id);
+                node.ConfigurationJson = authored.ConfigurationJson;
+                node.InputBindingsJson = authored.InputBindingsJson;
+                node.DisplayAlias = authored.DisplayAlias;
+            }
+        }
+        db.AutomationFlowNodes.AddRange(persistedNodes);
         db.AutomationFlowEdges.AddRange(draft.Edges.Select(edge => Persist(flow.Id, edge)));
         db.AutomationSubflowCallers.AddRange(
             AutomationSubflowStore
@@ -140,56 +199,81 @@ public sealed partial class AutomationFlowService
         return new AutomationFlowSaveOutcome.Saved(new(flow.Id));
     }
 
-    private ImmutableArray<AutomationGraphError> TransformInputBindingFieldErrors(
-        AutomationFlowDraft existing,
+    private static ImmutableArray<AutomationGraphError> TransformInputBindingFieldErrors(
+        AutomationFlow existing,
         AutomationFlowDraft candidate
     )
     {
-        var candidateNodes = candidate.Nodes.ToDictionary(static node => node.Id);
+        var candidateNodes = candidate.Nodes.ToDictionary(static node => node.Id.Value);
         var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
-        foreach (var existingNode in existing.Nodes)
+        foreach (
+            var old in existing.Nodes.Where(node =>
+                node.DefinitionId == AutomationDefinitionIds.CelTransform.Value
+            )
+        )
         {
             if (
-                !candidateNodes.TryGetValue(existingNode.Id, out var candidateNode)
-                || catalog.ValidatePersistedDefinition(existingNode.Definition)
-                    is not AutomationConfigurationCheck.Valid
-                    {
-                        Configuration: AutomationCelTransformConfiguration existingTransform,
-                    }
-                || catalog.ValidatePersistedDefinition(candidateNode.Definition)
-                    is not AutomationConfigurationCheck.Valid
-                    {
-                        Configuration: AutomationCelTransformConfiguration candidateTransform,
-                    }
+                !candidateNodes.TryGetValue(old.Id, out var node)
+                || node.Definition.TypeId != old.DefinitionId
             )
             {
                 continue;
             }
 
-            var candidateInputs = candidateTransform.Inputs.ToDictionary(static input =>
-                input.PortId
-            );
-            foreach (var existingInput in existingTransform.Inputs)
+            using var document = TryReadConfiguration(old.ConfigurationJson);
+            if (
+                document is null
+                || !AutomationCelTransform.TryReadInputIdentities(
+                    document.RootElement,
+                    out var identities
+                )
+                || !AutomationCelTransform.TryReadInputIdentities(
+                    node.Definition.Configuration,
+                    out var candidateIdentities
+                )
+            )
+            {
+                errors.Add(
+                    new(
+                        new(old.Id),
+                        "transform-input-identities-invalid",
+                        "The stored Transform input identities cannot be matched safely. This repair was not saved."
+                    )
+                );
+                continue;
+            }
+            foreach (var (port, field) in identities)
             {
                 if (
-                    candidateInputs.TryGetValue(existingInput.PortId, out var candidateInput)
-                    && candidateInput.BindingFieldId != existingInput.BindingFieldId
+                    candidateIdentities.TryGetValue(port, out var replacement)
+                    && replacement != field
                 )
                 {
                     errors.Add(
                         new(
-                            existingNode.Id,
+                            new(old.Id),
                             "transform-input-binding-field-changed",
                             "Create a new Transform input instead of changing its binding field.",
-                            existingInput.BindingFieldId,
-                            existingInput.PortId
+                            field,
+                            port
                         )
                     );
                 }
             }
         }
-
         return errors.ToImmutable();
+    }
+
+    private static System.Text.Json.JsonDocument? TryReadConfiguration(string text)
+    {
+        try
+        {
+            return System.Text.Json.JsonDocument.Parse(text);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     public async Task<AutomationFlowEnableOutcome> SetEnabledAsync(

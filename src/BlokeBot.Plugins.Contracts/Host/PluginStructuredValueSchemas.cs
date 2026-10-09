@@ -280,6 +280,54 @@ public static class PluginStructuredValueSchemas
             InvocationPage
         );
 
+    public static PluginLuaFieldDescriptor WidgetId { get; } =
+        Field("id", PluginLuaFieldShape.String, "The declared widget ID.");
+    public static PluginLuaFieldDescriptor WidgetOverlayId { get; } =
+        Field("overlayId", PluginLuaFieldShape.String, "The resolved full overlay ID.");
+    public static PluginLuaFieldDescriptor WidgetDocumentId { get; } =
+        Field("documentId", PluginLuaFieldShape.String, "The resolved full document identity.");
+    public static PluginLuaFieldDescriptor WidgetInstanceId { get; } =
+        Field(
+            "instanceId",
+            PluginLuaFieldShape.String,
+            "The instance ID within the full document."
+        );
+    public static PluginLuaFieldDescriptor WidgetProjectionMode { get; } =
+        Field(
+            "mode",
+            new PluginLuaFieldShape.LiteralText("live", "preview-live", "preview-sample"),
+            "The server projection intent. Preview handlers must not admit or consume production work."
+        );
+    public static PluginLuaSchemaDescriptor WidgetContext { get; } =
+        Schema(
+            "BlokeBotWidgetContext",
+            "The admitted full overlay/widget identity, not management authority.",
+            null,
+            WidgetId,
+            WidgetOverlayId,
+            WidgetDocumentId,
+            WidgetInstanceId,
+            WidgetProjectionMode
+        );
+    public static PluginLuaFieldDescriptor WidgetKind { get; } =
+        Field("kind", new PluginLuaFieldShape.LiteralText("widget"), "The context kind.");
+    public static PluginLuaFieldDescriptor InvocationWidget { get; } =
+        Field(
+            "widget",
+            new PluginLuaFieldShape.Structured(WidgetContext),
+            "The full widget identity."
+        );
+    public static PluginLuaSchemaDescriptor WidgetInvocationContext { get; } =
+        Schema(
+            "BlokeBotWidgetInvocationContext",
+            "A trusted server-side public widget projection invocation.",
+            ContextBase,
+            WidgetKind,
+            ContextHostId,
+            ContextFeatureId,
+            InvocationWidget
+        );
+
     public static PluginLuaFieldDescriptor HttpRequestMethod { get; } =
         Field(
             "method",
@@ -358,6 +406,7 @@ public static class PluginStructuredValueSchemas
                 AutomationInvocationContext,
                 MigrationInvocationContext,
                 PageInvocationContext,
+                WidgetInvocationContext,
             ]
         );
 
@@ -385,6 +434,8 @@ public static class PluginStructuredValueSchemas
         AutomationInvocationContext,
         MigrationInvocationContext,
         PageInvocationContext,
+        WidgetContext,
+        WidgetInvocationContext,
         HttpRequest,
         HttpResponse,
         HttpRejected,

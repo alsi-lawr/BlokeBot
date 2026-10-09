@@ -1,0 +1,15 @@
+<span class="editor-action editor-toolbox-toggle">
+    <button type="button" class="editor-action-button btn-secondary" aria-label="Toolbox" aria-describedby="@_tipId"
+            aria-expanded="@(Open ? "true" : "false")" aria-controls="@Controls" @ref="_button" @onclick="Toggle" @attributes="AdditionalAttributes"><EditorIcon Name="toolbox" /></button>
+    <span id="@_tipId" class="editor-action-tip" role="tooltip">Toolbox</span>
+</span>
+
+@code {
+    private readonly string _tipId = $"editor-toolbox-tip-{Guid.NewGuid():N}";
+    private ElementReference _button;
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string? Controls { get; set; }
+    [Parameter] public EventCallback Toggle { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+    public ValueTask FocusAsync() => _button.FocusAsync();
+}

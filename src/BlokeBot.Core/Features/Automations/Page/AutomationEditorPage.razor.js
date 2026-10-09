@@ -1,6 +1,24 @@
+import { containToolboxKeyboard } from '../../../Components/EditorToolboxKeyboard.js';
 import { revealNode } from "./AutomationFlowCanvas.js";
+import { createAutomationMenu } from './AutomationEditorMenu.js';
+let editorMenu = null;
+let menuRoot = null;
+
+export function initializeEditorMenu(root, dotnet) {
+    if (root !== menuRoot) {
+        disposeEditorMenu();
+        menuRoot = root;
+        editorMenu = createAutomationMenu(root, dotnet);
+    }
+    editorMenu.refresh();
+}
+
+export function disposeEditorMenu() {
+    editorMenu?.dispose();
+    editorMenu = null;
+    menuRoot = null;
+}
 let dirtyNavigation = null;
-let fullscreenState = null;
 let historyKeyboard = null;
 let toolboxKeyboard = null;
 
@@ -58,25 +76,6 @@ export function navigateDocument(target) {
     requestAnimationFrame(() => window.location.assign(target));
 }
 
-export function initializeFullscreen(dotnet) {
-    disposeFullscreen();
-    const change = () => {
-        void dotnet.invokeMethodAsync(
-            "BrowserFullscreenChangedAsync",
-            document.fullscreenElement !== null,
-        );
-    };
-    fullscreenState = { change };
-    document.addEventListener("fullscreenchange", change);
-    change();
-}
-
-export function disposeFullscreen() {
-    if (fullscreenState === null) return;
-    document.removeEventListener("fullscreenchange", fullscreenState.change);
-    fullscreenState = null;
-}
-
 function isEditable(target) {
     return (
         target instanceof Element
@@ -86,6 +85,9 @@ function isEditable(target) {
 
 function historyAction(event) {
     if (
+        event.defaultPrevented
+        || event.target?.closest?.('[data-editor-menu],[data-editor-toolbox]')
+        ||
         !event.ctrlKey
         || event.altKey
         || event.metaKey
@@ -106,6 +108,7 @@ function historyAction(event) {
 export function initializeHistoryKeyboard(dotnet) {
     disposeHistoryKeyboard();
     const keydown = (event) => {
+        if (containToolboxKeyboard(event)) return;
         const action = historyAction(event);
         if (action === null) return;
 
@@ -126,6 +129,9 @@ export function initializeToolboxKeyboard(dotnet) {
     disposeToolboxKeyboard();
     const keydown = (event) => {
         if (
+            event.defaultPrevented
+            || event.target?.closest?.('[data-editor-menu],[data-editor-toolbox]')
+            ||
             event.key !== "/"
             || event.altKey
             || event.ctrlKey
@@ -149,17 +155,14 @@ export function disposeToolboxKeyboard() {
     toolboxKeyboard = null;
 }
 
-export async function toggleBrowserFullscreen() {
-    if (document.fullscreenElement) {
-        await document.exitFullscreen();
-        return;
-    }
-
-    await document.documentElement.requestFullscreen();
-}
-
-export function focusInspector() {
-    document.querySelector("[data-automation-inspector]")?.focus({ preventScroll: true });
+export function focusInspector(field = null, port = null) {
+    const inspector = document.querySelector("[data-automation-inspector]");
+    const owner = field !== null
+        ? inspector?.querySelector(`[data-automation-field="${CSS.escape(field)}"]`)
+        : port !== null ? inspector?.querySelector(`[data-automation-output="${CSS.escape(port)}"]`) : null;
+    const target = owner?.querySelector('[aria-invalid="true"]')
+        ?? owner?.querySelector('input,textarea,select,button') ?? inspector;
+    target?.focus({ preventScroll: false });
 }
 
 export function focusAuthoring() {

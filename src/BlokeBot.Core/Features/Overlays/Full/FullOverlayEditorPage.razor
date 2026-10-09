@@ -1,0 +1,113 @@
+@inherits AuthenticatedPageComponent
+@implements IAsyncDisposable
+
+<HeadContent><link rel="stylesheet" href="@Assets["vendor/full-overlay-editor/coloris/coloris.css"]" /></HeadContent>
+<PageTitle>@_name · Full overlay · BlokeBot</PageTitle>
+<NavigationLock ConfirmExternalNavigation='@_hasChanges' OnBeforeInternalNavigation="BeforeNavigationAsync" />
+@if (_row is null) {
+    <PageState Kind='@(_loading ? PageStateKind.Loading : PageStateKind.Failure)' Title='@(_loading ? "Loading full overlay" : _message)' />
+} else {
+    var controlView = _view;
+    <EditorWorkspace Class="full-overlay-editor" @ref="_workspace" data-full-editor inert='@(_client is null)' aria-busy='@(_client is null ? "true" : "false")' data-sticky-save-scope data-pane="preview" data-mode="visual">
+        <Header Context="focusControls">
+        <header class="full-editor-header">
+            <a href="/full-overlays" class="btn-secondary full-editor-back" aria-label="Back to full overlays"><EditorIcon Name="arrow-left" /></a>
+            <div class="full-editor-title"><Field Id="full-overlay-name" Label="Overlay name" MaxLength="128" @bind-Value="_name" /><span class="text-muted-foreground">@(_row.IsArchived ? "Archived" : _row.PublishedVersion is { } liveVersion ? $"Live · v{liveVersion.Value}" : "Unpublished draft")</span></div>
+            <div class="full-editor-header-actions">
+            <span class="full-editor-state">@(_hasChanges ? "Unsaved" : "Saved")</span>
+            <StickySaveRegion Scope="StickySaveScope.Editor"><div class="full-editor-save"><EditorAction Label="Save draft" Icon="save" Disabled="_busy" Click="SaveAsync" /><EditorAction Label="Save & publish" Icon="arrow-up" Class="btn-primary" Disabled="@(_busy || _row.IsArchived)" Click="PublishAsync" /></div></StickySaveRegion>
+            <EditorAction Label="History & live URL" Icon="history" Click="OpenManagementAsync" />
+            @focusControls
+            </div>
+        </header>
+        </Header>
+        <ChildContent>
+        <div class="full-editor-toolbar">
+            <SegmentedTabs Id="full-mode" AriaLabel="Editor mode" Items="_modeTabs" ActiveKey="visual" BrowserOwned="true" data-editor-tabs="mode" />
+            <div role="group" aria-label="Focused editor history"><EditorAction Label="Undo" Icon="undo" Click='() => HistoryAsync("undo")' /><EditorAction Label="Redo" Icon="redo" Click='() => HistoryAsync("redo")' /><span class="text-muted-foreground">@FocusLabel()</span></div>
+            <span data-visual-region><EditorToolboxToggle @ref="_toolboxToggle" Open="_toolboxOpen" Controls="full-overlay-toolbox" Toggle="ToggleToolboxAsync" data-full-toolbox-toggle /></span>
+            <div class="full-editor-view-controls" data-visual-region>
+                <label class="full-editor-inline"><input type="checkbox" data-snap checked />Snap <span class="full-editor-desktop text-muted-foreground">· Shift bypass</span></label>
+                <EditorAction Label="Pan view" Icon="direction" Pressed="_pan" Click="PanAsync" />
+                <EditorAction Label="Preview viewport" Tip='@($"Preview viewport · {_viewportWidth} × {_viewportHeight}")' Icon="grid" Click="OpenViewportAsync" />
+                <label class="full-editor-inline"><span class="sr-only">View</span><select aria-label="Canvas zoom" @onchange="ZoomAsync"><option value="0">Fit</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option></select></label>
+                <label class="full-editor-inline"><span class="sr-only">Data</span><select aria-label="Private preview data" @onchange="DataModeAsync"><option value="Sample">Sample</option><option value="Live">Live</option></select></label>
+                <EditorAction Label="Replay preview" Icon="test" Click="ReplayAsync" />
+            </div>
+            <EditorContextMenu />
+        </div>
+        <nav class="full-editor-mobile-tabs" aria-label="Editor panels" data-visual-region>
+            @foreach (var pane in new[] { "layers", "preview", "inspector" }) { <button class="btn-secondary" aria-pressed='@(pane == "preview" ? "true" : "false")' data-editor-pane="@pane">@(pane == "preview" ? "Canvas" : char.ToUpperInvariant(pane[0]) + pane[1..])</button> }
+        </nav>
+        <div class="full-editor-workspace">
+            @if (_toolboxOpen) {
+                <div class="full-editor-toolbox-backdrop" @onclick="CloseToolboxAsync" aria-hidden="true" data-visual-region></div>
+                <FullOverlayToolbox @ref="_toolbox" HostId="HostId" Feedback="@_toolboxFeedback" Add="AddAsync" AddOrdinary='() => InsertAsync(new { kind = "add" })' Close="CloseToolboxAsync" />
+            }
+            <aside class="full-editor-layers" aria-label="Layers" data-visual-region>
+                <h2>Layers</h2>
+                @if (_view.Members.Count > 1) { <p class="form-help" role="status">@_view.Members.Count selected · Active: @SelectedLabel()</p> }
+                <FullOverlayLayerTree View="_view" Selected="SelectAsync" />
+                <div class="full-hierarchy-root"><EditorAction Label='@($"Move to {controlView.HierarchyRoot.ToLowerInvariant()}")' Icon="arrow-up" data-hierarchy-root Disabled="@(_view.Selected is null)" Click='() => CommandAtAsync(new { kind = "hierarchy", relation = "root" }, controlView.Selected, controlView.Revision, controlView.SelectionVersion, controlView)' /><EditorAction Label="Move in HTML…" Icon="direction" Disabled="@(_view.Selected is null)" Click="OpenHierarchyAsync" /></div>
+            </aside>
+            <div class="full-editor-centre">
+                <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Ctrl toggles layers. Alt drag selects all intersecting layers. Middle drag pans the view.">
+                    <div class="full-editor-canvas-stage" data-canvas-stage>
+                        <div class="full-editor-canvas-scene" data-canvas-scene><iframe data-preview-frame title="Private unsaved overlay preview" referrerpolicy="no-referrer" allow="autoplay"></iframe></div>
+                        <div data-selection class="full-editor-selection" hidden>@foreach (var handle in new[] { "nw", "n", "ne", "e", "se", "s", "sw", "w" }) { <button data-resize="@handle" type="button" tabindex="-1" aria-label="@($"Resize {handle}. Keyboard alternatives are in Position and size.")"></button> }</div>
+                    </div>
+                    <span class="full-editor-preview-state" role="status">@_previewState</span>
+                </section>
+                <section class="full-editor-source" data-source-region hidden role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "source")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "source")'>
+                    <header class="full-editor-source-header"><SegmentedTabs Id="full-source" AriaLabel="Source editor" Items="_sourceTabs" ActiveKey="html" BrowserOwned="true" data-editor-tabs="source" /><span class="text-muted-foreground">Includes your visual edits</span><span class="full-editor-source-selection">@SelectedLabel()</span></header>
+                    <div class="full-editor-source-pane" data-source-pane="html" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "html")' aria-labelledby='@SegmentedTabs.TabId("full-source", "html")' ><textarea id="full-source-html" data-source="html" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay HTML source"></textarea></div>
+                    <div class="full-editor-source-pane" data-source-pane="css" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "css")' aria-labelledby='@SegmentedTabs.TabId("full-source", "css")' hidden><textarea id="full-source-css" data-source="css" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay CSS source"></textarea></div>
+                </section>
+            </div>
+            <aside class="full-editor-inspector" aria-label="Selected layer inspector" tabindex="-1" data-visual-region>
+                <FullOverlayInspector @ref="_inspector" @key="controlView.Selected" View="controlView" HierarchyPreview="command => HierarchyPreviewAsync(command, controlView)" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion, controlView)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
+                @if (_view.Widget is { } widget) {
+                    <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">
+                        @if (widget.Kind.Value is "image" or "audio" or "video") {
+                            <label class="full-editor-field">Uploaded media<select value='@MediaAsset(widget)' aria-label="Uploaded media" @onchange="args => MediaSelectedAsync(args, controlView)"><option value="">Choose a file</option>@foreach (var asset in MediaFor(widget.Kind.Value)) { <option value='@asset.Id'>@asset.Name@(!asset.IsAvailable ? " (unavailable)" : "")</option> }</select></label>
+                            <FileDropInput @key='("media-upload", widget.Id)' Label='@($"Upload {widget.Kind.Value}")' Accept='@($"{widget.Kind.Value}/*")' Compact="true" Disabled="_busy" OnChange="args => UploadAsync(args, controlView)" />
+                        }
+                        @if (widget.RequiresSetup) {
+                            <p role="status">This widget needs setup for this channel. Choose its destination configuration, then confirm.</p>
+                            <EditorAction Label="Confirm destination setup" Icon="apply" Click='() => CommandAtAsync(new { kind = "setup", value = false }, controlView.Selected, controlView.Revision, controlView.SelectionVersion)' />
+                        }
+                        <FullOverlayWidgetSettings @key="widget.Id" Widget="widget" Bindings="BindingsFor(widget)" PluginFields="@(_registry.Descriptors.FirstOrDefault(item => item.Kind == widget.Kind)?.PluginConfigurationFields ?? [])" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion)" />
+                        <StudioFold Key="widget-advanced" Label="Advanced" @bind-Open="_advancedConfigurationOpen" Bare="true">
+                            <TextAreaField Id="full-widget-json" Label="Configuration JSON" Value="@_configuration" ValueChanged="ConfigurationInput" />
+                            <EditorAction Label="Apply configuration" Icon="apply" Click="() => ApplyConfigurationAsync(controlView)" />
+                        </StudioFold>
+                    </StudioFold>
+                }
+            </aside>
+        </div>
+        <footer class="full-editor-footer">
+            <div class="full-editor-feedback" role="status">@(_view.Feedback.Length > 0 ? _view.Feedback : _message)
+                @if (_view.Diagnostics.Count > 0) { <span>@_view.Diagnostics.Count source diagnostic(s) · incomplete drafts can be saved</span> }
+                @foreach (var diagnostic in _publicationDiagnostics) { <span>@diagnostic.Message</span> }
+            </div>
+
+        </footer>
+        <dialog class="full-editor-dialog" @ref="_managementDialog" aria-labelledby="full-management-title">
+            <header><h2 id="full-management-title">History &amp; live URL</h2><EditorAction Label="Close history &amp; live URL" Icon="close" Click="CloseManagementAsync" /></header>
+            <label class="full-editor-field" for="full-live-url">Stable live URL<input class="field__input" id="full-live-url" readonly value='@_liveUrl' /></label><EditorAction Label="Copy live URL" Icon="duplicate" Click="CopyUrlAsync" />
+            <p class="text-muted-foreground">Use this URL in OBS. Draft saves do not change the live publication or this URL.</p>
+            <form method="post" action="/full-overlays/export" @ref="_exportForm"><AntiforgeryToken /><input type="hidden" name="document" /><input type="hidden" name="name" /><EditorAction Label="Export working document / template" Icon="arrow-down" Click="ExportAsync" /></form>
+            <h3>Published history</h3>
+            @if (_history.Count == 0) { <p>No published versions yet.</p> }
+            @foreach (var version in _history) {
+                <div class="full-overlay-list-row"><div><strong>Version @version.Version.Value@(_row.PublishedVersion == version.Version ? " · live" : "")</strong><p>@version.AuthorLogin · @version.PublishedAtUtc.ToLocalTime().ToString("g")</p></div><div><EditorAction Label='@($"Make version {version.Version.Value} live")' Icon="arrow-up" Disabled="@(_busy || _row.IsArchived)" Click='() => RollbackAsync(version.Version)' /><EditorAction Label='@($"Forget version {version.Version.Value}")' Icon="delete" Disabled="@(_busy || _row.PublishedVersion == version.Version)" Click='() => ForgetAsync(version.Version)' /></div></div>
+            }
+            <p class="text-muted-foreground">Make live switches directly to retained content, leaving your draft unchanged. Warnings do not prevent rollback. History is kept until you forget it.</p>
+            <div class="full-editor-lifecycle"><EditorAction Label="Copy saved draft" Icon="duplicate" Disabled="_busy" Click="DuplicateAsync" /><EditorAction Label='@(_row.IsArchived ? "Restore" : "Archive")' Icon='@(_row.IsArchived ? "undo" : "archive")' Disabled="_busy" Click="LifecycleAsync" /><EditorAction Label="Delete overlay…" Icon="delete" Class="btn-danger" Disabled="_busy" Click="AskDeleteAsync" /></div>
+            @if (_message.Length > 0) { <p role="status">@_message</p> }
+        </dialog>
+        <dialog class="full-editor-dialog" @ref="_viewportDialog" aria-labelledby="full-viewport-title"><header><h2 id="full-viewport-title">Preview viewport</h2><EditorAction Label="Close preview viewport" Icon="close" Click="CloseViewportAsync" /></header><p>This changes your authoring view, not the document or OBS Browser Source size. Responsive authored CSS stays authoritative.</p><div class="full-inspector-grid"><Field Id="full-viewport-width" Label="Preview width" @bind-Value="_viewportWidth" /><Field Id="full-viewport-height" Label="Preview height" @bind-Value="_viewportHeight" /></div><EditorAction Label="Apply viewport" Icon="apply" Class="btn-primary" Click="ApplyViewportAsync" /></dialog>
+        <dialog class="full-editor-dialog" @ref="_deleteDialog" aria-labelledby="full-delete-title"><h2 id="full-delete-title">Permanently delete @_name?</h2><p>This deletes the overlay, draft, history and live URL. It cannot be undone.</p><button class="btn-secondary gap-2" @onclick="CancelDeleteAsync"><EditorIcon Name="cancel" />Cancel</button><button class="btn-danger gap-2" @onclick="DeleteAsync"><EditorIcon Name="delete" />Delete permanently</button></dialog>
+        </ChildContent>
+    </EditorWorkspace>
+}

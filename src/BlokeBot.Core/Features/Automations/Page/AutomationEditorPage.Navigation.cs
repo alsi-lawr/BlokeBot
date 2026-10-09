@@ -70,7 +70,7 @@ public partial class AutomationEditorPage
             return;
         }
 
-        if (!await SaveCoreAsync())
+        if (!await (_sourceFlowId is not null ? SaveSourceCoreAsync() : SaveCoreAsync()))
         {
             CancelDirtyTransition();
             return;
@@ -99,7 +99,14 @@ public partial class AutomationEditorPage
         return InvokeAsync(StateHasChanged);
     }
 
-    private void CancelDirtyTransition() => CloseDirtyDialog();
+    private void CancelDirtyTransition()
+    {
+        CloseDirtyDialog();
+        if (_sourceFlowId is not null)
+        {
+            _sourceFocusRequest++;
+        }
+    }
 
     private void CloseDirtyDialog()
     {
@@ -109,6 +116,7 @@ public partial class AutomationEditorPage
 
     private void ResetTransientState()
     {
+        ResetSource();
         ResetAuthoring();
         CancelValidationFeedback();
         _validated = false;

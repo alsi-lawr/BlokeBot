@@ -1,11 +1,16 @@
 {
   "type": "module",
   "scripts": {
+    "editor:assets": "node scripts/full-overlay-editor-assets.mjs",
+    "editor:test": "node --test ../../tests/BlokeBot.Core.Tests/Client/EditorWorkspace.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayEditor.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayWorkingDocument.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlaySelection.test.mjs ../../tests/BlokeBot.Core.Tests/Client/FullOverlayHierarchy.test.mjs ../../tests/BlokeBot.Core.Tests/Client/GuidedFill.test.mjs",
     "css:build": "tailwindcss -i ./Styles/app.css -o ./wwwroot/app.css --minify",
     "css:watch": "tailwindcss -i ./Styles/app.css -o ./wwwroot/app.css --watch"
   },
   "dependencies": {
+    "@melloware/coloris": "0.25.0",
     "@tailwindcss/cli": "^4.3.2",
+    "css-tree": "3.2.1",
+    "parse5": "8.0.1",
     "tailwindcss": "^4.3.2"
   }
 }

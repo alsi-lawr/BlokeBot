@@ -301,6 +301,44 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationCountdown", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)");
+
+                    b.Property<int>("AutomationGeneration")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("DeadlineUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRunning")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProcessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("WasCancelled")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("HostId", "Name");
+
+                    b.ToTable("automation_countdowns", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationEventReceipt", b =>
                 {
                     b.Property<int>("HostId")
@@ -522,6 +560,49 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("automation_flow_runs", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalMilestone", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("GoalId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("HostId", "GoalId", "Amount");
+
+                    b.ToTable("automation_goal_milestones", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalObservation", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("GoalId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("CurrentAmount")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsEnded")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("HostId", "GoalId");
+
+                    b.ToTable("automation_goal_observations", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationNodeRun", b =>
                 {
                     b.Property<long>("Id")
@@ -597,6 +678,57 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsUnique();
 
                     b.ToTable("automation_scenarios", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ViewerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("HostId", "ViewerId");
+
+                    b.ToTable("automation_seen_viewers", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSourceAdmission", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AcceptEventsAfterUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("HostId");
+
+                    b.ToTable("automation_source_admissions", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationStreamObservation", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StreamId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("SuppressUptimeBeforeUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("HostId");
+
+                    b.ToTable("automation_stream_observations", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
@@ -4563,6 +4695,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<bool>("SingleArgument")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -4688,6 +4823,48 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasKey("HostId", "CustomCommandId", "TwitchUserId");
 
                     b.ToTable("custom_command_allowed_users", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CommandId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InvocationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("InvocationId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reply")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ReplyEligible")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "InvocationHash")
+                        .IsUnique();
+
+                    b.ToTable("custom_command_computed_results", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
@@ -4898,6 +5075,110 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("custom_message_variants", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DefinitionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EntryKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId", "TargetHash")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "DefinitionId");
+
+                    b.ToTable("custom_stored_values", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<long>("DefaultNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DefaultText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NameHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "DictionaryName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_DictionaryName")
+                        .HasFilter("\"Kind\" = 2");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "ScalarName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_ScalarName")
+                        .HasFilter("\"Kind\" <> 2");
+
+                    b.ToTable("custom_value_definitions", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
                 {
                     b.Property<int>("Id")
@@ -4968,6 +5249,137 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         {
                             t.HasCheckConstraint("CK_durable_alerts_Severity", "\"Severity\" IN ('Critical', 'Info', 'Warning')");
                         });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlay", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<byte[]>("AccessKeyDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DraftDocumentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ProtectedAccessKey")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<long>("PublicationSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PublishedVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessKeyDigest")
+                        .IsUnique();
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "IsArchived", "PublicId");
+
+                    b.ToTable("full_overlays", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("BindingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FullOverlayId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("PublishedVersion")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.HasIndex("FullOverlayId", "BindingId")
+                        .IsUnique();
+
+                    b.ToTable("full_overlay_event_feed_bindings", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
+                {
+                    b.Property<long>("OverlayId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AuthorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("AuthorUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("OverlayId", "Version");
+
+                    b.ToTable("full_overlay_publications", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.GuessOption", b =>
@@ -5899,6 +6311,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<DateTime>("EnqueuedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long?>("FullOverlayEventFeedBindingId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("HostId")
                         .HasColumnType("integer");
 
@@ -5912,7 +6327,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<long>("OverlayInstanceId")
+                    b.Property<long?>("OverlayInstanceId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Priority")
@@ -5935,6 +6350,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Kind", "SourceKey")
+                        .IsUnique();
+
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Lifecycle", "EnqueuedAtUtc");
+
                     b.HasIndex("OverlayInstanceId", "Kind", "SourceKey")
                         .IsUnique();
 
@@ -5947,6 +6367,8 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "\"Kind\" IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "\"Lifecycle\" IN ('active', 'consumed', 'queued', 'suppressed')");
+
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Owner", "(\"OverlayInstanceId\" IS NULL) <> (\"FullOverlayEventFeedBindingId\" IS NULL)");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Priority", "\"Priority\" IN ('high', 'normal')");
 
@@ -7247,7 +7669,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
                     b.ToTable("point_ledger_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "\"Kind\" IN ('Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
+                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "\"Kind\" IN ('WatchTimeReward', 'Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
                         });
                 });
 
@@ -7502,6 +7924,19 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("WatchTimeConfigurationRevision")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WatchTimeEnableGeneration")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WatchTimePointAmount")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("WatchTimePointsEnabled")
+                        .HasColumnType("boolean");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HostId")
@@ -7510,6 +7945,8 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("points_settings", null, t =>
                         {
                             t.HasCheckConstraint("CK_points_settings_GiveawayEligibility", "\"GiveawayEligibility\" IN ('everyone', 'followers', 'subscribers')");
+
+                            t.HasCheckConstraint("CK_points_settings_WatchTimeEnabled", "NOT \"WatchTimePointsEnabled\" OR (\"WatchTimePointAmount\" IS NOT NULL AND \"WatchTimeEnableGeneration\" <> '00000000-0000-0000-0000-000000000000')");
                         });
                 });
 
@@ -9486,6 +9923,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationCountdown", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationEventReceipt", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
@@ -9537,6 +9983,24 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Navigation("Flow");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalMilestone", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationGoalObservation", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalObservation", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationNodeRun", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.AutomationFlowRun", "Run")
@@ -9557,6 +10021,33 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Flow");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationStreamObservation", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSourceAdmission", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationStreamObservation", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
@@ -10520,6 +11011,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Navigation("Command");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.CustomCommand", "Command")
@@ -10577,11 +11077,65 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Navigation("Entry");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CustomValueDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "DefinitionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlay", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", "FullOverlay")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FullOverlay");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", null)
+                        .WithMany()
+                        .HasForeignKey("OverlayId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -10883,6 +11437,11 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayEventFeedItem", b =>
                 {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", "FullOverlayEventFeedBinding")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayEventFeedBindingId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
@@ -10892,8 +11451,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.HasOne("BlokeBot.Persistence.Models.OverlayInstance", "OverlayInstance")
                         .WithMany()
                         .HasForeignKey("OverlayInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("FullOverlayEventFeedBinding");
 
                     b.Navigation("OverlayInstance");
                 });

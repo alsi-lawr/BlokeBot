@@ -3,7 +3,7 @@ using static BlokeBot.Core.Features.Automations.AutomationConfigurationJson;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public static class AutomationDefinitionIds
+public static partial class AutomationDefinitionIds
 {
     public static AutomationDefinitionId CustomCommandSource { get; } = new("custom-command");
 
@@ -216,7 +216,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                     new(
                         new("message"),
                         "Message",
-                        "The chat message can contain automation variables.",
+                        "Enter the exact chat message, or connect a Text output.",
                         new AutomationConfigurationFieldType.Text(500, true),
                         true
                     ),
@@ -225,7 +225,27 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationActionRetrySafety.Unsafe
             ),
             ParseSendChat,
-            ValidateSendChat
+            ValidateSendChat,
+            parseForInputBindings: ParseSendChat,
+            validateForInputBindings: (configuration, bindings) =>
+                bindings.TryGetValue(new("message"), out var binding)
+                    ? !Enum.IsDefined(binding.Mode)
+                        ? AutomationValidationResult.Invalid(
+                            new AutomationValidationTarget.Field(new("message")),
+                            "Choose Fixed or Connected for the chat message."
+                        )
+                        : binding.Mode switch
+                        {
+                            AutomationInputBindingMode.Fixed => ValidateSendChat(configuration),
+                            AutomationInputBindingMode.Connected =>
+                                AutomationValidationResult.Valid,
+                            AutomationInputBindingMode.Expression =>
+                                AutomationValidationResult.Invalid(
+                                    new AutomationValidationTarget.Field(new("message")),
+                                    "Send chat message supports Fixed or Connected. Choose Fixed to enter a message, or connect a Text output from CEL Transform."
+                                ),
+                        }
+                    : ValidateSendChat(configuration)
         );
 
     private static AutomationDefinition<AutomationRandomNumberConfiguration> RandomNumber() =>
@@ -361,17 +381,33 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationDefinitionScope.Host,
                 _schema,
                 new("Delay", "Pauses this flow for a set time.", "Control"),
-                [_flowInput],
+                [
+                    _flowInput,
+                    new(
+                        AutomationDelayDurationBinding.Port,
+                        "Duration (milliseconds)",
+                        "Wait for a positive whole number of milliseconds.",
+                        AutomationPortValueType.Number,
+                        BindingFieldId: AutomationDelayDurationBinding.ValueField
+                    ),
+                ],
                 [_completeOutput],
                 [
                     new(
-                        new("duration-milliseconds"),
+                        AutomationDelayDurationBinding.LiteralField,
                         "Duration",
                         "How long the automation waits.",
                         new AutomationConfigurationFieldType.Duration(
                             TimeSpan.FromMilliseconds(1),
                             null
                         ),
+                        true
+                    ),
+                    new(
+                        AutomationDelayDurationBinding.ValueField,
+                        "Duration (milliseconds)",
+                        "Use Fixed, Connected, or Expression for a positive whole number of milliseconds.",
+                        new AutomationConfigurationFieldType.Data(AutomationPortValueType.Number),
                         true
                     ),
                 ],
@@ -432,7 +468,10 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             : Invalid("predicate", "Choose a Boolean predicate.");
 
     private static AutomationConfigurationParseResult ParseDelay(JsonElement json) =>
-        TryReadInt64(json, "duration-milliseconds", out var milliseconds)
+        json.ValueKind == JsonValueKind.Object
+        && json.TryGetProperty("duration-milliseconds", out var duration)
+        && duration.ValueKind == JsonValueKind.Number
+        && TryReadInt64(json, "duration-milliseconds", out var milliseconds)
         && milliseconds >= TimeSpan.MinValue.Ticks / TimeSpan.TicksPerMillisecond
         && milliseconds <= TimeSpan.MaxValue.Ticks / TimeSpan.TicksPerMillisecond
             ? Parsed(

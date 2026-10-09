@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.Points.Configuration;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -105,6 +106,30 @@ public sealed partial class ConfigurationImportPreviewService
             return new(ConfigurationSectionId.Points, new(0, 0, 1, 0), [], []);
         }
 
+        var validationIssues = PointsConfigurationTransferAdapter
+            .MapValidatedConfiguration(section)
+            .Match<IReadOnlyList<ConfigurationValidationIssue>>(
+                _ => [],
+                errors =>
+                    errors
+                        .Select(error => new ConfigurationValidationIssue(
+                            "sections.points",
+                            error.Message
+                        ))
+                        .ToArray()
+            );
+        if (section.WatchTimePoints is null)
+        {
+            validationIssues = validationIssues
+                .Append(
+                    new ConfigurationValidationIssue(
+                        "Watch-time points",
+                        "Applying these Points settings turns watch-time points off and clears the configured amount.",
+                        BlocksApply: false
+                    )
+                )
+                .ToArray();
+        }
         var aliases = section.CommandAliases.SelectMany(x => x.Aliases).ToArray();
         var collision =
             FixedChatCommandRoutes.FindCollision(aliases)
@@ -117,15 +142,19 @@ public sealed partial class ConfigurationImportPreviewService
         return new(
             ConfigurationSectionId.Points,
             counts,
-            collision is null
-                ? []
-                :
-                [
-                    new(
-                        "sections.points.commandAliases",
-                        $"!{collision} is already used by another command."
-                    ),
-                ],
+            validationIssues
+                .Concat(
+                    collision is null
+                        ? []
+                        :
+                        [
+                            new(
+                                "sections.points.commandAliases",
+                                $"!{collision} is already used by another command."
+                            ),
+                        ]
+                )
+                .ToArray(),
             []
         );
     }

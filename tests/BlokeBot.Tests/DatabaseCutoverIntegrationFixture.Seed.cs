@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Security.Cryptography;
 using BlokeBot.Announcements;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.CustomCommands;
+using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -16,8 +18,9 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 {
     internal const string PriorReleaseSqliteMigration =
         "20260822192152_v0.12.0_GuessingSharedAliases";
-    internal const string CurrentSqliteMigration = "20260907091826_CurrentSubflowCallers";
-    internal const string CurrentPostgreSqlMigration = "20260907093259_CurrentSubflowCallers";
+    internal const string CurrentSqliteMigration = "20261008185949_SeparateStoredValueNamespaces";
+    internal const string CurrentPostgreSqlMigration =
+        "20261008190031_SeparateStoredValueNamespaces";
     internal static readonly string[] CurrentPostgreSqlMigrations =
     [
         "20260901145930_20260901_v0_14_0_Baseline",
@@ -25,6 +28,13 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         "20260906180403_AutomationScenarios",
         "20260907001120_AutomationTraces",
         "20260907005350_AutomationSubflows",
+        "20260907093259_CurrentSubflowCallers",
+        "20261001153219_FullOverlays",
+        "20261001164846_FullOverlayWidgets",
+        "20261002151335_FullOverlayProtectedKeys",
+        "20261003213012_AutomationSourceLifecycle",
+        "20261006192903_WatchTimePoints",
+        "20261008174636_ScopedCustomCommandValues",
         CurrentPostgreSqlMigration,
     ];
     internal const int SeedHostId = 900;
@@ -115,6 +125,42 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
             outcome: AutomationTraceOutcome.Succeeded
         ),
     ];
+
+    private const long _fullOverlayId = 600;
+    private static readonly Guid _fullOverlayPublicId = Guid.Parse(
+        "b99e5307-79c3-4577-bc36-9868d00df37a"
+    );
+    private static readonly FullOverlayDocument _publishedOverlayDocument = new(
+        Guid.Parse("9ff2a062-01b1-414c-9ee3-ff0712652928"),
+        "<main>Published cutover overlay</main>",
+        "main { color: #abcdef; }",
+        [],
+        []
+    );
+    private static readonly FullOverlayDocument _draftOverlayDocument =
+        _publishedOverlayDocument with
+        {
+            Html = "<main>Unpublished draft edits</main>",
+        };
+    private static readonly byte[] _overlayAccessKeyDigest = SHA256.HashData(
+        "synthetic-cutover-access-key"u8
+    );
+    private const string _protectedOverlayAccessKey = "synthetic-cutover-protected-access-key";
+    private const string _storedValueName = "profile";
+    private const string _storedValueViewerId = "cutover-viewer";
+    private const string _dictionaryEntryKey = "game";
+    private const long _storedNumber = 9_007_199_254_740_993;
+    private const string _storedText = "Celeste — preserved";
+    private const string _computedInvocationId = "cutover-computed-invocation";
+    private const string _computedReply = "9007199254740993/Celeste — preserved";
+    private const string _storedValueTemplate =
+        "{var_get|user|profile}/{dict_get|user|profile|game}";
+    private static readonly Guid _scalarRevision = Guid.Parse(
+        "bc829d09-5d6f-45bd-8902-67a0a52b4890"
+    );
+    private static readonly Guid _dictionaryRevision = Guid.Parse(
+        "099afc78-d603-48fc-90d8-2f7458c756d7"
+    );
 
     private static readonly AutomationSubflowRevision _subflowRevision = CreateSubflowRevision();
 
@@ -373,6 +419,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 SubflowId = _subflowId,
             }
         );
+        SeedCurrentOverlayAndStoredValueRows(db);
         _ = await db.SaveChangesAsync();
         await AutomationTraceStore.CreateAsync(
             db,
@@ -393,6 +440,122 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 CancellationToken.None
             );
         }
+    }
+
+    private static void SeedCurrentOverlayAndStoredValueRows(BlokeBotDbContext db)
+    {
+        _ = db.FullOverlays.Add(
+            new()
+            {
+                Id = _fullOverlayId,
+                PublicId = _fullOverlayPublicId,
+                HostId = SeedHostId,
+                Name = "Cutover full overlay",
+                DraftDocumentJson = FullOverlayDocuments.Serialize(_draftOverlayDocument),
+                AccessKeyDigest = _overlayAccessKeyDigest,
+                ProtectedAccessKey = _protectedOverlayAccessKey,
+                Revision = 9,
+                PublicationSequence = 3,
+                PublishedVersion = 3,
+                CreatedAtUtc = SeedTime,
+                UpdatedAtUtc = SeedTime.AddMinutes(1),
+            }
+        );
+        _ = db.FullOverlayPublications.Add(
+            new()
+            {
+                OverlayId = _fullOverlayId,
+                Version = 3,
+                DocumentJson = FullOverlayDocuments.Serialize(_publishedOverlayDocument),
+                AuthorUserId = "seed-user",
+                AuthorLogin = "cutover_seed",
+                PublishedAtUtc = SeedTime,
+            }
+        );
+        db.CustomValueDefinitions.AddRange(
+            new CustomValueDefinition
+            {
+                Id = 710,
+                HostId = SeedHostId,
+                Name = _storedValueName,
+                NameHash = CustomValueIdentity.Hash(_storedValueName),
+                Scope = CustomValueScope.User,
+                Kind = CustomValueKind.Number,
+                DefaultNumber = -7,
+                Revision = _scalarRevision,
+            },
+            new CustomValueDefinition
+            {
+                Id = 711,
+                HostId = SeedHostId,
+                Name = _storedValueName,
+                NameHash = CustomValueIdentity.Hash(_storedValueName),
+                Scope = CustomValueScope.User,
+                Kind = CustomValueKind.Dictionary,
+                DefaultText = "unknown game",
+                Revision = _dictionaryRevision,
+            }
+        );
+        db.CustomStoredValues.AddRange(
+            new CustomStoredValue
+            {
+                Id = 720,
+                HostId = SeedHostId,
+                DefinitionId = 710,
+                ViewerId = _storedValueViewerId,
+                TargetHash = CustomValueIdentity.Target(_storedValueViewerId, ""),
+                Kind = CustomValueKind.Number,
+                Number = _storedNumber,
+                Revision = _scalarRevision,
+            },
+            new CustomStoredValue
+            {
+                Id = 721,
+                HostId = SeedHostId,
+                DefinitionId = 711,
+                ViewerId = _storedValueViewerId,
+                EntryKey = _dictionaryEntryKey,
+                TargetHash = CustomValueIdentity.Target(_storedValueViewerId, _dictionaryEntryKey),
+                Kind = CustomValueKind.Text,
+                Text = _storedText,
+                Revision = _dictionaryRevision,
+            }
+        );
+        _ = db.CustomCommands.Add(
+            new()
+            {
+                Id = 7,
+                HostId = SeedHostId,
+                Name = "cutover_profile",
+                CreatedAtUtc = SeedTime,
+                UpdatedAtUtc = SeedTime,
+                Action = new MessageCustomCommandAction
+                {
+                    HostId = SeedHostId,
+                    ZeroArgumentMessageLibraryEntry = new()
+                    {
+                        HostId = SeedHostId,
+                        Name = "Cutover stored-value reply",
+                        CreatedAtUtc = SeedTime,
+                        UpdatedAtUtc = SeedTime,
+                        Variants = [new() { Text = _storedValueTemplate }],
+                    },
+                },
+            }
+        );
+        _ = db.CustomCommandComputedResults.Add(
+            new()
+            {
+                Id = 730,
+                HostId = SeedHostId,
+                CommandId = 7,
+                InvocationId = _computedInvocationId,
+                InvocationHash = CustomValueIdentity.Hash(_computedInvocationId),
+                ViewerId = _storedValueViewerId,
+                Reply = _computedReply,
+                ReplyEligible = false,
+            }
+        );
     }
 
     private static AutomationSubflowRevision CreateSubflowRevision()

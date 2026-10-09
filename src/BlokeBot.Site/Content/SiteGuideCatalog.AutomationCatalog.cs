@@ -13,13 +13,14 @@ internal static partial class SiteGuideCatalog
                 "The Twitch events page lists each automation source for the selected channel. It shows the required Twitch approval and current use.",
             Sections =
             [
+                .. CreateExpandedAutomationSourceSections(),
                 new SiteGuideSection
                 {
                     Heading = "Read the source list",
                     Bullets =
                     [
                         "Open Automations. Open Twitch events.",
-                        "Each source shows its Twitch subscription.",
+                        "Twitch sources show their subscription. Timing and local feature sources use their own observations, not invented Twitch notifications.",
                         "Each source shows the required approval.",
                         "Each source shows whether an enabled flow uses it today.",
                         "Ready means the source can start flows now.",
@@ -45,14 +46,14 @@ internal static partial class SiteGuideCatalog
                         "The three Hype Train events need Hype Train reading.",
                         "The page names each required approval exactly.",
                         "The Gifted subscriptions source uses a minimum gift count.",
-                        "Cheer uses a minimum Bits amount.",
+                        "Cheer uses an inclusive minimum Bits amount and an optional inclusive maximum. Leave the maximum empty for no upper limit. Set both to the same amount to match only that amount.",
                         "Incoming raid uses a minimum viewer count.",
                         "Smaller events do not start a flow.",
                         "Chat notification starts flows from typed Twitch notices such as announcements.",
                         "Chat notification starts flows from typed Twitch notices such as resubs.",
                         "Chat notification starts flows from typed Twitch notices such as gift upgrades.",
                         "Chat notification starts flows from typed Twitch notices such as charity donations.",
-                        "You choose the notification type. Ordinary chat messages never start automations.",
+                        "You choose the notification type. Chat matching is a separate source with explicit keyword, phrase, emote or first-observed configuration.",
                     ],
                 },
                 new SiteGuideSection
@@ -142,7 +143,7 @@ internal static partial class SiteGuideCatalog
                         "Actions can play overlay cues.",
                         "Actions can complete Channel Points redemptions.",
                         "Actions can run Native Twitch operations.",
-                        "Send chat message sends up to 500 characters in the channel. The message can include automation variables from the source event.",
+                        "Send chat message sends up to 500 characters in the channel. Choose Fixed to enter the exact message, or Connected to use a Text output. Use CEL Transform to build a message from event data.",
                         "Play overlay cue plays a saved Cue through a chosen Cue player Browser Source.",
                         "For playback, enable the cue.",
                         "For playback, enable Cue player.",
@@ -150,6 +151,17 @@ internal static partial class SiteGuideCatalog
                         "A replaced or deleted cue or Cue player makes the action fail. BlokeBot does not play a substitute.",
                     ],
                     Links = [new SiteLink("Build reusable Cues", "overlays/cues")],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Start, reset or cancel a named countdown",
+                    Bullets =
+                    [
+                        "Start countdown starts a stopped timer. Starting an already running timer changes nothing and sends no new Started event.",
+                        "Reset countdown starts a fresh full-duration occurrence, whether the timer was running or stopped. It sends Reset, not Started. The previous occurrence cannot produce another warning or finish.",
+                        "Cancel countdown stops a running occurrence and sends Cancelled. These are normal flow actions; there is no countdown manager or manual timer-control dashboard.",
+                        "Timer names belong to the selected channel. The bot's process restart cancels active countdowns quietly: no resumed timers, old warnings, finishes or cancellation flows run on startup.",
+                    ],
                 },
                 new SiteGuideSection
                 {

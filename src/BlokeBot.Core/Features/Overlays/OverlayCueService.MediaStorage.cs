@@ -30,7 +30,12 @@ internal sealed partial class OverlayCueService
         var publicationCommitted = false;
         try
         {
-            var length = await WriteUploadAsync(content, tempPath, cancellationToken);
+            var copied = await WriteUploadAsync(content, tempPath, cancellationToken);
+            if (copied is OverlayCueResult<long>.Rejected rejected)
+            {
+                return Reject<OverlayMediaAssetView>(rejected.Reason);
+            }
+            var length = ((OverlayCueResult<long>.Succeeded)copied).Value;
             if (length == 0)
             {
                 return Reject<OverlayMediaAssetView>(
@@ -68,15 +73,23 @@ internal sealed partial class OverlayCueService
                     if (
                         OverlayMediaTypes.Kind(previousDocument.ContentType)
                             != OverlayMediaTypes.Kind(declaredContentType)
-                        && await db.OverlayCueMediaAssetReferences.AnyAsync(
-                            value => value.HostId == hostId && value.AssetId == asset.Id,
-                            cancellationToken
+                        && (
+                            await db.OverlayCueMediaAssetReferences.AnyAsync(
+                                value => value.HostId == hostId && value.AssetId == asset.Id,
+                                cancellationToken
+                            )
+                            || await FullOverlayReferencesMediaAsync(
+                                db,
+                                hostId,
+                                asset.PublicId,
+                                cancellationToken
+                            )
                         )
                     )
                     {
                         return Reject<OverlayMediaAssetView>(
                             new OverlayCueRejection.Invalid(
-                                "Remove this asset from every cue before replacing it with a different media type."
+                                "Remove this asset from every cue and full overlay before replacing it with a different media type."
                             )
                         );
                     }
@@ -169,14 +182,6 @@ internal sealed partial class OverlayCueService
             {
                 _ = mediaMaintenance.Gate.Release();
             }
-        }
-        catch (UploadTooLargeException)
-        {
-            return Reject<OverlayMediaAssetView>(
-                new OverlayCueRejection.Invalid(
-                    $"The upload exceeds the {_options.Overlays.Media.MaximumUploadBytes}-byte limit."
-                )
-            );
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or DbUpdateException)

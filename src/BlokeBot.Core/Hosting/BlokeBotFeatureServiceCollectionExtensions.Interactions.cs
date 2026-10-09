@@ -6,10 +6,12 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.MomentAttachments;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Hosts;
+using BlokeBot.Eventing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;
@@ -63,6 +65,17 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<OverlayInstanceService>();
         _ = services.AddSingleton<OverlayInstanceResolver>();
         _ = services.AddSingleton<OverlayManagementAuthority>();
+        _ = services.AddSingleton<FullOverlayService>();
+        _ =
+            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.FullOverlays.FullOverlayPortability>();
+        _ =
+            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.FullOverlays.FullOverlayTransferService>();
+        _ = services.AddSingleton<FullOverlayKeyProtection>();
+        _ = services.AddSingleton<FullOverlayPublishedReader>();
+        services.TryAddSingleton<
+            IFullOverlayPublicationAdmission,
+            FullOverlayPublicationAdmission
+        >();
         _ = services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
         _ = services.AddSingleton<OverlayRemoteUrlPolicy>();
         _ = services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
@@ -72,6 +85,13 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         );
         _ = services.AddSingleton<OverlayCueService>();
         _ = services.AddSingleton<OverlayServerEpoch>();
+        _ = services.AddEventBus<FullOverlayEventFeedIdentity>(
+            ObserverBoundary.Named("BlokeBot.FullOverlayEventFeed"),
+            static identity =>
+                ObserverEventIdentity.Named(
+                    $"BlokeBot.FullOverlayEventFeed.{identity.HostId}.{identity.OverlayId}.{identity.BindingId}"
+                )
+        );
         _ = services.AddSingleton<OverlayEventFeedService>();
         _ = services.AddSingleton<IOverlayEventPresenter>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
@@ -88,7 +108,15 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
                 CommunityAchievementOverlayEventPublisher
             >()
         );
-        _ = services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
+        _ = services.AddSingleton<OverlayStateProvider>();
+        _ = services.AddSingleton<IOverlayStateProvider>(provider =>
+            provider.GetRequiredService<OverlayStateProvider>()
+        );
+        _ = services.AddSingleton<FullOverlayWidgetRegistry>();
+        _ = services.AddSingleton<FullOverlayDelivery>();
+        _ = services.AddHostedService(provider =>
+            provider.GetRequiredService<FullOverlayDelivery>()
+        );
         _ = services.AddSingleton<OverlayLiveCoordinator>();
         _ = services.AddSingleton<IOverlayLivePublisher>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()

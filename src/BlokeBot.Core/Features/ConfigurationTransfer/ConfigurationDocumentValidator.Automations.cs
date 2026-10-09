@@ -162,7 +162,7 @@ internal static partial class ConfigurationDocumentValidator
                         $"{nodePath}.inputBindings",
                         node.InputBindings.Select(value => value.FieldId)
                     )
-                    ?? ValidateBindingShape(nodePath, node.InputBindings)
+                    ?? ValidateBindingShape(nodePath, node.DefinitionId, node.InputBindings)
                     ?? ValidateConfigurationObject(nodePath, node.Configuration);
                 if (issue is not null)
                 {
@@ -183,6 +183,7 @@ internal static partial class ConfigurationDocumentValidator
 
     private static ConfigurationValidationIssue? ValidateBindingShape(
         string nodePath,
+        string definitionId,
         IEnumerable<AutomationInputBindingV2> bindings
     )
     {
@@ -197,8 +198,16 @@ internal static partial class ConfigurationDocumentValidator
                 binding.Mode == AutomationInputBindingMode.Expression
                     ? binding.ExpressionLanguageVersion is null or <= 0
                         || string.IsNullOrWhiteSpace(binding.Expression)
-                    : binding.ExpressionLanguageVersion is not null
+                : AutomationRuntimeSerialization.RetainsInactiveExpression(new(definitionId))
+                    ? (
+                        binding.ExpressionLanguageVersion is not null
                         || binding.Expression is not null
+                    )
+                        && (
+                            binding.ExpressionLanguageVersion is null or <= 0
+                            || binding.Expression is null
+                        )
+                : binding.ExpressionLanguageVersion is not null || binding.Expression is not null
             )
             {
                 return new(

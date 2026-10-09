@@ -162,6 +162,60 @@ public static class TwitchEventAutomationSources
             [PredictionsReadScope],
             "channel.prediction.end"
         ),
+        new(
+            AutomationDefinitionIds.UptimeSource,
+            AutomationEventSubRequirement.Stream,
+            [],
+            "stream.online, stream.offline; observed Helix stream identity"
+        ),
+        new(
+            AutomationDefinitionIds.ChatMatchSource,
+            AutomationEventSubRequirement.Stream,
+            [],
+            "channel.chat.message; stream.online, stream.offline for first observed"
+        ),
+        new(
+            AutomationDefinitionIds.MetadataSource,
+            AutomationEventSubRequirement.ChannelUpdates,
+            [],
+            "channel.update v2"
+        ),
+        new(
+            AutomationDefinitionIds.AdTimingSource,
+            AutomationEventSubRequirement.Exact,
+            ["channel:read:ads"],
+            "channel.ad_break.begin v1; Helix ad schedule"
+        ),
+        new(
+            AutomationDefinitionIds.GoalSource,
+            AutomationEventSubRequirement.Exact,
+            ["channel:read:goals"],
+            "channel.goal.begin, channel.goal.progress, channel.goal.end v1"
+        ),
+        new(
+            AutomationDefinitionIds.ModerationSource,
+            AutomationEventSubRequirement.Exact,
+            EventSubModerationActions.ReadScopes,
+            "channel.moderate v2"
+        ),
+        new(
+            AutomationDefinitionIds.ChatSettingsSource,
+            AutomationEventSubRequirement.Exact,
+            [],
+            "channel.chat_settings.update v1"
+        ),
+        new(
+            AutomationDefinitionIds.OutgoingRaidSource,
+            AutomationEventSubRequirement.Shoutouts,
+            [],
+            "channel.raid (outgoing; Raid & collaboration owner)"
+        ),
+        new(
+            AutomationDefinitionIds.RedemptionUpdateSource,
+            AutomationEventSubRequirement.Redemptions,
+            [RedemptionsReadScope],
+            "channel.channel_points_custom_reward_redemption.update v1"
+        ),
     ];
 
     public static ImmutableArray<string> ChatNotificationNoticeTypes { get; } =
@@ -428,25 +482,43 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                     new(
                         new("minimum-bits"),
                         "Minimum Bits",
-                        "The smallest cheer that starts this automation.",
+                        "The smallest cheer that starts this automation, inclusive.",
                         new AutomationConfigurationFieldType.Number(1, 1000000),
                         true
+                    ),
+                    new(
+                        new("maximum-bits"),
+                        "Maximum Bits",
+                        "The largest cheer that starts this automation, inclusive. Leave empty for no upper limit.",
+                        new AutomationConfigurationFieldType.Number(1, int.MaxValue),
+                        false
                     ),
                 ],
                 AutomationActionCapabilities.None,
                 AutomationActionRetrySafety.NotApplicable
             ),
             static json =>
-                TryReadInt32(json, "minimum-bits", out var minimum)
+                !TryReadInt32(json, "minimum-bits", out var minimum)
+                    ? Invalid("minimum-bits", "Enter a whole-number minimum Bits amount.")
+                : !json.TryGetProperty("maximum-bits", out var maximum)
                     ? Parsed(new CheerSourceConfiguration(minimum))
-                    : Invalid("minimum-bits", "Enter a whole-number minimum Bits amount."),
+                : maximum.ValueKind == JsonValueKind.Number && maximum.TryGetInt32(out var bits)
+                    ? Parsed(new CheerSourceConfiguration(minimum, bits))
+                : Invalid("maximum-bits", "Enter a whole-number maximum Bits amount."),
             static configuration =>
-                configuration.MinimumBits is >= 1 and <= 1000000
-                    ? AutomationValidationResult.Valid
-                    : AutomationValidationResult.Invalid(
+                configuration switch
+                {
+                    { MinimumBits: < 1 or > 1000000 } => AutomationValidationResult.Invalid(
                         new AutomationValidationTarget.Field(new("minimum-bits")),
                         "Choose a minimum Bits amount from 1 to 1,000,000."
-                    )
+                    ),
+                    { MaximumBits: { } maximum } when maximum < configuration.MinimumBits =>
+                        AutomationValidationResult.Invalid(
+                            new AutomationValidationTarget.Field(new("maximum-bits")),
+                            "Choose a maximum Bits amount at least as large as the minimum."
+                        ),
+                    _ => AutomationValidationResult.Valid,
+                }
         );
 
     private static AutomationDefinition<IncomingRaidSourceConfiguration> IncomingRaidSource() =>

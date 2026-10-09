@@ -205,24 +205,52 @@ internal static class AutomationFrozenSubflows
 
     internal static AutomationConfigurationCheck ValidateDefinition(
         AutomationCatalogService catalog,
-        PersistedAutomationNodeDefinition definition
+        AutomationRuntimeSerialization.PersistedNode node
     ) =>
-        AutomationSubflowDefinitions.CheckFrozen(definition)
-        ?? catalog.ValidatePersistedDefinition(definition);
+        AutomationRuntimeSerialization.RestoreInputBindings(
+            node.InputBindingsJson,
+            new(node.DefinitionId)
+        )
+            is AutomationInputBindingsRestoreOutcome.Available bindings
+            ? ValidateDefinition(catalog, node, bindings.Bindings)
+            : InvalidBindings();
+
+    internal static AutomationConfigurationCheck ValidateDefinition(
+        AutomationCatalogService catalog,
+        AutomationRuntimeSerialization.PersistedNode node,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
+    ) =>
+        AutomationSubflowDefinitions.CheckFrozen(AutomationRuntimeSerialization.Definition(node))
+        ?? catalog.ValidatePersistedDefinition(
+            AutomationRuntimeSerialization.Definition(node),
+            bindings
+        );
 
     internal static async Task<AutomationConfigurationCheck> ValidateBeforeExecutionAsync(
         AutomationCatalogService catalog,
         AutomationHostId host,
         AutomationContext context,
-        PersistedAutomationNodeDefinition definition,
+        AutomationRuntimeSerialization.PersistedNode node,
         CancellationToken cancellationToken
     ) =>
-        await catalog.ValidateFrozenBeforeExecutionAsync(
-            host,
-            context,
-            definition,
-            cancellationToken
-        );
+        AutomationRuntimeSerialization.RestoreInputBindings(
+            node.InputBindingsJson,
+            new(node.DefinitionId)
+        )
+            is AutomationInputBindingsRestoreOutcome.Available bindings
+            ? await catalog.ValidateFrozenBeforeExecutionAsync(
+                host,
+                context,
+                AutomationRuntimeSerialization.Definition(node),
+                bindings.Bindings,
+                cancellationToken
+            )
+            : InvalidBindings();
+
+    private static AutomationConfigurationCheck InvalidBindings() =>
+        new AutomationConfigurationCheck.Invalid([
+            new(new AutomationValidationTarget.Definition(), "Repair this node's input bindings."),
+        ]);
 
     internal static AutomationConfigurationCheck WithContract(
         AutomationRuntimeSerialization.PersistedNode node,

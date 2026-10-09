@@ -150,6 +150,12 @@ internal sealed partial class OverlayCueService
                     value => value.HostId == actor.HostId && value.AssetId == asset.Id,
                     cancellationToken
                 )
+                || await FullOverlayReferencesMediaAsync(
+                    db,
+                    actor.HostId,
+                    asset.PublicId,
+                    cancellationToken
+                )
             )
             {
                 return Reject<Guid>(new OverlayCueRejection.InUse());

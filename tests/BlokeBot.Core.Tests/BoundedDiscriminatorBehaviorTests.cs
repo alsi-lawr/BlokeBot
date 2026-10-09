@@ -105,6 +105,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
 
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
+            await using var transaction = await db.Database.BeginTransactionAsync();
             var now = new DateTime(2026, 7, 13, 12, 0, 0, DateTimeKind.Utc);
             AssertSuccess(
                 await service
@@ -117,6 +118,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
                     .ExecuteAsync(CancellationToken.None)
             );
             _ = await db.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         AssertSuccess(

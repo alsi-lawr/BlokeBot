@@ -96,10 +96,7 @@ public sealed partial class AutomationScenarioService(
             if (
                 AutomationFrozenSubflows.WithContract(
                     node,
-                    AutomationFrozenSubflows.ValidateDefinition(
-                        catalog,
-                        AutomationRuntimeSerialization.Definition(node)
-                    )
+                    AutomationFrozenSubflows.ValidateDefinition(catalog, node)
                 )
                     is not AutomationConfigurationCheck.Valid valid
                 || !AutomationScenarioSimulation.Supports(valid, catalog.Data)
@@ -199,10 +196,7 @@ public sealed partial class AutomationScenarioService(
                 var node = frozen.Nodes.Single(candidate => candidate.Id == pendingNode.Id);
                 var check = AutomationFrozenSubflows.WithContract(
                     node,
-                    AutomationFrozenSubflows.ValidateDefinition(
-                        catalog,
-                        AutomationRuntimeSerialization.Definition(node)
-                    )
+                    AutomationFrozenSubflows.ValidateDefinition(catalog, node)
                 );
                 if (check is not AutomationConfigurationCheck.Valid valid)
                 {
