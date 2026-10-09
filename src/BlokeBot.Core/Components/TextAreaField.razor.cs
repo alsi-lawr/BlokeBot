@@ -45,6 +45,5 @@ public partial class TextAreaField
         await FocusAsync();
     }
 
-    private Task OnInput(ChangeEventArgs e) =>
-        ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+    private Task OnInput(string value) => ValueChanged.InvokeAsync(value);
 }
