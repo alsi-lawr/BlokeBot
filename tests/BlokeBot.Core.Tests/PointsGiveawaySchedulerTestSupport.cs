@@ -65,7 +65,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
         );
 
     private protected static PointsGiveawayService CreateGiveawayService(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         IPointsGiveawayScheduler scheduler,
         IHostBotAppAccessTokenSource? appTokens = null,
         bool streamIsLive = false

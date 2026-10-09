@@ -62,6 +62,25 @@ public sealed class HostedChannelRuntimeTransitionService(
             cancellationToken
         );
 
+    internal async Task<BotChannelTarget?> GetCurrentSessionTargetAsync(
+        int hostId,
+        string login,
+        CancellationToken ct
+    )
+    {
+        await _transitionGate.WaitAsync(ct);
+        try
+        {
+            return _activeSessions.Find(hostId) is { } identity
+                ? new BotChannelTarget(login, identity)
+                : null;
+        }
+        finally
+        {
+            _ = _transitionGate.Release();
+        }
+    }
+
     internal async Task<BotChannelTarget> GetOrCreateSessionTargetAsync(
         int hostId,
         string channelLogin,

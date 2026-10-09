@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.Points.Commands;
 using BlokeBot.Core.Features.Points.Replies;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Core.Features.Replies;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -11,7 +12,9 @@ namespace BlokeBot.Core.Features.Points.Configuration;
 
 public sealed class PointsConfigurationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    PointsChangeNotifier changes
+    PointsChangeNotifier changes,
+    IWatchTimeSettingsCommitObserver? watchTime = null,
+    TimeProvider? timeProvider = null
 )
 {
     public async Task<PointsConfiguration> LoadConfigurationAsync(int hostId, CancellationToken ct)
@@ -35,6 +38,8 @@ public sealed class PointsConfigurationService(
 
         return new PointsConfiguration
         {
+            WatchTimePointsEnabled = settings.WatchTimePointsEnabled,
+            WatchTimePointAmount = settings.WatchTimePointAmount,
             PointLabel = settings.PointLabel,
             Aliases = new PointsCommandAliasEditor
             {
@@ -75,6 +80,7 @@ public sealed class PointsConfigurationService(
     > ExecuteSaveAsync(int hostId, PointsConfigurationSaveCommand command, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var stageFailure = await StageAsync(db, hostId, command, ct);
         if (stageFailure is not null)
         {
@@ -83,8 +89,57 @@ public sealed class PointsConfigurationService(
             );
         }
         _ = await db.SaveChangesAsync(ct);
+        var written = await ApplyWatchTimeAsync(db, hostId, command.WatchTime, ct);
+        await transaction.CommitAsync(ct);
+        watchTime?.SettingsCommitted(
+            hostId,
+            written,
+            (timeProvider ?? TimeProvider.System).GetUtcNow()
+        );
         _ = await changes.NotifyChangedAsync(ct);
         return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Success(new());
+    }
+
+    internal static async Task<WatchTimeSettingsWriteResult> ApplyWatchTimeAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        WatchTimeConfiguration configuration,
+        CancellationToken ct
+    )
+    {
+        var enabled = configuration.Match(_ => false, _ => true);
+        var amount = configuration.Match(
+            value => value.Amount.Match<string?>(amount => amount.ToString(), () => null),
+            value => value.Amount.ToString()
+        );
+        var result = await MainDatabaseStatements.ApplyWatchTimeSettingsAsync(
+            db,
+            hostId,
+            enabled,
+            amount,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            ct
+        );
+        foreach (
+            var entry in db
+                .ChangeTracker.Entries<PointsSettings>()
+                .Where(value => value.Entity.HostId == hostId)
+                .ToArray()
+        )
+        {
+            entry.Property(value => value.WatchTimePointsEnabled).CurrentValue = result.Enabled;
+            entry.Property(value => value.WatchTimePointAmount).CurrentValue = result.Amount;
+            entry.Property(value => value.WatchTimeConfigurationRevision).CurrentValue =
+                result.Revision;
+            entry.Property(value => value.WatchTimeEnableGeneration).CurrentValue =
+                result.EnableGeneration;
+            entry.Property(value => value.WatchTimePointsEnabled).IsModified = false;
+            entry.Property(value => value.WatchTimePointAmount).IsModified = false;
+            entry.Property(value => value.WatchTimeConfigurationRevision).IsModified = false;
+            entry.Property(value => value.WatchTimeEnableGeneration).IsModified = false;
+        }
+        return result;
     }
 
     internal static async Task<PointsConfigurationSaveFailure?> StageAsync(

@@ -4,6 +4,7 @@ using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -269,9 +270,24 @@ public sealed partial class RequestBoardService(
         }
 
         var cost = PointAmount.ParseAbsolute(board.PointCost);
-        var balance = await LoadBalanceAsync(db, hostId, command.Actor.Login, now, ct);
-        var currentBalance = PointAmount.ParseAbsolute(balance.Amount);
-        if (currentBalance.CompareTo(cost) < 0)
+        var target = new PointBalanceTarget(hostId, command.Actor.Login);
+        await MainDatabaseStatements.EnsurePointBalanceAsync(db, target, now, ct);
+        var debit = await MainDatabaseStatements.ApplyPointDeltaAsync(
+            db,
+            target,
+            CanonicalPointInteger.From(-cost.Value),
+            new(
+                CanonicalPointInteger.From(cost.Value),
+                CanonicalPointInteger.From(PointAmount.MaximumValue)
+            ),
+            now,
+            ct
+        );
+        var currentBalance = debit.Match<PointAmount?>(
+            applied => new PointAmount(applied.After.ToBigInteger()),
+            _ => null
+        );
+        if (currentBalance is null)
         {
             return Rejected<PublicRequestSubmissionView>(
                 new RequestBoardRejection.InsufficientPoints(cost.ToDisplayString())
@@ -316,9 +332,7 @@ public sealed partial class RequestBoardService(
         _ = await db.SaveChangesAsync(ct);
         if (!cost.IsZero)
         {
-            var next = currentBalance.Subtract(cost);
-            balance.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
+            var next = currentBalance.Value;
             AddPointLedger(
                 db,
                 submission,
@@ -550,7 +564,20 @@ public sealed partial class RequestBoardService(
         }
         else if (command.TargetStatus == RequestSubmissionStatus.Rejected)
         {
-            await RefundIfRequiredAsync(db, submission, RequestClosure.Rejected, now, ct);
+            var refundFailure = await RefundIfRequiredAsync(
+                db,
+                submission,
+                RequestClosure.Rejected,
+                now,
+                ct
+            );
+            if (refundFailure.Match(_ => true, () => false))
+            {
+                return refundFailure.Match(
+                    Rejected<ModeratorRequestSubmissionView>,
+                    () => throw new System.Diagnostics.UnreachableException()
+                );
+            }
         }
 
         AddEvent(
@@ -633,7 +660,20 @@ public sealed partial class RequestBoardService(
         var now = timeProvider.GetUtcNow().UtcDateTime;
         submission.Status = RequestSubmissionStatus.Withdrawn;
         submission.UpdatedAtUtc = now;
-        await RefundIfRequiredAsync(db, submission, RequestClosure.Withdrawn, now, ct);
+        var refundFailure = await RefundIfRequiredAsync(
+            db,
+            submission,
+            RequestClosure.Withdrawn,
+            now,
+            ct
+        );
+        if (refundFailure.Match(_ => true, () => false))
+        {
+            return refundFailure.Match(
+                Rejected<PublicRequestSubmissionView>,
+                () => throw new System.Diagnostics.UnreachableException()
+            );
+        }
         AddEvent(
             db,
             submission.Board,
@@ -743,7 +783,14 @@ public sealed partial class RequestBoardService(
         source.PrivateModeratorNote = privateModeratorNote.Trim();
         source.UpdatedAtUtc = now;
         target.UpdatedAtUtc = now;
-        await RefundIfRequiredAsync(db, source, RequestClosure.Merged, now, ct);
+        var refundFailure = await RefundIfRequiredAsync(db, source, RequestClosure.Merged, now, ct);
+        if (refundFailure.Match(_ => true, () => false))
+        {
+            return refundFailure.Match(
+                Rejected<ModeratorRequestSubmissionView>,
+                () => throw new System.Diagnostics.UnreachableException()
+            );
+        }
         AddEvent(
             db,
             source.Board,
@@ -997,7 +1044,7 @@ public sealed partial class RequestBoardService(
                 );
     }
 
-    private async Task RefundIfRequiredAsync(
+    private async Task<Option<RequestBoardRejection.Invalid>> RefundIfRequiredAsync(
         BlokeBotDbContext db,
         RequestSubmission submission,
         RequestClosure closure,
@@ -1011,21 +1058,29 @@ public sealed partial class RequestBoardService(
             || !ShouldRefund(submission.Board.RefundPolicy, closure)
         )
         {
-            return;
+            return Option<RequestBoardRejection.Invalid>.None;
         }
 
         var amount = PointAmount.ParseAbsolute(submission.Board.PointCost);
-        var balance = await LoadBalanceAsync(
+        var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
             db,
-            submission.HostId,
-            submission.SubmitterLogin,
+            new(submission.HostId, submission.SubmitterLogin),
+            CanonicalPointInteger.From(amount.Value),
+            CanonicalPointInteger.From(PointAmount.MaximumValue),
             now,
             ct
         );
-        var current = PointAmount.ParseAbsolute(balance.Amount);
-        var next = current.Add(amount);
-        balance.Amount = next.ToString();
-        balance.UpdatedAtUtc = now;
+        var returned = credit.Match<PointAmount?>(
+            applied => new PointAmount(applied.After.ToBigInteger()),
+            _ => null
+        );
+        if (returned is null)
+        {
+            return Option<RequestBoardRejection.Invalid>.Some(
+                new("The point refund would exceed the point limit.")
+            );
+        }
+        var next = returned.Value;
         submission.PointReservationState = RequestPointReservationState.Refunded;
         AddPointLedger(
             db,
@@ -1044,6 +1099,7 @@ public sealed partial class RequestBoardService(
             new { submission.Id, Amount = amount.ToString() },
             now
         );
+        return Option<RequestBoardRejection.Invalid>.None;
     }
 
     private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct) =>
@@ -1072,34 +1128,6 @@ public sealed partial class RequestBoardService(
             RequestBoardRefundPolicy.AnyUnfulfilledClosure => true,
             _ => throw new ArgumentOutOfRangeException(nameof(policy), policy, null),
         };
-
-    private static async Task<PointBalance> LoadBalanceAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        string login,
-        DateTime now,
-        CancellationToken ct
-    )
-    {
-        var balance = await db.PointBalances.SingleOrDefaultAsync(
-            value => value.HostId == hostId && value.Login == login,
-            ct
-        );
-        if (balance is not null)
-        {
-            return balance;
-        }
-
-        balance = new PointBalance
-        {
-            HostId = hostId,
-            Login = login,
-            Amount = "0",
-            UpdatedAtUtc = now,
-        };
-        _ = db.PointBalances.Add(balance);
-        return balance;
-    }
 
     private static void AddPointLedger(
         BlokeBotDbContext db,

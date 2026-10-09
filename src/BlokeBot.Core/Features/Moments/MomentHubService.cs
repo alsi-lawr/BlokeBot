@@ -294,7 +294,8 @@ public sealed partial class MomentHubService(
                 await ApplyRewardsAsync(db, candidate, command.ActorLogin, now, ct);
                 return new ModerationDecision();
             },
-            ct
+            ct,
+            credit: true
         );
 
     public Task<MomentResult<ModeratorMomentView>> EditAsync(
@@ -901,7 +902,8 @@ public sealed partial class MomentHubService(
         int hostId,
         ModerateMomentCommand command,
         Func<BlokeBotDbContext, MomentCandidate, DateTime, Task<ModerationDecision>> mutation,
-        CancellationToken ct
+        CancellationToken ct,
+        bool credit = false
     )
     {
         if (!await FeatureIsEnabledAsync(hostId, ct))
@@ -919,9 +921,11 @@ public sealed partial class MomentHubService(
                 new MomentRejection.Invalid("Moment metadata is too long.")
             );
         }
+        var phase = credit ? new PointAttemptPhase() : null;
         var result = await RetryPersistenceAsync(
-            () => ModerateCoreAsync(hostId, command, mutation, ct),
-            ct
+            () => ModerateCoreAsync(hostId, command, mutation, phase, ct),
+            ct,
+            phase is null ? null : phase.CanRetry
         );
         if (result.Changed)
         {
@@ -934,47 +938,68 @@ public sealed partial class MomentHubService(
         int hostId,
         ModerateMomentCommand command,
         Func<BlokeBotDbContext, MomentCandidate, DateTime, Task<ModerationDecision>> mutation,
+        PointAttemptPhase? phase,
         CancellationToken ct
     )
     {
+        phase?.Reset();
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
-            db,
-            ct
-        );
-        var candidate = await db
-            .MomentCandidates.Include(value => value.Contributors)
-            .Include(value => value.Suggestions)
-            .Include(value => value.Votes)
-            .Include(value => value.TwitchClip)
-            .Include(value => value.TwitchStreamMarker)
-            .SingleOrDefaultAsync(
-                value => value.HostId == hostId && value.PublicId == command.PublicId,
-                ct
-            );
-        if (candidate is null)
+        await using var transaction = phase is null
+            ? await MainDatabaseWriteTransaction.StartImmediateAsync(db, ct)
+            : await MainDatabaseWriteTransaction.StartImmediateSerializableAsync(db, ct);
+        phase?.Acquired = true;
+        try
         {
+            var candidate = await db
+                .MomentCandidates.Include(value => value.Contributors)
+                .Include(value => value.Suggestions)
+                .Include(value => value.Votes)
+                .Include(value => value.TwitchClip)
+                .Include(value => value.TwitchStreamMarker)
+                .SingleOrDefaultAsync(
+                    value => value.HostId == hostId && value.PublicId == command.PublicId,
+                    ct
+                );
+            if (candidate is null)
+            {
+                return new ModerationResult(
+                    Rejected<ModeratorMomentView>(new MomentRejection.NotFound())
+                );
+            }
+            var decision = await mutation(db, candidate, Now());
+            if (decision.Rejection is not null)
+            {
+                return new ModerationResult(Rejected<ModeratorMomentView>(decision.Rejection));
+            }
+            if (decision.WasIdempotent)
+            {
+                return new ModerationResult(
+                    new MomentResult<ModeratorMomentView>.Succeeded(
+                        await ToModeratorAsync(db, candidate, ct),
+                        true
+                    )
+                );
+            }
+            _ = await db.SaveChangesAsync(ct);
+            var prepared = phase is null ? null : await ToModeratorAsync(db, candidate, ct);
+            await transaction.CommitAsync(ct);
+            phase?.Committed = true;
             return new ModerationResult(
-                Rejected<ModeratorMomentView>(new MomentRejection.NotFound())
+                Succeeded(prepared ?? await ToModeratorAsync(db, candidate, ct)),
+                true
             );
         }
-        var decision = await mutation(db, candidate, Now());
-        if (decision.Rejection is not null)
+        catch (Exception exception)
+            when (phase is not null
+                && !phase.Committed
+                && !ct.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
         {
-            return new ModerationResult(Rejected<ModeratorMomentView>(decision.Rejection));
+            await db.Database.CurrentTransaction!.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
         }
-        if (decision.WasIdempotent)
-        {
-            return new ModerationResult(
-                new MomentResult<ModeratorMomentView>.Succeeded(
-                    await ToModeratorAsync(db, candidate, ct),
-                    true
-                )
-            );
-        }
-        _ = await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return new ModerationResult(Succeeded(await ToModeratorAsync(db, candidate, ct)), true);
     }
 
     private static void AddOrUpdateContributor(
@@ -1138,38 +1163,38 @@ public sealed partial class MomentHubService(
             {
                 continue;
             }
-            var balance = await db.PointBalances.SingleOrDefaultAsync(
-                value =>
-                    value.HostId == candidate.HostId && value.Login == contributor.NormalizedLogin,
+            var ceiling = await PointCreditCapacity.LoadCeilingAsync(
+                db,
+                candidate.HostId,
+                contributor.NormalizedLogin,
                 ct
             );
-            if (balance is null)
-            {
-                balance = new PointBalance
-                {
-                    HostId = candidate.HostId,
-                    Login = contributor.NormalizedLogin,
-                    Amount = "0",
-                };
-                _ = db.PointBalances.Add(balance);
-            }
-            var current = PointAmount.ParseAbsolute(balance.Amount);
-            if (
-                !await PointCreditCapacity.CanCreditAsync(
-                    db,
-                    candidate.HostId,
-                    contributor.NormalizedLogin,
-                    current,
-                    amount.Value,
-                    ct
-                )
-            )
-            {
-                throw new InvalidOperationException("Moment reward would exceed the point limit.");
-            }
-            var next = current.Add(amount);
-            balance.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
+            var maximum = ceiling.Match<System.Numerics.BigInteger?>(
+                value => value.Amount.Value,
+                _ => null
+            );
+            var maximumAmount =
+                maximum
+                ?? throw new InvalidOperationException(
+                    "Moment reward would exceed the point limit."
+                );
+            var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                db,
+                new(candidate.HostId, contributor.NormalizedLogin),
+                CanonicalPointInteger.From(amount.Value),
+                CanonicalPointInteger.From(maximumAmount),
+                now,
+                ct
+            );
+            var returned = credit.Match<PointAmount?>(
+                value => new PointAmount(value.After.ToBigInteger()),
+                _ => null
+            );
+            var next =
+                returned
+                ?? throw new InvalidOperationException(
+                    "Moment reward would exceed the point limit."
+                );
             _ = db.PointLedgerEntries.Add(
                 new PointLedgerEntry
                 {
@@ -1460,7 +1485,8 @@ public sealed partial class MomentHubService(
 
     private static async Task<T> RetryPersistenceAsync<T>(
         Func<Task<T>> action,
-        CancellationToken ct
+        CancellationToken ct,
+        Func<Exception, bool>? retryAllowed = null
     )
     {
         for (var attempt = 1; ; attempt++)
@@ -1470,7 +1496,9 @@ public sealed partial class MomentHubService(
                 return await action();
             }
             catch (Exception exception)
-                when (attempt < _persistenceRetryCount && IsPersistenceCollision(exception))
+                when (attempt < _persistenceRetryCount
+                    && (retryAllowed?.Invoke(exception) ?? IsPersistenceCollision(exception))
+                )
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
             }
@@ -1519,4 +1547,23 @@ public sealed partial class MomentHubService(
         MomentResult<ModeratorMomentView> Result,
         bool Changed = false
     );
+
+    private sealed class PointAttemptPhase
+    {
+        public bool Acquired { get; set; }
+        public bool Committed { get; set; }
+        public bool RolledBack { get; set; }
+
+        public void Reset()
+        {
+            Acquired = false;
+            Committed = false;
+            RolledBack = false;
+        }
+
+        public bool CanRetry(Exception exception) =>
+            !Committed
+            && (!Acquired || RolledBack)
+            && MainDatabaseFailureClassifier.IsContention(exception);
+    }
 }

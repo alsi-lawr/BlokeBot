@@ -18,12 +18,19 @@ public sealed partial class BlokeBotDbContext
             _ = b.ToTable(
                 "points_settings",
                 t =>
-                    t.HasCheckConstraint(
+                {
+                    _ = t.HasCheckConstraint(
                         "CK_points_settings_GiveawayEligibility",
                         KindIn(modelBuilder, "GiveawayEligibility", _pointsEligibilityKinds)
-                    )
+                    );
+                    _ = t.HasCheckConstraint(
+                        "CK_points_settings_WatchTimeEnabled",
+                        "NOT \"WatchTimePointsEnabled\" OR (\"WatchTimePointAmount\" IS NOT NULL AND \"WatchTimeEnableGeneration\" <> '00000000-0000-0000-0000-000000000000')"
+                    );
+                }
             );
             _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.WatchTimePointAmount).HasMaxLength(128);
             _ = b.Property(static x => x.PointLabel).HasMaxLength(64);
             _ = b.Property(static x => x.GiveawayMinimumPayout).HasMaxLength(128);
             _ = b.Property(static x => x.GiveawayMaximumPayout).HasMaxLength(128);

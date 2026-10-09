@@ -517,9 +517,11 @@ public sealed partial class CommunityProgressionService(
             return new CommunityOperationOutcome.FeatureDisabled();
         }
 
+        var pointPhase = new PointAttemptPhase();
         var result = await RetryAsync<CommunityOperationOutcome>(
-            () => ProcessEventAttemptAsync(hostId, sourceEvent, ct),
-            ct
+            () => ProcessEventAttemptAsync(hostId, sourceEvent, pointPhase, ct),
+            ct,
+            pointPhase.CanRetry
         );
         await PublishIfChangedAsync(hostId, result, pointsChanged: true, ct);
         if (result is CommunityOperationOutcome.Succeeded { WasIdempotent: false })
@@ -536,175 +538,200 @@ public sealed partial class CommunityProgressionService(
     private async Task<CommunityOperationOutcome> ProcessEventAttemptAsync(
         int hostId,
         CommunitySourceEvent sourceEvent,
+        PointAttemptPhase phase,
         CancellationToken ct
     )
     {
+        phase.Reset();
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (!await FeatureEnabledAsync(db, hostId, ct))
-        {
-            return new CommunityOperationOutcome.FeatureDisabled();
-        }
-        var acceptEventsAfterUtc = await db
-            .Hosts.Where(value => value.Id == hostId)
-            .Select(value => value.CommunityProgressionAcceptEventsAfterUtc)
-            .SingleAsync(ct);
-        if (acceptEventsAfterUtc is { } cutoff && sourceEvent.OccurredAtUtc.UtcDateTime < cutoff)
-        {
-            await transaction.CommitAsync(ct);
-            return new CommunityOperationOutcome.Succeeded(true);
-        }
-        var now = clock.GetUtcNow().UtcDateTime;
-        var claimed = await MainDatabaseStatements.TryClaimCommunitySourceEventAsync(
-            db,
-            hostId,
-            sourceEvent.Kind,
-            sourceEvent.SourceEventId,
-            now,
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
             ct
         );
-        if (claimed == 0)
+        phase.Acquired = true;
+        try
         {
-            await transaction.CommitAsync(ct);
-            return new CommunityOperationOutcome.Succeeded(true);
-        }
-
-        var seasons = await db
-            .CommunitySeasons.Include(value => value.Definitions)
-                .ThenInclude(value => value.Rewards)
-            .Where(value =>
-                value.HostId == hostId
-                && value.Status == CommunitySeasonStatus.Open
-                && value.StartsAtUtc <= sourceEvent.OccurredAtUtc.UtcDateTime
-                && value.EndsAtUtc >= sourceEvent.OccurredAtUtc.UtcDateTime
-            )
-            .ToListAsync(ct);
-        var changed = false;
-        foreach (var season in seasons)
-        {
-            foreach (
-                var definition in season.Definitions.Where(value =>
-                    value.EventRule == sourceEvent.Kind
-                    && FilterMatches(value.FilterToken, sourceEvent.FilterToken)
-                    && (
-                        value.Scope == CommunityProgressScope.Communal
-                        || sourceEvent.Viewer is not null
-                    )
-                )
+            if (!await FeatureEnabledAsync(db, hostId, ct))
+            {
+                return new CommunityOperationOutcome.FeatureDisabled();
+            }
+            var acceptEventsAfterUtc = await db
+                .Hosts.Where(value => value.Id == hostId)
+                .Select(value => value.CommunityProgressionAcceptEventsAfterUtc)
+                .SingleAsync(ct);
+            if (
+                acceptEventsAfterUtc is { } cutoff
+                && sourceEvent.OccurredAtUtc.UtcDateTime < cutoff
             )
             {
-                var period =
-                    definition.ResetCadence == CommunityResetCadence.None
-                        ? null
-                        : await EnsureCurrentPeriodAsync(
+                await transaction.CommitAsync(ct);
+                phase.Committed = true;
+                return new CommunityOperationOutcome.Succeeded(true);
+            }
+            var now = clock.GetUtcNow().UtcDateTime;
+            var claimed = await MainDatabaseStatements.TryClaimCommunitySourceEventAsync(
+                db,
+                hostId,
+                sourceEvent.Kind,
+                sourceEvent.SourceEventId,
+                now,
+                ct
+            );
+            if (claimed == 0)
+            {
+                await transaction.CommitAsync(ct);
+                phase.Committed = true;
+                return new CommunityOperationOutcome.Succeeded(true);
+            }
+
+            var seasons = await db
+                .CommunitySeasons.Include(value => value.Definitions)
+                    .ThenInclude(value => value.Rewards)
+                .Where(value =>
+                    value.HostId == hostId
+                    && value.Status == CommunitySeasonStatus.Open
+                    && value.StartsAtUtc <= sourceEvent.OccurredAtUtc.UtcDateTime
+                    && value.EndsAtUtc >= sourceEvent.OccurredAtUtc.UtcDateTime
+                )
+                .ToListAsync(ct);
+            var changed = false;
+            foreach (var season in seasons)
+            {
+                foreach (
+                    var definition in season.Definitions.Where(value =>
+                        value.EventRule == sourceEvent.Kind
+                        && FilterMatches(value.FilterToken, sourceEvent.FilterToken)
+                        && (
+                            value.Scope == CommunityProgressScope.Communal
+                            || sourceEvent.Viewer is not null
+                        )
+                    )
+                )
+                {
+                    var period =
+                        definition.ResetCadence == CommunityResetCadence.None
+                            ? null
+                            : await EnsureCurrentPeriodAsync(
+                                db,
+                                season,
+                                definition,
+                                CommunityRolloverKind.Restart,
+                                $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}:{definition.Id}",
+                                now,
+                                ct
+                            );
+                    var subjectKey =
+                        definition.Scope == CommunityProgressScope.Communal
+                            ? "community"
+                            : $"viewer:{sourceEvent.Viewer!.TwitchUserId}";
+                    var progress = await db.CommunityProgress.SingleOrDefaultAsync(
+                        value =>
+                            value.HostId == hostId
+                            && value.DefinitionId == definition.Id
+                            && value.SubjectKey == subjectKey,
+                        ct
+                    );
+                    if (progress is null)
+                    {
+                        progress = new CommunityProgress
+                        {
+                            HostId = hostId,
+                            SeasonId = season.Id,
+                            DefinitionId = definition.Id,
+                            SubjectKey = subjectKey,
+                            ViewerTwitchUserId = sourceEvent.Viewer?.TwitchUserId,
+                            ViewerLogin = sourceEvent.Viewer is null
+                                ? null
+                                : CommunityInput.NormalizeLogin(sourceEvent.Viewer.Login),
+                            ViewerDisplayName = sourceEvent.Viewer?.DisplayName,
+                            PeriodKey = period?.Key,
+                            UpdatedAtUtc = now,
+                        };
+                        _ = db.CommunityProgress.Add(progress);
+                    }
+                    if (progress.PeriodKey != period?.Key)
+                    {
+                        progress.Amount = 0;
+                        progress.PeriodKey = period?.Key;
+                    }
+                    if (
+                        definition.CompletionMode == CommunityCompletionMode.OneTime
+                        && progress.CompletionCount > 0
+                    )
+                    {
+                        continue;
+                    }
+                    var increment =
+                        definition.Increment == CommunityProgressIncrement.EventValue
+                            ? sourceEvent.Value
+                            : 1;
+                    progress.Amount = checked(progress.Amount + increment);
+                    progress.UpdatedAtUtc = now;
+                    changed = true;
+                    _ = db.CommunityEvents.Add(
+                        DomainEvent(
+                            hostId,
+                            season.Id,
+                            CommunityEventKind.ProgressAdvanced,
+                            $"progress:{sourceEvent.Kind}:{sourceEvent.SourceEventId}:{definition.Id}",
+                            JsonSerializer.Serialize(
+                                new
+                                {
+                                    seasonId = season.PublicId,
+                                    definitionId = definition.PublicId,
+                                    amount = progress.Amount,
+                                    target = definition.Target,
+                                }
+                            ),
+                            now
+                        )
+                    );
+                    while (
+                        progress.Amount >= definition.Target
+                        && (
+                            definition.CompletionMode == CommunityCompletionMode.Repeatable
+                            || progress.CompletionCount == 0
+                        )
+                    )
+                    {
+                        var completion = await CompleteAsync(
                             db,
                             season,
                             definition,
-                            CommunityRolloverKind.Restart,
-                            $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}:{definition.Id}",
+                            progress,
+                            sourceEvent.Viewer,
+                            $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}",
                             now,
                             ct
                         );
-                var subjectKey =
-                    definition.Scope == CommunityProgressScope.Communal
-                        ? "community"
-                        : $"viewer:{sourceEvent.Viewer!.TwitchUserId}";
-                var progress = await db.CommunityProgress.SingleOrDefaultAsync(
-                    value =>
-                        value.HostId == hostId
-                        && value.DefinitionId == definition.Id
-                        && value.SubjectKey == subjectKey,
-                    ct
-                );
-                if (progress is null)
-                {
-                    progress = new CommunityProgress
-                    {
-                        HostId = hostId,
-                        SeasonId = season.Id,
-                        DefinitionId = definition.Id,
-                        SubjectKey = subjectKey,
-                        ViewerTwitchUserId = sourceEvent.Viewer?.TwitchUserId,
-                        ViewerLogin = sourceEvent.Viewer is null
-                            ? null
-                            : CommunityInput.NormalizeLogin(sourceEvent.Viewer.Login),
-                        ViewerDisplayName = sourceEvent.Viewer?.DisplayName,
-                        PeriodKey = period?.Key,
-                        UpdatedAtUtc = now,
-                    };
-                    _ = db.CommunityProgress.Add(progress);
-                }
-                if (progress.PeriodKey != period?.Key)
-                {
-                    progress.Amount = 0;
-                    progress.PeriodKey = period?.Key;
-                }
-                if (
-                    definition.CompletionMode == CommunityCompletionMode.OneTime
-                    && progress.CompletionCount > 0
-                )
-                {
-                    continue;
-                }
-                var increment =
-                    definition.Increment == CommunityProgressIncrement.EventValue
-                        ? sourceEvent.Value
-                        : 1;
-                progress.Amount = checked(progress.Amount + increment);
-                progress.UpdatedAtUtc = now;
-                changed = true;
-                _ = db.CommunityEvents.Add(
-                    DomainEvent(
-                        hostId,
-                        season.Id,
-                        CommunityEventKind.ProgressAdvanced,
-                        $"progress:{sourceEvent.Kind}:{sourceEvent.SourceEventId}:{definition.Id}",
-                        JsonSerializer.Serialize(
-                            new
-                            {
-                                seasonId = season.PublicId,
-                                definitionId = definition.PublicId,
-                                amount = progress.Amount,
-                                target = definition.Target,
-                            }
-                        ),
-                        now
-                    )
-                );
-                while (
-                    progress.Amount >= definition.Target
-                    && (
-                        definition.CompletionMode == CommunityCompletionMode.Repeatable
-                        || progress.CompletionCount == 0
-                    )
-                )
-                {
-                    var completion = await CompleteAsync(
-                        db,
-                        season,
-                        definition,
-                        progress,
-                        sourceEvent.Viewer,
-                        $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}",
-                        now,
-                        ct
-                    );
-                    if (completion is null)
-                    {
-                        return new CommunityOperationOutcome.Conflict(
-                            "A point reward would exceed the viewer balance limit."
-                        );
+                        if (completion is null)
+                        {
+                            return new CommunityOperationOutcome.Conflict(
+                                "A point reward would exceed the viewer balance limit."
+                            );
+                        }
+                        progress.Amount =
+                            definition.CompletionMode == CommunityCompletionMode.Repeatable
+                                ? progress.Amount - definition.Target
+                                : definition.Target;
                     }
-                    progress.Amount =
-                        definition.CompletionMode == CommunityCompletionMode.Repeatable
-                            ? progress.Amount - definition.Target
-                            : definition.Target;
                 }
             }
+            _ = await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            phase.Committed = true;
+            return new CommunityOperationOutcome.Succeeded(!changed);
         }
-        _ = await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return new CommunityOperationOutcome.Succeeded(!changed);
+        catch (Exception exception)
+            when (!phase.Committed
+                && !ct.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
+        {
+            await db.Database.CurrentTransaction!.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
+        }
     }
 
     public async Task<CommunityOperationOutcome> EditScheduleAsync(
@@ -1132,9 +1159,11 @@ public sealed partial class CommunityProgressionService(
         {
             return new CommunityExternalGrantOutcome.FeatureDisabled();
         }
+        var pointPhase = new PointAttemptPhase();
         var result = await RetryAsync<CommunityExternalGrantOutcome>(
-            () => GrantAttemptAsync(request, cancellationToken),
-            cancellationToken
+            () => GrantAttemptAsync(request, pointPhase, cancellationToken),
+            cancellationToken,
+            pointPhase.CanRetry
         );
         if (result is CommunityExternalGrantOutcome.Granted { WasIdempotent: false } granted)
         {
@@ -1158,142 +1187,163 @@ public sealed partial class CommunityProgressionService(
 
     private async Task<CommunityExternalGrantOutcome> GrantAttemptAsync(
         CommunityExternalGrantRequest request,
+        PointAttemptPhase phase,
         CancellationToken ct
     )
     {
+        phase.Reset();
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (!await FeatureEnabledAsync(db, request.HostId, ct))
-        {
-            return new CommunityExternalGrantOutcome.FeatureDisabled();
-        }
-        var acceptEventsAfterUtc = await db
-            .Hosts.Where(value => value.Id == request.HostId)
-            .Select(value => value.CommunityProgressionAcceptEventsAfterUtc)
-            .SingleAsync(ct);
-        if (acceptEventsAfterUtc is { } cutoff && request.OccurredAtUtc.UtcDateTime < cutoff)
-        {
-            return new CommunityExternalGrantOutcome.AchievementUnavailable();
-        }
-        var fingerprint = Fingerprint(
-            $"{request.AchievementKey.Value}\n{request.Viewer.TwitchUserId}"
-        );
-        var existing = await db.CommunityExternalGrantReceipts.SingleOrDefaultAsync(
-            value =>
-                value.HostId == request.HostId
-                && value.Source == request.Source
-                && value.IdempotencyKey == request.IdempotencyKey,
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
             ct
         );
-        if (existing is not null)
+        phase.Acquired = true;
+        try
         {
-            if (!string.Equals(existing.Fingerprint, fingerprint, StringComparison.Ordinal))
+            if (!await FeatureEnabledAsync(db, request.HostId, ct))
+            {
+                return new CommunityExternalGrantOutcome.FeatureDisabled();
+            }
+            var acceptEventsAfterUtc = await db
+                .Hosts.Where(value => value.Id == request.HostId)
+                .Select(value => value.CommunityProgressionAcceptEventsAfterUtc)
+                .SingleAsync(ct);
+            if (acceptEventsAfterUtc is { } cutoff && request.OccurredAtUtc.UtcDateTime < cutoff)
+            {
+                return new CommunityExternalGrantOutcome.AchievementUnavailable();
+            }
+            var fingerprint = Fingerprint(
+                $"{request.AchievementKey.Value}\n{request.Viewer.TwitchUserId}"
+            );
+            var existing = await db.CommunityExternalGrantReceipts.SingleOrDefaultAsync(
+                value =>
+                    value.HostId == request.HostId
+                    && value.Source == request.Source
+                    && value.IdempotencyKey == request.IdempotencyKey,
+                ct
+            );
+            if (existing is not null)
+            {
+                if (!string.Equals(existing.Fingerprint, fingerprint, StringComparison.Ordinal))
+                {
+                    return new CommunityExternalGrantOutcome.Conflict();
+                }
+                var completionId = await db
+                    .CommunityCompletions.Where(value => value.Id == existing.CompletionId!.Value)
+                    .Select(value => value.PublicId)
+                    .SingleAsync(ct);
+                await transaction.CommitAsync(ct);
+                phase.Committed = true;
+                return new CommunityExternalGrantOutcome.Granted(completionId, true);
+            }
+            var definition = await db
+                .CommunityDefinitions.Include(value => value.Rewards)
+                .SingleOrDefaultAsync(
+                    value =>
+                        value.HostId == request.HostId
+                        && value.Key == request.AchievementKey.Value
+                        && value.Kind == CommunityDefinitionKind.Achievement,
+                    ct
+                );
+            if (definition is null)
+            {
+                return new CommunityExternalGrantOutcome.AchievementNotFound();
+            }
+            if (
+                definition.EventRule != CommunityEventRuleKind.ExternalGrant
+                || definition.Scope != CommunityProgressScope.Viewer
+            )
+            {
+                return new CommunityExternalGrantOutcome.AchievementUnavailable();
+            }
+            var season = await db.CommunitySeasons.SingleAsync(
+                value => value.HostId == request.HostId && value.Id == definition.SeasonId,
+                ct
+            );
+            if (season.Status != CommunitySeasonStatus.Open)
+            {
+                return new CommunityExternalGrantOutcome.AchievementUnavailable();
+            }
+            if (
+                request.OccurredAtUtc.UtcDateTime < season.StartsAtUtc
+                || request.OccurredAtUtc.UtcDateTime > season.EndsAtUtc
+            )
+            {
+                return new CommunityExternalGrantOutcome.AchievementUnavailable();
+            }
+            var viewer = Normalize(request.Viewer);
+            var subjectKey = $"viewer:{viewer.TwitchUserId}";
+            var progress = await db.CommunityProgress.SingleOrDefaultAsync(
+                value =>
+                    value.HostId == request.HostId
+                    && value.DefinitionId == definition.Id
+                    && value.SubjectKey == subjectKey,
+                ct
+            );
+            if (progress is null)
+            {
+                progress = new CommunityProgress
+                {
+                    HostId = request.HostId,
+                    SeasonId = season.Id,
+                    DefinitionId = definition.Id,
+                    SubjectKey = subjectKey,
+                    ViewerTwitchUserId = viewer.TwitchUserId,
+                    ViewerLogin = viewer.Login,
+                    ViewerDisplayName = viewer.DisplayName,
+                    UpdatedAtUtc = request.OccurredAtUtc.UtcDateTime,
+                };
+                _ = db.CommunityProgress.Add(progress);
+            }
+            if (
+                definition.CompletionMode == CommunityCompletionMode.OneTime
+                && progress.CompletionCount > 0
+            )
+            {
+                return new CommunityExternalGrantOutcome.AchievementUnavailable();
+            }
+            progress.Amount = definition.Target;
+            var operationKey = $"external:{request.Source}:{request.IdempotencyKey}";
+            var completion = await CompleteAsync(
+                db,
+                season,
+                definition,
+                progress,
+                viewer,
+                operationKey,
+                request.OccurredAtUtc.UtcDateTime,
+                ct
+            );
+            if (completion is null)
             {
                 return new CommunityExternalGrantOutcome.Conflict();
             }
-            var completionId = await db
-                .CommunityCompletions.Where(value => value.Id == existing.CompletionId!.Value)
-                .Select(value => value.PublicId)
-                .SingleAsync(ct);
-            await transaction.CommitAsync(ct);
-            return new CommunityExternalGrantOutcome.Granted(completionId, true);
-        }
-        var definition = await db
-            .CommunityDefinitions.Include(value => value.Rewards)
-            .SingleOrDefaultAsync(
-                value =>
-                    value.HostId == request.HostId
-                    && value.Key == request.AchievementKey.Value
-                    && value.Kind == CommunityDefinitionKind.Achievement,
-                ct
+            _ = db.CommunityExternalGrantReceipts.Add(
+                new()
+                {
+                    HostId = request.HostId,
+                    Source = request.Source,
+                    IdempotencyKey = request.IdempotencyKey,
+                    Fingerprint = fingerprint,
+                    CompletionId = completion.Id,
+                    ProcessedAtUtc = request.OccurredAtUtc.UtcDateTime,
+                }
             );
-        if (definition is null)
-        {
-            return new CommunityExternalGrantOutcome.AchievementNotFound();
+            _ = await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            phase.Committed = true;
+            return new CommunityExternalGrantOutcome.Granted(completion.PublicId, false);
         }
-        if (
-            definition.EventRule != CommunityEventRuleKind.ExternalGrant
-            || definition.Scope != CommunityProgressScope.Viewer
-        )
+        catch (Exception exception)
+            when (!phase.Committed
+                && !ct.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
         {
-            return new CommunityExternalGrantOutcome.AchievementUnavailable();
+            await db.Database.CurrentTransaction!.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
         }
-        var season = await db.CommunitySeasons.SingleAsync(
-            value => value.HostId == request.HostId && value.Id == definition.SeasonId,
-            ct
-        );
-        if (season.Status != CommunitySeasonStatus.Open)
-        {
-            return new CommunityExternalGrantOutcome.AchievementUnavailable();
-        }
-        if (
-            request.OccurredAtUtc.UtcDateTime < season.StartsAtUtc
-            || request.OccurredAtUtc.UtcDateTime > season.EndsAtUtc
-        )
-        {
-            return new CommunityExternalGrantOutcome.AchievementUnavailable();
-        }
-        var viewer = Normalize(request.Viewer);
-        var subjectKey = $"viewer:{viewer.TwitchUserId}";
-        var progress = await db.CommunityProgress.SingleOrDefaultAsync(
-            value =>
-                value.HostId == request.HostId
-                && value.DefinitionId == definition.Id
-                && value.SubjectKey == subjectKey,
-            ct
-        );
-        if (progress is null)
-        {
-            progress = new CommunityProgress
-            {
-                HostId = request.HostId,
-                SeasonId = season.Id,
-                DefinitionId = definition.Id,
-                SubjectKey = subjectKey,
-                ViewerTwitchUserId = viewer.TwitchUserId,
-                ViewerLogin = viewer.Login,
-                ViewerDisplayName = viewer.DisplayName,
-                UpdatedAtUtc = request.OccurredAtUtc.UtcDateTime,
-            };
-            _ = db.CommunityProgress.Add(progress);
-        }
-        if (
-            definition.CompletionMode == CommunityCompletionMode.OneTime
-            && progress.CompletionCount > 0
-        )
-        {
-            return new CommunityExternalGrantOutcome.AchievementUnavailable();
-        }
-        progress.Amount = definition.Target;
-        var operationKey = $"external:{request.Source}:{request.IdempotencyKey}";
-        var completion = await CompleteAsync(
-            db,
-            season,
-            definition,
-            progress,
-            viewer,
-            operationKey,
-            request.OccurredAtUtc.UtcDateTime,
-            ct
-        );
-        if (completion is null)
-        {
-            return new CommunityExternalGrantOutcome.Conflict();
-        }
-        _ = db.CommunityExternalGrantReceipts.Add(
-            new()
-            {
-                HostId = request.HostId,
-                Source = request.Source,
-                IdempotencyKey = request.IdempotencyKey,
-                Fingerprint = fingerprint,
-                CompletionId = completion.Id,
-                ProcessedAtUtc = request.OccurredAtUtc.UtcDateTime,
-            }
-        );
-        _ = await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return new CommunityExternalGrantOutcome.Granted(completion.PublicId, false);
     }
 
     public async Task<IReadOnlyList<CommunitySeasonView>> GetModeratorSeasonsAsync(
@@ -1689,32 +1739,37 @@ public sealed partial class CommunityProgressionService(
         PointLedgerEntry? pointLedger = null;
         if (viewer is not null && !points.IsZero)
         {
-            var balance = await db.PointBalances.SingleOrDefaultAsync(
-                value => value.HostId == season.HostId && value.Login == viewer.Login,
+            var ceiling = await PointCreditCapacity.LoadCeilingAsync(
+                db,
+                season.HostId,
+                viewer.Login,
                 ct
             );
-            var current = PointAmount.ParseAbsolute(balance?.Amount ?? "0");
-            if (
-                !await PointCreditCapacity.CanCreditAsync(
-                    db,
-                    season.HostId,
-                    viewer.Login,
-                    current,
-                    points.Value,
-                    ct
-                )
-            )
+            var maximum = ceiling.Match<System.Numerics.BigInteger?>(
+                value => value.Amount.Value,
+                _ => null
+            );
+            if (maximum is null)
             {
                 return null;
             }
-            balance ??= new PointBalance { HostId = season.HostId, Login = viewer.Login };
-            if (balance.Id == 0)
+            var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                db,
+                new(season.HostId, viewer.Login),
+                CanonicalPointInteger.From(points.Value),
+                CanonicalPointInteger.From(maximum.Value),
+                now,
+                ct
+            );
+            var returned = credit.Match<PointAmount?>(
+                value => new PointAmount(value.After.ToBigInteger()),
+                _ => null
+            );
+            if (returned is null)
             {
-                _ = db.PointBalances.Add(balance);
+                return null;
             }
-            var next = current.Add(points);
-            balance.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
+            var next = returned.Value;
             pointLedger = new()
             {
                 HostId = season.HostId,
@@ -2299,7 +2354,11 @@ public sealed partial class CommunityProgressionService(
     private static string Fingerprint(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
-    private static async Task<T> RetryAsync<T>(Func<Task<T>> operation, CancellationToken ct)
+    private static async Task<T> RetryAsync<T>(
+        Func<Task<T>> operation,
+        CancellationToken ct,
+        Func<Exception, bool>? retryAllowed = null
+    )
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -2308,7 +2367,9 @@ public sealed partial class CommunityProgressionService(
                 return await operation();
             }
             catch (Exception exception)
-                when (attempt < _persistenceRetryCount && IsPersistenceCollision(exception))
+                when (attempt < _persistenceRetryCount
+                    && (retryAllowed?.Invoke(exception) ?? IsPersistenceCollision(exception))
+                )
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
             }
@@ -2317,4 +2378,23 @@ public sealed partial class CommunityProgressionService(
 
     private static bool IsPersistenceCollision(Exception exception) =>
         MainDatabaseFailureClassifier.IsRetryableTransactionContention(exception);
+
+    private sealed class PointAttemptPhase
+    {
+        public bool Acquired { get; set; }
+        public bool Committed { get; set; }
+        public bool RolledBack { get; set; }
+
+        public void Reset()
+        {
+            Acquired = false;
+            Committed = false;
+            RolledBack = false;
+        }
+
+        public bool CanRetry(Exception exception) =>
+            !Committed
+            && (!Acquired || RolledBack)
+            && MainDatabaseFailureClassifier.IsContention(exception);
+    }
 }

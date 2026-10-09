@@ -59,6 +59,7 @@ public partial class PointsDashboard
     internal static string LedgerChangeLabel(PointLedgerKind kind) =>
         kind switch
         {
+            PointLedgerKind.WatchTimeReward => "Watch-time points",
             PointLedgerKind.Add => "Points added",
             PointLedgerKind.Remove => "Points removed",
             PointLedgerKind.DeleteBalance => "Balance deleted",

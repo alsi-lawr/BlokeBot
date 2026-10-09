@@ -3,6 +3,7 @@ using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -639,7 +640,7 @@ public sealed partial class CompetitionService(
             command.PrivateReason,
             now
         );
-        await GrantPlacementAsync(
+        var winnerFailure = await GrantPlacementAsync(
             db,
             competition,
             placements[0],
@@ -649,9 +650,16 @@ public sealed partial class CompetitionService(
             now,
             ct
         );
+        if (winnerFailure.Match(_ => true, () => false))
+        {
+            return winnerFailure.Match<CompetitionOutcome>(
+                value => value,
+                () => throw new System.Diagnostics.UnreachableException()
+            );
+        }
         if (placements.Count > 1)
         {
-            await GrantPlacementAsync(
+            var runnerFailure = await GrantPlacementAsync(
                 db,
                 competition,
                 placements[1],
@@ -661,12 +669,19 @@ public sealed partial class CompetitionService(
                 now,
                 ct
             );
+            if (runnerFailure.Match(_ => true, () => false))
+            {
+                return runnerFailure.Match<CompetitionOutcome>(
+                    value => value,
+                    () => throw new System.Diagnostics.UnreachableException()
+                );
+            }
         }
         foreach (var rule in competition.MilestoneRewards.OrderBy(x => x.WinsRequired))
         {
             foreach (var standing in standings.Where(x => x.Wins >= rule.WinsRequired))
             {
-                await GrantWinMilestoneAsync(
+                var milestoneFailure = await GrantWinMilestoneAsync(
                     db,
                     competition,
                     competition.Entrants.Single(x => x.Id == standing.EntrantId),
@@ -674,6 +689,13 @@ public sealed partial class CompetitionService(
                     now,
                     ct
                 );
+                if (milestoneFailure.Match(_ => true, () => false))
+                {
+                    return milestoneFailure.Match<CompetitionOutcome>(
+                        value => value,
+                        () => throw new System.Diagnostics.UnreachableException()
+                    );
+                }
             }
         }
         var milestoneRecipients = competition.Rewards.Count(x =>
@@ -932,7 +954,7 @@ public sealed partial class CompetitionService(
             .ToArray();
     }
 
-    private static Task GrantPlacementAsync(
+    private static Task<Option<CompetitionOutcome.Invalid>> GrantPlacementAsync(
         BlokeBotDbContext db,
         Competition competition,
         CompetitionEntrant entrant,
@@ -957,7 +979,7 @@ public sealed partial class CompetitionService(
             ct
         );
 
-    private static Task GrantWinMilestoneAsync(
+    private static Task<Option<CompetitionOutcome.Invalid>> GrantWinMilestoneAsync(
         BlokeBotDbContext db,
         Competition competition,
         CompetitionEntrant entrant,
@@ -980,7 +1002,7 @@ public sealed partial class CompetitionService(
             ct
         );
 
-    private static async Task GrantRewardAsync(
+    private static async Task<Option<CompetitionOutcome.Invalid>> GrantRewardAsync(
         BlokeBotDbContext db,
         Competition competition,
         CompetitionEntrant entrant,
@@ -1007,32 +1029,23 @@ public sealed partial class CompetitionService(
             }
             if (!points.IsZero)
             {
-                var balance = db.PointBalances.Local.SingleOrDefault(x =>
-                    x.HostId == competition.HostId && x.Login == member.Login
-                );
-                balance ??= await db.PointBalances.SingleOrDefaultAsync(
-                    x => x.HostId == competition.HostId && x.Login == member.Login,
+                var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                    db,
+                    new(competition.HostId, member.Login),
+                    CanonicalPointInteger.From(points.Value),
+                    CanonicalPointInteger.From(PointAmount.MaximumValue),
+                    now,
                     ct
                 );
-                var current = balance is null
-                    ? PointAmount.Zero
-                    : PointAmount.ParseAbsolute(balance.Amount);
-                var updated = current.Add(points);
-                if (balance is null)
+                var updated = credit.Match<PointAmount?>(
+                    value => new PointAmount(value.After.ToBigInteger()),
+                    _ => null
+                );
+                if (updated is null)
                 {
-                    balance = new PointBalance
-                    {
-                        HostId = competition.HostId,
-                        Login = member.Login,
-                        Amount = updated.ToString(),
-                        UpdatedAtUtc = now,
-                    };
-                    _ = db.PointBalances.Add(balance);
-                }
-                else
-                {
-                    balance.Amount = updated.ToString();
-                    balance.UpdatedAtUtc = now;
+                    return Option<CompetitionOutcome.Invalid>.Some(
+                        new("The point reward would exceed the point limit.")
+                    );
                 }
                 _ = db.PointLedgerEntries.Add(
                     new PointLedgerEntry
@@ -1042,7 +1055,7 @@ public sealed partial class CompetitionService(
                         Kind = PointLedgerKind.CompetitionReward,
                         Login = member.Login,
                         Delta = points.ToString(),
-                        BalanceAfter = updated.ToString(),
+                        BalanceAfter = updated.Value.ToString(),
                         Note = note,
                         OperationKey =
                             $"competition:{competition.PublicId:N}:{rewardKey}:{member.Login}",
@@ -1066,6 +1079,7 @@ public sealed partial class CompetitionService(
                 }
             );
         }
+        return Option<CompetitionOutcome.Invalid>.None;
     }
 
     private async Task ReconcileAchievementsAsync(Competition competition, CancellationToken ct)

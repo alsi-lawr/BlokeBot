@@ -104,6 +104,19 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Watch-time points",
+                    Bullets =
+                    [
+                        "This is a connected-to-chat proxy, not measured video watch time. It starts off with no amount; choose a positive whole amount in Points Settings and save with watch-time points on.",
+                        "Wait a full five minutes after enabling or restarting the bot. Later five-minute intervals award only while the stream is live and the bot is connected.",
+                        "Each interval uses complete current chat membership, including lurkers and the broadcaster, excluding only the active bot. Just-joined people get the full amount; absent people get none.",
+                        "Offline, disconnected, or unavailable intervals are skipped without partial or catch-up awards. Check the settings status; later fresh intervals recover automatically.",
+                        "Balances and the normal ledger update without a public award feed, chat announcements, or a new point-gain trigger.",
+                        "Applying older Points settings without watch-time settings turns this off and clears the configured amount.",
+                    ],
+                },
+                new SiteGuideSection
+                {
                     Heading = "Manage balances",
                     Bullets =
                     [

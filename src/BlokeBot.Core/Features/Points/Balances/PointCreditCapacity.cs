@@ -9,6 +9,20 @@ namespace BlokeBot.Core.Features.Points.Balances;
 
 internal static class PointCreditCapacity
 {
+    internal static async Task<PointCreditCeiling> LoadCeilingAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        string login,
+        CancellationToken ct
+    )
+    {
+        var remaining =
+            PointAmount.MaximumValue - await LoadRefundLiabilityAsync(db, hostId, login, ct);
+        return remaining.Sign < 0
+            ? new PointCreditCeiling.Exhausted()
+            : new PointCreditCeiling.Available(new PointAmount(remaining));
+    }
+
     public static async Task<bool> CanCreditAsync(
         BlokeBotDbContext db,
         int hostId,
@@ -65,5 +79,24 @@ internal static class PointCreditCapacity
                 static (total, amount) =>
                     total + BigInteger.Parse(amount, CultureInfo.InvariantCulture)
             );
+    }
+}
+
+internal abstract record PointCreditCeiling
+{
+    private PointCreditCeiling() { }
+
+    internal abstract T Match<T>(Func<Available, T> available, Func<Exhausted, T> exhausted);
+
+    internal sealed record Available(PointAmount Amount) : PointCreditCeiling
+    {
+        internal override T Match<T>(Func<Available, T> available, Func<Exhausted, T> exhausted) =>
+            available(this);
+    }
+
+    internal sealed record Exhausted : PointCreditCeiling
+    {
+        internal override T Match<T>(Func<Available, T> available, Func<Exhausted, T> exhausted) =>
+            exhausted(this);
     }
 }
