@@ -42,3 +42,5 @@
 @source "../Auth/**/*.cs";
 @source "../Components/**/*.{razor,cs}";
 @source "../Features/**/*.{razor,cs}";
+
+@import "./features/full-overlay-editor.css";

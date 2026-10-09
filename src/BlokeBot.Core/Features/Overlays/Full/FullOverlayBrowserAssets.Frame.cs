@@ -10,6 +10,21 @@ internal static partial class FullOverlayBrowserAssets
           let lifetime = null;
           let source = null;
           const widgets = new Map();
+          let observation = null;
+          const observe = () => {
+            if (!observation || !port) return;
+            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow"];
+            const items = observation.selectors.flatMap(item => {
+              let node;
+              try { node = document.querySelector(item.selector); } catch { return []; }
+              if (!node) return [];
+              const rect = node.getBoundingClientRect(); const computed = getComputedStyle(node);
+              return [{ key: item.key, x: rect.x, y: rect.y, width: rect.width, height: rect.height, layoutX: node.offsetLeft, layoutY: node.offsetTop,
+                styles: Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)])) }];
+            });
+            port.postMessage({ kind: "observations", lifetime, requestId: observation.requestId,
+              viewport: { width: innerWidth, height: innerHeight }, items });
+          };
           const dispose = () => { for (const widget of widgets.values()) widget.dispose(); widgets.clear(); };
           window.addEventListener("message", (event) => {
             if (port || event.source !== parent || parent === window || event.ports.length !== 1) return;
@@ -18,6 +33,10 @@ internal static partial class FullOverlayBrowserAssets
             lifetime = value.lifetime; port = event.ports[0];
             port.onmessage = (message) => {
               const data = message.data;
+              if (data?.kind === "observe" && data.lifetime === lifetime && typeof data.requestId === "string" && Array.isArray(data.selectors)) {
+                observation = { requestId: data.requestId, selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
+                requestAnimationFrame(observe); return;
+              }
               if (data?.kind !== "render" || data.lifetime !== lifetime || typeof data.html !== "string"
                 || typeof data.css !== "string" || !Array.isArray(data.widgets)) return;
               const diagnostics = [];
@@ -50,9 +69,11 @@ internal static partial class FullOverlayBrowserAssets
                 }
               }
               port.postMessage({ kind: "diagnostics", lifetime, items: diagnostics });
+              requestAnimationFrame(observe);
             };
             port.start(); port.postMessage({ kind: "ready", lifetime });
           });
+          window.addEventListener("resize", () => requestAnimationFrame(observe));
           window.addEventListener("pagehide", () => { dispose(); port?.close(); }, { once: true });
         })();
         """;
