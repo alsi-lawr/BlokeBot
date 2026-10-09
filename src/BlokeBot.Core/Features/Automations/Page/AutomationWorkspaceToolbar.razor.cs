@@ -1,10 +1,11 @@
+using BlokeBot.Core.Components;
 using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationWorkspaceToolbar
 {
-    private ElementReference _toolboxButton;
+    private EditorToolboxToggle? _toolboxButton;
 
     [Parameter]
     public bool ToolboxOpen { get; set; }
@@ -27,5 +28,5 @@ public partial class AutomationWorkspaceToolbar
     [Parameter]
     public EventCallback<ChangeEventArgs> EdgeStyleChanged { get; set; }
 
-    internal ValueTask FocusToolboxButtonAsync() => _toolboxButton.FocusAsync();
+    internal ValueTask FocusToolboxButtonAsync() => _toolboxButton!.FocusAsync();
 }

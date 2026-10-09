@@ -14,6 +14,7 @@ public partial class PageHelpButton
                 "One working document",
                 "Visual and HTML/CSS edit the same unsaved document. Switch modes to see your visual edits already in the source; there is no Apply or Sync step.",
                 [
+                    "Open the Toolbox icon in Visual mode to search widgets and ordinary Text / HTML. Layers only lists the document hierarchy. Adding selects the new layer and opens its inspector; Escape closes Toolbox and returns to its button.",
                     "Select a layer to move or resize it and change its style, motion or widget settings.",
                     "Find HTML opens HTML/CSS and places the caret at the selected layer.",
                     "HTML and CSS keep separate histories. Undo and Redo follow the history named in the toolbar. Incomplete source is retained, and newer overlapping edits are not overwritten.",

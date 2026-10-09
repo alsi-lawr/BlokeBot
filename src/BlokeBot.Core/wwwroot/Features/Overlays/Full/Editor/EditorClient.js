@@ -3,6 +3,8 @@ import { createCanvas } from './EditorCanvas.js';
 import { createPreviewBridge } from './EditorPreview.js';
 import { createGuidedStyling } from './GuidedStyling.js';
 import { createPresentation } from './EditorPresentation.js';
+import { containToolboxKeyboard } from '../../../../Components/EditorToolboxKeyboard.js';
+import { insertedLayer } from './ToolboxInsertion.js';
 import { createEditorMenu } from '../../../../Components/EditorContextMenu.js';
 
 export function createClient(root, document, dotnet) {
@@ -33,7 +35,7 @@ export function createClient(root, document, dotnet) {
         (state,diagnostics)=>{if(!disposed)void dotnet.invokeMethodAsync('PreviewStatusAsync',state,diagnostics.map(d=>d.code));},
         (id,item)=>canvas.presented(id,item),()=>{canvas.cancel();styling?.cancel();});
     const focusEditor=(buffer,moveFocus=true)=>{if(disposed)return;view=owner.focus(buffer);publish();if(moveFocus)(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});};
-    const presentation=createPresentation(root,focusEditor,()=>{canvas.cancel();styling?.cancel();},()=>canvas.refresh());
+    const presentation=createPresentation(root,focusEditor,()=>{canvas.cancel();styling?.cancel();void dotnet.invokeMethodAsync('CloseToolboxForModeAsync');},()=>canvas.refresh());
     styling=createGuidedStyling(root,()=>view,()=>owner.view().styles,{
         plan:(properties,selection,revision)=>owner.planStyle(properties,selection,revision),
         present:(id,presentation,revision)=>preview.present(id,presentation,revision),
@@ -69,6 +71,8 @@ export function createClient(root, document, dotnet) {
     }
     root.addEventListener('keydown',event=>{
         if(!(event.target instanceof Element))return;
+        if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key.toLowerCase()==='s'){event.preventDefault();void dotnet.invokeMethodAsync('SaveShortcutAsync');return;}
+        if(containToolboxKeyboard(event))return;
         const tree=event.target.closest('[role=tree]');if(tree&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End',' '].includes(event.key))event.preventDefault();
         const source=event.target.closest('[data-source]');
         const editable=event.target.closest('input,textarea,select,[contenteditable=true]');
@@ -78,7 +82,6 @@ export function createClient(root, document, dotnet) {
                 event.preventDefault();if(source)owner.focus(source.dataset.source);
                 changed(owner.history(key==='y'||event.shiftKey?'redo':'undo'));return;
             }
-            if(key==='s'){event.preventDefault();void dotnet.invokeMethodAsync('SaveShortcutAsync');return;}
         }
         if(editable)return;
         if(event.key==='Delete'&&view.selected){event.preventDefault();command({kind:'remove'});}
@@ -97,11 +100,13 @@ export function createClient(root, document, dotnet) {
     window.addEventListener('resize',height,options);height();publish();
     return {
         candidate:()=>owner.candidate(),view:()=>view,command,
+        insert(value,selection,revision){const before=owner.view(),after=command(value,selection,revision);return {inserted:insertedLayer(before,after),revision:after.revision,feedback:after.feedback};},
         candidateStream(){return new Blob([JSON.stringify(owner.candidate())],{type:'application/json'});},
         export(form,name){form.elements.namedItem('document').value=JSON.stringify(owner.candidate());form.elements.namedItem('name').value=name;form.requestSubmit();},
         history:direction=>changed(owner.history(direction)),
         saved:value=>changed(owner.saved(value)),
         preview(id,revision,request){if(disposed||request<=previewRequest)return false;previewRequest=request;return revision===view.revision&&preview.set(id,revision,owner.candidate());},
+        focusInsertedLayer(selection,revision){if(disposed||selection!==view.selected||revision!==view.revision)return;presentation.revealInspector();},
         pan:value=>canvas.pan(value),
         viewport(width,height){canvas.viewport(width,height);preview.query();},
         zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),
