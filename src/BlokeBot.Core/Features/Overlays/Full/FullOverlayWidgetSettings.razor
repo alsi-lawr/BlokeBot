@@ -1,5 +1,5 @@
 @using BlokeBot.Plugins.Contracts
-@if (Widget.Configuration.ValueKind != System.Text.Json.JsonValueKind.Object) { <p role="status">This configuration is unresolved. Its original value is kept; use Configuration JSON to repair it.</p> }
+@if (Widget.Configuration.ValueKind != System.Text.Json.JsonValueKind.Object) { <p role="status">This configuration is unresolved. Its original value is kept; open Advanced and use Configuration JSON to repair it.</p> }
 else {
     @switch (Widget.Kind.Value) {
         case "guessing":
@@ -19,7 +19,6 @@ else {
             break;
         case "event-feed":
             <Field Id="full-feed-binding" Label="Shared feed binding ID" Value='@Text("bindingId")' ValueChanged='value => ChangeAsync(["bindingId"], value)' />
-            <p class="text-muted-foreground">Repeated widgets with the same binding share one feed queue. Layout and audio remain independent.</p>
             break;
         case "html":
             <label class="full-editor-field">Widget HTML<textarea class="full-editor-config" value='@Text("html")' @onchange='args => ChangeAsync(["html"], args.Value?.ToString() ?? "")' spellcheck="false"></textarea></label>
@@ -39,5 +38,5 @@ else {
         else if (field.ValueKind == PluginValueKind.Number) { <Field Id='@($"full-plugin-{field.Name}")' Label='@field.Title' Value='@Text(field.Name)' ValueChanged='value => NumberAsync([field.Name], value)' /> }
         else if (field.ValueKind == PluginValueKind.String) { <Field Id='@($"full-plugin-{field.Name}")' Label='@field.Title' Value='@Text(field.Name)' ValueChanged='value => ChangeAsync([field.Name], value)' /> }
     }
-    @if (AppearancePath() is { } appearance) { <label class="full-editor-field">Native source CSS<textarea class="full-editor-config" value='@Text([..appearance, "css"])' @onchange='args => ChangeAsync([..appearance, "css"], args.Value?.ToString() ?? "")' spellcheck="false"></textarea></label><p class="text-muted-foreground">This source-specific CSS uses the existing native source validation. The full document CSS remains unrestricted.</p> }
+    @if (AppearancePath() is { } appearance) { <label class="full-editor-field">Native source CSS<textarea class="full-editor-config" value='@Text([..appearance, "css"])' @onchange='args => ChangeAsync([..appearance, "css"], args.Value?.ToString() ?? "")' spellcheck="false"></textarea></label> }
 }

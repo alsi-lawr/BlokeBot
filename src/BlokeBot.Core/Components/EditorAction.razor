@@ -1,5 +1,5 @@
 <span class="editor-action">
-    <button type="button" class="@($"{Class} editor-action-button")" aria-label="@Label" aria-describedby="@_tipId" aria-pressed="@(Pressed?.ToString().ToLowerInvariant())" disabled="@Disabled" @onclick="Click">
+    <button @attributes="AdditionalAttributes" type="button" class="@($"{Class} editor-action-button")" aria-label="@Label" aria-describedby="@_tipId" aria-pressed="@(Pressed?.ToString().ToLowerInvariant())" disabled="@Disabled" @onclick="Click">
         <EditorIcon Name="@Icon" />
     </button>
     <span id="@_tipId" class="editor-action-tip" role="tooltip">@(Tip ?? Label)</span>
@@ -14,4 +14,5 @@
     [Parameter] public bool? Pressed { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public EventCallback Click { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 }

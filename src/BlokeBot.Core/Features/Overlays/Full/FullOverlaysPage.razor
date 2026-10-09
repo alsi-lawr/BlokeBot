@@ -6,30 +6,30 @@
 
 <PageTitle>Full overlays · BlokeBot</PageTitle>
 <DashboardPage Kicker="Stream presentation" Title="Full overlays" Description="Compose widgets and your own HTML and CSS. Simple overlays stay separate." Width="DashboardPageWidth.Wide">
-    <Actions><a class="btn-secondary" href="/overlays">Simple overlays</a></Actions>
+    <Actions><a class="btn-secondary gap-2" href="/overlays"><EditorIcon Name="grid" />Simple overlays</a></Actions>
     <ChildContent>
         <section class="surface-card full-overlay-collection">
-            <div class="flex flex-wrap items-end gap-3">
+            <div class="full-overlay-create">
                 <Field Id="full-overlay-name" Label="New overlay name" @bind-Value="_name" MaxLength="128" />
-                <label class="full-editor-field">Start from<select aria-label="Start from" @bind="_template"><option value="Blank">Blank document</option><option value="StreamCompanion">Stream companion</option><option value="CommunityProgress">Community progress</option></select></label>
-                <button class="btn-primary" disabled='@_busy' @onclick="CreateAsync">Create overlay</button>
+                <div class="field"><label class="field__label" for="full-overlay-template">Start from</label><select id="full-overlay-template" class="field__input" @bind="_template"><option value="Blank">Blank document</option><option value="StreamCompanion">Stream companion</option><option value="CommunityProgress">Community progress</option></select></div>
+                <EditorAction Label="Create overlay" Icon="add" Class="btn-primary" Disabled="_busy" Click="CreateAsync" />
             </div>
             <StudioFold Key="full-import" Label="Import document / template" Bare="true" @bind-Open="_importOpen">
-                <label class="full-editor-field">Overlay package<InputFile OnChange="ImportAsync" accept=".zip,application/zip" disabled='@_busy' /></label>
+                <FileDropInput Label="Overlay package" Accept=".zip,application/zip" Disabled="_busy" OnChange="ImportAsync" />
                 <p class="text-muted-foreground">Creates a new unpublished overlay. Current packaged media is uploaded for this channel; source widgets need destination setup.</p>
-                @if (_import is not null) { <button class="btn-secondary" @onclick="() => _import.Cancel()">Cancel import</button> }
+                @if (_import is not null) { <EditorAction Label="Cancel import" Icon="cancel" Click="() => _import.Cancel()" /> }
             </StudioFold>
             <div class="flex flex-wrap gap-3" role="group" aria-label="Overlay collection">
                 <button class="btn-secondary" aria-pressed='@(!_archived ? "true" : "false")' @onclick='() => SelectCollectionAsync(false)'>Active</button>
                 <button class="btn-secondary" aria-pressed='@(_archived ? "true" : "false")' @onclick='() => SelectCollectionAsync(true)'>Archived</button>
             </div>
             @if (_message.Length > 0) { <p role="status">@_message</p> }
-            @if (_importedId is { } imported) { <a class="btn-secondary" href="@($"/full-overlays/{imported}/edit")">Edit imported overlay</a> }
+            @if (_importedId is { } imported) { <a class="btn-secondary gap-2" href="@($"/full-overlays/{imported}/edit")"><EditorIcon Name="tools" />Edit imported overlay</a> }
             @if (_items.Count == 0) { <p class="text-muted-foreground">No @(_archived ? "archived" : "active") full overlays.</p> }
             @foreach (var item in _items) {
                 <article class="full-overlay-list-row">
                     <div><h2><a href='@($"/full-overlays/{item.Id}/edit")'>@item.Name</a></h2><p class="text-muted-foreground">@(item.PublishedVersion is { } version ? $"Live version {version.Value}" : "Unpublished draft") · @item.UpdatedAtUtc.ToLocalTime().ToString("g")</p></div>
-                    <a class="btn-secondary" href='@($"/full-overlays/{item.Id}/edit")'>@(_archived ? "Manage" : "Edit")</a>
+                    <a class="btn-secondary gap-2" href='@($"/full-overlays/{item.Id}/edit")'><EditorIcon Name="tools" />@(_archived ? "Manage" : "Edit")</a>
                 </article>
             }
         </section>

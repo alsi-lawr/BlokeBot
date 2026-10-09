@@ -48,9 +48,7 @@
                 <h2>Layers</h2>
                 @if (_view.Members.Count > 1) { <p class="form-help" role="status">@_view.Members.Count selected · Active: @SelectedLabel()</p> }
                 <FullOverlayLayerTree View="_view" Selected="SelectAsync" />
-                <div class="full-hierarchy-root"><button type="button" class="btn-secondary" data-hierarchy-root disabled="@(_view.Selected is null)" @onclick='() => CommandAtAsync(new { kind = "hierarchy", relation = "root" }, controlView.Selected, controlView.Revision, controlView.SelectionVersion, controlView)'>Move to @controlView.HierarchyRoot.ToLowerInvariant()</button></div>
-                <button type="button" class="btn-secondary full-hierarchy-open" disabled="@(_view.Selected is null)" @onclick="OpenHierarchyAsync">Move in HTML…</button>
-                <p class="form-help full-hierarchy-hint">Drag a row before, inside or after another layer. Or use Move in HTML.</p>
+                <div class="full-hierarchy-root"><EditorAction Label='@($"Move to {controlView.HierarchyRoot.ToLowerInvariant()}")' Icon="arrow-up" data-hierarchy-root Disabled="@(_view.Selected is null)" Click='() => CommandAtAsync(new { kind = "hierarchy", relation = "root" }, controlView.Selected, controlView.Revision, controlView.SelectionVersion, controlView)' /><EditorAction Label="Move in HTML…" Icon="direction" Disabled="@(_view.Selected is null)" Click="OpenHierarchyAsync" /></div>
             </aside>
             <div class="full-editor-centre">
                 <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Ctrl toggles layers. Alt drag selects all intersecting layers. Middle drag pans the view.">
@@ -72,16 +70,17 @@
                     <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">
                         @if (widget.Kind.Value is "image" or "audio" or "video") {
                             <label class="full-editor-field">Uploaded media<select value='@MediaAsset(widget)' aria-label="Uploaded media" @onchange="args => MediaSelectedAsync(args, controlView)"><option value="">Choose a file</option>@foreach (var asset in MediaFor(widget.Kind.Value)) { <option value='@asset.Id'>@asset.Name@(!asset.IsAvailable ? " (unavailable)" : "")</option> }</select></label>
-                            <label class="full-editor-field">Upload a @widget.Kind.Value<InputFile OnChange="args => UploadAsync(args, controlView)" accept='@($"{widget.Kind.Value}/*")' /></label>
+                            <FileDropInput @key='("media-upload", widget.Id)' Label='@($"Upload {widget.Kind.Value}")' Accept='@($"{widget.Kind.Value}/*")' Compact="true" Disabled="_busy" OnChange="args => UploadAsync(args, controlView)" />
                         }
                         @if (widget.RequiresSetup) {
                             <p role="status">This widget needs setup for this channel. Choose its destination configuration, then confirm.</p>
-                            <button class="btn-secondary" @onclick='() => CommandAtAsync(new { kind = "setup", value = false }, controlView.Selected, controlView.Revision, controlView.SelectionVersion)'>Confirm destination setup</button>
+                            <EditorAction Label="Confirm destination setup" Icon="apply" Click='() => CommandAtAsync(new { kind = "setup", value = false }, controlView.Selected, controlView.Revision, controlView.SelectionVersion)' />
                         }
                         <FullOverlayWidgetSettings @key="widget.Id" Widget="widget" Bindings="BindingsFor(widget)" PluginFields="@(_registry.Descriptors.FirstOrDefault(item => item.Kind == widget.Kind)?.PluginConfigurationFields ?? [])" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion)" />
-                        <TextAreaField Id="full-widget-json" Label="Configuration JSON" Value="@_configuration" ValueChanged="ConfigurationInput" />
-                        <button class="btn-secondary" @onclick="() => ApplyConfigurationAsync(controlView)">Apply configuration</button>
-                        <p class="text-muted-foreground">Settings stay in the trusted editor. Unresolved bindings remain in your draft.</p>
+                        <StudioFold Key="widget-advanced" Label="Advanced" @bind-Open="_advancedConfigurationOpen" Bare="true">
+                            <TextAreaField Id="full-widget-json" Label="Configuration JSON" Value="@_configuration" ValueChanged="ConfigurationInput" />
+                            <EditorAction Label="Apply configuration" Icon="apply" Click="() => ApplyConfigurationAsync(controlView)" />
+                        </StudioFold>
                     </StudioFold>
                 }
             </aside>
@@ -94,21 +93,21 @@
 
         </footer>
         <dialog class="full-editor-dialog" @ref="_managementDialog" aria-labelledby="full-management-title">
-            <header><h2 id="full-management-title">History &amp; live URL</h2><button class="btn-secondary" @onclick="CloseManagementAsync">Close</button></header>
-            <label class="full-editor-field" for="full-live-url">Stable live URL<input class="field__input" id="full-live-url" readonly value='@_liveUrl' /></label><button class="btn-secondary" @onclick="CopyUrlAsync">Copy live URL</button>
+            <header><h2 id="full-management-title">History &amp; live URL</h2><EditorAction Label="Close history &amp; live URL" Icon="close" Click="CloseManagementAsync" /></header>
+            <label class="full-editor-field" for="full-live-url">Stable live URL<input class="field__input" id="full-live-url" readonly value='@_liveUrl' /></label><EditorAction Label="Copy live URL" Icon="duplicate" Click="CopyUrlAsync" />
             <p class="text-muted-foreground">Use this URL in OBS. Draft saves do not change the live publication or this URL.</p>
-            <form method="post" action="/full-overlays/export" @ref="_exportForm"><AntiforgeryToken /><input type="hidden" name="document" /><input type="hidden" name="name" /><button class="btn-secondary" type="button" @onclick="ExportAsync">Export working document / template</button></form>
+            <form method="post" action="/full-overlays/export" @ref="_exportForm"><AntiforgeryToken /><input type="hidden" name="document" /><input type="hidden" name="name" /><EditorAction Label="Export working document / template" Icon="arrow-down" Click="ExportAsync" /></form>
             <h3>Published history</h3>
             @if (_history.Count == 0) { <p>No published versions yet.</p> }
             @foreach (var version in _history) {
-                <div class="full-overlay-list-row"><div><strong>Version @version.Version.Value@(_row.PublishedVersion == version.Version ? " · live" : "")</strong><p>@version.AuthorLogin · @version.PublishedAtUtc.ToLocalTime().ToString("g")</p></div><div><button class="btn-secondary" disabled='@(_busy || _row.IsArchived)' @onclick='() => RollbackAsync(version.Version)'>Make live</button><button class="btn-secondary" disabled='@(_busy || _row.PublishedVersion == version.Version)' @onclick='() => ForgetAsync(version.Version)'>Forget</button></div></div>
+                <div class="full-overlay-list-row"><div><strong>Version @version.Version.Value@(_row.PublishedVersion == version.Version ? " · live" : "")</strong><p>@version.AuthorLogin · @version.PublishedAtUtc.ToLocalTime().ToString("g")</p></div><div><EditorAction Label='@($"Make version {version.Version.Value} live")' Icon="arrow-up" Disabled="@(_busy || _row.IsArchived)" Click='() => RollbackAsync(version.Version)' /><EditorAction Label='@($"Forget version {version.Version.Value}")' Icon="delete" Disabled="@(_busy || _row.PublishedVersion == version.Version)" Click='() => ForgetAsync(version.Version)' /></div></div>
             }
             <p class="text-muted-foreground">Make live switches directly to retained content, leaving your draft unchanged. Warnings do not prevent rollback. History is kept until you forget it.</p>
-            <div class="full-editor-lifecycle"><button class="btn-secondary" disabled='@_busy' @onclick="DuplicateAsync">Copy saved draft</button><button class="btn-secondary" disabled='@_busy' @onclick="LifecycleAsync">@(_row.IsArchived ? "Restore" : "Archive")</button><button class="btn-danger" disabled='@_busy' @onclick="AskDeleteAsync">Delete…</button></div>
+            <div class="full-editor-lifecycle"><EditorAction Label="Copy saved draft" Icon="duplicate" Disabled="_busy" Click="DuplicateAsync" /><EditorAction Label='@(_row.IsArchived ? "Restore" : "Archive")' Icon='@(_row.IsArchived ? "undo" : "archive")' Disabled="_busy" Click="LifecycleAsync" /><EditorAction Label="Delete overlay…" Icon="delete" Class="btn-danger" Disabled="_busy" Click="AskDeleteAsync" /></div>
             @if (_message.Length > 0) { <p role="status">@_message</p> }
         </dialog>
-        <dialog class="full-editor-dialog" @ref="_viewportDialog" aria-labelledby="full-viewport-title"><header><h2 id="full-viewport-title">Preview viewport</h2><button class="btn-secondary" @onclick="CloseViewportAsync">Close</button></header><p>This changes your authoring view, not the document or OBS Browser Source size. Responsive authored CSS stays authoritative.</p><div class="full-inspector-grid"><Field Id="full-viewport-width" Label="Preview width" @bind-Value="_viewportWidth" /><Field Id="full-viewport-height" Label="Preview height" @bind-Value="_viewportHeight" /></div><button class="btn-primary" @onclick="ApplyViewportAsync">Apply viewport</button></dialog>
-        <dialog class="full-editor-dialog" @ref="_deleteDialog" aria-labelledby="full-delete-title"><h2 id="full-delete-title">Permanently delete @_name?</h2><p>This deletes the overlay, draft, history and live URL. It cannot be undone.</p><button class="btn-secondary" @onclick="CancelDeleteAsync">Cancel</button><button class="btn-danger" @onclick="DeleteAsync">Delete permanently</button></dialog>
+        <dialog class="full-editor-dialog" @ref="_viewportDialog" aria-labelledby="full-viewport-title"><header><h2 id="full-viewport-title">Preview viewport</h2><EditorAction Label="Close preview viewport" Icon="close" Click="CloseViewportAsync" /></header><p>This changes your authoring view, not the document or OBS Browser Source size. Responsive authored CSS stays authoritative.</p><div class="full-inspector-grid"><Field Id="full-viewport-width" Label="Preview width" @bind-Value="_viewportWidth" /><Field Id="full-viewport-height" Label="Preview height" @bind-Value="_viewportHeight" /></div><EditorAction Label="Apply viewport" Icon="apply" Class="btn-primary" Click="ApplyViewportAsync" /></dialog>
+        <dialog class="full-editor-dialog" @ref="_deleteDialog" aria-labelledby="full-delete-title"><h2 id="full-delete-title">Permanently delete @_name?</h2><p>This deletes the overlay, draft, history and live URL. It cannot be undone.</p><button class="btn-secondary gap-2" @onclick="CancelDeleteAsync"><EditorIcon Name="cancel" />Cancel</button><button class="btn-danger gap-2" @onclick="DeleteAsync"><EditorIcon Name="delete" />Delete permanently</button></dialog>
         </ChildContent>
     </EditorWorkspace>
 }
