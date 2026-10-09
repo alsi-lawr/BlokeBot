@@ -11,7 +11,7 @@
         "aarch64-linux"
         "aarch64-darwin"
       ];
-      releaseVersion = "0.16.0";
+      releaseVersion = "0.17.0";
       imageSource = "https://github.com/alsi-lawr/BlokeBot";
       imageRevision = self.rev or self.dirtyRev or "unknown";
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -98,7 +98,7 @@
           npmRoot = "src/BlokeBot.Core";
           npmDeps = pkgs.fetchNpmDeps {
             src = src + "/src/BlokeBot.Core";
-            hash = "sha256-k5pp2FsJVuu9XU93k5oLtkskIJ/b09C0s9f7PxO5Nh8=";
+            hash = "sha256-4gnmj0C8mR52AYQC1Kn3CtYq1msFY5TOWzgbdH+wPcI=";
           };
           nativeBuildInputs = [
             pkgs.nodejs_22
