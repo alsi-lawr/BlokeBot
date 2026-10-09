@@ -361,17 +361,33 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationDefinitionScope.Host,
                 _schema,
                 new("Delay", "Pauses this flow for a set time.", "Control"),
-                [_flowInput],
+                [
+                    _flowInput,
+                    new(
+                        AutomationDelayDurationBinding.Port,
+                        "Duration (milliseconds)",
+                        "Wait for a positive whole number of milliseconds.",
+                        AutomationPortValueType.Number,
+                        BindingFieldId: AutomationDelayDurationBinding.ValueField
+                    ),
+                ],
                 [_completeOutput],
                 [
                     new(
-                        new("duration-milliseconds"),
+                        AutomationDelayDurationBinding.LiteralField,
                         "Duration",
                         "How long the automation waits.",
                         new AutomationConfigurationFieldType.Duration(
                             TimeSpan.FromMilliseconds(1),
                             null
                         ),
+                        true
+                    ),
+                    new(
+                        AutomationDelayDurationBinding.ValueField,
+                        "Duration (milliseconds)",
+                        "Use Fixed, Connected, or Expression for a positive whole number of milliseconds.",
+                        new AutomationConfigurationFieldType.Data(AutomationPortValueType.Number),
                         true
                     ),
                 ],
@@ -432,7 +448,10 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             : Invalid("predicate", "Choose a Boolean predicate.");
 
     private static AutomationConfigurationParseResult ParseDelay(JsonElement json) =>
-        TryReadInt64(json, "duration-milliseconds", out var milliseconds)
+        json.ValueKind == JsonValueKind.Object
+        && json.TryGetProperty("duration-milliseconds", out var duration)
+        && duration.ValueKind == JsonValueKind.Number
+        && TryReadInt64(json, "duration-milliseconds", out var milliseconds)
         && milliseconds >= TimeSpan.MinValue.Ticks / TimeSpan.TicksPerMillisecond
         && milliseconds <= TimeSpan.MaxValue.Ticks / TimeSpan.TicksPerMillisecond
             ? Parsed(

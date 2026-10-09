@@ -41,7 +41,29 @@ public partial class AutomationNodeInspector
     ) =>
         Node is null
             ? []
-            : Errors.Where(error => error.NodeId == Node.Id && error.FieldId == fieldId).ToArray();
+            : Errors
+                .Where(error =>
+                    error.NodeId == Node.Id
+                    && (
+                        error.FieldId == fieldId
+                        || (
+                            Node.Definition.Id == AutomationDefinitionIds.DelayControl
+                            && fieldId == AutomationDelayDurationBinding.ValueField
+                            && error.FieldId == AutomationDelayDurationBinding.LiteralField
+                        )
+                    )
+                )
+                .ToArray();
+
+    private bool IsDelayDuration(AutomationPortMetadata input) =>
+        Node is not null && AutomationDelayDurationBinding.IsInput(Node.Definition, input);
+
+    private bool ShowConfigurationField(AutomationConfigurationFieldMetadata field) =>
+        field.FieldType is not AutomationConfigurationFieldType.Data
+        && !(
+            Node?.Definition.Id == AutomationDefinitionIds.DelayControl
+            && field.Id == AutomationDelayDurationBinding.LiteralField
+        );
 
     private IReadOnlyList<AutomationEditorNode> CompatibleTargets(AutomationPortMetadata output) =>
         Nodes
