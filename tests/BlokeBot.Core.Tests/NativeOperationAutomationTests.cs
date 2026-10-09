@@ -91,17 +91,9 @@ public sealed class NativeOperationAutomationTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var sentSource = Node("shoutout-sent", "{}");
-        var sentAction = Node("send-chat", """{"message":"Sent to ${actor.login}"}""");
         var receivedSource = Node("shoutout-received", "{}");
-        var receivedAction = Node("send-chat", """{"message":"Received from ${actor.login}"}""");
-        _ = await fixture.SaveAsync(
-            [sentSource, sentAction],
-            [Edge(sentSource, "flow", sentAction)]
-        );
-        _ = await fixture.SaveAsync(
-            [receivedSource, receivedAction],
-            [Edge(receivedSource, "flow", receivedAction)]
-        );
+        _ = await fixture.SaveConnectedChatAsync(sentSource, "Sent to partner");
+        _ = await fixture.SaveConnectedChatAsync(receivedSource, "Received from partner");
 
         await fixture.Runtime.ShoutoutOccurredAsync(
             fixture.Shoutout("message-1", EventSubShoutoutDirection.Sent),
@@ -122,6 +114,12 @@ public sealed class NativeOperationAutomationTests
 
         (await fixture.RunCountAsync()).ShouldBe(2);
         fixture.Chat.Messages.ShouldContain("Received from partner");
+        (
+            await fixture.RunContextAsync(AutomationDefinitionIds.ShoutoutSentSource)
+        ).Actor!.Login.ShouldBe("partner");
+        (
+            await fixture.RunContextAsync(AutomationDefinitionIds.ShoutoutReceivedSource)
+        ).Actor!.Login.ShouldBe("partner");
     }
 
     [Test]
@@ -129,20 +127,9 @@ public sealed class NativeOperationAutomationTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var startedSource = Node("poll-started", "{}");
-        var startedAction = Node("send-chat", """{"message":"Started ${poll_title}"}""");
         var endedSource = Node("poll-ended", "{}");
-        var endedAction = Node(
-            "send-chat",
-            """{"message":"Ended ${poll_status} ${total_votes}"}"""
-        );
-        _ = await fixture.SaveAsync(
-            [startedSource, startedAction],
-            [Edge(startedSource, "flow", startedAction)]
-        );
-        _ = await fixture.SaveAsync(
-            [endedSource, endedAction],
-            [Edge(endedSource, "flow", endedAction)]
-        );
+        _ = await fixture.SaveConnectedChatAsync(startedSource, "Started Favourite game?");
+        _ = await fixture.SaveConnectedChatAsync(endedSource, "Ended completed 7");
 
         await fixture.Runtime.PollChangedAsync(
             fixture.Poll("message-1", EventSubPollStage.Begin),
@@ -159,6 +146,17 @@ public sealed class NativeOperationAutomationTests
 
         (await fixture.RunCountAsync()).ShouldBe(2);
         fixture.Chat.Messages.ShouldBe(["Started Favourite game?", "Ended completed 7"]);
+        var started = await fixture.RunContextAsync(AutomationDefinitionIds.PollStartedSource);
+        started
+            .Variables.ForExecution()[new("poll_title")]
+            .Value.ShouldBe(new AutomationValue.Text("Favourite game?"));
+        var ended = await fixture.RunContextAsync(AutomationDefinitionIds.PollEndedSource);
+        ended
+            .Variables.ForExecution()[new("poll_status")]
+            .Value.ShouldBe(new AutomationValue.Text("completed"));
+        ended
+            .Variables.ForExecution()[new("total_votes")]
+            .Value.ShouldBe(new AutomationValue.Number(7));
     }
 
     [Test]
@@ -166,20 +164,9 @@ public sealed class NativeOperationAutomationTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var lockedSource = Node("prediction-locked", "{}");
-        var lockedAction = Node("send-chat", """{"message":"Locked ${prediction_title}"}""");
         var endedSource = Node("prediction-ended", "{}");
-        var endedAction = Node(
-            "send-chat",
-            """{"message":"Winner ${winning_outcome_title} (${winning_outcome_id})"}"""
-        );
-        _ = await fixture.SaveAsync(
-            [lockedSource, lockedAction],
-            [Edge(lockedSource, "flow", lockedAction)]
-        );
-        _ = await fixture.SaveAsync(
-            [endedSource, endedAction],
-            [Edge(endedSource, "flow", endedAction)]
-        );
+        _ = await fixture.SaveConnectedChatAsync(lockedSource, "Locked Will we win?");
+        _ = await fixture.SaveConnectedChatAsync(endedSource, "Winner Yes (yes)");
 
         await fixture.Runtime.PredictionChangedAsync(
             fixture.Prediction("message-1", EventSubPredictionStage.Lock, "locked"),
@@ -197,6 +184,17 @@ public sealed class NativeOperationAutomationTests
 
         (await fixture.RunCountAsync()).ShouldBe(2);
         fixture.Chat.Messages.ShouldBe(["Locked Will we win?", "Winner Yes (yes)"]);
+        var locked = await fixture.RunContextAsync(AutomationDefinitionIds.PredictionLockedSource);
+        locked
+            .Variables.ForExecution()[new("prediction_title")]
+            .Value.ShouldBe(new AutomationValue.Text("Will we win?"));
+        var ended = await fixture.RunContextAsync(AutomationDefinitionIds.PredictionEndedSource);
+        ended
+            .Variables.ForExecution()[new("winning_outcome_title")]
+            .Value.ShouldBe(new AutomationValue.Text("Yes"));
+        ended
+            .Variables.ForExecution()[new("winning_outcome_id")]
+            .Value.ShouldBe(new AutomationValue.Text("yes"));
     }
 
     [Test]
@@ -267,7 +265,16 @@ public sealed class NativeOperationAutomationTests
         var listed = (
             await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
-        listed.Flows.ShouldHaveSingleItem().Draft.Nodes.ShouldContain(node => node.Id == source.Id);
+        listed.AuthoringEntries.ShouldHaveSingleItem().Id.ShouldBe(saved.FlowId);
+        var authoring = (
+            await fixture.Flows.ReadForAuthoringAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowAuthoringReadOutcome.Editor>();
+        authoring.Snapshot.Draft.Nodes.ShouldContain(node => node.Id == source.Id);
+        authoring.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
         var validation = (
             await fixture.Flows.ValidateDraftAsync(
                 Draft(fixture.HostId, [source, action], [edge]),
@@ -291,6 +298,15 @@ public sealed class NativeOperationAutomationTests
             )
         ).ShouldBeOfType<AutomationFlowEnableOutcome.Invalid>();
         enable.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
+        var after = (
+            await fixture.Flows.ReadForAuthoringAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowAuthoringReadOutcome.Editor>();
+        after.Original.Nodes.ShouldBe(authoring.Original.Nodes, ignoreOrder: true);
+        after.Original.Edges.ShouldBe(authoring.Original.Edges, ignoreOrder: true);
         await using var db = await fixture.Database.CreateDbContextAsync();
         var retained = await db.AutomationFlows.SingleAsync();
         retained.IsEnabled.ShouldBeFalse();
@@ -631,7 +647,11 @@ public sealed class NativeOperationAutomationTests
         ImmutableArray<AutomationFlowDraftEdge> edges
     ) => new(null, new(hostId), "Flow", 1, true, nodes, edges);
 
-    private static AutomationFlowDraftNode Node(string type, string json)
+    private static AutomationFlowDraftNode Node(
+        string type,
+        string json,
+        AutomationInputBindingMode messageMode = AutomationInputBindingMode.Fixed
+    )
     {
         using var document = JsonDocument.Parse(json);
         return new(
@@ -643,16 +663,7 @@ public sealed class NativeOperationAutomationTests
                 ? ImmutableDictionary<
                     AutomationConfigurationFieldId,
                     AutomationInputBinding
-                >.Empty.Add(
-                    new("message"),
-                    document.RootElement.GetProperty("message").GetString() is { } message
-                    && message.Contains("${", StringComparison.Ordinal)
-                        ? new(
-                            AutomationInputBindingMode.Expression,
-                            new(AutomationExpressionLanguage.CurrentVersion, message)
-                        )
-                        : new(AutomationInputBindingMode.Fixed, Expression: null)
-                )
+                >.Empty.Add(new("message"), new(messageMode, Expression: null))
                 : ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
@@ -956,15 +967,17 @@ public sealed class NativeOperationAutomationTests
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                 []
             );
+            var expressions = new AutomationExpressionService();
             var catalog = new AutomationCatalogService(
                 new([
                     new CoreAutomationCatalogModule(),
                     new TwitchEventAutomationCatalogModule(),
                     new NativeOperationAutomationCatalogModule(),
                 ]),
-                features
+                features,
+                expressions,
+                [new AutomationCelTransformHandler()]
             );
-            var expressions = new AutomationExpressionService();
             var overlays = new NoOverlayCues();
             AutomationRuntimeService flowRuntime = null!;
             var countdowns = new AutomationCountdownService(database, clock, () => flowRuntime);
@@ -1041,6 +1054,68 @@ public sealed class NativeOperationAutomationTests
             (await Flows.SaveAsync(Draft(hostId ?? HostId, nodes, edges), CancellationToken.None))
                 .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>()
                 .FlowId;
+
+        internal Task<AutomationFlowId> SaveConnectedChatAsync(
+            AutomationFlowDraftNode source,
+            string message
+        )
+        {
+            var transform = Node(
+                AutomationDefinitionIds.CelTransform.Value,
+                JsonSerializer.Serialize(
+                    new Dictionary<string, object?>
+                    {
+                        ["inputs"] = Array.Empty<object>(),
+                        ["outputs"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["port-id"] = "message",
+                                ["display-name"] = "Message",
+                                ["type"] = nameof(AutomationPortValueType.Text),
+                                ["nullability"] = nameof(AutomationPortNullability.NonNullable),
+                                ["cel"] = JsonSerializer.Serialize(message),
+                            },
+                        },
+                    }
+                )
+            );
+            var action = Node(
+                AutomationDefinitionIds.SendChatAction.Value,
+                """{"message":""}""",
+                AutomationInputBindingMode.Connected
+            );
+            return SaveAsync(
+                [source, transform, action],
+                [
+                    Edge(source, "flow", action),
+                    new(
+                        Guid.NewGuid(),
+                        AutomationEdgeKind.Data,
+                        transform.Id,
+                        new("message"),
+                        action.Id,
+                        new("message")
+                    ),
+                ]
+            );
+        }
+
+        internal async Task<AutomationContext> RunContextAsync(AutomationDefinitionId source)
+        {
+            await using var db = await Database.CreateDbContextAsync();
+            var runs = await db
+                .AutomationFlowRuns.AsNoTracking()
+                .Where(run => run.HostId == HostId)
+                .ToArrayAsync();
+            return runs.Select(run =>
+                    AutomationRuntimeSerialization
+                        .RestoreContext(run.ContextSchemaVersion, run.ContextJson)
+                        .ShouldBeOfType<AutomationContextRestoreOutcome.Available>()
+                        .Context
+                )
+                .Single(context => context.Event.SourceDefinitionId == source);
+        }
 
         internal async Task<int> RunCountAsync(int? hostId = null)
         {
