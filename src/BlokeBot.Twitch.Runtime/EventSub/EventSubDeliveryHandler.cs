@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
@@ -30,7 +31,9 @@ internal sealed partial class EventSubDeliveryHandler(
     IEnumerable<IIncomingRaidEventObserver>? incomingRaidObservers = null,
     IEnumerable<ITwitchEventAutomationObserver>? automationObservers = null,
     IEnumerable<IPluginTwitchEventObserver>? pluginObservers = null,
-    IEnumerable<IEventSubRawObserver>? rawObservers = null
+    IEnumerable<IEventSubRawObserver>? rawObservers = null,
+    IEnumerable<IExpandedTwitchEventObserver>? expandedObservers = null,
+    Microsoft.Extensions.Logging.ILogger<EventSubDeliveryHandler>? log = null
 ) : IEventSubDeliveryHandler
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -57,6 +60,10 @@ internal sealed partial class EventSubDeliveryHandler(
         .. automationObservers ?? [],
     ];
     private readonly IPluginTwitchEventObserver[] _pluginObservers = [.. pluginObservers ?? []];
+    private readonly IExpandedTwitchEventObserver[] _expandedObservers =
+    [
+        .. expandedObservers ?? [],
+    ];
     private readonly EventSubRawDelivery _rawDelivery = new(rawObservers);
 
     internal async Task DispatchChatMessageAsync(
@@ -95,7 +102,60 @@ internal sealed partial class EventSubDeliveryHandler(
     {
         switch (EventSubNotification.Parse(envelope, _jsonOptions))
         {
+            case EventSubNotification.AdBreak { Event: var ad }:
+                await NotifyExpandedAsync(
+                    (o, t) => o.AdBreakStartedAsync(ad, t),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.Goal { Event: var goal }:
+                await NotifyExpandedAsync((o, t) => o.GoalChangedAsync(goal, t), cancellationToken);
+                break;
+            case EventSubNotification.ChatSettings { Event: var settings }:
+                await NotifyExpandedAsync(
+                    (o, t) => o.ChatSettingsChangedAsync(settings, t),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.Moderation { Event: var moderation }:
+                await NotifyExpandedAsync(
+                    (o, t) => o.ModerationOccurredAsync(moderation, t),
+                    cancellationToken
+                );
+                break;
             case EventSubNotification.Chat { Event: var chatEvent }:
+                if (
+                    envelope.Metadata.MessageTimestamp is { } at
+                    && !string.IsNullOrWhiteSpace(chatEvent.BroadcasterUserId)
+                )
+                {
+                    await NotifyExpandedAsync(
+                        (o, t) =>
+                            o.ChatReceivedAsync(
+                                new(
+                                    chatEvent.MessageId,
+                                    at,
+                                    chatEvent.BroadcasterUserId,
+                                    chatEvent.SourceBroadcasterUserId
+                                        ?? chatEvent.BroadcasterUserId,
+                                    chatEvent.ChatterUserId,
+                                    chatEvent.ChatterUserLogin,
+                                    chatEvent.ChatterUserName,
+                                    chatEvent.Message?.Text ?? "",
+                                    [
+                                        .. chatEvent
+                                            .Message?.Fragments.Where(f =>
+                                                f.Type == "emote" && f.Emote is not null
+                                            )
+                                            .Select(f => f.Emote!.Id)
+                                            ?? [],
+                                    ]
+                                ),
+                                t
+                            ),
+                        cancellationToken
+                    );
+                }
                 await DispatchChatMessageAsync(chatEvent, rawJson, cancellationToken);
                 break;
             case EventSubNotification.Shoutout { Event: var shoutout }:
@@ -120,12 +180,20 @@ internal sealed partial class EventSubDeliveryHandler(
                 );
                 break;
             case EventSubNotification.StreamOffline { Event: var streamOffline }:
+                await NotifyExpandedAsync(
+                    (o, t) => o.StreamEndedAsync(streamOffline, t),
+                    cancellationToken
+                );
                 await NotifyAutomationObserversAsync(
                     (observer, token) => observer.StreamOfflineAsync(streamOffline, token),
                     cancellationToken
                 );
                 break;
             case EventSubNotification.ChannelUpdate { Event: var channelUpdate }:
+                await NotifyExpandedAsync(
+                    (o, t) => o.MetadataChangedAsync(channelUpdate, t),
+                    cancellationToken
+                );
                 await NotifyAutomationObserversAsync(
                     (observer, token) => observer.ChannelUpdatedAsync(channelUpdate, token),
                     cancellationToken
@@ -171,6 +239,31 @@ internal sealed partial class EventSubDeliveryHandler(
             case EventSubNotification.Unknown:
                 await _rawDelivery.DispatchAsync(envelope, cancellationToken);
                 break;
+        }
+    }
+
+    private async Task NotifyExpandedAsync(
+        Func<IExpandedTwitchEventObserver, CancellationToken, Task> notify,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in _expandedObservers)
+        {
+            try
+            {
+                await notify(observer, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception failure)
+            {
+                log?.LogError(
+                    "Expanded Twitch automation observer failed ({FailureType}); the acknowledged delivery is not replayed.",
+                    failure.GetType().Name
+                );
+            }
         }
     }
 

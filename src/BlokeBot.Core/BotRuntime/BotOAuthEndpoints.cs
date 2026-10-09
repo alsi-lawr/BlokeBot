@@ -351,35 +351,40 @@ internal static class BotOAuthEndpoints
         _ = botOAuth
             .MapGet(
                 "/broadcaster/start",
-                (HttpContext context) =>
+                async (HttpContext context, CancellationToken ct) =>
                 {
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     var selected = SelectedHost(session);
+                    if (!session.CanAuthorizeSelectedHost || selected is null)
+                    {
+                        return ConnectionAccessResult(session);
+                    }
                     var oauth = context.RequestServices.GetService<HostBotAccountOAuthService>();
                     var states =
                         context.RequestServices.GetService<HostBroadcasterOAuthStateStore>();
-                    return (session.CanAuthorizeSelectedHost, selected, oauth, states) switch
+                    if (oauth is null || states is null)
                     {
-                        (false, _, _, _) or (_, null, _, _) => ConnectionAccessResult(session),
-                        (_, _, null, _) or (_, _, _, null) => Unavailable(
-                            BlokeBotAuthReturnAction.ChannelSetup
-                        ),
-                        (_, { } selectedHost, { } readyOauth, { } readyStates) => readyOauth
-                            .CreateAuthorizationUriForScopes(
-                                readyStates.Issue(session.UserId, selectedHost.Id),
-                                OAuthAuthorizationScopeSet.Create(
-                                    context.Request.Query.ContainsKey("raid")
-                                        ? HostBroadcasterAuthorizationService.RaidManagementScopes
-                                    : context.Request.Query.ContainsKey("followed-live")
-                                        ? HostBroadcasterAuthorizationService.FollowedLiveScopes
-                                    : HostBroadcasterAuthorizationService.MilestoneScopes
-                                )
-                            )
-                            .Match<IResult>(
-                                ready => Results.Redirect(ready.AuthorizationUri.ToString()),
-                                _ => Unavailable(BlokeBotAuthReturnAction.ChannelSetup)
-                            ),
-                    };
+                        return Unavailable(BlokeBotAuthReturnAction.ChannelSetup);
+                    }
+                    IEnumerable<string> required =
+                        context.Request.Query.ContainsKey("raid")
+                            ? HostBroadcasterAuthorizationService.RaidManagementScopes
+                        : context.Request.Query.ContainsKey("followed-live")
+                            ? HostBroadcasterAuthorizationService.FollowedLiveScopes
+                        : context.Request.Query.ContainsKey("automations")
+                            ? await context
+                                .RequestServices.GetRequiredService<BlokeBot.Core.Features.Automations.TwitchEventSourceReadinessService>()
+                                .AuthorizationScopesAsync(selected.Id, ct)
+                        : HostBroadcasterAuthorizationService.MilestoneScopes;
+                    return oauth
+                        .CreateAuthorizationUriForScopes(
+                            states.Issue(session.UserId, selected.Id),
+                            OAuthAuthorizationScopeSet.Create(required)
+                        )
+                        .Match<IResult>(
+                            ready => Results.Redirect(ready.AuthorizationUri.ToString()),
+                            _ => Unavailable(BlokeBotAuthReturnAction.ChannelSetup)
+                        );
                 }
             )
             .RequireAuthorization();

@@ -17,6 +17,10 @@
             {
             <button class="btn-secondary" type="button" disabled="@(Busy || !HasNodes)" data-automation-test-flow @onclick="Test"><AutomationIcon Name="test" />Test draft</button>
             }
+            @if (!Subflow && CanRun)
+            {
+                <button class="btn-primary" type="button" disabled="@(Busy || !Saved || HasChanges || !Enabled)" title="Runs the saved flow with its manual trigger data and real effects." @onclick="Run">Run saved flow</button>
+            }
             <button class="btn-secondary" type="button" disabled="@Busy" data-automation-save-flow @onclick="Save"><AutomationIcon Name="save" />@(Subflow ? "Review subflow" : "Save")</button>
             @if (FocusMode)
             {
@@ -35,6 +39,8 @@
 }
 
 @code {
+    [Parameter] public bool CanRun { get; set; }
+    [Parameter] public EventCallback Run { get; set; }
     [Parameter] public bool Subflow { get; set; }
     [Parameter] public bool Visible { get; set; }
     [Parameter] public string Name { get; set; } = string.Empty;

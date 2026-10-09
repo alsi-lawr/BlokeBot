@@ -240,6 +240,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureMoments(modelBuilder);
         ConfigureOverlays(modelBuilder);
         ConfigureAutomations(modelBuilder);
+        ConfigureAutomationSources(modelBuilder);
         ConfigureSubflows(modelBuilder);
         ConfigureCollectives(modelBuilder);
         ConfigureConfigurationTransfer(modelBuilder);

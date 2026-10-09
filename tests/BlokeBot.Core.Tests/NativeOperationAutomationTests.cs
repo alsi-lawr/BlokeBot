@@ -32,18 +32,26 @@ public sealed class NativeOperationAutomationTests
         );
 
         await using var fixture = await NativeFixture.CreateAsync();
+        var tokens = new FixedBroadcasterTokens(
+            new TokenStatus.MissingScopes(
+                "token",
+                new("streamer-id", "streamer", OAuthScopeSet.Empty),
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                [],
+                ["channel:read:polls"]
+            )
+        );
         var readiness = new TwitchEventSourceReadinessService(
             fixture.Database,
             fixture.Catalog,
             fixture.FlowRuntime,
-            new FixedBroadcasterTokens(
-                new TokenStatus.MissingScopes(
-                    "token",
-                    new("streamer-id", "streamer", OAuthScopeSet.Empty),
-                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
-                    [],
-                    ["channel:read:polls"]
-                )
+            tokens,
+            AutomationRuntimeTests.ObservationRuntimeFor(
+                fixture.Database,
+                fixture.FlowRuntime,
+                fixture.Catalog,
+                fixture.Clock,
+                tokens
             )
         );
 
@@ -958,11 +966,14 @@ public sealed class NativeOperationAutomationTests
             );
             var expressions = new AutomationExpressionService();
             var overlays = new NoOverlayCues();
+            AutomationRuntimeService flowRuntime = null!;
+            var countdowns = new AutomationCountdownService(database, clock, () => flowRuntime);
             var executor = new AutomationActionExecutor(
                 features,
                 chat,
                 overlays,
                 expressions,
+                countdowns,
                 database,
                 channelPoints: null,
                 shoutouts,
@@ -971,13 +982,7 @@ public sealed class NativeOperationAutomationTests
                 predictions
             );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var flowRuntime = new AutomationRuntimeService(
-                database,
-                catalog,
-                flows,
-                executor,
-                clock
-            );
+            flowRuntime = new AutomationRuntimeService(database, catalog, flows, executor, clock);
             var runtime = new TwitchEventAutomationRuntime(
                 database,
                 flowRuntime,

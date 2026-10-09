@@ -111,6 +111,13 @@ internal sealed partial class EventSubDeliveryHandler
                 cancellationToken
             );
         }
+        if (incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Outgoing)
+        {
+            await NotifyExpandedAsync(
+                (o, t) => o.OutgoingRaidAsync(incomingRaid, t),
+                cancellationToken
+            );
+        }
         var targetEnabled =
             incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Incoming
             && await nativeTwitch.IsEnabledAsync(
@@ -190,6 +197,14 @@ internal sealed partial class EventSubDeliveryHandler
         foreach (var observer in _channelPointsObservers)
         {
             await observer.RedemptionReceivedAsync(redemption, cancellationToken);
+        }
+
+        if (!redemption.IsNewRedemption)
+        {
+            await NotifyExpandedAsync(
+                (o, t) => o.RedemptionChangedAsync(redemption, t),
+                cancellationToken
+            );
         }
 
         // The Rewards & redemptions parent gate above also bounds automation dispatch; automation

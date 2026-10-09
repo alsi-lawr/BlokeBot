@@ -2,6 +2,31 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationNodeInspector
 {
+    private string? _scheduleTimeWarning
+    {
+        get
+        {
+            if (Node?.Definition.Id != AutomationDefinitionIds.ScheduledTimeSource)
+            {
+                return null;
+            }
+            var local = Node.Value(new("local-time"));
+            var zone = Node.Value(new("zone"));
+            return
+                DateTime.TryParseExact(
+                    local,
+                    ["yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm"],
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out var time
+                )
+                && TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var selected)
+                && selected.IsInvalidTime(time)
+                ? $"{local} does not exist in {zone} because the clock moves forwards. This occurrence is skipped, not shifted; weekly occurrences keep their chosen local time. An interval skips invalid slots on its original cadence, then uses the first valid slot for fixed UTC intervals."
+                : null;
+        }
+    }
+
     private IReadOnlyList<AutomationGraphError> _genericErrors =>
         Node is null
             ? []

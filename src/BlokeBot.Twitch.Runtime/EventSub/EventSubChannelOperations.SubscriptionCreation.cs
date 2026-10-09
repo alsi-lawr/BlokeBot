@@ -8,13 +8,30 @@ internal sealed partial class EventSubChannelOperations
         EventSubExactSubscription subscription,
         CancellationToken cancellationToken
     ) =>
-        CreateBroadcasterOperationSubscriptionsAsync(
-            channel,
-            EventSubAuthorizationContext.ConfiguredBotAuthority,
-            account,
-            [(subscription.Type, subscription.Version)],
-            cancellationToken
-        );
+        subscription.Type switch
+        {
+            "channel.moderate" => CreateBotConditionSubscriptionsAsync(
+                channel,
+                subscription.Authorization,
+                account,
+                [(subscription.Type, "2", "moderator_user_id")],
+                cancellationToken
+            ),
+            "channel.chat_settings.update" => CreateBotConditionSubscriptionsAsync(
+                channel,
+                subscription.Authorization,
+                account,
+                [(subscription.Type, subscription.Version, "user_id")],
+                cancellationToken
+            ),
+            _ => CreateBroadcasterOperationSubscriptionsAsync(
+                channel,
+                subscription.Authorization,
+                account,
+                [(subscription.Type, subscription.Version)],
+                cancellationToken
+            ),
+        };
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotRaidSubscriptionAsync(
         string channel,

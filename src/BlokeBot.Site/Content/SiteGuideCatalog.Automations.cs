@@ -107,6 +107,21 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Run a saved flow for real",
+                    Steps =
+                    [
+                        "Add Manual run from the Toolbox. Configure its explicit Data value in the existing inspector and connect its Flow output to the desired actions.",
+                        "Save, validate and enable the flow. Resolve required channel tools and permissions first.",
+                        "Choose Run saved flow. This is a real authorized run for the selected channel, using the saved enabled graph and its configured data, not your unsaved draft.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Run saved flow is unavailable while the draft is changed, unsaved, busy, disabled or has no Manual run source. Multiple Manual run nodes each start their own matching source-node run for the same invocation.",
+                        "Real runs may send public chat, change points, play cues or use Twitch actions. Test draft and Run scenario remain isolated simulations. A real flow's Cancel countdown action is ordinary cancellation, not quiet restart cancellation.",
+                    ],
+                },
+                new SiteGuideSection
+                {
                     Heading = "Reuse a subflow",
                     Media = new SiteMedia(
                         DarkPhoneSource: "media/automations/phone-dark-list-visual-automations.png",

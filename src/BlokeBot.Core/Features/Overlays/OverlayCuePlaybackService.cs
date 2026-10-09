@@ -16,7 +16,8 @@ internal sealed partial class OverlayCuePlaybackService(
     IOptions<BlokeBotOptions> options,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
-    ILogger<OverlayCuePlaybackService> logger
+    ILogger<OverlayCuePlaybackService> logger,
+    IEnumerable<IOverlayCueLifecycleObserver>? lifecycleObservers = null
 ) : IOverlayCueAdmissionService, IHostedService, IAsyncDisposable
 {
     private const int _maximumPendingPerTarget = 64;
@@ -133,63 +134,82 @@ internal sealed partial class OverlayCuePlaybackService(
 
         var identity = new OverlayTargetIdentity(request.HostId, request.TargetOverlayId);
         var state = _targets.GetOrAdd(identity, _ => new TargetState());
-        lock (state.Gate)
+        var notices = new List<OverlayCueLifecycleNotice>();
+        try
         {
-            if (ready.Target is OverlayCueTarget.Full full)
+            lock (state.Gate)
             {
-                if (state.Selection is { } selection && full.Generation.Value < selection.Value)
+                if (ready.Target is OverlayCueTarget.Full full)
                 {
-                    return new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled();
+                    if (state.Selection is { } selection && full.Generation.Value < selection.Value)
+                    {
+                        return new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled();
+                    }
+                    if (state.Selection is { } previous && previous != full.Generation)
+                    {
+                        CancelAll(identity, state, notices);
+                    }
+                    state.Selection = full.Generation;
                 }
-                if (state.Selection is { } previous && previous != full.Generation)
+                PruneTerminal(state);
+                var connected =
+                    presence.Read(request.HostId, request.TargetOverlayId).ActiveConnectionCount
+                    > 0;
+                var busy = state.Active.Count > 0 || state.Pending.Count > 0;
+                if (request.QueuePolicy == OverlayCueQueuePolicy.Ignore && busy)
                 {
-                    CancelAll(identity, state);
+                    return new OverlayCueAdmissionOutcome.QueueRejected();
                 }
-                state.Selection = full.Generation;
-            }
-            PruneTerminal(state);
-            var connected =
-                presence.Read(request.HostId, request.TargetOverlayId).ActiveConnectionCount > 0;
-            var busy = state.Active.Count > 0 || state.Pending.Count > 0;
-            if (request.QueuePolicy == OverlayCueQueuePolicy.Ignore && busy)
-            {
-                return new OverlayCueAdmissionOutcome.QueueRejected();
-            }
-            if (request.QueuePolicy == OverlayCueQueuePolicy.Replace)
-            {
-                CancelAll(identity, state);
-                busy = false;
-            }
-            if (state.Pending.Count + state.Active.Count >= _maximumPendingPerTarget)
-            {
-                return new OverlayCueAdmissionOutcome.QueueRejected();
-            }
+                if (request.QueuePolicy == OverlayCueQueuePolicy.Replace)
+                {
+                    CancelAll(identity, state, notices);
+                    busy = false;
+                }
+                if (state.Pending.Count + state.Active.Count >= _maximumPendingPerTarget)
+                {
+                    return new OverlayCueAdmissionOutcome.QueueRejected();
+                }
 
-            var expiresAt = connected
-                ? DateTimeOffset.MaxValue
-                : timeProvider
-                    .GetUtcNow()
-                    .AddSeconds(options.Value.Overlays.Media.DisconnectedQueueExpirySeconds);
-            var admitted = new AdmittedRun(
-                ready.Target,
-                ready.Plan,
-                request.QueuePolicy,
-                expiresAt
-            );
-            if (connected && (request.QueuePolicy == OverlayCueQueuePolicy.Concurrent || !busy))
-            {
-                Start(identity, state, admitted);
-                return new OverlayCueAdmissionOutcome.Running(ready.Plan.RunId);
-            }
+                var expiresAt = connected
+                    ? DateTimeOffset.MaxValue
+                    : timeProvider
+                        .GetUtcNow()
+                        .AddSeconds(options.Value.Overlays.Media.DisconnectedQueueExpirySeconds);
+                var admitted = new AdmittedRun(
+                    ready.Target,
+                    ready.Plan,
+                    request.QueuePolicy,
+                    expiresAt,
+                    request.Origin
+                );
+                if (connected && (request.QueuePolicy == OverlayCueQueuePolicy.Concurrent || !busy))
+                {
+                    Start(identity, state, admitted, notices);
+                    return new OverlayCueAdmissionOutcome.Running(ready.Plan.RunId);
+                }
 
-            state.Pending.Enqueue(admitted);
-            return connected
-                ? new OverlayCueAdmissionOutcome.Queued(ready.Plan.RunId)
-                : new OverlayCueAdmissionOutcome.Disconnected(ready.Plan.RunId, expiresAt);
+                state.Pending.Enqueue(admitted);
+                RecordLifecycle(
+                    notices,
+                    identity,
+                    admitted,
+                    OverlayCueLifecycleKind.Queued,
+                    connected
+                        ? OverlayCueLifecycleOutcome.Queued
+                        : OverlayCueLifecycleOutcome.QueuedDisconnected
+                );
+                return connected
+                    ? new OverlayCueAdmissionOutcome.Queued(ready.Plan.RunId)
+                    : new OverlayCueAdmissionOutcome.Disconnected(ready.Plan.RunId, expiresAt);
+            }
+        }
+        finally
+        {
+            await NotifyLifecycleAsync(notices, cancellationToken);
         }
     }
 
-    public Task<OverlayCueAdmissionOutcome> CompleteAsync(
+    public async Task<OverlayCueAdmissionOutcome> CompleteAsync(
         int hostId,
         Guid targetOverlayId,
         Guid runId,
@@ -200,26 +220,31 @@ internal sealed partial class OverlayCuePlaybackService(
         var identity = new OverlayTargetIdentity(hostId, targetOverlayId);
         if (!_targets.TryGetValue(identity, out var state))
         {
-            return Task.FromResult<OverlayCueAdmissionOutcome>(
-                new OverlayCueAdmissionOutcome.Missing()
-            );
+            return new OverlayCueAdmissionOutcome.Missing();
         }
+        var notices = new List<OverlayCueLifecycleNotice>();
+        OverlayCueAdmissionOutcome outcome;
         lock (state.Gate)
         {
             if (!state.Active.Remove(runId, out var completed))
             {
-                return Task.FromResult<OverlayCueAdmissionOutcome>(
-                    state.Expired.Contains(runId)
-                        ? new OverlayCueAdmissionOutcome.Expired()
-                        : new OverlayCueAdmissionOutcome.Missing()
-                );
+                return state.Expired.Contains(runId)
+                    ? new OverlayCueAdmissionOutcome.Expired()
+                    : new OverlayCueAdmissionOutcome.Missing();
             }
             transport.Stop(completed.Target, runId);
-            Advance(identity, state);
-            return Task.FromResult<OverlayCueAdmissionOutcome>(
-                new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled()
+            RecordLifecycle(
+                notices,
+                identity,
+                completed,
+                OverlayCueLifecycleKind.Finished,
+                OverlayCueLifecycleOutcome.BrowserReportedEndUnverified
             );
+            Advance(identity, state, notices);
+            outcome = new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled();
         }
+        await NotifyLifecycleAsync(notices, cancellationToken);
+        return outcome;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -250,7 +275,7 @@ internal sealed partial class OverlayCuePlaybackService(
         {
             lock (pair.Value.Gate)
             {
-                CancelAll(pair.Key, pair.Value);
+                CancelAll(pair.Key, pair.Value, []);
             }
         }
     }

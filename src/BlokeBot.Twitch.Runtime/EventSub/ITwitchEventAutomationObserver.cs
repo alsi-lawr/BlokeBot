@@ -78,6 +78,9 @@ public interface IAutomationEventSubRequirementSource : IEventSubRequirementSour
 public enum AutomationEventSubRequirement
 {
     Stream,
+
+    /// <summary>Exact source-owned subscriptions; not a legacy subscription group.</summary>
+    Exact,
     Follows,
     Subscriptions,
     Cheers,

@@ -257,6 +257,101 @@ internal static partial class SimulationAutomationAuthoringFixture
             cancellationToken
         );
 
+        var manualSource = Node(
+            Definition("manual-run", """{"data":"Manual browser fixture"}"""),
+            "Manual trigger",
+            60,
+            100
+        );
+        var manualSend = Node(
+            Definition("send-chat", """{"message":"Manual browser fixture"}"""),
+            "Real chat effect",
+            310,
+            100
+        ) with
+        {
+            InputBindings = Connected("message"),
+        };
+        _ = await flows.SaveAsync(
+            Graph(
+                host,
+                "Manual run verification",
+                [manualSource, manualSend],
+                [
+                    Edge(manualSource, "flow", manualSend),
+                    Edge(
+                        manualSource,
+                        "manual-data",
+                        manualSend,
+                        "message",
+                        AutomationEdgeKind.Data
+                    ),
+                ]
+            ) with
+            {
+                IsEnabled = true,
+            },
+            cancellationToken
+        );
+
+        var manualCue = Node(
+            Definition("manual-run", "{\"data\":\"Cue browser fixture\"}"),
+            "Run saved cue",
+            60,
+            100
+        );
+        var playCue = Node(
+            Definition(
+                "play-overlay-cue",
+                "{\"target-id\":\"a24ea34e-47f7-41f7-bdf7-5de18d90389c\",\"cue-id\":\"f9c437a7-4df5-45de-bb87-450ca6a40f9b\"}"
+            ),
+            "Play real cue",
+            310,
+            100
+        );
+        _ = await flows.SaveAsync(
+            Graph(
+                host,
+                "Manual cue verification",
+                [manualCue, playCue],
+                [Edge(manualCue, "flow", playCue)]
+            ) with
+            {
+                IsEnabled = true,
+            },
+            cancellationToken
+        );
+        foreach (var kind in new[] { "Started", "Finished" })
+        {
+            var cueSource = Node(
+                Definition(
+                    "cue-lifecycle",
+                    $"{{\"event\":\"{kind}\",\"cue-id\":\"\",\"target-id\":\"\"}}"
+                ),
+                "Observe cue",
+                60,
+                100
+            );
+            var cueMessage = Node(
+                Definition("send-chat", $"{{\"message\":\"Cue {kind} browser fixture\"}}"),
+                "Observed lifecycle",
+                310,
+                100
+            );
+            _ = await flows.SaveAsync(
+                Graph(
+                    host,
+                    $"Cue {kind} verification",
+                    [cueSource, cueMessage],
+                    [Edge(cueSource, "flow", cueMessage)]
+                ) with
+                {
+                    IsEnabled = true,
+                },
+                cancellationToken
+            );
+        }
+
         var largeSource = source with { Id = new(Guid.NewGuid()) };
         var actions = Enumerable
             .Range(0, 255)

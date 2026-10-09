@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Configuration;
@@ -17,7 +18,8 @@ public sealed class PointsGiveawayService(
     PointsGiveawayEligibilityPolicy eligibility,
     PointsGiveawayMessageFormatter formatter,
     IPointsGiveawayScheduler scheduler,
-    PointsGiveawayChangeNotifier changes
+    PointsGiveawayChangeNotifier changes,
+    AutomationFeatureLifecycle? automations = null
 )
 {
     public IO<Option<PointsGiveawayView>, Never> GetActiveGiveaway(int hostId) =>
@@ -115,6 +117,18 @@ public sealed class PointsGiveawayService(
         };
         _ = db.PointsGiveaways.Add(giveaway);
         _ = await db.SaveChangesAsync(ct);
+        if (automations is not null)
+        {
+            await automations.EmitAsync(
+                hostId,
+                FeatureLifecycleKind.GiveawayOpened,
+                giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                now,
+                "",
+                ct
+            );
+        }
         scheduler.Schedule(
             new PointsGiveawaySchedule(
                 giveaway.Id,
@@ -249,6 +263,18 @@ public sealed class PointsGiveawayService(
         giveaway.Status = PointsGiveawayStatus.Cancelled;
         giveaway.CompletedAtUtc = DateTime.UtcNow;
         _ = await db.SaveChangesAsync(ct);
+        if (automations is not null)
+        {
+            await automations.EmitAsync(
+                hostId,
+                FeatureLifecycleKind.GiveawayClosed,
+                giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                giveaway.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                giveaway.CompletedAtUtc.Value,
+                "cancelled",
+                ct
+            );
+        }
         scheduler.Cancel(giveaway.Id);
         await changes.NotifyChangedAsync(hostId, ct);
         return new PointsGiveawayCancelOutcome.Cancelled(settings);
