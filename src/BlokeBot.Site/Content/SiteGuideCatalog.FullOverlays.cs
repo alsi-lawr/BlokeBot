@@ -37,7 +37,7 @@ internal static partial class SiteGuideCatalog
                         "Select your channel, then open Overlays → Editor.",
                         "Choose Blank, Stream companion or Community progress. Each creates an unpublished document with a fresh browser-source key.",
                         "Name the document. Starter headings, HTML and CSS are ordinary editable source, not a locked template.",
-                        "Select a layer or use Add. Confirm destination setup for starter widgets before expecting live data.",
+                        "Select a layer, or open the Toolbox icon in Visual mode and search widgets or Text / HTML. Adding selects the new layer and reveals its inspector. Confirm destination setup for starter widgets before expecting live data.",
                     ],
                     Facts =
                     [
@@ -47,7 +47,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new(
                             "Other widgets",
-                            "Add HTML, a sandboxed web page, uploaded image/audio/video or an available plugin widget."
+                            "Ordinary Text / HTML edits the document; Isolated HTML keeps its own HTML and CSS separate. Add a sandboxed web page, uploaded image/audio/video or a declared plugin widget. Toolbox shows plugin readiness for this channel; unready declarations can still be added as drafts."
                         ),
                         new(
                             "Repeated widgets",

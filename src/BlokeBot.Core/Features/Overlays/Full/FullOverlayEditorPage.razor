@@ -24,7 +24,8 @@
         <ChildContent>
         <div class="full-editor-toolbar">
             <SegmentedTabs Id="full-mode" AriaLabel="Editor mode" Items="_modeTabs" ActiveKey="visual" BrowserOwned="true" data-editor-tabs="mode" />
-            <div role="group" aria-label="Focused editor history"><EditorAction Label="Undo" Icon="arrow-left" Click='() => HistoryAsync("undo")' /><EditorAction Label="Redo" Icon="arrow-right" Click='() => HistoryAsync("redo")' /><span class="text-muted-foreground">@FocusLabel()</span></div>
+            <div role="group" aria-label="Focused editor history"><EditorAction Label="Undo" Icon="undo" Click='() => HistoryAsync("undo")' /><EditorAction Label="Redo" Icon="redo" Click='() => HistoryAsync("redo")' /><span class="text-muted-foreground">@FocusLabel()</span></div>
+            <span data-visual-region><EditorToolboxToggle @ref="_toolboxToggle" Open="_toolboxOpen" Controls="full-overlay-toolbox" Toggle="ToggleToolboxAsync" data-full-toolbox-toggle /></span>
             <div class="full-editor-view-controls" data-visual-region>
                 <label class="full-editor-inline"><input type="checkbox" data-snap checked />Snap <span class="full-editor-desktop text-muted-foreground">· Shift bypass</span></label>
                 <EditorAction Label="Pan view" Icon="direction" Pressed="_pan" Click="PanAsync" />
@@ -39,15 +40,13 @@
             @foreach (var pane in new[] { "layers", "preview", "inspector" }) { <button class="btn-secondary" aria-pressed='@(pane == "preview" ? "true" : "false")' data-editor-pane="@pane">@(pane == "preview" ? "Canvas" : char.ToUpperInvariant(pane[0]) + pane[1..])</button> }
         </nav>
         <div class="full-editor-workspace">
-            <aside class="full-editor-layers" aria-label="Layers and widget palette" data-visual-region>
+            @if (_toolboxOpen) {
+                <div class="full-editor-toolbox-backdrop" @onclick="CloseToolboxAsync" aria-hidden="true" data-visual-region></div>
+                <FullOverlayToolbox @ref="_toolbox" HostId="HostId" Feedback="@_toolboxFeedback" Add="AddAsync" AddOrdinary='() => InsertAsync(new { kind = "add" })' Close="CloseToolboxAsync" />
+            }
+            <aside class="full-editor-layers" aria-label="Layers" data-visual-region>
                 <h2>Layers</h2>
                 <FullOverlayLayerTree View="_view" Selected="SelectAsync" />
-                <StudioFold Key="full-palette" Label="Add widget" @bind-Open="_paletteOpen" Bare="true">
-                    <div class="full-editor-palette">
-                        <button class="btn-secondary" @onclick='() => CommandAsync(new { kind = "add" })'>Text / HTML element</button>
-                        @foreach (var descriptor in _registry.Descriptors.OrderBy(item => item.Name)) { <button class="btn-secondary" @onclick='() => AddAsync(descriptor.Kind)'>@descriptor.Name</button> }
-                    </div>
-                </StudioFold>
             </aside>
             <div class="full-editor-centre">
                 <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Alt drag pans the view.">
@@ -63,7 +62,7 @@
                     <div class="full-editor-source-pane" data-source-pane="css" role="tabpanel" id='@SegmentedTabs.PanelId("full-source", "css")' aria-labelledby='@SegmentedTabs.TabId("full-source", "css")' hidden><textarea id="full-source-css" data-source="css" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Overlay CSS source"></textarea></div>
                 </section>
             </div>
-            <aside class="full-editor-inspector" aria-label="Selected layer inspector" data-visual-region>
+            <aside class="full-editor-inspector" aria-label="Selected layer inspector" tabindex="-1" data-visual-region>
                 <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
                 @if (_view.Widget is { } widget) {
                     <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">
