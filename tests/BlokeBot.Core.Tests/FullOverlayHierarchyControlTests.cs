@@ -39,19 +39,28 @@ public sealed class FullOverlayHierarchyControlTests
         );
         inspector.Find("[data-fold=full-hierarchy]>button").Click();
         inspector.WaitForAssertion(() =>
-            inspector.Find(".full-hierarchy-apply").HasAttribute("disabled").ShouldBeFalse()
+            inspector
+                .Find("button[aria-label='Move selected roots']")
+                .HasAttribute("disabled")
+                .ShouldBeFalse()
         );
         inspector.Find("#full-hierarchy-destination").Change("element:b");
         inspector.Find(".full-hierarchy-relations button:nth-child(2)").Click();
         inspector.WaitForAssertion(() =>
-            inspector.Find(".full-hierarchy-apply").HasAttribute("disabled").ShouldBeTrue()
+            inspector
+                .Find("button[aria-label='Move selected roots']")
+                .HasAttribute("disabled")
+                .ShouldBeTrue()
         );
         commands.ShouldBeEmpty();
         inspector.Find(".full-hierarchy-relations button:nth-child(3)").Click();
         inspector.WaitForAssertion(() =>
-            inspector.Find(".full-hierarchy-apply").HasAttribute("disabled").ShouldBeFalse()
+            inspector
+                .Find("button[aria-label='Move selected roots']")
+                .HasAttribute("disabled")
+                .ShouldBeFalse()
         );
-        inspector.Find(".full-hierarchy-apply").Click();
+        inspector.Find("button[aria-label='Move selected roots']").Click();
         commands.Single().GetProperty("relation").GetString().ShouldBe("after");
         commands.Single().GetProperty("target").GetString().ShouldBe("element:b");
         inspector.Find(".full-hierarchy-relations button:nth-child(4)").Click();
