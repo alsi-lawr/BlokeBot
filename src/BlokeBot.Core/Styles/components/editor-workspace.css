@@ -35,10 +35,25 @@
     color: var(--app-text-muted);
     cursor: pointer;
     display: inline-flex;
-    height: 2.2rem;
+    height: 2.5rem;
     justify-content: center;
     padding: 0;
-    width: 2.2rem;
+    width: 2.25rem;
+}
+
+.editor-workspace-controls--inline {
+    flex-shrink: 0;
+    position: static;
+}
+
+.editor-workspace-header {
+    flex-shrink: 0;
+}
+
+.editor-workspace-header .editor-workspace-error {
+    position: static;
+    margin: 0 0.7rem 0.7rem auto;
+    max-width: min(24rem, calc(100vw - 1.4rem));
 }
 
 .editor-workspace-controls button:hover {
