@@ -25,6 +25,7 @@ internal sealed partial class OverlayCuePlaybackService
         OverlayCuePlaybackPlan Plan,
         OverlayCueQueuePolicy QueuePolicy,
         DateTimeOffset ExpiresAtUtc,
+        OverlayCueAdmissionOrigin Origin,
         DateTimeOffset? StartedAtUtc = null
     );
 

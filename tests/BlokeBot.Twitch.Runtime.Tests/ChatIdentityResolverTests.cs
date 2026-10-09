@@ -8,7 +8,7 @@ using Shouldly;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
-public sealed class ChatIdentityResolverTests
+public sealed partial class ChatIdentityResolverTests
 {
     [Test]
     public async Task ChannelAndBotUsers_Resolving_ReturnsResolvedIdentities()
@@ -642,7 +642,9 @@ public sealed class ChatIdentityResolverTests
             HttpMethod Method,
             string? Type,
             string? SubscriptionId,
-            string? Authorization
+            string? Authorization,
+            string? Version = null,
+            IReadOnlyDictionary<string, string>? Condition = null
         );
 
         private sealed class Handler(string usersJson) : HttpMessageHandler
@@ -700,12 +702,19 @@ public sealed class ChatIdentityResolverTests
             {
                 EventSubRequestCount++;
                 string? type = null;
+                string? version = null;
+                IReadOnlyDictionary<string, string>? condition = null;
                 if (request.Content is not null)
                 {
                     using var document = JsonDocument.Parse(
                         request.Content.ReadAsStringAsync().GetAwaiter().GetResult()
                     );
                     type = document.RootElement.GetProperty("type").GetString();
+                    version = document.RootElement.GetProperty("version").GetString();
+                    condition = document
+                        .RootElement.GetProperty("condition")
+                        .EnumerateObject()
+                        .ToDictionary(p => p.Name, p => p.Value.GetString()!);
                 }
                 var subscriptionId = request
                     .RequestUri?.Query.TrimStart('?')
@@ -718,7 +727,9 @@ public sealed class ChatIdentityResolverTests
                         request.Method,
                         type,
                         subscriptionId,
-                        request.Headers.Authorization?.ToString()
+                        request.Headers.Authorization?.ToString(),
+                        version,
+                        condition
                     )
                 );
                 return (request.Method == HttpMethod.Delete) switch

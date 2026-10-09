@@ -27,6 +27,7 @@ public sealed class AutomationActionExecutor(
     IPublicChatMessageSender chat,
     IOverlayCueAdmissionService overlayCues,
     AutomationExpressionService expressions,
+    AutomationCountdownService countdowns,
     IDbContextFactory<BlokeBotDbContext>? dbFactory = null,
     IChannelPointsDashboardOperations? channelPoints = null,
     IShoutoutDashboardOperations? shoutouts = null,
@@ -48,6 +49,13 @@ public sealed class AutomationActionExecutor(
         {
             return configuration switch
             {
+                CountdownActionConfiguration countdown => await countdowns.ApplyAsync(
+                    hostId,
+                    countdown,
+                    cancellationToken
+                )
+                    ? new AutomationActionOutcome.Succeeded()
+                    : new AutomationActionOutcome.Failed("countdown-unavailable"),
                 SendChatActionConfiguration => await SendChatAsync(
                     hostId,
                     inputs,

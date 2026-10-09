@@ -124,6 +124,48 @@ public partial class AutomationEditorPage
         }
     }
 
+    private async Task RunSavedFlowAsync()
+    {
+        if (_busy || _hasChanges || _editor?.Id is not { } id || !_editor.IsEnabled)
+        {
+            return;
+        }
+        var requestedHostId = HostId;
+        _busy = true;
+        try
+        {
+            await RunSelectedHostMutationAsync(
+                requestedHostId,
+                async () =>
+                {
+                    var outcome = await _manualRuns.RunAsync(
+                        new(requestedHostId),
+                        id,
+                        CancellationToken.None
+                    );
+                    await LoadCoreAsync(id, preserveViewport: true, preserveHistory: true);
+                    _feedback = outcome
+                        is AutomationManualRunOutcome.Dispatched
+                        {
+                            Dispatch.Status: AutomationDispatchStatus.Accepted
+                        }
+                        ? "Saved flow run admitted with real effects."
+                        : "The saved flow could not run. Check its enabled state, manual source and required features.";
+                    _operationFailed =
+                        outcome
+                            is not AutomationManualRunOutcome.Dispatched
+                            {
+                                Dispatch.Status: AutomationDispatchStatus.Accepted
+                            };
+                }
+            );
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
     private async Task RunSampleAsync()
     {
         await OpenScenariosAsync();

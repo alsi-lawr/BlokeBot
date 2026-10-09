@@ -3,7 +3,7 @@ using static BlokeBot.Core.Features.Automations.AutomationConfigurationJson;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public static class AutomationDefinitionIds
+public static partial class AutomationDefinitionIds
 {
     public static AutomationDefinitionId CustomCommandSource { get; } = new("custom-command");
 

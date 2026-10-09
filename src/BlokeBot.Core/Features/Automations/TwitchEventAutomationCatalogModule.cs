@@ -162,6 +162,60 @@ public static class TwitchEventAutomationSources
             [PredictionsReadScope],
             "channel.prediction.end"
         ),
+        new(
+            AutomationDefinitionIds.UptimeSource,
+            AutomationEventSubRequirement.Stream,
+            [],
+            "stream.online, stream.offline; observed Helix stream identity"
+        ),
+        new(
+            AutomationDefinitionIds.ChatMatchSource,
+            AutomationEventSubRequirement.Stream,
+            [],
+            "channel.chat.message; stream.online, stream.offline for first observed"
+        ),
+        new(
+            AutomationDefinitionIds.MetadataSource,
+            AutomationEventSubRequirement.ChannelUpdates,
+            [],
+            "channel.update v2"
+        ),
+        new(
+            AutomationDefinitionIds.AdTimingSource,
+            AutomationEventSubRequirement.Exact,
+            ["channel:read:ads"],
+            "channel.ad_break.begin v1; Helix ad schedule"
+        ),
+        new(
+            AutomationDefinitionIds.GoalSource,
+            AutomationEventSubRequirement.Exact,
+            ["channel:read:goals"],
+            "channel.goal.begin, channel.goal.progress, channel.goal.end v1"
+        ),
+        new(
+            AutomationDefinitionIds.ModerationSource,
+            AutomationEventSubRequirement.Exact,
+            EventSubModerationActions.ReadScopes,
+            "channel.moderate v2"
+        ),
+        new(
+            AutomationDefinitionIds.ChatSettingsSource,
+            AutomationEventSubRequirement.Exact,
+            [],
+            "channel.chat_settings.update v1"
+        ),
+        new(
+            AutomationDefinitionIds.OutgoingRaidSource,
+            AutomationEventSubRequirement.Shoutouts,
+            [],
+            "channel.raid (outgoing; Raid & collaboration owner)"
+        ),
+        new(
+            AutomationDefinitionIds.RedemptionUpdateSource,
+            AutomationEventSubRequirement.Redemptions,
+            [RedemptionsReadScope],
+            "channel.channel_points_custom_reward_redemption.update v1"
+        ),
     ];
 
     public static ImmutableArray<string> ChatNotificationNoticeTypes { get; } =

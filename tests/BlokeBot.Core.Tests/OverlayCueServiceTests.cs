@@ -20,7 +20,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class OverlayCueServiceTests
+public sealed partial class OverlayCueServiceTests
 {
     [Test]
     public async Task SubflowLatest_CueValidationSharesThePreparationTransactionAndPreservesReferenceChecks()
@@ -1072,7 +1072,8 @@ public sealed class OverlayCueServiceTests
             long maximumHostStorageBytes = 2048,
             IOverlayMediaFileDeletion? fileDeletion = null,
             long maximumUploadBytes = 1024,
-            IInterceptor? interceptor = null
+            IInterceptor? interceptor = null,
+            IOverlayCueLifecycleObserver? lifecycle = null
         )
         {
             var database = interceptor is null
@@ -1146,7 +1147,8 @@ public sealed class OverlayCueServiceTests
                 options,
                 events,
                 clock,
-                NullLogger<OverlayCuePlaybackService>.Instance
+                NullLogger<OverlayCuePlaybackService>.Instance,
+                lifecycleObservers: lifecycle is null ? [] : [lifecycle]
             );
             return new(
                 database,

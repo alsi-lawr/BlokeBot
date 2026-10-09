@@ -5813,6 +5813,7 @@ public sealed partial class AutomationRuntimeTests
         internal AutomationScenarioService Scenarios => new(Database, Catalog, Flows, Clock);
         internal AutomationRunQueryService Queries { get; }
         internal int HostId { get; }
+        internal AutomationCountdownService Countdowns { get; private init; } = null!;
 
         internal static async Task<RuntimeFixture> CreateAsync(
             IEnumerable<bool>? chatAdmissions = null,
@@ -5856,6 +5857,7 @@ public sealed partial class AutomationRuntimeTests
             var catalog = new AutomationCatalogService(
                 new([
                     new CoreAutomationCatalogModule(),
+                    new ExpandedAutomationCatalogModule(),
                     new TwitchEventAutomationCatalogModule(),
                     new DataContractAutomationModule(),
                 ]),
@@ -5868,9 +5870,17 @@ public sealed partial class AutomationRuntimeTests
                 integerEntropy
             );
             overlays ??= new NoOverlayCues();
-            var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
+            AutomationRuntimeService runtime = null!;
+            var countdowns = new AutomationCountdownService(database, clock, () => runtime);
+            var actions = new AutomationActionExecutor(
+                features,
+                chat,
+                overlays,
+                expressions,
+                countdowns
+            );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
+            runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
             var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
                 database,
@@ -5903,7 +5913,10 @@ public sealed partial class AutomationRuntimeTests
                 flows,
                 queries,
                 hostId
-            );
+            )
+            {
+                Countdowns = countdowns,
+            };
         }
 
         internal AutomationRuntimeService NewRuntime() =>
@@ -6004,10 +6017,15 @@ public sealed partial class AutomationRuntimeTests
         );
         private int _armed;
         private int _intercepted;
+        private int _skip;
 
         internal Task Entered => _entered.Task;
 
-        internal void Arm() => Volatile.Write(ref _armed, 1);
+        internal void Arm(int skipTransactions = 0)
+        {
+            Volatile.Write(ref _skip, skipTransactions);
+            Volatile.Write(ref _armed, 1);
+        }
 
         internal void Release() => _release.TrySetResult();
 
@@ -6018,6 +6036,11 @@ public sealed partial class AutomationRuntimeTests
             CancellationToken cancellationToken = default
         )
         {
+            if (Volatile.Read(ref _armed) != 0 && Volatile.Read(ref _skip) > 0)
+            {
+                _ = Interlocked.Decrement(ref _skip);
+                return result;
+            }
             if (
                 Volatile.Read(ref _armed) == 0
                 || Interlocked.CompareExchange(ref _intercepted, 1, 0) != 0

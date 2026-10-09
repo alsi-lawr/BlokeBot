@@ -1445,6 +1445,9 @@ public sealed partial class AutomationEditorInteractionTests
             _ = context.Services.AddSingleton<IOverlayCueAdmissionService>(
                 new UnavailableOverlayCueAdmissionService()
             );
+            _ = context.Services.AddSingleton<IPublicChatMessageSender>(
+                new UnavailablePublicChatMessageSender()
+            );
             _ = context.Services.AddBlokeBotAutomations();
             var editor = AvailableEditor();
             _ = (
@@ -1566,6 +1569,16 @@ public sealed partial class AutomationEditorInteractionTests
         AutomationEditorNode CompatibleSource,
         AutomationEditorNode Target
     );
+
+    private sealed class UnavailablePublicChatMessageSender : IPublicChatMessageSender
+    {
+        public ValueTask<PublicChatSendOutcome> SendAsync(
+            string channel,
+            string message,
+            PublicChatDeliveryDeadline deadline,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
+    }
 
     private sealed record PickerCompletion(
         AutomationConnectionRequest? Connection,
