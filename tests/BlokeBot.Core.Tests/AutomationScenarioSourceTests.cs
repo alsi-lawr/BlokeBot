@@ -7,6 +7,45 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationRuntimeTests
 {
     [Test]
+    [Arguments("""{"minimum-bits":100}""")]
+    [Arguments("""{"minimum-bits":100,"maximum-bits":200}""")]
+    public async Task Scenario_CheerSavedFixtureRunsBoundedAndUncappedSourcesWithoutRealEffects(
+        string json
+    )
+    {
+        var writes = new ScenarioWriteGuard();
+        await using var fixture = await RuntimeFixture.CreateAsync(databaseInterceptors: [writes]);
+        var source = Node("cheer", json);
+        var action = Node("send-chat", """{"message":"Scenario cheer"}""");
+        var draft = Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]);
+        var flowId = await fixture.SaveAsync(draft.Nodes, draft.Edges);
+        var input = fixture.Scenarios.CreateDefaultFixture(draft, source.Id);
+        var saved = await fixture.Scenarios.SaveAsync(
+            new(fixture.HostId),
+            flowId,
+            null,
+            "Cheer scenario",
+            input,
+            CancellationToken.None
+        );
+        saved.Status.ShouldBe(AutomationScenarioAuthoringStatus.Saved);
+        writes.Armed = true;
+        var result = (
+            await fixture.Scenarios.RunSavedAsync(
+                new(fixture.HostId),
+                flowId,
+                saved.Id!.Value,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
+        result.Nodes.ShouldContain(node =>
+            node.NodeId == action.Id && node.State == AutomationNodeRunState.Succeeded
+        );
+        writes.Writes.ShouldBe(0);
+        fixture.Chat.Calls.ShouldBe(0);
+    }
+
+    [Test]
     public async Task Scenario_SourceContextRoundTripsWithoutShadowingExpressionOrSourceValues()
     {
         const string Viewer = "Fixture viewer";

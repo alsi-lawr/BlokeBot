@@ -46,7 +46,7 @@ internal static partial class SiteGuideCatalog
                         "The three Hype Train events need Hype Train reading.",
                         "The page names each required approval exactly.",
                         "The Gifted subscriptions source uses a minimum gift count.",
-                        "Cheer uses a minimum Bits amount.",
+                        "Cheer uses an inclusive minimum Bits amount and an optional inclusive maximum. Leave the maximum empty for no upper limit. Set both to the same amount to match only that amount.",
                         "Incoming raid uses a minimum viewer count.",
                         "Smaller events do not start a flow.",
                         "Chat notification starts flows from typed Twitch notices such as announcements.",
