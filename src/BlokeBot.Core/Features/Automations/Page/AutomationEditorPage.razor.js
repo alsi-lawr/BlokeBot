@@ -155,8 +155,14 @@ export function disposeToolboxKeyboard() {
     toolboxKeyboard = null;
 }
 
-export function focusInspector() {
-    document.querySelector("[data-automation-inspector]")?.focus({ preventScroll: true });
+export function focusInspector(field = null, port = null) {
+    const inspector = document.querySelector("[data-automation-inspector]");
+    const owner = field !== null
+        ? inspector?.querySelector(`[data-automation-field="${CSS.escape(field)}"]`)
+        : port !== null ? inspector?.querySelector(`[data-automation-output="${CSS.escape(port)}"]`) : null;
+    const target = owner?.querySelector('[aria-invalid="true"]')
+        ?? owner?.querySelector('input,textarea,select,button') ?? inspector;
+    target?.focus({ preventScroll: false });
 }
 
 export function focusAuthoring() {

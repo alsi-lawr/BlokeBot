@@ -23,11 +23,14 @@ public partial class AutomationEditorPage
             _feedback = feedback;
             _operationFailed = true;
         }
-        if (_selectedNodeIds.Count == 0)
+        if (errors.FirstOrDefault(error => error.NodeId is not null) is { } first)
         {
-            SetSingleNodeSelection(
-                errors.FirstOrDefault(error => error.NodeId is not null)?.NodeId
-            );
+            SetSingleNodeSelection(first.NodeId);
+            _mobileInspectorOpen = true;
+            _inspectorFocusMode = _mode;
+            _focusInspectorAfterRender = true;
+            _validationFocusField = first.FieldId?.Value;
+            _validationFocusPort = first.PortId?.Value;
         }
     }
 

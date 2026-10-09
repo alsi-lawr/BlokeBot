@@ -87,8 +87,8 @@ else
             var binding = Node.Binding(fieldId);
             var edge = IncomingDataEdge(input.Id);
             var issue = edge is null ? null : AutomationConnections.Issue(edge, Nodes);
-            var fieldErrors = IsDelayDuration(input) ? FieldErrors(fieldId) : [];
-            <section class="automation-input-editor" @key="input.Id" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")}")">
+            var fieldErrors = FieldErrors(fieldId);
+            <section class="automation-input-editor" data-automation-field="@fieldId.Value" @key="input.Id" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")}")">
                 <div class="automation-input-heading"><h3>@(_isSubflowExit ? input.Name : $"Input · {input.Name}")</h3><span>@AutomationConnections.TypeLabel(input) · @(input.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</span></div>
                 <div class="automation-binding-mode-tabs" role="group" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")} choice")">
                     @foreach (var mode in Enum.GetValues<AutomationInputBindingMode>())
@@ -115,12 +115,12 @@ else
                     }
                     else
                     {
-                        <label class="automation-field"><span>@(IsDelayDuration(input) ? "Enter whole milliseconds" : "Enter a value")</span><input type="@FixedInputType(input)" min="@(IsDelayDuration(input) ? "1" : null)" step="@(IsDelayDuration(input) ? "1" : null)" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
+                        <label class="automation-field"><span>@(IsDelayDuration(input) ? "Enter whole milliseconds" : "Enter a value")</span><input type="@FixedInputType(input)" min="@(IsDelayDuration(input) ? "1" : null)" step="@(IsDelayDuration(input) ? "1" : null)" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" aria-describedby="@(fieldErrors.Count > 0 ? FieldId(Node.Id, fieldId) + "-errors" : null)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
                     }
                 }
                 else if (binding.Mode == AutomationInputBindingMode.Expression)
                 {
-                    <label class="automation-field"><span>Calculate a value</span><textarea aria-label="@input.Name input expression" value="@binding.Expression?.Source" @oninput="args => SetExpressionAsync(fieldId, args.Value)"></textarea></label>
+                    <label class="automation-field"><span>Calculate a value</span><textarea aria-label="@input.Name input expression" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" aria-describedby="@(fieldErrors.Count > 0 ? FieldId(Node.Id, fieldId) + "-errors" : null)" value="@binding.Expression?.Source" @oninput="args => SetExpressionAsync(fieldId, args.Value)"></textarea></label>
                     <div class="automation-cel-completions" aria-label="Available names for @input.Name">
                         <strong>@(IsDelayDuration(input) ? "Command argument example" : "Available name for this input")</strong>
                         @if (IsDelayDuration(input))
@@ -168,7 +168,7 @@ else
                         }
                     </div>
                 }
-                @foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@error.Message</span>}
+                @if (fieldErrors.Count > 0) { <div id="@(FieldId(Node.Id, fieldId) + "-errors")">@foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@error.Message</span>}</div> }
             </section>
         }
 
@@ -213,7 +213,7 @@ else
                     <input id="@FieldId(Node.Id, field.Id)" type="@GenericInputType(field)" value="@Node.Value(field.Id)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @oninput="args => SetValueAsync(field.Id, args.Value)" />
                 }
                 <p>@field.Description</p>
-                @foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@error.Message</span>}
+                @if (fieldErrors.Count > 0) { <div id="@(FieldId(Node.Id, field.Id) + "-errors")">@foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@error.Message</span>}</div> }
             </div>
         }
 
@@ -228,11 +228,12 @@ else
                 <div class="automation-inspector-section-heading"><h3 id="automation-transform-outputs-heading">Outputs</h3><button class="automation-icon-button" type="button" aria-label="Add output" title="Add output" @onclick="AddTransformOutputAsync"><EditorIcon Name="add" /></button></div>
                 @foreach (var output in Node.TransformOutputs)
                 {
-                    <div class="automation-transform-declaration" @key="output.PortId">
+                    <div class="automation-transform-declaration" data-automation-output="@output.PortId.Value" @key="output.PortId">
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "name")">Output name</label><input class="field__input" id="@DeclarationFieldId(output.PortId, "name")" type="text" value="@output.DisplayName" @oninput="args => UpdateTransformOutputAsync(output, displayName: args.Value?.ToString())" /></div>
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "type")">Type</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "type")" value="@output.ValueType" @onchange="args => UpdateTransformOutputAsync(output, valueType: args.Value?.ToString())">@foreach (var type in _outputTypes){<option value="@type">@type</option>}</select></div>
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "required")" value="@output.Nullability" @onchange="args => UpdateTransformOutputAsync(output, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
-                        <div class="field automation-transform-cel"><label class="field__label" for="@DeclarationFieldId(output.PortId, "expression")">CEL expression</label><textarea class="field__input" id="@DeclarationFieldId(output.PortId, "expression")" value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></div>
+                        <div class="field automation-transform-cel"><label class="field__label" for="@DeclarationFieldId(output.PortId, "expression")">CEL expression</label><textarea class="field__input" id="@DeclarationFieldId(output.PortId, "expression")" aria-invalid="@(Errors.Any(error => error.NodeId == Node.Id && error.PortId == output.PortId) ? "true" : null)" aria-describedby="@(Errors.Any(error => error.NodeId == Node.Id && error.PortId == output.PortId) ? DeclarationFieldId(output.PortId, "errors") : null)" value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></div>
+                        <div id="@DeclarationFieldId(output.PortId, "errors")">@foreach (var error in Errors.Where(error => error.NodeId == Node.Id && error.PortId == output.PortId)) { <span class="automation-field-error" role="alert">@error.Message</span> }</div>
                         <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove output @output.DisplayName" title="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><EditorIcon Name="delete" /></button>
                     </div>
                 }

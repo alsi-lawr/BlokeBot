@@ -102,6 +102,22 @@ public sealed partial class AutomationEditorNode
     private readonly Dictionary<AutomationConfigurationFieldId, string> _values;
     private readonly Dictionary<AutomationConfigurationFieldId, AutomationInputBinding> _bindings;
     private AutomationCelTransformConfiguration? _transform;
+    private AutomationFlowDraftNode? _original;
+    private System.Text.Json.JsonElement _originalProjection;
+
+    internal bool ProjectionPreservesOriginal =>
+        _original is null
+        || (
+            _original.ExpressionLanguageVersion == AutomationExpressionLanguage.CurrentVersion
+            && System.Text.Json.JsonElement.DeepEquals(
+                _original.Definition.Configuration,
+                _originalProjection
+            )
+            && _original.InputBindings.Count == _bindings.Count
+            && _original.InputBindings.All(pair =>
+                _bindings.TryGetValue(pair.Key, out var binding) && binding == pair.Value
+            )
+        );
 
     private AutomationEditorNode(
         AutomationNodeId id,
@@ -231,12 +247,17 @@ public sealed partial class AutomationEditorNode
             ),
             definition.Id == AutomationDefinitionIds.DelayControl
                 ? node.InputBindings.ToDictionary()
-                : definition.Configuration.ToDictionary(
-                    static field => field.Id,
-                    field =>
-                        node.InputBindings.GetValueOrDefault(field.Id)
-                        ?? new(AutomationInputBindingMode.Fixed, null)
-                ),
+                : definition
+                    .Configuration.Where(field =>
+                        node.InputBindings.ContainsKey(field.Id)
+                        || definition.Inputs.Any(port => port.BindingFieldId == field.Id)
+                    )
+                    .ToDictionary(
+                        static field => field.Id,
+                        field =>
+                            node.InputBindings.GetValueOrDefault(field.Id)
+                            ?? new(AutomationInputBindingMode.Fixed, null)
+                    ),
             transform,
             subflow
         );
@@ -252,6 +273,8 @@ public sealed partial class AutomationEditorNode
                 _ = restored._values.TryAdd(field, string.Empty);
             }
         }
+        restored._originalProjection = restored.ConfigurationJson();
+        restored._original = node;
         return restored;
     }
 

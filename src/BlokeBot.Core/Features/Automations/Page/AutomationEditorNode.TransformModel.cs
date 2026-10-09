@@ -26,7 +26,9 @@ public sealed partial class AutomationEditorNode
 
         var parser = AutomationCelTransform.Definition(definition.Id, definition.Display);
         return
-            parser.Parse(node.Definition.Configuration)
+            ((IAutomationInputBindingDefinition)parser).ParseForInputBindings(
+                node.Definition.Configuration
+            )
                 is AutomationConfigurationParseResult.Parsed
                 {
                     Configuration: AutomationCelTransformConfiguration configuration,

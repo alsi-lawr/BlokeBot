@@ -81,7 +81,7 @@ internal static partial class ConfigurationExportMappers
             );
         }
         if (
-            catalog.ValidatePersistedDefinition(node.Definition)
+            catalog.ValidatePersistedDefinition(node.Definition, node.InputBindings)
             is not AutomationConfigurationCheck.Valid valid
         )
         {

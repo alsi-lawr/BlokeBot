@@ -187,7 +187,7 @@ public sealed partial class AutomationFlowService
                         admission == AutomationGraphAdmission.Frozen
                             ? AutomationSubflowDefinitions.CheckFrozen(node.Definition)
                             : null
-                    ) ?? catalog.ValidatePersistedDefinition(node.Definition)
+                    ) ?? catalog.ValidatePersistedDefinition(node.Definition, node.InputBindings)
                 )
                 is AutomationConfigurationCheck.Valid valid
             )
