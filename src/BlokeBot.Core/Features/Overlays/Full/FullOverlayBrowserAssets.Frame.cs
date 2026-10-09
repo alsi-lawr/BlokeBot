@@ -27,13 +27,20 @@ internal static partial class FullOverlayBrowserAssets
           };
           const observe = () => {
             if (!observation || !port) return;
-            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow"];
+            const properties = ["left","right","top","bottom","width","height","font-family","font-size","font-weight","color","background-color","background-image","text-align","opacity","gap","padding","border-radius","box-shadow","transform","rotate","scale","translate","display","overflow","--blokebot-x","--blokebot-y","--blokebot-anchor-x","--blokebot-anchor-y"];
             const items = observation.selectors.flatMap(item => {
               let node;
-              try { node = document.querySelector(item.selector); } catch { return []; }
-              if (!node) return [];
+              try { const nodes = document.querySelectorAll(item.selector); if (nodes.length !== 1) return []; node = nodes[0]; } catch { return []; }
               const rect = node.getBoundingClientRect(); const computed = getComputedStyle(node);
+              const parent = node.offsetParent;
+              const parentStyle = parent ? getComputedStyle(parent) : null;
+              const initialContainingBlock = parent === document.body && parentStyle.position === "static"
+                && parentStyle.transform === "none" && parentStyle.perspective === "none" && parentStyle.filter === "none"
+                && parentStyle.contain === "none" && ["auto", "opacity"].includes(parentStyle.willChange);
               return [{ key: item.key, x: rect.x, y: rect.y, width: rect.width, height: rect.height, layoutX: node.offsetLeft, layoutY: node.offsetTop,
+                containingWidth: initialContainingBlock ? innerWidth : parent?.clientWidth ?? innerWidth,
+                containingHeight: initialContainingBlock ? innerHeight : parent?.clientHeight ?? innerHeight,
+                visible: computed.display !== "none" && !["hidden", "collapse"].includes(computed.visibility),
                 styles: Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)])) }];
             });
             port.postMessage({ kind: "observations", lifetime, requestId: observation.requestId,
@@ -44,8 +51,8 @@ internal static partial class FullOverlayBrowserAssets
           const dispose = () => { for (const widget of widgets.values()) widget.renderer.dispose(); widgets.clear(); };
           const restorePresentation = () => {
             if (!presentation) return;
-            for (const [key, value] of Object.entries(presentation.attributes))
-              if (value === null) presentation.node.removeAttribute(key); else presentation.node.setAttribute(key, value);
+            for (const patch of presentation.patches) for (const [key, value] of Object.entries(patch.attributes))
+              if (value === null) patch.node.removeAttribute(key); else patch.node.setAttribute(key, value);
             authored.textContent = presentation.css;
             presentation = null;
           };
@@ -67,20 +74,28 @@ internal static partial class FullOverlayBrowserAssets
                 measure(); return;
               }
               if (data?.kind === "present" && data.lifetime === lifetime) {
-                if (!authored || data.requestId !== observation?.requestId || typeof data.gestureId !== "string"
+                if (!privatePreview || !authored || data.requestId !== observation?.requestId || typeof data.gestureId !== "string"
                   || !Number.isSafeInteger(data.sequence) || data.sequence <= presentationSequence) return;
                 const value = data.presentation;
-                if (value !== null && (!value || typeof value.css !== "string" || !value.attributes || typeof value.attributes !== "object"
-                  || !Object.entries(value.attributes).every(([key, value]) => ["style", "data-blokebot-element"].includes(key) && typeof value === "string")
-                  || !observation.selectors.some(item => item.selector === value.selector))) return;
+                if (value !== null && (!value || typeof value.css !== "string" || !Array.isArray(value.patches) || !value.patches.length
+                  || new Set(value.patches.map(patch => patch?.selector)).size !== value.patches.length
+                  || !value.patches.every(patch => patch && patch.attributes && typeof patch.attributes === "object" && !Array.isArray(patch.attributes)
+                    && Object.entries(patch.attributes).every(([key, value]) => ["style", "data-blokebot-element"].includes(key) && typeof value === "string")
+                    && observation.selectors.some(item => item.selector === patch.selector)))) return;
+                const targets = [];
+                if (value !== null) for (const patch of value.patches) {
+                  let nodes;
+                  try { nodes = document.querySelectorAll(patch.selector); } catch { return; }
+                  if (nodes.length !== 1 || targets.some(target => target.node === nodes[0])) return;
+                  targets.push({ node: nodes[0], attributes: patch.attributes });
+                }
+                // Admission of every native target precedes even restoration of a prior held value.
                 presentationSequence = data.sequence; restorePresentation();
                 if (value !== null) {
-                  let node;
-                  try { node = document.querySelector(value.selector); } catch { return; }
-                  if (!node) return;
-                  presentation = { node, gestureId: data.gestureId, sequence: data.sequence, css: authored.textContent,
-                    attributes: Object.fromEntries(Object.keys(value.attributes).map(key => [key, node.getAttribute(key)])) };
-                  for (const [key, attributeValue] of Object.entries(value.attributes)) node.setAttribute(key, attributeValue);
+                  presentation = { patches: targets.map(patch => ({ node: patch.node,
+                      attributes: Object.fromEntries(Object.keys(patch.attributes).map(key => [key, patch.node.getAttribute(key)])) })),
+                    gestureId: data.gestureId, sequence: data.sequence, css: authored.textContent };
+                  for (const patch of targets) for (const [key, attributeValue] of Object.entries(patch.attributes)) patch.node.setAttribute(key, attributeValue);
                   authored.textContent = value.css;
                 }
                 measure(); return;

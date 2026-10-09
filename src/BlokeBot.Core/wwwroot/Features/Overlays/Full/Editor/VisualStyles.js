@@ -3,7 +3,8 @@ import { htmlRanges, attributeEdit, parsedCss } from './SourceRanges.js';
 
 export function targetElement(snapshot, key) {
     const elements = htmlRanges(snapshot.html).elements;
-    return elements.find(element => elementKey(element) === key);
+    const matches = elements.filter(element => elementKey(element) === key);
+    return matches.length === 1 ? matches[0] : null;
 }
 export function elementKey(element) {
     return element.values['data-blokebot-widget'] ? `widget:${element.values['data-blokebot-widget']}`
@@ -13,7 +14,7 @@ export function prepareStyles(snapshot, key) {
     const element=targetElement(snapshot,key);
     return {element,stylesheet:element?parsedCss(snapshot.css):{tree:null,diagnostics:[]}};
 }
-export function planStyles(snapshot, key, properties, prepared=prepareStyles(snapshot,key)) {
+export function planStyles(snapshot, key, properties, prepared=prepareStyles(snapshot,key), placement=null) {
     const element = prepared.element;
     if (!element) return { kind: 'unmapped', code: 'selection-changed' };
     const edits = [], attributes = {};
@@ -32,27 +33,32 @@ export function planStyles(snapshot, key, properties, prepared=prepareStyles(sna
     const {tree,diagnostics}=prepared.stylesheet;
     if(!tree||diagnostics.length)return {kind:'unmapped',code:'incomplete-css'};
     properties={...properties};
-    if(element.values.style){
+    if(element.values.style||placement){
         const attribute=element.attributes.find(item=>item.name==='style');
-        if(!attribute||!snapshot.html.slice(attribute.start,attribute.end).includes(element.values.style))return {kind:'unmapped',code:'encoded-inline-css'};
-        const inline=parsedCss(element.values.style,'declarationList');
+        const original=element.values.style??'';
+        if(attribute&&!snapshot.html.slice(attribute.start,attribute.end).includes(original))return {kind:'unmapped',code:'encoded-inline-css'};
+        const inline=parsedCss(original,'declarationList');
         if(!inline.tree||inline.diagnostics.length)return {kind:'unmapped',code:'incomplete-inline-css'};
         const changes=[],appended=[];
         for(const [property,value] of Object.entries(properties)){
             const declarations=inline.tree.children.toArray();
-            const declaration=declarations.findLast(node=>node.type==='Declaration'&&node.property===property);
+            const matching=declarations.filter(node=>node.type==='Declaration'&&node.property===property);
+            const declaration=placement?matching.findLast(node=>node.important)??matching.at(-1):matching.at(-1);
             const shorthand=['background-color','background-image'].includes(property)?declarations.findLast(node=>node.type==='Declaration'&&node.property==='background'):null;
             if(shorthand&&(!declaration||declarations.indexOf(shorthand)>declarations.indexOf(declaration)||shorthand.important&&!declaration.important)) {
                 appended.push(`${property}: ${value}${shorthand.important||declaration?.important?' !important':''};`);
                 delete properties[property];continue;
             }
-            if(!declaration?.value.loc)continue;
+            if(!declaration?.value.loc){
+                if(placement){appended.push(`${property}: ${value}${placement==='move'?' !important':''};`);delete properties[property];}
+                continue;
+            }
             const first=declaration.value.children?.first??declaration.value,last=declaration.value.children?.last??declaration.value;
-            changes.push({start:first.loc.start.offset,end:last.loc.end.offset,after:String(value)});
+            changes.push({start:first.loc.start.offset,end:last.loc.end.offset,after:String(value)+(placement==='move'&&!declaration.important?' !important':'')});
             delete properties[property];
         }
         if(changes.length||appended.length){
-            let value=element.values.style;
+            let value=original;
             for(const change of changes.sort((a,b)=>b.start-a.start))value=value.slice(0,change.start)+change.after+value.slice(change.end);
             if(appended.length)value+=`; ${appended.join(' ')}`;
             const change=attributeEdit(snapshot.html,element.start,'style',value);
@@ -90,7 +96,30 @@ export function planStyles(snapshot, key, properties, prepared=prepareStyles(sna
     let css = snapshot.css;
     for (const edit of edits.filter(edit=>edit.buffer==='css').sort((a,b)=>b.start-a.start))
         css = css.slice(0,edit.start)+edit.after+css.slice(edit.end);
-    return { kind: 'planned', edits, selected, presentation:{selector:element.selector,attributes,css} };
+    return { kind: 'planned', edits, selected, presentation:{patches:[{selector:element.selector,attributes}],css} };
+}
+
+// Multiple roots are planned against the same source, never applied one at a time.
+export function combineStyles(snapshot, plans) {
+    const failure=plans.find(plan=>plan.kind!=='planned');
+    if(failure)return failure;
+    if(!plans.length)return {kind:'unchanged'};
+    const edits=[];
+    for(const edit of plans.flatMap(plan=>plan.edits)) {
+        const insertion=edit.start===edit.end&&edits.find(item=>item.buffer===edit.buffer&&item.start===edit.start&&item.end===edit.end);
+        if(insertion)insertion.after+=edit.after;else edits.push({...edit});
+    }
+    const ordered=[...edits].sort((a,b)=>a.buffer.localeCompare(b.buffer)||b.start-a.start);
+    for(let i=0;i<ordered.length;i++) {
+        const edit=ordered[i],previous=ordered[i-1];
+        if(snapshot[edit.buffer].slice(edit.start,edit.end)!==edit.before
+            ||previous?.buffer===edit.buffer&&edit.end>previous.start)return {kind:'invalid',code:'overlapping-patches'};
+    }
+    let css=snapshot.css;
+    for(const edit of ordered.filter(edit=>edit.buffer==='css'))css=css.slice(0,edit.start)+edit.after+css.slice(edit.end);
+    return {kind:'planned',edits,metadata:plans.flatMap(plan=>plan.metadata??[]),
+        selectionMap:plans.map(plan=>[plan.selection,plan.selected]),
+        presentation:{css,patches:plans.flatMap(plan=>plan.presentation.patches)}};
 }
 
 export function styleValues(snapshot, key, prepared=prepareStyles(snapshot,key)) {
@@ -110,8 +139,10 @@ export function styleValues(snapshot, key, prepared=prepareStyles(snapshot,key))
     }
     if(element.values.style){
         const {tree:inline}=parsedCss(element.values.style,'declarationList');
-        if(inline)for(const declaration of inline.children.toArray())if(declaration.type==='Declaration'&&declaration.value.loc)
-            result[declaration.property]=element.values.style.slice(declaration.value.loc.start.offset,declaration.value.loc.end.offset);
+        const declarations=new Map();
+        if(inline)for(const declaration of inline.children.toArray())if(declaration.type==='Declaration'&&declaration.value.loc
+            &&(!declarations.get(declaration.property)?.important||declaration.important))declarations.set(declaration.property,declaration);
+        for(const declaration of declarations.values())result[declaration.property]=element.values.style.slice(declaration.value.loc.start.offset,declaration.value.loc.end.offset);
     }
     return result;
 }
