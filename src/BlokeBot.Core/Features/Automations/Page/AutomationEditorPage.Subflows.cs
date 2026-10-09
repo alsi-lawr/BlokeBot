@@ -109,7 +109,7 @@ public partial class AutomationEditorPage
         foreach (var node in draft.Nodes)
         {
             if (
-                _catalogService.ValidatePersistedDefinition(node.Definition)
+                _catalogService.ValidatePersistedDefinition(node.Definition, node.InputBindings)
                 is not AutomationConfigurationCheck.Valid valid
             )
             {

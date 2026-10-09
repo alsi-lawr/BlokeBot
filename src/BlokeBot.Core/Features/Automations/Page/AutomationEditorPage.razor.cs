@@ -39,6 +39,8 @@ public partial class AutomationEditorPage
     private bool _nodeLibraryOpen;
     private bool _mobileInspectorOpen;
     private bool _focusInspectorAfterRender;
+    private string? _validationFocusField;
+    private string? _validationFocusPort;
     private bool _focusToolboxAfterRender;
     private bool _enableConfirmation;
     private bool _deleteConfirmation;
@@ -136,7 +138,13 @@ public partial class AutomationEditorPage
         if (_focusInspectorAfterRender && _pageModule is not null)
         {
             _focusInspectorAfterRender = false;
-            await _pageModule.InvokeVoidAsync("focusInspector");
+            await _pageModule.InvokeVoidAsync(
+                "focusInspector",
+                _validationFocusField,
+                _validationFocusPort
+            );
+            _validationFocusField = null;
+            _validationFocusPort = null;
         }
 
         await EnsureCallSelectorAsync();

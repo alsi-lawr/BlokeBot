@@ -159,6 +159,11 @@ internal static class AutomationCelSyntax
     internal static bool TryAnalyze(string source, out AutomationCelAnalysis analysis)
     {
         analysis = null!;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return false;
+        }
+
         try
         {
             var tree = new CelEnvironment([], string.Empty).Parse(source);

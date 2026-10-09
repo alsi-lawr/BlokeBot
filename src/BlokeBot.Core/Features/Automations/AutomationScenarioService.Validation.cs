@@ -113,7 +113,7 @@ public sealed partial class AutomationScenarioService
         foreach (var node in configured.Nodes)
         {
             if (
-                catalog.ValidatePersistedDefinition(node.Definition)
+                catalog.ValidatePersistedDefinition(node.Definition, node.InputBindings)
                     is AutomationConfigurationCheck.Valid valid
                 && !AutomationScenarioSimulation.Supports(valid, catalog.Data)
             )
@@ -134,7 +134,7 @@ public sealed partial class AutomationScenarioService
             if (
                 !connected.Add((input.NodeId, input.PortId))
                 || node is null
-                || catalog.ValidatePersistedDefinition(node.Definition)
+                || catalog.ValidatePersistedDefinition(node.Definition, node.InputBindings)
                     is not AutomationConfigurationCheck.Valid valid
                 || valid.Definition.Inputs.FirstOrDefault(port => port.Id == input.PortId)
                     is not { BindingFieldId: { } field } port
@@ -164,7 +164,7 @@ public sealed partial class AutomationScenarioService
                 !effects.Add(effect.NodeId)
                 || !Enum.IsDefined(effect.Result)
                 || node is null
-                || catalog.ValidatePersistedDefinition(node.Definition)
+                || catalog.ValidatePersistedDefinition(node.Definition, node.InputBindings)
                     is not AutomationConfigurationCheck.Valid
                     {
                         Definition.Kind: AutomationNodeKind.Action

@@ -72,23 +72,26 @@ public partial class AutomationEditorPage
         }
 
         var flowQuery = await _flowsService.ListAsync(hostId, CancellationToken.None);
-        _flowSnapshots = flowQuery is AutomationFlowQueryOutcome.Available available
-            ? available.Flows
-            : [];
-        await LoadReferenceChoicesAsync();
-        var selected = preferredFlowId is { } preferred
-            ? _flowSnapshots.FirstOrDefault(flow => flow.Draft.Id == preferred)
-            : _flowSnapshots.FirstOrDefault();
-        if (selected is not null)
+        if (flowQuery is not AutomationFlowQueryOutcome.Available available)
         {
-            if (!preserveViewport && selected.Draft.Id != previousFlowId)
+            _loadFailed = true;
+            return;
+        }
+        _flowSnapshots = available.Flows;
+        _authoringEntries = available.AuthoringEntries;
+        await LoadReferenceChoicesAsync();
+        var selectedId =
+            preferredFlowId
+            ?? _flowSnapshots.FirstOrDefault()?.Draft.Id
+            ?? _authoringEntries.FirstOrDefault()?.Id;
+        if (selectedId is { } id)
+        {
+            if (!preserveViewport && id != previousFlowId)
             {
                 ResetCanvasViewport();
             }
-            if (RestoreEditor(selected, preserveHistory))
-            {
-                await ValidateCoreAsync(showFeedback: false);
-            }
+
+            await LoadAuthoringFlowAsync(id, preserveHistory);
         }
         else
         {
@@ -96,6 +99,7 @@ public partial class AutomationEditorPage
             {
                 ResetCanvasViewport();
             }
+
             _editor = null;
         }
 
@@ -194,17 +198,8 @@ public partial class AutomationEditorPage
         _hasChanges = true;
     }
 
-    private async Task SelectFlowCoreAsync(AutomationFlowSnapshot snapshot)
-    {
-        if (snapshot.Draft.Id != _editor?.Id)
-        {
-            ResetCanvasViewport();
-        }
-        if (RestoreEditor(snapshot))
-        {
-            await ValidateCoreAsync(showFeedback: false);
-        }
-    }
+    private Task SelectFlowCoreAsync(AutomationFlowSnapshot snapshot) =>
+        LoadAuthoringFlowAsync(snapshot.Draft.Id!.Value);
 
     private Task RequestNewFlowAsync() =>
         RequestTransitionAsync(() =>
@@ -234,21 +229,32 @@ public partial class AutomationEditorPage
                     _editor = null;
                     _disclosedNodeId = null;
                     _history.Clear();
-                    _flowRecoveryMessage =
-                        $"The saved flow '{snapshot.Draft.Name}' uses an unavailable node type. Restore the node provider, or delete the flow.";
+                    _flowRecoveryMessage = null;
                     return false;
                 }
 
                 _ = _unavailableDefinitionIds.Add(id);
             }
 
-            definitions[node.Id] = _catalogService.ValidatePersistedDefinition(node.Definition)
-                is AutomationConfigurationCheck.Valid valid
-                ? valid.Definition
-                : descriptor;
+            if (
+                _catalogService.DescribeForAuthoring(new(HostId), node)
+                is not AutomationConfigurationCheck.Valid valid
+            )
+            {
+                _editor = null;
+                return false;
+            }
+            definitions[node.Id] = valid.Definition;
         }
 
-        _editor = AutomationEditorState.Restore(snapshot, definitions);
+        var restoredEditor = AutomationEditorState.Restore(snapshot, definitions);
+        if (restoredEditor.Nodes.Any(node => !node.ProjectionPreservesOriginal))
+        {
+            _editor = null;
+            return false;
+        }
+        _editor = restoredEditor;
+
         _selectedNodeId = null;
         ResetTransientState();
         SetSingleNodeSelection(null);
