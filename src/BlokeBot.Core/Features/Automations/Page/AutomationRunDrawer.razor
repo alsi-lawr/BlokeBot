@@ -8,10 +8,10 @@
         <div class="automation-run-actions">
             @if (FocusMode)
             {
-                <button class="btn-secondary" type="button" @onclick="Toggle"><AutomationIcon Name="hide" />Hide runs</button>
+                <button class="btn-secondary" type="button" @onclick="Toggle"><EditorIcon Name="hide" />Hide runs</button>
             }
-            <button class="btn-secondary" type="button" disabled="@(!HasRecentRuns)" @onclick="ShowDetails"><AutomationIcon Name="history" />Run details</button>
-            <button class="btn-secondary" type="button" disabled="@(!CanRunSample)" @onclick="RunSample"><AutomationIcon Name="test" />Test again</button>
+            <button class="btn-secondary" type="button" disabled="@(!HasRecentRuns)" @onclick="ShowDetails"><EditorIcon Name="history" />Run details</button>
+            <button class="btn-secondary" type="button" disabled="@(!CanRunSample)" @onclick="RunSample"><EditorIcon Name="test" />Test again</button>
         </div>
     </footer>
 }

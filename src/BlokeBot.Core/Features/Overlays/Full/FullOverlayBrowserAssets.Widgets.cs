@@ -6,15 +6,29 @@ internal static partial class FullOverlayBrowserAssets
         (() => {
           "use strict";
           const create = window.blokeBotOverlayRenderer.create;
-          const mount = (anchor, initial, report) => {
+          const mount = (anchor, initial, report, privatePreview = false) => {
             const host = document.createElement("div"); host.dataset.fullWidgetRenderer = ""; anchor.append(host);
             let engine = null; let appearanceStylesheet = null; let fingerprint = null; let presentation = null; let kind = null; let plugin = null; let nestedPort = null;
             const runs = new Set();
+            const diagnostics = new Set();
+            let reportLifetime = {};
+            const reporter = (widget) => {
+              const identity = reportLifetime;
+              return (code) => {
+                if (privatePreview) {
+                  if (reportLifetime !== identity) return;
+                  diagnostics.add(code);
+                }
+                report(widget.id, code);
+              };
+            };
             const cleanup = () => {
+              reportLifetime = {}; diagnostics.clear();
               engine?.dispose(); engine = null; appearanceStylesheet = null; nestedPort?.close(); nestedPort = null;
               plugin = null; runs.clear(); host.replaceChildren();
             };
             const sourceEngine = (widget) => {
+              const blocked = reporter(widget);
               host.dataset.overlayRoot = ""; host.id = `blokebot-native-${widget.id}`;
               const canvas = document.createElementNS("http://www.w3.org/2000/svg", "svg");
               const cueCanvas = document.createElement("div"); cueCanvas.style.cssText = "position:absolute;inset:0";
@@ -24,7 +38,7 @@ internal static partial class FullOverlayBrowserAssets
                 credentials: "omit", startTransport: false, audio: widget.audio,
                 clipPrefix: `${widget.id}-`,
                 onCueComplete: () => {},
-                onAudioBlocked: () => report(widget.id, "audio-blocked"),
+                onAudioBlocked: () => blocked("audio-blocked"),
               });
               return canvas;
             };
@@ -56,19 +70,20 @@ internal static partial class FullOverlayBrowserAssets
               }
               if (!changed) return;
               if (kind === "source") {
+                diagnostics.delete("widget-unavailable");
                 if (!engine) canvas = sourceEngine(widget);
                 appearanceStylesheet.textContent = widget.appearanceCss;
                 const snapshot = widget.content;
                 if (snapshot.appearance) canvas.setAttribute("viewBox", `${snapshot.appearance.x} ${snapshot.appearance.y} ${snapshot.appearance.width} ${snapshot.appearance.height}`);
                 if (!engine.applyPresentation(snapshot, snapshot.sequence, snapshot.serverEpoch, snapshot.generatedAtUtc))
-                  report(widget.id, "widget-unavailable");
+                  reporter(widget)("widget-unavailable");
                 return;
               }
               if (kind === "plugin" && plugin?.src === new URL(widget.content.url, location.href).href) {
                 plugin.contentWindow.postMessage({ kind: "blokebot-widget-state", state: widget.content.state }, "*"); return;
               }
               cleanup();
-              if (kind === "unavailable") { host.dataset.status = "unavailable"; report(widget.id, "widget-unavailable"); return; }
+              if (kind === "unavailable") { host.dataset.status = "unavailable"; reporter(widget)("widget-unavailable"); return; }
               delete host.dataset.status;
               if (kind === "html" || kind === "web" || kind === "plugin") {
                 const child = document.createElement("iframe"); child.sandbox = "allow-scripts";
@@ -95,18 +110,19 @@ internal static partial class FullOverlayBrowserAssets
                 }
               } else if (kind === "media") {
                 const type = widget.content.contentType.split("/")[0];
-                if (!["image", "audio", "video"].includes(type)) { report(widget.id, "widget-unavailable"); return; }
+                if (!["image", "audio", "video"].includes(type)) { reporter(widget)("widget-unavailable"); return; }
                 const media = document.createElement(type === "image" ? "img" : type);
                 media.src = widget.content.url;
                 if (media instanceof HTMLMediaElement) {
                   media.autoplay = true; media.loop = widget.content.loop; media.muted = widget.audio.isMuted;
                   media.volume = widget.audio.volume;
-                  host.append(media); void media.play().catch(() => report(widget.id, "audio-blocked"));
+                  const blocked = reporter(widget);
+                  host.append(media); void media.play().catch(() => blocked("audio-blocked"));
                 } else { media.alt = ""; host.append(media); }
               }
             };
             const dispose = () => { cleanup(); host.remove(); };
-            return { update, dispose };
+            return { update, dispose, diagnostics };
           };
           window.blokeBotFullWidgets = { mount };
         })();

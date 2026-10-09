@@ -109,42 +109,16 @@ public partial class AutomationEditorPage
         }
     }
 
-    private void ToggleFocusMode() => _focusMode = !_focusMode;
+    private void WorkspaceFocusChanged(bool _) => StateHasChanged();
+
+    private void WorkspaceInteropFailure(JSException exception) =>
+        ReportUiFault("EditorWorkspace.Fullscreen", exception);
 
     private void ToggleFlowRail() => _flowRailCollapsed = !_flowRailCollapsed;
 
     private void ToggleEditorTools() => _editorToolsCollapsed = !_editorToolsCollapsed;
 
     private void ToggleRunDrawer() => _runDrawerCollapsed = !_runDrawerCollapsed;
-
-    private async Task ToggleBrowserFullscreenAsync()
-    {
-        if (_pageModule is null)
-        {
-            _feedback = "Browser full screen did not start. Try again.";
-            _operationFailed = true;
-            return;
-        }
-
-        try
-        {
-            await _pageModule.InvokeVoidAsync("toggleBrowserFullscreen");
-        }
-        catch (JSException exception)
-        {
-            _feedback = "Browser full screen did not start. Try again.";
-            _operationFailed = true;
-            ReportUiFault(nameof(ToggleBrowserFullscreenAsync), exception);
-        }
-    }
-
-    [JSInvokable]
-    public Task BrowserFullscreenChangedAsync(bool active) =>
-        InvokeAsync(() =>
-        {
-            _browserFullscreen = active;
-            StateHasChanged();
-        });
 
     private void ResetCanvasViewport() => _canvasViewportKey = Guid.NewGuid().ToString("N");
 

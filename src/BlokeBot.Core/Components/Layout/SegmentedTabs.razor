@@ -39,13 +39,14 @@
                     id="@TabIdFor(item)"
                     class="@TabClass(active)"
                     type="button"
+                    data-tab-key="@(BrowserOwned ? item.Key : null)"
                     role="tab"
                     aria-selected="@(active ? "true" : "false")"
                     aria-controls="@PanelIdFor(item)"
                     tabindex="@TabIndexFor(item)"
                     @ref="_tabElements[item.Key]"
-                    @onclick="() => SelectAsync(item)"
-                    @onkeydown="args => HandleKeyDownAsync(args, item)">
+                    @onclick="@(BrowserOwned ? default : EventCallback.Factory.Create<MouseEventArgs>(this, () => SelectAsync(item)))"
+                    @onkeydown="@(BrowserOwned ? default : EventCallback.Factory.Create<KeyboardEventArgs>(this, args => HandleKeyDownAsync(args, item)))">
                 @if (ItemTemplate is not null)
                 {
                     @ItemTemplate(item)

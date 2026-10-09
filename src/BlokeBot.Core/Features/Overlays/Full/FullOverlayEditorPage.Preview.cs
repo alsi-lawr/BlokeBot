@@ -11,7 +11,7 @@ public partial class FullOverlayEditorPage
     private string _previewState = "Preparing private preview";
 
     [JSInvokable]
-    public async Task RefreshPreviewAsync(long revision)
+    public async Task RefreshPreviewAsync(long revision, bool revokeExisting)
     {
         if (_disposed || _client is null || revision != _view.Revision)
         {
@@ -20,6 +20,18 @@ public partial class FullOverlayEditorPage
 
         var request = ++_previewRequest;
         var candidate = await ReadCandidateAsync();
+        if (!PreviewCurrent(request, revision))
+        {
+            return;
+        }
+        if (revokeExisting)
+        {
+            await ReleasePreviewAsync();
+        }
+        if (!PreviewCurrent(request, revision))
+        {
+            return;
+        }
         var result = await _delivery.CreatePreviewAsync(
             PageContext.Session,
             candidate,
@@ -35,6 +47,10 @@ public partial class FullOverlayEditorPage
         }
         else
         {
+            if (!PreviewCurrent(request, revision))
+            {
+                return;
+            }
             _ = result.Match(
                 _ => true,
                 rejected =>
@@ -56,16 +72,22 @@ public partial class FullOverlayEditorPage
             return false;
         }
 
-        await ReleasePreviewAsync();
-        if (!PreviewCurrent(request, revision))
+        if (
+            !await _client!.InvokeAsync<bool>("preview", id.ToString(), revision, request)
+            || _disposed
+            || request != _previewRequest
+        )
         {
             await ReleaseCandidateAsync(id);
             return false;
         }
-
+        var previous = _previewId;
         _previewId = id;
-        await _client!.InvokeVoidAsync("preview", id.ToString(), revision);
-        return true;
+        if (previous is { } prior)
+        {
+            await ReleaseCandidateAsync(prior);
+        }
+        return !_disposed && request == _previewRequest && _previewId == id;
     }
 
     private bool PreviewCurrent(long request, long revision) =>
@@ -81,7 +103,7 @@ public partial class FullOverlayEditorPage
             codes.Contains("audio-blocked", StringComparer.Ordinal)
                 ? "Audio blocked by browser autoplay"
             : codes.Length > 0 ? "Preview ready · some widgets need attention"
-            : state == "ready" ? "Private unsaved preview"
+            : state == "ready" ? "Unsaved"
             : "Preview reconnecting";
         return InvokeAsync(StateHasChanged);
     }
@@ -101,8 +123,8 @@ public partial class FullOverlayEditorPage
             args.Value?.ToString() == "Live"
                 ? FullOverlayDataMode.Live
                 : FullOverlayDataMode.Sample;
-        return RefreshPreviewAsync(_view.Revision);
+        return RefreshPreviewAsync(_view.Revision, false);
     }
 
-    private Task ReplayAsync() => RefreshPreviewAsync(_view.Revision);
+    private Task ReplayAsync() => RefreshPreviewAsync(_view.Revision, false);
 }

@@ -117,6 +117,31 @@ public sealed class PageHelpButtonTests
         FocusCalls(context).ShouldBe(focusCalls);
     }
 
+    [Test]
+    public void FullOverlayHelp_FollowsCollectionToEditorAndRestoresFocusAfterEscape()
+    {
+        using var context = CreateContext("https://guide.example.com/docs");
+        var help = RenderAt(context, "/full-overlays");
+        help.Find("button[aria-label='Page help']").Click();
+        var guide = help.Find("[data-help-guide]").GetAttribute("href");
+        guide.ShouldBe("https://guide.example.com/docs/full-overlays");
+
+        context
+            .Services.GetRequiredService<NavigationManager>()
+            .NavigateTo($"/full-overlays/{Guid.NewGuid()}/edit");
+        help.WaitForAssertion(() =>
+            help.Find("button[aria-label='Page help']")
+                .GetAttribute("aria-expanded")
+                .ShouldBe("false")
+        );
+        help.Find("button[aria-label='Page help']").Click();
+        help.Find("[data-help-guide]").GetAttribute("href").ShouldBe(guide);
+        var focusCalls = FocusCalls(context);
+        help.Find("#page-help-popover").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        help.Find("button[aria-label='Page help']").GetAttribute("aria-expanded").ShouldBe("false");
+        FocusCalls(context).ShouldBe(focusCalls + 1);
+    }
+
     private static IRenderedComponent<PageHelpButton> RenderAt(
         BunitContext context,
         string location
