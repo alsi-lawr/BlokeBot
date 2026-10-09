@@ -46,10 +46,11 @@
             }
             <aside class="full-editor-layers" aria-label="Layers" data-visual-region>
                 <h2>Layers</h2>
+                @if (_view.Members.Count > 1) { <p class="form-help" role="status">@_view.Members.Count selected · Active: @SelectedLabel()</p> }
                 <FullOverlayLayerTree View="_view" Selected="SelectAsync" />
             </aside>
             <div class="full-editor-centre">
-                <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Alt drag pans the view.">
+                <section class="full-editor-canvas" data-visual-region role="tabpanel" id='@SegmentedTabs.PanelId("full-mode", "visual")' aria-labelledby='@SegmentedTabs.TabId("full-mode", "visual")' data-canvas-area tabindex="0" aria-label="Overlay canvas. Select a layer to move with arrow keys, Shift for larger steps. Ctrl toggles layers. Alt drag selects all intersecting layers. Middle drag pans the view.">
                     <div class="full-editor-canvas-stage" data-canvas-stage>
                         <div class="full-editor-canvas-scene" data-canvas-scene><iframe data-preview-frame title="Private unsaved overlay preview" referrerpolicy="no-referrer" allow="autoplay"></iframe></div>
                         <div data-selection class="full-editor-selection" hidden>@foreach (var handle in new[] { "nw", "n", "ne", "e", "se", "s", "sw", "w" }) { <button data-resize="@handle" type="button" tabindex="-1" aria-label="@($"Resize {handle}. Keyboard alternatives are in Position and size.")"></button> }</div>
@@ -63,7 +64,7 @@
                 </section>
             </div>
             <aside class="full-editor-inspector" aria-label="Selected layer inspector" tabindex="-1" data-visual-region>
-                <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
+                <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
                 @if (_view.Widget is { } widget) {
                     <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">
                         @if (widget.Kind.Value is "image" or "audio" or "video") {
@@ -72,9 +73,9 @@
                         }
                         @if (widget.RequiresSetup) {
                             <p role="status">This widget needs setup for this channel. Choose its destination configuration, then confirm.</p>
-                            <button class="btn-secondary" @onclick='() => CommandAtAsync(new { kind = "setup", value = false }, controlView.Selected, controlView.Revision)'>Confirm destination setup</button>
+                            <button class="btn-secondary" @onclick='() => CommandAtAsync(new { kind = "setup", value = false }, controlView.Selected, controlView.Revision, controlView.SelectionVersion)'>Confirm destination setup</button>
                         }
-                        <FullOverlayWidgetSettings @key="widget.Id" Widget="widget" Bindings="BindingsFor(widget)" PluginFields="@(_registry.Descriptors.FirstOrDefault(item => item.Kind == widget.Kind)?.PluginConfigurationFields ?? [])" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" />
+                        <FullOverlayWidgetSettings @key="widget.Id" Widget="widget" Bindings="BindingsFor(widget)" PluginFields="@(_registry.Descriptors.FirstOrDefault(item => item.Kind == widget.Kind)?.PluginConfigurationFields ?? [])" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision, controlView.SelectionVersion)" />
                         <TextAreaField Id="full-widget-json" Label="Configuration JSON" Value="@_configuration" ValueChanged="ConfigurationInput" />
                         <button class="btn-secondary" @onclick="() => ApplyConfigurationAsync(controlView)">Apply configuration</button>
                         <p class="text-muted-foreground">Settings stay in the trusted editor. Unresolved bindings remain in your draft.</p>

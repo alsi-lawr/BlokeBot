@@ -87,9 +87,11 @@ internal static partial class FullOverlayBrowserAssets
               if (!loaded || !observation || data.requestId !== observation.requestId || data.revision !== observation.revision
                 || typeof data.gestureId !== "string" || !Number.isSafeInteger(data.sequence) || data.sequence <= presentationSequence) return;
               const value = data.presentation;
-              if (value !== null && (!value || typeof value.css !== "string" || !value.attributes || typeof value.attributes !== "object"
-                || !Object.entries(value.attributes).every(([key, value]) => ["style", "data-blokebot-element"].includes(key) && typeof value === "string")
-                || !observation.selectors.some(item => item.selector === value.selector))) return;
+              if (value !== null && (!value || typeof value.css !== "string" || !Array.isArray(value.patches) || !value.patches.length
+                || new Set(value.patches.map(patch => patch?.selector)).size !== value.patches.length
+                || !value.patches.every(patch => patch && patch.attributes && typeof patch.attributes === "object" && !Array.isArray(patch.attributes)
+                  && Object.entries(patch.attributes).every(([key, value]) => ["style", "data-blokebot-element"].includes(key) && typeof value === "string")
+                  && observation.selectors.some(item => item.selector === patch.selector)))) return;
               presentationSequence = data.sequence;
               presentation = value === null ? null : { gestureId: data.gestureId, sequence: data.sequence,
                 renderedSequence: presentation?.gestureId === data.gestureId ? presentation.renderedSequence : 0 };
@@ -127,7 +129,7 @@ internal static partial class FullOverlayBrowserAssets
                 const allowed = new Set(observation.selectors.map(item => item.key));
                 const items = value.items.filter(item => allowed.has(item?.key)
                   && [item.x,item.y,item.width,item.height,item.layoutX,item.layoutY].every(Number.isFinite) && item.width >= 0 && item.height >= 0
-                  && item.styles && Object.values(item.styles).every(style => typeof style === "string"));
+                  && typeof item.visible === "boolean" && item.styles && Object.values(item.styles).every(style => typeof style === "string"));
                 const viewport = value.viewport;
                 if (viewport && [viewport.width,viewport.height].every(size => Number.isFinite(size) && size > 0))
                   parent.postMessage({ kind: "blokebot-full-observations", previewId: location.pathname.split("/").pop(), requestId: value.requestId, revision: observation.revision,

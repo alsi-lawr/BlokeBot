@@ -14,7 +14,7 @@ export function createClient(root, document, dotnet) {
     const measured=value=>{const item=measuredRevision===value.revision?measurements.find(item=>item.key===value.selected):null;return item?{...value,styles:{...item.styles,...value.styles}}:value;};
     const publish=()=>disposed?Promise.resolve():dotnet.invokeMethodAsync('EditorChangedAsync',view,++notification);
     const changed=(next,retainPresentation=false)=>{
-        if(next.revision!==view.revision||next.selected!==view.selected)styling?.cancel();
+        if(next.revision!==view.revision||next.selected!==view.selected||next.selectionVersion!==view.selectionVersion)styling?.cancel();
         const previous=view.revision;view=measured(next);
         const authorize=previous!==view.revision&&preview.render(owner.candidate(),view.revision,retainPresentation);
         const snapshot=owner.session.snapshot();
@@ -23,9 +23,9 @@ export function createClient(root, document, dotnet) {
         canvas.draw();styling?.refresh();menu?.refresh();const revision=view.revision;
         void publish().then(()=>{if(authorize&&!disposed&&revision===view.revision)void dotnet.invokeMethodAsync('RefreshPreviewAsync',revision,true);});return view;
     };
-    const command=(value,selection=view.selected,revision=view.revision)=>{styling?.cancel();return changed(owner.control(value.kind==='visible'&&!value.value?{...value,display:view.styles.display}:value.kind==='position'||value.kind==='anchor'||value.kind==='move'||value.kind==='resize'?{...value,computed:{...value.computed,...view.styles}}:value,selection,revision));};
+    const command=(value,selection=view.selected,revision=view.revision,version=view.selectionVersion)=>{styling?.cancel();return changed(owner.control(value.kind==='visible'&&!value.value?{...value,display:view.styles.display}:value.kind==='position'||value.kind==='anchor'||value.kind==='move'||value.kind==='resize'?{...value,computed:{...value.computed,...view.styles}}:value,selection,revision,version));};
     const canvas=createCanvas(root,()=>view,command,{
-        plan:(value,selection,revision)=>owner.planGesture(value,selection,revision),
+        plan:(value,selection,revision,version)=>owner.planGesture(value,selection,revision,version),
         present:(id,presentation,revision)=>preview.present(id,presentation,revision),
         clear:()=>preview.clear(),
         commit(planned){const next=owner.commitGesture(planned);if(next.revision===view.revision)preview.clear();changed(next,next.revision!==view.revision);}
@@ -33,7 +33,7 @@ export function createClient(root, document, dotnet) {
     const preview=createPreviewBridge(root.querySelector('[data-preview-frame]'),()=>view,
         (items,size,revision)=>{if(revision===view.revision){measurements=items;measuredRevision=revision;view=measured(owner.view());canvas.observed(items,size);styling?.refresh();publish();}},
         (state,diagnostics)=>{if(!disposed)void dotnet.invokeMethodAsync('PreviewStatusAsync',state,diagnostics.map(d=>d.code));},
-        (id,item)=>canvas.presented(id,item),()=>{canvas.cancel();styling?.cancel();});
+        (id,items)=>canvas.presented(id,items),()=>{canvas.cancel();styling?.cancel();});
     const focusEditor=(buffer,moveFocus=true)=>{if(disposed)return;view=owner.focus(buffer);publish();if(moveFocus)(buffer==='visual'?root.querySelector('[data-canvas-area]'):buffer==='html'?html:css).focus({preventScroll:true});};
     const presentation=createPresentation(root,focusEditor,()=>{canvas.cancel();styling?.cancel();void dotnet.invokeMethodAsync('CloseToolboxForModeAsync');},()=>canvas.refresh());
     styling=createGuidedStyling(root,()=>view,()=>owner.view().styles,{
@@ -49,19 +49,19 @@ export function createClient(root, document, dotnet) {
         fallback:visibleCanvas,
         prepare(target,point){
             const layer=target.closest('[data-layer-key]');
-            if(layer)changed(owner.select(layer.dataset.layerKey));
-            else if(point&&target.closest('[data-canvas-area]'))changed(owner.select(canvas.contextTarget(point)));
+            const key=layer?layer.dataset.layerKey:point&&target.closest('[data-canvas-area]')?canvas.contextTarget(point):view.selected;
+            if(!view.members.includes(key))changed(owner.select(key));else changed(owner.focus('visual'));
             const current=owner.view();
-            return {selection:current.selected,revision:current.revision,focus:current.focus,
-                target:current.layers.find(layer=>layer.key===current.selected)?.label??'No selection',
+            return {...owner.context(),selection:current.selected,
+                target:current.members.length>1?`${current.members.length} selected · Active: ${current.layers.find(layer=>layer.key===current.selected)?.label??'layer'}`:current.layers.find(layer=>layer.key===current.selected)?.label??'No selection',
                 history:`${current.focus==='html'?'HTML':current.focus==='css'?'CSS':'Visual'} history`,
                 ...current.history,delete:!!current.selected,
                 note:current.history.undo||current.history.redo?'Selection Delete is undoable.':'No edits in this history.'};
         },
-        current:captured=>{const current=owner.view();return captured.selection===current.selected&&captured.revision===current.revision&&captured.focus===current.focus;},
+        current:captured=>owner.matches(captured),
         execute(action,captured){
             styling.handoff();
-            changed(action==='delete'?owner.contextualDelete(captured.selection,captured.revision):owner.history(action));
+            changed(action==='delete'?owner.contextualDelete(captured.selection,captured.revision,captured.selectionVersion):owner.history(action));
         }
     });
     html.value=document.html;css.value=document.css;
@@ -85,11 +85,10 @@ export function createClient(root, document, dotnet) {
         }
         if(editable)return;
         if(event.key==='Delete'&&view.selected){event.preventDefault();command({kind:'remove'});}
-        if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)&&event.target.closest('[data-canvas-area]')&&view.selected&&!view.locked){
+        if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)&&event.target.closest('[data-canvas-area]')&&view.selected){
             event.preventDefault();const axis=event.key==='ArrowLeft'||event.key==='ArrowRight'?'x':'y';
             const step=(event.shiftKey?10:1)*(event.key==='ArrowLeft'||event.key==='ArrowUp'?-1:1);
-            const item=measurements.find(item=>item.key===view.selected);
-            command({kind:'move',dx:axis==='x'?step:0,dy:axis==='y'?step:0,computed:item?.styles,layoutX:item?.layoutX,layoutY:item?.layoutY});
+            canvas.nudge(axis==='x'?step:0,axis==='y'?step:0);
         }
     },options);
     const beforeUnload=event=>{if(view.dirty){event.preventDefault();event.returnValue='';}};
@@ -100,13 +99,13 @@ export function createClient(root, document, dotnet) {
     window.addEventListener('resize',height,options);height();publish();
     return {
         candidate:()=>owner.candidate(),view:()=>view,command,
-        insert(value,selection,revision){const before=owner.view(),after=command(value,selection,revision);return {inserted:insertedLayer(before,after),revision:after.revision,feedback:after.feedback};},
+        insert(value,selection,revision,version){const before=owner.view(),after=command(value,selection,revision,version);return {inserted:insertedLayer(before,after),revision:after.revision,selectionVersion:after.selectionVersion,feedback:after.feedback};},
         candidateStream(){return new Blob([JSON.stringify(owner.candidate())],{type:'application/json'});},
         export(form,name){form.elements.namedItem('document').value=JSON.stringify(owner.candidate());form.elements.namedItem('name').value=name;form.requestSubmit();},
         history:direction=>changed(owner.history(direction)),
         saved:value=>changed(owner.saved(value)),
         preview(id,revision,request){if(disposed||request<=previewRequest)return false;previewRequest=request;return revision===view.revision&&preview.set(id,revision,owner.candidate());},
-        focusInsertedLayer(selection,revision){if(disposed||selection!==view.selected||revision!==view.revision)return;presentation.revealInspector();},
+        focusInsertedLayer(selection,revision,version){if(disposed||selection!==view.selected||revision!==view.revision||version!==view.selectionVersion)return;presentation.revealInspector();},
         pan:value=>canvas.pan(value),
         viewport(width,height){canvas.viewport(width,height);preview.query();},
         zoom:value=>canvas.zoom(value),align:(axis,edge,selection,revision)=>canvas.align(axis,edge,selection,revision),

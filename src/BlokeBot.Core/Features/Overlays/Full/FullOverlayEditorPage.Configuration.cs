@@ -34,7 +34,8 @@ public partial class FullOverlayEditorPage
             await CommandAtAsync(
                 new { kind = "configuration", value = json.RootElement.Clone() },
                 view.Selected,
-                view.Revision
+                view.Revision,
+                view.SelectionVersion
             );
         }
         catch (JsonException)
@@ -71,7 +72,8 @@ public partial class FullOverlayEditorPage
                 value = JsonSerializer.SerializeToElement(configuration),
             },
             view.Selected,
-            view.Revision
+            view.Revision,
+            view.SelectionVersion
         );
         _configuration = _view.Widget?.Configuration.GetRawText() ?? "";
     }

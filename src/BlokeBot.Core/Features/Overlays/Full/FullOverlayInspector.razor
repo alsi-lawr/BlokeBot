@@ -1,7 +1,8 @@
 @if (View.Selected is null) { <h2>Inspector</h2><p class="text-muted-foreground">Select a widget or HTML layer. Source edits remain available without a selection.</p> }
 else {
     <header class="full-inspector-heading"><h2>@(View.Layers.FirstOrDefault(layer => layer.Key == View.Selected)?.Label ?? "Selected layer")</h2><EditorAction Label="Find HTML" Icon="search" Click="Find" /></header>
-    <div class="full-inspector-actions"><EditorAction Label="Duplicate layer" Icon="duplicate" Click='() => Send(new { kind = "duplicate" })' /><EditorAction Label="Remove layer" Icon="delete" Click='() => Send(new { kind = "remove" })' /></div>
+    @if (View.Members.Count > 1) { <p class="form-help">Active layer settings · Move and Delete use the selection.</p> }
+    <div class="full-inspector-actions"><EditorAction Label="Duplicate layer" Icon="duplicate" Click='() => Send(new { kind = "duplicate" })' /><EditorAction Label="Delete selection" Icon="delete" Click='() => Send(new { kind = "remove" })' /></div>
     <div class="full-inspector-actions"><EditorAction Label="Move before previous sibling" Tip="Move one place earlier in the HTML parent" Icon="arrow-up" Click='() => Send(new { kind = "reorder", direction = -1 })' /><EditorAction Label="Move after next sibling" Tip="Move one place later in the HTML parent" Icon="arrow-down" Click='() => Send(new { kind = "reorder", direction = 1 })' /></div>
     <div class="full-inspector-toggles"><label><input type="checkbox" checked='@(View.Widget?.Authoring.IsVisible ?? Value("display") != "none")' @onchange='args => Send(new { kind = "visible", value = (bool)args.Value! })' />Visible</label>
         <label><input type="checkbox" checked='@View.Locked' @onchange='args => Send(new { kind = "lock", value = (bool)args.Value! })' />Lock</label>
