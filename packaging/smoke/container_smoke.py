@@ -37,7 +37,15 @@ def _inspect(image: str) -> dict[str, object]:
 
 def _read_http_body(url: str, accepted_statuses: frozenset[int]) -> str:
     try:
-        response = urllib.request.urlopen(url, timeout=2)
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Dest": "document",
+            },
+        )
+        response = urllib.request.urlopen(request, timeout=2)
     except urllib.error.HTTPError as error:
         with error:
             status = error.code
