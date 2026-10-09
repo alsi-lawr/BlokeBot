@@ -1,5 +1,5 @@
 import { walk, string } from 'css-tree';
-import { htmlRanges, attributeEdit, declarationEdit, parsedCss } from './SourceRanges.js';
+import { htmlRanges, attributeEdit, parsedCss } from './SourceRanges.js';
 
 export function targetElement(snapshot, key) {
     const elements = htmlRanges(snapshot.html).elements;
@@ -9,10 +9,14 @@ export function elementKey(element) {
     return element.values['data-blokebot-widget'] ? `widget:${element.values['data-blokebot-widget']}`
         : element.values['data-blokebot-element'] ? `element:${element.values['data-blokebot-element']}` : `source:${element.start}`;
 }
-export function planStyles(snapshot, key, properties) {
-    const element = targetElement(snapshot, key);
+export function prepareStyles(snapshot, key) {
+    const element=targetElement(snapshot,key);
+    return {element,stylesheet:element?parsedCss(snapshot.css):{tree:null,diagnostics:[]}};
+}
+export function planStyles(snapshot, key, properties, prepared=prepareStyles(snapshot,key)) {
+    const element = prepared.element;
     if (!element) return { kind: 'unmapped', code: 'selection-changed' };
-    const edits = [];
+    const edits = [], attributes = {};
     let identity = element.values['data-blokebot-widget'], selector, selected = key;
     if (identity) selector = `[data-blokebot-widget=${string.encode(identity)}]`;
     else {
@@ -22,9 +26,10 @@ export function planStyles(snapshot, key, properties) {
             const patch = attributeEdit(snapshot.html, element.start, 'data-blokebot-element', identity);
             if (patch.kind !== 'patch') return patch;
             edits.push(patch.edit); selected = `element:${identity}`;
+            attributes['data-blokebot-element'] = identity;
         }
     }
-    const {tree,diagnostics}=parsedCss(snapshot.css);
+    const {tree,diagnostics}=prepared.stylesheet;
     if(!tree||diagnostics.length)return {kind:'unmapped',code:'incomplete-css'};
     properties={...properties};
     if(element.values.style){
@@ -46,6 +51,7 @@ export function planStyles(snapshot, key, properties) {
             const change=attributeEdit(snapshot.html,element.start,'style',value);
             if(change.kind!=='patch')return change;
             edits.push(change.edit);
+            attributes.style = value;
         }
     }
     const rules = [];
@@ -58,25 +64,31 @@ export function planStyles(snapshot, key, properties) {
     const additions = [];
     for (const [property, value] of Object.entries(properties)) {
         const declaration = rule?.block.children.toArray().findLast(node => node.type === 'Declaration' && node.property === property);
-        if (declaration?.value.loc) edits.push(declarationEdit(snapshot.css, declaration.loc.start.offset, String(value)).edit);
-        else additions.push(`${property}: ${value};`);
+        if (declaration?.value.loc) {
+            const first=declaration.value.children?.first??declaration.value,last=declaration.value.children?.last??declaration.value;
+            const start=first.loc.start.offset,end=last.loc.end.offset;
+            edits.push({buffer:'css',start,end,before:snapshot.css.slice(start,end),after:String(value)});
+        } else additions.push(`${property}: ${value};`);
     }
     if (additions.length) {
         const at = rule ? rule.block.loc.end.offset - 1 : snapshot.css.length;
-        const after = rule ? `\n  ${additions.join('\n  ')}\n` : `\n${selector} {\n  ${additions.join('\n  ')}\n}\n`;
+        const after = rule ? `;\n  ${additions.join('\n  ')}\n` : `\n${selector} {\n  ${additions.join('\n  ')}\n}\n`;
         edits.push({ buffer: 'css', start: at, end: at, before: '', after });
     }
-    return { kind: 'planned', edits, selected };
+    let css = snapshot.css;
+    for (const edit of edits.filter(edit=>edit.buffer==='css').sort((a,b)=>b.start-a.start))
+        css = css.slice(0,edit.start)+edit.after+css.slice(edit.end);
+    return { kind: 'planned', edits, selected, presentation:{selector:element.selector,attributes,css} };
 }
 
-export function styleValues(snapshot, key) {
-    const element = targetElement(snapshot, key);
+export function styleValues(snapshot, key, prepared=prepareStyles(snapshot,key)) {
+    const element = prepared.element;
     if (!element) return {};
     const selector = element.values['data-blokebot-widget']
         ? `[data-blokebot-widget=${string.encode(element.values['data-blokebot-widget'])}]`
         : element.values['data-blokebot-element'] ? `[data-blokebot-element=${string.encode(element.values['data-blokebot-element'])}]` : null;
 
-    const {tree}=parsedCss(snapshot.css);
+    const {tree}=prepared.stylesheet;
     if(!tree)return {};
     const result = {};
     for (const rule of tree.children.toArray()) {
