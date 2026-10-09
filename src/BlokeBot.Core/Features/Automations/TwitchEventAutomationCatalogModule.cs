@@ -482,25 +482,48 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                     new(
                         new("minimum-bits"),
                         "Minimum Bits",
-                        "The smallest cheer that starts this automation.",
+                        "The smallest cheer that starts this automation, inclusive.",
                         new AutomationConfigurationFieldType.Number(1, 1000000),
                         true
+                    ),
+                    new(
+                        new("maximum-bits"),
+                        "Maximum Bits",
+                        "The largest cheer that starts this automation, inclusive. Leave empty for no upper limit.",
+                        new AutomationConfigurationFieldType.Number(1, int.MaxValue),
+                        false
                     ),
                 ],
                 AutomationActionCapabilities.None,
                 AutomationActionRetrySafety.NotApplicable
             ),
             static json =>
-                TryReadInt32(json, "minimum-bits", out var minimum)
-                    ? Parsed(new CheerSourceConfiguration(minimum))
-                    : Invalid("minimum-bits", "Enter a whole-number minimum Bits amount."),
+            {
+                if (!TryReadInt32(json, "minimum-bits", out var minimum))
+                {
+                    return Invalid("minimum-bits", "Enter a whole-number minimum Bits amount.");
+                }
+
+                return !json.TryGetProperty("maximum-bits", out var maximum)
+                        ? Parsed(new CheerSourceConfiguration(minimum))
+                    : maximum.ValueKind == JsonValueKind.Number && maximum.TryGetInt32(out var bits)
+                        ? Parsed(new CheerSourceConfiguration(minimum, bits))
+                    : Invalid("maximum-bits", "Enter a whole-number maximum Bits amount.");
+            },
             static configuration =>
-                configuration.MinimumBits is >= 1 and <= 1000000
-                    ? AutomationValidationResult.Valid
-                    : AutomationValidationResult.Invalid(
+                configuration switch
+                {
+                    { MinimumBits: < 1 or > 1000000 } => AutomationValidationResult.Invalid(
                         new AutomationValidationTarget.Field(new("minimum-bits")),
                         "Choose a minimum Bits amount from 1 to 1,000,000."
-                    )
+                    ),
+                    { MaximumBits: { } maximum } when maximum < configuration.MinimumBits =>
+                        AutomationValidationResult.Invalid(
+                            new AutomationValidationTarget.Field(new("maximum-bits")),
+                            "Choose a maximum Bits amount at least as large as the minimum."
+                        ),
+                    _ => AutomationValidationResult.Valid,
+                }
         );
 
     private static AutomationDefinition<IncomingRaidSourceConfiguration> IncomingRaidSource() =>

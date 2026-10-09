@@ -90,6 +90,8 @@ public sealed partial class AutomationEditorNode
     private static string DefaultValue(AutomationConfigurationFieldMetadata field) =>
         field.FieldType switch
         {
+            AutomationConfigurationFieldType.Number
+                when !field.Required && field.Id.Value == "maximum-bits" => string.Empty,
             AutomationConfigurationFieldType.Number number => number.Minimum.ToString(
                 CultureInfo.InvariantCulture
             ),

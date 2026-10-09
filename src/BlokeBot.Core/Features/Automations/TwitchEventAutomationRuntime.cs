@@ -111,7 +111,8 @@ public sealed class TwitchEventAutomationRuntime(
             (host, receivedAtUtc) => TwitchEventAutomationContext.Cheer(host, cheer, receivedAtUtc),
             configuration =>
                 configuration is CheerSourceConfiguration required
-                && cheer.Bits >= required.MinimumBits,
+                && cheer.Bits >= required.MinimumBits
+                && (required.MaximumBits is not { } maximum || cheer.Bits <= maximum),
             cancellation
         );
 
