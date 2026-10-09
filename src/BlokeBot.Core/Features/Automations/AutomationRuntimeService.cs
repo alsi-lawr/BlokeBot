@@ -1666,6 +1666,7 @@ public sealed partial class AutomationRuntimeService(
             ),
             DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(
                 delay,
+                inputs,
                 clock.GetUtcNow().UtcDateTime
             ),
             _ => await ExecuteActionAsync(

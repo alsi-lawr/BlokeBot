@@ -87,6 +87,7 @@ else
             var binding = Node.Binding(fieldId);
             var edge = IncomingDataEdge(input.Id);
             var issue = edge is null ? null : AutomationConnections.Issue(edge, Nodes);
+            var fieldErrors = IsDelayDuration(input) ? FieldErrors(fieldId) : [];
             <section class="automation-input-editor" @key="input.Id" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")}")">
                 <div class="automation-input-heading"><h3>@(_isSubflowExit ? input.Name : $"Input · {input.Name}")</h3><span>@AutomationConnections.TypeLabel(input) · @(input.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</span></div>
                 <div class="automation-binding-mode-tabs" role="group" aria-label="@($"{input.Name} {(_isSubflowExit ? "return value" : "input")} choice")">
@@ -114,15 +115,19 @@ else
                     }
                     else
                     {
-                        <label class="automation-field"><span>Enter a value</span><input type="@FixedInputType(input)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
+                        <label class="automation-field"><span>@(IsDelayDuration(input) ? "Enter whole milliseconds" : "Enter a value")</span><input type="@FixedInputType(input)" min="@(IsDelayDuration(input) ? "1" : null)" step="@(IsDelayDuration(input) ? "1" : null)" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" value="@Node.Value(fieldId)" @oninput="args => SetValueAsync(fieldId, args.Value)" /></label>
                     }
                 }
                 else if (binding.Mode == AutomationInputBindingMode.Expression)
                 {
                     <label class="automation-field"><span>Calculate a value</span><textarea aria-label="@input.Name input expression" value="@binding.Expression?.Source" @oninput="args => SetExpressionAsync(fieldId, args.Value)"></textarea></label>
                     <div class="automation-cel-completions" aria-label="Available names for @input.Name">
-                        <strong>Available name for this input</strong>
-                        @if (AutomationCelCompletions.ForRestrictedInput(input).IsEmpty)
+                        <strong>@(IsDelayDuration(input) ? "Command argument example" : "Available name for this input")</strong>
+                        @if (IsDelayDuration(input))
+                        {
+                            <span>Convert the first command argument to milliseconds: <code>int(arguments[0])</code>. The result must be a positive whole number.</span>
+                        }
+                        else if (AutomationCelCompletions.ForRestrictedInput(input).IsEmpty)
                         {
                             <span>No available name has the required type.</span>
                         }
@@ -163,6 +168,7 @@ else
                         }
                     </div>
                 }
+                @foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@error.Message</span>}
             </section>
         }
 
@@ -188,7 +194,7 @@ else
             </section>
         }
 
-        @foreach (var field in Node.Definition.Configuration.Where(static field => field.FieldType is not AutomationConfigurationFieldType.Data))
+        @foreach (var field in Node.Definition.Configuration.Where(ShowConfigurationField))
         {
             var choices = ChoicesFor(field);
             var fieldErrors = FieldErrors(field.Id);

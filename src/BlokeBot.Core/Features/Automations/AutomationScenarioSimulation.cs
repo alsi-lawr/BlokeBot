@@ -65,7 +65,7 @@ internal static class AutomationScenarioSimulation
         configuration switch
         {
             ConditionControlConfiguration => AutomationNodeEvaluation.Condition(inputs, now),
-            DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(delay, now),
+            DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(delay, inputs, now),
             SendChatActionConfiguration
                 when !inputs.TryGetValue(new("message"), out var message)
                     || AutomationPublicSinkAdmission.AdmitText(message)

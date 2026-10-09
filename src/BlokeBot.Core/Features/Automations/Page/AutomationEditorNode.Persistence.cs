@@ -51,6 +51,13 @@ public sealed partial class AutomationEditorNode
             foreach (var field in Definition.Configuration)
             {
                 if (
+                    Definition.Id == AutomationDefinitionIds.DelayControl
+                    && field.Id == AutomationDelayDurationBinding.ValueField
+                )
+                {
+                    continue;
+                }
+                if (
                     Definition.PluginProvenance is not null
                     && field.FieldType is AutomationConfigurationFieldType.Data
                     && _bindings[field.Id].Mode != AutomationInputBindingMode.Fixed
