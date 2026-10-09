@@ -1,0 +1,35 @@
+<section class="automation-flow-source" aria-label="Flow JSON repair" data-automation-flow-source>
+    <header class="automation-source-heading">
+        <div><h2>Repair flow JSON</h2><p>These values cannot be shown in the visual editor. Repair the authored flow, then validate before saving.</p></div>
+        <div class="automation-editor-actions">
+            <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Parse"><EditorIcon Name="tools" />Parse</button>
+            <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Validate"><EditorIcon Name="validate" />Validate</button>
+            <button class="btn-primary" type="button" disabled="@(Busy || !Validated)" @onclick="Save"><EditorIcon Name="save" />Save</button>
+        </div>
+    </header>
+    <p class="automation-source-original" role="status">@Status</p>
+    @if (Enabled)
+    {
+        <p>This flow is enabled. Saving a valid repair keeps it enabled; it can respond to live events.</p>
+    }
+    <TextAreaField Id="automation-flow-json" Label="Authored flow JSON" Value="@Text" ValueChanged="TextChanged" FocusRequest="FocusRequest"
+                   ErrorMessage="@(Errors.Count == 0 ? null : Errors[0])" />
+    @if (Errors.Count > 1)
+    {
+        <ul class="automation-source-errors" role="alert">@foreach (var error in Errors.Skip(1)) { <li>@error</li> }</ul>
+    }
+</section>
+
+@code {
+    [Parameter] public string Text { get; set; } = string.Empty;
+    [Parameter] public string Status { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<string> Errors { get; set; } = [];
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool Validated { get; set; }
+    [Parameter] public bool Enabled { get; set; }
+    [Parameter] public long FocusRequest { get; set; }
+    [Parameter] public EventCallback<string> TextChanged { get; set; }
+    [Parameter] public EventCallback Parse { get; set; }
+    [Parameter] public EventCallback Validate { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+}

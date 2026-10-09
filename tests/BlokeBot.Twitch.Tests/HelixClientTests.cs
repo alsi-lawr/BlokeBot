@@ -5,7 +5,7 @@ using Shouldly;
 
 namespace BlokeBot.Twitch.Tests;
 
-public sealed class HelixClientTests
+public sealed partial class HelixClientTests
 {
     [Test]
     public async Task LiveStreamPayload_LoadingStream_ReturnsTwitchStreamId()

@@ -23,18 +23,15 @@ internal sealed partial class OverlayCuePlaybackService
     {
         foreach (var pair in _targets)
         {
-            OverlayCuePlaybackPlan[] plans;
+            AdmittedRun[] runs;
             lock (pair.Value.Gate)
             {
-                plans = pair
-                    .Value.Active.Values.Select(value => value.Plan)
-                    .Concat(pair.Value.Pending.Select(value => value.Plan))
-                    .ToArray();
+                runs = pair.Value.Active.Values.Concat(pair.Value.Pending).ToArray();
             }
             bool valid;
             try
             {
-                valid = await StateStillEnabledAsync(pair.Key, plans, cancellationToken);
+                valid = await StateStillEnabledAsync(pair.Key, runs, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -43,28 +40,45 @@ internal sealed partial class OverlayCuePlaybackService
             catch (Exception exception)
             {
                 logger.LogWarning(
-                    exception,
-                    "Cue target validation failed for host {HostId} and overlay {OverlayId}.",
+                    "Cue target validation failed for host {HostId} and overlay {OverlayId} ({FailureType}).",
                     pair.Key.HostId,
-                    pair.Key.OverlayId
+                    pair.Key.OverlayId,
+                    exception.GetType().Name
                 );
                 continue;
             }
-            lock (pair.Value.Gate)
+            var notices = new List<OverlayCueLifecycleNotice>();
+            try
             {
-                if (!valid)
+                lock (pair.Value.Gate)
                 {
-                    CancelAll(pair.Key, pair.Value);
-                    continue;
+                    if (
+                        !pair
+                            .Value.Active.Values.Concat(pair.Value.Pending)
+                            .Select(run => run.Plan.RunId)
+                            .SequenceEqual(runs.Select(run => run.Plan.RunId))
+                    )
+                    {
+                        continue;
+                    }
+                    if (!valid)
+                    {
+                        CancelAll(pair.Key, pair.Value, notices);
+                        continue;
+                    }
+                    ExpireAndAdvance(pair.Key, pair.Value, notices);
                 }
-                ExpireAndAdvance(pair.Key, pair.Value);
+            }
+            finally
+            {
+                await NotifyLifecycleAsync(notices, cancellationToken);
             }
         }
     }
 
     private async Task<bool> StateStillEnabledAsync(
         OverlayTargetIdentity identity,
-        IReadOnlyCollection<OverlayCuePlaybackPlan> plans,
+        IReadOnlyCollection<AdmittedRun> runs,
         CancellationToken cancellationToken
     )
     {
@@ -87,11 +101,29 @@ internal sealed partial class OverlayCuePlaybackService
                 features => (features & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays,
                 cancellationToken
             );
+        if (!targetEnabled && runs.FirstOrDefault()?.Target is OverlayCueTarget.Full full)
+        {
+            var current = await ResolveFullTargetAsync(
+                db,
+                identity.HostId,
+                identity.OverlayId,
+                cancellationToken
+            );
+            targetEnabled =
+                current is not null
+                && current.Generation == full.Generation
+                && runs.All(run =>
+                    run.Target is OverlayCueTarget.Full target
+                    && target.Generation == current.Generation
+                )
+                && await ParentEnabledAsync(identity.HostId, cancellationToken);
+        }
         if (!targetEnabled)
         {
             return false;
         }
-        if (plans.Count == 0)
+        var plans = runs.Select(run => run.Plan).ToArray();
+        if (plans.Length == 0)
         {
             return true;
         }
@@ -153,7 +185,11 @@ internal sealed partial class OverlayCuePlaybackService
             );
     }
 
-    private void ExpireAndAdvance(OverlayTargetIdentity identity, TargetState state)
+    private void ExpireAndAdvance(
+        OverlayTargetIdentity identity,
+        TargetState state,
+        List<OverlayCueLifecycleNotice> notices
+    )
     {
         var now = timeProvider.GetUtcNow();
         if (presence.Read(identity.HostId, identity.OverlayId).ActiveConnectionCount == 0)
@@ -187,17 +223,35 @@ internal sealed partial class OverlayCuePlaybackService
             _ = state.Active.Remove(expired.Plan.RunId);
             _ = state.Expired.Add(expired.Plan.RunId);
             transport.Stop(expired.Target, expired.Plan.RunId);
+            RecordLifecycle(
+                notices,
+                identity,
+                expired,
+                OverlayCueLifecycleKind.Finished,
+                OverlayCueLifecycleOutcome.TimeDerivedEndUnconfirmed
+            );
         }
         while (state.Pending.TryPeek(out var pending) && pending.ExpiresAtUtc <= now)
         {
             _ = state.Pending.Dequeue();
             _ = state.Expired.Add(pending.Plan.RunId);
+            RecordLifecycle(
+                notices,
+                identity,
+                pending,
+                OverlayCueLifecycleKind.Interrupted,
+                OverlayCueLifecycleOutcome.QueueExpiredUnavailable
+            );
         }
-        Advance(identity, state);
+        Advance(identity, state, notices);
         PruneTerminal(state);
     }
 
-    private void Advance(OverlayTargetIdentity identity, TargetState state)
+    private void Advance(
+        OverlayTargetIdentity identity,
+        TargetState state,
+        List<OverlayCueLifecycleNotice> notices
+    )
     {
         if (presence.Read(identity.HostId, identity.OverlayId).ActiveConnectionCount == 0)
         {
@@ -210,7 +264,7 @@ internal sealed partial class OverlayCuePlaybackService
                 return;
             }
             _ = state.Pending.Dequeue();
-            Start(identity, state, next);
+            Start(identity, state, next, notices);
             if (next.QueuePolicy != OverlayCueQueuePolicy.Concurrent)
             {
                 return;
@@ -218,23 +272,53 @@ internal sealed partial class OverlayCuePlaybackService
         }
     }
 
-    private void Start(OverlayTargetIdentity identity, TargetState state, AdmittedRun admitted)
+    private void Start(
+        OverlayTargetIdentity identity,
+        TargetState state,
+        AdmittedRun admitted,
+        List<OverlayCueLifecycleNotice> notices
+    )
     {
         var running = admitted with { StartedAtUtc = timeProvider.GetUtcNow() };
         state.Active.Add(running.Plan.RunId, running);
         transport.Start(running.Target, running.Plan);
+        RecordLifecycle(
+            notices,
+            identity,
+            running,
+            OverlayCueLifecycleKind.Started,
+            OverlayCueLifecycleOutcome.ServerStartedUnconfirmed
+        );
     }
 
-    private void CancelAll(OverlayTargetIdentity identity, TargetState state)
+    private void CancelAll(
+        OverlayTargetIdentity identity,
+        TargetState state,
+        List<OverlayCueLifecycleNotice> notices
+    )
     {
         foreach (var active in state.Active.Values)
         {
             _ = state.Cancelled.Add(active.Plan.RunId);
+            RecordLifecycle(
+                notices,
+                identity,
+                active,
+                OverlayCueLifecycleKind.Interrupted,
+                OverlayCueLifecycleOutcome.CancelledOrTargetUnavailable
+            );
             transport.Stop(active.Target, active.Plan.RunId);
         }
         foreach (var pending in state.Pending)
         {
             _ = state.Cancelled.Add(pending.Plan.RunId);
+            RecordLifecycle(
+                notices,
+                identity,
+                pending,
+                OverlayCueLifecycleKind.Interrupted,
+                OverlayCueLifecycleOutcome.CancelledWhileQueued
+            );
         }
         state.Active.Clear();
         state.Pending.Clear();

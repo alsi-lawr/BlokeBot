@@ -46,7 +46,7 @@ buildDotnetModule {
   npmDeps = fetchNpmDeps {
     inherit src;
     sourceRoot = "${src.name}/src/BlokeBot.Core";
-    hash = "sha256-LqmXiyTdzKlsubgaD93Zlb9aOoKSQd+7zHcpMcHpbXg=";
+    hash = "sha256-4gnmj0C8mR52AYQC1Kn3CtYq1msFY5TOWzgbdH+wPcI=";
   };
   nativeBuildInputs = [
     nodejs_22

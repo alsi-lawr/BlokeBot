@@ -145,7 +145,10 @@ public abstract record AutomationFlowQueryOutcome
     private AutomationFlowQueryOutcome() { }
 
     public sealed record Available(ImmutableArray<AutomationFlowSnapshot> Flows)
-        : AutomationFlowQueryOutcome;
+        : AutomationFlowQueryOutcome
+    {
+        internal ImmutableArray<AutomationFlowAuthoringEntry> AuthoringEntries { get; init; } = [];
+    }
 
     public sealed record Invalid(
         AutomationFlowId FlowId,

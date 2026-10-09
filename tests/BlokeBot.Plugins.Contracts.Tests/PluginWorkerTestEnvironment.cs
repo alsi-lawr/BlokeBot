@@ -21,10 +21,15 @@ internal sealed class MaterializedPluginTestPackage : IAsyncDisposable
 
     internal static async ValueTask<MaterializedPluginTestPackage> CreateAsync(
         string mainModule,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        PluginManifest? manifest = null,
+        string? temporaryRoot = null
     )
     {
-        var root = Path.Combine(Path.GetTempPath(), $"blokebot-worker-boundary-{Guid.NewGuid():N}");
+        var root = Path.Combine(
+            temporaryRoot ?? Path.GetTempPath(),
+            $"blokebot-worker-boundary-{Guid.NewGuid():N}"
+        );
         _ = Directory.CreateDirectory(root);
         var entries = PluginContractFixtures
             .CompletePackage()
@@ -37,6 +42,23 @@ internal sealed class MaterializedPluginTestPackage : IAsyncDisposable
                     : entry
             )
             .ToArray();
+        if (manifest is not null)
+        {
+            var validated = PluginManifestValidator
+                .Validate(manifest, CurrentTarget())
+                .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
+                .Manifest;
+            entries = entries
+                .Select(entry =>
+                    entry.Path == PluginPackage.ManifestPath
+                        ? new PluginPackageEntry.File(
+                            PluginPackage.ManifestPath,
+                            PluginManifestToml.Serialize(validated)
+                        )
+                        : entry
+                )
+                .ToArray();
+        }
         var outcome = await PluginWorkerPackageMaterializer.MaterializeAsync(
             entries,
             CurrentTarget(),

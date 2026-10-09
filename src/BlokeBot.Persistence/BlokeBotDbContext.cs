@@ -182,6 +182,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<OverlayMediaDocument> OverlayMediaDocuments => Set<OverlayMediaDocument>();
     public DbSet<OverlayCueMediaAssetReference> OverlayCueMediaAssetReferences =>
         Set<OverlayCueMediaAssetReference>();
+    public DbSet<FullOverlayEventFeedBinding> FullOverlayEventFeedBindings =>
+        Set<FullOverlayEventFeedBinding>();
+
     public DbSet<OverlayEventFeedItem> OverlayEventFeedItems => Set<OverlayEventFeedItem>();
     public DbSet<AutomationScenario> AutomationScenarios => Set<AutomationScenario>();
 
@@ -216,6 +219,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureReplyDelivery(modelBuilder);
         ConfigureAccess(modelBuilder);
         ConfigureCommands(modelBuilder);
+        ConfigureStoredValues(modelBuilder);
         ConfigureAnnouncements(modelBuilder);
         ConfigureAlertsAndPublicChat(modelBuilder);
         ConfigurePoints(modelBuilder);
@@ -237,6 +241,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureMoments(modelBuilder);
         ConfigureOverlays(modelBuilder);
         ConfigureAutomations(modelBuilder);
+        ConfigureAutomationSources(modelBuilder);
         ConfigureSubflows(modelBuilder);
         ConfigureCollectives(modelBuilder);
         ConfigureConfigurationTransfer(modelBuilder);

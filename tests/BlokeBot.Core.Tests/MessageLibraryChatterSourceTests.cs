@@ -67,6 +67,87 @@ public sealed class MessageLibraryChatterSourceTests
         http.AccessTokens.ShouldBe(["first-token", "second-token"]);
     }
 
+    [Test]
+    public async Task NestedViewer_UsesExistingReadinessHostCacheAndOpaqueSnapshotData()
+    {
+        const string InjectedName = "Viewer|{random_between|1|1}";
+        var provider = new RecordingTokenStatusProvider(Ready("bot-id", "secret-token"));
+        var http = new RecordingHttpClientFactory { ViewerName = InjectedName };
+        var source = new MessageLibraryChatterSource(
+            provider,
+            new HelixClient(http, TwitchEndpointPolicy.Default),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
+            ),
+            new MutableTimeProvider(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero))
+        );
+        var random = new ViewerRandomSource();
+        var renderer = new CustomCommandTemplateRenderer(random, source);
+        var firstHost = new MessageLibraryRenderHost(7, "streamer", "channel-id");
+        var secondHost = new MessageLibraryRenderHost(8, "other", "other-channel-id");
+        const string Template = "{random_from|{random_viewer}}:{random_from|{random_viewer}}";
+
+        var first = await renderer.RenderScheduledAsync(
+            Template,
+            firstHost,
+            CancellationToken.None
+        );
+        var cached = await renderer.RenderScheduledAsync(
+            Template,
+            firstHost,
+            CancellationToken.None
+        );
+        http.ViewerName = "Other";
+        var other = await renderer.RenderScheduledAsync(
+            Template,
+            secondHost,
+            CancellationToken.None
+        );
+        var stillFirst = await renderer.RenderScheduledAsync(
+            Template,
+            firstHost,
+            CancellationToken.None
+        );
+        provider.Status = provider.Status with
+        {
+            Status = new TokenStatus.Invalid([Scopes.ModeratorReadChatters]),
+        };
+        var blocked = await renderer.RenderScheduledAsync(
+            "{random_between|1|{random_viewer}}",
+            firstHost,
+            CancellationToken.None
+        );
+
+        first
+            .Match(static text => text, static failure => failure.ChatMessage())
+            .ShouldBe($"{InjectedName}:{InjectedName}");
+        cached.ShouldBe(first);
+        other
+            .Match(static text => text, static failure => failure.ChatMessage())
+            .ShouldBe("Other:Other");
+        stillFirst.ShouldBe(first);
+        blocked
+            .Match(static text => text, static failure => failure.ChatMessage())
+            .ShouldContain("missing");
+        provider.RequiredScopes.Count.ShouldBe(5);
+        http.RequestCount.ShouldBe(2);
+        http.BroadcasterIds.ShouldBe(["channel-id", "other-channel-id"]);
+        random.IntegerDraws.ShouldBe(0);
+    }
+
+    private sealed class ViewerRandomSource : IMessageLibraryRandomSource
+    {
+        public int IntegerDraws { get; private set; }
+
+        public int Next(int exclusiveMaximum) => 0;
+
+        public int NextInclusive(int minimum, int maximum)
+        {
+            IntegerDraws++;
+            return minimum;
+        }
+    }
+
     private static ActiveBotAccountTokenStatus Ready(string userId, string accessToken)
     {
         var scopes = ImmutableArray.Create(Scopes.ModeratorReadChatters);
@@ -115,6 +196,10 @@ public sealed class MessageLibraryChatterSourceTests
 
         public List<string> ModeratorIds { get; } = [];
 
+        public List<string> BroadcasterIds { get; } = [];
+
+        public string ViewerName { get; set; } = "Viewer";
+
         public List<string> AccessTokens { get; } = [];
 
         public HttpClient CreateClient(string name) =>
@@ -129,7 +214,7 @@ public sealed class MessageLibraryChatterSourceTests
             {
                 owner.RequestCount++;
                 request.RequestUri!.AbsolutePath.ShouldBe("/helix/chat/chatters");
-                request.RequestUri.Query.ShouldContain("broadcaster_id=channel-id");
+                owner.BroadcasterIds.Add(QueryValue(request.RequestUri, "broadcaster_id"));
                 owner.ModeratorIds.Add(QueryValue(request.RequestUri, "moderator_id"));
                 request.Headers.GetValues("Client-Id").Single().ShouldBe("client-id");
                 owner.AccessTokens.Add(request.Headers.Authorization!.Parameter!);
@@ -143,7 +228,7 @@ public sealed class MessageLibraryChatterSourceTests
                                 {"user_id":"{{owner.ModeratorIds[
                                 ^1
                             ]}}","user_login":"bot","user_name":"Bot"},
-                                {"user_id":"viewer-id","user_login":"viewer","user_name":"Viewer"}
+                                {"user_id":"viewer-id","user_login":"viewer","user_name":"{{owner.ViewerName}}"}
                               ],
                               "pagination": {}
                             }

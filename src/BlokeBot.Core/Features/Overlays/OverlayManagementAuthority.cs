@@ -17,47 +17,73 @@ internal sealed class OverlayManagementAuthority(
         CancellationToken cancellationToken
     )
     {
-        var selectedHost = session.State.Match<BotHostChoice?>(
+        var selected = await AuthorizedHostAsync(session, cancellationToken);
+        if (selected is null)
+        {
+            return Denied();
+        }
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await ReadHostAsync(session, selected, db, cancellationToken);
+    }
+
+    internal async Task<OverlayManagementAuthorization> AuthorizeAsync(
+        AuthenticatedSession session,
+        BlokeBotDbContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        var selected = await AuthorizedHostAsync(session, cancellationToken);
+        return selected is null
+            ? Denied()
+            : await ReadHostAsync(session, selected, db, cancellationToken);
+    }
+
+    private async Task<BotHostChoice?> AuthorizedHostAsync(
+        AuthenticatedSession session,
+        CancellationToken cancellationToken
+    )
+    {
+        var selected = session.State.Match<BotHostChoice?>(
             _ => null,
-            selected => selected.Selection.Current,
+            value => value.Selection.Current,
             _ => null
         );
         if (
             !session.IsAuthenticated
             || session.IsBotAccount
             || string.IsNullOrWhiteSpace(session.UserId)
-            || selectedHost is null
-            || selectedHost.Role == AuthRole.Bot
+            || selected is null
+            || selected.Role == AuthRole.Bot
         )
         {
-            return new OverlayManagementAuthorization.Rejected(
-                OverlayManagementRejection.Unauthorized
-            );
+            return null;
         }
-
-        if (selectedHost.Role is not (AuthRole.Streamer or AuthRole.Admin))
+        if (selected.Role is AuthRole.Streamer or AuthRole.Admin)
         {
-            if (selectedHost.Role != AuthRole.Moderator)
-            {
-                return new OverlayManagementAuthorization.Rejected(
-                    OverlayManagementRejection.Unauthorized
-                );
-            }
-            var authority = await moderatorAuthority.AuthorizeAsync(
-                session,
-                selectedHost.Id,
-                cancellationToken
-            );
-            var granted = authority.Match(_ => true, _ => false, _ => false, _ => false);
-            if (!granted)
-            {
-                return new OverlayManagementAuthorization.Rejected(
-                    OverlayManagementRejection.Unauthorized
-                );
-            }
+            return selected;
         }
+        if (selected.Role != AuthRole.Moderator)
+        {
+            return null;
+        }
+        var authority = await moderatorAuthority.AuthorizeAsync(
+            session,
+            selected.Id,
+            cancellationToken
+        );
+        return authority.Match(_ => true, _ => false, _ => false, _ => false) ? selected : null;
+    }
 
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+    private static OverlayManagementAuthorization Denied() =>
+        new OverlayManagementAuthorization.Rejected(OverlayManagementRejection.Unauthorized);
+
+    private static async Task<OverlayManagementAuthorization> ReadHostAsync(
+        AuthenticatedSession session,
+        BotHostChoice selectedHost,
+        BlokeBotDbContext db,
+        CancellationToken cancellationToken
+    )
+    {
         var enabled = await db
             .Hosts.AsNoTracking()
             .Where(host => host.Id == selectedHost.Id)

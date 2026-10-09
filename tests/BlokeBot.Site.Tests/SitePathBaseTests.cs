@@ -39,6 +39,15 @@ public sealed class SitePathBaseTests
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
+            var editorGuide = await client.GetStringAsync("/blokebot/full-overlays");
+            editorGuide.ShouldContain("<base href=\"/blokebot/\" />");
+            editorGuide.ShouldContain("href=\"full-overlays\"");
+            var editorMedia = await client.GetAsync(
+                "/blokebot/media/full-overlays/laptop-light-full-overlay-editor.png"
+            );
+            editorMedia.StatusCode.ShouldBe(HttpStatusCode.OK);
+            editorMedia.Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
+
             var showcase = await client.GetAsync("/blokebot/blokebot-mark.svg");
             showcase.StatusCode.ShouldBe(HttpStatusCode.OK);
         }

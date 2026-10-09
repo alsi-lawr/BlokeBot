@@ -18,6 +18,8 @@ public sealed class PointsConfigurationUiTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedInvalidSettingsAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        await using var watch = new WatchTimeTestSupport(dbFactory);
+        _ = context.Services.AddSingleton(watch.Runtime);
         _ = context.Services.AddSingleton<PointsChangeNotifier>();
         _ = context.Services.AddSingleton<PointsConfigurationService>();
         _ = context.ComponentFactories.AddStub<PointsEligibilitySelector>();

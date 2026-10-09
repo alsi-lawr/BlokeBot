@@ -10,16 +10,28 @@ public sealed partial class AutomationEditorNode
             Id,
             new(
                 Definition.Id.Value,
-                Definition.Schema.Current.Value,
-                ConfigurationJson(),
-                Definition.PluginProvenance
+                _original?.Definition.SchemaVersion ?? Definition.Schema.Current.Value,
+                PreservedConfigurationJson(),
+                _original is { } original
+                    ? original.Definition.PluginProvenance
+                    : Definition.PluginProvenance
             ),
-            AutomationExpressionLanguage.CurrentVersion,
+            _original?.ExpressionLanguageVersion ?? AutomationExpressionLanguage.CurrentVersion,
             FailurePolicy,
             _bindings.ToImmutableDictionary(),
             Position,
-            string.IsNullOrWhiteSpace(DisplayAlias) ? null : DisplayAlias
+            DisplayAlias == _original?.DisplayAlias ? DisplayAlias
+                : string.IsNullOrWhiteSpace(DisplayAlias) ? null
+                : DisplayAlias
         );
+
+    private JsonElement PreservedConfigurationJson()
+    {
+        var configuration = ConfigurationJson();
+        return _original is not null && JsonElement.DeepEquals(configuration, _originalProjection)
+            ? _original.Definition.Configuration
+            : configuration;
+    }
 
     private JsonElement ConfigurationJson()
     {
@@ -50,6 +62,13 @@ public sealed partial class AutomationEditorNode
             writer.WriteStartObject();
             foreach (var field in Definition.Configuration)
             {
+                if (
+                    Definition.Id == AutomationDefinitionIds.DelayControl
+                    && field.Id == AutomationDelayDurationBinding.ValueField
+                )
+                {
+                    continue;
+                }
                 if (
                     Definition.PluginProvenance is not null
                     && field.FieldType is AutomationConfigurationFieldType.Data

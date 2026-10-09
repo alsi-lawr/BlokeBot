@@ -64,22 +64,22 @@ public sealed class ConfigurationDocumentExporter(
             );
         }
 
-        var references = await ConfigurationExportReferencePlan.LoadAsync(
-            db,
-            hostId,
-            cancellationToken
-        );
-        var commandGraph =
-            selection.Sections.Contains(ConfigurationSectionId.CustomCommands)
-            || selection.Sections.Contains(ConfigurationSectionId.Announcements)
-                ? await ConfigurationExportMappers.LoadCommandGraphAsync(
-                    db,
-                    hostId,
-                    cancellationToken
-                )
-                : null;
         try
         {
+            var references = await ConfigurationExportReferencePlan.LoadAsync(
+                db,
+                hostId,
+                cancellationToken
+            );
+            var commandGraph =
+                selection.Sections.Contains(ConfigurationSectionId.CustomCommands)
+                || selection.Sections.Contains(ConfigurationSectionId.Announcements)
+                    ? await ConfigurationExportMappers.LoadCommandGraphAsync(
+                        db,
+                        hostId,
+                        cancellationToken
+                    )
+                    : null;
             var automations = selection.Sections.Contains(ConfigurationSectionId.Automations)
                 ? await ConfigurationExportMappers.AutomationsAsync(
                     db,
@@ -142,11 +142,13 @@ public sealed class ConfigurationDocumentExporter(
                 )
             );
             var json = codec.Serialize(document);
-            return json.Length > ConfigurationDocumentCodec.MaximumBytes
-                ? new ConfigurationExportOutcome.Unsupported(
-                    "Select fewer items. The configuration file exceeds the 2 MB limit."
-                )
-                : new ConfigurationExportOutcome.Success(document, json);
+            return new ConfigurationExportOutcome.Success(document, json);
+        }
+        catch (OutOfMemoryException)
+        {
+            return new ConfigurationExportOutcome.Unsupported(
+                "There is not enough memory to export this configuration. Close other work or use a host with more available memory."
+            );
         }
         catch (AutomationConfigurationExportException exception)
         {

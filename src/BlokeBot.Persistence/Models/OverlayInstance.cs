@@ -72,7 +72,8 @@ public enum OverlayEventFeedLifecycle
 public sealed class OverlayEventFeedItem
 {
     public long Id { get; set; }
-    public long OverlayInstanceId { get; set; }
+    public long? OverlayInstanceId { get; set; }
+    public long? FullOverlayEventFeedBindingId { get; set; }
     public int HostId { get; set; }
     public OverlayEventFeedKind Kind { get; set; }
     public string SourceKey { get; set; } = string.Empty;
@@ -84,7 +85,8 @@ public sealed class OverlayEventFeedItem
     public DateTime EnqueuedAtUtc { get; set; }
     public DateTime? DisplayDeadlineUtc { get; set; }
     public DateTime? TombstoneExpiresAtUtc { get; set; }
-    public OverlayInstance OverlayInstance { get; set; } = null!;
+    public OverlayInstance? OverlayInstance { get; set; }
+    public FullOverlayEventFeedBinding? FullOverlayEventFeedBinding { get; set; }
 }
 
 public enum OverlayInstanceEventKind

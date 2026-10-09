@@ -17,6 +17,7 @@ internal static class SiteRoutes
         "/plugins",
         "/configuration-transfer",
         "/overlays",
+        "/full-overlays",
         "/overlays/cues",
         "/overlays/media",
         "/community/viewer-portal",

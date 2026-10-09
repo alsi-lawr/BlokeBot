@@ -26,6 +26,9 @@ internal sealed class SimulationStartupCoordinator(
             CookieContainer = new CookieContainer(),
         };
         using var client = new HttpClient(handler) { BaseAddress = new Uri(dashboardOrigin) };
+        _ = client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Mode", "navigate");
+        _ = client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Dest", "document");
+        _ = client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Site", "none");
 
         await FollowRedirectsAsync(client, "/auth/login?start=true&returnUrl=/", cancellationToken);
         await FollowRedirectsAsync(client, "/oauth/start", cancellationToken);

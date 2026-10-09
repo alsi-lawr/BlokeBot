@@ -658,17 +658,25 @@ public sealed class RedemptionAutomationTests
         var source = Node("reward-redemption", """{"completion-policy":"manual"}""");
         var action = Node("send-chat", """{"message":"Redeemed!"}""");
         _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        var tokens = new FixedBroadcasterTokens(
+            new TokenStatus.Ready(
+                "token",
+                new("streamer-id", "streamer", OAuthScopeSet.Empty),
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes]
+            )
+        );
         var readiness = new TwitchEventSourceReadinessService(
             fixture.Database,
             fixture.Catalog,
             fixture.FlowRuntime,
-            new FixedBroadcasterTokens(
-                new TokenStatus.Ready(
-                    "token",
-                    new("streamer-id", "streamer", OAuthScopeSet.Empty),
-                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
-                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
-                )
+            tokens,
+            AutomationRuntimeTests.ObservationRuntimeFor(
+                fixture.Database,
+                fixture.FlowRuntime,
+                fixture.Catalog,
+                fixture.Clock,
+                tokens
             )
         );
 
@@ -850,11 +858,14 @@ public sealed class RedemptionAutomationTests
             );
             var expressions = new AutomationExpressionService();
             var overlays = new NoOverlayCues();
+            AutomationRuntimeService flowRuntime = null!;
+            var countdowns = new AutomationCountdownService(database, clock, () => flowRuntime);
             var actions = new AutomationActionExecutor(
                 features,
                 chat,
                 overlays,
                 expressions,
+                countdowns,
                 database,
                 redemptions
             );
@@ -865,7 +876,7 @@ public sealed class RedemptionAutomationTests
                 NullLogger<RedemptionCompletionPolicyObserver>.Instance
             );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var flowRuntime = new AutomationRuntimeService(
+            flowRuntime = new AutomationRuntimeService(
                 database,
                 catalog,
                 flows,

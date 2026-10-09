@@ -56,8 +56,8 @@ public sealed partial class AutomationFlowService
                 is AutomationGraphAdmission.Frozen
                     or AutomationGraphAdmission.ConfigurationTransfer
                     or AutomationGraphAdmission.Scenario
-                ? catalog.ValidatePersistedDefinition(node.Definition)
-            : catalog.ValidatePreparedDefinition(hostId, node.Definition);
+                ? catalog.ValidatePersistedDefinition(node.Definition, node.InputBindings)
+            : catalog.ValidatePreparedDefinition(hostId, node.Definition, node.InputBindings);
         if (check is AutomationConfigurationCheck.Invalid invalid)
         {
             foreach (var error in invalid.Errors)
@@ -209,6 +209,10 @@ public sealed partial class AutomationFlowService
             }
             else if (
                 binding.Expression is { } expression
+                && (
+                    descriptor.Id != AutomationDefinitionIds.SendChatAction
+                    || binding.Mode == AutomationInputBindingMode.Expression
+                )
                 && descriptor.Kind != AutomationNodeKind.Transform
                 && !ValidOrdinaryBindingExpression(descriptor, fieldId, expression)
             )
@@ -253,7 +257,10 @@ public sealed partial class AutomationFlowService
         AutomationExpressionSource expression
     )
     {
-        if (expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion)
+        if (
+            expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
+            || string.IsNullOrWhiteSpace(expression.Source)
+        )
         {
             return false;
         }

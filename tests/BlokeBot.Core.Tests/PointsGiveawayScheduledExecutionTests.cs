@@ -239,17 +239,7 @@ public sealed class PointsGiveawayScheduledExecutionTests : PointsGiveawaySchedu
 
         changeNotification.Attempts.ShouldBe(1);
         chat.Messages.ShouldBe(["Giveaway winners: entrant (10)."]);
-        logger
-            .Entries.Count(entry =>
-                entry.Level == LogLevel.Error
-                && entry.Message.Contains("Draw failed", StringComparison.Ordinal)
-                && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
-            )
-            .ShouldBe(1);
-        logger.Entries.ShouldContain(entry =>
-            entry.Level == LogLevel.Information
-            && entry.Message.Contains("Draw recovered", StringComparison.Ordinal)
-        );
+        // The native draw owner now absorbs the known-abort attempt before scheduler recovery.
         var notificationFailure = logger.Entries.Single(entry =>
             entry.Level == LogLevel.Error
             && entry.Message.Contains("StateChanged notification failed", StringComparison.Ordinal)

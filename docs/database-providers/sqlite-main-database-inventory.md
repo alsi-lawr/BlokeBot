@@ -24,18 +24,22 @@ adapter.
 
 ## Raw SQL register
 
-`main-database-raw-sql-v1.json` registers 46 execution sites:
+`main-database-raw-sql-v1.json` registers 50 current execution sites. Its `source_commit` remains
+the frozen inventory protocol's original baseline, not a claim that the register describes only
+that historical checkout.
 
 - four SQLite-only `HetznerBaselineBridge` catalog/history statements;
 - nine named SQLite/PostgreSQL idempotent insert authorities;
 - host locking, two bounded cleanup statements, and automatic-raid cleanup;
 - separate SQLite and PostgreSQL plugin JSON queries;
 - the two closed provider SQL dispatch sites;
-- PostgreSQL's two transaction-local lock bounds and transaction-scoped immediate-write lock; and
+- the typed current-row point SQL dispatch and watch-time settings revision/generation update;
+- PostgreSQL's two transaction-local lock bounds and transaction-scoped immediate-write lock;
 - 22 offline cutover statements: seven target preparation statements; five ownership, session,
   and physical catalog reads; two SQLite exclusive-lease statements; one row count; two bounded
   copy statements; two bounded self-reference statements; and three sequence or constraint
-  statements.
+  statements; and
+- the portal simulation's two SQLite journal/synchronous configuration statements.
 
 The register records the exact path, line, API, source marker, purpose, and dialect dependency. The
 verifier also requires the exact reviewed set of four `sqlite_schema` references: three in the

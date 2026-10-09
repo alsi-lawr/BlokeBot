@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -13,7 +14,14 @@ public partial class AutomationToolbox
     private ElementReference _transformTab;
     private ElementReference _controlTab;
     private ElementReference _actionTab;
-    private ElementReference _searchInput;
+    private EditorToolbox? _presentation;
+    private static readonly IReadOnlyDictionary<string, object> _searchAttributes = new Dictionary<
+        string,
+        object
+    >
+    {
+        ["data-automation-toolbox-search"] = true,
+    };
 
     [Parameter, EditorRequired]
     public IReadOnlyList<AutomationDefinitionDescriptor> Definitions { get; set; } = [];
@@ -46,8 +54,7 @@ public partial class AutomationToolbox
     private string _activeTabId =>
         $"automation-toolbox-tab-{AutomationToolboxCatalog.CategoryLabel(_category).ToLowerInvariant()}";
 
-    private void SearchChanged(ChangeEventArgs args) =>
-        _search = args.Value?.ToString() ?? string.Empty;
+    private void SearchChanged(string search) => _search = search;
 
     private void SelectCategory(AutomationToolboxCategory category) => _category = category;
 
@@ -72,13 +79,10 @@ public partial class AutomationToolbox
         await TabReference(_category).FocusAsync();
     }
 
-    private Task HandleKeyAsync(KeyboardEventArgs args) =>
-        args.Key == "Escape" ? Close.InvokeAsync() : Task.CompletedTask;
-
     private Task AddAsync(AutomationToolboxItem item) =>
         item.IsAvailable ? Add.InvokeAsync(item.Definition) : Task.CompletedTask;
 
-    internal ValueTask FocusSearchAsync() => _searchInput.FocusAsync();
+    internal ValueTask FocusSearchAsync() => _presentation!.FocusSearchAsync();
 
     private AutomationNodeAvailability Availability(AutomationDefinitionDescriptor definition) =>
         AutomationNodeAvailability.Evaluate(definition, Nodes);

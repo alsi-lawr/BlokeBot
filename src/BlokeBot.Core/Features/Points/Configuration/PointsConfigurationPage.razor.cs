@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Numerics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Studio;
+using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Commands;
 using BlokeBot.Core.Features.Points.Replies;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components.Web;
@@ -298,12 +300,18 @@ public partial class PointsConfigurationPage
     ];
 
     private readonly Dictionary<PointsCommandKind, string> _aliasDrafts = [];
-    private readonly StudioOpenSet<PointsStage> _openStages = new(PointsStage.Label);
+    private readonly StudioOpenSet<PointsStage> _openStages = new(
+        PointsStage.Label,
+        PointsStage.WatchTime
+    );
     private readonly StudioOpenSet<string> _openReplies = new();
 
     private PointsConfiguration? _config;
     private bool _featureEnabled;
     private IReadOnlyList<PointsConfigurationValidationError> _validationErrors = [];
+    private long _watchTimeFocusRequest;
+    private bool _savedWatchEnabled;
+    private string? _savedWatchAmount;
     private long _gamblingFocusRequest;
     private long _giveawaysFocusRequest;
     private string _validationFocusId = "gamblingCooldown";
@@ -311,6 +319,7 @@ public partial class PointsConfigurationPage
     private enum PointsStage
     {
         Label,
+        WatchTime,
         Gambling,
         Giveaways,
         Commands,
@@ -337,8 +346,14 @@ public partial class PointsConfigurationPage
             .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
             .FirstOrDefault();
 
+    private PointsConfigurationValidationError.InvalidWatchTimeAmount? _watchTimeAmountError =>
+        _validationErrors
+            .OfType<PointsConfigurationValidationError.InvalidWatchTimeAmount>()
+            .FirstOrDefault();
+
     protected override async Task OnInitializedAsync()
     {
+        _watchTime.StatusChanged += WatchStatusChanged;
         _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
@@ -365,6 +380,7 @@ public partial class PointsConfigurationPage
         _config = _featureEnabled
             ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
+        ReadSavedWatchConfiguration();
         _validationErrors = [];
         _aliasDrafts.Clear();
     }
@@ -707,6 +723,9 @@ public partial class PointsConfigurationPage
     {
         switch (error)
         {
+            case PointsConfigurationValidationError.InvalidWatchTimeAmount:
+                Reveal(PointsStage.WatchTime, "watch-amount");
+                break;
             case PointsConfigurationValidationError.NegativeGamblingCooldown:
                 Reveal(PointsStage.Gambling, "gamblingCooldown");
                 break;
@@ -726,7 +745,11 @@ public partial class PointsConfigurationPage
     {
         _validationFocusId = focusId;
         _openStages.Open(stage);
-        if (stage is PointsStage.Gambling)
+        if (stage is PointsStage.WatchTime)
+        {
+            _watchTimeFocusRequest++;
+        }
+        else if (stage is PointsStage.Gambling)
         {
             _gamblingFocusRequest++;
         }
@@ -751,6 +774,7 @@ public partial class PointsConfigurationPage
                             HostId,
                             CancellationToken.None
                         );
+                        ReadSavedWatchConfiguration();
                         _validationErrors = [];
                         _ = _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>("Points settings saved.")
@@ -764,6 +788,62 @@ public partial class PointsConfigurationPage
                 );
             }
         );
+
+    private void ReadSavedWatchConfiguration()
+    {
+        _savedWatchEnabled = _config?.WatchTimePointsEnabled ?? false;
+        _savedWatchAmount = _config?.WatchTimePointAmount;
+    }
+
+    private Task WatchStatusChanged() =>
+        ObserveUiOperationAsync(nameof(WatchStatusChanged), () => InvokeAsync(StateHasChanged));
+
+    private string WatchSavedSummary()
+    {
+        var status = _watchTime.GetStatus(HostId);
+        var enabled = status?.Kind is { } kind
+            ? kind != WatchTimeStatusKind.Off
+            : _savedWatchEnabled;
+        var amount = status?.Amount ?? _savedWatchAmount;
+        return enabled
+            ? $"Saved: On · {PointAmount.ParseAbsolute(amount).ToDisplayString()} points per person"
+            : "Saved: Off";
+    }
+
+    private string WatchStatusSummary()
+    {
+        var status = _watchTime.GetStatus(HostId);
+        if (status is null)
+        {
+            return _savedWatchEnabled
+                ? "Waiting for a live stream and connected bot. The first interval takes a full 5 minutes."
+                : "No watch-time points are being awarded.";
+        }
+        var next = status.NextDue is { } due ? $" Next interval: {due.ToLocalTime():HH:mm}." : "";
+        return status.Kind switch
+        {
+            WatchTimeStatusKind.Off => "No watch-time points are being awarded.",
+            WatchTimeStatusKind.Waiting =>
+                "Waiting for a live stream and connected bot. The first interval takes a full 5 minutes."
+                    + next,
+            WatchTimeStatusKind.Offline =>
+                "Stream offline. This interval was skipped; no catch-up points." + next,
+            WatchTimeStatusKind.Unavailable =>
+                "Chat membership or live status is unavailable. This interval was skipped; a later fresh interval retries automatically."
+                    + next,
+            WatchTimeStatusKind.Active =>
+                "Watch-time points are active for people connected to chat." + next,
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _watchTime.StatusChanged -= WatchStatusChanged;
+        }
+        base.Dispose(disposing);
+    }
 
     private sealed record PointsAliasField(
         PointsCommandKind Kind,

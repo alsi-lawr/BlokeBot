@@ -2,6 +2,31 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationNodeInspector
 {
+    private string? _scheduleTimeWarning
+    {
+        get
+        {
+            if (Node?.Definition.Id != AutomationDefinitionIds.ScheduledTimeSource)
+            {
+                return null;
+            }
+            var local = Node.Value(new("local-time"));
+            var zone = Node.Value(new("zone"));
+            return
+                DateTime.TryParseExact(
+                    local,
+                    ["yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm"],
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out var time
+                )
+                && TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var selected)
+                && selected.IsInvalidTime(time)
+                ? $"{local} does not exist in {zone} because the clock moves forwards. This occurrence is skipped, not shifted; weekly occurrences keep their chosen local time. An interval skips invalid slots on its original cadence, then uses the first valid slot for fixed UTC intervals."
+                : null;
+        }
+    }
+
     private IReadOnlyList<AutomationGraphError> _genericErrors =>
         Node is null
             ? []
@@ -16,7 +41,42 @@ public partial class AutomationNodeInspector
     ) =>
         Node is null
             ? []
-            : Errors.Where(error => error.NodeId == Node.Id && error.FieldId == fieldId).ToArray();
+            : Errors
+                .Where(error =>
+                    error.NodeId == Node.Id
+                    && (
+                        error.FieldId == fieldId
+                        || (
+                            Node.Definition.Id == AutomationDefinitionIds.DelayControl
+                            && fieldId == AutomationDelayDurationBinding.ValueField
+                            && error.FieldId == AutomationDelayDurationBinding.LiteralField
+                        )
+                    )
+                )
+                .ToArray();
+
+    private bool IsDelayDuration(AutomationPortMetadata input) =>
+        Node is not null && AutomationDelayDurationBinding.IsInput(Node.Definition, input);
+
+    private bool IsSendChatMessage(AutomationPortMetadata input) =>
+        Node?.Definition.Id == AutomationDefinitionIds.SendChatAction
+        && input.BindingFieldId == new AutomationConfigurationFieldId("message");
+
+    private IReadOnlyList<AutomationInputBindingMode> BindingModes(AutomationPortMetadata input) =>
+        IsSendChatMessage(input)
+            ? [AutomationInputBindingMode.Fixed, AutomationInputBindingMode.Connected]
+            : Enum.GetValues<AutomationInputBindingMode>();
+
+    private bool ShowConfigurationField(AutomationConfigurationFieldMetadata field) =>
+        field.FieldType is not AutomationConfigurationFieldType.Data
+        && !(
+            Node?.Definition.Id == AutomationDefinitionIds.SendChatAction
+            && field.Id == new AutomationConfigurationFieldId("message")
+        )
+        && !(
+            Node?.Definition.Id == AutomationDefinitionIds.DelayControl
+            && field.Id == AutomationDelayDurationBinding.LiteralField
+        );
 
     private IReadOnlyList<AutomationEditorNode> CompatibleTargets(AutomationPortMetadata output) =>
         Nodes

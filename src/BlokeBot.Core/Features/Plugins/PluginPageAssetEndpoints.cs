@@ -55,17 +55,14 @@ internal static class PluginPageAssetEndpoints
             assetPath,
             cancellationToken
         );
-        return resolution switch
-        {
-            PluginPageAssetResolution.Available available => Asset(http.Response, available.Asset),
-            PluginPageAssetResolution.TooLarge => Results.StatusCode(
-                StatusCodes.Status413PayloadTooLarge
-            ),
-            _ => Results.NotFound(),
-        };
+        return resolution.Match(
+            available => Asset(http.Response, available.Asset),
+            static _ => Results.NotFound(),
+            static _ => Results.StatusCode(StatusCodes.Status413PayloadTooLarge)
+        );
     }
 
-    private static IResult Asset(HttpResponse response, PluginPageAsset asset)
+    private static IResult Asset(HttpResponse response, PluginAssetContent asset)
     {
         response.Headers.CacheControl = "no-store";
         response.Headers.XContentTypeOptions = "nosniff";

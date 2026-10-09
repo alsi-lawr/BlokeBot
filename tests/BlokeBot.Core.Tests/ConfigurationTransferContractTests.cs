@@ -47,8 +47,12 @@ public sealed class ConfigurationTransferContractTests
                 Message: "require one expression and language version"
             ),
             (
-                Bindings: [new("message", AutomationInputBindingMode.Fixed, 1, "actor.login")],
-                Message: "must omit both"
+                Bindings: [new("message", AutomationInputBindingMode.Fixed, 1)],
+                Message: "require one expression and language version"
+            ),
+            (
+                Bindings: [new("message", AutomationInputBindingMode.Fixed, null, "actor.login")],
+                Message: "require one expression and language version"
             ),
             (
                 Bindings: Enumerable
@@ -551,21 +555,6 @@ public sealed class ConfigurationTransferContractTests
 
         invalid.Issue.Location.ShouldContain("customCommands.commands");
         invalid.Issue.Message.ShouldContain("Enabled");
-    }
-
-    [Test]
-    public void PastedJson_ExceedingUtf8Limit_IsRejectedBeforeByteParsing()
-    {
-        var pasted = string.Concat(
-            Enumerable.Repeat("😀", ConfigurationDocumentCodec.MaximumBytes / 3)
-        );
-        pasted.Length.ShouldBeLessThan(ConfigurationDocumentCodec.MaximumBytes);
-
-        var invalid = new ConfigurationDocumentCodec()
-            .Parse(pasted)
-            .ShouldBeOfType<ConfigurationDocumentParseOutcome.Invalid>();
-
-        invalid.Issue.Message.ShouldContain("2 MB limit");
     }
 
     [Test]

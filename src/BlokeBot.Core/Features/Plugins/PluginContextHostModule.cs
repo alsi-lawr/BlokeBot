@@ -38,6 +38,7 @@ public sealed class PluginContextHostModule : IPluginHostModule
             PluginInvocationContext.Automation automation => Automation(identity, automation),
             PluginInvocationContext.Migration migration => Migration(identity, migration),
             PluginInvocationContext.Page page => Page(identity, page),
+            PluginInvocationContext.Widget widget => Widget(identity, widget),
             _ => throw new InvalidOperationException("Unknown plugin invocation context."),
         };
 
@@ -125,6 +126,47 @@ public sealed class PluginContextHostModule : IPluginHostModule
             )
         );
         return PluginStructuredValueSchemas.PageInvocationContext.Create(values.ToArray());
+    }
+
+    private static PluginValue.Map Widget(
+        PluginWorkerInvocationIdentity identity,
+        PluginInvocationContext.Widget widget
+    )
+    {
+        var values = Feature(
+            identity,
+            PluginStructuredValueSchemas.WidgetKind.Value(Text("widget"))
+        );
+        values.Add(
+            PluginStructuredValueSchemas.InvocationWidget.Value(
+                PluginStructuredValueSchemas.WidgetContext.Create(
+                    PluginStructuredValueSchemas.WidgetId.Value(Text(widget.WidgetId.Value)),
+                    PluginStructuredValueSchemas.WidgetOverlayId.Value(
+                        Text(widget.OverlayId.ToString("D"))
+                    ),
+                    PluginStructuredValueSchemas.WidgetDocumentId.Value(
+                        Text(widget.DocumentId.ToString("D"))
+                    ),
+                    PluginStructuredValueSchemas.WidgetInstanceId.Value(
+                        Text(widget.InstanceId.ToString("D"))
+                    ),
+                    PluginStructuredValueSchemas.WidgetProjectionMode.Value(
+                        Text(
+                            widget.Mode switch
+                            {
+                                PluginWidgetProjectionMode.Live => "live",
+                                PluginWidgetProjectionMode.PreviewLive => "preview-live",
+                                PluginWidgetProjectionMode.PreviewSample => "preview-sample",
+                                _ => throw new InvalidOperationException(
+                                    "Unknown widget projection intent."
+                                ),
+                            }
+                        )
+                    )
+                )
+            )
+        );
+        return PluginStructuredValueSchemas.WidgetInvocationContext.Create(values.ToArray());
     }
 
     private static PluginValue.Map? Actor(PluginActorContext? actor) =>

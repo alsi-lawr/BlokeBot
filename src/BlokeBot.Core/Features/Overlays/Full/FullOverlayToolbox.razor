@@ -1,0 +1,26 @@
+<EditorToolbox @ref="_presentation" Id="full-overlay-toolbox" Class="full-editor-toolbox" Purpose="Add to this overlay"
+               Search="@_search" SearchChanged="value => _search = value" SearchPlaceholder="Search widgets and HTML"
+               ResultsTitle="@(string.IsNullOrWhiteSpace(_search) ? "Widgets & HTML" : $"Results for “{_search.Trim()}”")"
+               Count="@(Items().Count() + (OrdinaryMatches() ? 1 : 0))" EmptyMessage="No widgets or HTML match this search."
+               Feedback="@Feedback" Close="Close" data-full-toolbox data-visual-region>
+    @if (OrdinaryMatches())
+    {
+        <EditorToolboxRow Name="Text / HTML element" Purpose="Add ordinary editable HTML to this document."
+                          AccessibleLabel="Text / HTML element. Add ordinary editable HTML to this document."
+                          Status="Editable in HTML/CSS" Activate="AddOrdinary">
+            <Icon><EditorIcon Name="add" /></Icon>
+        </EditorToolboxRow>
+    }
+    @foreach (var item in Items())
+    {
+        var plugin = Plugin(item.Kind);
+        var status = plugin is { } declaration
+            ? PluginStatus(declaration)
+            : "Configure after adding";
+        <EditorToolboxRow @key="item.Kind" Name="@item.Name" Purpose="@Purpose(item)"
+                          AccessibleLabel="@($"{item.Name}. {Purpose(item)} {status}.")" Status="@status"
+                          StatusWarning="@(plugin is { } current && !Ready(current))" Activate="() => Add.InvokeAsync(item.Kind)">
+            <Icon><EditorIcon Name="@(plugin is null ? "node" : "tools")" /></Icon>
+        </EditorToolboxRow>
+    }
+</EditorToolbox>

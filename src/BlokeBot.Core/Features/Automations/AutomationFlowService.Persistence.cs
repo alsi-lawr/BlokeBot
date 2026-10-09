@@ -42,7 +42,8 @@ public sealed partial class AutomationFlowService
 
     internal static AutomationFlowDraftRestoreOutcome RestoreDraft(
         AutomationFlow flow,
-        bool? enabled = null
+        bool? enabled = null,
+        bool forAuthoring = false
     )
     {
         var nodes = ImmutableArray.CreateBuilder<AutomationFlowDraftNode>();
@@ -59,7 +60,17 @@ public sealed partial class AutomationFlowService
             }
 
             if (
-                AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+                (
+                    forAuthoring
+                        ? AutomationRuntimeSerialization.RestoreAuthoringInputBindings(
+                            node.InputBindingsJson,
+                            new(node.DefinitionId)
+                        )
+                        : AutomationRuntimeSerialization.RestoreInputBindings(
+                            node.InputBindingsJson,
+                            new(node.DefinitionId)
+                        )
+                )
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
             )
             {
@@ -143,7 +154,10 @@ public sealed partial class AutomationFlowService
         foreach (var node in flow.Nodes)
         {
             if (
-                AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+                AutomationRuntimeSerialization.RestoreInputBindings(
+                    node.InputBindingsJson,
+                    new(node.DefinitionId)
+                )
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
             )
             {

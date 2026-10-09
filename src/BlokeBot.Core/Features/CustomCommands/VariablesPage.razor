@@ -1,0 +1,131 @@
+@page "/custom-commands/variables"
+@using BlokeBot.Persistence.Models
+@using BlokeBot.Core.Components.Studio
+@using BlokeBot.Core.Components.Layout
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject CustomStoredValueService _values
+@inject ICustomCommandViewerResolver _viewers
+
+<PageTitle>BlokeBot | Variables</PageTitle>
+<div class="custom-command-page mx-auto max-w-7xl space-y-6">
+    <PageHeader Title="Variables" Description="Manage saved numbers, text and dictionary entries.">
+        <a class="btn-secondary" href="/custom-commands/settings">Custom commands</a>
+    </PageHeader>
+    <p class="text-sm text-muted-foreground">Channel: <strong>@_loadedChannel</strong></p>
+    @if (_feedback is not null)
+    {
+        <div class="card p-4" role="status" aria-live="polite">@_feedback</div>
+    }
+    @if (_loadError is not null)
+    {
+        <section class="page-state" role="alert"><p>@_loadError</p><button class="btn-secondary" @onclick="LoadAsync">Retry</button></section>
+    }
+    @if (_loading)
+    {
+        <p role="status">Loading Variables...</p>
+    }
+    else if (_loadedHostId == 0)
+    {
+        <p>Choose a channel to continue.</p>
+    }
+    else
+    {
+        <SegmentedTabs Id="variables" AriaLabel="Saved-value definitions" Items="_tabs" ActiveKey="@_tab" ActiveKeyChanged="ChangeTab" />
+        <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]"
+                 id="@SegmentedTabs.PanelId("variables", _tab)" role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId("variables", _tab)">
+            <StudioRail AriaLabel="Variables and dictionaries" Groups="_railGroups" SearchPlaceholder="Search">
+                <Footer><button class="btn-primary w-full" @onclick="RequestNew">+ New @(_tab == "dictionaries" ? "dictionary" : "variable")</button></Footer>
+            </StudioRail>
+            <div class="studio__inspector flex min-w-0 flex-col">
+                <header class="studio__header flex flex-wrap items-center justify-between gap-3 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] max-lg:rounded-tr-none">
+                    <div class="min-w-0"><h2 class="text-lg font-bold wrap-anywhere">@(_selected?.Name ?? (_creating ? "New definition" : "Select a definition"))</h2>
+                        <p class="text-sm text-muted-foreground">@_contextLabel</p></div>
+                    <button class="btn-primary" disabled="@(!_creating && _original is null)" @onclick="SaveAsync">Save changes</button>
+                </header>
+                <div class="studio__body grid min-w-0 gap-5 p-5 max-md:p-4">
+                    @if (_switch is not null)
+                    {
+                        <section class="card p-4 space-y-3" role="alert"><p>You have unsaved edits.</p><div class="flex flex-wrap gap-2"><button class="btn-secondary" @onclick="KeepEditing">Keep editing</button><button class="btn-secondary" @onclick="DiscardAndSwitch">Discard edits and continue</button></div></section>
+                    }
+                    @if (_creating)
+                    {
+                        <div class="studio-grid">
+                            <div class="studio-span-6"><Field Id="variable-name" Label="Name" @bind-Value="_name" /></div>
+                            <div class="studio-span-6 field"><label class="field__label" for="variable-scope">Scope</label><select id="variable-scope" class="field__input" @bind="_scope"><option value="User">User · each viewer</option><option value="Global">Global · this channel</option></select></div>
+                            @if (_tab != "dictionaries")
+                            {
+                                <div class="studio-span-6 field"><label class="field__label" for="variable-type">Value type</label><select id="variable-type" class="field__input" @bind="_kind"><option value="Number">Number</option><option value="Text">Text</option></select></div>
+                            }
+                            <div class="studio-span-12"><TextAreaField Id="variable-default" Label="@(_tab == "dictionaries" ? "Missing entry value" : "Default value")" @bind-Value="_default" /></div>
+                        </div>
+                    }
+                    else if (_selected is not null)
+                    {
+                        @if (_selected.Scope == CustomValueScope.User)
+                        {
+                            <div class="flex flex-wrap items-end gap-3">
+                                <Field Id="variable-viewer" Label="Viewer login" @bind-Value="_viewerLogin" />
+                                <button class="btn-secondary" @onclick="RequestViewer">Select viewer</button>
+                            </div>
+                            <p class="text-sm text-muted-foreground">Viewer: <strong>@(_viewer?.DisplayName ?? "Not selected")</strong> · ID: <span class="font-mono wrap-anywhere">@(_viewer?.TwitchUserId ?? "—")</span></p>
+                        }
+                        else
+                        {
+                            <p class="text-sm font-semibold">Global · channel-wide value for @_loadedChannel</p>
+                        }
+                        @if (_selected.Kind == CustomValueKind.Dictionary)
+                        {
+                            <section class="space-y-3" aria-label="Saved dictionary entries">
+                                <h3 class="font-bold">Saved entries</h3>
+                                <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th class="p-2">Key</th><th class="p-2">Type</th><th class="p-2">Value</th><th class="p-2">Action</th></tr></thead><tbody>
+                                    @foreach (var entry in _entries)
+                                    {
+                                        <tr @key="entry.Target.Key"><td class="p-2 wrap-anywhere">@entry.Target.Key</td><td class="p-2">@entry.Kind</td><td class="p-2 wrap-anywhere whitespace-pre-wrap">@entry.Value</td><td class="p-2"><button class="btn-secondary" @onclick="() => RequestEntry(entry)">Edit</button></td></tr>
+                                    }
+                                </tbody></table></div>
+                                @if (_entries.Count == 0) { <p class="text-sm text-muted-foreground">No saved entries for this target.</p> }
+                                <button class="btn-secondary" disabled="@(!_hasTarget)" @onclick="RequestAddEntry">+ Add entry</button>
+                                @if (_adding)
+                                {
+                                    <div class="flex flex-wrap items-end gap-3"><Field Id="dictionary-key" Label="Entry key" @bind-Value="_newKey" /><button class="btn-secondary" @onclick="OpenEntryAsync">Open entry</button></div>
+                                }
+                            </section>
+                        }
+                        @if (_original is not null)
+                        {
+                            <section class="space-y-3" aria-label="Edit saved value">
+                                @if (_selected.Kind == CustomValueKind.Dictionary)
+                                {
+                                    <p class="wrap-anywhere">Entry key: <strong>@_original.Target.Key</strong></p>
+                                    <div class="field"><label class="field__label" for="entry-type">Value type</label><select id="entry-type" class="field__input" @bind="_editKind"><option value="Text">Text</option><option value="Number">Number</option></select></div>
+                                }
+                                <TextAreaField Id="saved-value" Label="@($"Saved {_editKind} value")" @bind-Value="_input" />
+                                <p class="text-sm text-muted-foreground">@(_original.Saved ? "Saved value" : "Default · no saved value")</p>
+                                <button class="btn-secondary" @onclick="RequestReset">@(_selected.Kind == CustomValueKind.Dictionary ? "Delete this entry" : "Reset this value to default")</button>
+                                <button class="btn-secondary" @onclick="ReloadValueAsync">Reload current value</button>
+                            </section>
+                        }
+                        <details class="space-y-3">
+                            <summary class="font-bold">@(_selected.Kind == CustomValueKind.Dictionary ? "Dictionary definition" : "Variable definition")</summary>
+                            <div class="space-y-3 pt-3"><Field Id="definition-name" Label="Name" @bind-Value="_name" />
+                                <p>Scope: @_selected.Scope · Type: @_selected.Kind</p>
+                                <TextAreaField Id="definition-default" Label="@(_selected.Kind == CustomValueKind.Dictionary ? "Missing entry value" : "Default value")" @bind-Value="_default" />
+                                <button class="btn-secondary" @onclick="SaveDefinitionAsync">Save definition</button>
+                            </div>
+                        </details>
+                        <section class="space-y-2"><h3 class="font-bold">Message token</h3><code class="block wrap-anywhere">@_tokenExample</code></section>
+                        <button class="btn-secondary" @onclick="RequestDeleteAsync">Delete @(_selected.Kind == CustomValueKind.Dictionary ? "dictionary" : "variable")</button>
+                    }
+                    else { <p class="text-sm text-muted-foreground">Choose a definition, or create one.</p> }
+                    @if (_confirmation is not null)
+                    {
+                        <section class="card p-4 space-y-3" role="alert"><p class="wrap-anywhere">@_confirmation</p><div class="flex flex-wrap gap-2"><button class="btn-secondary" @onclick="CancelConfirmation">Cancel</button><button class="btn-primary" @onclick="ConfirmAsync">Confirm @_confirmationAction</button></div></section>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+</div>

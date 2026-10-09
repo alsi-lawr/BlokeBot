@@ -39,6 +39,8 @@ public partial class AutomationEditorPage
     private bool _nodeLibraryOpen;
     private bool _mobileInspectorOpen;
     private bool _focusInspectorAfterRender;
+    private string? _validationFocusField;
+    private string? _validationFocusPort;
     private bool _focusToolboxAfterRender;
     private bool _enableConfirmation;
     private bool _deleteConfirmation;
@@ -53,8 +55,8 @@ public partial class AutomationEditorPage
     private bool _dirtyDialogOpen;
     private IJSObjectReference? _pageModule;
     private DotNetObjectReference<AutomationEditorPage>? _pageReference;
-    private bool _focusMode;
-    private bool _browserFullscreen;
+    private EditorWorkspace? _workspace;
+    private bool _focusMode => _workspace?.FocusMode ?? false;
     private bool _flowRailCollapsed;
     private bool _editorToolsCollapsed;
     private bool _runDrawerCollapsed;
@@ -90,13 +92,27 @@ public partial class AutomationEditorPage
                     _pageReference,
                     _hasChanges
                 );
-                await _pageModule.InvokeVoidAsync("initializeFullscreen", _pageReference);
                 await _pageModule.InvokeVoidAsync("initializeHistoryKeyboard", _pageReference);
                 await _pageModule.InvokeVoidAsync("initializeToolboxKeyboard", _pageReference);
             }
             else if (_pageModule is not null)
             {
                 await _pageModule.InvokeVoidAsync("setDirtyNavigation", _hasChanges);
+            }
+            if (_pageModule is not null)
+            {
+                if (_workspace is not null)
+                {
+                    await _pageModule.InvokeVoidAsync(
+                        "initializeEditorMenu",
+                        _workspace.Element,
+                        _pageReference
+                    );
+                }
+                else
+                {
+                    await _pageModule.InvokeVoidAsync("disposeEditorMenu");
+                }
             }
         }
         catch (JSDisconnectedException) { }
@@ -122,7 +138,13 @@ public partial class AutomationEditorPage
         if (_focusInspectorAfterRender && _pageModule is not null)
         {
             _focusInspectorAfterRender = false;
-            await _pageModule.InvokeVoidAsync("focusInspector");
+            await _pageModule.InvokeVoidAsync(
+                "focusInspector",
+                _validationFocusField,
+                _validationFocusPort
+            );
+            _validationFocusField = null;
+            _validationFocusPort = null;
         }
 
         await EnsureCallSelectorAsync();
@@ -157,9 +179,9 @@ public partial class AutomationEditorPage
             try
             {
                 await _pageModule.InvokeVoidAsync("disposeDirtyNavigation");
-                await _pageModule.InvokeVoidAsync("disposeFullscreen");
                 await _pageModule.InvokeVoidAsync("disposeHistoryKeyboard");
                 await _pageModule.InvokeVoidAsync("disposeToolboxKeyboard");
+                await _pageModule.InvokeVoidAsync("disposeEditorMenu");
             }
             catch (JSDisconnectedException) { }
             catch (JSException) { }

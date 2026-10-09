@@ -1,8 +1,12 @@
+from collections.abc import Callable
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import Mock
 
+import container_smoke
 import native_smoke
 
 
@@ -44,6 +48,62 @@ class WorkerProbeTests(unittest.TestCase):
         worker = worker_directory / "BlokeBot.PluginWorker"
         worker.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         worker.chmod(0o755)
+
+
+class DocumentProbeTests(unittest.TestCase):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            navigation = (
+                self.headers.get("Sec-Fetch-Site"),
+                self.headers.get("Sec-Fetch-Mode"),
+                self.headers.get("Sec-Fetch-Dest"),
+            ) == ("none", "navigate", "document")
+            status = 503 if navigation and self.path == "/auth/login" else 403
+            body = b"offline-auth-body" if status == 503 else b"forbidden"
+            self.send_response(status)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    def setUp(self) -> None:
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), self.Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+
+    def tearDown(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+
+    def test_document_navigation_reads_the_unavailable_auth_response_body(self) -> None:
+        for name, read in self._readers():
+            with self.subTest(probe=name):
+                self.assertEqual(read(f"{self.url}/auth/login"), "offline-auth-body")
+
+    def test_forbidden_document_is_not_accepted_as_an_offline_auth_response(self) -> None:
+        for name, read in self._readers():
+            with self.subTest(probe=name):
+                error = (
+                    native_smoke.NativeSmokeError
+                    if name == "native"
+                    else container_smoke.ContainerSmokeError
+                )
+                with self.assertRaisesRegex(error, "Unexpected HTTP status 403"):
+                    read(f"{self.url}/forbidden")
+
+    @staticmethod
+    def _readers() -> tuple[tuple[str, Callable[[str], str]], ...]:
+        return (
+            ("native", native_smoke._read_http_body),
+            (
+                "container",
+                lambda url: container_smoke._read_http_body(url, frozenset({503})),
+            ),
+        )
 
 
 class RemoveDataDirectoryTests(unittest.TestCase):

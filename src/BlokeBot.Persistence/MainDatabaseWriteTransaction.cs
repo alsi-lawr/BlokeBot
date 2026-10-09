@@ -24,7 +24,12 @@ public sealed class MainDatabaseWriteTransaction : IAsyncDisposable
     public static Task<MainDatabaseWriteTransaction> StartImmediateAsync(
         BlokeBotDbContext db,
         CancellationToken cancellationToken
-    ) => StartAsync(db, null, cancellationToken);
+    ) => StartAsync(db, null, IsolationLevel.ReadCommitted, cancellationToken);
+
+    public static Task<MainDatabaseWriteTransaction> StartImmediateSerializableAsync(
+        BlokeBotDbContext db,
+        CancellationToken cancellationToken
+    ) => StartAsync(db, null, IsolationLevel.Serializable, cancellationToken);
 
     public static Task<MainDatabaseWriteTransaction> StartImmediateWithBoundedAdmissionAsync(
         BlokeBotDbContext db,
@@ -33,11 +38,12 @@ public sealed class MainDatabaseWriteTransaction : IAsyncDisposable
     ) =>
         admissionTimeout <= TimeSpan.Zero || admissionTimeout > TimeSpan.FromMinutes(1)
             ? throw new ArgumentOutOfRangeException(nameof(admissionTimeout))
-            : StartAsync(db, admissionTimeout, cancellationToken);
+            : StartAsync(db, admissionTimeout, IsolationLevel.ReadCommitted, cancellationToken);
 
     private static async Task<MainDatabaseWriteTransaction> StartAsync(
         BlokeBotDbContext db,
         TimeSpan? admissionTimeout,
+        IsolationLevel isolationLevel,
         CancellationToken cancellationToken
     ) =>
         db.Database.Provider() switch
@@ -50,6 +56,7 @@ public sealed class MainDatabaseWriteTransaction : IAsyncDisposable
             BlokeBotDatabaseProvider.PostgreSql => await StartPostgreSqlAsync(
                 db,
                 admissionTimeout,
+                isolationLevel,
                 cancellationToken
             ),
         };
@@ -97,11 +104,12 @@ public sealed class MainDatabaseWriteTransaction : IAsyncDisposable
     private static async Task<MainDatabaseWriteTransaction> StartPostgreSqlAsync(
         BlokeBotDbContext db,
         TimeSpan? admissionTimeout,
+        IsolationLevel isolationLevel,
         CancellationToken cancellationToken
     )
     {
         var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
+            isolationLevel,
             cancellationToken
         );
         try

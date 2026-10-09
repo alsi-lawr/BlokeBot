@@ -15,6 +15,8 @@ internal sealed class HostedChannelRuntimeSessions
         return identity;
     }
 
+    internal BotChannelSessionIdentity? Find(int hostId) => _identities.GetValueOrDefault(hostId);
+
     internal bool IsCurrent(int hostId, BotChannelSessionIdentity identity) =>
         _identities.TryGetValue(hostId, out var current) && ReferenceEquals(current, identity);
 

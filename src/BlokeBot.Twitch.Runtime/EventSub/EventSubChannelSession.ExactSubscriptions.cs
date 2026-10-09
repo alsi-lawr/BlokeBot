@@ -95,7 +95,7 @@ internal sealed partial class EventSubChannelSession
         }
 
         var account = await operations
-            .ResolveAccount(channel, EventSubAuthorizationContext.ConfiguredBotAuthority)
+            .ResolveAccount(channel, subscription.Authorization)
             .ExecuteAsync(cancellationToken);
         return await account.Match<
             Task<(

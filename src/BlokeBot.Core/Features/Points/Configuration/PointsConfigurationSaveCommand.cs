@@ -1,5 +1,6 @@
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Core.Features.Replies;
 using BlokeBot.Persistence.Models;
 
@@ -71,9 +72,11 @@ public sealed record PointsConfigurationSaveCommand
         PointAmount giveawayMaximumPayout,
         int giveawayWinnerCount,
         PointsEligibilityMode giveawayEligibility,
-        int giveawayCooldownSeconds
+        int giveawayCooldownSeconds,
+        WatchTimeConfiguration watchTime
     )
     {
+        WatchTime = watchTime;
         PointLabel = pointLabel;
         Aliases = aliases;
         Replies = replies;
@@ -87,6 +90,8 @@ public sealed record PointsConfigurationSaveCommand
         GiveawayEligibility = giveawayEligibility;
         GiveawayCooldownSeconds = giveawayCooldownSeconds;
     }
+
+    public WatchTimeConfiguration WatchTime { get; }
 
     public string PointLabel { get; }
 

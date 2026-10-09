@@ -286,6 +286,44 @@ namespace BlokeBot.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationCountdown", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(96)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AutomationGeneration")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DeadlineUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsRunning")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProcessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("WasCancelled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("HostId", "Name");
+
+                    b.ToTable("automation_countdowns", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationEventReceipt", b =>
                 {
                     b.Property<int>("HostId")
@@ -507,6 +545,49 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("automation_flow_runs", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalMilestone", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("GoalId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("HostId", "GoalId", "Amount");
+
+                    b.ToTable("automation_goal_milestones", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalObservation", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("GoalId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CurrentAmount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnded")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId", "GoalId");
+
+                    b.ToTable("automation_goal_observations", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationNodeRun", b =>
                 {
                     b.Property<long>("Id")
@@ -580,6 +661,57 @@ namespace BlokeBot.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("automation_scenarios", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ViewerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId", "ViewerId");
+
+                    b.ToTable("automation_seen_viewers", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSourceAdmission", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AcceptEventsAfterUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId");
+
+                    b.ToTable("automation_source_admissions", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationStreamObservation", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StreamId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SuppressUptimeBeforeUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId");
+
+                    b.ToTable("automation_stream_observations", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
@@ -4424,6 +4556,9 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("SingleArgument")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -4547,6 +4682,46 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasKey("HostId", "CustomCommandId", "TwitchUserId");
 
                     b.ToTable("custom_command_allowed_users", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CommandId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InvocationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvocationId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reply")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ReplyEligible")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "InvocationHash")
+                        .IsUnique();
+
+                    b.ToTable("custom_command_computed_results", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
@@ -4745,6 +4920,106 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("custom_message_variants", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EntryKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId", "TargetHash")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "DefinitionId");
+
+                    b.ToTable("custom_stored_values", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("DefaultNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DefaultText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NameHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("Revision")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "DictionaryName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_DictionaryName")
+                        .HasFilter("\"Kind\" = 2");
+
+                    b.HasIndex(new[] { "HostId", "Scope", "NameHash" }, "ScalarName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_custom_value_definitions_ScalarName")
+                        .HasFilter("\"Kind\" <> 2");
+
+                    b.ToTable("custom_value_definitions", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
                 {
                     b.Property<int>("Id")
@@ -4813,6 +5088,133 @@ namespace BlokeBot.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_durable_alerts_Severity", "Severity IN ('Critical', 'Info', 'Warning')");
                         });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlay", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("AccessKeyDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("BLOB");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DraftDocumentJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProtectedAccessKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("PublicationSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("PublishedVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessKeyDigest")
+                        .IsUnique();
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "IsArchived", "PublicId");
+
+                    b.ToTable("full_overlays", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("BindingId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("FullOverlayId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("PublishedVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.HasIndex("FullOverlayId", "BindingId")
+                        .IsUnique();
+
+                    b.ToTable("full_overlay_event_feed_bindings", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
+                {
+                    b.Property<long>("OverlayId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AuthorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AuthorUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("PublishedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OverlayId", "Version");
+
+                    b.ToTable("full_overlay_publications", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.GuessOption", b =>
@@ -5702,6 +6104,9 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<DateTime>("EnqueuedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("FullOverlayEventFeedBindingId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("HostId")
                         .HasColumnType("INTEGER");
 
@@ -5715,7 +6120,7 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
-                    b.Property<long>("OverlayInstanceId")
+                    b.Property<long?>("OverlayInstanceId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Priority")
@@ -5738,6 +6143,11 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Kind", "SourceKey")
+                        .IsUnique();
+
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Lifecycle", "EnqueuedAtUtc");
+
                     b.HasIndex("OverlayInstanceId", "Kind", "SourceKey")
                         .IsUnique();
 
@@ -5750,6 +6160,8 @@ namespace BlokeBot.Persistence.Migrations
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "Lifecycle IN ('active', 'consumed', 'queued', 'suppressed')");
+
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Owner", "(OverlayInstanceId IS NULL) <> (FullOverlayEventFeedBindingId IS NULL)");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Priority", "Priority IN ('high', 'normal')");
 
@@ -7024,7 +7436,7 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.ToTable("point_ledger_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "Kind IN ('Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
+                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "Kind IN ('WatchTimeReward', 'Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward', 'CompetitionReward', 'BlokeRaidSpecialSpend', 'BlokeRaidVictoryReward')");
                         });
                 });
 
@@ -7271,6 +7683,19 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("WatchTimeConfigurationRevision")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("WatchTimeEnableGeneration")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WatchTimePointAmount")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("WatchTimePointsEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HostId")
@@ -7279,6 +7704,8 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("points_settings", null, t =>
                         {
                             t.HasCheckConstraint("CK_points_settings_GiveawayEligibility", "GiveawayEligibility IN ('everyone', 'followers', 'subscribers')");
+
+                            t.HasCheckConstraint("CK_points_settings_WatchTimeEnabled", "NOT \"WatchTimePointsEnabled\" OR (\"WatchTimePointAmount\" IS NOT NULL AND \"WatchTimeEnableGeneration\" <> '00000000-0000-0000-0000-000000000000')");
                         });
                 });
 
@@ -9189,6 +9616,15 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationCountdown", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationEventReceipt", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
@@ -9240,6 +9676,24 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Flow");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalMilestone", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationGoalObservation", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationGoalObservation", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationNodeRun", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.AutomationFlowRun", "Run")
@@ -9260,6 +9714,33 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Flow");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.AutomationStreamObservation", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSourceAdmission", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationStreamObservation", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSubflow", b =>
@@ -10220,6 +10701,15 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Command");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandComputedResult", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomCommandInvocationClaim", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.CustomCommand", "Command")
@@ -10277,11 +10767,65 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Entry");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomStoredValue", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CustomValueDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "DefinitionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CustomValueDefinition", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.DurableAlert", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlay", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", "FullOverlay")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FullOverlay");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", null)
+                        .WithMany()
+                        .HasForeignKey("OverlayId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -10583,6 +11127,11 @@ namespace BlokeBot.Persistence.Migrations
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayEventFeedItem", b =>
                 {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", "FullOverlayEventFeedBinding")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayEventFeedBindingId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
@@ -10592,8 +11141,9 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasOne("BlokeBot.Persistence.Models.OverlayInstance", "OverlayInstance")
                         .WithMany()
                         .HasForeignKey("OverlayInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("FullOverlayEventFeedBinding");
 
                     b.Navigation("OverlayInstance");
                 });

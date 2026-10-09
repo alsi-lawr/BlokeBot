@@ -1,0 +1,19 @@
+<span class="editor-action editor-menu-opener">
+    <button type="button" class="btn-secondary editor-action-button" aria-label="Open editor actions" aria-haspopup="menu" aria-controls="@_id" aria-expanded="false" data-editor-menu-open>
+        <EditorIcon Name="menu" />
+    </button>
+    <span class="editor-action-tip" role="tooltip">Open editor actions</span>
+    <div id="@_id" class="editor-menu surface" data-editor-menu hidden>
+        <header><strong id="@($"{_id}-target")" data-editor-menu-target></strong><span id="@($"{_id}-history")" data-editor-menu-history></span></header>
+        <div role="menu" aria-label="Editor actions" aria-describedby="@($"{_id}-target {_id}-history {_id}-note")">
+            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="undo"><EditorIcon Name="undo" /><span>Undo</span><kbd>Ctrl Z</kbd></button>
+            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="redo"><EditorIcon Name="redo" /><span>Redo</span><kbd>Ctrl Y</kbd></button>
+            <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="delete"><EditorIcon Name="delete" /><span>Delete selected</span><kbd>Del</kbd></button>
+        </div>
+        <p id="@($"{_id}-note")" data-editor-menu-note></p>
+    </div>
+</span>
+
+@code {
+    private readonly string _id = $"editor-menu-{Guid.NewGuid():N}";
+}

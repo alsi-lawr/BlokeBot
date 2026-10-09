@@ -14,6 +14,7 @@ using BlokeBot.Core.Features.Points.Dashboard;
 using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Points.HostSetup;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Core.Hosts;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -116,6 +117,12 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<PointsCommandService>();
         _ = services.AddSingleton<PointBalanceService>();
         _ = services.AddSingleton<IPointTargetUserLookup, HelixPointTargetUserLookup>();
+        _ = services.AddSingleton<WatchTimeEligibilityReader>();
+        _ = services.AddSingleton<WatchTimeRuntime>();
+        _ = services.AddSingleton<IWatchTimeSettingsCommitObserver>(provider =>
+            provider.GetRequiredService<WatchTimeRuntime>()
+        );
+        _ = services.AddHostedService(provider => provider.GetRequiredService<WatchTimeRuntime>());
         _ = services.AddSingleton<PointsConfigurationService>();
         _ = services.AddSingleton<PointsDashboardService>();
         _ = services.AddSingleton<PointsGiveawayChangeNotifier>();

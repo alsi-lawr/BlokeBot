@@ -20,7 +20,7 @@ internal static partial class SiteGuideCatalog
                         "Commands and events.",
                         "Schedules and webhooks.",
                         "HTTP actions and page actions.",
-                        "Pages and automation handlers.",
+                        "Pages, public widget projections and automation handlers.",
                     ],
                     Heading = "Handler modules",
                     Paragraphs =
@@ -161,6 +161,41 @@ internal static partial class SiteGuideCatalog
                     [
                         "Cancellation stops a coroutine that waits for a host result. A late result does not resume the coroutine.",
                         "Cancellation does not undo an effect that completed first.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Public widget projections",
+                    Paragraphs =
+                    [
+                        "A widget render handler receives input.configuration, not a page session, browser credential or private host payload. context.current derives the resolved host, feature, full document and widget instance on the server.",
+                        "The context's widget.mode is live, preview-live or preview-sample. Preview handlers must not admit, drain, advance or acknowledge production work. Read a non-consuming projection or return sample data instead.",
+                        "Trusted server Lua can use its own declared settings, storage and HTTP APIs to construct a public-safe result. Never return secrets, private viewer information or management authority to the browser, diagnostics or asset URLs.",
+                        "The widget browser document runs in an isolated script-enabled frame. Declared relative HTML/CSS/JS assets work through scoped public asset delivery; a management-page action bridge is not available.",
+                    ],
+                    Code = """
+                        local blokebot = require("blokebot")
+                        return {
+                          render_widget = function(input)
+                            local context = blokebot.context.current()
+                            assert(context.kind == "widget")
+                            if context.widget.mode == "preview-sample" then
+                              return { text = "Sample heading" }
+                            end
+                            -- Read only public-safe, non-consuming state here.
+                            return { text = input.configuration.text }
+                          end,
+                        }
+                        """,
+                    Note =
+                        "The trusted Lua worker is an availability boundary, not a malicious-Lua sandbox. Isolation of browser-authored code does not make arbitrary server Lua untrusted.",
+                    Links =
+                    [
+                        new(
+                            "Widget declaration and portability",
+                            "plugin-development/manifest#public-overlay-widgets"
+                        ),
+                        new("Full overlay authoring", "full-overlays"),
                     ],
                 },
             ],

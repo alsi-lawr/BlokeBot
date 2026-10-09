@@ -61,6 +61,9 @@ start_and_check_host() {
     status="$(
       curl \
         --silent \
+        --header 'Sec-Fetch-Site: none' \
+        --header 'Sec-Fetch-Mode: navigate' \
+        --header 'Sec-Fetch-Dest: document' \
         --output "$surface" \
         --write-out '%{http_code}' \
         http://127.0.0.1:18080/auth/login 2>/dev/null || true

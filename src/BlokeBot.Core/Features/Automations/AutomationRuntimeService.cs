@@ -71,6 +71,38 @@ public sealed partial class AutomationRuntimeService(
         };
     }
 
+    internal async Task<AutomationDispatchOutcome> DispatchExpandedAsync(
+        AutomationContext context,
+        Func<AutomationConfiguration, bool> matches,
+        CancellationToken cancellationToken,
+        Func<BlokeBotDbContext, CancellationToken, Task<bool>>? currentOccurrence = null,
+        AutomationFlowId? selectedFlow = null,
+        bool deferExecution = false
+    )
+    {
+        var result = await DispatchCoreAsync(
+            context,
+            matches,
+            null,
+            null,
+            cancellationToken,
+            async (db, ct) =>
+            {
+                var acceptAfter = await db
+                    .AutomationSourceAdmissions.Where(h => h.HostId == context.Channel.HostId.Value)
+                    .Select(h => (DateTime?)h.AcceptEventsAfterUtc)
+                    .SingleOrDefaultAsync(ct);
+                return (
+                        acceptAfter is null
+                        || context.Timestamps.OccurredAtUtc.UtcDateTime > acceptAfter
+                    ) && (currentOccurrence is null || await currentOccurrence(db, ct));
+            },
+            selectedFlow,
+            !deferExecution
+        );
+        return ((CustomCommandAutomationAdmissionOutcome.Dispatched)result).Dispatch;
+    }
+
     private Task<CustomCommandAutomationAdmissionOutcome> DispatchCoreAsync(
         AutomationTrigger trigger,
         Func<
@@ -98,7 +130,10 @@ public sealed partial class AutomationRuntimeService(
             Task<CustomCommandInvocationClaimOutcome>
         >? claim,
         Action? onCommitted,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        Func<BlokeBotDbContext, CancellationToken, Task<bool>>? currentOccurrence = null,
+        AutomationFlowId? selectedFlow = null,
+        bool resumeImmediately = true
     )
     {
         await EnsureInitializedAsync(cancellationToken);
@@ -122,6 +157,7 @@ public sealed partial class AutomationRuntimeService(
             .Include(static flow => flow.Edges)
             .Where(flow =>
                 flow.HostId == context.HostId.Value
+                && (selectedFlow == null || flow.Id == selectedFlow.Value.Value)
                 && flow.IsEnabled
                 && flow.SchemaVersion == AutomationFlowSchema.CurrentVersion
             )
@@ -181,6 +217,11 @@ public sealed partial class AutomationRuntimeService(
         if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
         {
             return Dispatched(AutomationDispatchStatus.FeatureDisabled);
+        }
+
+        if (currentOccurrence is not null && !await currentOccurrence(db, cancellationToken))
+        {
+            return Dispatched(AutomationDispatchStatus.Duplicate);
         }
 
         if (invalidFlow)
@@ -394,7 +435,11 @@ public sealed partial class AutomationRuntimeService(
         await dispatchTransaction.CommitAsync(cancellationToken);
         onCommitted?.Invoke();
 
-        foreach (var runId in accepted)
+        foreach (
+            var runId in resumeImmediately
+                ? accepted.ToImmutable()
+                : ImmutableArray<AutomationRunId>.Empty
+        )
         {
             _ = await ResumeAsync(runId, cancellationToken);
         }
@@ -831,7 +876,7 @@ public sealed partial class AutomationRuntimeService(
                     catalog,
                     new(run.HostId),
                     available.Context,
-                    AutomationRuntimeSerialization.Definition(node),
+                    node,
                     cancellationToken
                 )
             );
@@ -1621,6 +1666,7 @@ public sealed partial class AutomationRuntimeService(
             ),
             DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(
                 delay,
+                inputs,
                 clock.GetUtcNow().UtcDateTime
             ),
             _ => await ExecuteActionAsync(
@@ -1669,7 +1715,10 @@ public sealed partial class AutomationRuntimeService(
     )
     {
         if (
-            AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+            AutomationRuntimeSerialization.RestoreInputBindings(
+                node.InputBindingsJson,
+                new(node.DefinitionId)
+            )
             is not AutomationInputBindingsRestoreOutcome.Available restored
         )
         {

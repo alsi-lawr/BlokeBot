@@ -53,6 +53,7 @@ public static partial class PluginManifestValidator
         ValidateHostModulesAndMigrations(manifest, errors);
         ValidateAutomations(manifest, errors);
         ValidatePages(manifest, errors);
+        ValidateWidgets(manifest, errors);
         ValidatePageActionHandlerContracts(manifest, errors);
         return errors;
     }

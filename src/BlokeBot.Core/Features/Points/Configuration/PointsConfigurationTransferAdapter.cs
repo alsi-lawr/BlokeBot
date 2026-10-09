@@ -1,22 +1,24 @@
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.Points.Commands;
+using BlokeBot.Core.Features.Points.WatchTime;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 
 namespace BlokeBot.Core.Features.Points.Configuration;
 
 public sealed class PointsConfigurationTransferAdapter
 {
-    internal static async Task<IReadOnlyList<ConfigurationValidationIssue>> StageAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        PointsSectionV1 section,
-        CancellationToken cancellationToken
-    )
+    internal static Validation<
+        PointsConfigurationSaveCommand,
+        PointsConfigurationValidationError
+    > MapValidatedConfiguration(PointsSectionV1 section)
     {
         var aliases = section.CommandAliases.ToDictionary(x => x.Command, x => x.Aliases);
         var draft = new PointsConfiguration
         {
+            WatchTimePointsEnabled = section.WatchTimePoints?.Enabled ?? false,
+            WatchTimePointAmount = section.WatchTimePoints?.Amount,
             PointLabel = section.PointLabel,
             Aliases = new PointsCommandAliasEditor
             {
@@ -43,8 +45,16 @@ public sealed class PointsConfigurationTransferAdapter
             GiveawayEligibility = section.GiveawayEligibility,
             GiveawayCooldownSeconds = section.GiveawayCooldownSeconds,
         };
-        return await PointsConfigurationValidator
-            .Validate(draft)
+        return PointsConfigurationValidator.Validate(draft);
+    }
+
+    internal static async Task<PointsConfigurationTransferStageResult> StageAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        PointsSectionV1 section,
+        CancellationToken cancellationToken
+    ) =>
+        await MapValidatedConfiguration(section)
             .Match(
                 async command =>
                 {
@@ -55,26 +65,28 @@ public sealed class PointsConfigurationTransferAdapter
                         cancellationToken
                     );
                     return failure is null
-                        ? []
-                        :
-                        [
-                            new ConfigurationValidationIssue(
-                                "sections.points.commandAliases",
-                                failure.Message
-                            ),
-                        ];
+                        ? new PointsConfigurationTransferStageResult(
+                            [],
+                            Option<WatchTimeConfigurationWrite>.Some(new(command.WatchTime))
+                        )
+                        : new PointsConfigurationTransferStageResult(
+                            [new("sections.points.commandAliases", failure.Message)],
+                            Option<WatchTimeConfigurationWrite>.None
+                        );
                 },
                 errors =>
-                    Task.FromResult<IReadOnlyList<ConfigurationValidationIssue>>(
-                        errors
-                            .Select(error => new ConfigurationValidationIssue(
-                                "sections.points",
-                                error.Message
-                            ))
-                            .ToArray()
+                    Task.FromResult(
+                        new PointsConfigurationTransferStageResult(
+                            errors
+                                .Select(error => new ConfigurationValidationIssue(
+                                    "sections.points",
+                                    error.Message
+                                ))
+                                .ToArray(),
+                            Option<WatchTimeConfigurationWrite>.None
+                        )
                     )
             );
-    }
 
     private static string Join(
         IReadOnlyDictionary<Persistence.Models.AppCommandKind, IReadOnlyList<string>> aliases,
@@ -109,3 +121,8 @@ public sealed class PointsConfigurationTransferAdapter
             FollowerEligibilityUnavailableReply = value.FollowerEligibilityUnavailable,
         };
 }
+
+internal sealed record PointsConfigurationTransferStageResult(
+    IReadOnlyList<ConfigurationValidationIssue> Issues,
+    Option<WatchTimeConfigurationWrite> WatchWrite
+);

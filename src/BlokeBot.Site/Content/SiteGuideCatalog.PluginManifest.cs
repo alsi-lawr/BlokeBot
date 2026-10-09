@@ -19,7 +19,7 @@ internal static partial class SiteGuideCatalog
                         "The manifest defines package identity and compatibility.",
                         "It defines files and settings.",
                         "It defines features and handlers.",
-                        "It defines pages and automations.",
+                        "It defines pages, public overlay widgets and automations.",
                         "It defines migrations.",
                     ],
                     Heading = "Plugin identity",
@@ -152,6 +152,55 @@ internal static partial class SiteGuideCatalog
                         settings = ["response-message"]
                         automationTemplates = []
                         """,
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Public overlay widgets",
+                    Paragraphs =
+                    [
+                        "A widget is not a management page. Declare its feature, Lua render entry point, HTML document asset and every additional browser asset it may use.",
+                        "Use public-safe configuration defaults. The browser receives only the projected public result and scoped, short-lived GET-only URLs for declared assets, not installation settings, page sessions or dashboard actions.",
+                        "Configuration portability is optional host-side metadata. Mark values portable only when the entire value, including nested maps and arrays, is safe to transfer. Destination bindings and withheld, undeclared or unknown values are omitted from full-document transfer.",
+                        "An imported widget retains layout, audio and source but needs explicit destination setup, even when omitted fields are optional. Old manifests remain locally usable. Older hosts reject the new TOML keys; set the appropriate minimum BlokeBot version when using them.",
+                    ],
+                    Code = """
+                        [[widgets]]
+                        id = "public-display"
+                        featureId = "starter"
+                        title = "Public display"
+                        module = "main"
+                        renderEntryPoint = "render_widget"
+                        documentAsset = "widget-document"
+                        assets = ["widget-script"]
+                        defaultConfiguration = { text = "Welcome" }
+
+                        [[widgets.configurationFields]]
+                        name = "text"
+                        title = "Public heading"
+                        valueKind = "string"
+                        required = true
+                        portability = "portable"
+
+                        [[widgets.configurationFields]]
+                        name = "destination"
+                        title = "Destination binding"
+                        valueKind = "string"
+                        required = false
+                        portability = "destinationBinding"
+                        """,
+                    Note =
+                        "Declare widget-document and widget-script in assets with their real paths, media types, supported targets and maximum sizes. There is no manifest or worker-protocol version bump for portability metadata.",
+                    Links =
+                    [
+                        new(
+                            "Public projection handler",
+                            "plugin-development/handlers#public-widget-projections"
+                        ),
+                        new(
+                            "Full overlay transfer",
+                            "full-overlays#transfer-a-working-document-and-current-media"
+                        ),
+                    ],
                 },
                 new SiteGuideSection
                 {

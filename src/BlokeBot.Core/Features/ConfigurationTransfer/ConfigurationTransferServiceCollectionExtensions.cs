@@ -2,6 +2,7 @@ using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -70,7 +71,8 @@ public static class ConfigurationTransferServiceCollectionExtensions
             provider.GetRequiredService<ConfigurationImportObserverDispatcher>(),
             overlaysAvailable
                 ? provider.GetRequiredService<OverlayMediaMaintenanceService>().Gate
-                : new SemaphoreSlim(1, 1)
+                : new SemaphoreSlim(1, 1),
+            provider.GetService<IWatchTimeSettingsCommitObserver>()
         ));
         _ = services.AddSingleton<ConfigurationActivationQueue>();
         _ = services.AddSingleton<ConfigurationActivationService>();

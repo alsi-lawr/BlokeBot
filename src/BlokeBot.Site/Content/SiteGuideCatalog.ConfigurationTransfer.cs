@@ -207,7 +207,7 @@ internal static partial class SiteGuideCatalog
                         ),
                         new SiteGuideFact(
                             "Format and limits",
-                            "BlokeBot exports UTF-8 JSON with the identifier blokebot.channel-configuration and format version 2. The maximum file size is 2 MB, and each collection accepts up to 1,000 records. The envelope and typed section records reject unknown properties and enum values. Present sections with empty collections are valid. Only format 2 is accepted; versions 0 and 1 are unsupported."
+                            "BlokeBot exports UTF-8 JSON with the identifier blokebot.channel-configuration and format version 2. Files must fit in the available memory and storage. Existing command and feature collections accept up to 1,000 records. Variable and dictionary definitions do not use this record limit. The envelope and typed section records reject unknown properties and enum values. Present sections with empty collections are valid. Only format 2 is accepted; versions 0 and 1 are unsupported."
                         ),
                     ],
                 },

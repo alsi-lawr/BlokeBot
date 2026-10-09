@@ -25,6 +25,61 @@ public sealed partial class ConfigurationTransferAutomationTests
     private const string _malformedCommandReference = "raw-host-reference-secret";
 
     [Test]
+    [Arguments("""{"minimum-bits":100}""", null)]
+    [Arguments("""{"minimum-bits":100,"maximum-bits":200}""", 200)]
+    public async Task Cheer_ExportImportPreservesBoundedAndUncappedConfiguration(
+        string json,
+        int? maximum
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "cheer-transfer");
+        var transfer = AutomationTransfer(database);
+        _ = await SeedPersistedFlowAsync(
+            database,
+            hostId,
+            "Cheer transfer",
+            AutomationDefinitionIds.CheerSource.Value,
+            JsonSerializer.Deserialize<JsonElement>(json),
+            "{}"
+        );
+        var exported = (
+            await ExportAutomationsAsync(database, transfer, hostId)
+        ).ShouldBeOfType<ConfigurationExportOutcome.Success>();
+        _ = (
+            await Coordinator(database, new RecordingLogger<ConfigurationTransferCoordinator>())
+                .ApplyAsync(
+                    Session(hostId),
+                    exported.Document,
+                    AutomationSelection(hostId),
+                    new("destination-id", "destination"),
+                    CancellationToken.None
+                )
+        ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
+
+        await using var verify = await database.CreateDbContextAsync();
+        var imported = await verify.AutomationFlowNodes.SingleAsync(node =>
+            node.DefinitionId == AutomationDefinitionIds.CheerSource.Value
+        );
+        using var configuration = JsonDocument.Parse(imported.ConfigurationJson);
+        var validated = transfer
+            .Catalog.ValidatePersistedDefinition(
+                new(
+                    imported.DefinitionId,
+                    imported.DefinitionSchemaVersion,
+                    configuration.RootElement.Clone()
+                )
+            )
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        var cheer = validated.Configuration.ShouldBeOfType<CheerSourceConfiguration>();
+        cheer.MinimumBits.ShouldBe(100);
+        cheer.MaximumBits.ShouldBe(maximum);
+        JsonElement
+            .DeepEquals(configuration.RootElement, JsonSerializer.Deserialize<JsonElement>(json))
+            .ShouldBeTrue();
+    }
+
+    [Test]
     public async Task DynamicTransform_WithOptionalStreamFieldsImportsAndExports()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

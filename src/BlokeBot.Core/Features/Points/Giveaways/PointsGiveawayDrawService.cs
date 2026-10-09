@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Gambling;
-using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +14,8 @@ public sealed class PointsGiveawayDrawService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
     IPointsRandom random,
-    IEnumerable<IOverlayEventPresenter> eventPresenters
+    IEnumerable<IOverlayEventPresenter> eventPresenters,
+    AutomationFeatureLifecycle? automations = null
 )
 {
     public PointsGiveawayDrawService(
@@ -30,13 +31,88 @@ public sealed class PointsGiveawayDrawService(
     )
     {
         PointsGiveawayDrawOutcome? committedOutcome = null;
+        var preparation = new DrawPreparation();
         try
         {
-            return await DrawAndCommitOutcomeAsync(
-                giveawayId,
-                outcome => committedOutcome = outcome,
-                ct
-            );
+            DrawWork work;
+            for (var attempt = 1; ; attempt++)
+            {
+                var phase = new DrawAttemptPhase();
+                try
+                {
+                    work = await DrawAttemptAsync(
+                        giveawayId,
+                        preparation,
+                        phase,
+                        outcome => committedOutcome = outcome,
+                        ct
+                    );
+                    break;
+                }
+                catch (Exception exception)
+                    when (attempt < 20
+                        && committedOutcome is null
+                        && !ct.IsCancellationRequested
+                        && phase.CanRetry(exception)
+                    )
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
+                }
+            }
+            if (work.HostId is { } hostId)
+            {
+                var key = giveawayId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (automations is not null)
+                {
+                    await automations.EmitAsync(
+                        hostId,
+                        FeatureLifecycleKind.GiveawayClosed,
+                        key,
+                        key,
+                        work.Now,
+                        work.Outcome is PointsGiveawayDrawOutcome.NoEntrants
+                            ? "no entrants"
+                            : "draw complete",
+                        ct
+                    );
+                }
+                if (work.Outcome is PointsGiveawayDrawOutcome.Winners winners)
+                {
+                    if (automations is not null)
+                    {
+                        await automations.EmitAsync(
+                            hostId,
+                            FeatureLifecycleKind.GiveawayWinners,
+                            key,
+                            key,
+                            work.Now,
+                            string.Join(", ", winners.Payouts.Select(value => value.Login)),
+                            ct
+                        );
+                    }
+                    foreach (var presenter in eventPresenters)
+                    {
+                        await presenter.PresentAsync(
+                            new OverlayEventPresentation.GiveawayWinner
+                            {
+                                HostId = hostId,
+                                SourceKey = key,
+                                Winners = winners
+                                    .Payouts.Select(value => value.Login)
+                                    .ToImmutableArray(),
+                                Prizes = winners
+                                    .Payouts.Select(value =>
+                                        $"{value.Payout.ToDisplayString()} {winners.Settings.PointLabel}"
+                                    )
+                                    .ToImmutableArray(),
+                                PointLabel = winners.Settings.PointLabel,
+                            },
+                            ct
+                        );
+                    }
+                }
+            }
+            return work.Outcome;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -56,145 +132,156 @@ public sealed class PointsGiveawayDrawService(
         }
     }
 
-    private async Task<PointsGiveawayDrawOutcome> DrawAndCommitOutcomeAsync(
+    private async Task<DrawWork> DrawAttemptAsync(
         int giveawayId,
+        DrawPreparation preparation,
+        DrawAttemptPhase phase,
         Action<PointsGiveawayDrawOutcome> onCommitted,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var giveawayHeader = await db
-            .PointsGiveaways.AsNoTracking()
-            .Where(x => x.Id == giveawayId)
-            .Select(x => new { x.HostId, x.Status })
-            .SingleOrDefaultAsync(ct);
-        if (giveawayHeader is null)
+        await using var tx = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            ct
+        );
+        phase.Acquired = true;
+        try
         {
-            return new PointsGiveawayDrawOutcome.Missing();
-        }
-
-        var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, giveawayHeader.HostId, ct);
-        if (giveawayHeader.Status != PointsGiveawayStatus.Active)
-        {
-            return new PointsGiveawayDrawOutcome.NotActive(settings);
-        }
-
-        var now = DateTime.UtcNow;
-        var claimed = await db
-            .PointsGiveaways.Where(x =>
-                x.Id == giveawayId && x.Status == PointsGiveawayStatus.Active
-            )
-            .ExecuteUpdateAsync(
-                update =>
-                    update
-                        .SetProperty(x => x.Status, PointsGiveawayStatus.Completed)
-                        .SetProperty(x => x.CompletedAtUtc, now),
-                ct
-            );
-        if (claimed == 0)
-        {
-            return new PointsGiveawayDrawOutcome.NotActive(settings);
-        }
-
-        var giveaway = await db
-            .PointsGiveaways.Include(x => x.Entrants)
-            .Include(x => x.Winners)
-            .SingleAsync(x => x.Id == giveawayId, ct);
-        var entrants = giveaway
-            .Entrants.Select(x => x.Login)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        if (entrants.Count == 0)
-        {
-            var outcome = new PointsGiveawayDrawOutcome.NoEntrants(settings);
-            await CommitAsync(tx, giveawayId, outcome, ct);
-            onCommitted(outcome);
-            return outcome;
-        }
-
-        var winnerCount = Math.Min(Math.Max(1, giveaway.WinnerCount), entrants.Count);
-        var winners = entrants
-            .OrderBy(_ => random.Next(0, int.MaxValue))
-            .Take(winnerCount)
-            .ToArray();
-        Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure> payoutAttempt =
-            Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure>.Success([]);
-        foreach (var winner in winners)
-        {
-            payoutAttempt = await payoutAttempt.Match(
-                async winnerPayouts =>
-                {
-                    var payout = RandomPayout(giveaway.MinimumPayout, giveaway.MaximumPayout);
-                    var result = await balances
-                        .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
-                        .ExecuteAsync(ct);
-                    return result.Match(
-                        mutation =>
-                        {
-                            winnerPayouts.Add(
-                                new PointsGiveawayWinnerPayout(winner, mutation.Amount)
-                            );
-                            giveaway.Winners.Add(
-                                new PointsGiveawayWinner
-                                {
-                                    GiveawayId = giveaway.Id,
-                                    Login = winner,
-                                    Payout = mutation.Amount.ToString(),
-                                }
-                            );
-                            return Result<
-                                List<PointsGiveawayWinnerPayout>,
-                                PointBalanceMutationFailure
-                            >.Success(winnerPayouts);
-                        },
-                        Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure>.Error
-                    );
-                },
-                failure =>
-                    Task.FromResult(
-                        Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure>.Error(
-                            failure
-                        )
-                    )
-            );
-        }
-
-        return await payoutAttempt.Match(CommitWinnersAsync, PayoutFailedAsync);
-
-        async Task<PointsGiveawayDrawOutcome> CommitWinnersAsync(
-            List<PointsGiveawayWinnerPayout> winnerPayouts
-        )
-        {
-            _ = await db.SaveChangesAsync(ct);
-            var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
-            await CommitAsync(tx, giveawayId, completed, ct);
-            foreach (var presenter in eventPresenters)
+            var header = await db
+                .PointsGiveaways.AsNoTracking()
+                .Where(value => value.Id == giveawayId)
+                .Select(value => new { value.HostId, value.Status })
+                .SingleOrDefaultAsync(ct);
+            if (header is null)
             {
-                await presenter.PresentAsync(
-                    new OverlayEventPresentation.GiveawayWinner
-                    {
-                        HostId = giveaway.HostId,
-                        SourceKey = giveaway.Id.ToString(
-                            System.Globalization.CultureInfo.InvariantCulture
-                        ),
-                        Winners = winnerPayouts.Select(x => x.Login).ToImmutableArray(),
-                        Prizes = winnerPayouts
-                            .Select(x => $"{x.Payout.ToDisplayString()} {settings.PointLabel}")
-                            .ToImmutableArray(),
-                        PointLabel = settings.PointLabel,
-                    },
+                return new(new PointsGiveawayDrawOutcome.Missing(), null, default);
+            }
+            var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, header.HostId, ct);
+            if (header.Status != PointsGiveawayStatus.Active)
+            {
+                return new(new PointsGiveawayDrawOutcome.NotActive(settings), null, default);
+            }
+            var now = DateTime.UtcNow;
+            var claimed = await db
+                .PointsGiveaways.Where(value =>
+                    value.Id == giveawayId && value.Status == PointsGiveawayStatus.Active
+                )
+                .ExecuteUpdateAsync(
+                    update =>
+                        update
+                            .SetProperty(value => value.Status, PointsGiveawayStatus.Completed)
+                            .SetProperty(value => value.CompletedAtUtc, now),
                     ct
                 );
+            if (claimed == 0)
+            {
+                return new(new PointsGiveawayDrawOutcome.NotActive(settings), null, default);
             }
-            onCommitted(completed);
-            return completed;
+            var giveaway = await db
+                .PointsGiveaways.Include(value => value.Entrants)
+                .Include(value => value.Winners)
+                .SingleAsync(value => value.Id == giveawayId, ct);
+            var entrants = giveaway
+                .Entrants.Select(value => value.Login)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            foreach (var entrant in entrants)
+            {
+                if (!preparation.Ranks.ContainsKey(entrant))
+                {
+                    preparation.Ranks.Add(
+                        entrant,
+                        (random.Next(0, int.MaxValue), preparation.Ranks.Count)
+                    );
+                }
+            }
+            PointsGiveawayDrawOutcome outcome;
+            if (entrants.Length == 0)
+            {
+                outcome = new PointsGiveawayDrawOutcome.NoEntrants(settings);
+            }
+            else
+            {
+                var winnerCount = Math.Min(Math.Max(1, giveaway.WinnerCount), entrants.Length);
+                var winners = entrants
+                    .OrderBy(value => preparation.Ranks[value].Rank)
+                    .ThenBy(value => preparation.Ranks[value].Order)
+                    .Take(winnerCount)
+                    .ToArray();
+                var payouts = new List<PointsGiveawayWinnerPayout>();
+                foreach (var winner in winners)
+                {
+                    if (!preparation.Payouts.TryGetValue(winner, out var payout))
+                    {
+                        payout = RandomPayout(giveaway.MinimumPayout, giveaway.MaximumPayout);
+                        preparation.Payouts.Add(winner, payout);
+                    }
+                    var mutation = await balances
+                        .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
+                        .ExecuteAsync(ct);
+                    var failure = mutation.Match<PointBalanceMutationFailure?>(
+                        _ => null,
+                        value => value
+                    );
+                    if (failure is not null)
+                    {
+                        return new(
+                            new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure),
+                            null,
+                            default
+                        );
+                    }
+                    payouts.Add(new(winner, payout));
+                    giveaway.Winners.Add(
+                        new PointsGiveawayWinner
+                        {
+                            GiveawayId = giveaway.Id,
+                            Login = winner,
+                            Payout = payout.ToString(),
+                        }
+                    );
+                }
+                _ = await db.SaveChangesAsync(ct);
+                outcome = new PointsGiveawayDrawOutcome.Winners(settings, payouts);
+            }
+            await CommitAsync(tx, giveawayId, outcome, ct);
+            phase.Committed = true;
+            onCommitted(outcome);
+            return new(outcome, giveaway.HostId, now);
         }
+        catch (Exception exception)
+            when (!phase.Committed
+                && !ct.IsCancellationRequested
+                && MainDatabaseFailureClassifier.IsContention(exception)
+            )
+        {
+            await tx.RollbackAsync(CancellationToken.None);
+            phase.RolledBack = true;
+            throw;
+        }
+    }
 
-        Task<PointsGiveawayDrawOutcome> PayoutFailedAsync(PointBalanceMutationFailure failure) =>
-            Task.FromResult<PointsGiveawayDrawOutcome>(
-                new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure)
-            );
+    private sealed record DrawWork(PointsGiveawayDrawOutcome Outcome, int? HostId, DateTime Now);
+
+    private sealed class DrawPreparation
+    {
+        public Dictionary<string, (int Rank, int Order)> Ranks { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, PointAmount> Payouts { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class DrawAttemptPhase
+    {
+        public bool Acquired { get; set; }
+        public bool Committed { get; set; }
+        public bool RolledBack { get; set; }
+
+        public bool CanRetry(Exception exception) =>
+            !Committed
+            && (!Acquired || RolledBack)
+            && MainDatabaseFailureClassifier.IsContention(exception);
     }
 
     private PointAmount RandomPayout(string minimum, string maximum)
@@ -219,7 +306,7 @@ public sealed class PointsGiveawayDrawService(
         {
             await transaction.CommitAsync(CancellationToken.None);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (!MainDatabaseFailureClassifier.IsContention(exception))
         {
             throw new PointsGiveawayDrawCommitAmbiguousException(
                 giveawayId,
