@@ -6,6 +6,7 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.MomentAttachments;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.RequestBoards;
@@ -63,6 +64,12 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<OverlayInstanceService>();
         _ = services.AddSingleton<OverlayInstanceResolver>();
         _ = services.AddSingleton<OverlayManagementAuthority>();
+        _ = services.AddSingleton<FullOverlayService>();
+        _ = services.AddSingleton<FullOverlayPublishedReader>();
+        services.TryAddSingleton<
+            IFullOverlayPublicationAdmission,
+            UnavailableFullOverlayPublicationAdmission
+        >();
         _ = services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
         _ = services.AddSingleton<OverlayRemoteUrlPolicy>();
         _ = services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
