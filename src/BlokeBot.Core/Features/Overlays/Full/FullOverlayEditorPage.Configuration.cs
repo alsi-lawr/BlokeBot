@@ -10,6 +10,7 @@ public partial class FullOverlayEditorPage
     private IReadOnlyList<OverlayMediaAssetView> _mediaAssets = [];
     private string _configuration = "";
     private bool _configurationOpen;
+    private bool _advancedConfigurationOpen;
 
     private async Task LoadMediaAsync()
     {
