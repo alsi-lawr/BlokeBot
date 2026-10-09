@@ -21,11 +21,26 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Content Update="package.json;package-lock.json" CopyToPublishDirectory="Never" />
+    <Content Remove="wwwroot/vendor/full-overlay-editor/**/*" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Cel" />
   </ItemGroup>
+
+  <Target
+    Name="PrepareFullOverlayEditorAssets"
+    BeforeTargets="AssignTargetPaths"
+    DependsOnTargets="RestoreNodePackages"
+  >
+    <Exec Command="npm run editor:assets" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <ItemGroup>
+      <Content
+        Include="wwwroot/vendor/full-overlay-editor/**/*"
+        CopyToPublishDirectory="PreserveNewest"
+      />
+    </ItemGroup>
+  </Target>
 
   <Target
     Name="RestoreNodePackages"

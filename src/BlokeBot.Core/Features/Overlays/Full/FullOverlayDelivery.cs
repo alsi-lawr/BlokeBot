@@ -91,6 +91,10 @@ internal sealed partial class FullOverlayDelivery(
         {
             return null;
         }
+        if (preview.IsRevoked)
+        {
+            return null;
+        }
         var lease = new FullOverlayRenderLease(
             Guid.NewGuid(),
             null,
@@ -98,7 +102,13 @@ internal sealed partial class FullOverlayDelivery(
             null,
             clock.GetUtcNow() + _idleLifetime
         );
-        return Register(lease, preview.Document);
+        _ = Register(lease, preview.Document);
+        if (preview.IsRevoked)
+        {
+            Close(lease);
+            return null;
+        }
+        return lease;
     }
 
     internal FullOverlayRenderLease OpenPublished(PublishedFullOverlay selected)
@@ -190,7 +200,8 @@ internal sealed partial class FullOverlayDelivery(
     )
     {
         var authorized = await authority.AuthorizeAsync(preview.Session, ct);
-        return authorized is OverlayManagementAuthorization.Granted granted
+        return !preview.IsRevoked
+            && authorized is OverlayManagementAuthorization.Granted granted
             && granted.Actor == preview.Actor
             && (await documents.GetAsync(preview.Session, preview.Document.Id, ct)).Match(
                 found => found.Value.Revision == preview.Revision,

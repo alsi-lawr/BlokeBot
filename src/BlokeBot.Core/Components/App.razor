@@ -226,7 +226,7 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets[$"{Environment.ApplicationName}.styles.css"]" />
-    <ImportMap nonce="@_bootstrap.Document.Nonce" />
+    <ImportMap ImportMapDefinition="@_importMap" nonce="@_bootstrap.Document.Nonce" />
     <HeadOutlet @rendermode="_renderMode" />
     <link rel="icon" type="image/svg+xml" href="blokebot-mark.svg" />
 </head>
@@ -259,9 +259,13 @@
 
 @code {
     private PublicDocumentBootstrap _bootstrap = null!;
+    private ImportMapDefinition _importMap = null!;
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
         _bootstrap = (PublicDocumentBootstrap)HttpContextAccessor.HttpContext!.Items[PublicDocumentProtector.BootstrapKey]!;
+        _importMap = BlokeBot.Core.Features.Overlays.Full.FullOverlayEditorImportMap.Create(Assets);
+    }
 
     private IComponentRenderMode _renderMode =>
         HttpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true

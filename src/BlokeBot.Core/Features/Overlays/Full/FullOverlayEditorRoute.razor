@@ -1,0 +1,10 @@
+@page "/full-overlays/{OverlayId:guid}/edit"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+
+<FullOverlayEditorPage @key="OverlayId" OverlayId="OverlayId" />
+
+@code {
+    [Parameter]
+    public Guid OverlayId { get; set; }
+}

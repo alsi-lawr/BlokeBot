@@ -1,0 +1,30 @@
+@page "/full-overlays"
+@using Microsoft.AspNetCore.Authorization
+@inherits AuthenticatedPageComponent
+@attribute [Authorize(Policy = "HostSelected")]
+@inject NavigationManager Navigation
+
+<PageTitle>Full overlays · BlokeBot</PageTitle>
+<DashboardPage Kicker="Stream presentation" Title="Full overlays" Description="Compose widgets and your own HTML and CSS. Simple overlays stay separate." Width="DashboardPageWidth.Wide">
+    <Actions><a class="btn-secondary" href="/overlays">Simple overlays</a></Actions>
+    <ChildContent>
+        <section class="surface-card full-overlay-collection">
+            <div class="flex flex-wrap items-end gap-3">
+                <Field Id="full-overlay-name" Label="New overlay name" @bind-Value="_name" MaxLength="128" />
+                <button class="btn-primary" disabled='@_busy' @onclick="CreateAsync">Create overlay</button>
+            </div>
+            <div class="flex flex-wrap gap-3" role="group" aria-label="Overlay collection">
+                <button class="btn-secondary" aria-pressed='@(!_archived ? "true" : "false")' @onclick='() => SelectCollectionAsync(false)'>Active</button>
+                <button class="btn-secondary" aria-pressed='@(_archived ? "true" : "false")' @onclick='() => SelectCollectionAsync(true)'>Archived</button>
+            </div>
+            @if (_message.Length > 0) { <p role="status">@_message</p> }
+            @if (_items.Count == 0) { <p class="text-muted-foreground">No @(_archived ? "archived" : "active") full overlays.</p> }
+            @foreach (var item in _items) {
+                <article class="full-overlay-list-row">
+                    <div><h2><a href='@($"/full-overlays/{item.Id}/edit")'>@item.Name</a></h2><p class="text-muted-foreground">@(item.PublishedVersion is { } version ? $"Live version {version.Value}" : "Unpublished draft") · @item.UpdatedAtUtc.ToLocalTime().ToString("g")</p></div>
+                    <a class="btn-secondary" href='@($"/full-overlays/{item.Id}/edit")'>@(_archived ? "Manage" : "Edit")</a>
+                </article>
+            }
+        </section>
+    </ChildContent>
+</DashboardPage>

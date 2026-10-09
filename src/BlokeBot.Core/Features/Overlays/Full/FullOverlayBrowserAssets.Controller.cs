@@ -17,6 +17,7 @@ internal static partial class FullOverlayBrowserAssets
           let pending = null;
           let loaded = false;
           let retry = 500;
+          let observation = null;
           const completions = new Map();
           const finished = new Set();
           const clear = () => {
@@ -34,6 +35,14 @@ internal static partial class FullOverlayBrowserAssets
               state, diagnostics,
             }, location.origin);
           };
+          const observe = () => { if (preview && loaded && observation) port.postMessage({ kind: "observe", lifetime, ...observation }); };
+          window.addEventListener("message", (event) => {
+            if (!preview || parent === window || event.source !== parent || event.origin !== location.origin) return;
+            const data = event.data;
+            if (data?.kind !== "blokebot-full-observe" || typeof data.requestId !== "string" || !Array.isArray(data.selectors)) return;
+            observation = { requestId: data.requestId, selectors: data.selectors.filter(item => typeof item?.key === "string" && typeof item.selector === "string") };
+            observe();
+          });
           frame.addEventListener("load", () => {
             // Authored document.write loads again without changing the render lifetime.
             if (!lifetime || port) return;
@@ -46,6 +55,15 @@ internal static partial class FullOverlayBrowserAssets
               if (value.kind === "ready") {
                 loaded = true;
                 if (pending) port.postMessage({ kind: "render", lifetime: identity, ...pending });
+                observe();
+              } else if (preview && value.kind === "observations" && value.requestId === observation?.requestId && Array.isArray(value.items)) {
+                const allowed = new Set(observation.selectors.map(item => item.key));
+                const items = value.items.filter(item => allowed.has(item?.key)
+                  && [item.x,item.y,item.width,item.height,item.layoutX,item.layoutY].every(Number.isFinite) && item.width >= 0 && item.height >= 0
+                  && item.styles && Object.values(item.styles).every(style => typeof style === "string"));
+                const viewport = value.viewport;
+                if (viewport && [viewport.width,viewport.height].every(size => Number.isFinite(size) && size > 0))
+                  parent.postMessage({ kind: "blokebot-full-observations", previewId: location.pathname.split("/").pop(), requestId: value.requestId, viewport, items }, location.origin);
               } else if (value.kind === "diagnostics" && Array.isArray(value.items)) {
                 const allowed = new Set(pending?.widgets.map(widget => widget.id));
                 const codes = new Set(["missing-anchor", "widget-unavailable", "audio-blocked"]);

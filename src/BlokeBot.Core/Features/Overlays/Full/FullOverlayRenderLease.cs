@@ -19,6 +19,11 @@ internal sealed class FullOverlayPreviewCandidate(
 )
 {
     private long _expiresAt = expiresAt.UtcTicks;
+    private int _revoked;
+    internal bool IsRevoked => Volatile.Read(ref _revoked) != 0;
+
+    internal void Revoke() => Interlocked.Exchange(ref _revoked, 1);
+
     internal AuthenticatedSession Session { get; } = session;
     internal OverlayManagementActor Actor { get; } = actor;
     internal FullOverlayRevision Revision { get; } = revision;
