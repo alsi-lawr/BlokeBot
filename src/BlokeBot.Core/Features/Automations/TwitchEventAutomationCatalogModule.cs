@@ -498,18 +498,13 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 AutomationActionRetrySafety.NotApplicable
             ),
             static json =>
-            {
-                if (!TryReadInt32(json, "minimum-bits", out var minimum))
-                {
-                    return Invalid("minimum-bits", "Enter a whole-number minimum Bits amount.");
-                }
-
-                return !json.TryGetProperty("maximum-bits", out var maximum)
-                        ? Parsed(new CheerSourceConfiguration(minimum))
-                    : maximum.ValueKind == JsonValueKind.Number && maximum.TryGetInt32(out var bits)
-                        ? Parsed(new CheerSourceConfiguration(minimum, bits))
-                    : Invalid("maximum-bits", "Enter a whole-number maximum Bits amount.");
-            },
+                !TryReadInt32(json, "minimum-bits", out var minimum)
+                    ? Invalid("minimum-bits", "Enter a whole-number minimum Bits amount.")
+                : !json.TryGetProperty("maximum-bits", out var maximum)
+                    ? Parsed(new CheerSourceConfiguration(minimum))
+                : maximum.ValueKind == JsonValueKind.Number && maximum.TryGetInt32(out var bits)
+                    ? Parsed(new CheerSourceConfiguration(minimum, bits))
+                : Invalid("maximum-bits", "Enter a whole-number maximum Bits amount."),
             static configuration =>
                 configuration switch
                 {
