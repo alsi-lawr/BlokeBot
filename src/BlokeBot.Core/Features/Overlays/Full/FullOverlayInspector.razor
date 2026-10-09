@@ -1,7 +1,6 @@
-@if (View.Selected is null) { <h2>Inspector</h2><p class="text-muted-foreground">Select a widget or HTML layer. Source edits remain available without a selection.</p> }
+@if (View.Selected is null) { <h2>Inspector</h2><p class="text-muted-foreground">No layer selected</p> }
 else {
     <header class="full-inspector-heading"><h2>@(View.Layers.FirstOrDefault(layer => layer.Key == View.Selected)?.Label ?? "Selected layer")</h2><EditorAction Label="Find HTML" Icon="search" Click="Find" /></header>
-    @if (View.Members.Count > 1) { <p class="form-help">Style and size edit the active layer · Move, Return and Delete use selected roots.</p> }
     <div class="full-inspector-actions"><EditorAction Label="Duplicate layer" Icon="duplicate" Click='() => Send(new { kind = "duplicate" })' /><EditorAction Label="Delete selection" Icon="delete" Click='() => Send(new { kind = "remove" })' /></div>
     <div class="full-inspector-toggles"><label><input type="checkbox" checked='@(View.Widget?.Authoring.IsVisible ?? Value("display") != "none")' @onchange='args => Send(new { kind = "visible", value = (bool)args.Value! })' />Visible</label>
         <label><input type="checkbox" checked='@View.Locked' @onchange='args => Send(new { kind = "lock", value = (bool)args.Value! })' />Lock</label>
@@ -9,10 +8,8 @@ else {
     </div>
     <section class="full-inspector-placement">
         <h3>Placement</h3><p class="full-placement-status">@PlacementStatus()</p>
-        <p class="form-help">@(View.Members.Count > 1 ? "Selected roots move together. In-flow layers keep their layout space." : "Canvas movement keeps the HTML parent. In-flow layers keep their layout space.")</p>
-        <button type="button" class="btn-secondary full-return-layout" disabled='@(!View.NativeStyles.ContainsKey("position"))' @onclick='() => Send(new { kind = "return-layout" })'><EditorIcon Name="undo" />Return to layout</button>
+        <div class="full-return-layout"><EditorAction Label="Return to layout" Icon="undo" Disabled='@(!View.NativeStyles.ContainsKey("position"))' Click='() => Send(new { kind = "return-layout" })' /></div>
         <StudioFold Key="full-hierarchy" Label="Move in HTML" Open="_hierarchyOpen" OpenChanged="HierarchyOpenAsync" Bare="true">
-            <p class="form-help">@(View.Members.Count > 1 ? "Move selected roots. Nested selected children stay with their selected parent." : "Change this layer’s HTML parent or sibling order.")</p>
             <div class="full-hierarchy-relations" role="group" aria-label="HTML placement relation">
                 @foreach (var relation in new[] { "inside", "before", "after", "root" }) { <button type="button" class="btn-secondary" aria-pressed='@(_relation == relation ? "true" : "false")' @onclick="() => RelationAsync(relation)">@(relation == "root" ? "At root" : char.ToUpperInvariant(relation[0]) + relation[1..])</button> }
             </div>
@@ -20,7 +17,7 @@ else {
                 @foreach (var layer in View.Layers) { <option value="@layer.Key">@layer.Label · @(layer.WidgetId is null ? layer.Tag : "widget")</option> }
             </select></label>
             <p id="full-hierarchy-plan" class="full-hierarchy-plan" role="status">@_hierarchyFeedback.Message</p>
-            <button type="button" class="btn-primary full-hierarchy-apply" disabled="@(!_hierarchyFeedback.Valid)" @onclick="MoveHierarchyAsync">@(View.Members.Count > 1 ? "Move selected roots" : "Move 1 layer")</button>
+            <EditorAction Label='@(View.Members.Count > 1 ? "Move selected roots" : "Move 1 layer")' Icon="direction" Class="btn-primary" Disabled="@(!_hierarchyFeedback.Valid)" Click="MoveHierarchyAsync" />
         </StudioFold>
     </section>
     <StudioFold Key="full-style" Label="Style" @bind-Open="_styleOpen" Bare="true">
@@ -30,20 +27,18 @@ else {
         <StudioFold Key="full-style-spacing" Label="Spacing & effects" @bind-Open="_effectsOpen" Bare="true"><div class="full-inspector-grid">@foreach (var field in _effectFields) { <Field Id='@($"full-style-{field.Property}")' Label='@field.Label' Value='@Value(field.Property)' ValueChanged='value => StyleAsync(field.Property, value)' /> }</div></StudioFold>
     </StudioFold>
     <StudioFold Key="full-position" Label="Position & size" @bind-Open="_positionOpen" Bare="true">
-    <p class="form-help">X/Y, anchors and Align explicitly position the active layer outside normal flow. Width and height change its size.</p>
     <div class="full-inspector-grid">
         <Field Id="full-x" Label="X" Value='@Position("x")' ValueChanged='value => PositionAsync("x", value)' />
         <Field Id="full-y" Label="Y" Value='@Position("y")' ValueChanged='value => PositionAsync("y", value)' />
         <Field Id="full-width" Label="Width" Value='@Value("width", View.Widget?.Authoring.Width ?? "auto")' ValueChanged='value => DimensionAsync("width", value)' />
         <Field Id="full-height" Label="Height" Value='@Value("height", View.Widget?.Authoring.Height ?? "auto")' ValueChanged='value => DimensionAsync("height", value)' />
-        <label class="field"><span class="field__label">Rotation (°)</span><input id="full-rotate" class="field__input" type="number" step="any" data-transform="rotate" aria-describedby="full-transform-help" /><span class="form-help" data-transform-custom="rotate" hidden>Custom rotation in source</span></label>
-        <label class="field"><span class="field__label">Scale (×)</span><input id="full-scale" class="field__input" type="number" step="any" data-transform="scale" aria-describedby="full-transform-help" /><span class="form-help" data-transform-custom="scale" hidden>Custom scale in source</span></label>
+        <label class="field"><span class="field__label">Rotation (°)</span><input id="full-rotate" class="field__input" type="number" step="any" data-transform="rotate" /><span class="form-help" data-transform-custom="rotate" hidden>Custom rotation in source</span></label>
+        <label class="field"><span class="field__label">Scale (×)</span><input id="full-scale" class="field__input" type="number" step="any" data-transform="scale" /><span class="form-help" data-transform-custom="scale" hidden>Custom scale in source</span></label>
     </div>
-    <p class="form-help" id="full-transform-help">0° and 1× are neutral individual controls. Authored transforms stay unchanged.</p>
     <h3>Anchors</h3><div class="full-inspector-grid">
         <label class="full-editor-field">Horizontal<select aria-label="Horizontal anchor" value='@Anchor("x")' @onchange='args => AnchorAsync("x", args)'><option value="0">Left edge</option><option value="1">Centre</option><option value="2">Right edge</option></select></label>
         <label class="full-editor-field">Vertical<select aria-label="Vertical anchor" value='@Anchor("y")' @onchange='args => AnchorAsync("y", args)'><option value="0">Top edge</option><option value="1">Centre</option><option value="2">Bottom edge</option></select></label>
-    </div><p class="form-help">Offsets use the chosen edge of the CSS containing block. Align now uses the preview viewport.</p><div class="full-inspector-align" role="group" aria-label="Align within preview viewport">
+    </div><div class="full-inspector-align" role="group" aria-label="Align within preview viewport">
         <EditorAction Label="Align left" Tip="Align left now within the preview viewport" Icon="arrow-left" Click='() => Align.InvokeAsync(("x", 0))' /><EditorAction Label="Centre horizontally" Tip="Centre horizontally now within the preview viewport" Icon="direction" Click='() => Align.InvokeAsync(("x", 1))' /><EditorAction Label="Align right" Tip="Align right now within the preview viewport" Icon="arrow-right" Click='() => Align.InvokeAsync(("x", 2))' />
         <EditorAction Label="Align top" Tip="Align top now within the preview viewport" Icon="arrow-up" Click='() => Align.InvokeAsync(("y", 0))' /><EditorAction Label="Centre vertically" Tip="Centre vertically now within the preview viewport" Icon="direction" Click='() => Align.InvokeAsync(("y", 1))' /><EditorAction Label="Align bottom" Tip="Align bottom now within the preview viewport" Icon="arrow-down" Click='() => Align.InvokeAsync(("y", 2))' />
     </div>
@@ -52,7 +47,7 @@ else {
         <label class="full-editor-field">When<select aria-label="When" @bind="_motionPhase"><option value="entrance">Entrance</option><option value="exit">Exit / unavailable</option><option value="state">State change</option></select></label>
         <div class="full-motion-presets" role="group" aria-label="Animation presets"><button class="btn-secondary" @onclick='() => MotionAsync(FullOverlayMotionPreset.Fade)'>@(_motionPhase == "entrance" ? "Fade in" : "Fade")</button><button class="btn-secondary" @onclick='() => MotionAsync(FullOverlayMotionPreset.Rise)'>@(_motionPhase == "entrance" ? "Rise in" : "Rise")</button><button class="btn-secondary" @onclick='() => MotionAsync(FullOverlayMotionPreset.Scale)'>@(_motionPhase == "entrance" ? "Scale in" : "Scale")</button><button class="btn-secondary" @onclick='() => MotionAsync(FullOverlayMotionPreset.None)'>None</button></div>
         <div class="full-inspector-grid"><label class="field"><span class="field__label">Duration (ms)</span><input id="full-motion-duration" class="field__input" type="number" min="0" step="any" @bind="_duration" /></label><Field Id="full-motion-easing" Label="Easing" @bind-Value="_easing" /></div>
-        <button class="btn-secondary" @onclick="Replay">Replay entrance preview</button>
+        <EditorAction Label="Replay entrance preview" Icon="test" Click="Replay" />
     </StudioFold>
     @if (View.Widget is { } audioWidget) { <StudioFold Key="full-audio" Label="Audio" @bind-Open="_audioOpen" Bare="true"><label class="full-editor-inline"><input type="checkbox" checked='@audioWidget.Audio.IsMuted' @onchange='args => Send(new { kind = "audio", property = "isMuted", value = (bool)args.Value! })' />Mute this widget</label><label class="full-editor-field">Volume<input type="range" min="0" max="1" step="0.01" value='@audioWidget.Audio.Volume.ToString(CultureInfo.InvariantCulture)' @oninput="VolumeAsync" /></label></StudioFold> }
 }
