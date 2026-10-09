@@ -11,6 +11,7 @@ public enum FullOverlayMigrationStart
     Released016,
 }
 
+[NotInParallel]
 public sealed partial class FullOverlayPersistenceJourneys
 {
     [Test]
@@ -24,7 +25,7 @@ public sealed partial class FullOverlayPersistenceJourneys
             Directory.GetCurrentDirectory(),
             ".agent-workspace",
             "overlay-composition-20261001",
-            "writer287",
+            "writer290",
             "provider-fixtures",
             Guid.NewGuid().ToString("N")
         );
@@ -41,7 +42,12 @@ public sealed partial class FullOverlayPersistenceJourneys
                 )
                 .AddInterceptors(new WeeklyAnnouncementMigrationInterceptor())
                 .Options;
-            await JourneyAsync(new(options), start, "20260907091826_CurrentSubflowCallers");
+            await JourneyAsync(
+                new(options),
+                start,
+                "20260907091826_CurrentSubflowCallers",
+                directory
+            );
         }
         finally
         {
@@ -71,6 +77,27 @@ public sealed partial class FullOverlayPersistenceJourneys
                 provider => provider.MigrationsAssembly("BlokeBot.Persistence.PostgreSql")
             )
             .Options;
-        await JourneyAsync(new(options), start, "20260907093259_CurrentSubflowCallers");
+        var directory = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            ".agent-workspace",
+            "overlay-composition-20261001",
+            "writer290",
+            "provider-fixtures",
+            Guid.NewGuid().ToString("N")
+        );
+        _ = Directory.CreateDirectory(directory);
+        try
+        {
+            await JourneyAsync(
+                new(options),
+                start,
+                "20260907093259_CurrentSubflowCallers",
+                directory
+            );
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 }

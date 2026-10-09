@@ -94,6 +94,25 @@ For `test`, a missing, malformed, or semantically invalid `tests.toml` reports
 source reports `SourceInvalid` and exits `3`; a rejected package reports `PackageRejected` and exits
 `4` before worker execution.
 
+## Public overlay widgets
+
+A `widgets` declaration belongs to one feature and names a Lua `renderEntryPoint`, a declared HTML
+`documentAsset`, additional declared `assets`, typed configuration fields and public-safe defaults.
+It is separate from an embedded management page. The host resolves the installation, feature, full
+overlay/document and widget instance; input contains only `configuration`. The trusted server
+`context.current()` provides this resolved identity and `widget.mode` (`live`, `preview-live` or
+`preview-sample`), not a browser-controlled identity. Preview handlers must be non-consuming:
+they must not admit, drain, advance, acknowledge or complete production work.
+
+Trusted server handlers may use their own settings, storage and HTTP APIs to produce a public-safe
+projection. The returned value must contain no secrets, private viewer data, page sessions,
+management actions or host authority. These responsibilities do not turn Lua into a malicious-code
+sandbox. The browser receives only the public projection and short-lived GET-only declared asset
+URLs, fenced to the resolved host, frozen live/private-preview document, widget and render lifetime.
+Relative HTML/CSS/JS asset loading is supported; no generic private fetch or management bridge is
+forwarded. Widget browser documents run script-enabled in an opaque-origin frame; executable asset
+documents retain that authority boundary when opened directly.
+
 ## Widget configuration portability
 
 Widget configuration fields may declare `portability = "portable"`, `"destinationBinding"` or

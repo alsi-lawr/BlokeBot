@@ -6,6 +6,7 @@ internal static partial class SiteGuideCatalog
         .Concat(CreateChannelSetupPages())
         .Concat(CreateConfigurationTransferPages())
         .Concat(CreateStreamOverlayPages())
+        .Concat(CreateFullOverlayPages())
         .Concat(CreateStreamMediaPages())
         .Concat(CreateViewerPortalPages())
         .Concat(CreateCommunityInteractionPages())
@@ -70,6 +71,7 @@ internal static partial class SiteGuideCatalog
             "Stream presentation",
             [
                 GuideLink("Browser Sources", "overlays"),
+                GuideLink("Full overlay editor", "full-overlays"),
                 GuideLink("Goal & bounty overlays", "overlays#show-community-goals-and-bounties"),
                 GuideLink(
                     "Achievement event feed",

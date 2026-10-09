@@ -32,6 +32,7 @@ DEFINITIONS=(
   "community-guides.lua:5460"
   "overlay-sources.lua:5461"
   "overlay-previews.lua:5462"
+  "full-overlays.lua:5479"
   "community-guide-figures.lua:5473"
   "community-progression-figures-laptop.lua:5476"
   "community-progression-figures-phone.lua:5477"
@@ -49,6 +50,9 @@ run_definition() {
 
   if [[ "$definition" == "automations.lua" ]]; then
     export BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE=1
+  fi
+  if [[ "$definition" == "full-overlays.lua" ]]; then
+    local -x BlokeBot__StateDirectory="${BLOKEBOT_CAPTURE_STATE_DIRECTORY:-$PWD/../.agent-workspace/full-overlay-capture/$port}"
   fi
   "$DOTNET" run --project "$PROJECT" --configuration Release --no-build \
     --no-launch-profile -- --urls "$base" >"/tmp/simulation-${port}.log" 2>&1 &
