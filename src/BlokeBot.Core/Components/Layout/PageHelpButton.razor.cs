@@ -134,6 +134,8 @@ public partial class PageHelpButton
                 "media" => new(_mediaLibraryHelp, "/overlays/media"),
                 _ => new(_overlaysHelp, "/overlays"),
             },
+            "/full-overlays" => new(_fullOverlaysHelp, "/full-overlays"),
+            _ when IsFullOverlayEditorPath(path) => new(_fullOverlaysHelp, "/full-overlays"),
             "/twitch-operations/polls" => new(_pollsHelp, "/twitch-operations/polls"),
             "/twitch-operations/clips-markers" => new(
                 _clipsMarkersHelp,
@@ -149,6 +151,15 @@ public partial class PageHelpButton
             ),
             _ => null,
         };
+
+    private static bool IsFullOverlayEditorPath(string path)
+    {
+        var parts = path.Split('/');
+        return parts.Length == 4
+            && parts[1] == "full-overlays"
+            && Guid.TryParse(parts[2], out _)
+            && parts[3] == "edit";
+    }
 
     internal static string? GuidePathForLocation(string path, string fragment) =>
         LocationFor(path, fragment)?.GuidePath;

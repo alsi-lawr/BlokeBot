@@ -9,9 +9,9 @@
             <h2 id="automation-dirty-dialog-title">Are you sure?</h2>
             <p>@(Subflow ? "Subflow has unsaved changes." : "Flow has unsaved changes.")</p>
             <div class="automation-dirty-dialog-actions">
-                <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Cancel"><AutomationIcon Name="cancel" />Cancel</button>
-                <button class="automation-danger-button" type="button" disabled="@Busy" @onclick="Discard"><AutomationIcon Name="delete" />Discard</button>
-                <button class="btn-primary" type="button" disabled="@Busy" autofocus @onclick="Save"><AutomationIcon Name="save" />@(Subflow ? "Review subflow" : "Save")</button>
+                <button class="btn-secondary" type="button" disabled="@Busy" @onclick="Cancel"><EditorIcon Name="cancel" />Cancel</button>
+                <button class="automation-danger-button" type="button" disabled="@Busy" @onclick="Discard"><EditorIcon Name="delete" />Discard</button>
+                <button class="btn-primary" type="button" disabled="@Busy" autofocus @onclick="Save"><EditorIcon Name="save" />@(Subflow ? "Review subflow" : "Save")</button>
             </div>
         </section>
     </div>

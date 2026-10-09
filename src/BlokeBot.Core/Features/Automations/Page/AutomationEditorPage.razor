@@ -34,7 +34,7 @@
     {
         <PageState Kind="PageStateKind.Failure"
                    Title="BlokeBot cannot load automations">
-            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync"><AutomationIcon Name="history" />Retry</button></Actions>
+            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync"><EditorIcon Name="history" />Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
@@ -92,12 +92,12 @@
             <section class="automation-empty card">
                 <span class="automation-empty-icon" aria-hidden="true">⌘</span>
                 <h2>Create your first visual automation</h2>
-                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" />Create flow</button>
+                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><EditorIcon Name="add" />Create flow</button>
             </section>
         }
         else
         {
-            <section class="@_editorClass"
+            <EditorWorkspace @ref="_workspace" Class="@_editorClass" FocusChanged="WorkspaceFocusChanged" InteropFailure="WorkspaceInteropFailure"
                      aria-label="Visual automation editor"
                      data-editor-mode="@ModeToken(_mode)"
                      data-automation-editor-history>
@@ -131,23 +131,6 @@
                                         Hide="ToggleEditorTools"
                                         ToggleEnabled="ToggleEnabledAsync" />
 
-                <div class="automation-focus-controls" role="group" aria-label="Editor focus controls" data-automation-focus-controls>
-                    <button type="button"
-                            aria-label="@(_focusMode ? "Exit Focus" : "Focus")"
-                            aria-pressed="@(_focusMode ? "true" : "false")"
-                            title="@(_focusMode ? "Exit Focus" : "Focus")"
-                            @onclick="ToggleFocusMode">
-                        <AutomationIcon Name="focus" />
-                    </button>
-                    <button type="button"
-                            aria-label="@(_browserFullscreen ? "Exit Full screen" : "Full screen")"
-                            aria-pressed="@(_browserFullscreen ? "true" : "false")"
-                            title="@(_browserFullscreen ? "Exit Full screen" : "Full screen")"
-                            @onclick="ToggleBrowserFullscreenAsync">
-                        <AutomationIcon Name="fullscreen" />
-                    </button>
-                </div>
-
                 <div class="automation-editor-notices">
                     @if (_feedback is not null)
                     {
@@ -168,7 +151,7 @@
                                 <strong>This flow can affect your live channel</strong>
                                 <span>@_impactWarning</span>
                             </div>
-                            <button type="button" @onclick="CancelEnable"><AutomationIcon Name="cancel" />Cancel</button>
+                            <button type="button" @onclick="CancelEnable"><EditorIcon Name="cancel" />Cancel</button>
                         </div>
                     }
                 </div>
@@ -350,18 +333,18 @@
                 {
                     @if (_flowRailCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--flows" type="button" @onclick="ToggleFlowRail"><AutomationIcon Name="flow-list" />Flows</button>
+                        <button class="automation-restore-tab automation-restore-tab--flows" type="button" @onclick="ToggleFlowRail"><EditorIcon Name="flow-list" />Flows</button>
                     }
                     @if (_editorToolsCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--tools" type="button" @onclick="ToggleEditorTools"><AutomationIcon Name="tools" />Tools</button>
+                        <button class="automation-restore-tab automation-restore-tab--tools" type="button" @onclick="ToggleEditorTools"><EditorIcon Name="tools" />Tools</button>
                     }
                     @if (_runDrawerCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--runs" type="button" @onclick="ToggleRunDrawer"><AutomationIcon Name="history" />Runs</button>
+                        <button class="automation-restore-tab automation-restore-tab--runs" type="button" @onclick="ToggleRunDrawer"><EditorIcon Name="history" />Runs</button>
                     }
                 }
-            </section>
+            </EditorWorkspace>
         }
 
     }
@@ -376,7 +359,7 @@
 
 @code {
     private RenderFragment CreationActions => @<div class="automation-page-actions">
-        <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="new-flow" />New flow</button>
-        <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><AutomationIcon Name="new-subflow" />New subflow</button>
+        <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><EditorIcon Name="new-flow" />New flow</button>
+        <button class="btn-primary" type="button" data-automation-new-subflow @onclick="NewSubflowAsync"><EditorIcon Name="new-subflow" />New subflow</button>
     </div>;
 }

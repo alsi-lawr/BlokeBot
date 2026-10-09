@@ -132,10 +132,19 @@
                                                    showBingo,
                                                    showCompetitions,
                                                    showPlayQueues,
-                                                   showMoments,
-                                                   showOverlays
+                                                   showMoments
                                                ))"
                                             Routes="routes" />
+
+                @if (showOverlays)
+                {
+                    <NavMenuOverlaysGroup Group="@(new(
+                        GroupIsOpen(NavigationGroup.Overlays),
+                        GroupBodyId(NavigationGroup.Overlays),
+                        EventCallback.Factory.Create(this, () => ToggleGroupAsync(NavigationGroup.Overlays)),
+                        EventCallback.Factory.Create<KeyboardEventArgs>(this, args => CloseGroupOnEscape(NavigationGroup.Overlays, args))
+                    ))" Routes="routes" />
+                }
 
                 <NavMenuFeatureGroups Guessing="@(new(showGuessing, new(
                                            GroupIsOpen(NavigationGroup.Guessing),

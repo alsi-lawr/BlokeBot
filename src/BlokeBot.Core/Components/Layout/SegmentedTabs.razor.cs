@@ -34,6 +34,9 @@ public partial class SegmentedTabs : IDisposable
     public bool OwnsFragment { get; set; }
 
     [Parameter]
+    public bool BrowserOwned { get; set; }
+
+    [Parameter]
     public string? ActiveKey { get; set; }
 
     [Parameter]

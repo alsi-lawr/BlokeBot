@@ -24,8 +24,7 @@ public partial class FullOverlayEditorPage
         }
     }
 
-    private void ConfigurationInput(ChangeEventArgs args) =>
-        _configuration = args.Value?.ToString() ?? "";
+    private void ConfigurationInput(string value) => _configuration = value;
 
     private async Task ApplyConfigurationAsync(FullOverlayEditorView view)
     {

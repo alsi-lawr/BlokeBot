@@ -1,4 +1,4 @@
-import { createSourceSession, EditorFocus, htmlRanges, cssRanges, attributeEdit } from './FullOverlayEditorCore.js';
+import { createSourceSession, EditorFocus, htmlRanges, attributeEdit } from './FullOverlayEditorCore.js';
 import { planStyles, prepareStyles, styleValues, elementKey, targetElement } from './VisualStyles.js';
 import { parsedCss } from './SourceRanges.js';
 import { motionPreset } from './MotionCommands.js';
@@ -8,17 +8,25 @@ export function createEditorDocument(document) {
     const session = createSourceSession(document);
     let selected = null, saved = JSON.stringify({...document,diagnostics:[]}), feedback = '', focus = EditorFocus.Visual, externalRevision=0, gestureStyles=null;
     const candidate = () => { const value = session.snapshot(); return { ...document, html:value.html, css:value.css, widgets:value.widgets, diagnostics:[] }; };
+    let derived = null;
     function view() {
-        const snapshot = session.snapshot(), parsed = htmlRanges(snapshot.html);
-        const keys = new Map(parsed.elements.map(node=>[node.start,elementKey(node)]));
-        const layers = parsed.elements.map(node=>({ key:elementKey(node), parent:keys.get(node.parent)??null,
-            label:node.values['aria-label']??node.values.id??node.name,
-            tag:node.name, selector:node.selector, widgetId:node.values['data-blokebot-widget']??null }));
-        const widget = snapshot.widgets.find(widget=>`widget:${widget.id.value}`===selected)??null;
-        return { revision:snapshot.revision,dirty:JSON.stringify(candidate())!==saved, selected,
-            layers,widget,locked:widget?.authoring.isLocked??targetElement(snapshot,selected)?.values['data-blokebot-locked']==='true',styles:styleValues(snapshot,selected),feedback,focus,
-            diagnostics:[...parsed.diagnostics.filter(d=>d.code!=='missing-doctype').map(d=>({code:d.code,buffer:'html',offset:d.start})),
-                ...cssRanges(snapshot.css).diagnostics.map(d=>({code:d.code,buffer:'css',offset:d.start}))] };
+        const snapshot = session.snapshot();
+        if (!derived || derived.revision !== snapshot.revision || derived.selected !== selected || derived.saved !== saved) {
+            const parsed = htmlRanges(snapshot.html), stylesheet = parsedCss(snapshot.css);
+            const keys = new Map(parsed.elements.map(node=>[node.start,elementKey(node)]));
+            const layers = parsed.elements.map(node=>({ key:elementKey(node), parent:keys.get(node.parent)??null,
+                label:node.values['aria-label']??node.values.id??node.name,
+                tag:node.name, selector:node.selector, widgetId:node.values['data-blokebot-widget']??null }));
+            const widget = snapshot.widgets.find(widget=>`widget:${widget.id.value}`===selected)??null;
+            const element = parsed.elements.find(node=>elementKey(node)===selected);
+            derived = { revision:snapshot.revision, selected, saved, value:{
+                revision:snapshot.revision,dirty:JSON.stringify({...document,html:snapshot.html,css:snapshot.css,widgets:snapshot.widgets,diagnostics:[]})!==saved,
+                selected,layers,widget,locked:widget?.authoring.isLocked??element?.values['data-blokebot-locked']==='true',
+                styles:styleValues(snapshot,selected,{element,stylesheet}),
+                diagnostics:[...parsed.diagnostics.filter(d=>d.code!=='missing-doctype').map(d=>({code:d.code,buffer:'html',offset:d.start})),
+                    ...stylesheet.diagnostics.map(d=>({code:d.code,buffer:'css',offset:d.start}))] } };
+        }
+        return {...derived.value,feedback,focus};
     }
     function finish(result, nextSelection=selected) {
         if(result.kind==='applied') {selected=nextSelection;feedback='';}

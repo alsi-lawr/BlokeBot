@@ -1,29 +1,31 @@
 @if (View.Selected is null) { <h2>Inspector</h2><p class="text-muted-foreground">Select a widget or HTML layer. Source edits remain available without a selection.</p> }
 else {
-    <header class="full-inspector-heading"><h2>@(View.Layers.FirstOrDefault(layer => layer.Key == View.Selected)?.Label ?? "Selected layer")</h2><button class="btn-secondary" @onclick="Find">Find HTML</button></header>
-    <div class="full-inspector-actions"><button class="btn-secondary" @onclick='() => Send(new { kind = "duplicate" })'>Duplicate</button><button class="btn-secondary" @onclick='() => Send(new { kind = "remove" })'>Remove</button></div>
-    <div class="full-inspector-actions"><button class="btn-secondary" @onclick='() => Send(new { kind = "reorder", direction = -1 })'>Earlier</button><button class="btn-secondary" @onclick='() => Send(new { kind = "reorder", direction = 1 })'>Later</button></div>
+    <header class="full-inspector-heading"><h2>@(View.Layers.FirstOrDefault(layer => layer.Key == View.Selected)?.Label ?? "Selected layer")</h2><EditorAction Label="Find HTML" Icon="search" Click="Find" /></header>
+    <div class="full-inspector-actions"><EditorAction Label="Duplicate layer" Icon="duplicate" Click='() => Send(new { kind = "duplicate" })' /><EditorAction Label="Remove layer" Icon="delete" Click='() => Send(new { kind = "remove" })' /></div>
+    <div class="full-inspector-actions"><EditorAction Label="Move before previous sibling" Tip="Move one place earlier in the HTML parent" Icon="arrow-up" Click='() => Send(new { kind = "reorder", direction = -1 })' /><EditorAction Label="Move after next sibling" Tip="Move one place later in the HTML parent" Icon="arrow-down" Click='() => Send(new { kind = "reorder", direction = 1 })' /></div>
     <div class="full-inspector-toggles"><label><input type="checkbox" checked='@(View.Widget?.Authoring.IsVisible ?? Value("display") != "none")' @onchange='args => Send(new { kind = "visible", value = (bool)args.Value! })' />Visible</label>
         <label><input type="checkbox" checked='@View.Locked' @onchange='args => Send(new { kind = "lock", value = (bool)args.Value! })' />Lock</label>
         <label><input type="checkbox" checked='@(View.Widget?.Authoring.ClipOverflow ?? Value("overflow") == "hidden")' @onchange='args => Send(new { kind = "clip", value = (bool)args.Value! })' />Clip overflow</label>
     </div>
-    <section class="full-inspector-section"><h3>Position &amp; size</h3><div class="full-inspector-grid">
+    <StudioFold Key="full-style" Label="Style" @bind-Open="_styleOpen" Bare="true">
+        <div class="full-inspector-grid">@foreach (var field in _styleFields) { <Field Id='@($"full-style-{field.Property}")' Label='@field.Label' Value='@Value(field.Property)' ValueChanged='value => StyleAsync(field.Property, value)' /> }</div>
+    </StudioFold>
+    <StudioFold Key="full-position" Label="Position & size" @bind-Open="_positionOpen" Bare="true">
+    <div class="full-inspector-grid">
         <Field Id="full-x" Label="X" Value='@Position("x")' ValueChanged='value => PositionAsync("x", value)' />
         <Field Id="full-y" Label="Y" Value='@Position("y")' ValueChanged='value => PositionAsync("y", value)' />
         <Field Id="full-width" Label="Width" Value='@Value("width", View.Widget?.Authoring.Width ?? "auto")' ValueChanged='value => DimensionAsync("width", value)' />
         <Field Id="full-height" Label="Height" Value='@Value("height", View.Widget?.Authoring.Height ?? "auto")' ValueChanged='value => DimensionAsync("height", value)' />
         <Field Id="full-rotate" Label="Rotation (°)" Value='@(Value("rotate", "0deg").Replace("deg", ""))' ValueChanged="RotateAsync" />
         <Field Id="full-scale" Label="Scale" Value='@Value("scale", "1")' ValueChanged="ScaleAsync" />
-    </div></section>
-    <section class="full-inspector-section"><h3>Anchors</h3><div class="full-inspector-grid">
+    </div>
+    <h3>Anchors</h3><div class="full-inspector-grid">
         <label class="full-editor-field">Horizontal<select aria-label="Horizontal anchor" value='@Anchor("x")' @onchange='args => AnchorAsync("x", args)'><option value="0">Start</option><option value="1">Centre</option><option value="2">End</option></select></label>
         <label class="full-editor-field">Vertical<select aria-label="Vertical anchor" value='@Anchor("y")' @onchange='args => AnchorAsync("y", args)'><option value="0">Start</option><option value="1">Centre</option><option value="2">End</option></select></label>
     </div><div class="full-inspector-align" role="group" aria-label="Align within preview viewport">
-        <button class="btn-secondary" aria-label="Align left" @onclick='() => Align.InvokeAsync(("x", 0))'>←</button><button class="btn-secondary" aria-label="Centre horizontally" @onclick='() => Align.InvokeAsync(("x", 1))'>↔</button><button class="btn-secondary" aria-label="Align right" @onclick='() => Align.InvokeAsync(("x", 2))'>→</button>
-        <button class="btn-secondary" aria-label="Align top" @onclick='() => Align.InvokeAsync(("y", 0))'>↑</button><button class="btn-secondary" aria-label="Centre vertically" @onclick='() => Align.InvokeAsync(("y", 1))'>↕</button><button class="btn-secondary" aria-label="Align bottom" @onclick='() => Align.InvokeAsync(("y", 2))'>↓</button>
-    </div></section>
-    <StudioFold Key="full-style" Label="Style" @bind-Open="_styleOpen" Bare="true">
-        <div class="full-inspector-grid">@foreach (var field in _styleFields) { <Field Id='@($"full-style-{field.Property}")' Label='@field.Label' Value='@Value(field.Property)' ValueChanged='value => StyleAsync(field.Property, value)' /> }</div>
+        <EditorAction Label="Align left" Tip="Align left now within the preview viewport" Icon="arrow-left" Click='() => Align.InvokeAsync(("x", 0))' /><EditorAction Label="Centre horizontally" Tip="Centre horizontally now within the preview viewport" Icon="direction" Click='() => Align.InvokeAsync(("x", 1))' /><EditorAction Label="Align right" Tip="Align right now within the preview viewport" Icon="arrow-right" Click='() => Align.InvokeAsync(("x", 2))' />
+        <EditorAction Label="Align top" Tip="Align top now within the preview viewport" Icon="arrow-up" Click='() => Align.InvokeAsync(("y", 0))' /><EditorAction Label="Centre vertically" Tip="Centre vertically now within the preview viewport" Icon="direction" Click='() => Align.InvokeAsync(("y", 1))' /><EditorAction Label="Align bottom" Tip="Align bottom now within the preview viewport" Icon="arrow-down" Click='() => Align.InvokeAsync(("y", 2))' />
+    </div>
     </StudioFold>
     <StudioFold Key="full-motion" Label="Motion" @bind-Open="_motionOpen" Bare="true">
         <label class="full-editor-field">When<select aria-label="When" @bind="_motionPhase"><option value="entrance">Entrance</option><option value="exit">Exit / unavailable</option><option value="state">State change</option></select></label>

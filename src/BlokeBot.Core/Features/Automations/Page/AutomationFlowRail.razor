@@ -3,7 +3,7 @@
     <aside class="automation-flow-rail" aria-label="Automation library">
         @if (FocusMode)
         {
-            <div class="automation-flow-rail-controls"><button class="automation-icon-button" type="button" aria-label="Hide library" @onclick="Toggle"><AutomationIcon Name="collapse-left" /></button></div>
+            <div class="automation-flow-rail-controls"><button class="automation-icon-button" type="button" aria-label="Hide library" @onclick="Toggle"><EditorIcon Name="collapse-left" /></button></div>
         }
         <div class="automation-flow-rail-heading">
             <SegmentedTabs Items="_libraryTabs" ActiveKey="@(Library == AutomationLibraryKind.Flows ? "flows" : "subflows")" AriaLabel="Automation library" Id="automation-library" OwnsFragment="false" ActiveKeyChanged="SelectLibraryAsync" />
@@ -37,8 +37,8 @@
         @if (CurrentFlowId is not null && !EditingSubflow)
         {
             <div class="automation-flow-rail-actions">
-                <button class="btn-secondary" type="button" @onclick="Duplicate"><AutomationIcon Name="duplicate" />Duplicate</button>
-                <button class="automation-danger-button" type="button" @onclick="Delete"><AutomationIcon Name="delete" />@(DeleteConfirmation ? "Confirm delete" : "Delete")</button>
+                <button class="btn-secondary" type="button" @onclick="Duplicate"><EditorIcon Name="duplicate" />Duplicate</button>
+                <button class="automation-danger-button" type="button" @onclick="Delete"><EditorIcon Name="delete" />@(DeleteConfirmation ? "Confirm delete" : "Delete")</button>
             </div>
         }
         </div>

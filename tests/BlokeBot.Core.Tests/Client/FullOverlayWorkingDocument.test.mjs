@@ -4,10 +4,72 @@ import { createEditorDocument } from '../../../src/BlokeBot.Core/wwwroot/Feature
 import { createSourceSession, EditorFocus } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceSession.js';
 import { targetElement } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/VisualStyles.js';
 import { cssRanges } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/SourceRanges.js';
+import { createPreviewBridge } from '../../../src/BlokeBot.Core/wwwroot/Features/Overlays/Full/Editor/EditorPreview.js';
 
 const id='91c902f7-4020-416c-8b99-a5bdf008e55b';
 const widget={id:{value:id},kind:{value:'giveaway'},configuration:{appearance:{css:'.card { opacity: .7; }'},secretSetting:'EDITOR ONLY'},authoring:{isVisible:true,isLocked:false,clipOverflow:false,x:'0px',y:'0px',width:'100px',height:'50px',rotationDegrees:0,scaleX:1,scaleY:1,horizontalAnchor:0,verticalAnchor:0},audio:{isMuted:false,volume:.3}};
 const document={id:crypto.randomUUID(),html:`<!-- untouched --><main><section data-blokebot-widget="${id}"></section><p>Ordinary</p><script>const raw = "<section>";</script></main>`,css:`/* untouched */[data-blokebot-widget="${id}"] { color: red; unknown-prop: future(x); } @media (width > 30rem) { [data-blokebot-widget="${id}"] { opacity: .8; } }`,widgets:[widget],diagnostics:[]};
+
+test('Local preview keeps authorized widgets only and rejects obsolete or nested-frame geometry',()=>{
+ const previousWindow=globalThis.window,previousLocation=globalThis.location;
+ const host=new EventTarget(),frame=new EventTarget(),sent=[],accepted=[];
+ globalThis.window=host;globalThis.location={origin:'https://editor.example'};
+ frame.contentWindow={postMessage:value=>sent.push(value)};
+ frame.removeAttribute=()=>{};
+ let view={revision:0,selected:'element:target',layers:[{key:'element:target',selector:'#target'}]};
+ const bridge=createPreviewBridge(frame,()=>view,(...args)=>accepted.push(args),()=>{},()=>{},()=>{});
+ const receive=(data,source=frame.contentWindow)=>{const event=new Event('message');Object.assign(event,{data,source,origin:location.origin});host.dispatchEvent(event);};
+ try {
+  const complete=message=>receive({kind:'blokebot-full-source-complete',previewId:'approved',lifetime:'renderer',requestId:message.requestId,revision:message.revision});
+  bridge.set('approved',0,structuredClone(document));frame.dispatchEvent(new Event('load'));
+  receive({kind:'blokebot-full-preview-status',previewId:'approved',state:'ready',diagnostics:[],lifetime:'renderer'});
+  const first=sent.at(-1);assert.deepEqual(first.widgetIds,[id]);
+  complete(first);
+  const edited={...structuredClone(document),html:'<section id="target">new local source</section>'};
+  view={...view,revision:1};assert.equal(bridge.render(edited,1),false);
+  const current=sent.at(-1);assert.equal(current.html,edited.html);assert.deepEqual(current.widgetIds,[id]);
+  bridge.set('late-reply',0,document);assert.equal(frame.src,'/full-overlays/preview/approved');
+  const geometry=request=>({kind:'blokebot-full-observations',previewId:'approved',requestId:request.requestId,revision:request.revision,viewport:{width:1920,height:1080},items:[{key:'element:target',x:1,y:2,width:30,height:40,layoutX:1,layoutY:2,styles:{left:'1px'}}]});
+  const before=accepted.length;receive(geometry(first));receive(geometry(current),{});receive({...geometry(current),revision:0});assert.equal(accepted.length,before);
+  receive(geometry(current));assert.equal(accepted.at(-1)[0][0].x,1);
+  complete(current);
+  edited.widgets[0].configuration={sourceId:'new binding'};view={...view,revision:2};assert.equal(bridge.render(edited,2),true);assert.deepEqual(sent.at(-1).widgetIds,[]);
+  view={...view,revision:3};assert.equal(bridge.render(structuredClone(document),3),true);
+  view={...view,revision:4};assert.equal(bridge.render({...edited,widgets:[]},4),true);assert.deepEqual(sent.at(-1).widgetIds,[]);
+  bridge.dispose();const disposed=accepted.length;receive(geometry(sent.at(-1)));assert.equal(accepted.length,disposed);
+ } finally {bridge.dispose();globalThis.window=previousWindow;globalThis.location=previousLocation;}
+});
+
+test('Newest pending source drains once while authorization, reconnect and replacement stay independent',()=>{
+ const previousWindow=globalThis.window,previousLocation=globalThis.location;
+ const host=new EventTarget(),frame=new EventTarget(),sent=[];
+ globalThis.window=host;globalThis.location={origin:'https://editor.example'};
+ frame.contentWindow={postMessage:value=>sent.push(value)};frame.removeAttribute=()=>{};
+ let view={revision:0,layers:[]};
+ const bridge=createPreviewBridge(frame,()=>view,()=>{},()=>{},()=>{},()=>{});
+ const receive=data=>{const event=new Event('message');Object.assign(event,{data,source:frame.contentWindow,origin:location.origin});host.dispatchEvent(event);};
+ const ready=(previewId,lifetime,revision)=>receive({kind:'blokebot-full-preview-status',previewId,state:'ready',diagnostics:[],lifetime,revision});
+ const complete=message=>receive({kind:'blokebot-full-source-complete',previewId:message.previewId,lifetime:message.lifetime,requestId:message.requestId,revision:message.revision});
+ const renders=()=>sent.filter(value=>value.kind==='blokebot-full-source'&&!value.authorizationOnly);
+ const edit=(revision,widgets=document.widgets)=>{view={...view,revision};bridge.render({...document,html:`<p>${revision}</p>`,widgets},revision);};
+ try {
+  bridge.set('first',0,document);ready('first','old',0);const initial=renders().at(-1);
+  edit(1);edit(2);edit(3);
+  assert.equal(renders().length,1);
+  edit(4,[]);assert.equal(sent.at(-1).authorizationOnly,true);assert.deepEqual(sent.at(-1).widgetIds,[]);
+  complete({...initial,lifetime:'foreign'});complete({...initial,requestId:'obsolete'});assert.equal(renders().length,1);
+  complete(initial);const newest=renders().at(-1);assert.equal(newest.html,'<p>4</p>');assert.equal(newest.revision,4);assert.equal(renders().length,2);
+  edit(5,[]);complete(initial);assert.equal(renders().length,2);
+  receive({kind:'blokebot-full-preview-status',previewId:'first',state:'reconnecting',diagnostics:[],lifetime:null,revision:4});
+  ready('first','reconnected',4);const reconnected=renders().at(-1);assert.equal(reconnected.html,'<p>5</p>');assert.equal(reconnected.lifetime,'reconnected');
+  edit(6,[]);complete(newest);assert.equal(renders().at(-1),reconnected);
+  complete(reconnected);assert.equal(renders().at(-1).html,'<p>6</p>');
+  bridge.set('replacement',6,{...document,html:'<p>replacement</p>'});ready('replacement','new',6);const replacement=renders().at(-1);
+  edit(7);complete(reconnected);assert.equal(renders().at(-1),replacement);
+  complete(replacement);assert.equal(renders().at(-1).html,'<p>7</p>');
+  edit(8);const count=sent.length;bridge.dispose();complete(renders().at(-1));assert.equal(sent.length,count);
+ } finally {bridge.dispose();globalThis.window=previousWindow;globalThis.location=previousLocation;}
+});
 
 test('Grouped source and audio metadata undo preserves newer CSS and retries atomically',()=>{
  const owner=createEditorDocument(structuredClone(document));owner.select(`widget:${id}`);
@@ -183,4 +245,24 @@ test('Layout planning preserves authored value trivia and separates an untermina
  owner.source('css',owner.candidate().css.replace('--blokebot-x: 64px','--blokebot-x: 100px'));
  const revision=owner.view().revision,second=owner.planGesture({...command,dx:8},key,revision);owner.commitGesture(second);
  assert.match(owner.candidate().css,/--blokebot-x:\s*108px/);
+});
+
+test('Current view follows metadata-only edits, source diagnostics, selection and saved baseline without losing focused history',()=>{
+ const owner=createEditorDocument(structuredClone(document)),key=`widget:${id}`;
+ owner.select(key);assert.equal(owner.view().dirty,false);assert.equal(owner.view().styles.color,'red');
+ owner.command({kind:'audio',property:'volume',value:.8});owner.command({kind:'lock',value:true});
+ assert.equal(owner.view().widget.audio.volume,.8);assert.equal(owner.view().locked,true);assert.equal(owner.view().dirty,true);
+ const saved=owner.candidate();owner.saved(saved);assert.equal(owner.view().dirty,false);
+ owner.source('css','[broken');assert(owner.view().diagnostics.some(d=>d.buffer==='css'));assert.equal(owner.view().focus,'css');
+ owner.stale();const revision=owner.view().revision;owner.focus('html');
+ assert.equal(owner.view().revision,revision);assert.equal(owner.view().focus,'html');assert.match(owner.view().feedback,/newer work/);
+ owner.focus('css');owner.history('undo');assert.equal(owner.candidate().css,saved.css);assert.equal(owner.view().dirty,false);
+ assert.deepEqual(owner.view().diagnostics.filter(d=>d.buffer==='css'),[]);assert.equal(owner.view().styles.color,'red');
+ owner.focus('visual');owner.history('undo');assert.equal(owner.view().locked,false);assert.equal(owner.view().dirty,true);
+ owner.history('redo');assert.equal(owner.view().locked,true);assert.equal(owner.view().dirty,false);
+ owner.source('html',owner.candidate().html.replace('<p>Ordinary','<p data-blokebot-locked="true">Updated'));
+ owner.select(owner.view().layers.find(layer=>layer.tag==='p').key);
+ assert.equal(owner.view().widget,null);assert.equal(owner.view().locked,true);assert.deepEqual(owner.view().styles,{});
+ assert.match(owner.candidate().html,/Updated/);
+ owner.select(key);assert.equal(owner.view().styles.color,'red');assert.equal(owner.view().widget.audio.volume,.8);
 });

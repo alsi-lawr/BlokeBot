@@ -13,9 +13,9 @@ internal static partial class SiteGuideCatalog
                 "Arrange widgets and ordinary HTML in one editable document. Save drafts privately, then choose what your browser source shows.",
             Media = FullOverlayMedia(
                 "editor",
-                "A full overlay with its canvas, layers, source and selected widget settings.",
-                "The same editor on a narrow screen, with source and Save actions reachable by scrolling.",
-                "Canvas, source and widget settings edit one working document."
+                "A full overlay in Visual mode with its canvas, layers and selected widget settings.",
+                "The same editor on a narrow screen, with separate Visual and HTML/CSS modes and reachable Save actions.",
+                "Visual and HTML/CSS modes edit one working document."
             ),
             Sections =
             [
@@ -25,7 +25,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Simple overlays remain independent browser sources. Their saved configuration becomes live immediately. You do not need to convert them to use a full overlay.",
-                        "Open Full overlays in the dashboard for a separate document, draft and publication history. Its browser URL is different from a simple overlay URL.",
+                        "Open Overlays → Editor in the dashboard for a separate document, draft and publication history. Its browser URL is different from a simple overlay URL.",
                     ],
                     Links = [new("Simple browser sources", "overlays")],
                 },
@@ -34,7 +34,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Start an editable document",
                     Steps =
                     [
-                        "Select your channel, then open Full overlays.",
+                        "Select your channel, then open Overlays → Editor.",
                         "Choose Blank, Stream companion or Community progress. Each creates an unpublished document with a fresh browser-source key.",
                         "Name the document. Starter headings, HTML and CSS are ordinary editable source, not a locked template.",
                         "Select a layer or use Add. Confirm destination setup for starter widgets before expecting live data.",
@@ -62,12 +62,12 @@ internal static partial class SiteGuideCatalog
                     [
                         "Select a widget or ordinary HTML element in the layer tree. On a larger screen, the canvas also supports selection, move and resize handles.",
                         "Use the inspector for position, size, anchors, transforms, order, visibility, locking and optional clipping. Alignment and keyboard controls are alternatives to dragging.",
-                        "Use view-only zoom and pan to inspect the scene. Shift temporarily bypasses optional snapping. Full screen enters the browser's fullscreen mode; Escape or the same button exits it.",
-                        "Switch between HTML and CSS tabs to edit the authoritative source. Visual edits change only intended source ranges; comments, scripts and unfamiliar syntax remain yours.",
-                        "Use Undo or Redo in the editor you intend to change. Each editor has its own history. A newer overlapping edit is kept and reported as a conflict; undo that edit in its editor before retrying.",
+                        "Use view-only zoom and pan to inspect the scene. Shift temporarily bypasses optional snapping. Focus fills the application window; the same control restores the normal app shell. Full screen enters the browser's fullscreen mode; Escape or the same button exits it.",
+                        "Choose HTML/CSS, then HTML or CSS, to edit the authoritative source. Your visual edits are already included; there is no Apply or Sync step. Return to Visual without losing unsaved or incomplete source, the selected source buffer or its caret. Visual edits change only intended source ranges; comments, scripts and unfamiliar syntax remain yours.",
+                        "The toolbar names the current Visual, HTML or CSS history. Undo and Redo follow that history. Each editor has its own history. A newer overlapping edit is kept and reported as a conflict; undo that edit in its editor before retrying.",
                     ],
                     Note =
-                        "Canvas controls do not take over typing or text-selection shortcuts in source fields. On narrow screens, use the layer tree, inspector and source fields without spatial dragging.",
+                        "Canvas controls do not take over typing or text-selection shortcuts in source fields. On narrow screens, switch between Layers, Canvas and Inspector, or choose HTML/CSS. Action tips appear on keyboard focus; Escape dismisses them. Help remains beside the theme button in the normal app topbar; exit Focus to return to it.",
                     Code = """
                         <!-- A widget's stable anchor belongs to this document. -->
                         <section data-blokebot-widget="YOUR-WIDGET-GUID"></section>
@@ -92,7 +92,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Choose Sample or Live preview to freeze the current working document, including unsaved source, widget settings and audio.",
-                        "Inspect the actual rendered result. Editing refreshes preview from a new frozen candidate; Replay repeats it without consuming production work.",
+                        "Inspect the actual rendered result marked Unsaved. This is not your live publication. Editing refreshes preview from a new frozen candidate; Replay repeats it without consuming production work.",
                         "Read diagnostics for absent source anchors, missing media, unresolved setup or failed widgets. A failed widget does not replace unrelated content.",
                     ],
                     Note =
@@ -106,7 +106,7 @@ internal static partial class SiteGuideCatalog
                         "Save stores the working draft without changing the current live publication. Incomplete drafts can be saved.",
                         "Use Save and publish to save and select the candidate for live delivery together. Check publication diagnostics first; ordinary unresolved content can remain visible as warnings.",
                         "If another editor changed the saved revision, keep your working edits and resolve the reported conflict instead of silently overwriting it.",
-                        "Open the document menu to retrieve the same live URL while authorized. Paste it into an anonymous OBS browser source. OBS does not need a dashboard login.",
+                        "Open History & live URL to retrieve the same live URL while authorized. Paste it into an anonymous OBS browser source. OBS does not need a dashboard login.",
                     ],
                     Note =
                         "Treat the live URL as a bearer credential. This guide's screenshots do not show its key. A draft save does not restart production feed or cue owners. Publishing, rollback, archive and restore invalidate obsolete render work.",
