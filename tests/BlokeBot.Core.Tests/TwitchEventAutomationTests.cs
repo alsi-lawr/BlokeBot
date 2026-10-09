@@ -88,10 +88,11 @@ public sealed class TwitchEventAutomationTests
     }
 
     [Test]
-    [Arguments(200, 2, 3, 3)]
-    [Arguments(100, 1, 1, 1)]
+    [Arguments(200, 2, 3, 4, 4)]
+    [Arguments(100, 1, 1, 1, 1)]
     public async Task Cheer_InclusiveBoundsRejectOutsideAndEqualBoundsMatchOneAmount(
         int maximum,
+        int runsAt101,
         int runsAt150,
         int runsAt200,
         int runsAt201
@@ -107,6 +108,7 @@ public sealed class TwitchEventAutomationTests
             {
                 (99, 0),
                 (100, 1),
+                (101, runsAt101),
                 (150, runsAt150),
                 (200, runsAt200),
                 (201, runsAt201),
