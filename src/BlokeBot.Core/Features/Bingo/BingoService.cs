@@ -401,124 +401,162 @@ public sealed partial class BingoService(
             hostId,
             async () =>
             {
-                await using var db = await dbFactory.CreateDbContextAsync(ct);
-                var host = await db
-                    .Hosts.AsNoTracking()
-                    .SingleOrDefaultAsync(value => value.Id == hostId, ct);
-                if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.Bingo))
-                {
-                    return new BingoOperationOutcome.FeatureDisabled();
-                }
-                if (
-                    host.BingoAcceptEventsAfterUtc is { } acceptAfter
-                    && sourceEvent.OccurredAtUtc.UtcDateTime <= acceptAfter
-                )
-                {
-                    return new BingoOperationOutcome.Succeeded();
-                }
-                if (
-                    await db
-                        .BingoEventReceipts.AsNoTracking()
-                        .AnyAsync(
-                            value =>
-                                value.HostId == hostId
-                                && value.Kind == sourceEvent.Kind
-                                && value.SourceEventId == sourceEvent.SourceEventId,
-                            ct
-                        )
-                )
-                {
-                    return new BingoOperationOutcome.Succeeded(true);
-                }
-
-                var game = await LoadIssuedGameAsync(db, hostId, ct);
-                _ = db.BingoEventReceipts.Add(
-                    new BingoEventReceipt
+                var work = await RetryPointWorkAsync(
+                    async db =>
                     {
-                        HostId = hostId,
-                        GameId = game?.Id,
-                        Kind = sourceEvent.Kind,
-                        SourceEventId = sourceEvent.SourceEventId,
-                        OccurredAtUtc = sourceEvent.OccurredAtUtc.UtcDateTime,
-                        RecordedAtUtc = clock.GetUtcNow().UtcDateTime,
-                    }
-                );
-                if (game is null)
-                {
-                    _ = await db.SaveChangesAsync(ct);
-                    return new BingoOperationOutcome.Succeeded();
-                }
-                var matchingKeys = game.TemplateRevision!.Squares.Where(value =>
-                        Matches(value, sourceEvent)
-                    )
-                    .Select(value => value.Key)
-                    .ToHashSet(StringComparer.Ordinal);
-                if (matchingKeys.Count == 0)
-                {
-                    _ = await db.SaveChangesAsync(ct);
-                    return new BingoOperationOutcome.Succeeded();
-                }
-
-                var now = clock.GetUtcNow().UtcDateTime;
-                var changedCards = new List<BingoCard>();
-                foreach (var card in game.Cards)
-                {
-                    var layout = Layout(game, card);
-                    var changed = false;
-                    foreach (var squareKey in matchingKeys)
-                    {
-                        var position = IndexOf(layout, squareKey);
-                        var mark = card.Marks.SingleOrDefault(value =>
-                            value.SquareKey == squareKey
-                        );
-                        if (mark?.IsActive == true)
+                        var host = await db
+                            .Hosts.AsNoTracking()
+                            .SingleOrDefaultAsync(value => value.Id == hostId, ct);
+                        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.Bingo))
                         {
-                            continue;
-                        }
-                        mark ??= AddMark(db, game, card, squareKey, position, now);
-                        mark.IsActive = true;
-                        mark.ChangedAtUtc = now;
-                        _ = db.BingoEvidence.Add(ToEvidence(game, card, mark, sourceEvent, now));
-                        changed = true;
-                    }
-                    if (changed)
-                    {
-                        changedCards.Add(card);
-                        AddDomainEvent(
-                            db,
-                            game,
-                            card,
-                            BingoDomainEventKind.SquareMarked,
-                            $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}:{card.PublicId:N}",
-                            sourceEvent.PublicSummary,
-                            now
-                        );
-                        if (!await DetectWinsAsync(db, game, card, now, ct))
-                        {
-                            return new BingoOperationOutcome.Conflict(
-                                "A Bingo point reward would exceed the supported balance limit."
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.FeatureDisabled(),
+                                null,
+                                false
                             );
                         }
-                    }
-                }
-                _ = await db.SaveChangesAsync(ct);
-                await GrantPendingAchievementsAsync(hostId, ct);
-                if (changedCards.Count > 0)
+                        if (
+                            host.BingoAcceptEventsAfterUtc is { } acceptAfter
+                            && sourceEvent.OccurredAtUtc.UtcDateTime <= acceptAfter
+                        )
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Succeeded(),
+                                null,
+                                false
+                            );
+                        }
+                        if (
+                            await db
+                                .BingoEventReceipts.AsNoTracking()
+                                .AnyAsync(
+                                    value =>
+                                        value.HostId == hostId
+                                        && value.Kind == sourceEvent.Kind
+                                        && value.SourceEventId == sourceEvent.SourceEventId,
+                                    ct
+                                )
+                        )
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Succeeded(true),
+                                null,
+                                false
+                            );
+                        }
+
+                        var game = await LoadIssuedGameAsync(db, hostId, ct);
+                        _ = db.BingoEventReceipts.Add(
+                            new BingoEventReceipt
+                            {
+                                HostId = hostId,
+                                GameId = game?.Id,
+                                Kind = sourceEvent.Kind,
+                                SourceEventId = sourceEvent.SourceEventId,
+                                OccurredAtUtc = sourceEvent.OccurredAtUtc.UtcDateTime,
+                                RecordedAtUtc = clock.GetUtcNow().UtcDateTime,
+                            }
+                        );
+                        if (game is null)
+                        {
+                            _ = await db.SaveChangesAsync(ct);
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Succeeded(),
+                                null,
+                                false
+                            );
+                        }
+                        var matchingKeys = game.TemplateRevision!.Squares.Where(value =>
+                                Matches(value, sourceEvent)
+                            )
+                            .Select(value => value.Key)
+                            .ToHashSet(StringComparer.Ordinal);
+                        if (matchingKeys.Count == 0)
+                        {
+                            _ = await db.SaveChangesAsync(ct);
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Succeeded(),
+                                null,
+                                false
+                            );
+                        }
+
+                        var now = clock.GetUtcNow().UtcDateTime;
+                        var changedCards = new List<BingoCard>();
+                        foreach (var card in game.Cards)
+                        {
+                            var layout = Layout(game, card);
+                            var changed = false;
+                            foreach (var squareKey in matchingKeys)
+                            {
+                                var position = IndexOf(layout, squareKey);
+                                var mark = card.Marks.SingleOrDefault(value =>
+                                    value.SquareKey == squareKey
+                                );
+                                if (mark?.IsActive == true)
+                                {
+                                    continue;
+                                }
+                                mark ??= AddMark(db, game, card, squareKey, position, now);
+                                mark.IsActive = true;
+                                mark.ChangedAtUtc = now;
+                                _ = db.BingoEvidence.Add(
+                                    ToEvidence(game, card, mark, sourceEvent, now)
+                                );
+                                changed = true;
+                            }
+                            if (changed)
+                            {
+                                changedCards.Add(card);
+                                AddDomainEvent(
+                                    db,
+                                    game,
+                                    card,
+                                    BingoDomainEventKind.SquareMarked,
+                                    $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}:{card.PublicId:N}",
+                                    sourceEvent.PublicSummary,
+                                    now
+                                );
+                                if (!await DetectWinsAsync(db, game, card, now, ct))
+                                {
+                                    return new BingoPointWork(
+                                        new BingoOperationOutcome.Conflict(
+                                            "A Bingo point reward would exceed the supported balance limit."
+                                        ),
+                                        null,
+                                        false
+                                    );
+                                }
+                            }
+                        }
+                        _ = await db.SaveChangesAsync(ct);
+                        return new BingoPointWork(
+                            new BingoOperationOutcome.Succeeded(),
+                            changedCards.Count > 0
+                                ? new BingoOverlayEvent(
+                                    hostId,
+                                    new(game.PublicId),
+                                    null,
+                                    BingoDomainEventKind.SquareMarked,
+                                    $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}",
+                                    sourceEvent.PublicSummary,
+                                    sourceEvent.OccurredAtUtc
+                                )
+                                : null,
+                            true
+                        );
+                    },
+                    ct
+                );
+                if (work.ReconcileAchievements)
                 {
-                    await PublishAndOverlayAsync(
-                        new(
-                            hostId,
-                            new(game.PublicId),
-                            null,
-                            BingoDomainEventKind.SquareMarked,
-                            $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}",
-                            sourceEvent.PublicSummary,
-                            sourceEvent.OccurredAtUtc
-                        ),
-                        ct
-                    );
+                    await GrantPendingAchievementsAsync(hostId, ct);
                 }
-                return new BingoOperationOutcome.Succeeded();
+                if (work.Overlay is not null)
+                {
+                    await PublishAndOverlayAsync(work.Overlay, ct);
+                }
+                return work.Outcome;
             },
             ct
         );
@@ -848,132 +886,188 @@ public sealed partial class BingoService(
             hostId,
             async () =>
             {
-                await using var db = await dbFactory.CreateDbContextAsync(ct);
-                if (!await FeatureEnabledAsync(db, hostId, ct))
-                {
-                    return new BingoOperationOutcome.FeatureDisabled();
-                }
-                if (await OperationRecordedAsync(db, hostId, command.OperationId, ct))
-                {
-                    return new BingoOperationOutcome.Succeeded(true);
-                }
-                var game = await LoadIssuedGameAsync(db, hostId, ct);
-                if (game is null || game.PublicId != command.GameId.Value)
-                {
-                    return new BingoOperationOutcome.NotFound();
-                }
-                var card = game.Cards.SingleOrDefault(value =>
-                    value.PublicId == command.CardId.Value
-                );
-                if (card is null)
-                {
-                    return new BingoOperationOutcome.NotFound();
-                }
-                var layout = Layout(game, card);
-                if (command.Position < 0 || command.Position >= layout.Count)
-                {
-                    return new BingoOperationOutcome.Invalid("Choose a square on the issued card.");
-                }
-                var squareKey = layout[command.Position].Value;
-                var definition = game.TemplateRevision!.Squares.Single(value =>
-                    value.Key == squareKey
-                );
-                if (definition.Kind != BingoSquareKind.Manual)
-                {
-                    return new BingoOperationOutcome.Invalid(
-                        "Automatic squares can only be marked by their typed event source."
-                    );
-                }
-                var now = clock.GetUtcNow().UtcDateTime;
-                var current = card.Marks.SingleOrDefault(value => value.SquareKey == squareKey);
-                if ((mark && current?.IsActive == true) || (!mark && current?.IsActive != true))
-                {
-                    AddAudit(
-                        db,
-                        hostId,
-                        game.Id,
-                        card.Id,
-                        current?.Id,
-                        command.OperationId,
-                        mark ? "confirm-idempotent" : "reverse-idempotent",
-                        command.Actor,
-                        command.PrivateNote,
-                        now
-                    );
-                    _ = await db.SaveChangesAsync(ct);
-                    return new BingoOperationOutcome.Succeeded(true);
-                }
-                current ??= AddMark(db, game, card, squareKey, command.Position, now);
-                current.IsActive = mark;
-                current.ChangedAtUtc = now;
-                _ = db.BingoEvidence.Add(
-                    new BingoEvidence
+                var work = await RetryPointWorkAsync(
+                    async db =>
                     {
-                        HostId = hostId,
-                        GameId = game.Id,
-                        CardId = card.Id,
-                        Mark = current,
-                        Action = mark ? BingoEvidenceAction.Marked : BingoEvidenceAction.Reversed,
-                        Source = BingoEvidenceSource.Manual,
-                        EventKind = BingoSquareKind.Manual,
-                        Summary = mark
-                            ? "Moderator confirmed this square"
-                            : "Moderator reversed this square",
-                        OccurredAtUtc = now,
-                        RecordedAtUtc = now,
-                    }
-                );
-                AddAudit(
-                    db,
-                    hostId,
-                    game.Id,
-                    card.Id,
-                    current.Id == 0 ? null : current.Id,
-                    command.OperationId,
-                    mark ? "confirm" : "reverse",
-                    command.Actor,
-                    command.PrivateNote,
-                    now
-                );
-                AddDomainEvent(
-                    db,
-                    game,
-                    card,
-                    mark ? BingoDomainEventKind.SquareMarked : BingoDomainEventKind.SquareReversed,
-                    $"manual:{command.OperationId:N}",
-                    mark
-                        ? "Moderator confirmed a Bingo square"
-                        : "Moderator reversed a Bingo square",
-                    now
-                );
-                if (mark)
-                {
-                    if (!await DetectWinsAsync(db, game, card, now, ct))
-                    {
-                        return new BingoOperationOutcome.Conflict(
-                            "A Bingo point reward would exceed the supported balance limit."
+                        if (!await FeatureEnabledAsync(db, hostId, ct))
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.FeatureDisabled(),
+                                null,
+                                false
+                            );
+                        }
+                        if (await OperationRecordedAsync(db, hostId, command.OperationId, ct))
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Succeeded(true),
+                                null,
+                                false
+                            );
+                        }
+                        var game = await LoadIssuedGameAsync(db, hostId, ct);
+                        if (game is null || game.PublicId != command.GameId.Value)
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.NotFound(),
+                                null,
+                                false
+                            );
+                        }
+                        var card = game.Cards.SingleOrDefault(value =>
+                            value.PublicId == command.CardId.Value
                         );
-                    }
-                }
-                _ = await db.SaveChangesAsync(ct);
-                await GrantPendingAchievementsAsync(hostId, ct);
-                await PublishAndOverlayAsync(
-                    new(
-                        hostId,
-                        command.GameId,
-                        command.CardId,
-                        mark
-                            ? BingoDomainEventKind.SquareMarked
-                            : BingoDomainEventKind.SquareReversed,
-                        $"manual:{command.OperationId:N}",
-                        mark
-                            ? "Moderator confirmed a Bingo square"
-                            : "Moderator reversed a Bingo square",
-                        now
-                    ),
+                        if (card is null)
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.NotFound(),
+                                null,
+                                false
+                            );
+                        }
+                        var layout = Layout(game, card);
+                        if (command.Position < 0 || command.Position >= layout.Count)
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Invalid(
+                                    "Choose a square on the issued card."
+                                ),
+                                null,
+                                false
+                            );
+                        }
+                        var squareKey = layout[command.Position].Value;
+                        var definition = game.TemplateRevision!.Squares.Single(value =>
+                            value.Key == squareKey
+                        );
+                        if (definition.Kind != BingoSquareKind.Manual)
+                        {
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Invalid(
+                                    "Automatic squares can only be marked by their typed event source."
+                                ),
+                                null,
+                                false
+                            );
+                        }
+                        var now = clock.GetUtcNow().UtcDateTime;
+                        var current = card.Marks.SingleOrDefault(value =>
+                            value.SquareKey == squareKey
+                        );
+                        if (
+                            (mark && current?.IsActive == true)
+                            || (!mark && current?.IsActive != true)
+                        )
+                        {
+                            AddAudit(
+                                db,
+                                hostId,
+                                game.Id,
+                                card.Id,
+                                current?.Id,
+                                command.OperationId,
+                                mark ? "confirm-idempotent" : "reverse-idempotent",
+                                command.Actor,
+                                command.PrivateNote,
+                                now
+                            );
+                            _ = await db.SaveChangesAsync(ct);
+                            return new BingoPointWork(
+                                new BingoOperationOutcome.Succeeded(true),
+                                null,
+                                false
+                            );
+                        }
+                        current ??= AddMark(db, game, card, squareKey, command.Position, now);
+                        current.IsActive = mark;
+                        current.ChangedAtUtc = now;
+                        _ = db.BingoEvidence.Add(
+                            new BingoEvidence
+                            {
+                                HostId = hostId,
+                                GameId = game.Id,
+                                CardId = card.Id,
+                                Mark = current,
+                                Action = mark
+                                    ? BingoEvidenceAction.Marked
+                                    : BingoEvidenceAction.Reversed,
+                                Source = BingoEvidenceSource.Manual,
+                                EventKind = BingoSquareKind.Manual,
+                                Summary = mark
+                                    ? "Moderator confirmed this square"
+                                    : "Moderator reversed this square",
+                                OccurredAtUtc = now,
+                                RecordedAtUtc = now,
+                            }
+                        );
+                        AddAudit(
+                            db,
+                            hostId,
+                            game.Id,
+                            card.Id,
+                            current.Id == 0 ? null : current.Id,
+                            command.OperationId,
+                            mark ? "confirm" : "reverse",
+                            command.Actor,
+                            command.PrivateNote,
+                            now
+                        );
+                        AddDomainEvent(
+                            db,
+                            game,
+                            card,
+                            mark
+                                ? BingoDomainEventKind.SquareMarked
+                                : BingoDomainEventKind.SquareReversed,
+                            $"manual:{command.OperationId:N}",
+                            mark
+                                ? "Moderator confirmed a Bingo square"
+                                : "Moderator reversed a Bingo square",
+                            now
+                        );
+                        if (mark)
+                        {
+                            if (!await DetectWinsAsync(db, game, card, now, ct))
+                            {
+                                return new BingoPointWork(
+                                    new BingoOperationOutcome.Conflict(
+                                        "A Bingo point reward would exceed the supported balance limit."
+                                    ),
+                                    null,
+                                    false
+                                );
+                            }
+                        }
+                        _ = await db.SaveChangesAsync(ct);
+                        return new BingoPointWork(
+                            new BingoOperationOutcome.Succeeded(),
+                            new BingoOverlayEvent(
+                                hostId,
+                                command.GameId,
+                                command.CardId,
+                                mark
+                                    ? BingoDomainEventKind.SquareMarked
+                                    : BingoDomainEventKind.SquareReversed,
+                                $"manual:{command.OperationId:N}",
+                                mark
+                                    ? "Moderator confirmed a Bingo square"
+                                    : "Moderator reversed a Bingo square",
+                                now
+                            ),
+                            true
+                        );
+                    },
                     ct
                 );
-                return new BingoOperationOutcome.Succeeded();
+                if (work.ReconcileAchievements)
+                {
+                    await GrantPendingAchievementsAsync(hostId, ct);
+                }
+                if (work.Overlay is not null)
+                {
+                    await PublishAndOverlayAsync(work.Overlay, ct);
+                }
+                return work.Outcome;
             },
             ct
         );
@@ -1070,38 +1164,32 @@ public sealed partial class BingoService(
         foreach (var recipient in win.Recipients)
         {
             var login = NormalizeLogin(recipient.Login);
-            var balance = await db.PointBalances.SingleOrDefaultAsync(
-                value => value.HostId == win.HostId && value.Login == login,
-                ct
+            var ceiling = await PointCreditCapacity.LoadCeilingAsync(db, win.HostId, login, ct);
+            var maximum = ceiling.Match<System.Numerics.BigInteger?>(
+                value => value.Amount.Value,
+                _ => null
             );
-            if (balance is null)
-            {
-                balance = new PointBalance
-                {
-                    HostId = win.HostId,
-                    Login = login,
-                    Amount = "0",
-                    UpdatedAtUtc = now,
-                };
-                _ = db.PointBalances.Add(balance);
-            }
-            var current = PointAmount.ParseAbsolute(balance.Amount);
-            if (
-                !await PointCreditCapacity.CanCreditAsync(
-                    db,
-                    win.HostId,
-                    login,
-                    current,
-                    amount.Value,
-                    ct
-                )
-            )
+            if (maximum is null)
             {
                 return false;
             }
-            var next = current.Add(amount);
-            balance.Amount = next.ToString();
-            balance.UpdatedAtUtc = now;
+            var credit = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                db,
+                new(win.HostId, login),
+                CanonicalPointInteger.From(amount.Value),
+                CanonicalPointInteger.From(maximum.Value),
+                now,
+                ct
+            );
+            var returned = credit.Match<PointAmount?>(
+                value => new PointAmount(value.After.ToBigInteger()),
+                _ => null
+            );
+            if (returned is null)
+            {
+                return false;
+            }
+            var next = returned.Value;
             _ = db.PointLedgerEntries.Add(
                 new PointLedgerEntry
                 {
@@ -1972,5 +2060,58 @@ public sealed partial class BingoService(
         Join,
         Move,
         Remove,
+    }
+
+    private sealed record BingoPointWork(
+        BingoOperationOutcome Outcome,
+        BingoOverlayEvent? Overlay,
+        bool ReconcileAchievements
+    );
+
+    private async Task<BingoPointWork> RetryPointWorkAsync(
+        Func<BlokeBotDbContext, Task<BingoPointWork>> operation,
+        CancellationToken ct
+    )
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+            var committed = false;
+            try
+            {
+                transaction = await db.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable,
+                    ct
+                );
+                var work = await operation(db);
+                if (work.Outcome is BingoOperationOutcome.Succeeded)
+                {
+                    await transaction.CommitAsync(ct);
+                    committed = true;
+                }
+                return work;
+            }
+            catch (Exception exception)
+                when (!committed
+                    && attempt < 20
+                    && !ct.IsCancellationRequested
+                    && MainDatabaseFailureClassifier.IsContention(exception)
+                )
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(CancellationToken.None);
+                }
+            }
+            finally
+            {
+                if (transaction is not null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(5 * attempt), ct);
+        }
     }
 }

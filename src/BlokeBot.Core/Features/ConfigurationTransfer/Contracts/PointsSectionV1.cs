@@ -15,7 +15,8 @@ public sealed record PointsSectionV1(
     [property: JsonRequired] string GiveawayMaximumPayout,
     [property: JsonRequired] int GiveawayWinnerCount,
     [property: JsonRequired] PointsEligibilityMode GiveawayEligibility,
-    [property: JsonRequired] int GiveawayCooldownSeconds
+    [property: JsonRequired] int GiveawayCooldownSeconds,
+    WatchTimePointsV1? WatchTimePoints = null
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -43,4 +44,10 @@ public sealed record PointsRepliesV1(
     [property: JsonRequired] string StreamOffline,
     [property: JsonRequired] string NotEligible,
     [property: JsonRequired] string FollowerEligibilityUnavailable
+);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record WatchTimePointsV1(
+    [property: JsonRequired] bool Enabled,
+    [property: JsonRequired] string? Amount
 );

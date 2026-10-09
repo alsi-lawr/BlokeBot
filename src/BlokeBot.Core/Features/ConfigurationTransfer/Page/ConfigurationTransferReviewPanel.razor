@@ -86,7 +86,7 @@
                     <div class="review-row__nested">
                         @foreach (var issue in section.Issues)
                         {
-                            <PageState Kind="PageStateKind.Failure"
+                            <PageState Kind="@(issue.BlocksApply ? PageStateKind.Failure : PageStateKind.Empty)"
                                        Title="@issue.Location"
                                        Description="@issue.Message" />
                         }

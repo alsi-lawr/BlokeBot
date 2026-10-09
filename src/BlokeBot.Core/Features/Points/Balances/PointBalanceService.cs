@@ -127,72 +127,60 @@ public sealed partial class PointBalanceService(
         {
             return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
-
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var now = DateTime.UtcNow;
-        var target = await LoadBalanceForUpdateAsync(db, hostId, targetLogin, now, ct);
-        var current = PointAmount.ParseAbsolute(target.Amount);
-        if (
-            !await PointCreditCapacity.CanCreditAsync(
-                db,
-                hostId,
-                target.Login,
-                current,
-                amount.Value,
-                ct
-            )
-        )
-        {
-            return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
-        }
-
-        var next = current.Add(amount);
-        target.Amount = next.ToString();
-        target.UpdatedAtUtc = now;
-        AddLedger(
-            db,
-            hostId,
-            PointLedgerKind.Add,
-            target.Login,
-            amount.Value,
-            next,
-            actorLogin,
-            null,
-            null,
-            note,
-            now
-        );
-        _ = await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        var ledgerId = db
-            .ChangeTracker.Entries<PointLedgerEntry>()
-            .Single(entry => entry.Entity.Kind == PointLedgerKind.Add)
-            .Entity.Id;
-        var pointLabel =
-            await db
-                .PointsSettings.AsNoTracking()
-                .Where(x => x.HostId == hostId)
-                .Select(x => x.PointLabel)
-                .SingleOrDefaultAsync(ct)
-            ?? "points";
-        foreach (var presenter in eventPresenters)
-        {
-            await presenter.PresentAsync(
-                new OverlayEventPresentation.PointAward
+        var login = LoginName.Parse(targetLogin).Value;
+        var result = await RetryCreditAsync(
+            async (db, now) =>
+            {
+                var mutation = await CreditAsync(db, hostId, login, amount, now, ct);
+                return mutation.Map(value =>
                 {
-                    HostId = hostId,
-                    SourceKey = ledgerId.ToString(
-                        System.Globalization.CultureInfo.InvariantCulture
-                    ),
-                    Recipient = target.Login,
-                    Amount = amount.ToDisplayString(),
-                    PointLabel = pointLabel,
-                },
-                ct
-            );
-        }
-        return Success(next, amount);
+                    AddLedger(
+                        db,
+                        hostId,
+                        PointLedgerKind.Add,
+                        login,
+                        amount.Value,
+                        value.Balance,
+                        actorLogin,
+                        null,
+                        null,
+                        note,
+                        now
+                    );
+                    return value;
+                });
+            },
+            ct
+        );
+        return await result.Match<ValueTask<PointMutationResult>>(
+            async mutation =>
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                var label =
+                    await db
+                        .PointsSettings.AsNoTracking()
+                        .Where(x => x.HostId == hostId)
+                        .Select(x => x.PointLabel)
+                        .SingleOrDefaultAsync(ct)
+                    ?? "points";
+                foreach (var presenter in eventPresenters)
+                {
+                    await presenter.PresentAsync(
+                        new OverlayEventPresentation.PointAward
+                        {
+                            HostId = hostId,
+                            SourceKey = mutation.LedgerId.ToString(CultureInfo.InvariantCulture),
+                            Recipient = login,
+                            Amount = amount.ToDisplayString(),
+                            PointLabel = label,
+                        },
+                        ct
+                    );
+                }
+                return Success(mutation.Mutation.Balance, amount);
+            },
+            failure => ValueTask.FromResult(Failure(failure))
+        );
     }
 
     public PointMutationIO Remove(
@@ -223,16 +211,34 @@ public sealed partial class PointBalanceService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = DateTime.UtcNow;
-        var target = await LoadBalanceForUpdateAsync(db, hostId, targetLogin, now, ct);
-        var current = PointAmount.ParseAbsolute(target.Amount);
-        if (current.Value < amount.Value)
+        var target = new PointBalanceTarget(hostId, LoginName.Parse(targetLogin).Value);
+        await MainDatabaseStatements.EnsurePointBalanceAsync(db, target, now, ct);
+        var outcome = await MainDatabaseStatements.ApplyPointDeltaAsync(
+            db,
+            target,
+            CanonicalPointInteger.From(-amount.Value),
+            new(
+                CanonicalPointInteger.From(amount.Value),
+                CanonicalPointInteger.From(PointAmount.MaximumValue)
+            ),
+            now,
+            ct
+        );
+        var prepared = outcome.Match(
+            applied => Success(new PointAmount(applied.After.ToBigInteger()), amount),
+            rejected =>
+                Failure(
+                    new PointBalanceMutationFailure.InsufficientBalance(
+                        CurrentAmount(rejected.Current),
+                        amount
+                    )
+                )
+        );
+        if (prepared.Match(_ => false, _ => true))
         {
-            return Failure(new PointBalanceMutationFailure.InsufficientBalance(current, amount));
+            return prepared;
         }
-
-        var next = current.Subtract(amount);
-        target.Amount = next.ToString();
-        target.UpdatedAtUtc = now;
+        var next = prepared.Match(value => value.Balance, _ => PointAmount.Zero);
         AddLedger(
             db,
             hostId,
@@ -270,18 +276,21 @@ public sealed partial class PointBalanceService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var normalized = LoginName.Parse(targetLogin).Value;
-        var row = await db.PointBalances.SingleOrDefaultAsync(
-            x => x.HostId == hostId && x.Login == normalized,
+        var deleted = await MainDatabaseStatements.DeletePointBalanceAsync(
+            db,
+            new(hostId, normalized),
             ct
         );
-        if (row is null)
+        var before = deleted.Match<PointAmount?>(
+            value => new PointAmount(value.Before.ToBigInteger()),
+            _ => null
+        );
+        if (before is null)
         {
             return Failure(new PointBalanceMutationFailure.UnknownUser());
         }
-
-        var current = PointAmount.ParseAbsolute(row.Amount);
+        var current = before.Value;
         var now = DateTime.UtcNow;
-        _ = db.PointBalances.Remove(row);
         AddLedger(
             db,
             hostId,
@@ -327,69 +336,97 @@ public sealed partial class PointBalanceService(
             return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var now = DateTime.UtcNow;
-        var source = await LoadBalanceForUpdateAsync(db, hostId, from, now, ct);
-        var target = await LoadBalanceForUpdateAsync(db, hostId, to, now, ct);
-        var sourceCurrent = PointAmount.ParseAbsolute(source.Amount);
-        var targetCurrent = PointAmount.ParseAbsolute(target.Amount);
-        if (sourceCurrent.Value < amount.Value)
-        {
-            return Failure(
-                new PointBalanceMutationFailure.InsufficientBalance(sourceCurrent, amount)
-            );
-        }
-
-        if (
-            !await PointCreditCapacity.CanCreditAsync(
-                db,
-                hostId,
-                target.Login,
-                targetCurrent,
-                amount.Value,
-                ct
-            )
-        )
-        {
-            return Failure(new PointBalanceMutationFailure.CapExceeded(targetCurrent, amount));
-        }
-
-        var sourceNext = sourceCurrent.Subtract(amount);
-        var targetNext = targetCurrent.Add(amount);
-        source.Amount = sourceNext.ToString();
-        source.UpdatedAtUtc = now;
-        target.Amount = targetNext.ToString();
-        target.UpdatedAtUtc = now;
-        AddLedger(
-            db,
-            hostId,
-            PointLedgerKind.TransferOut,
-            source.Login,
-            -amount.Value,
-            sourceNext,
-            from,
-            target.Login,
-            null,
-            string.Empty,
-            now
+        var result = await RetryCreditAsync(
+            async (db, now) =>
+            {
+                async ValueTask<PointMutationResult> DebitAsync()
+                {
+                    var source = new PointBalanceTarget(hostId, from);
+                    await MainDatabaseStatements.EnsurePointBalanceAsync(db, source, now, ct);
+                    var debit = await MainDatabaseStatements.ApplyPointDeltaAsync(
+                        db,
+                        source,
+                        CanonicalPointInteger.From(-amount.Value),
+                        new(
+                            CanonicalPointInteger.From(amount.Value),
+                            CanonicalPointInteger.From(PointAmount.MaximumValue)
+                        ),
+                        now,
+                        ct
+                    );
+                    return debit.Match(
+                        applied => Success(new PointAmount(applied.After.ToBigInteger()), amount),
+                        rejected =>
+                            Failure(
+                                new PointBalanceMutationFailure.InsufficientBalance(
+                                    CurrentAmount(rejected.Current),
+                                    amount
+                                )
+                            )
+                    );
+                }
+                // Both rows are changed in normalized login order; either failure rolls back the whole attempt.
+                var creditFirst = StringComparer.Ordinal.Compare(to, from) < 0;
+                var first = creditFirst
+                    ? await CreditAsync(db, hostId, to, amount, now, ct)
+                    : await DebitAsync();
+                return await first.Match<ValueTask<PointMutationResult>>(
+                    async firstMutation =>
+                    {
+                        var second = creditFirst
+                            ? await DebitAsync()
+                            : await CreditAsync(db, hostId, to, amount, now, ct);
+                        return second.Map(secondMutation =>
+                        {
+                            var debit = creditFirst ? secondMutation : firstMutation;
+                            var credit = creditFirst ? firstMutation : secondMutation;
+                            AddLedger(
+                                db,
+                                hostId,
+                                PointLedgerKind.TransferOut,
+                                from,
+                                -amount.Value,
+                                debit.Balance,
+                                from,
+                                to,
+                                null,
+                                string.Empty,
+                                now
+                            );
+                            AddLedger(
+                                db,
+                                hostId,
+                                PointLedgerKind.TransferIn,
+                                to,
+                                amount.Value,
+                                credit.Balance,
+                                from,
+                                from,
+                                null,
+                                string.Empty,
+                                now
+                            );
+                            return new PointBalanceMutation(debit.Balance, amount);
+                        });
+                    },
+                    async failure =>
+                    {
+                        if (!creditFirst)
+                        {
+                            return Failure(failure);
+                        }
+                        var current = await ReadCurrentAmountAsync(db, hostId, from, ct);
+                        return current < amount
+                            ? Failure(
+                                new PointBalanceMutationFailure.InsufficientBalance(current, amount)
+                            )
+                            : Failure(failure);
+                    }
+                );
+            },
+            ct
         );
-        AddLedger(
-            db,
-            hostId,
-            PointLedgerKind.TransferIn,
-            target.Login,
-            amount.Value,
-            targetNext,
-            from,
-            source.Login,
-            null,
-            string.Empty,
-            now
-        );
-        _ = await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return Success(sourceNext, amount);
+        return result.Map(value => value.Mutation);
     }
 
     public PointMutationIO ApplyGamble(
@@ -412,69 +449,84 @@ public sealed partial class PointBalanceService(
             return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var now = DateTime.UtcNow;
-        var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
-        var current = PointAmount.ParseAbsolute(row.Amount);
-        if (current.Value < stake.Value)
-        {
-            return Failure(new PointBalanceMutationFailure.InsufficientBalance(current, stake));
-        }
-
-        if (
-            outcome is PointGambleOutcome.Won
-            && !await PointCreditCapacity.CanCreditAsync(
-                db,
-                hostId,
-                row.Login,
-                current,
-                stake.Value,
-                ct
-            )
-        )
-        {
-            return Failure(new PointBalanceMutationFailure.CapExceeded(current, stake));
-        }
-
-        var prepared = outcome.Match(
-            _ =>
-                Result<GambleMutation, PointBalanceMutationFailure>.Success(
-                    new GambleMutation(current.Add(stake), stake.Value, PointLedgerKind.GambleWin)
-                ),
-            _ =>
-                Result<GambleMutation, PointBalanceMutationFailure>.Success(
-                    new GambleMutation(
-                        current.Subtract(stake),
-                        -stake.Value,
-                        PointLedgerKind.GambleLoss
+        var normalized = LoginName.Parse(login).Value;
+        var result = await RetryCreditAsync(
+            async (db, now) =>
+            {
+                var ceiling = await PointCreditCapacity.LoadCeilingAsync(
+                    db,
+                    hostId,
+                    normalized,
+                    ct
+                );
+                var won = outcome.Match(_ => true, _ => false);
+                var maximum = won
+                    ? ceiling.Match(
+                        value => value.Amount.Value,
+                        _ => System.Numerics.BigInteger.MinusOne
                     )
-                )
+                    : PointAmount.MaximumValue;
+                if (maximum.Sign < 0)
+                {
+                    var current = await ReadCurrentAmountAsync(db, hostId, normalized, ct);
+                    return current < stake
+                        ? Failure(
+                            new PointBalanceMutationFailure.InsufficientBalance(current, stake)
+                        )
+                        : Failure(new PointBalanceMutationFailure.CapExceeded(current, stake));
+                }
+                var target = new PointBalanceTarget(hostId, normalized);
+                await MainDatabaseStatements.EnsurePointBalanceAsync(db, target, now, ct);
+                var delta = won ? stake.Value : -stake.Value;
+                var applied = await MainDatabaseStatements.ApplyPointDeltaAsync(
+                    db,
+                    target,
+                    CanonicalPointInteger.From(delta),
+                    new(
+                        CanonicalPointInteger.From(stake.Value),
+                        CanonicalPointInteger.From(maximum)
+                    ),
+                    now,
+                    ct
+                );
+                return applied.Match(
+                    value =>
+                    {
+                        var next = new PointAmount(value.After.ToBigInteger());
+                        AddLedger(
+                            db,
+                            hostId,
+                            won ? PointLedgerKind.GambleWin : PointLedgerKind.GambleLoss,
+                            normalized,
+                            delta,
+                            next,
+                            login,
+                            null,
+                            null,
+                            string.Empty,
+                            now
+                        );
+                        return Success(next, stake);
+                    },
+                    rejected =>
+                        CurrentAmount(rejected.Current) < stake
+                            ? Failure(
+                                new PointBalanceMutationFailure.InsufficientBalance(
+                                    CurrentAmount(rejected.Current),
+                                    stake
+                                )
+                            )
+                            : Failure(
+                                new PointBalanceMutationFailure.CapExceeded(
+                                    CurrentAmount(rejected.Current),
+                                    stake
+                                )
+                            )
+                );
+            },
+            ct
         );
-
-        return await prepared.Match(CommitAsync, failure => ValueTask.FromResult(Failure(failure)));
-
-        async ValueTask<PointMutationResult> CommitAsync(GambleMutation mutation)
-        {
-            row.Amount = mutation.Balance.ToString();
-            row.UpdatedAtUtc = now;
-            AddLedger(
-                db,
-                hostId,
-                mutation.LedgerKind,
-                row.Login,
-                mutation.Delta,
-                mutation.Balance,
-                login,
-                null,
-                null,
-                string.Empty,
-                now
-            );
-            _ = await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-            return Success(mutation.Balance, stake);
-        }
+        return result.Map(value => value.Mutation);
     }
 
     public PointMutationIO AwardGiveaway(
@@ -499,39 +551,25 @@ public sealed partial class PointBalanceService(
         CancellationToken ct
     )
     {
-        var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
-        var current = PointAmount.ParseAbsolute(row.Amount);
-        if (
-            !await PointCreditCapacity.CanCreditAsync(
+        var normalized = LoginName.Parse(login).Value;
+        var mutation = await CreditAsync(db, hostId, normalized, amount, now, ct);
+        return mutation.Map(value =>
+        {
+            AddLedger(
                 db,
                 hostId,
-                row.Login,
-                current,
+                PointLedgerKind.GiveawayWin,
+                normalized,
                 amount.Value,
-                ct
-            )
-        )
-        {
-            return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
-        }
-
-        var next = current.Add(amount);
-        row.Amount = next.ToString();
-        row.UpdatedAtUtc = now;
-        AddLedger(
-            db,
-            hostId,
-            PointLedgerKind.GiveawayWin,
-            row.Login,
-            amount.Value,
-            next,
-            null,
-            null,
-            giveawayId,
-            string.Empty,
-            now
-        );
-        return Success(next, amount);
+                value.Balance,
+                null,
+                null,
+                giveawayId,
+                string.Empty,
+                now
+            );
+            return value;
+        });
     }
 
     public PointMutationIO AwardGuessWin(
@@ -560,40 +598,25 @@ public sealed partial class PointBalanceService(
         {
             return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
-
-        var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
-        var current = PointAmount.ParseAbsolute(row.Amount);
-        if (
-            !await PointCreditCapacity.CanCreditAsync(
+        var normalized = LoginName.Parse(login).Value;
+        var mutation = await CreditAsync(db, hostId, normalized, amount, now, ct);
+        return mutation.Map(value =>
+        {
+            AddLedger(
                 db,
                 hostId,
-                row.Login,
-                current,
+                PointLedgerKind.GuessWin,
+                normalized,
                 amount.Value,
-                ct
-            )
-        )
-        {
-            return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
-        }
-
-        var next = current.Add(amount);
-        row.Amount = next.ToString();
-        row.UpdatedAtUtc = now;
-        AddLedger(
-            db,
-            hostId,
-            PointLedgerKind.GuessWin,
-            row.Login,
-            amount.Value,
-            next,
-            null,
-            null,
-            null,
-            $"guess round {roundId}",
-            now
-        );
-        return Success(next, amount);
+                value.Balance,
+                null,
+                null,
+                null,
+                $"guess round {roundId}",
+                now
+            );
+            return value;
+        });
     }
 
     private static PointMutationResult Success(PointAmount balance, PointAmount amount) =>
@@ -601,12 +624,6 @@ public sealed partial class PointBalanceService(
 
     private static PointMutationResult Failure(PointBalanceMutationFailure failure) =>
         PointMutationResult.Error(failure);
-
-    private sealed record GambleMutation(
-        PointAmount Balance,
-        BigInteger Delta,
-        PointLedgerKind LedgerKind
-    );
 
     private static void AddLedger(
         BlokeBotDbContext db,
@@ -639,32 +656,131 @@ public sealed partial class PointBalanceService(
             }
         );
 
-    private static async Task<PointBalance> LoadBalanceForUpdateAsync(
+    private static PointAmount CurrentAmount(PointBalanceRead read) =>
+        read.Match(value => new PointAmount(value.Amount.ToBigInteger()), _ => PointAmount.Zero);
+
+    private static async ValueTask<PointMutationResult> CreditAsync(
         BlokeBotDbContext db,
         int hostId,
         string login,
+        PointAmount amount,
         DateTime now,
         CancellationToken ct
     )
     {
-        var normalized = LoginName.Parse(login).Value;
-        var row = await db.PointBalances.SingleOrDefaultAsync(
-            x => x.HostId == hostId && x.Login == normalized,
-            ct
+        var ceiling = await PointCreditCapacity.LoadCeilingAsync(db, hostId, login, ct);
+        return await ceiling.Match<ValueTask<PointMutationResult>>(
+            async available =>
+            {
+                var result = await MainDatabaseStatements.ApplyCreatingPointCreditAsync(
+                    db,
+                    new(hostId, login),
+                    CanonicalPointInteger.From(amount.Value),
+                    CanonicalPointInteger.From(available.Amount.Value),
+                    now,
+                    ct
+                );
+                return result.Match(
+                    applied => Success(new PointAmount(applied.After.ToBigInteger()), amount),
+                    rejected =>
+                        Failure(
+                            new PointBalanceMutationFailure.CapExceeded(
+                                CurrentAmount(rejected.Current),
+                                amount
+                            )
+                        )
+                );
+            },
+            async _ =>
+                Failure(
+                    new PointBalanceMutationFailure.CapExceeded(
+                        await ReadCurrentAmountAsync(db, hostId, login, ct),
+                        amount
+                    )
+                )
         );
-        if (row is not null)
-        {
-            return row;
-        }
+    }
 
-        row = new PointBalance
+    private static async Task<PointAmount> ReadCurrentAmountAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        string login,
+        CancellationToken ct
+    )
+    {
+        var amount = await db
+            .PointBalances.AsNoTracking()
+            .Where(value => value.HostId == hostId && value.Login == login)
+            .Select(value => value.Amount)
+            .SingleOrDefaultAsync(ct);
+        return amount is null ? PointAmount.Zero : PointAmount.ParseAbsolute(amount);
+    }
+
+    private sealed record CommittedPointMutation(PointBalanceMutation Mutation, int LedgerId);
+
+    private async ValueTask<
+        Result<CommittedPointMutation, PointBalanceMutationFailure>
+    > RetryCreditAsync(
+        Func<BlokeBotDbContext, DateTime, ValueTask<PointMutationResult>> operation,
+        CancellationToken ct
+    )
+    {
+        for (var attempt = 1; ; attempt++)
         {
-            HostId = hostId,
-            Login = normalized,
-            Amount = "0",
-            UpdatedAtUtc = now,
-        };
-        _ = db.PointBalances.Add(row);
-        return row;
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+            var committed = false;
+            try
+            {
+                transaction = await db.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable,
+                    ct
+                );
+                var result = await operation(db, DateTime.UtcNow);
+                return await result.Match<
+                    ValueTask<Result<CommittedPointMutation, PointBalanceMutationFailure>>
+                >(
+                    async mutation =>
+                    {
+                        _ = await db.SaveChangesAsync(ct);
+                        var ledgerId = db
+                            .ChangeTracker.Entries<PointLedgerEntry>()
+                            .Select(value => value.Entity.Id)
+                            .First();
+                        await transaction.CommitAsync(ct);
+                        committed = true;
+                        return Result<CommittedPointMutation, PointBalanceMutationFailure>.Success(
+                            new(mutation, ledgerId)
+                        );
+                    },
+                    failure =>
+                        ValueTask.FromResult(
+                            Result<CommittedPointMutation, PointBalanceMutationFailure>.Error(
+                                failure
+                            )
+                        )
+                );
+            }
+            catch (Exception exception)
+                when (!committed
+                    && attempt < 20
+                    && !ct.IsCancellationRequested
+                    && MainDatabaseFailureClassifier.IsContention(exception)
+                )
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(CancellationToken.None);
+                }
+            }
+            finally
+            {
+                if (transaction is not null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(5 * attempt), ct);
+        }
     }
 }

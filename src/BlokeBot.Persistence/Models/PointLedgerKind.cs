@@ -25,10 +25,12 @@ public enum PointLedgerKind
     CompetitionReward,
     BlokeRaidSpecialSpend,
     BlokeRaidVictoryReward,
+    WatchTimeReward,
 }
 
 internal static class PointLedgerKindPersistence
 {
+    private const string _watchTimeRewardToken = "WatchTimeReward";
     private const string _addToken = "Add";
     private const string _removeToken = "Remove";
     private const string _deleteBalanceToken = "DeleteBalance";
@@ -53,6 +55,7 @@ internal static class PointLedgerKindPersistence
 
     public static IReadOnlyList<string> Tokens { get; } =
     [
+        _watchTimeRewardToken,
         _addToken,
         _removeToken,
         _deleteBalanceToken,
@@ -79,6 +82,7 @@ internal static class PointLedgerKindPersistence
     public static string ToToken(PointLedgerKind kind) =>
         kind switch
         {
+            PointLedgerKind.WatchTimeReward => _watchTimeRewardToken,
             PointLedgerKind.Add => _addToken,
             PointLedgerKind.Remove => _removeToken,
             PointLedgerKind.DeleteBalance => _deleteBalanceToken,
@@ -106,6 +110,7 @@ internal static class PointLedgerKindPersistence
     public static PointLedgerKind FromToken(string token) =>
         token switch
         {
+            _watchTimeRewardToken => PointLedgerKind.WatchTimeReward,
             _addToken => PointLedgerKind.Add,
             _removeToken => PointLedgerKind.Remove,
             _deleteBalanceToken => PointLedgerKind.DeleteBalance,

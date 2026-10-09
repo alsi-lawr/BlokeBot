@@ -37,6 +37,18 @@ public partial class PageHelpButton
         "Points settings",
         [
             new(
+                "Watch-time points",
+                "Points for people connected to chat, not measured video watch time.",
+                [
+                    "Choose a positive whole amount and save with watch-time points on. It starts off with no amount.",
+                    "The first award waits a full five minutes after enabling or restarting the bot. Later intervals are every five minutes while the stream is live and the bot is connected.",
+                    "Each interval uses the complete current chat membership, including lurkers and the broadcaster. Only the active bot account is excluded. Someone who just joined gets the full amount; absent people get none.",
+                    "Offline, disconnected, or unavailable intervals are skipped without partial or catch-up points. Later fresh intervals recover automatically; the settings status shows when data is unavailable.",
+                    "Points and the normal ledger update without award announcements, chat messages, or a new gain trigger.",
+                    "Applying an older Points import without watch-time settings turns this off and clears its amount.",
+                ]
+            ),
+            new(
                 "Commands",
                 "Command names are the words that viewers and mods type in chat.",
                 [

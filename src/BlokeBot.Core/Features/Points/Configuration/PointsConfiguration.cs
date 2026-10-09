@@ -6,6 +6,8 @@ namespace BlokeBot.Core.Features.Points.Configuration;
 
 public sealed class PointsConfiguration
 {
+    public bool WatchTimePointsEnabled { get; set; }
+    public string? WatchTimePointAmount { get; set; }
     public string PointLabel { get; set; } = "points";
     public PointsCommandAliasEditor Aliases { get; set; } = new();
     public PointsReplySettingsEditor Replies { get; set; } = new();
