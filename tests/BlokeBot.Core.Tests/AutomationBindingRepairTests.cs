@@ -1,6 +1,7 @@
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
@@ -9,26 +10,25 @@ namespace BlokeBot.Core.Tests;
 public sealed partial class AutomationRuntimeTests
 {
     [Test]
-    public async Task BindingRepair_SendValidatesOnlySelectedInputAndHistoryRetainsInactiveExpression()
+    public async Task SendChat_UnsupportedStoredExpressionRemainsInspectableAndRequiresExplicitRepair()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var trigger = Node("custom-command", """{"custom-command-id":7}""");
-        var send = Node(
-            "send-chat",
-            """{"message":""}""",
-            bindings: Bindings(
+        var send = Node("send-chat", """{"message":"Retained fixed\nmessage"}""");
+        var id = await fixture.SaveAsync([trigger, send], [Edge(trigger, "flow", send)]);
+        var unsupportedBindings = AutomationRuntimeSerialization.SerializeInputBindings(
+            Bindings(
                 "message",
                 AutomationInputBindingMode.Expression,
                 new(new(1), "actor.display_name")
             )
         );
-        var draft = Draft(fixture.HostId, [trigger, send], [Edge(trigger, "flow", send)]);
-        _ = (
-            await fixture.Flows.ValidateDraftAsync(draft, CancellationToken.None)
-        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
-        var id = (await fixture.Flows.SaveAsync(draft, CancellationToken.None))
-            .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>()
-            .FlowId;
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var row = await db.AutomationFlowNodes.SingleAsync(node => node.Id == send.Id.Value);
+            row.InputBindingsJson = unsupportedBindings;
+            _ = await db.SaveChangesAsync();
+        }
         var read = (
             await fixture.Flows.ReadForAuthoringAsync(
                 new(fixture.HostId),
@@ -36,6 +36,10 @@ public sealed partial class AutomationRuntimeTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowAuthoringReadOutcome.Editor>();
+        read.Errors.ShouldContain(error =>
+            error.NodeId == send.Id
+            && error.FieldId == new AutomationConfigurationFieldId("message")
+        );
         var descriptors = read.Snapshot.Draft.Nodes.ToDictionary(
             node => node.Id,
             node =>
@@ -46,32 +50,123 @@ public sealed partial class AutomationRuntimeTests
         );
         var editor = AutomationEditorState.Restore(read.Snapshot, descriptors);
         editor.Nodes.ShouldAllBe(node => node.ProjectionPreservesOriginal);
-        var history = new AutomationEditorHistory();
-        history.StartLoaded(editor);
-        var action = editor.Nodes.Single(node => node.Id == send.Id);
-        action.SetBindingMode(new("message"), AutomationInputBindingMode.Fixed);
-        history.Record(editor).ShouldBeTrue();
-        var invalid = (
-            await fixture.Flows.ValidateDraftAsync(
+        _ = (
+            await fixture.Flows.SaveAsync(editor.Draft(new(fixture.HostId)), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
+        _ = (
+            await fixture.Scenarios.RunDefaultAsync(
                 editor.Draft(new(fixture.HostId)),
+                trigger.Id,
                 CancellationToken.None
             )
-        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
-        invalid.Errors.ShouldContain(error =>
-            error.NodeId == send.Id
-            && error.FieldId == new AutomationConfigurationFieldId("message")
-        );
-        editor = history.Undo(editor).ShouldNotBeNull();
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>();
+        (
+            await fixture.Runtime.DispatchAsync(
+                new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+                CancellationToken.None
+            )
+        ).Status.ShouldBe(AutomationDispatchStatus.InvalidFlow);
+        fixture.Chat.Calls.ShouldBe(0);
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (
+                await db.AutomationFlowNodes.SingleAsync(node => node.Id == send.Id.Value)
+            ).InputBindingsJson.ShouldBe(unsupportedBindings);
+            (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        }
+        var history = new AutomationEditorHistory();
+        history.StartLoaded(editor);
         editor
             .Nodes.Single(node => node.Id == send.Id)
-            .Binding(new("message"))
-            .Expression!.Source.ShouldBe("actor.display_name");
+            .SetBindingMode(new("message"), AutomationInputBindingMode.Fixed);
+        history.Record(editor).ShouldBeTrue();
         _ = (
             await fixture.Flows.ValidateDraftAsync(
                 editor.Draft(new(fixture.HostId)),
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+        var undone = history.Undo(editor).ShouldNotBeNull();
+        undone
+            .Nodes.Single(node => node.Id == send.Id)
+            .Binding(new("message"))
+            .Expression!.Source.ShouldBe("actor.display_name");
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(
+                undone.Draft(new(fixture.HostId)),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        editor = history.Redo(undone).ShouldNotBeNull();
+        _ = (
+            await fixture.Flows.SaveAsync(editor.Draft(new(fixture.HostId)), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        _ = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        fixture.Chat.Messages.ShouldBe(["Retained fixed\nmessage"]);
+    }
+
+    [Test]
+    public async Task SendChat_UnsupportedFrozenExpressionFailsBeforePublicEffect()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"must not send"}""");
+        _ = await fixture.SaveAsync(
+            [source, delay, action],
+            [Edge(source, "flow", delay), Edge(delay, "complete", action)]
+        );
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        var runId = dispatched.RunIds.ShouldHaveSingleItem();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db.AutomationFlowRuns.SingleAsync(row => row.Id == runId.Value);
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>()
+                .Flow;
+            run.DefinitionJson = AutomationRuntimeSerialization.SerializeDefinition(
+                frozen with
+                {
+                    Nodes =
+                    [
+                        .. frozen.Nodes.Select(node =>
+                            node.Id == action.Id.Value
+                                ? node with
+                                {
+                                    InputBindingsJson =
+                                        AutomationRuntimeSerialization.SerializeInputBindings(
+                                            Bindings(
+                                                "message",
+                                                AutomationInputBindingMode.Expression,
+                                                new(new(1), "'must not execute'")
+                                            )
+                                        ),
+                                }
+                                : node
+                        ),
+                    ],
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        (await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None)).Status.ShouldBe(
+            AutomationResumeStatus.Failed
+        );
+        fixture.Chat.Calls.ShouldBe(0);
+        await using var verify = await fixture.Database.CreateDbContextAsync();
+        var failed = await verify
+            .AutomationFlowRuns.Include(row => row.NodeRuns)
+            .SingleAsync(row => row.Id == runId.Value);
+        failed.Status.ShouldBe(AutomationFlowRunStatus.Failed);
+        failed.NodeRuns.ShouldContain(node => node.OutcomeCode == "definition-invalid");
     }
 
     [Test]
