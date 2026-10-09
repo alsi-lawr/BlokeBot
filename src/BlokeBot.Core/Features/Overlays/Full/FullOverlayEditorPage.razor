@@ -1,6 +1,7 @@
 @inherits AuthenticatedPageComponent
 @implements IAsyncDisposable
 
+<HeadContent><link rel="stylesheet" href="@Assets["vendor/full-overlay-editor/coloris/coloris.css"]" /></HeadContent>
 <PageTitle>@_name · Full overlay · BlokeBot</PageTitle>
 <NavigationLock ConfirmExternalNavigation='@_hasChanges' OnBeforeInternalNavigation="BeforeNavigationAsync" />
 @if (_row is null) {
@@ -56,7 +57,7 @@
                 </section>
             </div>
             <aside class="full-editor-inspector" aria-label="Selected layer inspector" data-visual-region>
-                <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" />
+                <FullOverlayInspector @key="controlView.Selected" View="controlView" Command="command => CommandAtAsync(command, controlView.Selected, controlView.Revision)" Align="value => AlignAsync(value, controlView.Selected, controlView.Revision)" Find="() => FindAsync(controlView.Selected)" Replay="ReplayAsync" />
                 @if (_view.Widget is { } widget) {
                     <StudioFold Key="widget-settings" Label="Widget configuration" @bind-Open="_configurationOpen" Bare="true">
                         @if (widget.Kind.Value is "image" or "audio" or "video") {
