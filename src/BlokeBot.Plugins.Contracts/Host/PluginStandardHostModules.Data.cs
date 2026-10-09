@@ -121,5 +121,6 @@ public static partial class PluginStandardHostModules
             PluginInvocationContextKind.Automation,
             PluginInvocationContextKind.Migration,
             PluginInvocationContextKind.Page,
+            PluginInvocationContextKind.Widget,
         ];
 }

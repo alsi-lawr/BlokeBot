@@ -15,6 +15,7 @@ public enum PluginInvocationContextKind
     Automation,
     Migration,
     Page,
+    Widget,
 }
 
 public sealed record PluginHostModuleDescriptor(

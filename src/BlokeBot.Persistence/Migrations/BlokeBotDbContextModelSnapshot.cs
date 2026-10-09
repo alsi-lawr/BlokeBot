@@ -4874,6 +4874,41 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("full_overlays", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("BindingId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("FullOverlayId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("PublishedVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.HasIndex("FullOverlayId", "BindingId")
+                        .IsUnique();
+
+                    b.ToTable("full_overlay_event_feed_bindings", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
                 {
                     b.Property<long>("OverlayId")
@@ -5791,6 +5826,9 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<DateTime>("EnqueuedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("FullOverlayEventFeedBindingId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("HostId")
                         .HasColumnType("INTEGER");
 
@@ -5804,7 +5842,7 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
-                    b.Property<long>("OverlayInstanceId")
+                    b.Property<long?>("OverlayInstanceId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Priority")
@@ -5827,6 +5865,11 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Kind", "SourceKey")
+                        .IsUnique();
+
+                    b.HasIndex("FullOverlayEventFeedBindingId", "Lifecycle", "EnqueuedAtUtc");
+
                     b.HasIndex("OverlayInstanceId", "Kind", "SourceKey")
                         .IsUnique();
 
@@ -5839,6 +5882,8 @@ namespace BlokeBot.Persistence.Migrations
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "Lifecycle IN ('active', 'consumed', 'queued', 'suppressed')");
+
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Owner", "(OverlayInstanceId IS NULL) <> (FullOverlayEventFeedBindingId IS NULL)");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Priority", "Priority IN ('high', 'normal')");
 
@@ -10384,6 +10429,23 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlay", "FullOverlay")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FullOverlay");
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.FullOverlayPublication", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.FullOverlay", null)
@@ -10690,6 +10752,11 @@ namespace BlokeBot.Persistence.Migrations
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.OverlayEventFeedItem", b =>
                 {
+                    b.HasOne("BlokeBot.Persistence.Models.FullOverlayEventFeedBinding", "FullOverlayEventFeedBinding")
+                        .WithMany()
+                        .HasForeignKey("FullOverlayEventFeedBindingId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()
                         .HasForeignKey("HostId")
@@ -10699,8 +10766,9 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasOne("BlokeBot.Persistence.Models.OverlayInstance", "OverlayInstance")
                         .WithMany()
                         .HasForeignKey("OverlayInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("FullOverlayEventFeedBinding");
 
                     b.Navigation("OverlayInstance");
                 });

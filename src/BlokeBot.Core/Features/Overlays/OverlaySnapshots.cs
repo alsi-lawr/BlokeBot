@@ -429,13 +429,6 @@ internal sealed class OverlayStateProvider(
         CancellationToken cancellationToken
     )
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (instance is { Type: OverlayType.Empty, Configuration: OverlayConfiguration.EmptyV1 })
-        {
-            return Empty(instance);
-        }
-
         if (
             instance is
             {
@@ -462,6 +455,51 @@ internal sealed class OverlayStateProvider(
                         State = state,
                     }
                 );
+        }
+
+        return await ProjectSourceAsync(OverlaySourceBinding.From(instance), cancellationToken);
+    }
+
+    public Task<OverlaySnapshotProjection> ProjectSampleAsync(
+        ResolvedOverlayInstance instance,
+        GuessingOverlaySampleState sample,
+        CancellationToken ct
+    ) => ProjectSampleAsync(OverlaySourceBinding.From(instance), sample, ct);
+
+    public Task<OverlaySnapshotProjection> ProjectSampleAsync(
+        ResolvedOverlayInstance instance,
+        GiveawayOverlaySampleState sample,
+        CancellationToken ct
+    ) => ProjectSampleAsync(OverlaySourceBinding.From(instance), sample, ct);
+
+    public Task<OverlaySnapshotProjection> ProjectEventFeedSampleAsync(
+        ResolvedOverlayInstance instance,
+        OverlayEventFeedKind kind,
+        CancellationToken ct
+    ) => ProjectEventFeedSampleAsync(OverlaySourceBinding.From(instance), kind, ct);
+
+    public Task<OverlaySnapshotProjection> ProjectViewerQueueSampleAsync(
+        ResolvedOverlayInstance instance,
+        ViewerQueueOverlaySampleState sample,
+        CancellationToken ct
+    ) => ProjectViewerQueueSampleAsync(OverlaySourceBinding.From(instance), sample, ct);
+
+    public Task<OverlaySnapshotProjection> ProjectProgressSampleAsync(
+        ResolvedOverlayInstance instance,
+        ProgressOverlaySampleState sample,
+        CancellationToken ct
+    ) => ProjectProgressSampleAsync(OverlaySourceBinding.From(instance), sample, ct);
+
+    internal async Task<OverlaySnapshotProjection> ProjectSourceAsync(
+        OverlaySourceBinding instance,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (instance is { Type: OverlayType.Empty, Configuration: OverlayConfiguration.EmptyV1 })
+        {
+            return Empty(instance);
         }
 
         if (
@@ -618,6 +656,22 @@ internal sealed class OverlayStateProvider(
         );
     }
 
+    internal OverlaySnapshotProjection EventFeedSnapshot(
+        OverlaySourceBinding instance,
+        EventFeedStatePresentation state
+    ) =>
+        new OverlaySnapshotProjection.EventFeedV1(
+            new EventFeedV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = timeProvider.GetUtcNow(),
+                Animation = "none",
+                Appearance = ((OverlayConfiguration.EventFeedV1)instance.Configuration).Appearance,
+                State = state,
+            }
+        );
+
     private async Task<bool> OverlayParentEnabledAsync(
         int hostId,
         CancellationToken cancellationToken
@@ -636,7 +690,7 @@ internal sealed class OverlayStateProvider(
     }
 
     public async Task<OverlaySnapshotProjection> ProjectSampleAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         GuessingOverlaySampleState sample,
         CancellationToken cancellationToken
     )
@@ -689,7 +743,7 @@ internal sealed class OverlayStateProvider(
     }
 
     public async Task<OverlaySnapshotProjection> ProjectEventFeedSampleAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayEventFeedKind kind,
         CancellationToken cancellationToken
     )
@@ -797,7 +851,7 @@ internal sealed class OverlayStateProvider(
     }
 
     public async Task<OverlaySnapshotProjection> ProjectSampleAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         GiveawayOverlaySampleState sample,
         CancellationToken cancellationToken
     )
@@ -860,7 +914,7 @@ internal sealed class OverlayStateProvider(
     }
 
     public async Task<OverlaySnapshotProjection> ProjectViewerQueueSampleAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         ViewerQueueOverlaySampleState sample,
         CancellationToken cancellationToken
     )
@@ -911,7 +965,7 @@ internal sealed class OverlayStateProvider(
     }
 
     public async Task<OverlaySnapshotProjection> ProjectProgressSampleAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         ProgressOverlaySampleState sample,
         CancellationToken cancellationToken
     )
@@ -974,7 +1028,7 @@ internal sealed class OverlayStateProvider(
         };
     }
 
-    private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance) =>
+    private OverlaySnapshotProjection Empty(OverlaySourceBinding instance) =>
         new OverlaySnapshotProjection.EmptyV1(
             new EmptyV1OverlaySnapshot
             {
@@ -985,7 +1039,7 @@ internal sealed class OverlayStateProvider(
         );
 
     private OverlaySnapshotProjection Guessing(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.GuessingV1 configuration,
         GuessingV1OverlayPresentationState state
     ) =>
@@ -1002,7 +1056,7 @@ internal sealed class OverlayStateProvider(
         );
 
     private async Task<OverlaySnapshotProjection> CommunityGoalAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.CommunityGoalV1 configuration,
         CancellationToken cancellationToken
     )
@@ -1077,7 +1131,7 @@ internal sealed class OverlayStateProvider(
     }
 
     private async Task<OverlaySnapshotProjection> ViewerFundedBountyAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.ViewerFundedBountyV1 configuration,
         CancellationToken cancellationToken
     )
@@ -1155,7 +1209,7 @@ internal sealed class OverlayStateProvider(
     }
 
     private OverlaySnapshotProjection CommunityGoal(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.CommunityGoalV1 configuration,
         IReadOnlyList<ProgressOverlayItemPresentation> items,
         string animation
@@ -1174,7 +1228,7 @@ internal sealed class OverlayStateProvider(
         );
 
     private OverlaySnapshotProjection ViewerFundedBounty(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.ViewerFundedBountyV1 configuration,
         IReadOnlyList<ProgressOverlayItemPresentation> items,
         string animation
@@ -1256,7 +1310,7 @@ internal sealed class OverlayStateProvider(
     }
 
     private async Task<OverlaySnapshotProjection> GiveawayAsync(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.GiveawayV1 configuration,
         CancellationToken cancellationToken
     )
@@ -1352,7 +1406,7 @@ internal sealed class OverlayStateProvider(
     }
 
     private OverlaySnapshotProjection Giveaway(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.GiveawayV1 configuration,
         GiveawayV1OverlayPresentationState state
     ) =>
@@ -1368,7 +1422,7 @@ internal sealed class OverlayStateProvider(
         );
 
     private OverlaySnapshotProjection ViewerQueue(
-        ResolvedOverlayInstance instance,
+        OverlaySourceBinding instance,
         OverlayConfiguration.ViewerQueueV1 configuration,
         PlayQueueOverlayState state,
         string animation

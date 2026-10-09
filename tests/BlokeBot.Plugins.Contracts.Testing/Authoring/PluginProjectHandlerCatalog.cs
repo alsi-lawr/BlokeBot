@@ -120,6 +120,17 @@ internal sealed record PluginProjectHandlerCatalog(
             )
         );
         handlers.AddRange(
+            manifest.Widgets.Select(widget =>
+                Handler(
+                    widget.Module,
+                    HostOperation(widget.RenderEntryPoint),
+                    PluginInvocationInputSchemas.Widget.LuaTypeName,
+                    "BlokeBotValueMap",
+                    "return {}"
+                )
+            )
+        );
+        handlers.AddRange(
             manifest.AutomationDefinitions.Select(definition =>
                 Handler(
                     definition.Module,

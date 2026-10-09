@@ -220,6 +220,7 @@ public static partial class PluginStandardHostModules
             PluginInvocationContextKind.Channel,
             PluginInvocationContextKind.Automation,
             PluginInvocationContextKind.Page,
+            PluginInvocationContextKind.Widget,
         ];
 
     private static ImmutableArray<PluginInvocationContextKind> FeatureContexts() =>
@@ -227,6 +228,7 @@ public static partial class PluginStandardHostModules
             PluginInvocationContextKind.Channel,
             PluginInvocationContextKind.Automation,
             PluginInvocationContextKind.Page,
+            PluginInvocationContextKind.Widget,
         ];
 
     private static ImmutableArray<PluginInvocationContextKind> AllContexts() =>
@@ -236,6 +238,7 @@ public static partial class PluginStandardHostModules
             PluginInvocationContextKind.Automation,
             PluginInvocationContextKind.Migration,
             PluginInvocationContextKind.Page,
+            PluginInvocationContextKind.Widget,
         ];
 
     private delegate bool TryIdentifier<TIdentifier>(string? value, out TIdentifier identifier);

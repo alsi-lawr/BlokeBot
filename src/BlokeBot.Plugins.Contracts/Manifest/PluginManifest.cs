@@ -22,7 +22,10 @@ public sealed record PluginManifest(
     ImmutableArray<PluginAutomationTemplateDescriptor> AutomationTemplates,
     ImmutableArray<PluginGeneratedPageDescriptor> GeneratedPages,
     ImmutableArray<PluginEmbeddedPageDescriptor> EmbeddedPages
-);
+)
+{
+    public ImmutableArray<PluginWidgetDescriptor> Widgets { get; init; } = [];
+}
 
 public sealed record PluginMarketplaceMetadata(
     string Author,
