@@ -1,5 +1,5 @@
 .editor-workspace{position:relative;min-width:0;}
-.editor-workspace--focus {
+.editor-workspace.editor-workspace--focus {
     border: 0;
     border-radius: 0;
     box-shadow: none;
