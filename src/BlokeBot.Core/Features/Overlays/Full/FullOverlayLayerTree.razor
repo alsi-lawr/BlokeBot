@@ -1,7 +1,7 @@
 <div role="tree" aria-label="HTML and widget layers" class="full-editor-tree" @onkeydown="KeyAsync">
     @foreach (var layer in Visible()) {
         var children = View.Layers.Any(item => item.Parent == layer.Key);
-        <div @ref="_elements[layer.Key]" role="treeitem" aria-level='@Level(layer)' aria-selected='@(View.Selected == layer.Key ? "true" : "false")' aria-expanded='@(children ? (!_collapsed.Contains(layer.Key)).ToString().ToLowerInvariant() : null)' tabindex='@(View.Selected == layer.Key || View.Selected is null && layer == View.Layers.FirstOrDefault() ? 0 : -1)' class="full-editor-layer" style='@($"--layer-depth:{Level(layer) - 1}")' @onclick='() => Selected.InvokeAsync(layer.Key)'>
+        <div @ref="_elements[layer.Key]" data-layer-key="@layer.Key" role="treeitem" aria-level='@Level(layer)' aria-selected='@(View.Selected == layer.Key ? "true" : "false")' aria-expanded='@(children ? (!_collapsed.Contains(layer.Key)).ToString().ToLowerInvariant() : null)' tabindex='@(View.Selected == layer.Key || View.Selected is null && layer == View.Layers.FirstOrDefault() ? 0 : -1)' class="full-editor-layer" style='@($"--layer-depth:{Level(layer) - 1}")' @onclick='() => Selected.InvokeAsync(layer.Key)'>
             @if (children) { <button type="button" tabindex="-1" aria-label='@($"{(_collapsed.Contains(layer.Key) ? "Expand" : "Collapse")} {layer.Label}")' @onclick:stopPropagation @onclick='() => Toggle(layer.Key)'>@(_collapsed.Contains(layer.Key) ? "▸" : "▾")</button> } else { <span aria-hidden="true">·</span> }
             <span class="full-editor-layer-label">@layer.Label</span><small>@(layer.WidgetId is null ? layer.Tag : "widget")</small>
         </div>

@@ -165,6 +165,7 @@ public partial class PageHelpButton
                     "Press Alt and drag to select nodes.",
                     "Press Shift and select a node to change the node selection.",
                     "Select a connection to delete it.",
+                    "Right-click a node or connection, or use ⋯ for Undo, Redo and Delete selected. A selected node keeps its selected set. Context Menu or Shift+F10 opens actions; Escape closes the menu. Delete selected is undoable, not permanent flow deletion. Text fields keep browser menus.",
                 ]
             ),
             new(

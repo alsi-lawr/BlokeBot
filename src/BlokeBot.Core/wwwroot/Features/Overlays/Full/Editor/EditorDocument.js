@@ -26,7 +26,7 @@ export function createEditorDocument(document) {
                 diagnostics:[...parsed.diagnostics.filter(d=>d.code!=='missing-doctype').map(d=>({code:d.code,buffer:'html',offset:d.start})),
                     ...stylesheet.diagnostics.map(d=>({code:d.code,buffer:'css',offset:d.start}))] } };
         }
-        return {...derived.value,feedback,focus};
+        return {...derived.value,feedback,focus,history:session.availability(focus)};
     }
     function finish(result, nextSelection=selected) {
         if(result.kind==='applied') {selected=nextSelection;feedback='';}
@@ -111,6 +111,10 @@ export function createEditorDocument(document) {
         source(buffer,value){focus=buffer;if(buffer==='html'&&selected?.startsWith('source:'))selected=null;const result=session.replaceSource(buffer,session.snapshot().revision,value);if(result.kind==='applied')externalRevision=result.revision;return finish(result);},
         saved(value){saved=JSON.stringify(value);return view();},
         history(direction){const result=session[direction](focus);if(focus!==EditorFocus.Visual&&result.kind==='applied')externalRevision=result.revision;return finish(result);},
+        contextualDelete(selection,revision){
+            if(selection!==selected||revision!==session.snapshot().revision)return this.stale();
+            return this.command({kind:'remove'});
+        },
         control(command,selection,revision){
             if(selection!==selected||revision<externalRevision||revision>session.snapshot().revision||command.kind==='configuration'&&revision!==session.snapshot().revision)return this.stale();
             return this.command(command);
