@@ -166,14 +166,32 @@ public sealed partial class FullOverlayServiceTests
     private sealed class SaveFailure : SaveChangesInterceptor
     {
         internal bool FailPublication { get; set; }
+        internal bool FailImport { get; set; }
+        internal Action? DuringImportSave { get; set; }
 
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
             DbContextEventData data,
             InterceptionResult<int> result,
             CancellationToken cancellationToken = default
-        ) =>
-            (FailPublication && data.Context!.ChangeTracker.Entries<FullOverlayPublication>().Any())
+        )
+        {
+            if (
+                data.Context!.ChangeTracker.Entries<FullOverlay>()
+                    .Any(entry => entry.State == Microsoft.EntityFrameworkCore.EntityState.Added)
+            )
+            {
+                DuringImportSave?.Invoke();
+                if (FailImport)
+                {
+                    throw new IOException("Injected import persistence failure.");
+                }
+            }
+            return (
+                FailPublication
+                && data.Context!.ChangeTracker.Entries<FullOverlayPublication>().Any()
+            )
                 ? throw new IOException("Injected persistence failure after selection CAS.")
                 : ValueTask.FromResult(result);
+        }
     }
 }

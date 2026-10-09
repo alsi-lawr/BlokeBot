@@ -8,7 +8,9 @@ namespace BlokeBot.Core.Features.Overlays;
 internal sealed partial class OverlayCuePlaybackService
 {
     internal static bool HasCuePlayer(FullOverlayDocument document) =>
-        document.Widgets.Any(widget => widget.Kind == new FullOverlayWidgetKind("cue-player"));
+        document.Widgets.Any(widget =>
+            !widget.RequiresSetup && widget.Kind == new FullOverlayWidgetKind("cue-player")
+        );
 
     private static async Task<OverlayCueTarget.Full?> ResolveFullTargetAsync(
         BlokeBotDbContext db,

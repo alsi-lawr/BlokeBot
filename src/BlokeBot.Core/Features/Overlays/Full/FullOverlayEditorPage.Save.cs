@@ -23,7 +23,7 @@ public partial class FullOverlayEditorPage
         _publicationDiagnostics = [];
         try
         {
-            var candidate = await _client.InvokeAsync<FullOverlayDocument>("candidate");
+            var candidate = await ReadCandidateAsync();
             var name = _name;
             var command = new SaveFullOverlayCommand(OverlayId, _row.Revision, name, candidate);
             if (publish)

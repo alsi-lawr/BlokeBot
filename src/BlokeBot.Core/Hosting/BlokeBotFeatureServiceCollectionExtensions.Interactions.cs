@@ -66,6 +66,10 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<OverlayInstanceResolver>();
         _ = services.AddSingleton<OverlayManagementAuthority>();
         _ = services.AddSingleton<FullOverlayService>();
+        _ =
+            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.FullOverlays.FullOverlayPortability>();
+        _ =
+            services.AddSingleton<BlokeBot.Core.Features.ConfigurationTransfer.FullOverlays.FullOverlayTransferService>();
         _ = services.AddSingleton<FullOverlayKeyProtection>();
         _ = services.AddSingleton<FullOverlayPublishedReader>();
         services.TryAddSingleton<

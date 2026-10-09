@@ -13,7 +13,13 @@ internal sealed partial class FullOverlayService
     )
     {
         var result = await authority.AuthorizeAsync(session, ct);
-        return result switch
+        return Authorization(result);
+    }
+
+    private static FullOverlayResult<OverlayManagementActor> Authorization(
+        OverlayManagementAuthorization result
+    ) =>
+        result switch
         {
             OverlayManagementAuthorization.Granted granted => Success(granted.Actor),
             OverlayManagementAuthorization.Rejected
@@ -26,7 +32,6 @@ internal sealed partial class FullOverlayService
             } => Reject<OverlayManagementActor>(FullOverlayRejectionKind.NotFound),
             _ => Reject<OverlayManagementActor>(FullOverlayRejectionKind.Unauthorized),
         };
-    }
 
     private async Task<FullOverlayResult<T>> MutateAsync<T>(
         AuthenticatedSession session,

@@ -112,6 +112,7 @@ internal static partial class FullOverlayWebEndpoints
             }
         );
         MapPrivate(app);
+        MapTransfer(app);
         MapResources(app);
     }
 

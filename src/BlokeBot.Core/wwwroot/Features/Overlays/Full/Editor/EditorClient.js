@@ -58,6 +58,8 @@ export function createClient(root, document, dotnet) {
     window.addEventListener('resize',height,options);height();publish();
     return {
         candidate:()=>owner.candidate(),view:()=>view,command,
+        candidateStream(){return new Blob([JSON.stringify(owner.candidate())],{type:'application/json'});},
+        export(form,name){form.elements.namedItem('document').value=JSON.stringify(owner.candidate());form.elements.namedItem('name').value=name;form.requestSubmit();},
         history:direction=>changed(owner.history(direction)),
         saved:value=>changed(owner.saved(value)),
         preview(id,revision){if(revision===view.revision)preview.set(id,revision);},

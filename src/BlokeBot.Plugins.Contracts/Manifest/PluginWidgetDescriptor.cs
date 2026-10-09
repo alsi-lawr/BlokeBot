@@ -41,7 +41,18 @@ public sealed record PluginWidgetConfigurationField(
     string Title,
     PluginValueKind ValueKind,
     bool Required
-);
+)
+{
+    // Absent metadata preserves local use but never implies configuration export safety.
+    public PluginWidgetFieldPortability? Portability { get; init; }
+}
+
+public enum PluginWidgetFieldPortability
+{
+    Portable,
+    DestinationBinding,
+    Withheld,
+}
 
 public static class PluginWidgetConfiguration
 {

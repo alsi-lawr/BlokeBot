@@ -252,7 +252,7 @@ internal static class PluginManifestTomlShape
         && Child(table, "defaultConfiguration", PluginValue);
 
     private static bool WidgetField(TomlTable table) =>
-        Table(table, ["name", "title", "valueKind", "required"]);
+        Table(table, ["name", "title", "valueKind", "required", "portability"]);
 
     private static bool Table(TomlTable table, IReadOnlyList<string> fields) =>
         table.Keys.All(fields.Contains);

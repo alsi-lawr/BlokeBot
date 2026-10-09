@@ -7,7 +7,11 @@ namespace BlokeBot.Plugins.Contracts.Tests;
 public sealed class PluginWidgetWorkerTests
 {
     [Test]
-    public async Task PublicWidget_TraversesValidatedPackageAndRealWorkerWithServerOnlySettingsAccess()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PublicWidget_TraversesValidatedPackageAndRealWorkerWithServerOnlySettingsAccess(
+        bool declaredPortability
+    )
     {
         var previous = PluginManifestToml
             .Validate(
@@ -29,7 +33,14 @@ public sealed class PluginWidgetWorkerTests
                     "widget-render",
                     previous.Assets[0].Id,
                     [],
-                    [new("text", "Text", PluginValueKind.String, true)],
+                    [
+                        new("text", "Text", PluginValueKind.String, true)
+                        {
+                            Portability = declaredPortability
+                                ? PluginWidgetFieldPortability.Portable
+                                : null,
+                        },
+                    ],
                     new PluginValue.Map([new("text", new PluginValue.String("hello"))])
                 ),
             ],
@@ -49,7 +60,7 @@ public sealed class PluginWidgetWorkerTests
             manifest: manifest,
             temporaryRoot: Path.Combine(
                 Directory.GetCurrentDirectory(),
-                ".agent-workspace/overlay-composition-20261001/286/worker-packages"
+                ".agent-workspace/overlay-composition-20261001/writer289/worker-packages"
             )
         );
         var dispatcher = new SettingsDispatcher();
