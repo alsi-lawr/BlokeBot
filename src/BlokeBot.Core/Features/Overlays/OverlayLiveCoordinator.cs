@@ -10,7 +10,7 @@ using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Overlays;
 
-internal sealed class OverlayLiveCoordinator(
+internal sealed partial class OverlayLiveCoordinator(
     OverlayServerEpoch serverEpoch,
     IOverlayStateProvider stateProvider,
     TimeProvider timeProvider,
@@ -57,6 +57,7 @@ internal sealed class OverlayLiveCoordinator(
             (_, _) =>
             {
                 InvalidateAllConnections();
+                WakeFullConnections();
                 return ValueTask.CompletedTask;
             }
         );
@@ -71,6 +72,7 @@ internal sealed class OverlayLiveCoordinator(
         _playQueueChangesSubscription?.Dispose();
         _playQueueChangesSubscription = null;
         _stopping.Cancel();
+        CloseAllFullConnections();
         InvalidateAllConnections();
         return Task.CompletedTask;
     }
@@ -112,7 +114,7 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
-    void IOverlayCueTransport.Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan) =>
+    private void StartSimpleCue(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan) =>
         PublishCueMessage(
             target,
             (sequence, occurredAtUtc) =>
@@ -132,7 +134,7 @@ internal sealed class OverlayLiveCoordinator(
                 )
         );
 
-    void IOverlayCueTransport.Stop(ResolvedOverlayInstance target, Guid runId) =>
+    private void StopSimpleCue(ResolvedOverlayInstance target, Guid runId) =>
         PublishCueMessage(
             target,
             (sequence, occurredAtUtc) =>
@@ -178,6 +180,7 @@ internal sealed class OverlayLiveCoordinator(
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        WakeFullConnections(hostId);
         ResolvedOverlayInstance[] instances;
         lock (_connectionsGate)
         {
@@ -206,6 +209,7 @@ internal sealed class OverlayLiveCoordinator(
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        WakeFullConnections(change.HostId);
         ResolvedOverlayInstance[] instances;
         lock (_connectionsGate)
         {
@@ -1099,6 +1103,7 @@ internal sealed class OverlayLiveCoordinator(
         _overlayChangesSubscription?.Dispose();
         _playQueueChangesSubscription?.Dispose();
         _stopping.Cancel();
+        CloseAllFullConnections();
         foreach (var slot in _publicationSlots.Values)
         {
             await slot.DisposeAsync();

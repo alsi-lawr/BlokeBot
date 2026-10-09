@@ -210,7 +210,7 @@ public sealed partial class FullOverlayServiceTests
     {
         private readonly string _root = Path.Combine(
             Directory.GetCurrentDirectory(),
-            ".agent-workspace/overlay-composition-20261001/286/plugin",
+            ".agent-workspace/overlay-composition-20261001/writer287/plugin",
             Guid.NewGuid().ToString("N")
         );
         internal ValidatedPluginManifest Manifest { get; }
@@ -221,7 +221,7 @@ public sealed partial class FullOverlayServiceTests
         internal WidgetWorker Worker { get; } = new();
         internal WidgetPackage Package { get; }
 
-        internal WidgetPluginRig(int hostId)
+        internal WidgetPluginRig(int hostId, bool browserAssets = false)
         {
             var previous = PluginManifestToml
                 .Validate(
@@ -230,6 +230,36 @@ public sealed partial class FullOverlayServiceTests
                 )
                 .ShouldBeOfType<PluginManifestValidationOutcome.Accepted>()
                 .Manifest.Manifest;
+            if (browserAssets)
+            {
+                _ = PluginAssetId.TryCreate("widget-style", out var style);
+                _ = PluginAssetId.TryCreate("widget-svg", out var svg);
+                previous = previous with
+                {
+                    Assets =
+                    [
+                        .. previous.Assets,
+                        new(
+                            style,
+                            "web/style.css",
+                            PluginAssetKind.Browser,
+                            "text/css",
+                            "Public style",
+                            [PluginRuntimeIdentifier.LinuxX64],
+                            8192
+                        ),
+                        new(
+                            svg,
+                            "web/document.svg",
+                            PluginAssetKind.Browser,
+                            "image/svg+xml",
+                            "Public SVG",
+                            [PluginRuntimeIdentifier.LinuxX64],
+                            8192
+                        ),
+                    ],
+                };
+            }
             _ = PluginWidgetId.TryCreate("display", out var widgetId);
             _ = PluginLuaModuleId.TryCreate("main", out var module);
             var manifest = previous with
@@ -243,7 +273,17 @@ public sealed partial class FullOverlayServiceTests
                         module,
                         "widget-render",
                         previous.Assets.Single(asset => asset.Path == "web/index.html").Id,
-                        [],
+                        browserAssets
+                            ?
+                            [
+                                .. previous
+                                    .Assets.Where(asset =>
+                                        asset.Kind == PluginAssetKind.Browser
+                                        && asset.Path != "web/index.html"
+                                    )
+                                    .Select(asset => asset.Id),
+                            ]
+                            : [],
                         [new("text", "Text", PluginValueKind.String, true)],
                         new PluginValue.Map([new("text", new PluginValue.String("Public title"))])
                     ),
@@ -297,6 +337,42 @@ public sealed partial class FullOverlayServiceTests
                 Path.Combine(_root, "web/index.html"),
                 "<!doctype html><main>Public widget</main>"
             );
+            if (browserAssets)
+            {
+                File.WriteAllText(
+                    Path.Combine(_root, "web/index.html"),
+                    """
+                    <!doctype html><html><head><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head><body><main id="public">PUBLIC PLUGIN DOCUMENT</main></body></html>
+                    """
+                );
+                File.WriteAllText(
+                    Path.Combine(_root, "web/document.svg"),
+                    """
+                    <svg xmlns="http://www.w3.org/2000/svg"><text x="10" y="20">PUBLIC SVG DOCUMENT</text><script><![CDATA[
+                    window.svgObserved={executed:true,referrer:document.referrer};
+                    try{svgObserved.cookie=document.cookie}catch(e){svgObserved.cookie=e.name}
+                    fetch('/fixture/private',{credentials:'include'}).then(r=>r.text()).then(t=>svgObserved.private=t).catch(e=>svgObserved.private=e.name);
+                    if(new URL(location.href).searchParams.has('selfnav'))setTimeout(()=>location.href='/auth/logout',150);
+                    ]]></script></svg>
+                    """
+                );
+                File.WriteAllText(
+                    Path.Combine(_root, "web/style.css"),
+                    "main{color:rgb(11,22,33)}"
+                );
+                File.WriteAllText(
+                    Path.Combine(_root, "web/app.js"),
+                    """
+                    window.pluginObserved={executed:true,referrer:document.referrer,baseURI:document.baseURI};
+                    try{pluginObserved.cookie=document.cookie}catch(e){pluginObserved.cookie=e.name}
+                    try{pluginObserved.parent=parent.document.body.textContent}catch(e){pluginObserved.parent=e.name}
+                    fetch('/fixture/private',{credentials:'include'}).then(r=>r.text()).then(t=>pluginObserved.private=t).catch(e=>pluginObserved.private=e.name);
+                    fetch('/auth/logout',{credentials:'include',mode:'no-cors'}).catch(()=>{});
+                    if(new URL(location.href).searchParams.has('selfnav'))setTimeout(()=>location.href='/auth/logout',150);
+                    window.addEventListener('message',e=>{if(e.source===parent&&e.data?.kind==='blokebot-widget-state'){document.getElementById('public').textContent=e.data.state.text;pluginObserved.state=e.data.state}});
+                    """
+                );
+            }
             File.WriteAllText(Path.Combine(_root, "private.txt"), "server-only");
             Package = new(Manifest, _root);
         }
@@ -348,7 +424,7 @@ public sealed partial class FullOverlayServiceTests
             if (Pause)
             {
                 _ = Started.TrySetResult();
-                await Release.Task;
+                await Release.Task.WaitAsync(ct);
             }
             if (Failure is { } failure)
             {
@@ -386,7 +462,7 @@ public sealed partial class FullOverlayServiceTests
             if (Pause)
             {
                 _ = Started.TrySetResult();
-                await Release.Task;
+                await Release.Task.WaitAsync(ct);
             }
             return new PluginPackageAssetResolution.Available(manifest, root);
         }

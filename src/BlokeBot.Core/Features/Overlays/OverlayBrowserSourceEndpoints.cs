@@ -858,22 +858,35 @@ internal static class OverlayBrowserSourceEndpoints
         }
 
         var segments = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        return (
-            segments.Length < 2
-            || !string.Equals(segments[0], "overlay", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(segments[1], "assets", StringComparison.OrdinalIgnoreCase)
-        ) switch
-        {
-            true => path,
-            false => segments.Length switch
+        return
+            segments.Length >= 2
+            && segments[0].Equals("full-overlay", StringComparison.OrdinalIgnoreCase)
+            ? RedactedFullPath(segments, path)
+            : (
+                segments.Length < 2
+                || !string.Equals(segments[0], "overlay", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(segments[1], "assets", StringComparison.OrdinalIgnoreCase)
+            ) switch
             {
-                2 => new PathString("/overlay/[redacted]"),
-                _ => new PathString(
-                    $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(static value => value.ToLowerInvariant()))}"
-                ),
-            },
-        };
+                true => path,
+                false => segments.Length switch
+                {
+                    2 => new PathString("/overlay/[redacted]"),
+                    _ => new PathString(
+                        $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(static value => value.ToLowerInvariant()))}"
+                    ),
+                },
+            };
     }
+
+    private static PathString RedactedFullPath(string[] segments, PathString path) =>
+        segments[1].Equals("assets", StringComparison.OrdinalIgnoreCase) ? path
+        : segments[1].Equals("resources", StringComparison.OrdinalIgnoreCase)
+            ? new("/full-overlay/resources/[redacted]")
+        : new(
+            "/full-overlay/[redacted]"
+                + (segments.Length > 2 ? "/" + string.Join('/', segments.Skip(2)) : "")
+        );
 
     private sealed class OverlayLiveStreamResult(
         OverlayLiveCoordinator live,
