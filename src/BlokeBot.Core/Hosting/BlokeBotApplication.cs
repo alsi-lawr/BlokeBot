@@ -203,6 +203,9 @@ public static partial class BlokeBotApplication
         {
             _ = builder.Services.AddTwitchBotSettings(botSection);
             _ = builder.Services.AddUnavailableAccessTokenProvider();
+            _ = builder.Services.AddSingleton<IBotAccountProvider>(static serviceProvider =>
+                serviceProvider.GetRequiredService<HostBotAccountAuthorizationService>()
+            );
             _ = builder.Services.AddOfflineBotRuntimeStatus();
             _ = builder.Services.Replace(
                 ServiceDescriptor.Singleton<IPointTargetUserLookup, OfflinePointTargetUserLookup>()
