@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.CustomCommands;
+using BlokeBot.Core.Features.Overlays.Full;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.DatabaseCutover;
 using BlokeBot.Persistence;
@@ -259,6 +261,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         (await source.Hosts.CountAsync()).ShouldBe(1);
         foreach (var db in new[] { source, target })
         {
+            await AssertCurrentOverlayAndStoredValueRowsAsync(db);
             var scenario = (
                 await db.AutomationScenarios.AsNoTracking().ToArrayAsync()
             ).ShouldHaveSingleItem();
@@ -335,6 +338,101 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 AutomationSubflowDefinitions.Invocation(_subflowRevision).Configuration.GetRawText()
             );
         }
+    }
+
+    private static async Task AssertCurrentOverlayAndStoredValueRowsAsync(BlokeBotDbContext db)
+    {
+        var host = await db.Hosts.AsNoTracking().SingleAsync(x => x.Id == SeedHostId);
+        host.AutomationGeneration.ShouldBe(17);
+        host.TimeZoneId.ShouldBe("Europe/London");
+        var overlay = (await db.FullOverlays.AsNoTracking().ToArrayAsync()).ShouldHaveSingleItem();
+        overlay.Id.ShouldBe(_fullOverlayId);
+        overlay.HostId.ShouldBe(SeedHostId);
+        overlay.PublicId.ShouldBe(_fullOverlayPublicId);
+        overlay.Name.ShouldBe("Cutover full overlay");
+        overlay.DraftDocumentJson.ShouldBe(FullOverlayDocuments.Serialize(_draftOverlayDocument));
+        overlay.AccessKeyDigest.ShouldBe(_overlayAccessKeyDigest);
+        overlay.ProtectedAccessKey.ShouldBe(_protectedOverlayAccessKey);
+        overlay.IsArchived.ShouldBeFalse();
+        overlay.Revision.ShouldBe(9);
+        overlay.PublicationSequence.ShouldBe(3);
+        overlay.PublishedVersion.ShouldBe(3);
+        var publication = (
+            await db.FullOverlayPublications.AsNoTracking().ToArrayAsync()
+        ).ShouldHaveSingleItem();
+        publication.OverlayId.ShouldBe(overlay.Id);
+        publication.Version.ShouldBe(overlay.PublishedVersion!.Value);
+        publication.DocumentJson.ShouldBe(
+            FullOverlayDocuments.Serialize(_publishedOverlayDocument)
+        );
+        publication.DocumentJson.ShouldNotBe(overlay.DraftDocumentJson);
+        publication.AuthorUserId.ShouldBe("seed-user");
+        publication.AuthorLogin.ShouldBe("cutover_seed");
+
+        var definitions = await db
+            .CustomValueDefinitions.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .ToArrayAsync();
+        definitions.Select(x => x.Id).ShouldBe([710, 711]);
+        definitions.ShouldAllBe(x => x.HostId == SeedHostId && x.Scope == CustomValueScope.User);
+        definitions.ShouldAllBe(x =>
+            x.Name == _storedValueName && x.NameHash == CustomValueIdentity.Hash(_storedValueName)
+        );
+        definitions[0].Kind.ShouldBe(CustomValueKind.Number);
+        definitions[0].DefaultNumber.ShouldBe(-7);
+        definitions[0].Revision.ShouldBe(_scalarRevision);
+        definitions[1].Kind.ShouldBe(CustomValueKind.Dictionary);
+        definitions[1].DefaultText.ShouldBe("unknown game");
+        definitions[1].Revision.ShouldBe(_dictionaryRevision);
+        var values = await db.CustomStoredValues.AsNoTracking().OrderBy(x => x.Id).ToArrayAsync();
+        values.Select(x => x.Id).ShouldBe([720, 721]);
+        values.ShouldAllBe(x =>
+            x.HostId == SeedHostId && x.ViewerId == _storedValueViewerId && !x.IsDefault
+        );
+        values[0].DefinitionId.ShouldBe(definitions[0].Id);
+        values[0].EntryKey.ShouldBeEmpty();
+        values[0].TargetHash.ShouldBe(CustomValueIdentity.Target(_storedValueViewerId, ""));
+        values[0].Kind.ShouldBe(CustomValueKind.Number);
+        values[0].Number.ShouldBe(_storedNumber);
+        values[0].Revision.ShouldBe(_scalarRevision);
+        values[1].DefinitionId.ShouldBe(definitions[1].Id);
+        values[1].EntryKey.ShouldBe(_dictionaryEntryKey);
+        values[1]
+            .TargetHash.ShouldBe(
+                CustomValueIdentity.Target(_storedValueViewerId, _dictionaryEntryKey)
+            );
+        values[1].Kind.ShouldBe(CustomValueKind.Text);
+        values[1].Text.ShouldBe(_storedText);
+        values[1].Revision.ShouldBe(_dictionaryRevision);
+        var command = (
+            await db
+                .CustomCommands.AsNoTracking()
+                .Include(x => x.Action)
+                    .ThenInclude(x => x.ZeroArgumentMessageLibraryEntry)
+                        .ThenInclude(x => x!.Variants)
+                .ToArrayAsync()
+        ).ShouldHaveSingleItem();
+        command.Id.ShouldBe(7);
+        command.HostId.ShouldBe(SeedHostId);
+        command.Name.ShouldBe("cutover_profile");
+        command.Enabled.ShouldBeTrue();
+        var action = command.Action.ShouldBeOfType<MessageCustomCommandAction>();
+        action.HostId.ShouldBe(SeedHostId);
+        action
+            .ZeroArgumentMessageLibraryEntry.ShouldNotBeNull()
+            .Variants.ShouldHaveSingleItem()
+            .Text.ShouldBe(_storedValueTemplate);
+        var computed = (
+            await db.CustomCommandComputedResults.AsNoTracking().ToArrayAsync()
+        ).ShouldHaveSingleItem();
+        computed.Id.ShouldBe(730);
+        computed.HostId.ShouldBe(SeedHostId);
+        computed.CommandId.ShouldBe(command.Id);
+        computed.InvocationId.ShouldBe(_computedInvocationId);
+        computed.InvocationHash.ShouldBe(CustomValueIdentity.Hash(_computedInvocationId));
+        computed.ViewerId.ShouldBe(_storedValueViewerId);
+        computed.Reply.ShouldBe(_computedReply);
+        computed.ReplyEligible.ShouldBeFalse();
     }
 
     internal async Task DeliverTransferredPendingWorkOnceAsync()
