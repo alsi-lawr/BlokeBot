@@ -58,8 +58,21 @@ public partial class AutomationNodeInspector
     private bool IsDelayDuration(AutomationPortMetadata input) =>
         Node is not null && AutomationDelayDurationBinding.IsInput(Node.Definition, input);
 
+    private bool IsSendChatMessage(AutomationPortMetadata input) =>
+        Node?.Definition.Id == AutomationDefinitionIds.SendChatAction
+        && input.BindingFieldId == new AutomationConfigurationFieldId("message");
+
+    private IReadOnlyList<AutomationInputBindingMode> BindingModes(AutomationPortMetadata input) =>
+        IsSendChatMessage(input)
+            ? [AutomationInputBindingMode.Fixed, AutomationInputBindingMode.Connected]
+            : Enum.GetValues<AutomationInputBindingMode>();
+
     private bool ShowConfigurationField(AutomationConfigurationFieldMetadata field) =>
         field.FieldType is not AutomationConfigurationFieldType.Data
+        && !(
+            Node?.Definition.Id == AutomationDefinitionIds.SendChatAction
+            && field.Id == new AutomationConfigurationFieldId("message")
+        )
         && !(
             Node?.Definition.Id == AutomationDefinitionIds.DelayControl
             && field.Id == AutomationDelayDurationBinding.LiteralField
