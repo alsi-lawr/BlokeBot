@@ -273,14 +273,16 @@ internal sealed class CustomCommandExecutionService(
 
         var reply = selectedMessage is null
             ? null
-            : await templates.RenderCommandAsync(
-                selectedMessage,
-                new(host.Id, host.Login, host.TwitchUserId ?? string.Empty),
-                context,
-                args,
-                count,
-                ct
-            );
+            : (
+                await templates.RenderCommandAsync(
+                    selectedMessage,
+                    new(host.Id, host.Login, host.TwitchUserId ?? string.Empty),
+                    context,
+                    args,
+                    count,
+                    ct
+                )
+            ).Match(static text => text, static failure => failure.ChatMessage());
         if (
             cueAction is not null
             && reply is not null

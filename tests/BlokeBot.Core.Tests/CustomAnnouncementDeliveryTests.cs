@@ -22,7 +22,7 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
             dbFactory,
             hostId,
             new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
-            ["{random_from|First|Second}"],
+            ["{random_from|{random_between|4|4}}"],
             now.AddMinutes(-30).UtcDateTime
         );
         var random = new CountingRandomSource();
@@ -36,10 +36,12 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
 
         await scheduler.RunTickAsync(CancellationToken.None);
         clock.SetUtcNow(now.AddSeconds(2));
-        await scheduler.RunTickAsync(CancellationToken.None);
+        await CreateScheduler(dbFactory, clock, sender, random: random)
+            .RunTickAsync(CancellationToken.None);
 
-        sender.Calls.Select(static call => call.Message).ShouldBe(["First", "First"]);
+        sender.Calls.Select(static call => call.Message).ShouldBe(["4", "4"]);
         random.CallCount.ShouldBe(1);
+        random.Bounds.ShouldBe([(4, 4)]);
     }
 
     [Test]
@@ -370,6 +372,83 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
         blankAnnouncement.OccurrenceAttemptCount.ShouldBe(0);
     }
 
+    [Test]
+    public async Task ScheduledNestedNumericFailure_PersistsReplacementBeforeDeliveryAndReusesItOnRetry()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            database,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var seed = await SeedAnnouncementAsync(
+            database,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            [
+                "private-prefix {random_between|1|1} {random_from|{random_between|1|{arg1}}} private-suffix",
+            ],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        var random = new CountingRandomSource();
+        var sender = new PersistedPayloadSender(database, seed.AnnouncementId);
+
+        await CreateScheduler(database, clock, sender, random: random)
+            .RunTickAsync(CancellationToken.None);
+        await using (var pending = await database.CreateDbContextAsync())
+        {
+            var occurrence = await pending.CustomAnnouncements.SingleAsync();
+            occurrence.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.RetryScheduled);
+            occurrence.OccurrenceMessage.ShouldBe(sender.Messages.Single());
+        }
+        clock.SetUtcNow(now.AddSeconds(2));
+        await CreateScheduler(database, clock, sender, random: random)
+            .RunTickAsync(CancellationToken.None);
+
+        sender.Messages.Count.ShouldBe(2);
+        sender.Messages[0].ShouldContain("whole");
+        sender.Messages[0].ShouldNotContain("private-");
+        sender.Messages[0].ShouldNotContain("{arg1}");
+        sender.Messages[1].ShouldBe(sender.Messages[0]);
+        random.Bounds.ShouldBe([(1, 1)]);
+        random.CallCount.ShouldBe(1);
+        await using var verify = await database.CreateDbContextAsync();
+        var stored = await verify.CustomAnnouncements.SingleAsync();
+        stored.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
+        stored.OccurrenceAttemptCount.ShouldBe(2);
+        stored.OccurrenceMessage.ShouldBeNull();
+    }
+
+    private sealed class PersistedPayloadSender(
+        SqliteBlokeBotDbFactory database,
+        int announcementId
+    ) : ICustomAnnouncementSender
+    {
+        public List<string> Messages { get; } = [];
+
+        public async ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
+            CustomAnnouncementDeliveryRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            await using var verify = await database.CreateDbContextAsync(cancellationToken);
+            var stored = await verify.CustomAnnouncements.SingleAsync(
+                value => value.Id == announcementId,
+                cancellationToken
+            );
+            stored.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
+            stored.OccurrenceMessage.ShouldBe(request.Message);
+            Messages.Add(request.Message);
+            return Messages.Count == 1
+                ? new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
+                    new AnnouncementEnqueueFailureType("Busy")
+                )
+                : new AnnouncementEnqueueOutcome.Accepted();
+        }
+    }
+
     private sealed class CountingRandomSource : IMessageLibraryRandomSource
     {
         public int CallCount { get; private set; }
@@ -380,6 +459,12 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
             return CallCount - 1;
         }
 
-        public int NextInclusive(int minimum, int maximum) => minimum;
+        public List<(int Minimum, int Maximum)> Bounds { get; } = [];
+
+        public int NextInclusive(int minimum, int maximum)
+        {
+            Bounds.Add((minimum, maximum));
+            return minimum;
+        }
     }
 }
