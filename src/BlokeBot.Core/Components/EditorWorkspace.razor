@@ -2,12 +2,26 @@
 @inject IJSRuntime _js
 
 <section class="@($"{Class} editor-workspace{(FocusMode ? " editor-workspace--focus" : "")}")" @ref="Element" @attributes="Attributes">
+    @if (Header is not null) {
+        <div class="editor-workspace-header">
+            @Header(Controls)
+            @Failure
+        </div>
+    }
     @ChildContent
-    <div class="editor-workspace-controls" role="group" aria-label="Editor focus controls">
-        <EditorAction Class="" Label='@(FocusMode ? "Exit Focus" : "Focus")' Icon="focus" Pressed="FocusMode" Click="ToggleFocusAsync" />
-        <EditorAction Class="" Label='@(_fullscreen ? "Exit Full screen" : "Full screen")' Icon="fullscreen" Pressed="_fullscreen" Click="FullscreenAsync" />
-    </div>
-    @if (_failure is not null) {
-        <p class="editor-workspace-error" role="alert">@_failure</p>
+    @if (Header is null) {
+        @Controls
+        @Failure
     }
 </section>
+
+@code {
+    private RenderFragment Failure => @<text>@if (_failure is not null) {
+        <p class="editor-workspace-error" role="alert">@_failure</p>
+    }</text>;
+
+    private RenderFragment Controls => @<div class="@($"editor-workspace-controls{(Header is null ? "" : " editor-workspace-controls--inline")}")" role="group" aria-label="Editor focus controls">
+        <EditorAction Class="" Label='@(FocusMode ? "Exit Focus" : "Focus")' Icon="focus" Pressed="FocusMode" Click="ToggleFocusAsync" />
+        <EditorAction Class="" Label='@(_fullscreen ? "Exit Full screen" : "Full screen")' Icon="fullscreen" Pressed="_fullscreen" Click="FullscreenAsync" />
+    </div>;
+}
