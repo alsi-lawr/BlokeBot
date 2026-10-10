@@ -23,9 +23,10 @@ export function placementFromPointer(start, dx, dy, cell, columns, resize) {
         row: Math.max(0, start.row + Math.round(dy / cell.y)),
       };
 }
-export function create(root, dotnet, generation) {
+export function create(root, dotnet, generation, interaction) {
   const grid = root.querySelector("[data-dashboard-grid]");
   const state = {
+    interaction,
     items: new Map(),
     pending: new Map(),
     sequence: 0,
@@ -62,7 +63,9 @@ export function create(root, dotnet, generation) {
   const markDirty = () => {
     if (!state.dirty) {
       state.dirty = true;
-      dotnet.invokeMethodAsync("LocalEditStarted", generation).catch(report);
+      dotnet
+        .invokeMethodAsync("LocalEditStarted", generation, state.interaction)
+        .catch(report);
     }
   };
   const report = (error) => {
@@ -73,6 +76,7 @@ export function create(root, dotnet, generation) {
       await dotnet.invokeMethodAsync(
         "PlacementChanged",
         generation,
+        pending.interaction,
         id,
         pending.placement,
         pending.resize,
@@ -91,7 +95,9 @@ export function create(root, dotnet, generation) {
       if (gesture.previous) state.pending.set(gesture.id, gesture.previous);
       else state.pending.delete(gesture.id);
       style(gesture.id, gesture.start);
-      dotnet.invokeMethodAsync("GestureCancelled", generation).catch(report);
+      dotnet
+        .invokeMethodAsync("GestureCancelled", generation, gesture.interaction)
+        .catch(report);
     } else {
       const pending = state.pending.get(gesture.id);
       if (pending) void send(gesture.id, pending);
@@ -116,6 +122,7 @@ export function create(root, dotnet, generation) {
     const columns = Number(grid.dataset.columns);
     state.gesture = {
       id,
+      interaction: state.interaction,
       previous: state.pending.get(id),
       start: { ...start },
       x: event.clientX,
@@ -129,7 +136,12 @@ export function create(root, dotnet, generation) {
   };
   const move = (event) => {
     const g = state.gesture;
-    if (!g || event.pointerId !== g.pointer) return;
+    if (
+      !g ||
+      event.pointerId !== g.pointer ||
+      g.interaction !== state.interaction
+    )
+      return;
     const placement = placementFromPointer(
       g.start,
       event.clientX - g.x,
@@ -147,6 +159,7 @@ export function create(root, dotnet, generation) {
     state.pending.set(g.id, {
       placement,
       resize: g.resize,
+      interaction: g.interaction,
       sequence: ++state.sequence,
     });
     requestPaint();
@@ -236,6 +249,7 @@ export function create(root, dotnet, generation) {
       .invokeMethodAsync(
         "ToolboxDropped",
         generation,
+        state.interaction,
         kind,
         Math.max(
           0,
@@ -271,9 +285,18 @@ export function create(root, dotnet, generation) {
   });
   observer.observe(grid, { childList: true });
   tick();
+  const reset = (interaction) => {
+    if (interaction < state.interaction) return;
+    end(null, true);
+    state.interaction = interaction;
+    state.pending.clear();
+    state.dirty = false;
+    for (const [id, p] of state.items) style(id, p);
+  };
   return {
-    sync(items, acknowledged, dirty) {
-      if (state.disposed) return;
+    sync(items, acknowledged, dirty, interaction) {
+      if (state.disposed || interaction < state.interaction) return;
+      if (interaction !== state.interaction) reset(interaction);
       clockOffset = Date.parse(root.dataset.serverNow) - Date.now();
       cards = new Map(
         [...grid.querySelectorAll("[data-widget-id]")].map((e) => [
@@ -296,12 +319,7 @@ export function create(root, dotnet, generation) {
       }
       return [...state.pending].map(([id, p]) => ({ id, ...p }));
     },
-    cancel() {
-      end(null, true);
-      state.pending.clear();
-      state.dirty = false;
-      for (const [id, p] of state.items) style(id, p);
-    },
+    cancel: reset,
     focusManagement() {
       root.querySelector("#dashboard-management button")?.focus();
     },

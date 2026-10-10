@@ -652,10 +652,6 @@ public sealed partial class AutomationRuntimeService(
 
             if (run.ExecutionLeaseId != leaseId)
             {
-                if (run.Status != AutomationFlowRunStatus.Waiting)
-                {
-                    await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
-                }
                 return new(AutomationResumeStatus.Waiting);
             }
 

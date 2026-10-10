@@ -105,6 +105,74 @@ public sealed partial class AutomationRuntimeTests
         changes.States.ShouldBe([AutomationFlowRunState.Running, AutomationFlowRunState.Failed]);
     }
 
+    [Test]
+    [Arguments(AutomationFlowRunStatus.Running)]
+    [Arguments(AutomationFlowRunStatus.Completed)]
+    public async Task DashboardUiEvents_LeaseLostInsideOwnedLoopDoesNotPublishWithoutWrite(
+        AutomationFlowRunStatus status
+    )
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chat = new RecordingChatSender(
+            null,
+            async (_, _, _) =>
+            {
+                entered.SetResult();
+                await release.Task;
+            }
+        );
+        await using var f = await RuntimeFixture.CreateAsync(chat: chat);
+        var changes = new ReadingCommittedRunChanges(f);
+        var runtime = new AutomationRuntimeService(
+            f.Database,
+            f.Catalog,
+            f.Flows,
+            f.Actions,
+            f.Clock,
+            changes
+        );
+        var source = Node("manual-run", """{"data":"go"}""");
+        var action = Node("send-chat", """{"message":"one effect"}""");
+        var flow = await f.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        var operation = new AutomationManualRunService(
+            f.Database,
+            runtime,
+            f.Catalog,
+            f.Clock
+        ).RunAsync(new(f.HostId), flow, CancellationToken.None);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Guid runId;
+        var replacementLease = Guid.NewGuid();
+        try
+        {
+            await using var db = await f.Database.CreateDbContextAsync();
+            var run = await db.AutomationFlowRuns.SingleAsync();
+            _ = run.ExecutionLeaseId.ShouldNotBeNull();
+            runId = run.Id;
+            run.ExecutionLeaseId = replacementLease;
+            run.Status = status;
+            run.CompletedAtUtc =
+                status == AutomationFlowRunStatus.Completed
+                    ? f.Clock.GetUtcNow().UtcDateTime
+                    : null;
+            _ = await db.SaveChangesAsync();
+        }
+        finally
+        {
+            release.SetResult();
+        }
+        _ = (
+            await operation.WaitAsync(TimeSpan.FromSeconds(5))
+        ).ShouldBeOfType<AutomationManualRunOutcome.Dispatched>();
+        changes.States.ShouldBe([AutomationFlowRunState.Running]);
+        await using var read = await f.Database.CreateDbContextAsync();
+        var retained = await read.AutomationFlowRuns.FindAsync(runId);
+        retained!.ExecutionLeaseId.ShouldBe(replacementLease);
+        retained.Status.ShouldBe(status);
+        chat.Calls.ShouldBe(1);
+    }
+
     private sealed class ReadingCommittedRunChanges(RuntimeFixture fixture)
         : IAutomationUiChangePublisher
     {

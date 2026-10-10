@@ -83,8 +83,7 @@ public partial class DashboardPage
             }
             if (outcome is DashboardResult<DashboardId>.Succeeded)
             {
-                await CancelGestureAsync();
-                _edit?.Cancel();
+                await CancelGestureAsync(() => _edit?.Cancel());
                 _managementOpen = false;
                 _feedback = "Dashboard deleted. Its targets are unchanged.";
                 _focusPicker = true;

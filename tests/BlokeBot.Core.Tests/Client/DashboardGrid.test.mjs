@@ -70,7 +70,7 @@ function fixture() {
       return new Promise(() => {});
     },
   };
-  const api = create(root, dotnet);
+  const api = create(root, dotnet, 9, 0);
   api.sync(
     [
       {
@@ -80,6 +80,7 @@ function fixture() {
     ],
     0,
     false,
+    0,
   );
   const event = (x, y) => ({
     target: handle,
@@ -127,6 +128,7 @@ test("motion paints before release and interop; stale acknowledgements preserve 
     ],
     1,
     true,
+    0,
   );
   assert.equal(f.card.style.gridColumn, "4 / span 4");
   assert.equal(f.card.style.gridRow, "3 / span 3");
@@ -158,4 +160,37 @@ test("move/resize snaps from current state and clamps owned grid boundary", () =
     placementFromPointer(p, 1000, -1000, { x: 100, y: 72 }, 12, true),
     { ...p, width: 10, height: 1 },
   );
+});
+
+test("cancelled-origin calls stay old while new gestures survive stale sync", () => {
+  const f = fixture();
+  f.root.emit("pointerdown", f.event(0, 0));
+  f.root.emit("pointermove", f.event(200, 72));
+  f.paint();
+  f.root.emit("pointerup", f.event(200, 72));
+  const old = f.calls.find((c) => c.name === "PlacementChanged");
+  assert.equal(old.args[1], 0);
+  f.api.cancel(1);
+  f.root.emit("pointerdown", f.event(0, 0));
+  f.root.emit("pointermove", f.event(300, 144));
+  f.paint();
+  f.api.sync(
+    [
+      {
+        id: "a",
+        placement: { column: 2, row: 1, width: 4, height: 3, order: 0 },
+      },
+    ],
+    100,
+    false,
+    0,
+  );
+  assert.equal(f.card.style.gridColumn, "4 / span 4");
+  assert.equal(f.card.style.gridRow, "3 / span 3");
+  const pending = f.api.flush();
+  assert.equal(pending[0].interaction, 1);
+  assert.equal(old.args[1], 0);
+  const latest = f.calls.filter((c) => c.name === "PlacementChanged").at(-1);
+  assert.equal(latest.args[1], 1);
+  f.api.dispose();
 });

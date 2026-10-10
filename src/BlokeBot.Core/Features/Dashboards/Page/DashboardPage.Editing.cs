@@ -91,12 +91,19 @@ public partial class DashboardPage
     }
 
     [JSInvokable]
-    public async Task ToolboxDropped(long generation, string kind, int column, int row)
+    public async Task ToolboxDropped(
+        long generation,
+        long interaction,
+        string kind,
+        int column,
+        int row
+    )
     {
         if (
             !_editing
             || _busy
             || generation != _loadGeneration
+            || interaction != _interactionGeneration
             || _edit is null
             || !Enum.TryParse<DashboardWidgetKind>(kind, out var parsed)
             || !Enum.IsDefined(parsed)
@@ -115,7 +122,12 @@ public partial class DashboardPage
             },
             DashboardWidgetKinds.Create(parsed)
         );
-        while (!_disposed && _edit == session && generation == _loadGeneration)
+        while (
+            !_disposed
+            && _edit == session
+            && generation == _loadGeneration
+            && interaction == _interactionGeneration
+        )
         {
             var proposal = session.Propose(widget, DashboardPlacementIntent.Add);
             if (proposal is null)
@@ -128,7 +140,13 @@ public partial class DashboardPage
                     "confirm",
                     $"Replace {proposal.Victims.Length} covered widget(s)? Undo can restore them before Save."
                 );
-            if (!confirmed)
+            if (
+                !confirmed
+                || _disposed
+                || _edit != session
+                || generation != _loadGeneration
+                || interaction != _interactionGeneration
+            )
             {
                 break;
             }
@@ -143,7 +161,7 @@ public partial class DashboardPage
             }
             break;
         }
-        if (_disposed || generation != _loadGeneration)
+        if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
         {
             return;
         }
@@ -162,7 +180,14 @@ public partial class DashboardPage
             return;
         }
         var session = _edit;
-        while (!_disposed && _edit == session)
+        var interaction = _interactionGeneration;
+        var generation = _loadGeneration;
+        while (
+            !_disposed
+            && _edit == session
+            && interaction == _interactionGeneration
+            && generation == _loadGeneration
+        )
         {
             var current = session.Document.Widgets.FirstOrDefault(w => w.Id == widget.Id);
             if (current is null)
@@ -187,7 +212,13 @@ public partial class DashboardPage
                     "confirm",
                     $"Replace {proposal.Victims.Length} covered widget(s)? Undo can restore them before Save."
                 );
-            if (!confirmed)
+            if (
+                !confirmed
+                || _disposed
+                || _edit != session
+                || interaction != _interactionGeneration
+                || generation != _loadGeneration
+            )
             {
                 return;
             }
@@ -254,46 +285,42 @@ public partial class DashboardPage
         {
             return;
         }
-        await CancelGestureAsync();
-        _edit?.Remove(id);
-        if (_selected == id)
+        await CancelGestureAsync(() =>
         {
-            _selected = null;
-        }
+            _edit?.Remove(id);
+            if (_selected == id)
+            {
+                _selected = null;
+            }
+        });
         if (_toggle is not null)
         {
             await _toggle.FocusAsync();
         }
     }
 
-    private async Task CancelGestureAsync()
+    private async Task CancelGestureAsync(Action change)
     {
+        var interaction = ++_interactionGeneration;
+        _localDirty = false;
+        change();
         if (_grid is not null)
         {
-            await _grid.InvokeVoidAsync("cancel");
+            await _grid.InvokeVoidAsync("cancel", interaction);
         }
-        _localDirty = false;
     }
 
-    private async Task UndoAsync()
-    {
-        await CancelGestureAsync();
-        _edit?.Undo();
-    }
+    private Task UndoAsync() => CancelGestureAsync(() => _edit?.Undo());
 
-    private async Task RedoAsync()
-    {
-        await CancelGestureAsync();
-        _edit?.Redo();
-    }
+    private Task RedoAsync() => CancelGestureAsync(() => _edit?.Redo());
 
-    private async Task CancelAsync()
-    {
-        await CancelGestureAsync();
-        _edit?.Cancel();
-        _selected = null;
-        _feedback = null;
-    }
+    private Task CancelAsync() =>
+        CancelGestureAsync(() =>
+        {
+            _edit?.Cancel();
+            _selected = null;
+            _feedback = null;
+        });
 
     private async Task SaveAsync()
     {
@@ -302,6 +329,9 @@ public partial class DashboardPage
             return;
         }
         _busy = true;
+        var session = _edit;
+        var generation = _loadGeneration;
+        var interaction = _interactionGeneration;
         try
         {
             if (_grid is not null)
@@ -310,7 +340,8 @@ public partial class DashboardPage
                 foreach (var item in pending.OrderBy(p => p.Sequence))
                 {
                     await PlacementChanged(
-                        _loadGeneration,
+                        generation,
+                        item.Interaction,
                         item.Id,
                         item.Placement,
                         item.Resize,
@@ -318,25 +349,51 @@ public partial class DashboardPage
                     );
                 }
             }
-            var session = _edit;
+            if (
+                _disposed
+                || generation != _loadGeneration
+                || interaction != _interactionGeneration
+                || _edit != session
+            )
+            {
+                return;
+            }
             var host = new DashboardHostId(HostId);
             _ = await LoadPageContextAsync();
+            if (
+                _disposed
+                || generation != _loadGeneration
+                || interaction != _interactionGeneration
+                || _edit != session
+                || HostId != host.Value
+            )
+            {
+                return;
+            }
             var outcome = await _configuration.SaveAsync(
                 PageContext.Session,
                 session.Command(host),
                 CancellationToken.None
             );
-            if (_disposed || _edit != session || HostId != host.Value)
+            if (
+                _disposed
+                || generation != _loadGeneration
+                || interaction != _interactionGeneration
+                || _edit != session
+                || HostId != host.Value
+            )
             {
                 return;
             }
             switch (outcome)
             {
                 case DashboardSaveOutcome.Saved saved:
-                    session.Accept(saved.Dashboard);
-                    _snapshot = saved.Dashboard;
-                    _localDirty = false;
-                    _feedback = "Dashboard saved.";
+                    await CancelGestureAsync(() =>
+                    {
+                        session.Accept(saved.Dashboard);
+                        _snapshot = saved.Dashboard;
+                        _feedback = "Dashboard saved.";
+                    });
                     break;
                 case DashboardSaveOutcome.Conflict conflict:
                     session.PreserveConflict(conflict.Current);
@@ -356,18 +413,27 @@ public partial class DashboardPage
 
     private async Task ReloadConflictAsync()
     {
+        var session = _edit;
+        var generation = _loadGeneration;
+        var interaction = _interactionGeneration;
         if (
-            _edit?.Conflict is { } current
+            session?.Conflict is { } current
             && await _js.InvokeAsync<bool>(
                 "confirm",
                 "Discard your local changes and load the saved dashboard?"
             )
+            && !_disposed
+            && generation == _loadGeneration
+            && interaction == _interactionGeneration
+            && _edit == session
         )
         {
-            await CancelGestureAsync();
-            _edit.Accept(current);
-            _snapshot = current;
-            _feedback = null;
+            await CancelGestureAsync(() =>
+            {
+                session.Accept(current);
+                _snapshot = current;
+                _feedback = null;
+            });
         }
     }
 }

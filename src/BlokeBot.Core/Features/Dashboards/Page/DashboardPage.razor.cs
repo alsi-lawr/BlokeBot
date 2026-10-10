@@ -25,6 +25,7 @@ public partial class DashboardPage
     private bool _disposed;
     private long _loadGeneration;
     private long _acknowledged;
+    private long _interactionGeneration;
     private readonly SemaphoreSlim _placementGate = new(1, 1);
     private ElementReference _root;
     private ElementReference _picker;
@@ -150,7 +151,8 @@ public partial class DashboardPage
                     placement = w.Placement,
                 }),
                 _acknowledged,
-                _dirty
+                _dirty,
+                _interactionGeneration
             );
             if (_focusManagement)
             {
@@ -186,7 +188,8 @@ public partial class DashboardPage
             "create",
             _root,
             _reference,
-            generation
+            generation,
+            _interactionGeneration
         );
     }
 
@@ -244,9 +247,15 @@ public partial class DashboardPage
     private void Rename(string name) => _edit?.Rename(name);
 
     [JSInvokable]
-    public Task LocalEditStarted(long generation)
+    public Task LocalEditStarted(long generation, long interaction)
     {
-        if (!_disposed && generation == _loadGeneration && _editing && _edit is not null)
+        if (
+            !_disposed
+            && generation == _loadGeneration
+            && interaction == _interactionGeneration
+            && _editing
+            && _edit is not null
+        )
         {
             _localDirty = true;
             return InvokeAsync(StateHasChanged);
@@ -257,6 +266,7 @@ public partial class DashboardPage
     [JSInvokable]
     public async Task PlacementChanged(
         long generation,
+        long interaction,
         string id,
         DashboardPlacementTransport placement,
         bool resize,
@@ -269,6 +279,7 @@ public partial class DashboardPage
             if (
                 _disposed
                 || generation != _loadGeneration
+                || interaction != _interactionGeneration
                 || !_editing
                 || _edit is null
                 || sequence <= _acknowledged
@@ -286,6 +297,10 @@ public partial class DashboardPage
                     resize
                 );
             }
+            if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
+            {
+                return;
+            }
             _acknowledged = sequence;
             _localDirty = false;
             await InvokeAsync(StateHasChanged);
@@ -297,9 +312,9 @@ public partial class DashboardPage
     }
 
     [JSInvokable]
-    public Task GestureCancelled(long generation)
+    public Task GestureCancelled(long generation, long interaction)
     {
-        if (_disposed || generation != _loadGeneration)
+        if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
         {
             return Task.CompletedTask;
         }
@@ -329,12 +344,7 @@ public partial class DashboardPage
             context.PreventNavigation();
             return;
         }
-        if (_grid is not null)
-        {
-            await _grid.InvokeVoidAsync("cancel");
-        }
-        _localDirty = false;
-        _edit?.Cancel();
+        await CancelGestureAsync(() => _edit?.Cancel());
     }
 
     private async Task DisposeGridAsync()
@@ -387,5 +397,6 @@ public sealed record DashboardPendingPlacement(
     string Id,
     DashboardPlacementTransport Placement,
     bool Resize,
-    long Sequence
+    long Sequence,
+    long Interaction
 );
