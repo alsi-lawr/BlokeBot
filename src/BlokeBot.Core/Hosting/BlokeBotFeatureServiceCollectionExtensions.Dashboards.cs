@@ -16,6 +16,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<DashboardPollControls>();
         _ = services.AddSingleton<DashboardPredictionControls>();
         _ = services.AddSingleton<DashboardGiveawayControls>();
+        _ = services.AddSingleton<DashboardGuessingControls>();
         _ = services.AddEventBus<DashboardGiveawayChange>(
             ObserverBoundary.Named("BlokeBot.DashboardGiveaways"),
             static change =>

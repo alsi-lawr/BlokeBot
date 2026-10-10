@@ -8,6 +8,42 @@ namespace BlokeBot.Core.Features.Guessing.Rounds;
 
 public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
+    internal async Task<GuessingControlState?> ReadControlAsync(
+        int hostId,
+        int selectedProfileId,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var profile = await db
+            .Profiles.AsNoTracking()
+            .Where(x => x.HostId == hostId && x.Id == selectedProfileId)
+            .Select(x => new GuessRoundProfileSummary(x.Id, x.Revision, x.Name, x.IsDefault))
+            .SingleOrDefaultAsync(ct);
+        if (profile is null)
+        {
+            return null;
+        }
+        var round = await GuessingRoundQueries.LoadDashboardRoundAsync(db, hostId, ct);
+        if (round is null)
+        {
+            return new(profile, null, []);
+        }
+        var names = await db
+            .GuessOptions.AsNoTracking()
+            .Where(x => x.GuessRoundProfileId == round.ProfileId)
+            .Select(x => x.Name)
+            .ToArrayAsync(ct);
+        return new(
+            profile,
+            round,
+            names
+                .Select(x => GuessAnswerNames.Parse(x).Canonical)
+                .OrderBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
+                .ToImmutableArray()
+        );
+    }
+
     public async Task<GuessingDashboardState> LoadStateAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
