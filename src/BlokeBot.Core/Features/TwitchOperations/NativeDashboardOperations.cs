@@ -23,6 +23,12 @@ public interface IShoutoutDashboardOperations
 
 public interface IPollDashboardOperations
 {
+    Task<PollControlState> ReadControlAsync(
+        int hostId,
+        int templateId,
+        CancellationToken cancellationToken
+    );
+
     Task<PollDashboardState> LoadAsync(int hostId, CancellationToken cancellationToken);
 
     Task<PollOperationOutcome> SaveTemplateAsync(
@@ -109,6 +115,12 @@ public interface IChannelPointsDashboardOperations
 
 public interface IPredictionDashboardOperations
 {
+    Task<PredictionControlState> ReadControlAsync(
+        int hostId,
+        int templateId,
+        CancellationToken cancellationToken
+    );
+
     Task<PredictionDashboardState> LoadAsync(int hostId, CancellationToken cancellationToken);
 
     Task<PredictionOperationOutcome> SaveTemplateAsync(

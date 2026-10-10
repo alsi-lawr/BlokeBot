@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Predictions;
 
-public sealed class PredictionService(
+public sealed partial class PredictionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     BroadcasterOperationAuthorization broadcasterAuthorization,
     HelixClient helix,

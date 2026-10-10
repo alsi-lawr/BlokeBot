@@ -7,7 +7,7 @@ using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 
 namespace BlokeBot.Simulation;
 
-internal sealed class SimulationNativeTwitchDashboardOperations
+internal sealed partial class SimulationNativeTwitchDashboardOperations
     : IShoutoutDashboardOperations,
         IPollDashboardOperations,
         IClipMarkerDashboardOperations,

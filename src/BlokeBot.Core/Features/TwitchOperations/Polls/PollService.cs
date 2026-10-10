@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Polls;
 
-public sealed class PollService(
+public sealed partial class PollService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     BroadcasterOperationAuthorization broadcasterAuthorization,
     HelixClient helix,
