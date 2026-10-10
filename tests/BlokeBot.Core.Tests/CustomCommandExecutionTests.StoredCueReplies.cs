@@ -24,7 +24,7 @@ public sealed partial class CustomCommandExecutionTests
             "streamer",
             HostFeatureFlags.CustomCommands | HostFeatureFlags.Overlays
         );
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var total = await DeclareAsync(
             values,
             hostId,

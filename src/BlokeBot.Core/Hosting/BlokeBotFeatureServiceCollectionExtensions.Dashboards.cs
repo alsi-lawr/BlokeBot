@@ -10,6 +10,7 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<DashboardConfigurationService>();
         _ = services.AddSingleton<DashboardBindingReader>();
         _ = services.AddSingleton<DashboardAutomationControls>();
+        _ = services.AddSingleton<DashboardValueReader>();
         return services;
     }
 }

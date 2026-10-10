@@ -22,6 +22,7 @@ internal sealed partial class CustomCommandExecutionService(
     IOverlayCueAdmissionService overlayCues,
     ICustomCommandAutomationRuntime automations,
     TimeProvider clock,
+    CustomStoredValueChanges valueChanges,
     IEnumerable<IBingoCounterEventSink>? bingoCounters = null
 )
 {

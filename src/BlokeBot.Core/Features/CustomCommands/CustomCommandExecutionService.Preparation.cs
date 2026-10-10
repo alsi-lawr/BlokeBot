@@ -62,6 +62,7 @@ internal sealed partial class CustomCommandExecutionService
         }
         var renderFailed = false;
         CustomCommandComputedResult? computedResult = null;
+        IReadOnlyCollection<CustomStoredValueChange.Target> mutations = [];
         try
         {
             await using var transaction = await MainDatabaseWriteTransaction.StartImmediateAsync(
@@ -207,6 +208,7 @@ internal sealed partial class CustomCommandExecutionService
                         }
                     );
                     renderFailed = failure is not null;
+                    mutations = session.Mutations;
                     if (!renderFailed && invocationAvailable)
                     {
                         computedResult = new()
@@ -238,6 +240,10 @@ internal sealed partial class CustomCommandExecutionService
                     "The command save could not be confirmed. Check database storage and retry with the same message ID."
                 )
             );
+        }
+        if (!renderFailed)
+        {
+            await valueChanges.PublishCommittedAsync(mutations);
         }
         return renderFailed
             ? Result<PreparedCommandInvocation, CommandPreparationFailure>.Error(

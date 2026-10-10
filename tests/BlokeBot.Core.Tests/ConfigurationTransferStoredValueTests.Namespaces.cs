@@ -38,7 +38,7 @@ public sealed partial class ConfigurationTransferStoredValueTests
                 HostFeatureFlags.CustomCommands;
             _ = await destination.SaveChangesAsync();
         }
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var scalar = await CustomCommandExecutionTests.DeclareAsync(
             values,
             sourceId,

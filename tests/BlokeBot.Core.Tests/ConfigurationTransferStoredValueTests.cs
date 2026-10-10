@@ -37,7 +37,7 @@ public sealed partial class ConfigurationTransferStoredValueTests
     {
         var sourceId = await SeedHostAsync(database, "source");
         var destinationId = await SeedHostAsync(database, "destination");
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var largeDefault =
             new string('x', (2 * 1024 * 1024) + 4096) + " exact 😀 {var_inc|global|total|1}";
         (

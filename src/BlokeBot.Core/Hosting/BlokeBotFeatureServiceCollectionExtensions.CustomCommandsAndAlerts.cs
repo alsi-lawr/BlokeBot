@@ -3,6 +3,7 @@ using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Eventing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;
@@ -44,6 +45,19 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         >();
         services.TryAddSingleton<IMessageLibraryChatterSource, MessageLibraryChatterSource>();
         _ = services.AddSingleton<CustomCommandTemplateRenderer>();
+        _ = services.AddEventBus<CustomStoredValueChange>(
+            ObserverBoundary.Named("BlokeBot.CustomStoredValues"),
+            static identity =>
+                ObserverEventIdentity.Named(
+                    identity.Match(
+                        definition =>
+                            $"BlokeBot.CustomStoredValues.{definition.HostId}.{definition.DefinitionId}.Definition",
+                        target =>
+                            $"BlokeBot.CustomStoredValues.{target.HostId}.{target.DefinitionId}.{CustomValueIdentity.Target(target.Value.ViewerId, target.Value.Key)}"
+                    )
+                )
+        );
+        _ = services.AddSingleton<CustomStoredValueChanges>();
         _ = services.AddSingleton<CustomStoredValueService>();
         _ = services.AddSingleton<CustomCommandConfigurationGraphWriter>();
         _ = services.AddSingleton<CustomCommandConfigurationService>();

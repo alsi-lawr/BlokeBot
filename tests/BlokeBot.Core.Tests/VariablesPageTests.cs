@@ -39,7 +39,7 @@ public sealed partial class VariablesPageTests
             hostId = host.Id;
             otherId = other.Id;
         }
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var definition = await CustomCommandExecutionTests.DeclareAsync(
             values,
             hostId,
@@ -114,7 +114,7 @@ public sealed partial class VariablesPageTests
             _ = await seed.SaveChangesAsync();
             hostId = host.Id;
         }
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var definition = await CustomCommandExecutionTests.DeclareAsync(
             values,
             hostId,

@@ -65,7 +65,7 @@ public sealed partial class VariablesPageTests
         page.FindComponents<BlokeBot.Core.Components.TextAreaField>()
             .Single(x => x.Instance.Id == "saved-value")
             .Instance.Value.ShouldBe("Celeste");
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var definitions = await values.DefinitionsAsync(hostId, default);
         var scalar = definitions.Single(x => x.Kind == CustomValueKind.Number);
         var dictionary = definitions.Single(x => x.Kind == CustomValueKind.Dictionary);

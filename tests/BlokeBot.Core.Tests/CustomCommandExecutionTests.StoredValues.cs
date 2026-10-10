@@ -29,7 +29,7 @@ public sealed partial class CustomCommandExecutionTests
     )
     {
         var hostId = await SeedHostAsync(database, "streamer");
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var hugs = await DeclareAsync(
             values,
             hostId,
@@ -210,7 +210,7 @@ public sealed partial class CustomCommandExecutionTests
     {
         var hostId = await SeedHostAsync(database, "streamer");
         var otherHost = await SeedHostAsync(database, "other");
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var longName = new string('n', 8192);
         var longDefault = string.Concat(
             Enumerable.Repeat("literal {var_inc|global|total|1}|😀 ", 40)

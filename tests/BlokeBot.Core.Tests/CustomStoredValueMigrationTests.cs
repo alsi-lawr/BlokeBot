@@ -71,7 +71,7 @@ public sealed partial class CustomStoredValueMigrationTests
         }
         await new BlokeBotDatabaseInitializer(database).InitializeAsync(default);
         await new BlokeBotDatabaseInitializer(database).InitializeAsync(default);
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var definition = await CustomCommandExecutionTests.DeclareAsync(
             values,
             hostId,

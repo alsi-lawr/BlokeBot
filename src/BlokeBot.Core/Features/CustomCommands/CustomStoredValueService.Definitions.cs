@@ -7,6 +7,33 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 internal sealed partial class CustomStoredValueService
 {
+    internal async Task<CustomValueDefinitionDraft?> DefinitionAsync(
+        int hostId,
+        int definitionId,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var definition = await db
+            .CustomValueDefinitions.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.HostId == hostId && x.Id == definitionId, ct);
+        return definition is null ? null : DefinitionDraft(definition);
+    }
+
+    private static CustomValueDefinitionDraft DefinitionDraft(CustomValueDefinition definition) =>
+        new(
+            definition.Id,
+            definition.Name,
+            definition.Scope,
+            definition.Kind,
+            CustomStoredValueSession.Format(
+                definition.Kind,
+                definition.DefaultNumber,
+                definition.DefaultText
+            ),
+            definition.Revision
+        );
+
     public async Task<IReadOnlyList<CustomValueDefinitionDraft>> DefinitionsAsync(
         int hostId,
         CancellationToken ct
@@ -113,6 +140,9 @@ internal sealed partial class CustomStoredValueService
             definition.Revision = Guid.NewGuid();
             _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            await changes.PublishCommittedAsync([
+                new CustomStoredValueChange.Definition(hostId, definition.Id),
+            ]);
             return CustomValueEditOutcome.Saved;
         }
         catch (Exception exception) when (exception is DbException or DbUpdateException)
@@ -175,6 +205,9 @@ internal sealed partial class CustomStoredValueService
             _ = db.CustomValueDefinitions.Remove(definition);
             _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            await changes.PublishCommittedAsync([
+                new CustomStoredValueChange.Definition(hostId, definition.Id),
+            ]);
             return CustomValueEditOutcome.Saved;
         }
         catch (Exception exception) when (exception is DbException or DbUpdateException)

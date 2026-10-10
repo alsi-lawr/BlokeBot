@@ -54,7 +54,7 @@ public sealed partial class CustomStoredValueMigrationTests
             _ = await before.SaveChangesAsync();
             hostId = host.Id;
         }
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var scalar = await CustomCommandExecutionTests.DeclareAsync(
             values,
             hostId,

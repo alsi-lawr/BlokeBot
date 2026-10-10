@@ -50,6 +50,7 @@ public sealed class ViewerPassportCommandTests
             )
         );
         var services = new ServiceCollection();
+        _ = services.AddLogging();
         _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
         _ = services.AddSingleton(passports);
         _ = services.AddSingleton(PublicSiteLinks("https://localhost/oauth/callback"));
@@ -123,6 +124,7 @@ public sealed class ViewerPassportCommandTests
             )
         );
         var services = new ServiceCollection();
+        _ = services.AddLogging();
         _ = services.AddSingleton(service);
         _ = services.AddSingleton(PublicSiteLinks("https://localhost/oauth/callback"));
         _ = services.AddChatCommands().AddCommandModule<ViewerPassportCommandModule>();
@@ -262,6 +264,7 @@ public sealed class ViewerPassportCommandTests
         async Task<string> ReplyAsync(string? publicBaseUrl, string redirectUri)
         {
             var services = new ServiceCollection();
+            _ = services.AddLogging();
             _ = services.AddSingleton(service);
             _ = services.AddSingleton(PublicSiteLinks(redirectUri, publicBaseUrl));
             _ = services.AddChatCommands().AddCommandModule<ViewerPassportCommandModule>();

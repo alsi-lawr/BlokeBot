@@ -26,7 +26,7 @@ public sealed partial class CustomCommandExecutionTests
     private static async Task SameNameNamespacesAsync(IDbContextFactory<BlokeBotDbContext> database)
     {
         var hostId = await SeedHostAsync(database, "streamer");
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var scalar = await DeclareAsync(
             values,
             hostId,
@@ -103,7 +103,7 @@ public sealed partial class CustomCommandExecutionTests
             "2|missing|7|Celeste|9|3|9|Celeste|3",
             "2|missing|7|Celeste|9|3|9|Celeste|3",
         ]);
-        var reopened = new CustomStoredValueService(database);
+        var reopened = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         (
             await reopened.ValueAsync(
                 hostId,

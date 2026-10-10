@@ -1295,6 +1295,7 @@ public sealed partial class CustomCommandExecutionTests
     )
     {
         var services = new ServiceCollection();
+        _ = services.AddLogging();
         _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
         _ = services.AddSingleton(
             Options.Create(

@@ -32,7 +32,7 @@ public sealed partial class CustomCommandExecutionTests
     )
     {
         var hostId = await SeedHostAsync(database, "streamer");
-        var values = new CustomStoredValueService(database);
+        var values = new CustomStoredValueService(database, StoredValueTestChanges.Create());
         var total = await DeclareAsync(
             values,
             hostId,

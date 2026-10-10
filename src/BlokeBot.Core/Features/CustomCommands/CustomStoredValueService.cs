@@ -27,6 +27,12 @@ internal sealed record CustomValueSnapshot(
     bool Saved
 );
 
+internal sealed record CustomValueReadSnapshot(
+    CustomValueDefinitionDraft Definition,
+    CustomValueSnapshot Value,
+    HostFeatureFlags Features
+);
+
 internal enum CustomValueEditStatus
 {
     Saved,
@@ -62,7 +68,8 @@ internal sealed record CustomValueEditOutcome(CustomValueEditStatus Status, stri
 }
 
 internal sealed partial class CustomStoredValueService(
-    IDbContextFactory<BlokeBotDbContext> dbFactory
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    CustomStoredValueChanges changes
 )
 {
     public async Task<IReadOnlyList<CustomValueSnapshot>> ValuesAsync(
@@ -108,25 +115,50 @@ internal sealed partial class CustomStoredValueService(
         int hostId,
         CustomValueTarget target,
         CancellationToken ct
+    ) => (await ReadValueAsync(hostId, target, ct))?.Value;
+
+    internal async Task<CustomValueReadSnapshot?> ReadValueAsync(
+        int hostId,
+        CustomValueTarget target,
+        CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var definition = await db
-            .CustomValueDefinitions.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.HostId == hostId && x.Id == target.DefinitionId, ct);
-        if (definition is null || !ValidTarget(definition, target))
-        {
-            return null;
-        }
-        var stored = await db
-            .CustomStoredValues.AsNoTracking()
-            .SingleOrDefaultAsync(
-                x =>
-                    x.DefinitionId == target.DefinitionId
-                    && x.TargetHash == CustomValueIdentity.Target(target.ViewerId, target.Key),
-                ct
+        var globalOwner = target.ViewerId.Length == 0;
+        var userOwner = CustomValueIdentity.Valid(target.ViewerId);
+        var scalar = target.Key.Length == 0;
+        var dictionary = CustomValueIdentity.Valid(target.Key);
+        var hash = CustomValueIdentity.Target(target.ViewerId, target.Key);
+        var row = await (
+            from definition in db.CustomValueDefinitions.AsNoTracking()
+            where
+                definition.HostId == hostId
+                && definition.Id == target.DefinitionId
+                && (definition.Scope == CustomValueScope.Global ? globalOwner : userOwner)
+                && (definition.Kind == CustomValueKind.Dictionary ? dictionary : scalar)
+            join host in db.Hosts on definition.HostId equals host.Id
+            from stored in db
+                .CustomStoredValues.AsNoTracking()
+                .Where(value =>
+                    value.HostId == hostId
+                    && value.DefinitionId == target.DefinitionId
+                    && value.TargetHash == hash
+                )
+                .DefaultIfEmpty()
+            select new
+            {
+                Definition = definition,
+                Stored = stored,
+                Features = host.EnabledFeatures,
+            }
+        ).SingleOrDefaultAsync(ct);
+        return row is null
+            ? null
+            : new(
+                DefinitionDraft(row.Definition),
+                Snapshot(row.Definition, row.Stored, target),
+                row.Features
             );
-        return Snapshot(definition, stored, target);
     }
 
     public Task<CustomValueEditOutcome> SaveValueAsync(
@@ -225,6 +257,9 @@ internal sealed partial class CustomStoredValueService(
             stored.Revision = Guid.NewGuid();
             _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            await changes.PublishCommittedAsync([
+                new CustomStoredValueChange.Target(hostId, target),
+            ]);
             return CustomValueEditOutcome.Saved;
         }
         catch (Exception exception) when (exception is DbException or DbUpdateException)

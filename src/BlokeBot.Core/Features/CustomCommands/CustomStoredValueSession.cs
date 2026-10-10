@@ -40,6 +40,9 @@ internal sealed class CustomStoredValueSession(
     BlokeBotDbContext? db = null
 )
 {
+    private readonly HashSet<CustomStoredValueChange.Target> _mutations = [];
+    internal IReadOnlyCollection<CustomStoredValueChange.Target> Mutations => _mutations;
+
     public static async Task<CustomStoredValueSession> LoadAsync(
         BlokeBotDbContext db,
         int hostId,
@@ -202,6 +205,10 @@ internal sealed class CustomStoredValueSession(
         stored.Text = text;
         stored.IsDefault = false;
         stored.Revision = Guid.NewGuid();
+        if (db is not null)
+        {
+            _ = _mutations.Add(new(definition.HostId, new(definition.Id, owner, key)));
+        }
         return Success(Format(kind, number, text));
     }
 
