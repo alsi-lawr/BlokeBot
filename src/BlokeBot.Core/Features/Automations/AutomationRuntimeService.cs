@@ -77,7 +77,8 @@ public sealed partial class AutomationRuntimeService(
         CancellationToken cancellationToken,
         Func<BlokeBotDbContext, CancellationToken, Task<bool>>? currentOccurrence = null,
         AutomationFlowId? selectedFlow = null,
-        bool deferExecution = false
+        bool deferExecution = false,
+        AutomationNodeId? selectedSource = null
     )
     {
         var result = await DispatchCoreAsync(
@@ -98,7 +99,8 @@ public sealed partial class AutomationRuntimeService(
                     ) && (currentOccurrence is null || await currentOccurrence(db, ct));
             },
             selectedFlow,
-            !deferExecution
+            !deferExecution,
+            selectedSource
         );
         return ((CustomCommandAutomationAdmissionOutcome.Dispatched)result).Dispatch;
     }
@@ -133,7 +135,8 @@ public sealed partial class AutomationRuntimeService(
         CancellationToken cancellationToken,
         Func<BlokeBotDbContext, CancellationToken, Task<bool>>? currentOccurrence = null,
         AutomationFlowId? selectedFlow = null,
-        bool resumeImmediately = true
+        bool resumeImmediately = true,
+        AutomationNodeId? selectedSource = null
     )
     {
         await EnsureInitializedAsync(cancellationToken);
@@ -171,6 +174,7 @@ public sealed partial class AutomationRuntimeService(
                 .Nodes.Where(node =>
                     node.DefinitionId == context.Event.SourceDefinitionId.Value
                     && IsSourceDefinition(node)
+                    && (selectedSource == null || node.Id == selectedSource.Value.Value)
                 )
                 .ToArray();
             if (potentialSources.Length == 0)

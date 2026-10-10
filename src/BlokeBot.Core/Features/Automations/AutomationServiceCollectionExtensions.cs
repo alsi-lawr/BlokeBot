@@ -31,6 +31,7 @@ public static class AutomationServiceCollectionExtensions
             () => p.GetRequiredService<AutomationRuntimeService>()
         ));
         services.TryAddSingleton<AutomationManualRunService>();
+        services.TryAddSingleton<AutomationCountdownControlService>();
         services.TryAddSingleton(p => new AutomationFeatureLifecycle(
             () => p.GetRequiredService<ExpandedAutomationRuntime>(),
             p.GetRequiredService<ILogger<AutomationFeatureLifecycle>>()

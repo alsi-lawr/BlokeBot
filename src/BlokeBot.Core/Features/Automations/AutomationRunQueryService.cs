@@ -34,6 +34,48 @@ public sealed class AutomationRunQueryService(
         return new AutomationRunQueryOutcome.Available(runs.Select(Summary).ToImmutableArray());
     }
 
+    public async Task<AutomationRunStatusOutcome> ReadStatusAsync(
+        AutomationHostId hostId,
+        ImmutableArray<AutomationRunId> runIds,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        if (!await db.Hosts.AnyAsync(host => host.Id == hostId.Value, cancellationToken))
+        {
+            return new AutomationRunStatusOutcome.HostNotFound();
+        }
+        if (runIds.IsDefaultOrEmpty)
+        {
+            return new AutomationRunStatusOutcome.Available([]);
+        }
+        var ids = runIds.Select(id => id.Value).Distinct().ToArray();
+        var runs = await db
+            .AutomationFlowRuns.AsNoTracking()
+            .Where(run => run.HostId == hostId.Value && ids.Contains(run.Id))
+            .Select(run => new
+            {
+                run.Id,
+                run.FlowId,
+                run.Status,
+                run.StartedAtUtc,
+                run.CompletedAtUtc,
+            })
+            .ToArrayAsync(cancellationToken);
+        return new AutomationRunStatusOutcome.Available(
+            runs.Select(run => new AutomationRunStatus(
+                    new(run.Id),
+                    new(run.FlowId),
+                    (AutomationFlowRunState)run.Status,
+                    new(run.StartedAtUtc, TimeSpan.Zero),
+                    run.CompletedAtUtc is { } completed
+                        ? new DateTimeOffset(completed, TimeSpan.Zero)
+                        : null
+                ))
+                .ToImmutableArray()
+        );
+    }
+
     private AutomationRunSummary Summary(AutomationFlowRun run)
     {
         var frozen =

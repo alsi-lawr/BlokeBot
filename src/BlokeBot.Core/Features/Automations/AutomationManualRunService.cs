@@ -109,4 +109,77 @@ public sealed class AutomationManualRunService(
         var outcome = new AutomationDispatchOutcome(status, runs.ToImmutable());
         return new AutomationManualRunOutcome.Dispatched(outcome);
     }
+
+    public async Task<AutomationManualRunOutcome> RunSourceAsync(
+        AutomationHostId authorizedHost,
+        AutomationFlowId flowId,
+        AutomationNodeId sourceNodeId,
+        ManualSourceConfiguration? dataOverride,
+        CancellationToken cancellation
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellation);
+        var host = await db
+            .Hosts.AsNoTracking()
+            .SingleOrDefaultAsync(h => h.Id == authorizedHost.Value, cancellation);
+        var source = await db
+            .AutomationFlowNodes.AsNoTracking()
+            .SingleOrDefaultAsync(
+                n =>
+                    n.Id == sourceNodeId.Value
+                    && n.FlowId == flowId.Value
+                    && n.Flow.HostId == authorizedHost.Value
+                    && n.Flow.IsEnabled
+                    && n.DefinitionId == AutomationDefinitionIds.ManualSource.Value,
+                cancellation
+            );
+        if (
+            host is null
+            || source is null
+            || !host.EnabledFeatures.Contains(HostFeatureFlags.Automations)
+        )
+        {
+            return new AutomationManualRunOutcome.Unavailable();
+        }
+        using var json = System.Text.Json.JsonDocument.Parse(source.ConfigurationJson);
+        if (
+            catalog.ValidatePersistedDefinition(
+                new(source.DefinitionId, source.DefinitionSchemaVersion, json.RootElement.Clone())
+            )
+                is not AutomationConfigurationCheck.Valid
+                {
+                    Configuration: ManualSourceConfiguration saved
+                }
+            || (
+                dataOverride is not null
+                && await catalog.ValidateForSaveAsync(
+                    authorizedHost,
+                    AutomationDefinitionIds.ManualSource,
+                    new(source.DefinitionSchemaVersion),
+                    dataOverride,
+                    cancellation
+                )
+                    is not AutomationConfigurationCheck.Valid
+            )
+        )
+        {
+            return new AutomationManualRunOutcome.Unavailable();
+        }
+        var now = clock.GetUtcNow();
+        var dispatch = await runtime.DispatchExpandedAsync(
+            Create(
+                host,
+                AutomationDefinitionIds.ManualSource,
+                Guid.NewGuid().ToString(),
+                now,
+                now,
+                [Text("manual-data", (dataOverride ?? saved).Data)]
+            ),
+            configuration => configuration == saved,
+            cancellation,
+            selectedFlow: flowId,
+            selectedSource: sourceNodeId
+        );
+        return new AutomationManualRunOutcome.Dispatched(dispatch);
+    }
 }
