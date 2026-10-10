@@ -12,6 +12,7 @@ public enum ConfigurationSectionId
     ChannelToolEnablement,
     Overlays,
     Automations,
+    Dashboards,
 }
 
 public sealed record OverlayExportSelection(

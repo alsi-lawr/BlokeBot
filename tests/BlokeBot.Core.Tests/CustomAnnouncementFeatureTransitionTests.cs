@@ -188,7 +188,8 @@ public sealed class CustomAnnouncementFeatureTransitionTests : CustomAnnouncemen
             new(),
             clock,
             NullLogger<ConfigurationTransferCoordinator>.Instance,
-            TestAutomationUiChanges.Create()
+            TestAutomationUiChanges.Create(),
+            StoredValueTestChanges.Create()
         );
 
     private static ConfigurationDocumentV2 EnablementDocument() =>

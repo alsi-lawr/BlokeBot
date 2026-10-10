@@ -22,8 +22,9 @@ public sealed partial class ConfigurationTransferCoordinator
     private readonly IConfigurationImportObserverDispatcher _importObservers;
     private readonly SemaphoreSlim _overlayMediaGate;
     private readonly IAutomationUiChangePublisher _automationUiChanges;
+    private readonly CustomStoredValueChanges _storedValueChanges;
 
-    public ConfigurationTransferCoordinator(
+    internal ConfigurationTransferCoordinator(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
         CustomCommandConfigurationTransferAdapter customCommands,
         IModeratorAuthorityService moderatorAuthority,
@@ -31,6 +32,7 @@ public sealed partial class ConfigurationTransferCoordinator
         TimeProvider timeProvider,
         ILogger<ConfigurationTransferCoordinator> logger,
         IAutomationUiChangePublisher automationUiChanges,
+        CustomStoredValueChanges storedValueChanges,
         IWatchTimeSettingsCommitObserver? watchTime = null
     )
         : this(
@@ -41,6 +43,7 @@ public sealed partial class ConfigurationTransferCoordinator
             timeProvider,
             logger,
             automationUiChanges,
+            storedValueChanges,
             new(dbFactory),
             UnavailableOverlayConfigurationTransferAdapter.Instance,
             UnavailableAutomationConfigurationTransferAdapter.Instance,
@@ -57,6 +60,7 @@ public sealed partial class ConfigurationTransferCoordinator
         TimeProvider timeProvider,
         ILogger<ConfigurationTransferCoordinator> logger,
         IAutomationUiChangePublisher automationUiChanges,
+        CustomStoredValueChanges storedValueChanges,
         ConfigurationImportPreviewService previews,
         IOverlayConfigurationTransferAdapter overlays,
         IAutomationConfigurationTransferAdapter automations,
@@ -66,6 +70,7 @@ public sealed partial class ConfigurationTransferCoordinator
     )
     {
         _automationUiChanges = automationUiChanges;
+        _storedValueChanges = storedValueChanges;
         _watchTime = watchTime;
         _dbFactory = dbFactory;
         _customCommands = customCommands;

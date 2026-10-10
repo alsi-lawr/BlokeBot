@@ -102,6 +102,11 @@ public partial class ConfigurationTransferPage
             "Automations",
             "Flows, subflows and selected test scenarios"
         ),
+        new(
+            ConfigurationSectionId.Dashboards,
+            "Dashboards",
+            "Named layouts, widget settings and repairable targets"
+        ),
     ];
 
     protected override async Task OnInitializedAsync()
@@ -194,6 +199,7 @@ public partial class ConfigurationTransferPage
             "channeltoolenablement" => ConfigurationSectionId.ChannelToolEnablement,
             "overlays" => ConfigurationSectionId.Overlays,
             "automations" => ConfigurationSectionId.Automations,
+            "dashboards" => ConfigurationSectionId.Dashboards,
             _ => null,
         };
 
@@ -213,6 +219,7 @@ public partial class ConfigurationTransferPage
                 ),
                 (ConfigurationSectionId.Overlays, x.Sections.Overlays is not null),
                 (ConfigurationSectionId.Automations, x.Sections.Automations is not null),
+                (ConfigurationSectionId.Dashboards, x.Sections.Dashboards is not null),
             }
                 .Where(x => x.Item2)
                 .Select(x => x.Item1),

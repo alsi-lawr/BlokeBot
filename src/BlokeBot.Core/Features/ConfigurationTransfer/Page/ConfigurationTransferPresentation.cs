@@ -14,6 +14,7 @@ internal static class ConfigurationTransferPresentation
             ConfigurationSectionId.ChannelToolEnablement => "Chat Tools enablement",
             ConfigurationSectionId.Overlays => "Overlays",
             ConfigurationSectionId.Automations => "Automations",
+            ConfigurationSectionId.Dashboards => "Dashboards",
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 
@@ -27,6 +28,7 @@ internal static class ConfigurationTransferPresentation
             ConfigurationSectionId.ChannelToolEnablement => "/host#chat-tools",
             ConfigurationSectionId.Overlays => "/overlays",
             ConfigurationSectionId.Automations => "/automations",
+            ConfigurationSectionId.Dashboards => "/dashboards/editor",
             _ => "/configuration-transfer",
         };
 

@@ -85,7 +85,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
         var revisions = new List<AutomationSubflowRevision>();
         foreach (var imported in ordered)
         {
-            var graph = await MapGraphAsync(
+            var mappedGraph = await MapGraphAsync(
                 imported.Graph,
                 null,
                 documentKey,
@@ -98,6 +98,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 issues,
                 cancellationToken
             );
+            var graph = mappedGraph.Draft;
             var validation = await flows.ValidatePreparedAsync(
                 graph,
                 new([.. revisions]),
@@ -179,7 +180,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     )
                 );
             }
-            var graph = await MapGraphAsync(
+            var mappedGraph = await MapGraphAsync(
                 imported,
                 new(id),
                 documentKey,
@@ -192,6 +193,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 issues,
                 cancellationToken
             );
+            var graph = mappedGraph.Draft;
             AddErrors(
                 imported.Id,
                 await flows.ValidatePreparedAsync(
@@ -229,7 +231,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     )
                 );
             }
-            drafts.Add(new(imported.Id, graph));
+            drafts.Add(new(imported.Id, graph, mappedGraph.Nodes));
         }
         var fixtures = await MapScenariosAsync(
             db,
@@ -302,7 +304,16 @@ internal sealed partial class AutomationConfigurationTransferAdapter
         }
     }
 
-    private sealed record MappedAutomationDraft(string ImportedId, AutomationFlowDraft Draft);
+    private sealed record MappedAutomationGraph(
+        AutomationFlowDraft Draft,
+        IReadOnlyDictionary<string, AutomationNodeId> Nodes
+    );
+
+    private sealed record MappedAutomationDraft(
+        string ImportedId,
+        AutomationFlowDraft Draft,
+        IReadOnlyDictionary<string, AutomationNodeId> NodeIds
+    );
 
     private sealed record MappedScenario(
         string ImportedId,

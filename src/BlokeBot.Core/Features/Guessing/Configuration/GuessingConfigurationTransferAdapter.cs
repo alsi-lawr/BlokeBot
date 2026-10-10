@@ -17,7 +17,8 @@ public sealed class GuessingConfigurationTransferAdapter
         int hostId,
         GuessingSectionV1 section,
         SectionImportSelection selection,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        IDictionary<string, GuessRoundProfile>? importedProfiles = null
     )
     {
         var existing = await db
@@ -50,6 +51,10 @@ public sealed class GuessingConfigurationTransferAdapter
             x => existingById[x.Value],
             StringComparer.Ordinal
         );
+        foreach (var (id, profile) in matches)
+        {
+            importedProfiles?.Add(id, profile);
+        }
         var resolutions = selection.ItemResolutions.ToDictionary(
             x => x.ImportedId,
             StringComparer.Ordinal
@@ -198,6 +203,7 @@ public sealed class GuessingConfigurationTransferAdapter
                 _ = db.Profiles.Add(profile);
             }
 
+            importedProfiles?[imported.Id] = profile;
             profile.Revision++;
             GuessingConfigurationGraphStager.ApplyProfile(db, hostId, profile, command);
         }

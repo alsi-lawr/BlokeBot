@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.ConfigurationTransfer;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.CustomCommands;
@@ -39,7 +40,8 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
         ConfigurationDocumentV2 document,
         ConfigurationImportSelection selection,
         ConfigurationImportReferencePlan referencePlan,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        ICollection<CustomValueDefinition>? changedDefinitions = null
     )
     {
         var customSelection = selection.Sections.SingleOrDefault(x =>
@@ -112,7 +114,8 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                 hostId,
                 custom.StoredDefinitions,
                 customSelection.Strategy,
-                cancellationToken
+                cancellationToken,
+                changedDefinitions
             );
             if (definitionIssues.Count != 0)
             {

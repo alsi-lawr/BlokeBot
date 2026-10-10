@@ -68,6 +68,7 @@ public static class ConfigurationTransferServiceCollectionExtensions
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<ConfigurationTransferCoordinator>>(),
             provider.GetRequiredService<IAutomationUiChangePublisher>(),
+            provider.GetRequiredService<CustomStoredValueChanges>(),
             provider.GetRequiredService<ConfigurationImportPreviewService>(),
             overlaysAvailable
                 ? provider.GetRequiredService<OverlayConfigurationTransferAdapter>()

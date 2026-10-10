@@ -1691,6 +1691,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             TimeProvider.System,
             logger,
             uiChanges ?? TestAutomationUiChanges.Create(),
+            StoredValueTestChanges.Create(),
             new(database, overlays, automations),
             overlays,
             automations,

@@ -7,7 +7,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal sealed partial class AutomationConfigurationTransferAdapter
 {
-    private async Task StageDraftsAsync(
+    private async Task<IReadOnlyDictionary<string, DashboardAutomationImportMap>> StageDraftsAsync(
         BlokeBotDbContext db,
         int hostId,
         MappedAutomationSet mapped,
@@ -128,6 +128,11 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             }
         }
         _ = await db.SaveChangesAsync(cancellationToken);
+        return appliedFlows.ToDictionary(
+            flow => flow.ImportedId,
+            flow => new DashboardAutomationImportMap(flow.Draft.Id!.Value, flow.NodeIds),
+            StringComparer.Ordinal
+        );
     }
 
     private async Task StageRevisionsAsync(

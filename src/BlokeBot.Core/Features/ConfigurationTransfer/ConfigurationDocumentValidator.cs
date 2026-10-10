@@ -19,7 +19,8 @@ internal static partial class ConfigurationDocumentValidator
             ?? ValidateGuessing(document.Sections.Guessing)
             ?? ValidatePoints(document.Sections.Points)
             ?? ValidateOverlays(document.Sections.Overlays)
-            ?? ValidateAutomations(document.Sections.Automations);
+            ?? ValidateAutomations(document.Sections.Automations)
+            ?? ValidateDashboards(document);
 
     private static ConfigurationValidationIssue? ValidateAnnouncements(
         AnnouncementsSectionV1? section

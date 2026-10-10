@@ -144,6 +144,7 @@ public sealed partial class ConfigurationTransferOverlayCredentialTests
                 time,
                 NullLogger<ConfigurationTransferCoordinator>.Instance,
                 TestAutomationUiChanges.Create(),
+                StoredValueTestChanges.Create(),
                 new(
                     database,
                     overlayAdapter,

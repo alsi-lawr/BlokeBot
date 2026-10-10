@@ -61,6 +61,13 @@ public sealed partial class ConfigurationImportPreviewService
                 references,
                 cancellationToken
             ),
+            ConfigurationSectionId.Dashboards =>
+                await DashboardConfigurationTransferAdapter.PreviewAsync(
+                    db,
+                    host.Id,
+                    document.Sections.Dashboards,
+                    cancellationToken
+                ),
             ConfigurationSectionId.Automations => await _automations.PreviewAsync(
                 db,
                 host,
@@ -108,7 +115,8 @@ public sealed partial class ConfigurationImportPreviewService
             ConfigurationSectionId.Points => HostFeatureFlags.Points,
             ConfigurationSectionId.Overlays => HostFeatureFlags.Overlays,
             ConfigurationSectionId.Automations => HostFeatureFlags.Automations,
-            ConfigurationSectionId.ChannelToolEnablement => null,
+            ConfigurationSectionId.ChannelToolEnablement or ConfigurationSectionId.Dashboards =>
+                null,
             _ => null,
         };
 
@@ -133,6 +141,7 @@ public sealed partial class ConfigurationImportPreviewService
             ConfigurationSectionId.ChannelToolEnablement => "channelToolEnablement",
             ConfigurationSectionId.Overlays => "overlays",
             ConfigurationSectionId.Automations => "automations",
+            ConfigurationSectionId.Dashboards => "dashboards",
             _ => "sections",
         };
 }

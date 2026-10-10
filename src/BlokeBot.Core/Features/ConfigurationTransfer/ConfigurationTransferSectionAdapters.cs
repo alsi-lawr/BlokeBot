@@ -48,7 +48,11 @@ internal interface IAutomationConfigurationTransferAdapter
 
 internal sealed record AutomationConfigurationStageResult(
     IReadOnlyList<ConfigurationValidationIssue> Issues
-);
+)
+{
+    internal IReadOnlyDictionary<string, DashboardAutomationImportMap> AppliedFlows { get; init; } =
+        new Dictionary<string, DashboardAutomationImportMap>();
+}
 
 internal sealed class UnavailableOverlayConfigurationTransferAdapter
     : IOverlayConfigurationTransferAdapter

@@ -92,10 +92,25 @@ public sealed class ConfigurationDocumentExporter(
                     cancellationToken
                 )
                 : null;
-            if (ConfigurationDocumentValidator.ValidateAutomations(automations) is { } issue)
+            if (
+                ConfigurationDocumentValidator.ValidateAutomations(automations?.Section) is
+                { } issue
+            )
             {
                 return new ConfigurationExportOutcome.Unsupported(issue.Message);
             }
+            var guessing = selection.Sections.Contains(ConfigurationSectionId.Guessing)
+                ? await ConfigurationExportMappers.GuessingAsync(db, hostId, cancellationToken)
+                : null;
+            var dashboards = selection.Sections.Contains(ConfigurationSectionId.Dashboards)
+                ? await DashboardConfigurationExportMapper.ExportAsync(
+                    db,
+                    hostId,
+                    automations,
+                    guessing,
+                    cancellationToken
+                )
+                : null;
             var document = new ConfigurationDocumentV2(
                 ConfigurationDocumentCodec.Format,
                 ConfigurationDocumentCodec.CurrentVersion,
@@ -112,13 +127,7 @@ public sealed class ConfigurationDocumentExporter(
                     selection.Sections.Contains(ConfigurationSectionId.Announcements)
                         ? ConfigurationExportMappers.Announcements(commandGraph!)
                         : null,
-                    selection.Sections.Contains(ConfigurationSectionId.Guessing)
-                        ? await ConfigurationExportMappers.GuessingAsync(
-                            db,
-                            hostId,
-                            cancellationToken
-                        )
-                        : null,
+                    guessing,
                     selection.Sections.Contains(ConfigurationSectionId.Points)
                         ? await ConfigurationExportMappers.PointsAsync(
                             db,
@@ -138,9 +147,14 @@ public sealed class ConfigurationDocumentExporter(
                             cancellationToken
                         )
                         : null,
-                    automations
+                    automations?.Section,
+                    dashboards
                 )
             );
+            if (ConfigurationDocumentValidator.ValidateDashboards(document) is { } validation)
+            {
+                return new ConfigurationExportOutcome.Unsupported(validation.Message);
+            }
             var json = codec.Serialize(document);
             return new ConfigurationExportOutcome.Success(document, json);
         }

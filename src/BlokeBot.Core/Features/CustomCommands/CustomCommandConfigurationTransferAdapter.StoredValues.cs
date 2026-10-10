@@ -15,7 +15,8 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
         int hostId,
         IReadOnlyList<StoredDefinitionV1>? definitions,
         ImportConflictStrategy strategy,
-        CancellationToken ct
+        CancellationToken ct,
+        ICollection<CustomValueDefinition>? changedDefinitions
     )
     {
         if (definitions is null)
@@ -89,6 +90,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
             matched.DefaultText =
                 imported.Kind == CustomValueKind.Number ? string.Empty : imported.Default;
             matched.Revision = Guid.NewGuid();
+            changedDefinitions?.Add(matched);
         }
         return [];
     }

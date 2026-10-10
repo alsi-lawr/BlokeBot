@@ -2,6 +2,7 @@ using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Tests;
 
@@ -11,7 +12,7 @@ internal sealed record ConfigurationTransferAutomationTestServices(
 )
 {
     internal static ConfigurationTransferAutomationTestServices Create(
-        SqliteBlokeBotDbFactory database
+        IDbContextFactory<BlokeBotDbContext> database
     )
     {
         var features = TestHostFeatureServices.Create(
@@ -20,7 +21,11 @@ internal sealed record ConfigurationTransferAutomationTestServices(
             []
         );
         var catalog = new AutomationCatalogService(
-            new([new CoreAutomationCatalogModule(), new TwitchEventAutomationCatalogModule()]),
+            new([
+                new CoreAutomationCatalogModule(),
+                new ExpandedAutomationCatalogModule(),
+                new TwitchEventAutomationCatalogModule(),
+            ]),
             features,
             handlers: [new AutomationCelTransformHandler(), new AutomationRandomNumberHandler()]
         );

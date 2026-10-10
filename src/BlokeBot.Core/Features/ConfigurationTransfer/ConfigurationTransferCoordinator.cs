@@ -121,6 +121,10 @@ public sealed partial class ConfigurationTransferCoordinator
                 .ToArray();
             var stagingSelection = selection with { Sections = changingSelections };
             var issues = new List<ConfigurationValidationIssue>();
+            var changedDefinitions = new List<CustomValueDefinition>();
+            IReadOnlyDictionary<string, DashboardAutomationImportMap> appliedFlows =
+                new Dictionary<string, DashboardAutomationImportMap>();
+            var importedProfiles = new Dictionary<string, GuessRoundProfile>();
             if (
                 Selected(stagingSelection, ConfigurationSectionId.Overlays) is { } overlaySelection
                 && document.Sections.Overlays is { } overlaySection
@@ -144,7 +148,8 @@ public sealed partial class ConfigurationTransferCoordinator
                     document,
                     stagingSelection,
                     references,
-                    cancellationToken
+                    cancellationToken,
+                    changedDefinitions
                 )
             );
             if (
@@ -162,6 +167,7 @@ public sealed partial class ConfigurationTransferCoordinator
                     cancellationToken
                 );
                 issues.AddRange(automationStage.Issues);
+                appliedFlows = automationStage.AppliedFlows;
             }
             if (
                 Selected(stagingSelection, ConfigurationSectionId.Guessing) is { } guessingSelection
@@ -174,8 +180,23 @@ public sealed partial class ConfigurationTransferCoordinator
                         host.Id,
                         guessing,
                         guessingSelection,
-                        cancellationToken
+                        cancellationToken,
+                        importedProfiles
                     )
+                );
+            }
+            else if (
+                Selected(selection, ConfigurationSectionId.Guessing) is { } skippedGuessing
+                && document.Sections.Guessing is { } skippedProfiles
+            )
+            {
+                await CaptureSkippedProfilesAsync(
+                    db,
+                    host.Id,
+                    skippedProfiles,
+                    skippedGuessing,
+                    importedProfiles,
+                    cancellationToken
                 );
             }
             if (
@@ -202,6 +223,22 @@ public sealed partial class ConfigurationTransferCoordinator
             if (issues.Count > 0)
             {
                 return new ConfigurationImportApplyOutcome.Invalid(operationId, issues);
+            }
+
+            if (
+                Selected(stagingSelection, ConfigurationSectionId.Dashboards) is not null
+                && document.Sections.Dashboards is { } dashboards
+            )
+            {
+                _ = await db.SaveChangesAsync(cancellationToken);
+                await DashboardConfigurationTransferAdapter.StageAsync(
+                    db,
+                    host.Id,
+                    dashboards,
+                    appliedFlows,
+                    importedProfiles,
+                    cancellationToken
+                );
             }
 
             var activation = await StageEnablementAsync(
@@ -258,10 +295,14 @@ public sealed partial class ConfigurationTransferCoordinator
                 changedSections.ToHashSet()
             );
 
+            var definitionFailure = await PublishImportedDefinitionsAsync(
+                host.Id,
+                changedDefinitions
+            );
             return new ConfigurationImportApplyOutcome.Applied(
                 new(operationId, activation?.Id, changedSections)
                 {
-                    PostCommitFailures = postCommit.Failures,
+                    PostCommitFailures = [.. postCommit.Failures, .. definitionFailure],
                     ManualFollowUps = postCommit.ManualFollowUps,
                 }
             );

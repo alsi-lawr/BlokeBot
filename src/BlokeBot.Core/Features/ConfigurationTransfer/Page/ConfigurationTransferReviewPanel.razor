@@ -60,19 +60,26 @@
                             }
                         </span>
                     </div>
-                    <div class="strategy-field field">
-                        <label class="field__label" for="@StrategyId(section.Section)">Conflict strategy</label>
-                        <select class="field__input"
-                                id="@StrategyId(section.Section)"
-                                disabled="@(!selected)"
-                                value="@Strategies[section.Section]"
-                                @onchange="args => ChangeStrategyAsync(section.Section, args.Value?.ToString())">
-                            @foreach (var strategy in Enum.GetValues<ImportConflictStrategy>())
-                            {
-                                <option value="@strategy">@StrategyTitle(strategy)</option>
-                            }
-                        </select>
-                    </div>
+                    @if (section.Section == ConfigurationSectionId.Dashboards)
+                    {
+                        <span class="review-row__counts">Import new copies</span>
+                    }
+                    else
+                    {
+                        <div class="strategy-field field">
+                            <label class="field__label" for="@StrategyId(section.Section)">Conflict strategy</label>
+                            <select class="field__input"
+                                    id="@StrategyId(section.Section)"
+                                    disabled="@(!selected)"
+                                    value="@Strategies[section.Section]"
+                                    @onchange="args => ChangeStrategyAsync(section.Section, args.Value?.ToString())">
+                                @foreach (var strategy in Enum.GetValues<ImportConflictStrategy>())
+                                {
+                                    <option value="@strategy">@StrategyTitle(strategy)</option>
+                                }
+                            </select>
+                        </div>
+                    }
                     <button type="button"
                             class="studio-toggle"
                             role="switch"

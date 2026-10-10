@@ -164,8 +164,8 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
             return new(issues);
         }
 
-        await StageDraftsAsync(db, host.Id, drafts, selection, cancellationToken);
-        return new([]);
+        var applied = await StageDraftsAsync(db, host.Id, drafts, selection, cancellationToken);
+        return new([]) { AppliedFlows = applied };
     }
 
     private static ConfigurationPreviewCount Counts(

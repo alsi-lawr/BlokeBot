@@ -7,7 +7,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal static partial class ConfigurationExportMappers
 {
-    internal static async Task<AutomationsSectionV2> AutomationsAsync(
+    internal static async Task<AutomationConfigurationExport> AutomationsAsync(
         BlokeBotDbContext db,
         int hostId,
         ConfigurationExportReferencePlan references,
@@ -89,7 +89,8 @@ internal static partial class ConfigurationExportMappers
             StringComparer.Ordinal
         );
         var exported = new List<AutomationFlowV2>();
-        var nodeMaps = new Dictionary<AutomationFlowId, Dictionary<AutomationNodeId, string>>();
+        var nodeMaps =
+            new Dictionary<AutomationFlowId, IReadOnlyDictionary<AutomationNodeId, string>>();
         foreach (var draft in drafts)
         {
             var validation = await flowService.ValidatePreparedAsync(
@@ -112,16 +113,11 @@ internal static partial class ConfigurationExportMappers
                 subflowIds,
                 references,
                 hostReferences,
-                catalog
+                catalog,
+                out var exportedNodes
             );
             exported.Add(graph);
-            nodeMaps.Add(
-                draft.Id!.Value,
-                draft
-                    .Nodes.OrderBy(node => node.Id.Value)
-                    .Select((node, index) => (node.Id, Label("node", index)))
-                    .ToDictionary(pair => pair.Id, pair => pair.Item2)
-            );
+            nodeMaps.Add(draft.Id!.Value, exportedNodes);
         }
         var subflows = revisions
             .Select(revision => new AutomationSubflowV2(
@@ -134,7 +130,8 @@ internal static partial class ConfigurationExportMappers
                     subflowIds,
                     references,
                     hostReferences,
-                    catalog
+                    catalog,
+                    out _
                 )
             ))
             .ToArray();
@@ -221,7 +218,7 @@ internal static partial class ConfigurationExportMappers
                 )
             );
         }
-        return new(
+        var section = new AutomationsSectionV2(
             exported,
             hostReferences.Values.OrderBy(value => value.Id, StringComparer.Ordinal).ToArray()
         )
@@ -229,6 +226,18 @@ internal static partial class ConfigurationExportMappers
             Subflows = ordered,
             Scenarios = portable,
         };
+        return new(
+            section,
+            drafts
+                .Select((draft, index) => (draft, index))
+                .ToDictionary(
+                    pair => pair.draft.Id!.Value,
+                    pair => new DashboardAutomationExportMap(
+                        exported[pair.index].Id,
+                        nodeMaps[pair.draft.Id!.Value]
+                    )
+                )
+        );
     }
 
     private static string Label(string prefix, int index) => $"{prefix}-{index + 1:D4}";

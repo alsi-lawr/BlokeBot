@@ -25,7 +25,8 @@ public sealed record ConfigurationSectionsV2(
     PointsSectionV1? Points = null,
     ChannelToolEnablementV1? ChannelToolEnablement = null,
     OverlaysSectionV1? Overlays = null,
-    AutomationsSectionV2? Automations = null
+    AutomationsSectionV2? Automations = null,
+    DashboardsSectionV1? Dashboards = null
 );
 
 internal sealed record ConfigurationDocumentHeader(

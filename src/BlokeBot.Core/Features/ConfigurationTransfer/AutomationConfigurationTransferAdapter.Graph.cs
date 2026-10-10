@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 
 internal sealed partial class AutomationConfigurationTransferAdapter
 {
-    private Task<AutomationFlowDraft> MapGraphAsync(
+    private Task<MappedAutomationGraph> MapGraphAsync(
         AutomationFlowV2 imported,
         AutomationFlowId? flowId,
         string documentKey,
@@ -150,32 +150,35 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             );
         }
         return Task.FromResult(
-            new AutomationFlowDraft(
-                flowId,
-                new(hostId),
-                imported.Name.Trim(),
-                imported.SchemaVersion,
-                imported.Enabled,
-                nodes.ToImmutable(),
-                [
-                    .. imported.Edges.Select(
-                        (edge, index) =>
-                            new AutomationFlowDraftEdge(
-                                DestinationId(
-                                    hostId,
-                                    documentKey + imported.Id + "edge",
-                                    edge.Id,
-                                    index
-                                ),
-                                edge.Kind,
-                                nodeIds[edge.SourceNodeId],
-                                new(edge.SourcePortId),
-                                nodeIds[edge.TargetNodeId],
-                                new(edge.TargetPortId)
-                            )
-                    ),
-                ],
-                new(imported.Orientation, imported.EdgeStyle)
+            new MappedAutomationGraph(
+                new AutomationFlowDraft(
+                    flowId,
+                    new(hostId),
+                    imported.Name.Trim(),
+                    imported.SchemaVersion,
+                    imported.Enabled,
+                    nodes.ToImmutable(),
+                    [
+                        .. imported.Edges.Select(
+                            (edge, index) =>
+                                new AutomationFlowDraftEdge(
+                                    DestinationId(
+                                        hostId,
+                                        documentKey + imported.Id + "edge",
+                                        edge.Id,
+                                        index
+                                    ),
+                                    edge.Kind,
+                                    nodeIds[edge.SourceNodeId],
+                                    new(edge.SourcePortId),
+                                    nodeIds[edge.TargetNodeId],
+                                    new(edge.TargetPortId)
+                                )
+                        ),
+                    ],
+                    new(imported.Orientation, imported.EdgeStyle)
+                ),
+                nodeIds
             )
         );
     }
@@ -200,10 +203,7 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 );
                 continue;
             }
-            var imported = section.Flows.Single(flow => flow.Id == scenario.FlowId);
-            var ids = imported
-                .Nodes.Select((node, index) => (node.Id, mapped.Draft.Nodes[index].Id))
-                .ToDictionary(pair => pair.Item1, pair => pair.Item2, StringComparer.Ordinal);
+            var ids = mapped.NodeIds;
             if (
                 !ids.TryGetValue(scenario.SourceNodeId, out var source)
                 || scenario.Inputs.Any(input => !ids.ContainsKey(input.NodeId))

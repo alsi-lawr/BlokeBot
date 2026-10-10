@@ -12,13 +12,15 @@ internal static partial class ConfigurationExportMappers
         IReadOnlyDictionary<AutomationSubflowId, string> revisions,
         ConfigurationExportReferencePlan references,
         IDictionary<string, AutomationHostReferenceV2> hostReferences,
-        AutomationCatalogService catalog
+        AutomationCatalogService catalog,
+        out IReadOnlyDictionary<AutomationNodeId, string> exportedNodeIds
     )
     {
         var nodeIds = draft
             .Nodes.OrderBy(node => node.Id.Value)
             .Select((node, index) => (node.Id, Label("node", index)))
             .ToDictionary(pair => pair.Id, pair => pair.Item2);
+        exportedNodeIds = nodeIds;
         return new(
             id,
             draft.Name,

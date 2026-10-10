@@ -19,12 +19,12 @@ else {
             }
         </select>
     </label>
-    @if (_widget.Configuration.Binding is DashboardBinding.Unconfigured unresolved) {
-        <p class="text-slate-500">Unconfigured@(unresolved.Reference is null ? "." : $": {unresolved.Reference}.")</p>
-    }
-    else if (_selectedKey.Length == 0) {
+    @if (_widget.Configuration.Binding is not DashboardBinding.Unconfigured && _selectedKey.Length == 0) {
         <p class="text-slate-500">The saved target is missing. Choose a new target to rebind it.</p>
     }
+}
+@if (_widget.Configuration.Binding is DashboardBinding.Unconfigured unresolved) {
+    <p class="text-slate-500">Unconfigured@(unresolved.Reference is null ? "." : $": {unresolved.Reference}.")</p>
 }
 @if (_widget.Configuration is DashboardWidgetConfiguration.Automation automation) {
     <label class="dashboard-checkbox">

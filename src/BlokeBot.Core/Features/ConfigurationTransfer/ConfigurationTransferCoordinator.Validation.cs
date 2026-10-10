@@ -43,6 +43,7 @@ public sealed partial class ConfigurationTransferCoordinator
                 ? overlays.Instances.Count + overlays.MediaReferences.Count + overlays.Cues.Count
                 : 0,
             ConfigurationSectionId.Automations => document.Sections.Automations?.Flows.Count ?? 0,
+            ConfigurationSectionId.Dashboards => document.Sections.Dashboards?.Layouts.Count ?? 0,
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 
@@ -103,6 +104,7 @@ public sealed partial class ConfigurationTransferCoordinator
                 is not null,
             ConfigurationSectionId.Overlays => document.Sections.Overlays is not null,
             ConfigurationSectionId.Automations => document.Sections.Automations is not null,
+            ConfigurationSectionId.Dashboards => document.Sections.Dashboards is not null,
             _ => false,
         };
 
@@ -116,6 +118,7 @@ public sealed partial class ConfigurationTransferCoordinator
             ConfigurationSectionId.ChannelToolEnablement => "channelToolEnablement",
             ConfigurationSectionId.Overlays => "overlays",
             ConfigurationSectionId.Automations => "automations",
+            ConfigurationSectionId.Dashboards => "dashboards",
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
 
