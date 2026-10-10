@@ -1,4 +1,6 @@
 using BlokeBot.Core.Features.Dashboards;
+using BlokeBot.Core.Features.Points.Giveaways;
+using BlokeBot.Eventing;
 
 namespace BlokeBot.Core.Hosting;
 
@@ -13,6 +15,16 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<DashboardValueReader>();
         _ = services.AddSingleton<DashboardPollControls>();
         _ = services.AddSingleton<DashboardPredictionControls>();
+        _ = services.AddSingleton<DashboardGiveawayControls>();
+        _ = services.AddEventBus<DashboardGiveawayChange>(
+            ObserverBoundary.Named("BlokeBot.DashboardGiveaways"),
+            static change =>
+                ObserverEventIdentity.Named($"BlokeBot.DashboardGiveaways.{change.Host.Value}")
+        );
+        _ = services.AddSingleton<DashboardGiveawayChanges>();
+        _ = services.AddSingleton<IPointsGiveawayChangeObserver>(provider =>
+            provider.GetRequiredService<DashboardGiveawayChanges>()
+        );
         return services;
     }
 }

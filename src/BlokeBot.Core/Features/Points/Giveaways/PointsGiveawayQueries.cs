@@ -73,6 +73,41 @@ internal static class PointsGiveawayQueries
             );
         });
 
+    internal static async Task<PointsGiveawayCurrent?> LoadCurrentAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        var current = await db
+            .PointsGiveaways.AsNoTracking()
+            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
+            .OrderByDescending(x => x.StartedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.Status,
+                x.StartedAtUtc,
+                x.EndsAtUtc,
+                x.CompletedAtUtc,
+                EntrantCount = x.Entrants.Count,
+            })
+            .FirstOrDefaultAsync(ct);
+        return current is null
+            ? null
+            : new(
+                current.Id,
+                PointsGiveawayLifecycle.FromPersistence(
+                    current.Status,
+                    current.StartedAtUtc,
+                    current.CompletedAtUtc
+                ),
+                current.StartedAtUtc,
+                current.EndsAtUtc,
+                current.EntrantCount
+            );
+    }
+
     public static async Task<PointsGiveawayView?> LoadActiveViewAsync(
         BlokeBotDbContext db,
         int hostId,

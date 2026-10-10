@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Points.Giveaways;
 
-public sealed class PointsGiveawayService(
+public sealed partial class PointsGiveawayService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointsGiveawayDrawService draws,
     PointsGiveawayEligibilityPolicy eligibility,
