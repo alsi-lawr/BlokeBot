@@ -2617,6 +2617,34 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ChannelDashboard", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.ToTable("channel_dashboards", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.Collective", b =>
                 {
                     b.Property<long>("Id")
@@ -10426,6 +10454,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Bounty");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ChannelDashboard", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CollectiveAudit", b =>

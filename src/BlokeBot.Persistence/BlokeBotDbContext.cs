@@ -216,6 +216,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureHosts(modelBuilder);
+        ConfigureDashboards(modelBuilder);
         ConfigureReplyDelivery(modelBuilder);
         ConfigureAccess(modelBuilder);
         ConfigureCommands(modelBuilder);

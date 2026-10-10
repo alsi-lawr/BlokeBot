@@ -162,6 +162,7 @@ public static partial class BlokeBotApplication
             .AddBlokeBotPlayWithViewers()
             .AddBlokeBotMoments()
             .AddBlokeBotOverlays()
+            .AddBlokeBotDashboards()
             .AddBlokeBotPluginFeatures()
             .AddBlokeBotConfigurationTransfer()
             .AddBlokeBotToasts()

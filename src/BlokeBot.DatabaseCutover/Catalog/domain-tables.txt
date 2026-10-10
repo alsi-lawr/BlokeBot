@@ -31,6 +31,7 @@ bingo_templates
 bloke_raid_campaigns
 bloke_raid_configurations
 bounties
+channel_dashboards
 collective_audits
 collective_goals
 collective_local_settings
