@@ -1666,7 +1666,8 @@ public sealed partial class ConfigurationTransferAutomationTests
         SqliteBlokeBotDbFactory database,
         ILogger<ConfigurationTransferCoordinator> logger,
         IConfigurationImportObserverDispatcher? importObservers = null,
-        SemaphoreSlim? mediaGate = null
+        SemaphoreSlim? mediaGate = null,
+        AutomationUiChanges? uiChanges = null
     )
     {
         var transfer = AutomationTransfer(database);
@@ -1689,6 +1690,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             new(),
             TimeProvider.System,
             logger,
+            uiChanges ?? TestAutomationUiChanges.Create(),
             new(database, overlays, automations),
             overlays,
             automations,

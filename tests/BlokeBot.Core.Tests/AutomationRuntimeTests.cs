@@ -1727,10 +1727,13 @@ public sealed partial class AutomationRuntimeTests
             _ = await db.SaveChangesAsync();
         }
 
+        List<AutomationFlowRunState> changes = [];
+        using var observer = TrackCommittedRunStates(fixture, runId, changes);
         fixture.Clock.Advance(TimeSpan.FromSeconds(1));
         var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
 
         resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
+        changes.ShouldBe([AutomationFlowRunState.Failed]);
         fixture.Chat.Messages.ShouldBeEmpty();
         await using var verified = await fixture.Database.CreateDbContextAsync();
         var failed = await verified
@@ -4331,10 +4334,13 @@ public sealed partial class AutomationRuntimeTests
         stopCancellation.Cancel();
         _ = await Should.ThrowAsync<OperationCanceledException>(() => stopDispatch);
 
+        List<AutomationFlowRunState> stopChanges = [];
+        using var stopObserver = TrackCommittedRunStates(stop, new(stopRunId), stopChanges);
         (
             await stop.NewRuntime().ResumeAsync(new(stopRunId), CancellationToken.None)
         ).Status.ShouldBe(AutomationResumeStatus.Failed);
         stopChat.Messages.ShouldBe(["stop interrupted"]);
+        stopChanges.ShouldBe([AutomationFlowRunState.Failed]);
 
         var continueEntered = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
@@ -4362,10 +4368,18 @@ public sealed partial class AutomationRuntimeTests
         continueCancellation.Cancel();
         _ = await Should.ThrowAsync<OperationCanceledException>(() => continueDispatch);
 
+        List<AutomationFlowRunState> continuedChanges = [];
+        using var continuedObserver = TrackCommittedRunStates(
+            continued,
+            new(continueRunId),
+            continuedChanges
+        );
         (
             await continued.NewRuntime().ResumeAsync(new(continueRunId), CancellationToken.None)
         ).Status.ShouldBe(AutomationResumeStatus.Completed);
         continueChat.Messages.ShouldBe(["continue interrupted", "after restart"]);
+        continuedChanges.ShouldNotContain(AutomationFlowRunState.Running);
+        continuedChanges.Last().ShouldBe(AutomationFlowRunState.Completed);
         var summary = (
             await continued.Queries.ListAsync(new(continued.HostId), CancellationToken.None)
         )
@@ -4560,6 +4574,8 @@ public sealed partial class AutomationRuntimeTests
         );
         var runId = dispatched.RunIds.ShouldHaveSingleItem();
 
+        List<AutomationFlowRunState> changes = [];
+        using var observer = TrackCommittedRunStates(fixture, runId, changes);
         _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.CustomCommands,
@@ -4573,6 +4589,7 @@ public sealed partial class AutomationRuntimeTests
 
         blocked.Status.ShouldBe(AutomationDispatchStatus.FeatureDisabled);
         invalidated.Status.ShouldBe(AutomationResumeStatus.Invalidated);
+        changes.ShouldBe([AutomationFlowRunState.Invalidated]);
         var retained = (
             await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationRunQueryOutcome.Available>();
@@ -5804,6 +5821,7 @@ public sealed partial class AutomationRuntimeTests
         internal AutomationRunQueryService Queries { get; }
         internal int HostId { get; }
         internal AutomationCountdownService Countdowns { get; private init; } = null!;
+        internal AutomationUiChanges UiChanges { get; private init; } = null!;
 
         internal static async Task<RuntimeFixture> CreateAsync(
             IEnumerable<bool>? chatAdmissions = null,
@@ -5860,8 +5878,14 @@ public sealed partial class AutomationRuntimeTests
                 integerEntropy
             );
             overlays ??= new NoOverlayCues();
+            var uiChanges = TestAutomationUiChanges.Create();
             AutomationRuntimeService runtime = null!;
-            var countdowns = new AutomationCountdownService(database, clock, () => runtime);
+            var countdowns = new AutomationCountdownService(
+                database,
+                clock,
+                () => runtime,
+                uiChanges
+            );
             var actions = new AutomationActionExecutor(
                 features,
                 chat,
@@ -5870,7 +5894,14 @@ public sealed partial class AutomationRuntimeTests
                 countdowns
             );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
+            runtime = new AutomationRuntimeService(
+                database,
+                catalog,
+                flows,
+                actions,
+                clock,
+                uiChanges
+            );
             var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
                 database,
@@ -5906,11 +5937,12 @@ public sealed partial class AutomationRuntimeTests
             )
             {
                 Countdowns = countdowns,
+                UiChanges = uiChanges,
             };
         }
 
         internal AutomationRuntimeService NewRuntime() =>
-            new(Database, Catalog, Flows, Actions, Clock);
+            new(Database, Catalog, Flows, Actions, Clock, UiChanges);
 
         internal async Task<AutomationFlowId> SaveAsync(
             ImmutableArray<AutomationFlowDraftNode> nodes,

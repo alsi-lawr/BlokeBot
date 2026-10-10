@@ -870,7 +870,12 @@ public sealed class TwitchEventAutomationTests
             var expressions = new AutomationExpressionService();
             var overlays = new NoOverlayCues();
             AutomationRuntimeService flowRuntime = null!;
-            var countdowns = new AutomationCountdownService(database, clock, () => flowRuntime);
+            var countdowns = new AutomationCountdownService(
+                database,
+                clock,
+                () => flowRuntime,
+                TestAutomationUiChanges.Create()
+            );
             var actions = new AutomationActionExecutor(
                 features,
                 chat,
@@ -879,7 +884,14 @@ public sealed class TwitchEventAutomationTests
                 countdowns
             );
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            flowRuntime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
+            flowRuntime = new AutomationRuntimeService(
+                database,
+                catalog,
+                flows,
+                actions,
+                clock,
+                TestAutomationUiChanges.Create()
+            );
             var runtime = new TwitchEventAutomationRuntime(
                 database,
                 flowRuntime,

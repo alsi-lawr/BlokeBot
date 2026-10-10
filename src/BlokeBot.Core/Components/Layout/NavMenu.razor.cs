@@ -16,6 +16,7 @@ public partial class NavMenu
     private const string _pointsOpenStorageKey = "blokebot.sidebar.points.open";
     private const string _customCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
     private const string _automationsOpenStorageKey = "blokebot.sidebar.automations.open";
+    private const string _dashboardsOpenStorageKey = "blokebot.sidebar.dashboards.open";
     private const string _overlaysOpenStorageKey = "blokebot.sidebar.overlays.open";
     private const string _nativeTwitchOpenStorageKey = "blokebot.sidebar.nativetwitch.open";
 
@@ -27,6 +28,7 @@ public partial class NavMenu
     private bool _automationsOpen = true;
     private bool _nativeTwitchOpen = true;
     private bool _overlaysOpen = true;
+    private bool _dashboardsOpen = true;
     private bool _routeHelpActive;
     private IDisposable? _hostedChannelSubscription;
     private IReadOnlyDictionary<int, HostFeatureFlags> _hostedFeatures =
@@ -85,6 +87,11 @@ public partial class NavMenu
                 _nativeTwitchOpen = await _module.InvokeAsync<bool>(
                     "readBoolean",
                     _nativeTwitchOpenStorageKey,
+                    true
+                );
+                _dashboardsOpen = await _module.InvokeAsync<bool>(
+                    "readBoolean",
+                    _dashboardsOpenStorageKey,
                     true
                 );
                 _overlaysOpen = await _module.InvokeAsync<bool>(
@@ -157,6 +164,7 @@ public partial class NavMenu
                 NavigationGroup.Automations => _automationsOpen,
                 NavigationGroup.NativeTwitch => _nativeTwitchOpen,
                 NavigationGroup.Overlays => _overlaysOpen,
+                NavigationGroup.Dashboards => _dashboardsOpen,
                 _ => throw new UnreachableException(),
             },
             NavigationPresentation.IconRail => _iconRailOpenGroup == group,
@@ -211,6 +219,10 @@ public partial class NavMenu
             case NavigationGroup.NativeTwitch:
                 _nativeTwitchOpen = !_nativeTwitchOpen;
                 await PersistGroupAsync(_nativeTwitchOpenStorageKey, _nativeTwitchOpen);
+                break;
+            case NavigationGroup.Dashboards:
+                _dashboardsOpen = !_dashboardsOpen;
+                await PersistGroupAsync(_dashboardsOpenStorageKey, _dashboardsOpen);
                 break;
             case NavigationGroup.Overlays:
                 _overlaysOpen = !_overlaysOpen;
@@ -299,5 +311,6 @@ public partial class NavMenu
         Automations,
         NativeTwitch,
         Overlays,
+        Dashboards,
     }
 }

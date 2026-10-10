@@ -245,7 +245,8 @@ public sealed class ConfigurationTransferCustomCommandAggregateTests
             new GrantedAuthority(),
             new(),
             TimeProvider.System,
-            NullLogger<ConfigurationTransferCoordinator>.Instance
+            NullLogger<ConfigurationTransferCoordinator>.Instance,
+            TestAutomationUiChanges.Create()
         );
 
     private static AuthenticatedSession Session(int hostId)

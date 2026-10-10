@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -20,15 +21,10 @@ public abstract record HostFeatureUpdateResult
 public sealed class HostFeatureService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostFeatureActivationAuthority activation,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    IAutomationUiChangePublisher uiChanges
 )
 {
-    public HostFeatureService(
-        IDbContextFactory<BlokeBotDbContext> dbFactory,
-        HostFeatureActivationAuthority activation
-    )
-        : this(dbFactory, activation, TimeProvider.System) { }
-
     public async Task<IReadOnlyDictionary<int, HostFeatureFlags>> LoadHostedFeaturesAsync(
         CancellationToken ct
     )
@@ -110,8 +106,12 @@ public sealed class HostFeatureService(
 
         var previous = host.EnabledFeatures;
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        await HostFeatureTransitionStager.StageAsync(db, host, updated, now, ct);
+        await HostFeatureTransitionStager.StageAsync(db, host, updated, now, uiChanges, ct);
         _ = await db.SaveChangesAsync(ct);
+        if (((previous ^ updated) & HostFeatureFlags.Automations) != 0)
+        {
+            await uiChanges.CountdownsChangedAsync(new(hostId));
+        }
         var enabled = updated & ~previous;
         var disabled = previous & ~updated;
         return new HostFeatureUpdateResult.Saved(

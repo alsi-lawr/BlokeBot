@@ -115,7 +115,19 @@ public sealed partial class CustomCommandExecutionTests
             changes,
             NullLogger<DashboardValueReader>.Instance
         );
-        using var display = reader.CreateSession(() => ValueTask.CompletedTask);
+        var projected = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        DashboardValueSession? currentDisplay = null;
+        using var display = reader.CreateSession(() =>
+        {
+            if (currentDisplay?.State is DashboardValueState.Available { Value.Value: "3" })
+            {
+                _ = projected.TrySetResult();
+            }
+            return ValueTask.CompletedTask;
+        });
+        currentDisplay = display;
         await display.BindAsync(
             owner,
             host,
@@ -138,9 +150,6 @@ public sealed partial class CustomCommandExecutionTests
                 message,
                 (_, _) =>
                 {
-                    display
-                        .State.ShouldBeOfType<DashboardValueState.Available>()
-                        .Value.Value.ShouldBe("3");
                     totalChanges.ShouldBe(1);
                     oneChanges.ShouldBe(1);
                     twoChanges.ShouldBe(1);
@@ -149,6 +158,8 @@ public sealed partial class CustomCommandExecutionTests
                 default
             )
         );
+        await projected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        display.State.ShouldBeOfType<DashboardValueState.Available>().Value.Value.ShouldBe("3");
         List<string> replies = [];
         await dispatcher.DispatchResponsesAsync(message, RecordMessages(replies), default);
         totalChanges.ShouldBe(1);

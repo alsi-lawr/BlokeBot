@@ -1,13 +1,21 @@
+using BlokeBot.Core;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Eventing;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Simulation;
 
-internal sealed partial class SimulationNativeTwitchDashboardOperations
+internal sealed partial class SimulationNativeTwitchDashboardOperations(
+    IDbContextFactory<BlokeBotDbContext> database,
+    EventBus<AppEventKind> events
+)
     : IShoutoutDashboardOperations,
         IPollDashboardOperations,
         IClipMarkerDashboardOperations,
@@ -96,38 +104,49 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
         }
     }
 
-    public Task<PollOperationOutcome> SaveTemplateAsync(
+    public async Task<PollOperationOutcome> SaveTemplateAsync(
         int hostId,
         PollTemplateDraft draft,
         CancellationToken cancellationToken
     )
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var validation = draft.Validate();
-        if (validation is PollTemplateValidationOutcome.Invalid invalid)
+        if (draft.Validate() is not PollTemplateValidationOutcome.Valid valid)
         {
-            return Task.FromResult<PollOperationOutcome>(
-                new PollOperationOutcome.InvalidTemplate(invalid.Message)
+            return new PollOperationOutcome.InvalidTemplate(
+                ((PollTemplateValidationOutcome.Invalid)draft.Validate()).Message
             );
         }
-
-        var valid = ((PollTemplateValidationOutcome.Valid)validation).Draft;
+        await using var db = await database.CreateDbContextAsync(cancellationToken);
+        var row = new TwitchPollTemplate
+        {
+            HostId = hostId,
+            Title = valid.Draft.Title,
+            DurationSeconds = valid.Draft.DurationSeconds,
+            ChannelPointsVotingEnabled = valid.Draft.ChannelPointsVotingEnabled,
+            ChannelPointsPerVote = valid.Draft.ChannelPointsPerVote,
+            CreatedAtUtc = SimulationMode.Now.UtcDateTime,
+            Choices = valid
+                .Draft.Choices.Select(
+                    (title, index) =>
+                        new TwitchPollTemplateChoice { Title = title, Position = index }
+                )
+                .ToArray(),
+        };
+        _ = db.TwitchPollTemplates.Add(row);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        var template = new PollTemplateView(
+            row.Id,
+            row.Title,
+            valid.Draft.Choices,
+            row.DurationSeconds,
+            row.ChannelPointsVotingEnabled,
+            row.ChannelPointsPerVote
+        );
         lock (_gate)
         {
-            var host = ForHost(hostId);
-            var template = new PollTemplateView(
-                host.NextPollTemplateId++,
-                valid.Title,
-                valid.Choices,
-                valid.DurationSeconds,
-                valid.ChannelPointsVotingEnabled,
-                valid.ChannelPointsPerVote
-            );
-            host.PollTemplates.Add(template);
-            return Task.FromResult<PollOperationOutcome>(
-                new PollOperationOutcome.TemplateSaved(template)
-            );
+            ForHost(hostId).PollTemplates.Add(template);
         }
+        return new PollOperationOutcome.TemplateSaved(template);
     }
 
     Task<PollOperationOutcome> IPollDashboardOperations.StartAsync(
@@ -168,8 +187,9 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
                 SimulationMode.Now.AddSeconds(template.DurationSeconds).UtcDateTime,
                 null
             );
-            return Task.FromResult<PollOperationOutcome>(
-                new PollOperationOutcome.Started(host.ActivePoll)
+            return ChangedAsync<PollOperationOutcome>(
+                new PollOperationOutcome.Started(host.ActivePoll),
+                cancellationToken
             );
         }
     }
@@ -522,55 +542,66 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
         }
     }
 
-    public Task<PredictionOperationOutcome> SaveTemplateAsync(
+    public async Task<PredictionOperationOutcome> SaveTemplateAsync(
         int hostId,
         PredictionTemplateDraft draft,
         CancellationToken cancellationToken
     )
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var validation = draft.Validate();
-        if (validation is PredictionTemplateValidationOutcome.Invalid invalid)
+        if (draft.Validate() is not PredictionTemplateValidationOutcome.Valid valid)
         {
-            return Task.FromResult<PredictionOperationOutcome>(
-                new PredictionOperationOutcome.InvalidTemplate(invalid.Message)
+            return new PredictionOperationOutcome.InvalidTemplate(
+                ((PredictionTemplateValidationOutcome.Invalid)draft.Validate()).Message
             );
         }
-
-        var valid = ((PredictionTemplateValidationOutcome.Valid)validation).Draft;
+        await using var db = await database.CreateDbContextAsync(cancellationToken);
+        var row = new TwitchPredictionTemplate
+        {
+            HostId = hostId,
+            Title = valid.Draft.Title,
+            PredictionWindowSeconds = valid.Draft.PredictionWindowSeconds,
+            CreatedAtUtc = SimulationMode.Now.UtcDateTime,
+            Outcomes = valid
+                .Draft.Outcomes.Select(
+                    (title, index) =>
+                        new TwitchPredictionTemplateOutcome { Title = title, Position = index }
+                )
+                .ToArray(),
+        };
+        _ = db.TwitchPredictionTemplates.Add(row);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        var template = new PredictionTemplateView(
+            row.Id,
+            row.Title,
+            valid.Draft.Outcomes,
+            row.PredictionWindowSeconds
+        );
         lock (_gate)
         {
-            var host = ForHost(hostId);
-            var template = new PredictionTemplateView(
-                host.NextPredictionTemplateId++,
-                valid.Title,
-                valid.Outcomes,
-                valid.PredictionWindowSeconds
-            );
-            host.PredictionTemplates.Add(template);
-            return Task.FromResult<PredictionOperationOutcome>(
-                new PredictionOperationOutcome.TemplateSaved(template)
-            );
+            ForHost(hostId).PredictionTemplates.Add(template);
         }
+        return new PredictionOperationOutcome.TemplateSaved(template);
     }
 
-    public Task<PredictionOperationOutcome> DeleteTemplateAsync(
+    public async Task<PredictionOperationOutcome> DeleteTemplateAsync(
         int hostId,
         int templateId,
         CancellationToken cancellationToken
     )
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        await using var db = await database.CreateDbContextAsync(cancellationToken);
+        var deleted = await db
+            .TwitchPredictionTemplates.Where(t => t.HostId == hostId && t.Id == templateId)
+            .ExecuteDeleteAsync(cancellationToken);
+        if (deleted == 0)
+        {
+            return new PredictionOperationOutcome.TemplateNotFound();
+        }
         lock (_gate)
         {
-            var host = ForHost(hostId);
-            var removed = host.PredictionTemplates.RemoveAll(value => value.Id == templateId);
-            return Task.FromResult<PredictionOperationOutcome>(
-                removed == 0
-                    ? new PredictionOperationOutcome.TemplateNotFound()
-                    : new PredictionOperationOutcome.TemplateDeleted()
-            );
+            _ = ForHost(hostId).PredictionTemplates.RemoveAll(t => t.Id == templateId);
         }
+        return new PredictionOperationOutcome.TemplateDeleted();
     }
 
     Task<PredictionOperationOutcome> IPredictionDashboardOperations.StartAsync(
@@ -620,8 +651,9 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
                 SimulationMode.Now.AddSeconds(template.PredictionWindowSeconds).UtcDateTime,
                 null
             );
-            return Task.FromResult<PredictionOperationOutcome>(
-                new PredictionOperationOutcome.Started(host.ActivePrediction)
+            return ChangedAsync<PredictionOperationOutcome>(
+                new PredictionOperationOutcome.Started(host.ActivePrediction),
+                cancellationToken
             );
         }
     }
@@ -698,10 +730,19 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
             {
                 host.ActivePrediction = updated;
             }
-            return Task.FromResult<PredictionOperationOutcome>(
-                new PredictionOperationOutcome.Updated(updated)
+            return ChangedAsync<PredictionOperationOutcome>(
+                new PredictionOperationOutcome.Updated(updated),
+                cancellationToken
             );
         }
+    }
+
+    private async Task<T> ChangedAsync<T>(T outcome, CancellationToken ct)
+    {
+        // Mutators call this under the small fake-provider lock. Publish after releasing it.
+        await Task.Yield();
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        return outcome;
     }
 
     private HostState ForHost(int hostId)
@@ -754,12 +795,10 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
         public List<PredictionTemplateView> PredictionTemplates { get; } = [];
         public PredictionView? ActivePrediction { get; set; }
         public List<PredictionView> PredictionResults { get; } = [];
-        public int NextPollTemplateId { get; set; } = 2;
         public int NextPollId { get; set; } = 1;
         public int NextClipAttempt { get; set; } = 1;
         public int NextMarkerAttempt { get; set; } = 1;
         public int NextRewardId { get; set; } = 2;
-        public int NextPredictionTemplateId { get; set; } = 2;
         public int NextPredictionId { get; set; } = 1;
 
         public static HostState Create()

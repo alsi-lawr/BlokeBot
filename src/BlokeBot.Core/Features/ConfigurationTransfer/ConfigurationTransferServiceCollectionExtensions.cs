@@ -44,6 +44,12 @@ public static class ConfigurationTransferServiceCollectionExtensions
                 >()
             );
         }
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IConfigurationImportObserver,
+                CountdownConfigurationImportObserver
+            >()
+        );
         _ = services.AddSingleton<ConfigurationImportObserverDispatcher>();
         _ = services.AddSingleton(provider => new ConfigurationImportPreviewService(
             provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
@@ -61,6 +67,7 @@ public static class ConfigurationTransferServiceCollectionExtensions
             provider.GetRequiredService<ConfigurationActivationQueue>(),
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<ConfigurationTransferCoordinator>>(),
+            provider.GetRequiredService<IAutomationUiChangePublisher>(),
             provider.GetRequiredService<ConfigurationImportPreviewService>(),
             overlaysAvailable
                 ? provider.GetRequiredService<OverlayConfigurationTransferAdapter>()

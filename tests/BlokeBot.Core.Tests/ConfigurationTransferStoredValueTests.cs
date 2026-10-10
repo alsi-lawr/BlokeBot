@@ -175,7 +175,8 @@ public sealed partial class ConfigurationTransferStoredValueTests
             null!,
             new(),
             TimeProvider.System,
-            NullLogger<ConfigurationTransferCoordinator>.Instance
+            NullLogger<ConfigurationTransferCoordinator>.Instance,
+            TestAutomationUiChanges.Create()
         );
         var host = new BotHostChoice(
             destinationId,

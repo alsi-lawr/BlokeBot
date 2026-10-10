@@ -8,7 +8,8 @@ namespace BlokeBot.Core.Features.Automations;
 
 public sealed class PluginAutomationRunCoordinator(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    TimeProvider clock
+    TimeProvider clock,
+    IAutomationUiChangePublisher uiChanges
 )
 {
     internal Task CancelAsync(PluginFeatureState state, CancellationToken cancellationToken) =>
@@ -40,7 +41,8 @@ public sealed class PluginAutomationRunCoordinator(
             )
             .ToArrayAsync(cancellationToken);
         var now = clock.GetUtcNow().UtcDateTime;
-        foreach (var run in runs.Where(run => Contains(run.DefinitionJson, matches)))
+        var changed = runs.Where(run => Contains(run.DefinitionJson, matches)).ToArray();
+        foreach (var run in changed)
         {
             run.Status = AutomationFlowRunStatus.Invalidated;
             run.CompletedAtUtc = now;
@@ -98,6 +100,10 @@ public sealed class PluginAutomationRunCoordinator(
         }
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        foreach (var run in changed)
+        {
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+        }
     }
 
     private static bool Contains(

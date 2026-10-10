@@ -8,6 +8,9 @@ internal static class SimulationViewCatalog
     >(StringComparer.Ordinal)
     {
         ["home"] = "/",
+        ["dashboard-controls"] = $"/dashboards/control/{SimulationDashboardFixtures.ControlsId}",
+        ["dashboard-editor"] = "/dashboards/editor",
+        ["dashboard-benchmark"] = $"/dashboards/editor/{SimulationDashboardFixtures.BenchmarkId}",
         ["viewer-portal"] = "/channel/samplechannel",
         ["public-moments"] = "/moments/samplechannel",
         ["public-moments-stream"] = "/moments/samplechannel/streams/stream-0001",

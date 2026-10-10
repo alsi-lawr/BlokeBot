@@ -1,4 +1,5 @@
 using BlokeBot.Core.Auth.Moderation;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Points.WatchTime;
 using BlokeBot.Persistence;
@@ -20,6 +21,7 @@ public sealed partial class ConfigurationTransferCoordinator
     private readonly IAutomationConfigurationTransferAdapter _automations;
     private readonly IConfigurationImportObserverDispatcher _importObservers;
     private readonly SemaphoreSlim _overlayMediaGate;
+    private readonly IAutomationUiChangePublisher _automationUiChanges;
 
     public ConfigurationTransferCoordinator(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
@@ -28,6 +30,7 @@ public sealed partial class ConfigurationTransferCoordinator
         ConfigurationActivationQueue activationQueue,
         TimeProvider timeProvider,
         ILogger<ConfigurationTransferCoordinator> logger,
+        IAutomationUiChangePublisher automationUiChanges,
         IWatchTimeSettingsCommitObserver? watchTime = null
     )
         : this(
@@ -37,6 +40,7 @@ public sealed partial class ConfigurationTransferCoordinator
             activationQueue,
             timeProvider,
             logger,
+            automationUiChanges,
             new(dbFactory),
             UnavailableOverlayConfigurationTransferAdapter.Instance,
             UnavailableAutomationConfigurationTransferAdapter.Instance,
@@ -52,6 +56,7 @@ public sealed partial class ConfigurationTransferCoordinator
         ConfigurationActivationQueue activationQueue,
         TimeProvider timeProvider,
         ILogger<ConfigurationTransferCoordinator> logger,
+        IAutomationUiChangePublisher automationUiChanges,
         ConfigurationImportPreviewService previews,
         IOverlayConfigurationTransferAdapter overlays,
         IAutomationConfigurationTransferAdapter automations,
@@ -60,6 +65,7 @@ public sealed partial class ConfigurationTransferCoordinator
         IWatchTimeSettingsCommitObserver? watchTime = null
     )
     {
+        _automationUiChanges = automationUiChanges;
         _watchTime = watchTime;
         _dbFactory = dbFactory;
         _customCommands = customCommands;

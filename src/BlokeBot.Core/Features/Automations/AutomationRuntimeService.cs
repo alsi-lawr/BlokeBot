@@ -13,6 +13,7 @@ public sealed partial class AutomationRuntimeService(
     AutomationFlowService flowService,
     AutomationActionExecutor actions,
     TimeProvider clock,
+    IAutomationUiChangePublisher uiChanges,
     IEnumerable<IAutomationRunCompletionObserver>? runCompletionObservers = null
 ) : IPluginAutomationRunDispatcher
 {
@@ -438,6 +439,10 @@ public sealed partial class AutomationRuntimeService(
 
         await dispatchTransaction.CommitAsync(cancellationToken);
         onCommitted?.Invoke();
+        foreach (var acceptedRun in accepted)
+        {
+            await uiChanges.RunChangedAsync(context.HostId, acceptedRun);
+        }
 
         foreach (
             var runId in resumeImmediately
@@ -647,6 +652,10 @@ public sealed partial class AutomationRuntimeService(
 
             if (run.ExecutionLeaseId != leaseId)
             {
+                if (run.Status != AutomationFlowRunStatus.Waiting)
+                {
+                    await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+                }
                 return new(AutomationResumeStatus.Waiting);
             }
 
@@ -738,6 +747,7 @@ public sealed partial class AutomationRuntimeService(
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
                 await completionTransaction.CommitAsync(cancellationToken);
+                await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
                 return new(AutomationResumeStatus.Completed);
             }
 
@@ -757,6 +767,10 @@ public sealed partial class AutomationRuntimeService(
                     continue;
                 }
 
+                if (run.Status != AutomationFlowRunStatus.Waiting)
+                {
+                    await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+                }
                 return new(AutomationResumeStatus.Waiting);
             }
 
@@ -802,6 +816,7 @@ public sealed partial class AutomationRuntimeService(
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
                 await malformedTransaction.CommitAsync(cancellationToken);
+                await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
                 return new(AutomationResumeStatus.Failed);
             }
 
@@ -832,6 +847,7 @@ public sealed partial class AutomationRuntimeService(
                 );
                 _ = await db.SaveChangesAsync(cancellationToken);
                 await malformedTransaction.CommitAsync(cancellationToken);
+                await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
                 return new(AutomationResumeStatus.Failed);
             }
 
@@ -1010,6 +1026,10 @@ public sealed partial class AutomationRuntimeService(
             return;
         }
 
+        var previousStates = runs.ToDictionary(
+            run => run.Id,
+            run => (run.Status, run.CompletedAtUtc)
+        );
         var hostIds = runs.Select(static value => value.HostId).Distinct().ToArray();
         var hosts = await db
             .Hosts.AsNoTracking()
@@ -1214,6 +1234,14 @@ public sealed partial class AutomationRuntimeService(
         }
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        foreach (
+            var recovered in runs.Where(run =>
+                previousStates[run.Id] != (run.Status, run.CompletedAtUtc)
+            )
+        )
+        {
+            await uiChanges.RunChangedAsync(new(recovered.HostId), new(recovered.Id));
+        }
     }
 
     private static void FinishInterruptedNodes(
@@ -1574,6 +1602,7 @@ public sealed partial class AutomationRuntimeService(
             await CompleteTerminalAsync(db, run, AutomationTraceOutcome.Failed, cancellationToken);
             _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
             return AutomationFailureCompletion.Stopped;
         }
 
@@ -1616,6 +1645,7 @@ public sealed partial class AutomationRuntimeService(
         await CompleteTerminalAsync(db, run, AutomationTraceOutcome.Invalidated, cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
         return true;
     }
 

@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,13 +12,14 @@ internal static class HostFeatureTransitionStager
         BotHost host,
         HostFeatureFlags updated,
         DateTime now,
+        IAutomationUiChangePublisher uiChanges,
         CancellationToken cancellationToken
     )
     {
         var previous = host.EnabledFeatures;
         if (Disabled(previous, updated, HostFeatureFlags.Automations))
         {
-            _ = await db
+            var cancelled = await db
                 .AutomationCountdowns.Where(t => t.HostId == host.Id && t.IsRunning)
                 .ExecuteUpdateAsync(
                     s =>
@@ -25,6 +27,10 @@ internal static class HostFeatureTransitionStager
                             .SetProperty(t => t.WasCancelled, true),
                     cancellationToken
                 );
+            if (cancelled > 0 && db.Database.CurrentTransaction is null)
+            {
+                await uiChanges.CountdownsChangedAsync(new(host.Id));
+            }
         }
         if (Enabled(previous, updated, HostFeatureFlags.Automations))
         {

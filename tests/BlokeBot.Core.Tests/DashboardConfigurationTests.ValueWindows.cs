@@ -61,10 +61,10 @@ public sealed partial class DashboardConfigurationTests
         var stale = display.SelectViewerAsync("first", _ct);
         await window.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await display.SelectViewerAsync("second", _ct);
-        Display(display).Value.Value.ShouldBe("22");
+        (await DisplayAsync(display)).Value.Value.ShouldBe("22");
         window.Release.SetResult();
         await stale;
-        Display(display).Value.Value.ShouldBe("22");
+        (await DisplayAsync(display)).Value.Value.ShouldBe("22");
         var lateResolver = new ViewerResolver { Delay = true };
         var disposed = ValueReader(fixture, changes, lateResolver)
             .CreateSession(() =>
@@ -122,11 +122,11 @@ public sealed partial class DashboardConfigurationTests
             ValueConfiguration(other),
             _ct
         );
-        Display(display).Value.Value.ShouldBe("22");
+        (await DisplayAsync(display)).Value.Value.ShouldBe("22");
         window.Release.SetResult();
         await stale;
-        Display(display).Definition.Name.ShouldBe("Other");
-        Display(display).Value.Value.ShouldBe("22");
+        (await DisplayAsync(display)).Definition.Name.ShouldBe("Other");
+        (await DisplayAsync(display)).Value.Value.ShouldBe("22");
         var oldValue = (
             await values.ValueAsync(fixture.Host.Value, new(original.Id, "", ""), _ct)
         )!;
@@ -137,7 +137,7 @@ public sealed partial class DashboardConfigurationTests
             "33",
             _ct
         );
-        Display(display).Value.Value.ShouldBe("22");
+        (await DisplayAsync(display)).Value.Value.ShouldBe("22");
     }
 
     [Test]
@@ -181,7 +181,7 @@ public sealed partial class DashboardConfigurationTests
                 cancellation.Token
             )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(display).Value.Value.ShouldBe("44");
+        (await DisplayAsync(display)).Value.Value.ShouldBe("44");
         (await values.ValueAsync(fixture.Host.Value, original.Target, _ct))!.Value.ShouldBe("44");
         cancellation.Dispose();
     }

@@ -4,13 +4,28 @@ using BlokeBot.Eventing;
 
 namespace BlokeBot.Core.Features.Dashboards;
 
-internal sealed class DashboardValueSession(
-    DashboardValueReader reader,
-    CustomStoredValueChanges changes,
-    Func<ValueTask> changed
-) : IDisposable
+internal sealed class DashboardValueSession : IDisposable
 {
+    private readonly DashboardValueReader _reader;
+    private readonly CustomStoredValueChanges _changes;
+    private readonly Func<ValueTask> _changed;
+    private readonly DashboardRefreshQueue _refresh;
+
+    internal DashboardValueSession(
+        DashboardValueReader reader,
+        CustomStoredValueChanges changes,
+        Func<ValueTask> changed,
+        Action<Exception> failed
+    )
+    {
+        _reader = reader;
+        _changes = changes;
+        _changed = changed;
+        _refresh = new(() => RefreshAsync(null, CancellationToken.None), failed);
+    }
+
     private readonly object _gate = new();
+    private bool _visible = true;
     private readonly ObserverIdentity _observer = ObserverIdentity.Named(
         $"DashboardValue.{Guid.NewGuid():N}"
     );
@@ -21,6 +36,7 @@ internal sealed class DashboardValueSession(
     private DashboardHostId _host;
     private DashboardWidgetConfiguration.Value? _configuration;
     private long _generation;
+    private long _bindingGeneration;
     private long _read;
     private bool _disposed;
 
@@ -59,6 +75,7 @@ internal sealed class DashboardValueSession(
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             generation = ++_generation;
+            var bindingGeneration = ++_bindingGeneration;
             Unsubscribe();
             _session = session;
             _host = host;
@@ -74,10 +91,10 @@ internal sealed class DashboardValueSession(
                 }
             )
             {
-                _definitionSubscription = changes.Subscribe(
+                _definitionSubscription = _changes.Subscribe(
                     new CustomStoredValueChange.Definition(host.Value, value.DefinitionId),
                     _observer,
-                    OnChangeAsync
+                    (notification, ct) => OnChange(bindingGeneration, notification)
                 );
             }
         }
@@ -99,8 +116,8 @@ internal sealed class DashboardValueSession(
                 DashboardValueUnavailableReason.ViewerRequired
             );
         }
-        await changed();
-        var resolution = await reader.ResolveViewerAsync(login, ct);
+        await _changed();
+        var resolution = await _reader.ResolveViewerAsync(login, ct);
         lock (_gate)
         {
             if (_disposed || generation != _generation)
@@ -123,7 +140,7 @@ internal sealed class DashboardValueSession(
         }
         else
         {
-            await changed();
+            await _changed();
         }
     }
 
@@ -142,6 +159,7 @@ internal sealed class DashboardValueSession(
         {
             if (
                 _disposed
+                || !_visible
                 || _session is null
                 || _configuration is null
                 || (expectedGeneration is { } expected && expected != _generation)
@@ -157,7 +175,7 @@ internal sealed class DashboardValueSession(
             generation = _generation;
             read = ++_read;
         }
-        var state = await reader.ReadAsync(
+        var state = await _reader.ReadAsync(
             session,
             host,
             configuration,
@@ -168,13 +186,13 @@ internal sealed class DashboardValueSession(
         );
         lock (_gate)
         {
-            if (_disposed || generation != _generation || read != _read)
+            if (_disposed || !_visible || generation != _generation || read != _read)
             {
                 return;
             }
             State = state;
         }
-        await changed();
+        await _changed();
     }
 
     private void BindTarget(long generation, DashboardHostId host, CustomValueTarget target)
@@ -187,24 +205,44 @@ internal sealed class DashboardValueSession(
             }
             _targetSubscription?.Dispose();
             _target = target;
-            _targetSubscription = changes.Subscribe(
+            var bindingGeneration = _bindingGeneration;
+            _targetSubscription = _changes.Subscribe(
                 new CustomStoredValueChange.Target(host.Value, target),
                 _observer,
-                OnChangeAsync
+                (notification, ct) => OnChange(bindingGeneration, notification)
             );
         }
     }
 
-    private async ValueTask OnChangeAsync(
-        EventNotification<CustomStoredValueChange> notification,
-        CancellationToken ct
+    internal void SetVisible(bool visible)
+    {
+        lock (_gate)
+        {
+            if (_visible == visible)
+            {
+                return;
+            }
+            _visible = visible;
+            if (!visible)
+            {
+                ++_read;
+            }
+        }
+        _refresh.SetVisible(visible);
+    }
+
+    internal Task WhenIdleAsync() => _refresh.WhenIdleAsync();
+
+    private ValueTask OnChange(
+        long generation,
+        EventNotification<CustomStoredValueChange> notification
     )
     {
-        long generation;
         lock (_gate)
         {
             if (
                 _disposed
+                || generation != _bindingGeneration
                 || notification.Key.HostId != _host.Value
                 || _configuration?.Binding
                     is not DashboardBinding.Configured { Target: DashboardTarget.Value value }
@@ -212,11 +250,11 @@ internal sealed class DashboardValueSession(
                 || !notification.Key.Match(_ => true, target => target.Value == _target)
             )
             {
-                return;
+                return ValueTask.CompletedTask;
             }
-            generation = _generation;
+            _refresh.Request();
         }
-        await RefreshAsync(generation, ct);
+        return ValueTask.CompletedTask;
     }
 
     private void Unsubscribe()
@@ -234,7 +272,9 @@ internal sealed class DashboardValueSession(
         {
             _disposed = true;
             _generation++;
+            _bindingGeneration++;
             Unsubscribe();
+            _ = _refresh.DisposeAsync();
         }
     }
 }

@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.Alerts;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
@@ -19,6 +20,7 @@ internal static class TestHostFeatureServices
         services.TryAddSingleton<HostedChannelChangeNotifier>();
         services.TryAddSingleton<DurableAlertService>();
         services.TryAddSingleton<HostFeatureActivationAuthority>();
+        services.TryAddSingleton<IAutomationUiChangePublisher>(TestAutomationUiChanges.Create());
         services.TryAddSingleton<HostFeatureService>();
         return services;
     }
@@ -35,7 +37,8 @@ internal static class TestHostFeatureServices
         return new(
             database,
             new(observers, changes, alerts, NullLogger<HostFeatureActivationAuthority>.Instance),
-            clock
+            clock,
+            TestAutomationUiChanges.Create()
         );
     }
 }

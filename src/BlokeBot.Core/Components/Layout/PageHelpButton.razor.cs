@@ -109,6 +109,10 @@ public partial class PageHelpButton
             "/points/settings" => new(_pointsSettingsHelp, "/points"),
             "/custom-commands/settings" => new(_customCommandsHelp, "/commands"),
             "/custom-commands/variables" => new(_variablesHelp, "/commands"),
+            _ when path.StartsWith("/dashboards/", StringComparison.Ordinal) => new(
+                _dashboardsHelp,
+                "/dashboards"
+            ),
             "/automations" => new(_automationsHelp, "/automations"),
             "/automations/events" => new(_automationEventsHelp, "/automations/events"),
             "/host" => new(_hostConfigHelp, "/channels"),

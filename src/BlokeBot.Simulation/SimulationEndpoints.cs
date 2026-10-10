@@ -13,6 +13,35 @@ internal static class SimulationEndpoints
 {
     public static void MapSimulationEndpoints(this WebApplication app)
     {
+        _ = app.MapPost(
+                "/simulation/dashboard/poll-vote",
+                static async (
+                    IDbContextFactory<BlokeBotDbContext> database,
+                    SimulationNativeTwitchDashboardOperations controls,
+                    CancellationToken ct
+                ) =>
+                {
+                    var started = System.Diagnostics.Stopwatch.GetTimestamp();
+                    await using var db = await database.CreateDbContextAsync(ct);
+                    var hostId = await db
+                        .Hosts.Where(h => h.Login == SimulationMode.Login)
+                        .Select(h => h.Id)
+                        .SingleAsync(ct);
+                    var votes = await controls.AddPollVoteAsync(hostId, ct);
+                    return votes is null
+                        ? Results.Conflict()
+                        : Results.Json(
+                            new
+                            {
+                                votes,
+                                providerAndNotificationMs = System
+                                    .Diagnostics.Stopwatch.GetElapsedTime(started)
+                                    .TotalMilliseconds,
+                            }
+                        );
+                }
+            )
+            .AllowAnonymous();
         app.MapViewerPortalMockup();
         app.MapFullOverlayFixtures();
         SimulationAutomationAuthoringFixture.MapEvidence(app);

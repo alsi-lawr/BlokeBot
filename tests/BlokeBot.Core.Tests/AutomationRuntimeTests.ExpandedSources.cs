@@ -74,7 +74,12 @@ public sealed partial class AutomationRuntimeTests
         );
         await f.Runtime.ResumeDueAsync(CancellationToken.None);
         var before = f.Chat.Messages.Count;
-        var restarted = new AutomationCountdownService(f.Database, f.Clock, () => f.Runtime);
+        var restarted = new AutomationCountdownService(
+            f.Database,
+            f.Clock,
+            () => f.Runtime,
+            TestAutomationUiChanges.Create()
+        );
         await restarted.InitializeAsync(CancellationToken.None);
         f.Clock.Advance(TimeSpan.FromSeconds(3));
         await restarted.TickAsync(
@@ -1231,7 +1236,12 @@ public sealed partial class AutomationRuntimeTests
             database,
             runtime,
             catalog,
-            new AutomationCountdownService(database, clock, () => runtime),
+            new AutomationCountdownService(
+                database,
+                clock,
+                () => runtime,
+                TestAutomationUiChanges.Create()
+            ),
             clock,
             new ExpandedStreams(),
             new ExpandedAccounts(),

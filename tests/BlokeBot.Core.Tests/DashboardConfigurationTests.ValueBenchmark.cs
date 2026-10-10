@@ -51,16 +51,15 @@ public sealed partial class DashboardConfigurationTests
             (
                 await values.SaveValueAsync(
                     fixture.Host.Value,
-                    Display(display).Value,
+                    (await DisplayAsync(display)).Value,
                     CustomValueKind.Number,
                     sample.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     _ct
                 )
             ).Status.ShouldBe(CustomValueEditStatus.Saved);
-            Display(display)
-                .Value.Value.ShouldBe(
-                    sample.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                );
+            (await DisplayAsync(display)).Value.Value.ShouldBe(
+                sample.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            );
         }
         var measured = samples.Skip(5).Order().ToArray();
         var report = JsonSerializer.Serialize(

@@ -9,7 +9,8 @@ namespace BlokeBot.Core.Features.Automations;
 public sealed class AutomationCountdownService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider clock,
-    Func<AutomationRuntimeService> runtime
+    Func<AutomationRuntimeService> runtime,
+    IAutomationUiChangePublisher uiChanges
 )
 {
     internal Guid ProcessId { get; } = Guid.NewGuid();
@@ -33,11 +34,22 @@ public sealed class AutomationCountdownService(
     private async Task CancelOldProcessesAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        _ = await db
+        var changed = await db
+            .AutomationCountdowns.Where(t => t.IsRunning && t.ProcessId != ProcessId)
+            .Select(t => new { t.HostId, t.Name })
+            .ToArrayAsync();
+        var updated = await db
             .AutomationCountdowns.Where(t => t.IsRunning && t.ProcessId != ProcessId)
             .ExecuteUpdateAsync(s =>
                 s.SetProperty(t => t.IsRunning, false).SetProperty(t => t.WasCancelled, true)
             );
+        if (updated > 0)
+        {
+            foreach (var timer in changed)
+            {
+                await uiChanges.CountdownChangedAsync(new(timer.HostId), timer.Name);
+            }
+        }
     }
 
     internal async Task<bool> ApplyAsync(
@@ -99,6 +111,7 @@ public sealed class AutomationCountdownService(
         }
         _ = await db.SaveChangesAsync(cancellation);
         await transaction.CommitAsync(cancellation);
+        await uiChanges.CountdownChangedAsync(hostId, timer.Name);
         var kind = action.Operation switch
         {
             CountdownOperation.Start => CountdownLifecycle.Started,
@@ -118,6 +131,7 @@ public sealed class AutomationCountdownService(
         await InitializeAsync(cancellation);
         var emitted =
             new List<(AutomationCountdown Timer, CountdownLifecycle Event, TimeSpan Threshold)>();
+        var changed = new HashSet<string>();
         var now = clock.GetUtcNow();
         await using (var db = await dbFactory.CreateDbContextAsync(cancellation))
         {
@@ -142,6 +156,7 @@ public sealed class AutomationCountdownService(
                 {
                     timer.IsRunning = false;
                     timer.WasCancelled = true;
+                    _ = changed.Add(timer.Name);
                     continue;
                 }
                 foreach (
@@ -163,11 +178,16 @@ public sealed class AutomationCountdownService(
                 if (timer.DeadlineUtc <= now.UtcDateTime)
                 {
                     timer.IsRunning = false;
+                    _ = changed.Add(timer.Name);
                     emitted.Add((timer, CountdownLifecycle.Finished, TimeSpan.Zero));
                 }
             }
             _ = await db.SaveChangesAsync(cancellation);
             await transaction.CommitAsync(cancellation);
+        }
+        foreach (var name in changed)
+        {
+            await uiChanges.CountdownChangedAsync(new(host.Id), name);
         }
         foreach (var e in emitted)
         {

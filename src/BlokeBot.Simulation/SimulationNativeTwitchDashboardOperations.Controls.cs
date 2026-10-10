@@ -6,6 +6,40 @@ namespace BlokeBot.Simulation;
 
 internal sealed partial class SimulationNativeTwitchDashboardOperations
 {
+    internal async Task<int?> AddPollVoteAsync(int hostId, CancellationToken ct)
+    {
+        int votes;
+        lock (_gate)
+        {
+            var host = ForHost(hostId);
+            if (host.ActivePoll is not { } poll)
+            {
+                return null;
+            }
+            var choices = poll.Choices.ToArray();
+            choices[0] = choices[0] with { Votes = choices[0].Votes + 1 };
+            votes = choices[0].Votes;
+            host.ActivePoll = poll with { Choices = choices };
+        }
+        return await ChangedAsync(votes, ct);
+    }
+
+    internal void SetTemplates(
+        int hostId,
+        IReadOnlyList<PollTemplateView> polls,
+        IReadOnlyList<PredictionTemplateView> predictions
+    )
+    {
+        lock (_gate)
+        {
+            var host = ForHost(hostId);
+            host.PollTemplates.Clear();
+            host.PollTemplates.AddRange(polls);
+            host.PredictionTemplates.Clear();
+            host.PredictionTemplates.AddRange(predictions);
+        }
+    }
+
     Task<PollControlState> IPollDashboardOperations.ReadControlAsync(
         int hostId,
         int templateId,

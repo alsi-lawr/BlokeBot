@@ -1,0 +1,139 @@
+@using BlokeBot.Core.Features.Dashboards
+@using BlokeBot.Core.Features.Automations
+@using BlokeBot.Core.Features.TwitchOperations.Polls
+@using BlokeBot.Core.Features.TwitchOperations.Predictions
+@using BlokeBot.Core.Features.Guessing.Rounds
+@using BlokeBot.Core.Features.Points.Giveaways
+@using System.Globalization
+@inherits AuthenticatedPageComponent
+@implements IAsyncDisposable
+@if (Editing) {
+    <p class="dashboard-kind">@DashboardWidgetKinds.Label(DashboardWidgetKinds.Kind(_widget.Configuration))</p>
+    <p class="dashboard-target">@(_widget.Configuration.Binding is DashboardBinding.Unconfigured ? "Choose a target in settings" : "Configured target")</p>
+    <button type="button" class="btn-secondary dashboard-operation-preview" disabled>
+        <EditorIcon Name="@DashboardWidgetKinds.Icon(DashboardWidgetKinds.Kind(_widget.Configuration))" />@_widget.Label</button>
+}
+else if (_unavailable is not null) {
+    <p class="dashboard-unavailable" role="status">@_unavailable</p>
+}
+else {
+    @switch (_widget.Configuration) {
+        case DashboardWidgetConfiguration.Automation:
+        <p class="dashboard-kind">Manual Run</p>
+        <button class="btn-primary dashboard-primary-operation" disabled="@_busy" @onclick="RunAsync">
+            <EditorIcon Name="play" />@_widget.Label</button>
+        <p class="dashboard-status" data-native-status>@_status</p>
+        break;
+        case DashboardWidgetConfiguration.Value:
+        <div class="dashboard-value" data-native-value>@_valueText</div>
+        @if (_needsViewer) {
+            <div class="dashboard-viewer">
+                <Field Id='@($"dashboard-widget-{_widget.Id.Value}-viewer")' Label="Viewer" Value="@_viewer" ValueChanged="value => _viewer = value" />
+                <EditorAction Label="Select viewer" Icon="search" Click="SelectViewerAsync" Disabled="_busy" />
+            </div>
+        }
+        <p class="dashboard-status">@_valueStatus</p>
+        break;
+        case DashboardWidgetConfiguration.Countdown:
+        <div class="dashboard-value" data-countdown-deadline="@(_countdown?.State == AutomationCountdownState.Running ? _countdown.DeadlineUtc?.ToString("O") : null)">@(_remainingText)</div>
+        <label class="field">
+            <span class="field__label">Duration (seconds)</span>
+            <input class="field__input" type="number" min="1" step="1" @bind="_duration" />
+        </label>
+        <div class="dashboard-operations">
+            <button class="btn-secondary" disabled="@_busy" @onclick="() => CountdownAsync(CountdownOperation.Start)">
+                <EditorIcon Name="play" />Start</button>
+            <EditorAction Label="Reset countdown" Icon="history" Disabled="_busy" Click="() => CountdownAsync(CountdownOperation.Reset)" />
+            <EditorAction Label="Cancel countdown" Icon="close" Disabled="_busy" Click="() => CountdownAsync(CountdownOperation.Cancel)" />
+        </div>
+        <p class="dashboard-status" data-native-status>@(_countdown?.State.ToString() ?? "Not started")</p>
+        break;
+        case DashboardWidgetConfiguration.Poll:
+        <p class="dashboard-target">@(_poll?.ActivePoll?.Title ?? _poll?.Template?.Title)</p>
+        @if (_poll?.ActivePoll is { } activePoll) { @foreach (var choice in activePoll.Choices) {
+                <div class="dashboard-result-row">
+                    <span>@choice.Title</span>
+                    <span>@choice.Votes</span>
+                </div>
+            }
+            <button class="btn-secondary" disabled="@_busy" @onclick="EndPollAsync">
+                <EditorIcon Name="close" />End poll</button>
+        }
+        else {
+            <button class="btn-secondary" disabled="@_busy" @onclick="StartPollAsync">
+                <EditorIcon Name="play" />Start poll</button>
+        }
+        <p class="dashboard-status" data-native-status>@(_poll?.ActivePoll is { } poll ? $"{poll.Status}{(poll.IsExternallyStarted ? " · Started elsewhere" : string.Empty)}" : "No active poll")</p>
+        break;
+        case DashboardWidgetConfiguration.Prediction:
+        <p class="dashboard-target">@(_prediction?.ActivePrediction?.Title ?? _prediction?.Template?.Title)</p>
+        @if (_prediction?.ActivePrediction is { } prediction) {
+            <label class="field">
+                <span class="field__label">Winning outcome</span>
+                <select class="field__input" @bind="_winner">
+                    <option value="">Choose an outcome</option>
+                    @foreach (var outcome in prediction.Outcomes) {
+                        <option value="@outcome.Id">@outcome.Title</option>
+                    }
+                </select>
+            </label>
+            <div class="dashboard-operations">
+                <button class="btn-secondary" disabled="@_busy" @onclick="() => PredictionAsync(DashboardPredictionAction.Lock)">
+                    <EditorIcon Name="lock" />Lock</button>
+                <button class="btn-secondary" disabled="@(_busy || string.IsNullOrEmpty(_winner))" @onclick="() => PredictionAsync(DashboardPredictionAction.Resolve)">
+                    <EditorIcon Name="check" />Resolve</button>
+                <EditorAction Label="Cancel prediction" Icon="close" Disabled="_busy" Click="() => PredictionAsync(DashboardPredictionAction.Cancel)" />
+            </div>
+        }
+        else {
+            <button class="btn-secondary" disabled="@_busy" @onclick="() => PredictionAsync(DashboardPredictionAction.Start)">
+                <EditorIcon Name="play" />Start prediction</button>
+        }
+        <p class="dashboard-status" data-native-status>@(_prediction?.ActivePrediction?.Status ?? "No active prediction")</p>
+        break;
+        case DashboardWidgetConfiguration.Giveaway:
+        <div class="dashboard-value">@(_giveaway?.EntrantCount ?? 0)<small> entrants</small>
+        </div>
+        <div class="dashboard-operations">
+            @if (_giveaway?.Lifecycle is not PointsGiveawayLifecycle.Active) {
+                <button class="btn-secondary" disabled="@_busy" @onclick="() => GiveawayAsync(DashboardGiveawayAction.Start)">
+                    <EditorIcon Name="play" />Start giveaway</button>
+            }
+            else {
+                <button class="btn-secondary" disabled="@_busy" @onclick="() => GiveawayAsync(DashboardGiveawayAction.End)">
+                    <EditorIcon Name="check" />Draw winners</button>
+                <EditorAction Label="Cancel giveaway" Icon="close" Disabled="_busy" Click="() => GiveawayAsync(DashboardGiveawayAction.Cancel)" />
+            }
+        </div>
+        <p class="dashboard-status" data-native-status>@(_giveaway?.Lifecycle.Match(_ => "Active", _ => "Completed", _ => "Cancelled", _ => "Expired") ?? "No active giveaway")</p>
+        break;
+        case DashboardWidgetConfiguration.Guessing:
+        <p class="dashboard-target">@(_guessing?.CurrentRound?.ProfileName ?? _guessing?.SelectedProfile.Name)</p>
+        @if (_guessing?.CurrentRound is { Lifecycle: not GuessRoundLifecycle.Completed } round) {
+            <label class="field">
+                <span class="field__label">Winner</span>
+                <select class="field__input" @bind="_winner">
+                    <option value="">Choose a winner</option>
+                    @foreach (var option in _guessing.WinnerOptions) {
+                        <option value="@option.Value">@option.Value</option>
+                    }
+                </select>
+            </label>
+            <div class="dashboard-operations">
+                <button class="btn-secondary" disabled="@(_busy || round.Lifecycle is not GuessRoundLifecycle.Open)" @onclick="() => GuessingAsync(DashboardGuessingAction.Stop)">
+                    <EditorIcon Name="close" />Stop guesses</button>
+                <button class="btn-secondary" disabled="@(_busy || string.IsNullOrEmpty(_winner))" @onclick="() => GuessingAsync(DashboardGuessingAction.Declare)">
+                    <EditorIcon Name="check" />Declare winner</button>
+            </div>
+        }
+        else {
+            <button class="btn-secondary" disabled="@_busy" @onclick="() => GuessingAsync(DashboardGuessingAction.Start)">
+                <EditorIcon Name="play" />Start round</button>
+        }
+        <p class="dashboard-status" data-native-status>@(_guessing?.CurrentRound?.Lifecycle.Match(_ => "Open", _ => "Closed", _ => "Completed") ?? "No current round")</p>
+        break;
+    }
+}
+@if (!Editing && _feedback is not null) {
+    <p class="dashboard-operation-feedback" role="status">@_feedback</p>
+}

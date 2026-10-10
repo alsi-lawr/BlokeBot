@@ -1,0 +1,56 @@
+@using BlokeBot.Core.Features.Dashboards
+@inject DashboardTargetCatalog _targets
+@implements IDisposable
+<Field Id='@($"dashboard-widget-{_widget.Id.Value}-label")' Label="Label" Value="@_widget.Label" ValueChanged="value => ChangeAsync(_widget with { Label = value })" />
+@if (_widget.Configuration is DashboardWidgetConfiguration.Countdown countdown) {
+    <Field Id='@($"dashboard-widget-{_widget.Id.Value}-timer-name")' Label="Timer name" Value="@(countdown.Binding is DashboardBinding.Configured { Target: DashboardTarget.Countdown target } ? target.Name : string.Empty)" ValueChanged="TimerNameAsync" />
+    <label class="field">
+        <span class="field__label">Default duration (seconds)</span>
+        <input class="field__input" type="number" min="1" step="1" value="@countdown.DefaultDuration.TotalSeconds" @onchange="DurationAsync" />
+    </label>
+}
+else {
+    <label class="field">
+        <span class="field__label">@DashboardWidgetKinds.Label(DashboardWidgetKinds.Kind(_widget.Configuration)) target</span>
+        <select class="field__input" value="@_selectedKey" @onchange="TargetChangedAsync">
+            <option value="">Choose a target</option>
+            @foreach (var option in _options) {
+                <option value="@option.Key">@option.Label</option>
+            }
+        </select>
+    </label>
+    @if (_widget.Configuration.Binding is DashboardBinding.Unconfigured unresolved) {
+        <p class="text-slate-500">Unconfigured@(unresolved.Reference is null ? "." : $": {unresolved.Reference}.")</p>
+    }
+    else if (_selectedKey.Length == 0) {
+        <p class="text-slate-500">The saved target is missing. Choose a new target to rebind it.</p>
+    }
+}
+@if (_widget.Configuration is DashboardWidgetConfiguration.Automation automation) {
+    <label class="dashboard-checkbox">
+        <input type="checkbox" checked="@(automation.Data is DashboardTextOverride.Replace)" @onchange="OverrideAsync" />Override Manual Run text</label>
+    @if (automation.Data is DashboardTextOverride.Replace replacement) {
+        <Field Id='@($"dashboard-widget-{_widget.Id.Value}-manual-text")' Label="Manual Run text" Value="@replacement.Text" ValueChanged="TextAsync" />
+    }
+}
+@if (_widget.Configuration is DashboardWidgetConfiguration.Value value) {
+    <label class="dashboard-checkbox">
+        <input type="checkbox" checked="@(value.Selection is DashboardValueSelection.DictionaryEntry)" @onchange="DictionaryAsync" />Dictionary entry</label>
+    @if (value.Selection is DashboardValueSelection.DictionaryEntry entry) {
+        <Field Id='@($"dashboard-widget-{_widget.Id.Value}-entry-key")' Label="Entry key" Value="@entry.Key" ValueChanged="KeyAsync" />
+    }
+}
+<details class="dashboard-placement">
+    <summary>Position &amp; size</summary>
+    <div class="dashboard-placement-fields">
+        @foreach (var field in _placementFields) {
+            <label class="field">
+                <span class="field__label">@field.Label</span>
+                <input class="field__input" type="number" min="@field.Min" value="@field.Value" @onchange="args => PlacementAsync(field.Kind, args)" />
+            </label>
+        }
+    </div>
+</details>
+@if (_feedback is not null) {
+    <p role="status">@_feedback</p>
+}

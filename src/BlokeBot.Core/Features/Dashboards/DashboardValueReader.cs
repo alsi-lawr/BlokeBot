@@ -17,7 +17,12 @@ internal sealed class DashboardValueReader(
 )
 {
     internal DashboardValueSession CreateSession(Func<ValueTask> changed) =>
-        new(this, changes, changed);
+        new(
+            this,
+            changes,
+            changed,
+            exception => log.LogWarning(exception, "Dashboard value presentation refresh failed.")
+        );
 
     internal async Task<DashboardValueState> ReadAsync(
         AuthenticatedSession session,

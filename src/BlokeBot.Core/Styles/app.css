@@ -47,3 +47,5 @@
 @source "../Features/**/*.{razor,cs}";
 
 @import "./features/full-overlay-editor.css";
+
+@import "./features/dashboards.css";

@@ -455,7 +455,12 @@ public sealed partial class AutomationRuntimeTests
             null,
             CancellationToken.None
         );
-        var restarted = new AutomationCountdownService(f.Database, f.Clock, () => f.Runtime);
+        var restarted = new AutomationCountdownService(
+            f.Database,
+            f.Clock,
+            () => f.Runtime,
+            TestAutomationUiChanges.Create()
+        );
         var restartedControl = new AutomationCountdownControlService(
             f.Database,
             restarted,
@@ -519,7 +524,12 @@ public sealed partial class AutomationRuntimeTests
             await controls.ReadCountdownAsync(session, host, timer, CancellationToken.None)
         )
             .State.ShouldBe(AutomationCountdownState.Finished);
-        var restarted = new AutomationCountdownService(f.Database, f.Clock, () => f.Runtime);
+        var restarted = new AutomationCountdownService(
+            f.Database,
+            f.Clock,
+            () => f.Runtime,
+            TestAutomationUiChanges.Create()
+        );
         var restartedControl = new AutomationCountdownControlService(
             f.Database,
             restarted,

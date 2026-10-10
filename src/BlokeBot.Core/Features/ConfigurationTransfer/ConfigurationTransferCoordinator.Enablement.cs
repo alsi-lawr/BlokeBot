@@ -37,7 +37,14 @@ public sealed partial class ConfigurationTransferCoordinator
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        await HostFeatureTransitionStager.StageAsync(db, host, updated, now, cancellationToken);
+        await HostFeatureTransitionStager.StageAsync(
+            db,
+            host,
+            updated,
+            now,
+            _automationUiChanges,
+            cancellationToken
+        );
         var enabled = updated & ~previous;
         var disabled = previous & ~updated;
         var pending = await db.ConfigurationActivations.SingleOrDefaultAsync(

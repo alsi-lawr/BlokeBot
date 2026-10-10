@@ -43,7 +43,8 @@ public sealed partial class WatchTimeRuntimeTests
                 alerts,
                 NullLogger<HostFeatureActivationAuthority>.Instance
             ),
-            clock
+            clock,
+            TestAutomationUiChanges.Create()
         );
         clock.Advance(TimeSpan.FromMinutes(2));
         _ = (

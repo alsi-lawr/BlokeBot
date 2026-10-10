@@ -8,6 +8,8 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotDashboards(this IServiceCollection services)
     {
+        _ = services.AddSingleton<DashboardGuessingReplies>();
+        _ = services.AddSingleton<DashboardTargetCatalog>();
         _ = services.AddSingleton<DashboardAuthority>();
         _ = services.AddSingleton<DashboardConfigurationService>();
         _ = services.AddSingleton<DashboardBindingReader>();

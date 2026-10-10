@@ -264,6 +264,7 @@ public sealed class WatchTimePortableTests
             new(),
             fixture.Clock,
             NullLogger<ConfigurationTransferCoordinator>.Instance,
+            TestAutomationUiChanges.Create(),
             fixture.Runtime
         );
     }

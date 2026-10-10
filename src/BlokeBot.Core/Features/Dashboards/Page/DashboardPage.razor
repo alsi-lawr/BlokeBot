@@ -1,0 +1,173 @@
+@page "/dashboards/control"
+@page "/dashboards/control/{Dashboard:guid}"
+@page "/dashboards/editor"
+@page "/dashboards/editor/{Dashboard:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@implements IAsyncDisposable
+@using BlokeBot.Core.Features.Dashboards
+@inject DashboardConfigurationService _configuration
+@inject NavigationManager _navigation
+@inject IJSRuntime _js
+
+<PageTitle>BlokeBot | Dashboards</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_dirty" OnBeforeInternalNavigation="BeforeNavigationAsync" />
+<BlokeBot.Core.Components.Layout.DashboardPage Kicker="Channel tools" Title="@(_editing ? "Dashboard editor" : "Dashboard controls")" Description="@(_editing ? (_edit is null ? "Choose a dashboard to edit, or create a new one." : "Arrange your widgets and choose what they control.") : null)" Width="DashboardPageWidth.Wide">
+    @if (_loading) {
+        <PageState Kind="PageStateKind.Loading" Title="Loading dashboards" />
+    }
+    else if (_error is not null) {
+        <PageState Kind="PageStateKind.Failure" Title="@_error">
+            <Actions>
+                <button class="btn-secondary" @onclick="LoadAsync">Retry</button>
+            </Actions>
+        </PageState>
+    }
+    else if (_editing && _edit is null) {
+        <div class="dashboard-picker">
+            <TaskPanel Title="Choose a dashboard">
+                <div class="dashboard-selector">
+                    <label class="field">
+                        <span class="field__label">Dashboard</span>
+                        <select class="field__input" @ref="_picker" @bind="_choice">
+                            <option value="">Choose a dashboard</option>
+                            @foreach (var dashboard in _dashboards) {
+                                <option value="@dashboard.Id.Value">@dashboard.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <EditorAction Label="Open dashboard editor" Icon="edit" Disabled="@(_choice == Guid.Empty)" Click="OpenChoice" />
+                </div>
+                <div class="dashboard-create">
+                    <h3>New dashboard</h3>
+                    <div class="dashboard-selector">
+                        <Field Id="dashboard-new-name" Label="Name" Value="@_newName" ValueChanged="value => _newName = value" Placeholder="Dashboard name" />
+                        <EditorAction Label="Create dashboard" Icon="add" Disabled="@(string.IsNullOrWhiteSpace(_newName) || _busy)" Click="CreateAsync" />
+                    </div>
+                </div>
+            </TaskPanel>
+        </div>
+    }
+    else {
+        <div @ref="_root" class="dashboard-composition" data-server-now="@_clock.GetUtcNow().ToString("O")" data-editing="@((_editing && !_busy).ToString().ToLowerInvariant())" data-server-dirty="@_dirty.ToString().ToLowerInvariant()">
+            <fieldset class="dashboard-edit-boundary" disabled="@(_busy && _editing)">
+                <EditorWorkspace Class="dashboard-workspace" Header="_workspaceHeader" aria-label="@(_editing ? "Dashboard editor workspace" : "Dashboard control workspace")">
+                    <div class="dashboard-body">
+                        <div class="dashboard-grid" data-dashboard-grid data-columns="@_document.Columns" style="@($"--dashboard-columns: {_document.Columns}")">
+                            @foreach (var widget in _document.Widgets.OrderBy(w => w.Placement.Row).ThenBy(w => w.Placement.Column).ThenBy(w => w.Placement.Order)) {
+                                <div @key="widget.Id" class="dashboard-card" data-widget-id="@widget.Id.Value" style="@PlacementStyle(widget.Placement)">
+                                    <TaskPanel Title="@widget.Label">
+                                        <Actions>
+                                            @if (_editing) {
+                                                <button class="dashboard-grip" data-grid-move aria-label="Move @widget.Label" type="button" @onkeydown="args => GridKeyAsync(widget, args)">
+                                                    <EditorIcon Name="drag" />
+                                                </button>
+                                                <EditorAction Label='@($"Configure {widget.Label}")'  Icon="settings" data-settings-for="@widget.Id.Value" Click="() => SettingsAsync(widget.Id)" />
+                                            }
+                                        </Actions>
+                                        <ChildContent>
+                                            <DashboardWidgetControl View="@(new DashboardWidgetView(widget))" SelectedHostId="HostId" Session="PageContext.Session" Editing="_editing" Visible="_visible" />
+                                        </ChildContent>
+                                        <Footer>
+                                            @if (_editing) {
+                                                <div class="dashboard-card-layout">
+                                                    <EditorAction Label='@($"Move {widget.Label} left")'  Icon="arrow-left" Click="() => ChangePlacementAsync(widget, widget.Placement with { Column = Math.Max(0, widget.Placement.Column - 1) }, false)" />
+                                                    <EditorAction Label='@($"Move {widget.Label} right")'  Icon="arrow-right" Click="() => ChangePlacementAsync(widget, widget.Placement with { Column = widget.Placement.Column + 1 }, false)" />
+                                                    <EditorAction Label='@($"Narrow {widget.Label}")'  Icon="minus" Click="() => ChangePlacementAsync(widget, widget.Placement with { Width = Math.Max(1, widget.Placement.Width - 1) }, true)" />
+                                                    <EditorAction Label='@($"Widen {widget.Label}")'  Icon="add" Click="() => ChangePlacementAsync(widget, widget.Placement with { Width = widget.Placement.Width + 1 }, true)" />
+                                                    <EditorAction Label='@($"Delete {widget.Label}")'  Icon="delete" Click="() => RemoveAsync(widget.Id)" />
+                                                    <button class="dashboard-resize" data-grid-resize aria-label="Resize @widget.Label" type="button" @onkeydown="args => GridKeyAsync(widget, args, true)">
+                                                        <EditorIcon Name="fullscreen" />
+                                                    </button>
+                                                </div>
+                                            }
+                                        </Footer>
+                                    </TaskPanel>
+                                </div>
+                            }
+                        </div>
+                        @if (_editing) {
+                            <aside class="dashboard-settings" data-dashboard-settings @onkeydown="SettingsKeyAsync">
+                                <header>
+                                    <h2>Widget settings</h2>
+                                    @if (_selected is not null) {
+                                        <EditorAction Label="Close settings" Icon="close" Click="CloseSettingsAsync" />
+                                    }
+                                </header>
+                                @if (_selectedWidget is { } selected) {
+                                    <DashboardWidgetSettings @key="selected.Id" View="@(new DashboardWidgetView(selected))" HostId="HostId" Session="PageContext.Session" Columns="_document.Columns" Changed="view => ConfigureWidget(view.Widget)" PlacementChanged="placement => ChangePlacementAsync(selected, placement.ToPlacement(selected.Placement.Order), true)" />
+                                }
+                                else {
+                                    <p class="text-slate-500">Select a widget to configure it.</p>
+                                }
+                            </aside>
+                        }
+                    </div>
+                    @if (_editing && _toolboxOpen) {
+                        <EditorToolbox @ref="_toolbox" Id="dashboard-toolbox" Purpose="Dashboard widgets" Search="@_search" SearchChanged="value => _search = value" ResultsTitle="Add a widget" Count="_toolboxKinds.Count" EmptyMessage="No matching widgets" Close="CloseToolboxAsync">
+                            @foreach (var kind in _toolboxKinds) {
+                                <div draggable="true" data-toolbox-kind="@kind.ToString()">
+                                    <EditorToolboxRow Name="@DashboardWidgetKinds.Label(kind)" Purpose="@DashboardWidgetKinds.Label(kind)" AccessibleLabel='@($"Add {DashboardWidgetKinds.Label(kind)}")'  Activate="() => AddAsync(kind)">
+                                        <Icon>
+                                            <EditorIcon Name="@DashboardWidgetKinds.Icon(kind)" />
+                                        </Icon>
+                                    </EditorToolboxRow>
+                                </div>
+                            }
+                        </EditorToolbox>
+                    }
+                </EditorWorkspace>
+            </fieldset>
+            @if (_feedback is not null) {
+                <p class="dashboard-feedback" role="status">@_feedback</p>
+            }
+            @if (_edit?.Conflict is not null) {
+                <button class="btn-secondary" @onclick="ReloadConflictAsync">Discard local changes and reload saved dashboard</button>
+            }
+        </div>
+    }
+</BlokeBot.Core.Components.Layout.DashboardPage>
+
+@code {
+    private RenderFragment<RenderFragment> _workspaceHeader => controls => @<div class="dashboard-toolbar">
+        <div class="dashboard-toolbar-selection">
+            @if (_editing) {
+                <EditorAction Label="Choose another dashboard" Icon="arrow-left" Click='() => _navigation.NavigateTo("/dashboards/editor")' />
+                <Field Id="dashboard-name" Label="Dashboard name" Value="@(_edit?.Name ?? string.Empty)" ValueChanged="Rename" />
+            }
+            else {
+                <label class="field">
+                    <span class="field__label">Dashboard</span>
+                    <select class="field__input" @ref="_picker" value="@Dashboard" @onchange="SelectControl">
+                        <option value="">Choose a dashboard</option>
+                        @foreach (var dashboard in _dashboards) {
+                            <option value="@dashboard.Id.Value">@dashboard.Name</option>
+                        }
+                    </select>
+                </label>
+            }
+            @if (_editing && _snapshot is not null) {
+                <div class="dashboard-management" @onkeydown="ManagementKeyAsync">
+                    <EditorAction Label="Manage dashboard" Icon="menu" data-dashboard-manage aria-expanded="@_managementOpen.ToString().ToLowerInvariant()" aria-controls="dashboard-management" Click="ToggleManagement" Disabled="_busy" />
+                    @if (_managementOpen) {
+                        <section id="dashboard-management" class="dashboard-management-panel" aria-label="Manage dashboard">
+                            <button class="btn-secondary" type="button" @onclick="EditNameAsync"><EditorIcon Name="edit" />Rename in editor</button>
+                            <button class="btn-secondary" type="button" @onclick="DeleteDashboardAsync" disabled="@_busy"><EditorIcon Name="delete" />Delete dashboard</button>
+                        </section>
+                    }
+                </div>
+            }
+        </div>
+        <div class="dashboard-toolbar-actions">
+            @if (_editing) {
+                <span class="dashboard-save-state">@(_dirty ? "Unsaved" : "Saved")</span>
+                <EditorToolboxToggle @ref="_toggle" Open="_toolboxOpen" Controls="dashboard-toolbox" Toggle="ToggleToolboxAsync" />
+                <EditorAction Label="Undo" Icon="undo" Disabled="@(_edit?.CanUndo != true)" Click="UndoAsync" />
+                <EditorAction Label="Redo" Icon="redo" Disabled="@(_edit?.CanRedo != true)" Click="RedoAsync" />
+                <EditorAction Label="Cancel changes" Icon="close" Click="CancelAsync" Disabled="_busy" />
+                <EditorAction Label="Save dashboard" Icon="save" Click="SaveAsync" Disabled="_busy" />
+            }
+            @controls
+        </div>
+    </div>;
+}

@@ -33,8 +33,13 @@ public sealed partial class DashboardConfigurationTests
                 : new DashboardValueSelection.DictionaryEntry(key)
         );
 
-    private static DashboardValueState.Available Display(DashboardValueSession session) =>
-        session.State.ShouldBeOfType<DashboardValueState.Available>();
+    private static async Task<DashboardValueState.Available> DisplayAsync(
+        DashboardValueSession session
+    )
+    {
+        await session.WhenIdleAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        return session.State.ShouldBeOfType<DashboardValueState.Available>();
+    }
 
     [Test]
     public async Task DashboardValues_CommittedEditsDefaultsResetAndDeletionRefreshOnlyBoundTargets()
@@ -92,27 +97,31 @@ public sealed partial class DashboardConfigurationTests
             ValueConfiguration(dictionary, "two"),
             _ct
         );
-        Display(scalarSession).Value.Value.ShouldBe("3");
-        Display(selected).Value.Value.ShouldBe("fallback");
+        (await DisplayAsync(scalarSession)).Value.Value.ShouldBe("3");
+        (await DisplayAsync(selected)).Value.Value.ShouldBe("fallback");
         var initialOther = otherUpdates;
         (
             _ = await values.SaveValueAsync(
                 fixture.Host.Value,
-                Display(selected).Value,
+                (await DisplayAsync(selected)).Value,
                 CustomValueKind.Number,
                 "12",
                 _ct
             )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(selected).Value.Kind.ShouldBe(CustomValueKind.Number);
-        Display(selected).Value.Value.ShouldBe("12");
+        (await DisplayAsync(selected)).Value.Kind.ShouldBe(CustomValueKind.Number);
+        (await DisplayAsync(selected)).Value.Value.ShouldBe("12");
         otherUpdates.ShouldBe(initialOther);
         scalarUpdates.ShouldBe(1);
         (
-            await values.ResetValueAsync(fixture.Host.Value, Display(selected).Value, _ct)
+            await values.ResetValueAsync(
+                fixture.Host.Value,
+                (await DisplayAsync(selected)).Value,
+                _ct
+            )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(selected).Value.Value.ShouldBe("fallback");
-        Display(selected).Value.Kind.ShouldBe(CustomValueKind.Text);
+        (await DisplayAsync(selected)).Value.Value.ShouldBe("fallback");
+        (await DisplayAsync(selected)).Value.Kind.ShouldBe(CustomValueKind.Text);
         (
             await values.SaveDefinitionAsync(
                 fixture.Host.Value,
@@ -124,13 +133,13 @@ public sealed partial class DashboardConfigurationTests
                 _ct
             )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(selected).Definition.Name.ShouldBe("Names");
-        Display(selected).Value.Value.ShouldBe("new default");
-        Display(other).Value.Value.ShouldBe("new default");
+        (await DisplayAsync(selected)).Definition.Name.ShouldBe("Names");
+        (await DisplayAsync(selected)).Value.Value.ShouldBe("new default");
+        (await DisplayAsync(other)).Value.Value.ShouldBe("new default");
         (
             _ = await values.SaveValueAsync(
                 fixture.Host.Value,
-                Display(scalarSession).Value,
+                (await DisplayAsync(scalarSession)).Value,
                 CustomValueKind.Number,
                 "88",
                 _ct
@@ -139,16 +148,17 @@ public sealed partial class DashboardConfigurationTests
         (
             await values.SaveDefinitionAsync(fixture.Host.Value, scalar with { Default = "7" }, _ct)
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(scalarSession).Value.Value.ShouldBe("88");
+        (await DisplayAsync(scalarSession)).Value.Value.ShouldBe("88");
         var current = (await values.DefinitionAsync(fixture.Host.Value, scalar.Id, _ct))!;
         var deletion = await values.AffectedValuesAsync(fixture.Host.Value, scalar.Id, _ct);
         (
             await values.DeleteDefinitionAsync(fixture.Host.Value, current, deletion, _ct)
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
+        await scalarSession.WhenIdleAsync().WaitAsync(TimeSpan.FromSeconds(5));
         scalarSession
             .State.ShouldBeOfType<DashboardValueState.Unavailable>()
             .Reason.ShouldBe(DashboardValueUnavailableReason.Missing);
-        Display(other).Value.Value.ShouldBe("new default");
+        (await DisplayAsync(other)).Value.Value.ShouldBe("new default");
         selectedUpdates.ShouldBeGreaterThan(1);
     }
 
@@ -186,19 +196,19 @@ public sealed partial class DashboardConfigurationTests
         await first.SelectViewerAsync("first", _ct);
         resolver.Release.SetResult(new CustomCommandViewerResolution.Found(new("old-id", "old")));
         await old;
-        Display(first).Value.Target.ViewerId.ShouldBe("first-id");
-        Display(second).Value.Target.ViewerId.ShouldBe("second-id");
+        (await DisplayAsync(first)).Value.Target.ViewerId.ShouldBe("first-id");
+        (await DisplayAsync(second)).Value.Target.ViewerId.ShouldBe("second-id");
         (
             _ = await values.SaveValueAsync(
                 fixture.Host.Value,
-                Display(first).Value,
+                (await DisplayAsync(first)).Value,
                 CustomValueKind.Number,
                 "15",
                 _ct
             )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(first).Value.Value.ShouldBe("15");
-        Display(second).Value.Value.ShouldBe("0");
+        (await DisplayAsync(first)).Value.Value.ShouldBe("15");
+        (await DisplayAsync(second)).Value.Value.ShouldBe("0");
         await first.BindAsync(
             Session(fixture.Other),
             fixture.Other,
@@ -271,15 +281,15 @@ public sealed partial class DashboardConfigurationTests
         (
             _ = await values.SaveValueAsync(
                 fixture.Host.Value,
-                Display(healthy).Value,
+                (await DisplayAsync(healthy)).Value,
                 CustomValueKind.Number,
                 "6",
                 _ct
             )
         ).Status.ShouldBe(CustomValueEditStatus.Saved);
-        Display(healthy).Value.Value.ShouldBe("6");
+        (await DisplayAsync(healthy)).Value.Value.ShouldBe("6");
         disposedUpdates.ShouldBe(1);
-        Display(disposed).Value.Value.ShouldBe("0");
+        (await DisplayAsync(disposed)).Value.Value.ShouldBe("0");
         fixture.Moderator.Outcome =
             new BlokeBot.Core.Auth.Moderation.ModeratorAuthorityOutcome.Revoked();
         using var denied = ValueReader(fixture, changes)
@@ -293,7 +303,7 @@ public sealed partial class DashboardConfigurationTests
         denied
             .State.ShouldBeOfType<DashboardValueState.Rejected>()
             .Reason.ShouldBe(DashboardRejection.Revoked);
-        Display(healthy).Value.Value.ShouldBe("6");
+        (await DisplayAsync(healthy)).Value.Value.ShouldBe("6");
     }
 
     private sealed class ViewerResolver : ICustomCommandViewerResolver

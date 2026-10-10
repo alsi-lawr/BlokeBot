@@ -136,6 +136,15 @@
                                                ))"
                                             Routes="routes" />
 
+                @if (showConfigurationTransfer)
+                {
+                    <NavMenuDashboardsGroup Group="@(new(
+                        GroupIsOpen(NavigationGroup.Dashboards), GroupBodyId(NavigationGroup.Dashboards),
+                        EventCallback.Factory.Create(this, () => ToggleGroupAsync(NavigationGroup.Dashboards)),
+                        EventCallback.Factory.Create<KeyboardEventArgs>(this, args => CloseGroupOnEscape(NavigationGroup.Dashboards, args))
+                    ))" Routes="routes" />
+                }
+
                 @if (showOverlays)
                 {
                     <NavMenuOverlaysGroup Group="@(new(

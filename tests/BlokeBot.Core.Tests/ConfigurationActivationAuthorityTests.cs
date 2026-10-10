@@ -39,7 +39,12 @@ public sealed partial class ConfigurationActivationTests
             interactiveEvents,
             interactiveAlerts
         );
-        var featureService = new HostFeatureService(database, interactiveAuthority);
+        var featureService = new HostFeatureService(
+            database,
+            interactiveAuthority,
+            TimeProvider.System,
+            TestAutomationUiChanges.Create()
+        );
 
         _ = await featureService.DisableAsync(
             interactiveHost,

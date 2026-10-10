@@ -18,7 +18,8 @@ internal sealed class SimulationFixtureSeeder(
     AutomationSubflowService subflows,
     AutomationFlowService flows,
     AutomationScenarioService scenarios,
-    AutomationCatalogService catalog
+    AutomationCatalogService catalog,
+    SimulationNativeTwitchDashboardOperations nativeControls
 )
 {
     internal const string OverlayAccessKey = "simulation-overlay-access-key-0000000000000";
@@ -79,6 +80,8 @@ internal sealed class SimulationFixtureSeeder(
         _ = await db.SaveChangesAsync(cancellationToken);
         await SeedAutomationsAsync(db, hostId, now, cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
+
+        await SimulationDashboardFixtures.SeedAsync(db, hostId, nativeControls, cancellationToken);
 
         if (Environment.GetEnvironmentVariable("BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE") == "1")
         {

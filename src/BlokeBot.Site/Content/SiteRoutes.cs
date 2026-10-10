@@ -11,6 +11,7 @@ internal static class SiteRoutes
         "/guide",
         "/guide/getting-started",
         "/dashboard",
+        "/dashboards",
         "/channels",
         "/connect",
         "/tools",

@@ -1106,12 +1106,22 @@ public static class FakeTwitchHostingExtensions
     {
         try
         {
-            var current = authority.RequireUserToken(request);
+            var logins = request.Query["login"].ToArray();
+            FakeTwitchUser current;
+            if (logins.Length == 0)
+            {
+                current = authority.RequireUserToken(request);
+            }
+            else
+            {
+                authority.RequireAccessToken(request);
+                current = authority.Definition.AuthorizedUser;
+            }
             return Results.Json(
                 new
                 {
                     data = authority
-                        .Users(request.Query["login"].ToArray(), current)
+                        .Users(logins, current)
                         .Select(user => ToHelixUser(user, request)),
                 }
             );

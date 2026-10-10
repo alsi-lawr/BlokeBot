@@ -333,7 +333,8 @@ public sealed class ConfigurationTransferCoordinatorTests
                 new GrantedAuthority(),
                 new ConfigurationActivationQueue(),
                 TimeProvider.System,
-                NullLogger<ConfigurationTransferCoordinator>.Instance
+                NullLogger<ConfigurationTransferCoordinator>.Instance,
+                TestAutomationUiChanges.Create()
             )
             : new(
                 database,
@@ -342,6 +343,7 @@ public sealed class ConfigurationTransferCoordinatorTests
                 new ConfigurationActivationQueue(),
                 TimeProvider.System,
                 NullLogger<ConfigurationTransferCoordinator>.Instance,
+                TestAutomationUiChanges.Create(),
                 new(database),
                 UnavailableOverlayConfigurationTransferAdapter.Instance,
                 UnavailableAutomationConfigurationTransferAdapter.Instance,

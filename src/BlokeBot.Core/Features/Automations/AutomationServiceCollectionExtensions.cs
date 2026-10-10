@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Plugins.Features;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,14 @@ public static class AutomationServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotAutomations(this IServiceCollection services)
     {
+        _ = services.AddEventBus<AutomationUiChange>(
+            ObserverBoundary.Named("BlokeBot.AutomationUi"),
+            static change => ObserverEventIdentity.Named(change.ToString())
+        );
+        services.TryAddSingleton<AutomationUiChanges>();
+        services.TryAddSingleton<IAutomationUiChangePublisher>(p =>
+            p.GetRequiredService<AutomationUiChanges>()
+        );
         services.TryAddSingleton<PluginAutomationCatalogRegistry>();
         services.TryAddSingleton<IPluginFeatureAutomationPlanner>(provider =>
             provider.GetRequiredService<PluginAutomationCatalogRegistry>()
@@ -28,7 +37,8 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddSingleton(p => new AutomationCountdownService(
             p.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
             p.GetRequiredService<TimeProvider>(),
-            () => p.GetRequiredService<AutomationRuntimeService>()
+            () => p.GetRequiredService<AutomationRuntimeService>(),
+            p.GetRequiredService<IAutomationUiChangePublisher>()
         ));
         services.TryAddSingleton<AutomationManualRunService>();
         services.TryAddSingleton<AutomationCountdownControlService>();
@@ -104,6 +114,7 @@ public static class AutomationServiceCollectionExtensions
                 provider.GetRequiredService<AutomationFlowService>(),
                 provider.GetRequiredService<AutomationActionExecutor>(),
                 provider.GetRequiredService<TimeProvider>(),
+                provider.GetRequiredService<IAutomationUiChangePublisher>(),
                 provider.GetServices<IAutomationRunCompletionObserver>()
             );
             if (PluginExecution(provider) is { } pluginExecution)

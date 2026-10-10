@@ -75,6 +75,8 @@ public sealed partial class AutomationRuntimeTests
             CancellationToken.None
         );
         var runId = dispatched.RunIds.ShouldHaveSingleItem();
+        List<AutomationFlowRunState> changes = [];
+        using var observer = TrackCommittedRunStates(fixture, runId, changes);
         await using (var db = await fixture.Database.CreateDbContextAsync())
         {
             (await db.AutomationSubflowRunReferences.CountAsync()).ShouldBe(2);
@@ -94,7 +96,8 @@ public sealed partial class AutomationRuntimeTests
                 );
                 await new PluginAutomationRunCoordinator(
                     fixture.Database,
-                    fixture.Clock
+                    fixture.Clock,
+                    fixture.UiChanges
                 ).CancelAsync(plugin.State, CancellationToken.None);
                 break;
             case SubflowPluginChange.Remove:
@@ -154,13 +157,15 @@ public sealed partial class AutomationRuntimeTests
             plugin.Catalog,
             plugin.Flows,
             fixture.Actions,
-            fixture.Clock
+            fixture.Clock,
+            fixture.UiChanges
         );
         restarted.UsePluginExecution(plugin.Execution);
         (await restarted.ResumeAsync(runId, CancellationToken.None)).Status.ShouldBe(
             AutomationResumeStatus.Invalidated
         );
         plugin.Invoker.Calls.ShouldBe(0);
+        changes.ShouldBe([AutomationFlowRunState.Invalidated]);
     }
 
     [Test]
@@ -299,7 +304,8 @@ public sealed partial class AutomationRuntimeTests
             catalog,
             flows,
             fixture.Actions,
-            fixture.Clock
+            fixture.Clock,
+            fixture.UiChanges
         );
         runtime.UsePluginExecution(execution);
         var descriptor = (

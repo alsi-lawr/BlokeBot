@@ -3,6 +3,7 @@ namespace BlokeBot.Site.Content;
 internal static partial class SiteGuideCatalog
 {
     private static readonly IReadOnlyDictionary<string, SiteGuidePage> _pages = CreateStartPages()
+        .Concat(CreateDashboardPages())
         .Concat(CreateChannelSetupPages())
         .Concat(CreateConfigurationTransferPages())
         .Concat(CreateStreamOverlayPages())
@@ -46,6 +47,7 @@ internal static partial class SiteGuideCatalog
             [
                 GuideLink("Getting started", "guide/getting-started"),
                 GuideLink("Dashboard", "dashboard"),
+                GuideLink("Custom dashboards", "dashboards"),
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),

@@ -143,6 +143,7 @@ public sealed partial class ConfigurationTransferOverlayCredentialTests
                 new(),
                 time,
                 NullLogger<ConfigurationTransferCoordinator>.Instance,
+                TestAutomationUiChanges.Create(),
                 new(
                     database,
                     overlayAdapter,
