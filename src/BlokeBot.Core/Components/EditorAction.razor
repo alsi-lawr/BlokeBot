@@ -1,8 +1,8 @@
-<span class="editor-action">
+<span class="editor-action" data-editor-action-tooltip>
     <button @attributes="AdditionalAttributes" type="button" class="@($"{Class} editor-action-button")" aria-label="@Label" aria-describedby="@_tipId" aria-pressed="@(Pressed?.ToString().ToLowerInvariant())" disabled="@Disabled" @onclick="Click">
         <EditorIcon Name="@Icon" />
     </button>
-    <span id="@_tipId" class="editor-action-tip" role="tooltip">@(Tip ?? Label)</span>
+    <span id="@_tipId" class="editor-action-tip editor-action-tip--floating" role="tooltip" popover="manual">@(Tip ?? Label)</span>
 </span>
 
 @code {

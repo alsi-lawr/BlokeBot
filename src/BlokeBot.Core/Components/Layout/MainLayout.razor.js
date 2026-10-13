@@ -1,3 +1,7 @@
+import { bindEditorActionTooltips } from "../EditorAction.razor.js";
+
+bindEditorActionTooltips(document);
+
 const railPreferenceKey = "blokebot.shell.rail.v1";
 const preferenceVersion = 1;
 

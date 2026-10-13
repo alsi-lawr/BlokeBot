@@ -79,4 +79,6 @@
 .editor-action{position:relative;display:inline-flex;flex:none;}
 .editor-action-button{display:inline-flex;align-items:center;justify-content:center;min-width:2.25rem;min-height:2.25rem;padding:.45rem;}
 .editor-action-tip{position:absolute;top:calc(100% + .35rem);right:0;z-index:100;display:none;width:max-content;max-width:min(17rem,80vw);padding:.45rem .65rem;border:1px solid var(--app-border);border-radius:.5rem;background:var(--app-text-strong);color:var(--app-surface-solid);box-shadow:var(--app-shadow-surface);font-size:.82rem;font-weight:700;line-height:1.4;pointer-events:none;}
-.editor-action:not([data-tip-dismissed]):hover>.editor-action-tip,.editor-action:not([data-tip-dismissed]):focus-within>.editor-action-tip{display:block;}
+.editor-action:not([data-tip-dismissed]):hover>.editor-action-tip:not(.editor-action-tip--floating),.editor-action:not([data-tip-dismissed]):focus-within>.editor-action-tip:not(.editor-action-tip--floating){display:block;}
+.editor-action-tip--floating{position:fixed;inset:auto;margin:0;}
+.editor-action-tip--floating:popover-open{display:block;}
