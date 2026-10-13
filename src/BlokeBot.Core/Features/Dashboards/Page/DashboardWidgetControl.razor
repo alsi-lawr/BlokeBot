@@ -28,8 +28,15 @@ else {
         <div class="dashboard-value" data-native-value>@_valueText</div>
         @if (_needsViewer) {
             <div class="dashboard-viewer">
-                <Field Id='@($"dashboard-widget-{_widget.Id.Value}-viewer")' Label="Viewer" Value="@_viewer" ValueChanged="value => _viewer = value" />
-                <EditorAction Label="Select viewer" Icon="search" Click="SelectViewerAsync" Disabled="_busy" />
+                <label class="field">
+                    <span class="field__label">Recently active viewers</span>
+                    <select class="field__input" value="@(_value?.Viewer?.TwitchUserId ?? string.Empty)" @onchange="SelectViewerAsync" disabled="@(_busy || _viewerOptions.IsEmpty)">
+                        <option value="">@_viewerPlaceholder</option>
+                        @foreach (var viewer in _viewerOptions) {
+                            <option value="@viewer.TwitchUserId">@(string.IsNullOrWhiteSpace(viewer.DisplayName) ? viewer.Login : viewer.DisplayName) · @($"@{viewer.Login}")</option>
+                        }
+                    </select>
+                </label>
             </div>
         }
         <p class="dashboard-status">@_valueStatus</p>

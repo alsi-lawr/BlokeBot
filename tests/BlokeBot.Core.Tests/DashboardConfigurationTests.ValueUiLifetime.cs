@@ -40,7 +40,6 @@ public sealed partial class DashboardConfigurationTests
             factory,
             new(factory, fixture.Moderator),
             new(factory, changes),
-            new ViewerResolver(),
             changes,
             NullLogger<DashboardValueReader>.Instance
         );
@@ -123,7 +122,6 @@ public sealed partial class DashboardConfigurationTests
             factory,
             new(factory, fixture.Moderator),
             new(factory, changes),
-            new ViewerResolver(),
             changes,
             NullLogger<DashboardValueReader>.Instance
         );

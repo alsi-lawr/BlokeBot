@@ -10,7 +10,6 @@ internal enum DashboardValueUnavailableReason
     FeatureDisabled,
     ViewerRequired,
     ViewerNotFound,
-    ViewerUnavailable,
     StorageUnavailable,
     InvalidSelection,
 }

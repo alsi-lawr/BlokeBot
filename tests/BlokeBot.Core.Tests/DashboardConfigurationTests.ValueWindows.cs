@@ -46,6 +46,7 @@ public sealed partial class DashboardConfigurationTests
             "22",
             _ct
         );
+        await SeedRecentViewersAsync(fixture);
         int updates = 0;
         using var display = ValueReader(fixture, changes)
             .CreateSession(() =>
@@ -55,31 +56,48 @@ public sealed partial class DashboardConfigurationTests
             });
         var readsBefore = window.ValueReads;
         await display.BindAsync(fixture.Owner, fixture.Host, ValueConfiguration(definition), _ct);
-        await display.SelectViewerAsync("missing", _ct);
+        await display.SelectViewerAsync(Viewer("missing"), _ct);
         window.ValueReads.ShouldBe(readsBefore);
         window.PauseNext = true;
-        var stale = display.SelectViewerAsync("first", _ct);
+        var stale = display.SelectViewerAsync(Viewer("first"), _ct);
         await window.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        await display.SelectViewerAsync("second", _ct);
+        await display.SelectViewerAsync(Viewer("second"), _ct);
         (await DisplayAsync(display)).Value.Value.ShouldBe("22");
         window.Release.SetResult();
         await stale;
         (await DisplayAsync(display)).Value.Value.ShouldBe("22");
-        var lateResolver = new ViewerResolver { Delay = true };
-        var disposed = ValueReader(fixture, changes, lateResolver)
+        var disposeWindow = new ValueReadWindow();
+        await using var disposeDatabase = await Fixture.CreateAsync(
+            await PointProviderFixture.SqliteFileAsync(disposeWindow)
+        );
+        await SeedRecentViewersAsync(disposeDatabase);
+        var disposeValues = new CustomStoredValueService(disposeDatabase.Database, changes);
+        var disposeDefinition = await CustomCommandExecutionTests.DeclareAsync(
+            disposeValues,
+            disposeDatabase.Host.Value,
+            "Score",
+            CustomValueScope.User,
+            CustomValueKind.Number,
+            "0"
+        );
+        var disposed = ValueReader(disposeDatabase, changes)
             .CreateSession(() =>
             {
                 updates++;
                 return ValueTask.CompletedTask;
             });
-        await disposed.BindAsync(fixture.Owner, fixture.Host, ValueConfiguration(definition), _ct);
-        var late = disposed.SelectViewerAsync("first", _ct);
-        await lateResolver.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await disposed.BindAsync(
+            disposeDatabase.Owner,
+            disposeDatabase.Host,
+            ValueConfiguration(disposeDefinition),
+            _ct
+        );
+        disposeWindow.PauseNext = true;
+        var late = disposed.SelectViewerAsync(Viewer("first"), _ct);
+        await disposeWindow.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var beforeDispose = updates;
         disposed.Dispose();
-        lateResolver.Release.SetResult(
-            new CustomCommandViewerResolution.Found(new("first-id", "first"))
-        );
+        disposeWindow.Release.SetResult();
         await late;
         updates.ShouldBe(beforeDispose);
         disposed.Viewer.ShouldBeNull();

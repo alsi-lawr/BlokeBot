@@ -10,14 +10,12 @@ public sealed partial class DashboardConfigurationTests
 {
     private static DashboardValueReader ValueReader(
         Fixture fixture,
-        CustomStoredValueChanges changes,
-        ICustomCommandViewerResolver? resolver = null
+        CustomStoredValueChanges changes
     ) =>
         new(
             fixture.Database,
             new(fixture.Database, fixture.Moderator),
             new(fixture.Database, changes),
-            resolver ?? new ViewerResolver(),
             changes,
             NullLogger<DashboardValueReader>.Instance
         );
@@ -163,10 +161,11 @@ public sealed partial class DashboardConfigurationTests
     }
 
     [Test]
-    public async Task DashboardValues_ViewerSelectionIsPerSessionAndLateResolutionCannotRebindHost()
+    public async Task DashboardValues_ViewerSelectionIsPerSessionAndLateReadCannotRebindHost()
     {
+        var window = new ValueReadWindow();
         await using var fixture = await Fixture.CreateAsync(
-            await PointProviderFixture.SqliteFileAsync()
+            await PointProviderFixture.SqliteFileAsync(window)
         );
         var changes = StoredValueTestChanges.Create();
         var values = new CustomStoredValueService(fixture.Database, changes);
@@ -178,8 +177,8 @@ public sealed partial class DashboardConfigurationTests
             CustomValueKind.Number,
             "0"
         );
-        var resolver = new ViewerResolver();
-        using var first = ValueReader(fixture, changes, resolver)
+        await SeedRecentViewersAsync(fixture);
+        using var first = ValueReader(fixture, changes)
             .CreateSession(() => ValueTask.CompletedTask);
         using var second = ValueReader(fixture, changes)
             .CreateSession(() => ValueTask.CompletedTask);
@@ -188,13 +187,12 @@ public sealed partial class DashboardConfigurationTests
             .State.ShouldBeOfType<DashboardValueState.Unavailable>()
             .Reason.ShouldBe(DashboardValueUnavailableReason.ViewerRequired);
         await second.BindAsync(fixture.Owner, fixture.Host, ValueConfiguration(definition), _ct);
-        await second.SelectViewerAsync("second", _ct);
-        resolver.Delay = true;
-        var old = first.SelectViewerAsync("old", _ct);
-        await resolver.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        resolver.Delay = false;
-        await first.SelectViewerAsync("first", _ct);
-        resolver.Release.SetResult(new CustomCommandViewerResolution.Found(new("old-id", "old")));
+        await second.SelectViewerAsync(Viewer("second"), _ct);
+        window.PauseNext = true;
+        var old = first.SelectViewerAsync(Viewer("old"), _ct);
+        await window.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await first.SelectViewerAsync(Viewer("first"), _ct);
+        window.Release.SetResult();
         await old;
         (await DisplayAsync(first)).Value.Target.ViewerId.ShouldBe("first-id");
         (await DisplayAsync(second)).Value.Target.ViewerId.ShouldBe("second-id");
@@ -219,7 +217,7 @@ public sealed partial class DashboardConfigurationTests
         first
             .State.ShouldBeOfType<DashboardValueState.Unavailable>()
             .Reason.ShouldBe(DashboardValueUnavailableReason.Missing);
-        await second.SelectViewerAsync("missing", _ct);
+        await second.SelectViewerAsync(Viewer("missing"), _ct);
         second
             .State.ShouldBeOfType<DashboardValueState.Unavailable>()
             .Reason.ShouldBe(DashboardValueUnavailableReason.ViewerNotFound);
@@ -306,26 +304,24 @@ public sealed partial class DashboardConfigurationTests
         (await DisplayAsync(healthy)).Value.Value.ShouldBe("6");
     }
 
-    private sealed class ViewerResolver : ICustomCommandViewerResolver
-    {
-        internal bool Delay { get; set; }
-        internal TaskCompletionSource Entered { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal TaskCompletionSource<CustomCommandViewerResolution> Release { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private static CustomCommandViewer Viewer(string login) => new($"{login}-id", login, login);
 
-        public Task<CustomCommandViewerResolution> ResolveAsync(string login, CancellationToken ct)
+    private static async Task SeedRecentViewersAsync(Fixture fixture)
+    {
+        await using var db = fixture.Database.CreateDbContext();
+        foreach (var login in new[] { "first", "second", "old" })
         {
-            if (Delay)
-            {
-                _ = Entered.TrySetResult();
-                return Release.Task;
-            }
-            return Task.FromResult<CustomCommandViewerResolution>(
-                login == "missing"
-                    ? new CustomCommandViewerResolution.NotFound()
-                    : new CustomCommandViewerResolution.Found(new($"{login}-id", login))
+            _ = db.RecentChannelChatters.Add(
+                new()
+                {
+                    HostId = fixture.Host.Value,
+                    TwitchUserId = $"{login}-id",
+                    Login = login,
+                    DisplayName = login,
+                    ObservedAtUtc = DateTime.UtcNow,
+                }
             );
         }
+        _ = await db.SaveChangesAsync();
     }
 }

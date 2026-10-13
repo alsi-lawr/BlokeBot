@@ -111,7 +111,6 @@ public sealed partial class CustomCommandExecutionTests
             database,
             new(database, new NoModerator()),
             values,
-            new UnavailableCustomCommandViewerResolver(),
             changes,
             NullLogger<DashboardValueReader>.Instance
         );

@@ -15,6 +15,10 @@
   flex: 1;
   min-width: 0;
 }
+.dashboard-viewer option {
+  background-color: var(--app-surface-solid);
+  color: var(--app-text-strong);
+}
 .dashboard-create {
   border-top: 1px solid var(--app-border);
   margin-top: 1.25rem;

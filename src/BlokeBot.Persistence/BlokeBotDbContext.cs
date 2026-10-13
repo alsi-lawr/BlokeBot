@@ -217,6 +217,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     {
         ConfigureHosts(modelBuilder);
         ConfigureDashboards(modelBuilder);
+        ConfigureRecentChatters(modelBuilder);
         ConfigureReplyDelivery(modelBuilder);
         ConfigureAccess(modelBuilder);
         ConfigureCommands(modelBuilder);

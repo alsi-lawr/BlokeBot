@@ -15,6 +15,15 @@ public static partial class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<DashboardBindingReader>();
         _ = services.AddSingleton<DashboardAutomationControls>();
         _ = services.AddSingleton<DashboardValueReader>();
+        _ = services.AddEventBus<DashboardRecentViewersChanged>(
+            ObserverBoundary.Named("BlokeBot.DashboardRecentViewers"),
+            static change =>
+                ObserverEventIdentity.Named($"BlokeBot.DashboardRecentViewers.{change.Host.Value}")
+        );
+        _ = services.AddSingleton<DashboardRecentViewers>();
+        _ = services.AddSingleton<IChatMessageObserver>(provider =>
+            provider.GetRequiredService<DashboardRecentViewers>()
+        );
         _ = services.AddSingleton<DashboardPollControls>();
         _ = services.AddSingleton<DashboardPredictionControls>();
         _ = services.AddSingleton<DashboardGiveawayControls>();

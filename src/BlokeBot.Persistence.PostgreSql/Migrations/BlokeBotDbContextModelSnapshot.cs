@@ -8347,6 +8347,32 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("raid_collaboration_settings", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.RecentChannelChatter", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TwitchUserId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("HostId", "TwitchUserId");
+
+                    b.HasIndex("HostId", "ObservedAtUtc", "TwitchUserId");
+
+                    b.ToTable("recent_channel_chatters", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyDeliverySetting", b =>
                 {
                     b.Property<int>("Id")
@@ -11824,6 +11850,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.RaidCollaborationSettings", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.RecentChannelChatter", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()

@@ -41,7 +41,6 @@ public sealed partial class ConfigurationTransferDashboardTests
             database,
             new(database, new Granted()),
             values,
-            new UnavailableCustomCommandViewerResolver(),
             changes,
             NullLogger<DashboardValueReader>.Instance
         );

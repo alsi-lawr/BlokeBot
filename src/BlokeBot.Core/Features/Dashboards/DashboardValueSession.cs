@@ -101,14 +101,14 @@ internal sealed class DashboardValueSession : IDisposable
         return RefreshAsync(generation, ct);
     }
 
-    internal async Task SelectViewerAsync(string login, CancellationToken ct)
+    internal async Task SelectViewerAsync(CustomCommandViewer? viewer, CancellationToken ct)
     {
         long generation;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             generation = ++_generation;
-            Viewer = null;
+            Viewer = viewer;
             _targetSubscription?.Dispose();
             _targetSubscription = null;
             _target = null;
@@ -117,31 +117,7 @@ internal sealed class DashboardValueSession : IDisposable
             );
         }
         await _changed();
-        var resolution = await _reader.ResolveViewerAsync(login, ct);
-        lock (_gate)
-        {
-            if (_disposed || generation != _generation)
-            {
-                return;
-            }
-            Viewer = resolution is CustomCommandViewerResolution.Found found ? found.Viewer : null;
-            if (Viewer is null)
-            {
-                State = new DashboardValueState.Unavailable(
-                    resolution is CustomCommandViewerResolution.NotFound
-                        ? DashboardValueUnavailableReason.ViewerNotFound
-                        : DashboardValueUnavailableReason.ViewerUnavailable
-                );
-            }
-        }
-        if (resolution is CustomCommandViewerResolution.Found)
-        {
-            await RefreshAsync(generation, ct);
-        }
-        else
-        {
-            await _changed();
-        }
+        await RefreshAsync(generation, ct);
     }
 
     internal Task RefreshAsync(CancellationToken ct) => RefreshAsync(null, ct);
@@ -191,6 +167,24 @@ internal sealed class DashboardValueSession : IDisposable
                 return;
             }
             State = state;
+            if (state is DashboardValueState.Available available)
+            {
+                Viewer = available.Viewer;
+            }
+            else if (
+                state
+                is DashboardValueState.Unavailable
+                    {
+                        Reason: DashboardValueUnavailableReason.ViewerNotFound
+                    }
+                    or DashboardValueState.Rejected
+            )
+            {
+                Viewer = null;
+                _targetSubscription?.Dispose();
+                _targetSubscription = null;
+                _target = null;
+            }
         }
         await _changed();
     }
@@ -273,6 +267,7 @@ internal sealed class DashboardValueSession : IDisposable
             _disposed = true;
             _generation++;
             _bindingGeneration++;
+            Viewer = null;
             Unsubscribe();
             _ = _refresh.DisposeAsync();
         }

@@ -3,6 +3,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.Competitions;
+using BlokeBot.Core.Features.Dashboards;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
@@ -19,7 +20,8 @@ internal sealed class SimulationFixtureSeeder(
     AutomationFlowService flows,
     AutomationScenarioService scenarios,
     AutomationCatalogService catalog,
-    SimulationNativeTwitchDashboardOperations nativeControls
+    SimulationNativeTwitchDashboardOperations nativeControls,
+    DashboardRecentViewers recentViewers
 )
 {
     internal const string OverlayAccessKey = "simulation-overlay-access-key-0000000000000";
@@ -82,6 +84,7 @@ internal sealed class SimulationFixtureSeeder(
         _ = await db.SaveChangesAsync(cancellationToken);
 
         await SimulationDashboardFixtures.SeedAsync(db, hostId, nativeControls, cancellationToken);
+        await SimulationDashboardRecentViewersFixture.SeedAsync(recentViewers, cancellationToken);
 
         if (Environment.GetEnvironmentVariable("BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE") == "1")
         {

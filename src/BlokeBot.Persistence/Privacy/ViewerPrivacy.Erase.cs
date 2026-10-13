@@ -115,6 +115,7 @@ public static partial class ViewerPrivacyService
         );
 
         await ErasePointsAsync(context);
+        await EraseRecentChattersAsync(context);
         await EraseCommandsAndAccessAsync(context);
         await EraseMediaAndRequestsAsync(context);
         await EraseBountiesAsync(context);

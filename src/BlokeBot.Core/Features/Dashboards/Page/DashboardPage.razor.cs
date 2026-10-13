@@ -52,7 +52,12 @@ public partial class DashboardPage
         await ObserveRouteLoadAsync(async () =>
         {
             _ = await LoadPageContextAsync();
+            if (_disposed || generation != _loadGeneration)
+            {
+                return;
+            }
             var host = new DashboardHostId(HostId);
+            await BindRecentViewersAsync(generation, host);
             var list = await _configuration.ListAsync(
                 PageContext.Session,
                 host,
@@ -330,6 +335,7 @@ public partial class DashboardPage
             return Task.CompletedTask;
         }
         _visible = visible;
+        _viewerRefresh?.SetVisible(visible);
         return InvokeAsync(StateHasChanged);
     }
 
@@ -372,6 +378,11 @@ public partial class DashboardPage
     {
         _disposed = true;
         ++_loadGeneration;
+        _viewerSubscription?.Dispose();
+        if (_viewerRefresh is not null)
+        {
+            await _viewerRefresh.DisposeAsync();
+        }
         await DisposeGridAsync();
         if (_module is not null)
         {

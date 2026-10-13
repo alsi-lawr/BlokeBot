@@ -66,7 +66,7 @@
                                             }
                                         </Actions>
                                         <ChildContent>
-                                            <DashboardWidgetControl View="@(new DashboardWidgetView(widget))" SelectedHostId="HostId" Session="PageContext.Session" Editing="_editing" Visible="_visible" />
+                                            <DashboardWidgetControl View="@(new DashboardWidgetView(widget))" SelectedHostId="HostId" Session="PageContext.Session" Editing="_editing" Visible="_visible" RecentViewers="_recentViewers" />
                                         </ChildContent>
                                         <Footer>
                                             @if (_editing) {

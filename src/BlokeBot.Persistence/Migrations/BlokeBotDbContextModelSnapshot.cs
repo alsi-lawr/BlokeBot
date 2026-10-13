@@ -8098,6 +8098,32 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("raid_collaboration_settings", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.RecentChannelChatter", b =>
+                {
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TwitchUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("HostId", "TwitchUserId");
+
+                    b.HasIndex("HostId", "ObservedAtUtc", "TwitchUserId");
+
+                    b.ToTable("recent_channel_chatters", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyDeliverySetting", b =>
                 {
                     b.Property<int>("Id")
@@ -11514,6 +11540,15 @@ namespace BlokeBot.Persistence.Migrations
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.RaidCollaborationSettings", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.RecentChannelChatter", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()

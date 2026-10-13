@@ -11,7 +11,6 @@ internal sealed class DashboardValueReader(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     DashboardAuthority authority,
     CustomStoredValueService values,
-    ICustomCommandViewerResolver viewers,
     CustomStoredValueChanges changes,
     ILogger<DashboardValueReader> log
 )
@@ -101,6 +100,23 @@ internal sealed class DashboardValueReader(
                     DashboardValueUnavailableReason.ViewerRequired
                 );
             }
+            if (definition.Scope == CustomValueScope.User)
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                var recent = await db
+                    .RecentChannelChatters.AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        x => x.HostId == host.Value && x.TwitchUserId == viewer!.TwitchUserId,
+                        ct
+                    );
+                if (recent is null)
+                {
+                    return new DashboardValueState.Unavailable(
+                        DashboardValueUnavailableReason.ViewerNotFound
+                    );
+                }
+                viewer = new(recent.TwitchUserId, recent.Login, recent.DisplayName);
+            }
             var identity = new CustomValueTarget(
                 definition.Id,
                 definition.Scope == CustomValueScope.Global ? string.Empty : viewer!.TwitchUserId,
@@ -130,22 +146,6 @@ internal sealed class DashboardValueReader(
             return new DashboardValueState.Unavailable(
                 DashboardValueUnavailableReason.StorageUnavailable
             );
-        }
-    }
-
-    internal async Task<CustomCommandViewerResolution> ResolveViewerAsync(
-        string login,
-        CancellationToken ct
-    )
-    {
-        try
-        {
-            return await viewers.ResolveAsync(login, ct);
-        }
-        catch (HttpRequestException exception)
-        {
-            log.LogWarning(exception, "Dashboard viewer lookup unavailable.");
-            return new CustomCommandViewerResolution.Unavailable();
         }
     }
 }

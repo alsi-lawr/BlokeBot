@@ -57,6 +57,10 @@ public sealed class DashboardPageInteractionTests
         await using var ui = UiTestContextFactory.Create(database, hostId);
         _ = ui.Services.AddSingleton<DashboardAuthority>();
         _ = ui.Services.AddSingleton<DashboardConfigurationService>();
+        _ = ui.Services.AddSingleton(
+            TestEventBus.CreateContinueAndRecord<DashboardRecentViewersChanged>().Events
+        );
+        _ = ui.Services.AddSingleton<DashboardRecentViewers>();
         _ = ui.ComponentFactories.AddStub<DashboardWidgetControl>();
         _ = ui.ComponentFactories.AddStub<DashboardWidgetSettings>();
         var module = ui.JSInterop.SetupModule("./Features/Dashboards/Page/DashboardPage.razor.js");

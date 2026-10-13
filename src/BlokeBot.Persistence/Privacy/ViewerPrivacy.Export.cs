@@ -43,6 +43,7 @@ public static partial class ViewerPrivacyService
         );
 
         await ExportAccountsAndPointsAsync(context);
+        await ExportRecentChattersAsync(context);
         await ExportCommandsAndAccessAsync(context);
         await ExportMediaAndRequestsAsync(context);
         await ExportBountiesAndCompetitionsAsync(context);

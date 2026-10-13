@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Rounds;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
@@ -29,6 +30,9 @@ public partial class DashboardWidgetControl
 
     [Parameter]
     public bool Visible { get; set; } = true;
+
+    [Parameter]
+    public DashboardRecentViewerView? RecentViewers { get; set; }
 
     [Inject]
     private TimeProvider _clock { get; set; } = default!;
@@ -87,7 +91,6 @@ public partial class DashboardWidgetControl
     private string? _unavailable;
     private string? _feedback;
     private string _status = "No runs yet";
-    private string _viewer = string.Empty;
     private string _winner = string.Empty;
     private int _duration;
     private ImmutableArray<AutomationRunId> _runIds = [];
@@ -103,7 +106,6 @@ public partial class DashboardWidgetControl
                 {
                     Reason: DashboardValueUnavailableReason.ViewerRequired
                         or DashboardValueUnavailableReason.ViewerNotFound
-                        or DashboardValueUnavailableReason.ViewerUnavailable
                 };
     private string _valueText =>
         _value?.State is DashboardValueState.Available available ? available.Value.Value : "—";
@@ -117,7 +119,8 @@ public partial class DashboardWidgetControl
                 unavailable.Reason switch
                 {
                     DashboardValueUnavailableReason.ViewerRequired => "Choose a viewer",
-                    DashboardValueUnavailableReason.ViewerNotFound => "Viewer not found",
+                    DashboardValueUnavailableReason.ViewerNotFound =>
+                        "Viewer is no longer in the recent list",
                     _ => "Value unavailable",
                 },
             rejected => $"Access unavailable: {rejected.Reason}"
@@ -143,7 +146,6 @@ public partial class DashboardWidgetControl
             _unavailable = Editing ? null : "Loading target";
             _feedback = null;
             _busy = false;
-            _viewer = string.Empty;
             _duration = 0;
             _countdown = null;
             _poll = null;
@@ -252,6 +254,16 @@ public partial class DashboardWidgetControl
             _previousVisible = Visible;
             _refresh?.SetVisible(Visible);
             _value?.SetVisible(Visible);
+        }
+        if (
+            _value?.Viewer is { } selected
+            && RecentViewers?.Host == _selectedHost
+            && RecentViewers.Result
+                is DashboardResult<ImmutableArray<CustomCommandViewer>>.Succeeded
+            && !_viewerOptions.Any(viewer => viewer.TwitchUserId == selected.TwitchUserId)
+        )
+        {
+            await _value.RefreshAsync(CancellationToken.None);
         }
     }
 
@@ -499,8 +511,28 @@ public partial class DashboardWidgetControl
         Dispose();
     }
 
-    private Task SelectViewerAsync() =>
+    private ImmutableArray<CustomCommandViewer> _viewerOptions =>
+        RecentViewers?.Host == _selectedHost
+        && RecentViewers.Result
+            is DashboardResult<ImmutableArray<CustomCommandViewer>>.Succeeded result
+            ? result.Value
+            : [];
+
+    private string _viewerPlaceholder =>
+        RecentViewers?.Host != _selectedHost || RecentViewers.Result is null
+            ? "Loading recent viewers"
+        : RecentViewers.Result is DashboardResult<ImmutableArray<CustomCommandViewer>>.Rejected
+            ? "Recent viewers unavailable"
+        : _viewerOptions.IsEmpty ? "No recent chatters"
+        : "Choose a known viewer";
+
+    private Task SelectViewerAsync(ChangeEventArgs args) =>
         !Editing && _value is not null
-            ? _value.SelectViewerAsync(_viewer, CancellationToken.None)
+            ? _value.SelectViewerAsync(
+                _viewerOptions.FirstOrDefault(viewer =>
+                    viewer.TwitchUserId == args.Value?.ToString()
+                ),
+                CancellationToken.None
+            )
             : Task.CompletedTask;
 }
