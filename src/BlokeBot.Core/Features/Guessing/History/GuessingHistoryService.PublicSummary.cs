@@ -28,10 +28,18 @@ public sealed partial class GuessingHistoryService
                     && value.GuessName == value.GuessRound.WinningName
                 ),
                 RoundsPlayed = group.Count(),
+                FirstWinAtUtc = group.Min(value =>
+                    value.GuessRound!.Status == GuessRoundStatus.Completed
+                    && value.GuessRound.WinningName != null
+                    && value.GuessName == value.GuessRound.WinningName
+                        ? (DateTime?)value.GuessedAtUtc
+                        : null
+                ),
                 LastGuessAtUtc = group.Max(value => value.GuessedAtUtc),
             })
             .OrderByDescending(value => value.CorrectGuesses)
-            .ThenByDescending(value => value.RoundsPlayed)
+            .ThenByDescending(value => (double)value.CorrectGuesses / value.RoundsPlayed)
+            .ThenBy(value => value.FirstWinAtUtc)
             .ThenBy(value => value.Login)
             .FirstOrDefaultAsync(ct);
     }

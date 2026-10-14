@@ -112,6 +112,7 @@ public sealed partial class GuessingHistoryService(IDbContextFactory<BlokeBotDbC
             .Select(x => new GuessLeaderboardEntry
             {
                 CorrectGuesses = x.Count(vote => vote.IsCorrect),
+                FirstWinAtUtc = x.Min(vote => vote.IsCorrect ? (DateTime?)vote.GuessedAtUtc : null),
                 LastGuessAtUtc = x.Max(vote => vote.GuessedAtUtc),
                 Login = x.Key,
                 RoundsPlayed = x.Count(),
@@ -120,7 +121,8 @@ public sealed partial class GuessingHistoryService(IDbContextFactory<BlokeBotDbC
         var totalEntries = await leaderboard.CountAsync(ct);
         var entries = await leaderboard
             .OrderByDescending(x => x.CorrectGuesses)
-            .ThenByDescending(x => x.RoundsPlayed)
+            .ThenByDescending(x => (double)x.CorrectGuesses / x.RoundsPlayed)
+            .ThenBy(x => x.FirstWinAtUtc)
             .ThenBy(x => x.Login)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
