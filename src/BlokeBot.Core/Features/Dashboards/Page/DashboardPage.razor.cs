@@ -27,6 +27,7 @@ public partial class DashboardPage
     private long _acknowledged;
     private long _interactionGeneration;
     private long _gestureGeneration;
+    private bool _gestureActive;
     private readonly SemaphoreSlim _placementGate = new(1, 1);
     private ElementReference _root;
     private ElementReference _picker;
@@ -79,6 +80,7 @@ public partial class DashboardPage
             _snapshot = null;
             _edit = null;
             _localDirty = false;
+            _gestureActive = false;
             _selected = null;
             await DisposeGridAsync();
             _acknowledged = 0;
@@ -255,7 +257,7 @@ public partial class DashboardPage
     private void Rename(string name) => _edit?.Rename(name);
 
     [JSInvokable]
-    public Task GestureStarted(long generation, long interaction)
+    public async Task<long> GestureStarted(long generation, long interaction)
     {
         if (
             !_disposed
@@ -267,19 +269,23 @@ public partial class DashboardPage
             && interaction == _interactionGeneration
         )
         {
-            ++_gestureGeneration;
-            return InvokeAsync(StateHasChanged);
+            var gesture = ++_gestureGeneration;
+            _gestureActive = true;
+            await InvokeAsync(StateHasChanged);
+            return gesture;
         }
-        return Task.CompletedTask;
+        return 0;
     }
 
     [JSInvokable]
-    public Task LocalEditStarted(long generation, long interaction)
+    public Task LocalEditStarted(long generation, long interaction, long gesture)
     {
         if (
             !_disposed
             && generation == _loadGeneration
             && interaction == _interactionGeneration
+            && gesture == _gestureGeneration
+            && _gestureActive
             && _editing
             && _edit is not null
         )
@@ -297,7 +303,8 @@ public partial class DashboardPage
         string id,
         DashboardPlacementTransport placement,
         bool resize,
-        long sequence
+        long sequence,
+        long gesture
     )
     {
         await _placementGate.WaitAsync();
@@ -315,7 +322,6 @@ public partial class DashboardPage
             {
                 return;
             }
-            var gesture = _gestureGeneration;
             var widget = _document.Widgets.FirstOrDefault(w => w.Id.Value == widgetId);
             if (widget is not null)
             {
@@ -334,6 +340,7 @@ public partial class DashboardPage
                 {
                     // A refused flush is not permission to Save/reset the existing draft history.
                     await CancelGestureAsync(() => { });
+                    await InvokeAsync(StateHasChanged);
                 }
             }
             if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
@@ -341,9 +348,10 @@ public partial class DashboardPage
                 return;
             }
             _acknowledged = sequence;
-            if (gesture == _gestureGeneration)
+            if (gesture == _gestureGeneration || !_gestureActive)
             {
                 _localDirty = false;
+                _gestureActive = false;
             }
             await InvokeAsync(StateHasChanged);
         }
@@ -354,13 +362,21 @@ public partial class DashboardPage
     }
 
     [JSInvokable]
-    public Task GestureCancelled(long generation, long interaction)
+    public Task GestureCancelled(long generation, long interaction, long gesture, bool pending)
     {
-        if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
+        if (
+            _disposed
+            || generation != _loadGeneration
+            || interaction != _interactionGeneration
+            || gesture != _gestureGeneration
+            || !_editing
+        )
         {
             return Task.CompletedTask;
         }
-        _localDirty = false;
+        ++_gestureGeneration;
+        _gestureActive = false;
+        _localDirty = pending;
         return InvokeAsync(StateHasChanged);
     }
 
@@ -446,5 +462,6 @@ public sealed record DashboardPendingPlacement(
     DashboardPlacementTransport Placement,
     bool Resize,
     long Sequence,
-    long Interaction
+    long Interaction,
+    long Gesture
 );

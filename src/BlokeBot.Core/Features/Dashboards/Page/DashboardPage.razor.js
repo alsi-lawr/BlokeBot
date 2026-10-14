@@ -1,30 +1,6 @@
 import { createEditorMenu, isEditable } from "../../../Components/EditorContextMenu.js";
+import { createGridDrag } from './DashboardGridDrag.js';
 
-export function placementFromPointer(start, dx, dy, cell, columns, resize) {
-  return resize
-    ? {
-        ...start,
-        width: Math.max(
-          1,
-          Math.min(
-            columns - start.column,
-            start.width + Math.round(dx / cell.x),
-          ),
-        ),
-        height: Math.max(1, start.height + Math.round(dy / cell.y)),
-      }
-    : {
-        ...start,
-        column: Math.max(
-          0,
-          Math.min(
-            columns - start.width,
-            start.column + Math.round(dx / cell.x),
-          ),
-        ),
-        row: Math.max(0, start.row + Math.round(dy / cell.y)),
-      };
-}
 export function create(root, dotnet, generation, interaction) {
   const grid = root.querySelector("[data-dashboard-grid]");
   const menuOwner = {
@@ -78,7 +54,6 @@ export function create(root, dotnet, generation, interaction) {
     pending: new Map(),
     sequence: 0,
     gesture: null,
-    frame: 0,
     disposed: false,
     dirty: false,
     visible: !document.hidden,
@@ -98,132 +73,10 @@ export function create(root, dotnet, generation, interaction) {
       if (card.style.gridRow !== row) card.style.gridRow = row;
     }
   };
-  const paint = () => {
-    state.frame = 0;
-    if (!state.disposed) {
-      for (const [id, pending] of state.pending) style(id, pending.placement);
-    }
+  const report = error => {
+    if (!state.disposed) console.error('Dashboard interaction failed', error);
   };
-  const requestPaint = () => {
-    if (!state.frame) state.frame = requestAnimationFrame(paint);
-  };
-  const markDirty = () => {
-    if (!state.dirty) {
-      state.dirty = true;
-      dotnet
-        .invokeMethodAsync("LocalEditStarted", generation, state.interaction)
-        .catch(report);
-    }
-  };
-  const report = (error) => {
-    if (!state.disposed) console.error("Dashboard interaction failed", error);
-  };
-  const send = async (id, pending) => {
-    try {
-      await dotnet.invokeMethodAsync(
-        "PlacementChanged",
-        generation,
-        pending.interaction,
-        id,
-        pending.placement,
-        pending.resize,
-        pending.sequence,
-      );
-    } catch (error) {
-      report(error);
-    }
-  };
-  const end = (event, cancelled = false) => {
-    const gesture = state.gesture;
-    if (!gesture || (event && gesture.pointer !== event.pointerId)) return;
-    state.gesture = null;
-    gesture.handle.releasePointerCapture?.(gesture.pointer);
-    if (cancelled) {
-      if (gesture.previous) state.pending.set(gesture.id, gesture.previous);
-      else state.pending.delete(gesture.id);
-      style(gesture.id, gesture.start);
-      dotnet
-        .invokeMethodAsync("GestureCancelled", generation, gesture.interaction)
-        .catch(report);
-    } else {
-      const pending = state.pending.get(gesture.id);
-      if (pending) void send(gesture.id, pending);
-    }
-  };
-  const geometry = () => {
-    const computed = getComputedStyle(grid);
-    const columns = Number(grid.dataset.columns);
-    const columnGap = Number.parseFloat(computed.columnGap) || 0;
-    const rowGap = Number.parseFloat(computed.rowGap) || 0;
-    return {
-      columns,
-      cell: {
-        x: (grid.clientWidth + columnGap) / columns,
-        y: Number.parseFloat(computed.gridAutoRows) + rowGap,
-      },
-    };
-  };
-  const down = (event) => {
-    const handle = event.target.closest("[data-grid-move], [data-grid-resize]");
-    if (
-      !handle ||
-      event.button !== 0 ||
-      root.dataset.editing !== "true"
-    )
-      return;
-    const card = handle.closest("[data-widget-id]");
-    const id = card?.dataset.widgetId;
-    const start = state.pending.get(id)?.placement ?? state.items.get(id);
-    if (!start) return;
-    event.preventDefault();
-    dotnet.invokeMethodAsync('GestureStarted', generation, state.interaction).catch(report);
-    handle.setPointerCapture(event.pointerId);
-    const {columns, cell} = geometry();
-    state.gesture = {
-      id,
-      interaction: state.interaction,
-      previous: state.pending.get(id),
-      start: { ...start },
-      x: event.clientX,
-      y: event.clientY,
-      pointer: event.pointerId,
-      handle,
-      resize: handle.hasAttribute("data-grid-resize"),
-      columns,
-      cell,
-    };
-  };
-  const move = (event) => {
-    const g = state.gesture;
-    if (
-      !g ||
-      event.pointerId !== g.pointer ||
-      g.interaction !== state.interaction
-    )
-      return;
-    const placement = placementFromPointer(
-      g.start,
-      event.clientX - g.x,
-      event.clientY - g.y,
-      g.cell,
-      g.columns,
-      g.resize,
-    );
-    if (
-      JSON.stringify(placement) ===
-      JSON.stringify(state.pending.get(g.id)?.placement ?? g.start)
-    )
-      return;
-    markDirty();
-    state.pending.set(g.id, {
-      placement,
-      resize: g.resize,
-      interaction: g.interaction,
-      sequence: ++state.sequence,
-    });
-    requestPaint();
-  };
-  const cancel = (event) => end(event, true);
+  const drag = createGridDrag(root, grid, state, dotnet, generation, report);
   const beforeUnload = (event) => {
     if (state.dirty || state.gesture) {
       event.preventDefault();
@@ -270,13 +123,6 @@ export function create(root, dotnet, generation, interaction) {
     }
     timer = setTimeout(tick, 250);
   };
-  const key = (event) => {
-    if (
-      event.target.closest("[data-grid-move], [data-grid-resize]") &&
-      ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
-    )
-      event.preventDefault();
-  };
   const viewport = window.matchMedia("(max-width: 700px)");
   const arrangementViewport = async () => {
     if (state.disposed) return;
@@ -288,7 +134,6 @@ export function create(root, dotnet, generation, interaction) {
   };
   viewport.addEventListener("change", arrangementViewport);
   void arrangementViewport();
-  root.addEventListener("keydown", key);
   const dragStart = (event) => {
     const source = event.target.closest("[data-toolbox-kind]");
     if (source)
@@ -306,42 +151,10 @@ export function create(root, dotnet, generation, interaction) {
     )
       event.preventDefault();
   };
-  const drop = (event) => {
-    const kind = event.dataTransfer.getData(
-      "application/x-blokebot-dashboard-widget",
-    );
-    if (!kind || root.dataset.editing !== "true") return;
-    event.preventDefault();
-    dotnet.invokeMethodAsync('GestureStarted', generation, state.interaction).catch(report);
-    const rect = grid.getBoundingClientRect();
-    const {columns, cell} = geometry();
-    markDirty();
-    dotnet
-      .invokeMethodAsync(
-        "ToolboxDropped",
-        generation,
-        state.interaction,
-        kind,
-        Math.max(
-          0,
-          Math.min(
-            columns - Math.min(6, columns),
-            Math.floor(
-              (event.clientX - rect.left) / cell.x,
-            ),
-          ),
-        ),
-        Math.max(0, Math.floor((event.clientY - rect.top) / cell.y)),
-      )
-      .catch(report);
-  };
-  root.addEventListener("dragstart", dragStart);
-  grid.addEventListener("dragover", dragOver);
-  grid.addEventListener("drop", drop);
-  root.addEventListener("pointerdown", down);
-  root.addEventListener("pointermove", move);
-  root.addEventListener("pointerup", end);
-  root.addEventListener("pointercancel", cancel);
+  const drop = event => { void drag.drop(event).catch(report); };
+  root.addEventListener('dragstart', dragStart);
+  grid.addEventListener('dragover', dragOver);
+  grid.addEventListener('drop', drop);
   window.addEventListener("beforeunload", beforeUnload);
   document.addEventListener("click", navigate, true);
   document.addEventListener("visibilitychange", visibility);
@@ -352,13 +165,13 @@ export function create(root, dotnet, generation, interaction) {
         e,
       ]),
     );
-    requestPaint();
+    for (const [id, p] of state.items) style(id, p);
   });
   observer.observe(grid, { childList: true });
   tick();
   const reset = (interaction) => {
     if (interaction < state.interaction) return;
-    end(null, true);
+    drag.cancel();
     state.interaction = interaction;
     state.pending.clear();
     state.dirty = false;
@@ -377,11 +190,9 @@ export function create(root, dotnet, generation, interaction) {
         ]),
       );
       state.items = new Map(items.map((item) => [item.id, item.placement]));
-      for (const [id, pending] of state.pending)
-        if (pending.sequence <= acknowledged) state.pending.delete(id);
-      state.dirty = dirty || state.pending.size > 0;
-      for (const [id, p] of state.items)
-        style(id, state.pending.get(id)?.placement ?? p);
+      for (const [id, p] of state.items) style(id, p);
+      drag.acknowledge(acknowledged);
+      state.dirty = dirty || state.pending.size > 0 || !!state.gesture?.dirtied;
     },
     restoreGridInputs() {
       const columns = root.querySelector("#dashboard-columns");
@@ -389,14 +200,7 @@ export function create(root, dotnet, generation, interaction) {
       if (columns) columns.value = grid.dataset.columns;
       if (height) height.value = Number.parseFloat(getComputedStyle(grid).gridAutoRows);
     },
-    flush() {
-      end(null);
-      if (state.frame) {
-        cancelAnimationFrame(state.frame);
-        paint();
-      }
-      return [...state.pending].map(([id, p]) => ({ id, ...p }));
-    },
+    flush: () => drag.flush(),
     cancel: reset,
     focusManagement() {
       root.querySelector("#dashboard-management button")?.focus();
@@ -418,17 +222,12 @@ export function create(root, dotnet, generation, interaction) {
       menu?.dispose();
       root.removeEventListener('keydown', historyKey);
       clearTimeout(timer);
-      cancelAnimationFrame(state.frame);
+      drag.dispose();
       observer.disconnect();
       viewport.removeEventListener("change", arrangementViewport);
-      root.removeEventListener("keydown", key);
       root.removeEventListener("dragstart", dragStart);
       grid.removeEventListener("dragover", dragOver);
       grid.removeEventListener("drop", drop);
-      root.removeEventListener("pointerdown", down);
-      root.removeEventListener("pointermove", move);
-      root.removeEventListener("pointerup", end);
-      root.removeEventListener("pointercancel", cancel);
       window.removeEventListener("beforeunload", beforeUnload);
       document.removeEventListener("click", navigate, true);
       document.removeEventListener("visibilitychange", visibility);

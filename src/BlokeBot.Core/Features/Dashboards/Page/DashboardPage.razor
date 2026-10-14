@@ -53,17 +53,17 @@
             <fieldset class="dashboard-edit-boundary" disabled="@(_busy && _editing)">
                 <EditorWorkspace Class="dashboard-workspace" Header="_workspaceHeader" aria-label="@(_editing ? "Dashboard editor workspace" : "Dashboard control workspace")">
                     <div class="dashboard-body">
-                        <div class="dashboard-grid @(_editing && _showSlots ? "dashboard-grid--slots" : null)" data-dashboard-grid tabindex="0" aria-label="Dashboard arrangement" data-columns="@_arrangement.Columns" data-arrangement="@_arrangementKind" style="@_gridStyle">
+                        <div class="dashboard-grid @(_editing && _showSlots ? "dashboard-grid--slots" : null)" data-dashboard-grid tabindex="0" aria-label="Dashboard arrangement" data-columns="@_arrangement.Columns" data-cell-height="@_arrangement.CellHeight" data-arrangement="@_arrangementKind" style="@_gridStyle">
                             @foreach (var widget in _orderedWidgets) {
                                 var placement = Placement(widget.Id);
                                 <div @key="widget.Id" class="dashboard-card" data-widget-id="@widget.Id.Value" style="@PlacementStyle(placement)">
                                     <TaskPanel Title="@widget.Label">
                                         <Actions>
                                             @if (_editing) {
+                                                <EditorAction Label='@($"Configure {widget.Label}")'  Icon="settings" data-settings-for="@widget.Id.Value" Click="() => SettingsAsync(widget.Id)" />
                                                 <button class="dashboard-grip" data-grid-move aria-label="Move @widget.Label" type="button" @onkeydown="args => GridKeyAsync(widget, args)">
                                                     <EditorIcon Name="drag" />
                                                 </button>
-                                                <EditorAction Label='@($"Configure {widget.Label}")'  Icon="settings" data-settings-for="@widget.Id.Value" Click="() => SettingsAsync(widget.Id)" />
                                             }
                                         </Actions>
                                         <ChildContent>

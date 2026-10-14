@@ -287,6 +287,7 @@ public partial class DashboardPage
     private async Task CancelGestureAsync(Action change)
     {
         var interaction = ++_interactionGeneration;
+        _gestureActive = false;
         _localDirty = false;
         change();
         if (_grid is not null)
@@ -330,7 +331,8 @@ public partial class DashboardPage
                         item.Id,
                         item.Placement,
                         item.Resize,
-                        item.Sequence
+                        item.Sequence,
+                        item.Gesture
                     );
                 }
             }

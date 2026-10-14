@@ -107,7 +107,8 @@ public sealed class DashboardPageInteractionTests
                 first.Id.Value.ToString(),
                 new(0, 10, 4, 3),
                 false,
-                1
+                1,
+                0
             )
         );
         await page.InvokeAsync(() =>
@@ -117,7 +118,8 @@ public sealed class DashboardPageInteractionTests
                 second.Id.Value.ToString(),
                 new(2, 12, 4, 3),
                 false,
-                2
+                2,
+                0
             )
         );
         page.Find("#dashboard-name")
@@ -151,7 +153,8 @@ public sealed class DashboardPageInteractionTests
                 second.Id.Value.ToString(),
                 new(0, 15, 4, 3),
                 false,
-                3
+                3,
+                0
             )
         );
         page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeFalse();
@@ -159,7 +162,7 @@ public sealed class DashboardPageInteractionTests
         page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
 
         _ = flush.SetResult([
-            new(second.Id.Value.ToString(), new(0, 15, 4, 3), false, 4, Origin()),
+            new(second.Id.Value.ToString(), new(0, 15, 4, 3), false, 4, Origin(), 0),
         ]);
         await page.Find("button[aria-label='Save dashboard']").ClickAsync(new());
         page.WaitForAssertion(() =>

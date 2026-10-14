@@ -30,8 +30,8 @@ public sealed class DashboardPageEditorActionsTests
         Task? dropping = null;
         await page.InvokeAsync(async () =>
         {
-            await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
-            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin);
+            fixture.Gesture = await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
+            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, fixture.Gesture);
             dropping = page.Instance.ToolboxDropped(
                 fixture.Route,
                 fixture.Origin,
@@ -63,8 +63,8 @@ public sealed class DashboardPageEditorActionsTests
         var feedback = page.Find(".dashboard-feedback").TextContent;
         await page.InvokeAsync(async () =>
         {
-            await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
-            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin);
+            fixture.Gesture = await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
+            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, fixture.Gesture);
         });
         page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
         var geometry = fixture.Geometry;
@@ -94,7 +94,8 @@ public sealed class DashboardPageEditorActionsTests
                 fixture.First.ToString(),
                 new(0, 6, 4, 3),
                 false,
-                1
+                1,
+                fixture.Gesture
             )
         );
         page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeFalse();
@@ -117,8 +118,8 @@ public sealed class DashboardPageEditorActionsTests
         Task? dropping = null;
         await page.InvokeAsync(async () =>
         {
-            await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
-            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin);
+            fixture.Gesture = await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
+            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, fixture.Gesture);
             dropping = page.Instance.ToolboxDropped(
                 fixture.Route,
                 fixture.Origin,
@@ -183,7 +184,8 @@ public sealed class DashboardPageEditorActionsTests
                 fixture.First.ToString(),
                 new(0, 0, 8, 3),
                 true,
-                1
+                1,
+                fixture.Gesture
             );
         });
         page.WaitForAssertion(() => confirm.Invocations.ShouldHaveSingleItem());
@@ -204,7 +206,7 @@ public sealed class DashboardPageEditorActionsTests
                 await page.Find("button[aria-label='Configure Second']").ClickAsync(new());
                 break;
             case "Gesture":
-                await page.InvokeAsync(() =>
+                fixture.Gesture = await page.InvokeAsync(() =>
                     page.Instance.GestureStarted(fixture.Route, fixture.Origin)
                 );
                 break;
@@ -292,7 +294,7 @@ public sealed class DashboardPageEditorActionsTests
                 );
                 break;
             case "Gesture":
-                await page.InvokeAsync(() =>
+                fixture.Gesture = await page.InvokeAsync(() =>
                     page.Instance.GestureStarted(fixture.Route, fixture.Origin)
                 );
                 break;
@@ -393,7 +395,16 @@ public sealed class DashboardPageEditorActionsTests
         await page.Find("button[aria-label='Undo']").ClickAsync(new());
         _ = fixture
             .Grid.Setup<DashboardPendingPlacement[]>("flush")
-            .SetResult([new(fixture.First.ToString(), new(0, 0, 8, 3), true, 1, fixture.Origin)]);
+            .SetResult([
+                new(
+                    fixture.First.ToString(),
+                    new(0, 0, 8, 3),
+                    true,
+                    1,
+                    fixture.Origin,
+                    fixture.Gesture
+                ),
+            ]);
         var confirm = fixture.Ui.JSInterop.Setup<bool>("confirm", _ => true);
         Task? saving = null;
         await page.InvokeAsync(() =>
@@ -416,6 +427,132 @@ public sealed class DashboardPageEditorActionsTests
         document.Phone!.Placements.Length.ShouldBe(accept ? 1 : 2);
     }
 
+    [Test]
+    public async Task CancelledReleasedCollisionRendersSavedWithoutConsumingExistingRedo()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        page.Find("#dashboard-name").Input("Temporary");
+        await page.Find("button[aria-label='Undo']").ClickAsync(new());
+        var geometry = fixture.Geometry;
+        fixture.Gesture = await page.InvokeAsync(() =>
+            page.Instance.GestureStarted(fixture.Route, fixture.Origin)
+        );
+        await page.InvokeAsync(() =>
+            page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, fixture.Gesture)
+        );
+        var confirm = fixture.Ui.JSInterop.Setup<bool>("confirm", _ => true);
+        Task? pending = null;
+        await page.InvokeAsync(() =>
+        {
+            pending = page.Instance.PlacementChanged(
+                fixture.Route,
+                fixture.Origin,
+                fixture.First.ToString(),
+                new(0, 0, 8, 3),
+                true,
+                1,
+                fixture.Gesture
+            );
+        });
+        page.WaitForAssertion(() => confirm.Invocations.ShouldHaveSingleItem());
+        _ = confirm.SetResult(false);
+        await pending!;
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        fixture.Geometry.ShouldBe(geometry);
+        fixture.CardCount.ShouldBe(2);
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task CancelledAndOlderGestureCallbacksCannotDirtyOrFinalizeTheCurrentPreview()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        var geometry = fixture.Geometry;
+        var first = await page.InvokeAsync(() =>
+            page.Instance.GestureStarted(fixture.Route, fixture.Origin)
+        );
+        var current = await page.InvokeAsync(() =>
+            page.Instance.GestureStarted(fixture.Route, fixture.Origin)
+        );
+        await page.InvokeAsync(() =>
+            page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, current)
+        );
+        await page.InvokeAsync(() =>
+            page.Instance.GestureCancelled(fixture.Route, fixture.Origin, first, false)
+        );
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
+        await page.InvokeAsync(() =>
+            page.Instance.GestureCancelled(fixture.Route, fixture.Origin, current, false)
+        );
+        await page.InvokeAsync(() =>
+            page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, current)
+        );
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        fixture.Geometry.ShouldBe(geometry);
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+    }
+
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task ReleasedPlacementCompletionPreservesNewerPreviewAndFinalizesCancelledPending(
+        bool accept,
+        bool cancelNewer
+    )
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        var geometry = fixture.Geometry;
+        var released = await page.InvokeAsync(() =>
+            page.Instance.GestureStarted(fixture.Route, fixture.Origin)
+        );
+        await page.InvokeAsync(() =>
+            page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, released)
+        );
+        var confirm = fixture.Ui.JSInterop.Setup<bool>("confirm", _ => true);
+        Task? pending = null;
+        await page.InvokeAsync(() =>
+        {
+            pending = page.Instance.PlacementChanged(
+                fixture.Route,
+                fixture.Origin,
+                fixture.First.ToString(),
+                new(0, 0, 8, 3),
+                true,
+                1,
+                released
+            );
+        });
+        page.WaitForAssertion(() => confirm.Invocations.ShouldHaveSingleItem());
+        var current = await page.InvokeAsync(() =>
+            page.Instance.GestureStarted(fixture.Route, fixture.Origin)
+        );
+        await page.InvokeAsync(() =>
+            page.Instance.LocalEditStarted(fixture.Route, fixture.Origin, current)
+        );
+        if (cancelNewer)
+        {
+            await page.InvokeAsync(() =>
+                page.Instance.GestureCancelled(fixture.Route, fixture.Origin, current, true)
+            );
+        }
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
+        var cancellations = fixture.Grid.Invocations.Count(i => i.Identifier == "cancel");
+        _ = confirm.SetResult(accept);
+        await pending!;
+        page.Find(".dashboard-save-state").TextContent.ShouldBe(cancelNewer ? "Saved" : "Unsaved");
+        fixture.Grid.Invocations.Count(i => i.Identifier == "cancel").ShouldBe(cancellations);
+        fixture.Geometry.ShouldBe(geometry);
+        fixture.CardCount.ShouldBe(2);
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         internal required SqliteBlokeBotDbFactory Database { get; init; }
@@ -427,6 +564,7 @@ public sealed class DashboardPageEditorActionsTests
         internal required Guid Dashboard { get; init; }
         internal required Guid First { get; init; }
         internal required Guid Second { get; init; }
+        internal long Gesture { get; set; }
         internal long Route => (long)Module.Invocations["create"].Last().Arguments[2]!;
         internal long Origin => (long)Grid.Invocations["sync"].Last().Arguments[3]!;
         internal string Geometry =>
