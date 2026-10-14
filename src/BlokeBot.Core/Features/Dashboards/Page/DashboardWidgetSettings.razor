@@ -46,7 +46,7 @@ else {
         @foreach (var field in _placementFields) {
             <label class="field">
                 <span class="field__label">@field.Label</span>
-                <input class="field__input" type="number" min="@field.Min" value="@field.Value" @onchange="args => PlacementAsync(field.Kind, args)" />
+                <input class="field__input" type="number" min="@field.Min" @bind:get="field.Value" @bind:set="value => PlacementAsync(field.Kind, value)" />
             </label>
         }
     </div>

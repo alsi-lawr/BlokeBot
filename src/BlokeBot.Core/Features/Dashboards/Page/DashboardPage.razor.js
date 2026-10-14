@@ -1,3 +1,5 @@
+import { createEditorMenu, isEditable } from "../../../Components/EditorContextMenu.js";
+
 export function placementFromPointer(start, dx, dy, cell, columns, resize) {
   return resize
     ? {
@@ -25,6 +27,51 @@ export function placementFromPointer(start, dx, dy, cell, columns, resize) {
 }
 export function create(root, dotnet, generation, interaction) {
   const grid = root.querySelector("[data-dashboard-grid]");
+  const menuOwner = {
+    accepts: target => root.dataset.editing === 'true' && !!target.closest('[data-dashboard-grid]'),
+    fallback: () => grid,
+    async prepare(target, point, retainSelection = false) {
+      const context = root.dataset.editorMenuContext;
+      const hitGrid = !!target.closest('[data-dashboard-grid]') && (!retainSelection || !!target.closest('[data-widget-id]'));
+      const id = hitGrid ? target.closest('[data-widget-id]')?.dataset.widgetId ?? null : null;
+      try {
+        return await dotnet.invokeMethodAsync('PrepareEditorMenuAsync', context, hitGrid, id);
+      } catch (error) {
+        report(error);
+        return null;
+      }
+    },
+    current: captured => !state.disposed && root.dataset.editing === 'true' && root.dataset.editorMenuContext === captured.context,
+    async execute(action, captured) {
+      try {
+        await dotnet.invokeMethodAsync('ApplyEditorMenuAsync', action, captured.context);
+      } catch (error) {
+        report(error);
+      }
+    },
+  };
+  const menu = root.querySelector('[data-editor-menu-open]') ? createEditorMenu(root, menuOwner) : null;
+  const deleteSelection = async target => {
+    const prepared = await menuOwner.prepare(target, undefined, true);
+    if (prepared?.delete && menuOwner.current(prepared)) await menuOwner.execute('delete', prepared);
+  };
+  const historyKey = event => {
+    if (event.defaultPrevented || root.dataset.editing !== 'true'
+        || !(event.target instanceof Element) || isEditable(event.target) || event.target.closest('[data-editor-menu],[data-editor-toolbox]')) return;
+    if (event.key === 'Delete' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey
+        && event.target.closest('[data-dashboard-grid]')) {
+      event.preventDefault();
+      void deleteSelection(event.target).catch(report);
+      return;
+    }
+    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+    const action = event.key.toLowerCase() === 'z' ? 'undo' : event.key.toLowerCase() === 'y' ? 'redo' : null;
+    if (!action) return;
+    event.preventDefault();
+    dotnet.invokeMethodAsync('ApplyEditorMenuAsync', action, root.dataset.editorMenuContext).catch(report);
+  };
+  root.addEventListener('keydown', historyKey);
+
   const state = {
     interaction,
     items: new Map(),
@@ -103,13 +150,25 @@ export function create(root, dotnet, generation, interaction) {
       if (pending) void send(gesture.id, pending);
     }
   };
+  const geometry = () => {
+    const computed = getComputedStyle(grid);
+    const columns = Number(grid.dataset.columns);
+    const columnGap = Number.parseFloat(computed.columnGap) || 0;
+    const rowGap = Number.parseFloat(computed.rowGap) || 0;
+    return {
+      columns,
+      cell: {
+        x: (grid.clientWidth + columnGap) / columns,
+        y: Number.parseFloat(computed.gridAutoRows) + rowGap,
+      },
+    };
+  };
   const down = (event) => {
     const handle = event.target.closest("[data-grid-move], [data-grid-resize]");
     if (
       !handle ||
       event.button !== 0 ||
-      root.dataset.editing !== "true" ||
-      window.matchMedia("(max-width: 700px)").matches
+      root.dataset.editing !== "true"
     )
       return;
     const card = handle.closest("[data-widget-id]");
@@ -117,9 +176,9 @@ export function create(root, dotnet, generation, interaction) {
     const start = state.pending.get(id)?.placement ?? state.items.get(id);
     if (!start) return;
     event.preventDefault();
+    dotnet.invokeMethodAsync('GestureStarted', generation, state.interaction).catch(report);
     handle.setPointerCapture(event.pointerId);
-    const gap = Number.parseFloat(getComputedStyle(grid).columnGap) || 0;
-    const columns = Number(grid.dataset.columns);
+    const {columns, cell} = geometry();
     state.gesture = {
       id,
       interaction: state.interaction,
@@ -131,7 +190,7 @@ export function create(root, dotnet, generation, interaction) {
       handle,
       resize: handle.hasAttribute("data-grid-resize"),
       columns,
-      cell: { x: (grid.clientWidth + gap) / columns, y: 72 },
+      cell,
     };
   };
   const move = (event) => {
@@ -218,6 +277,17 @@ export function create(root, dotnet, generation, interaction) {
     )
       event.preventDefault();
   };
+  const viewport = window.matchMedia("(max-width: 700px)");
+  const arrangementViewport = async () => {
+    if (state.disposed) return;
+    try {
+      await dotnet.invokeMethodAsync("ViewportArrangementChanged", generation, viewport.matches);
+    } catch (error) {
+      report(error);
+    }
+  };
+  viewport.addEventListener("change", arrangementViewport);
+  void arrangementViewport();
   root.addEventListener("keydown", key);
   const dragStart = (event) => {
     const source = event.target.closest("[data-toolbox-kind]");
@@ -242,8 +312,9 @@ export function create(root, dotnet, generation, interaction) {
     );
     if (!kind || root.dataset.editing !== "true") return;
     event.preventDefault();
+    dotnet.invokeMethodAsync('GestureStarted', generation, state.interaction).catch(report);
     const rect = grid.getBoundingClientRect();
-    const columns = Number(grid.dataset.columns);
+    const {columns, cell} = geometry();
     markDirty();
     dotnet
       .invokeMethodAsync(
@@ -256,11 +327,11 @@ export function create(root, dotnet, generation, interaction) {
           Math.min(
             columns - Math.min(6, columns),
             Math.floor(
-              (event.clientX - rect.left) / ((rect.width + 16) / columns),
+              (event.clientX - rect.left) / cell.x,
             ),
           ),
         ),
-        Math.max(0, Math.floor((event.clientY - rect.top) / 72)),
+        Math.max(0, Math.floor((event.clientY - rect.top) / cell.y)),
       )
       .catch(report);
   };
@@ -297,6 +368,7 @@ export function create(root, dotnet, generation, interaction) {
     sync(items, acknowledged, dirty, interaction) {
       if (state.disposed || interaction < state.interaction) return;
       if (interaction !== state.interaction) reset(interaction);
+      menu?.refresh();
       clockOffset = Date.parse(root.dataset.serverNow) - Date.now();
       cards = new Map(
         [...grid.querySelectorAll("[data-widget-id]")].map((e) => [
@@ -310,6 +382,12 @@ export function create(root, dotnet, generation, interaction) {
       state.dirty = dirty || state.pending.size > 0;
       for (const [id, p] of state.items)
         style(id, state.pending.get(id)?.placement ?? p);
+    },
+    restoreGridInputs() {
+      const columns = root.querySelector("#dashboard-columns");
+      const height = root.querySelector("#dashboard-cell-height");
+      if (columns) columns.value = grid.dataset.columns;
+      if (height) height.value = Number.parseFloat(getComputedStyle(grid).gridAutoRows);
     },
     flush() {
       end(null);
@@ -337,9 +415,12 @@ export function create(root, dotnet, generation, interaction) {
     },
     dispose() {
       state.disposed = true;
+      menu?.dispose();
+      root.removeEventListener('keydown', historyKey);
       clearTimeout(timer);
       cancelAnimationFrame(state.frame);
       observer.disconnect();
+      viewport.removeEventListener("change", arrangementViewport);
       root.removeEventListener("keydown", key);
       root.removeEventListener("dragstart", dragStart);
       grid.removeEventListener("dragover", dragOver);

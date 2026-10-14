@@ -20,7 +20,8 @@ a selected bundle and can import only selected sections from a bundle.
     "points": {},
     "channelToolEnablement": {},
     "overlays": {},
-    "automations": {}
+    "automations": {},
+    "dashboards": {}
   }
 }
 ```
@@ -46,10 +47,28 @@ a selected bundle and can import only selected sections from a bundle.
   Each subflow has one export-local `id`, `description`, `interface` and `graph`. Invocation bindings
   contain `subflowId`, `interface` and `fixedInputsJson`; boundary bindings have a null `subflowId`.
   Revision IDs, revision numbers and history are not portable authoring fields.
+- `dashboards`: named layouts with one shared widget catalogue and separate `desktop` and `phone`
+  arrangements. Each arrangement has `columns`, `cellHeight` in pixels, and `placements` referencing
+  the catalogue's export-local `widgetId`. Labels, targets and widget configuration are shared;
+  row, column, width and height belong to each arrangement. Both arrangements must place every
+  widget exactly once, within bounds and without overlap. A missing phone arrangement is fitted
+  once from desktop, narrowing an initial footprint only when needed. A saved phone arrangement is
+  never regenerated. Dashboard imports create copies, not replacements of existing dashboards.
 
 References use deterministic export-local identifiers such as `reply-0001`; database primary keys
 are not part of the format. Object properties and collection order are deterministic where the
 source configuration has a stable order.
+
+### Dashboard format replacement during 0.x
+
+The former top-level `columns` and per-widget `placement` fields are no longer read, in local
+dashboard JSON or dashboard transfer sections. There is no automatic converter or dual reader.
+Before upgrading, keep a database backup and record any dashboard layouts you need to recreate.
+Recreate old dashboards with the current editor, then export a new configuration. Do not import an
+old dashboard section unchanged; other selected sections do not require dashboard geometry.
+If the upgrade has already made old dashboards unavailable, restore the backup with the previous
+application version to inspect them. Stop the application before restoring; never restore over a
+running database. Dashboard layout removal does not delete its referenced targets or native state.
 
 ## Compatibility and limits
 

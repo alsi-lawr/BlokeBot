@@ -78,11 +78,12 @@ public partial class DashboardPage
         var widget = new DashboardWidget(
             new(Guid.NewGuid()),
             DashboardWidgetKinds.Label(kind),
-            _edit.FreePlacement(),
             DashboardWidgetKinds.Create(kind)
         );
-        var proposal = _edit.Propose(widget, DashboardPlacementIntent.Add);
-        if (proposal is not null && _edit.Apply(proposal, false))
+        if (
+            _edit.FreePlacement(_arrangementKind) is { } placement
+            && _edit.Add(widget, _arrangementKind, placement)
+        )
         {
             _selected = widget.Id;
             _focusSettings = true;
@@ -102,6 +103,7 @@ public partial class DashboardPage
         if (
             !_editing
             || _busy
+            || _disposed
             || generation != _loadGeneration
             || interaction != _interactionGeneration
             || _edit is null
@@ -111,127 +113,89 @@ public partial class DashboardPage
         {
             return;
         }
-        var session = _edit;
         var widget = new DashboardWidget(
             new(Guid.NewGuid()),
             DashboardWidgetKinds.Label(parsed),
-            session.FreePlacement() with
-            {
-                Column = column,
-                Row = row,
-            },
             DashboardWidgetKinds.Create(parsed)
         );
-        while (
-            !_disposed
-            && _edit == session
-            && generation == _loadGeneration
-            && interaction == _interactionGeneration
-        )
+        var free = _edit.FreePlacement(_arrangementKind);
+        if (free is null)
         {
-            var proposal = session.Propose(widget, DashboardPlacementIntent.Add);
-            if (proposal is null)
-            {
-                break;
-            }
-            var confirmed =
-                !session.NeedsConfirmation(proposal)
-                || await _js.InvokeAsync<bool>(
-                    "confirm",
-                    $"Replace {proposal.Victims.Length} covered widget(s)? Undo can restore them before Save."
-                );
-            if (
-                !confirmed
-                || _disposed
-                || _edit != session
-                || generation != _loadGeneration
-                || interaction != _interactionGeneration
-            )
-            {
-                break;
-            }
-            if (proposal.Generation != session.Generation)
-            {
-                continue;
-            }
-            if (session.Apply(proposal, confirmed))
-            {
-                _selected = widget.Id;
-                _focusSettings = true;
-            }
-            break;
-        }
-        if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
-        {
+            _localDirty = false;
             return;
+        }
+        var placement = free with { Column = column, Row = row };
+        if (await ApplyPlacementAsync(_edit.ProposeAdd(widget, _arrangementKind, placement)))
+        {
+            _selected = widget.Id;
+            _focusSettings = true;
+        }
+        else
+        {
+            _feedback = "Choose a position within the dashboard columns.";
         }
         _localDirty = false;
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task ChangePlacementAsync(
+    private bool _confirming;
+
+    private Task<bool> ChangePlacementAsync(
         DashboardWidget widget,
         DashboardPlacement placement,
         bool resize
-    )
+    ) => ApplyPlacementAsync(_edit?.Propose(_arrangementKind, widget.Id, placement, resize));
+
+    private async Task<bool> ApplyPlacementAsync(DashboardPlacementProposal? proposal)
     {
-        if (!_editing || _edit is null)
+        if (!_editing || _edit is null || _disposed || _loading || _confirming)
         {
-            return;
+            return false;
         }
-        var session = _edit;
-        var interaction = _interactionGeneration;
-        var generation = _loadGeneration;
-        while (
-            !_disposed
-            && _edit == session
-            && interaction == _interactionGeneration
-            && generation == _loadGeneration
-        )
+        if (proposal is null)
         {
-            var current = session.Document.Widgets.FirstOrDefault(w => w.Id == widget.Id);
-            if (current is null)
-            {
-                return;
-            }
-            var proposal = session.Propose(
-                current with
-                {
-                    Placement = placement,
-                },
-                resize ? DashboardPlacementIntent.Resize : DashboardPlacementIntent.Move
+            _feedback = "Choose a position within the dashboard columns.";
+            return false;
+        }
+        var edit = _edit;
+        var confirmed = false;
+        if (proposal.NeedsConfirmation)
+        {
+            _confirming = true;
+            var context = _editorContext;
+            var names = proposal.Victims.Select(id =>
+                $"“{edit.Document.Widgets.Single(w => w.Id == id).Label}”"
             );
-            if (proposal is null)
+            try
             {
-                _feedback = "The widget must fit within the dashboard columns.";
-                return;
-            }
-            var confirmed =
-                !session.NeedsConfirmation(proposal)
-                || await _js.InvokeAsync<bool>(
+                confirmed = await _js.InvokeAsync<bool>(
                     "confirm",
-                    $"Replace {proposal.Victims.Length} covered widget(s)? Undo can restore them before Save."
+                    $"Replace {string.Join(", ", names)}? These widgets will be removed from both Desktop and Phone arrangements. Their underlying controls are not deleted. Undo can restore the widgets before Save."
                 );
-            if (
-                !confirmed
-                || _disposed
-                || _edit != session
-                || interaction != _interactionGeneration
-                || generation != _loadGeneration
-            )
-            {
-                return;
+                if (!confirmed || _edit != edit || context != _editorContext)
+                {
+                    return false;
+                }
             }
-            if (proposal.Generation != session.Generation)
+            finally
             {
-                continue;
+                _confirming = false;
+                if (!_disposed)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
             }
-            if (!session.Apply(proposal, confirmed))
-            {
-                _feedback = "These widget slots cannot be swapped. Choose another position.";
-            }
-            return;
         }
+        var applied = edit.Apply(proposal, confirmed);
+        if (applied)
+        {
+            if (_selected is { } selected && !edit.Document.Widgets.Any(w => w.Id == selected))
+            {
+                _selected = null;
+            }
+            _feedback = null;
+        }
+        return applied;
     }
 
     private async Task GridKeyAsync(
@@ -240,7 +204,7 @@ public partial class DashboardPage
         bool resize = false
     )
     {
-        var p = widget.Placement;
+        var p = Placement(widget.Id);
         var next = args.Key switch
         {
             "ArrowLeft" => resize
@@ -275,7 +239,7 @@ public partial class DashboardPage
         };
         if (next != p)
         {
-            await ChangePlacementAsync(widget, next, resize);
+            _ = await ChangePlacementAsync(widget, next, resize);
         }
     }
 

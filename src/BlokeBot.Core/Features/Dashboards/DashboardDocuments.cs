@@ -9,26 +9,33 @@ internal static class DashboardDocuments
     internal static string Serialize(DashboardDocument document) =>
         JsonSerializer.Serialize(document, _json);
 
-    internal static DashboardDocument Deserialize(string json) =>
-        JsonSerializer.Deserialize<DashboardDocument>(json, _json)
-        ?? throw new InvalidOperationException("The stored dashboard document is missing.");
+    internal static DashboardDocument Deserialize(string json)
+    {
+        var document = (
+            JsonSerializer.Deserialize<DashboardDocument>(json, _json)
+            ?? throw new InvalidOperationException("The stored dashboard document is missing.")
+        ).InitializePhone();
+        return Valid(document)
+            ? document
+            : throw new JsonException("The stored dashboard arrangements are invalid.");
+    }
 
     internal static bool Valid(DashboardDocument document) =>
-        document.Columns > 0
-        && !document.Widgets.IsDefault
+        !document.Widgets.IsDefault
         && document.Widgets.Select(widget => widget.Id).Distinct().Count()
             == document.Widgets.Length
         && document.Widgets.All(widget =>
-            widget.Id.Value != Guid.Empty
-            && widget.Label is not null
-            && widget.Placement.Column >= 0
-            && widget.Placement.Row >= 0
-            && widget.Placement.Width > 0
-            && widget.Placement.Height > 0
-            && widget.Placement.Order >= 0
-            && widget.Placement.Width <= document.Columns
-            && widget.Placement.Column <= document.Columns - widget.Placement.Width
-            && Valid(widget.Configuration)
+            widget.Id.Value != Guid.Empty && widget.Label is not null && Valid(widget.Configuration)
+        )
+        && document.Desktop is not null
+        && document.Phone is not null
+        && DashboardArrangements.Valid(
+            document.Desktop,
+            document.Widgets.Select(w => w.Id).ToArray()
+        )
+        && DashboardArrangements.Valid(
+            document.Phone,
+            document.Widgets.Select(w => w.Id).ToArray()
         );
 
     private static bool Valid(DashboardWidgetConfiguration configuration) =>

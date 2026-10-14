@@ -34,8 +34,8 @@
   padding: 1rem;
 }
 .dashboard-toolbar-selection {
-  min-width: 0;
-  flex: 1;
+  min-width: min(100%, 20rem);
+  flex: 1 1 20rem;
 }
 .dashboard-toolbar-selection .field {
   min-width: 12rem;
@@ -76,7 +76,8 @@
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(var(--dashboard-columns, 12), minmax(0, 1fr));
-  grid-auto-rows: 56px;
+  grid-auto-rows: var(--dashboard-cell-height, 56px);
+  align-content: start;
   gap: 16px;
   flex: 1;
   min-width: 0;
@@ -227,22 +228,6 @@
   .dashboard-body {
     display: block;
   }
-  .dashboard-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .dashboard-card > .task-panel {
-    min-height: 18rem;
-    height: auto;
-  }
-  .dashboard-card .task-panel__body {
-    overflow: visible;
-  }
-  .dashboard-grip,
-  .dashboard-resize {
-    display: none;
-  }
   .dashboard-settings {
     width: auto;
     position: relative;
@@ -278,8 +263,9 @@
   margin: 0;
 }
 
-/* Page entrance transforms must not become a containing block for the shared Focus workspace. */
-.dashboard-composition:has(.editor-workspace--focus) {
+/* Keep shared Focus and fixed editor menus in viewport coordinates, not the entrance transform. */
+.dashboard-composition:has(.editor-workspace--focus),
+.dashboard-composition:has([data-editor-menu]) {
   animation: none;
   transform: none;
 }
@@ -337,4 +323,44 @@
   > .editor-action
   .editor-action-tip {
   display: none;
+}
+
+.dashboard-grid-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem;
+}
+.dashboard-grid-controls .field {
+  flex: 0 0 7rem;
+  width: 7rem;
+}
+.dashboard-grid-controls .field:first-child {
+  flex-basis: 8rem;
+  width: 8rem;
+}
+.dashboard-grid-controls option {
+  background: var(--app-surface-solid);
+  color: var(--app-text-strong);
+}
+.dashboard-grid--slots {
+  --dashboard-column-pitch: calc((100% + 16px) / var(--dashboard-columns));
+  min-height: calc(
+    var(--dashboard-slot-rows) * (var(--dashboard-cell-height) + 16px) - 16px
+  );
+  background-image:
+    linear-gradient(to right, var(--app-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--app-border) 1px, transparent 1px);
+  background-size: var(--dashboard-column-pitch) calc(var(--dashboard-cell-height) + 16px);
+}
+@media (max-width: 700px) {
+  .dashboard-grid-controls {
+    width: 100%;
+  }
+  .dashboard-toolbar-selection {
+    flex-wrap: wrap;
+  }
+  .dashboard-card-layout {
+    flex-wrap: wrap;
+  }
 }

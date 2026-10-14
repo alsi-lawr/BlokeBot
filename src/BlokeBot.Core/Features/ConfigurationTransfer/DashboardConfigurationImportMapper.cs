@@ -13,20 +13,35 @@ internal static class DashboardConfigurationImportMapper
         DashboardTransferTargets targets,
         IReadOnlyDictionary<string, DashboardAutomationImportMap> appliedFlows,
         IReadOnlyDictionary<string, GuessRoundProfile> importedProfiles
-    ) =>
-        new(
-            layout.Columns,
+    )
+    {
+        var ids = layout.Widgets.ToDictionary(
+            widget => widget.Id,
+            _ => new DashboardWidgetId(Guid.NewGuid()),
+            StringComparer.Ordinal
+        );
+        DashboardArrangement Arrangement(DashboardArrangementV1 arrangement) =>
+            new(
+                arrangement.Columns,
+                arrangement.CellHeight,
+                [
+                    .. arrangement.Placements.Select(p => new DashboardWidgetPlacement(
+                        ids[p.WidgetId],
+                        new(
+                            p.Placement.Column,
+                            p.Placement.Row,
+                            p.Placement.Width,
+                            p.Placement.Height,
+                            p.Placement.Order
+                        )
+                    )),
+                ]
+            );
+        return new DashboardDocument(
             [
                 .. layout.Widgets.Select(widget => new DashboardWidget(
-                    new(Guid.NewGuid()),
+                    ids[widget.Id],
                     widget.Label,
-                    new(
-                        widget.Placement.Column,
-                        widget.Placement.Row,
-                        widget.Placement.Width,
-                        widget.Placement.Height,
-                        widget.Placement.Order
-                    ),
                     Configuration(
                         widget.Configuration,
                         Resolve(
@@ -37,8 +52,11 @@ internal static class DashboardConfigurationImportMapper
                         )
                     )
                 )),
-            ]
-        );
+            ],
+            Arrangement(layout.Desktop),
+            layout.Phone is null ? null : Arrangement(layout.Phone)
+        ).InitializePhone();
+    }
 
     internal static DashboardWidgetConfiguration Configuration(
         DashboardConfigurationV1 value,

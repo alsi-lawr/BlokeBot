@@ -207,35 +207,33 @@ internal static class SimulationDashboardFixtures
             ExpressionLanguageVersion = 1,
         };
         _ = db.AutomationFlowNodes.Add(disabledSource);
-        var unavailable = new DashboardDocument(
+        var unavailable = DashboardDocument.Create(
             12,
-            [
+            (
                 new(
                     new(Guid.NewGuid()),
                     "Missing poll template",
-                    new(0, 0, 6, 5, 0),
                     new DashboardWidgetConfiguration.Poll(
                         Bound(new DashboardTarget.Poll(int.MaxValue))
                     )
                 ),
+                new(0, 0, 6, 5, 0)
+            ),
+            (
                 new(
                     new(Guid.NewGuid()),
                     "Choose a target",
-                    new(6, 0, 6, 5, 1),
                     new DashboardWidgetConfiguration.Value(
                         new DashboardBinding.Unconfigured(DashboardBindingIssue.NotSelected),
                         new DashboardValueSelection.Scalar()
                     )
                 ),
-            ]
-        );
-        unavailable = unavailable with
-        {
-            Widgets = unavailable.Widgets.Add(
+                new(6, 0, 6, 5, 1)
+            ),
+            (
                 new(
                     new(Guid.NewGuid()),
                     "Disabled automation",
-                    new(0, 5, 6, 5, 2),
                     new DashboardWidgetConfiguration.Automation(
                         Bound(
                             new DashboardTarget.Automation(
@@ -245,9 +243,10 @@ internal static class SimulationDashboardFixtures
                         ),
                         new DashboardTextOverride.Inherit()
                     )
-                )
-            ),
-        };
+                ),
+                new(0, 5, 6, 5, 2)
+            )
+        );
         _ = db.ChannelDashboards.Add(
             new()
             {
@@ -266,7 +265,6 @@ internal static class SimulationDashboardFixtures
                 .Select(i => new DashboardWidget(
                     new(Guid.NewGuid()),
                     i < 7 ? labels[i] : $"{labels[i % 7]} {(i / 7) + 1}",
-                    new(i % 2 * 6, i / 2 * 5, 6, 5, i),
                     configurations[i % 7]
                 ))
                 .ToImmutableArray();
@@ -277,7 +275,20 @@ internal static class SimulationDashboardFixtures
                     HostId = hostId,
                     Name = name,
                     Revision = 1,
-                    DocumentJson = DashboardDocuments.Serialize(new(12, widgets)),
+                    DocumentJson = DashboardDocuments.Serialize(
+                        DashboardDocument.Create(
+                            12,
+                            widgets
+                                .Select(
+                                    (widget, i) =>
+                                        (
+                                            widget,
+                                            new DashboardPlacement(i % 2 * 6, i / 2 * 5, 6, 5, i)
+                                        )
+                                )
+                                .ToArray()
+                        )
+                    ),
                 }
             );
         }

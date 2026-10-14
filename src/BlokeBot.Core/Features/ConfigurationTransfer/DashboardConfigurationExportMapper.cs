@@ -28,32 +28,46 @@ internal static class DashboardConfigurationExportMapper
                     (row, index) =>
                     {
                         var document = DashboardDocuments.Deserialize(row.DocumentJson);
+                        var ids = document
+                            .Widgets.Select(
+                                (widget, position) =>
+                                    (widget.Id, Portable: $"widget-{position + 1:D4}")
+                            )
+                            .ToDictionary(item => item.Id, item => item.Portable);
+                        DashboardArrangementV1 Arrangement(DashboardArrangement arrangement) =>
+                            new(
+                                arrangement.Columns,
+                                arrangement.CellHeight,
+                                arrangement
+                                    .Placements.Select(p => new DashboardWidgetPlacementV1(
+                                        ids[p.WidgetId],
+                                        new(
+                                            p.Placement.Column,
+                                            p.Placement.Row,
+                                            p.Placement.Width,
+                                            p.Placement.Height,
+                                            p.Placement.Order
+                                        )
+                                    ))
+                                    .ToArray()
+                            );
                         return new DashboardLayoutV1(
                             $"dashboard-{index + 1:D4}",
                             row.Name,
-                            document.Columns,
                             document
-                                .Widgets.Select(
-                                    (widget, position) =>
-                                        new DashboardWidgetV1(
-                                            $"widget-{position + 1:D4}",
-                                            widget.Label,
-                                            new(
-                                                widget.Placement.Column,
-                                                widget.Placement.Row,
-                                                widget.Placement.Width,
-                                                widget.Placement.Height,
-                                                widget.Placement.Order
-                                            ),
-                                            Configuration(
-                                                widget.Configuration,
-                                                targets,
-                                                automations,
-                                                guessing
-                                            )
-                                        )
-                                )
-                                .ToArray()
+                                .Widgets.Select(widget => new DashboardWidgetV1(
+                                    ids[widget.Id],
+                                    widget.Label,
+                                    Configuration(
+                                        widget.Configuration,
+                                        targets,
+                                        automations,
+                                        guessing
+                                    )
+                                ))
+                                .ToArray(),
+                            Arrangement(document.Desktop),
+                            Arrangement(document.Phone!)
                         );
                     }
                 )

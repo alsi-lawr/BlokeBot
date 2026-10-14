@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Data.Common;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
@@ -27,14 +26,21 @@ public sealed partial class DashboardConfigurationTests
         string name = "Edited"
     ) => new(fixture.Host, snapshot.Id, snapshot.Revision, name, document);
 
-    private static DashboardWidget Widget(
-        DashboardWidgetConfiguration configuration,
-        int order = 0
-    ) => new(new(Guid.NewGuid()), "Control", new(0, order, 4, 2, order), configuration);
+    private static DashboardWidget Widget(DashboardWidgetConfiguration configuration) =>
+        new(new(Guid.NewGuid()), "Control", configuration);
 
     private static DashboardDocument Document(
         params DashboardWidgetConfiguration[] configurations
-    ) => new(12, configurations.Select(Widget).ToImmutableArray());
+    ) =>
+        DashboardDocument.Create(
+            12,
+            configurations
+                .Select(
+                    (configuration, index) =>
+                        (Widget(configuration), new DashboardPlacement(0, index * 2, 4, 2, index))
+                )
+                .ToArray()
+        );
 
     private static DashboardBinding Configured(DashboardTarget target) =>
         new DashboardBinding.Configured(target);

@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  create,
-  placementFromPointer,
-} from "../../../src/BlokeBot.Core/Features/Dashboards/Page/DashboardPage.razor.js";
+import { readFile } from "node:fs/promises";
+// Razor collocated modules are served at the web root; resolve that one asset for Node.
+const source = await readFile(new URL("../../../src/BlokeBot.Core/Features/Dashboards/Page/DashboardPage.razor.js", import.meta.url), "utf8");
+const asset = new URL("../../../src/BlokeBot.Core/wwwroot/Components/EditorContextMenu.js", import.meta.url).href;
+const { create, placementFromPointer } = await import(`data:text/javascript;base64,${Buffer.from(source.replace("../../../Components/EditorContextMenu.js", asset)).toString("base64")}`);
 
 class Surface {
   listeners = new Map();
@@ -35,7 +36,7 @@ function fixture() {
     serverDirty: "false",
     serverNow: new Date().toISOString(),
   };
-  root.querySelector = () => grid;
+  root.querySelector = selector => selector === "[data-dashboard-grid]" ? grid : null;
   grid.querySelectorAll = () => [card];
   handle.closest = (selector) =>
     selector === "[data-widget-id]" ? card : handle;
@@ -46,13 +47,16 @@ function fixture() {
     document = new Surface();
   document.hidden = false;
   document.addEventListener = document.addEventListener.bind(document);
-  window.matchMedia = () => ({ matches: false });
+  const viewport = new Surface();
+  viewport.matches = false;
+  window.matchMedia = () => viewport;
+  const geometry = { columnGap: "16", rowGap: "16", gridAutoRows: "56" };
   let nextFrame = 0;
   const frames = new Map();
   Object.assign(globalThis, {
     window,
     document,
-    getComputedStyle: () => ({ columnGap: "16" }),
+    getComputedStyle: () => geometry,
     MutationObserver: class {
       observe() {}
       disconnect() {}
@@ -92,10 +96,13 @@ function fixture() {
   });
   return {
     root,
+    geometry,
+    viewport,
     grid,
     card,
     handle,
     calls,
+    dotnet,
     api,
     event,
     paint() {
@@ -193,4 +200,48 @@ test("cancelled-origin calls stay old while new gestures survive stale sync", ()
   const latest = f.calls.filter((c) => c.name === "PlacementChanged").at(-1);
   assert.equal(latest.args[1], 1);
   f.api.dispose();
+});
+
+test("active grid pitch drives motion and a geometry boundary discards the previous origin", () => {
+  const f = fixture();
+  f.geometry.columnGap = "8";
+  f.geometry.rowGap = "12";
+  f.geometry.gridAutoRows = "96";
+  f.grid.dataset.columns = "4";
+  f.grid.clientWidth = 392;
+  f.api.sync([{ id: "a", placement: { column: 0, row: 0, width: 2, height: 3, order: 0 } }], 0, false, 0);
+  f.root.emit("pointerdown", f.event(0, 0));
+  f.root.emit("pointermove", f.event(100, 108));
+  f.paint();
+  assert.equal(f.card.style.gridColumn, "2 / span 2");
+  assert.equal(f.card.style.gridRow, "2 / span 3");
+  f.api.cancel(1);
+  f.root.emit("pointerup", f.event(100, 108));
+  assert.equal(f.api.flush().length, 0);
+  assert.equal(f.calls.filter(c => c.name === "PlacementChanged").length, 0);
+  f.root.emit("pointerdown", f.event(0, 0));
+  f.root.emit("pointermove", f.event(100, 216));
+  const pending = f.api.flush();
+  assert.equal(pending[0].placement.row, 2);
+  assert.equal(pending[0].interaction, 1);
+  f.api.dispose();
+  f.viewport.emit("change", {});
+  assert.equal(f.calls.filter(c => c.name === "ViewportArrangementChanged").length, 1);
+});
+
+test("viewport teardown contains a synchronously disconnected interop callback", async () => {
+  const f = fixture();
+  f.dotnet.invokeMethodAsync = () => { throw new Error("disconnected"); };
+  const queued = f.viewport.listeners.get("change");
+  const original = console.error, errors = [];
+  console.error = (...args) => errors.push(args);
+  try {
+    await assert.doesNotReject(queued());
+    assert.equal(errors.length, 1);
+    f.api.dispose();
+    await assert.doesNotReject(queued());
+    assert.equal(errors.length, 1);
+  } finally {
+    console.error = original;
+  }
 });

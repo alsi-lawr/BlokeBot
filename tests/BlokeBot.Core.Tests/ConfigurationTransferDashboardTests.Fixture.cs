@@ -116,18 +116,26 @@ public sealed partial class ConfigurationTransferDashboardTests
         new(
             "layout",
             "Operator",
-            12,
             configurations
                 .Select(
                     (configuration, index) =>
-                        new DashboardWidgetV1(
-                            $"widget-{index}",
-                            $"Widget {index}",
-                            new(index % 3 * 4, index / 3 * 3, 4, 3, index),
-                            configuration
-                        )
+                        new DashboardWidgetV1($"widget-{index}", $"Widget {index}", configuration)
                 )
-                .ToArray()
+                .ToArray(),
+            new(
+                12,
+                56,
+                configurations
+                    .Select(
+                        (_, index) =>
+                            new DashboardWidgetPlacementV1(
+                                $"widget-{index}",
+                                new(index % 3 * 4, index / 3 * 3, 4, 3, index)
+                            )
+                    )
+                    .ToArray()
+            ),
+            null
         );
 
     private static async Task<int> HostAsync(

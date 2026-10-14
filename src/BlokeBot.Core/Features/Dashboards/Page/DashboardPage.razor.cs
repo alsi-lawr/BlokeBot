@@ -26,6 +26,7 @@ public partial class DashboardPage
     private long _loadGeneration;
     private long _acknowledged;
     private long _interactionGeneration;
+    private long _gestureGeneration;
     private readonly SemaphoreSlim _placementGate = new(1, 1);
     private ElementReference _root;
     private ElementReference _picker;
@@ -81,6 +82,8 @@ public partial class DashboardPage
             _selected = null;
             await DisposeGridAsync();
             _acknowledged = 0;
+            _arrangementChosen = false;
+            _arrangementKind = DashboardArrangementKind.Desktop;
             _managementOpen = false;
             _focusManagement = false;
             _toolboxOpen = false;
@@ -150,9 +153,9 @@ public partial class DashboardPage
             }
             await _grid.InvokeVoidAsync(
                 "sync",
-                _document.Widgets.Select(w => new
+                _arrangement.Placements.Select(w => new
                 {
-                    id = w.Id.Value.ToString(),
+                    id = w.WidgetId.Value.ToString(),
                     placement = w.Placement,
                 }),
                 _acknowledged,
@@ -252,6 +255,25 @@ public partial class DashboardPage
     private void Rename(string name) => _edit?.Rename(name);
 
     [JSInvokable]
+    public Task GestureStarted(long generation, long interaction)
+    {
+        if (
+            !_disposed
+            && !_loading
+            && !_busy
+            && _editing
+            && _edit is not null
+            && generation == _loadGeneration
+            && interaction == _interactionGeneration
+        )
+        {
+            ++_gestureGeneration;
+            return InvokeAsync(StateHasChanged);
+        }
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
     public Task LocalEditStarted(long generation, long interaction)
     {
         if (
@@ -293,21 +315,36 @@ public partial class DashboardPage
             {
                 return;
             }
+            var gesture = _gestureGeneration;
             var widget = _document.Widgets.FirstOrDefault(w => w.Id.Value == widgetId);
             if (widget is not null)
             {
-                await ChangePlacementAsync(
+                var applied = await ChangePlacementAsync(
                     widget,
-                    placement.ToPlacement(widget.Placement.Order),
+                    placement.ToPlacement(Placement(widget.Id).Order),
                     resize
                 );
+                if (
+                    !applied
+                    && !_disposed
+                    && generation == _loadGeneration
+                    && interaction == _interactionGeneration
+                    && gesture == _gestureGeneration
+                )
+                {
+                    // A refused flush is not permission to Save/reset the existing draft history.
+                    await CancelGestureAsync(() => { });
+                }
             }
             if (_disposed || generation != _loadGeneration || interaction != _interactionGeneration)
             {
                 return;
             }
             _acknowledged = sequence;
-            _localDirty = false;
+            if (gesture == _gestureGeneration)
+            {
+                _localDirty = false;
+            }
             await InvokeAsync(StateHasChanged);
         }
         finally

@@ -135,6 +135,47 @@ public sealed partial class ConfigurationTransferDashboardTests
                     new DashboardBinding.Configured(new DashboardTarget.Poll(int.MaxValue))
                 ),
             };
+            var originalDocument = DashboardDocument.Create(
+                12,
+                configurations
+                    .Select(
+                        (configuration, index) =>
+                            (
+                                new DashboardWidget(
+                                    new(Guid.NewGuid()),
+                                    $"Control {index}",
+                                    configuration
+                                ),
+                                new DashboardPlacement(index % 3 * 4, index / 3 * 3, 4, 3, index)
+                            )
+                    )
+                    .ToArray()
+            );
+            originalDocument = originalDocument with
+            {
+                Desktop = originalDocument.Desktop with { Columns = 16, CellHeight = 80 },
+                Phone = originalDocument.Phone! with
+                {
+                    Columns = 5,
+                    CellHeight = 96,
+                    Placements =
+                    [
+                        .. originalDocument
+                            .Phone.Placements.Reverse()
+                            .Select(p =>
+                                p with
+                                {
+                                    Placement = p.Placement with
+                                    {
+                                        Column = 1,
+                                        Row = (p.Placement.Row * 2) + 1,
+                                        Height = 4,
+                                    },
+                                }
+                            ),
+                    ],
+                },
+            };
             _ = db.ChannelDashboards.Add(
                 new()
                 {
@@ -142,22 +183,7 @@ public sealed partial class ConfigurationTransferDashboardTests
                     HostId = source,
                     Name = "Operator",
                     Revision = 19,
-                    DocumentJson = DashboardDocuments.Serialize(
-                        new(
-                            12,
-                            [
-                                .. configurations.Select(
-                                    (configuration, index) =>
-                                        new DashboardWidget(
-                                            new(Guid.NewGuid()),
-                                            $"Control {index}",
-                                            new(index % 3 * 4, index / 3 * 3, 4, 3, index),
-                                            configuration
-                                        )
-                                ),
-                            ]
-                        )
-                    ),
+                    DocumentJson = DashboardDocuments.Serialize(originalDocument),
                 }
             );
             _ = await db.SaveChangesAsync();
@@ -212,9 +238,34 @@ public sealed partial class ConfigurationTransferDashboardTests
         widgets
             .Select(widget => widget.Label)
             .ShouldBe(original.Widgets.Select(widget => widget.Label));
-        widgets
-            .Select(widget => widget.Placement)
-            .ShouldBe(original.Widgets.Select(widget => widget.Placement));
+        var importedGeometry = DashboardDocuments.Deserialize(
+            (await DashboardsAsync(database, destination)).Single().DocumentJson
+        );
+        importedGeometry
+            .Desktop.Placements.Select(p => p.Placement)
+            .ShouldBe(original.Desktop.Placements.Select(p => p.Placement));
+        importedGeometry
+            .Phone!.Placements.Select(p => p.Placement)
+            .ShouldBe(original.Phone!.Placements.Select(p => p.Placement));
+        importedGeometry.Desktop.Columns.ShouldBe(original.Desktop.Columns);
+        importedGeometry.Desktop.CellHeight.ShouldBe(original.Desktop.CellHeight);
+        importedGeometry.Phone.Columns.ShouldBe(original.Phone.Columns);
+        importedGeometry.Phone.CellHeight.ShouldBe(original.Phone.CellHeight);
+        widgets.Select(w => w.Id).Intersect(original.Widgets.Select(w => w.Id)).ShouldBeEmpty();
+        foreach (var widget in widgets)
+        {
+            var sourceWidget = original.Widgets.Single(w => w.Label == widget.Label);
+            importedGeometry
+                .Desktop.Placements.Single(p => p.WidgetId == widget.Id)
+                .Placement.ShouldBe(
+                    original.Desktop.Placements.Single(p => p.WidgetId == sourceWidget.Id).Placement
+                );
+            importedGeometry
+                .Phone.Placements.Single(p => p.WidgetId == widget.Id)
+                .Placement.ShouldBe(
+                    original.Phone.Placements.Single(p => p.WidgetId == sourceWidget.Id).Placement
+                );
+        }
         var value = widgets[0].Configuration.ShouldBeOfType<DashboardWidgetConfiguration.Value>();
         value.Selection.ShouldBe(new DashboardValueSelection.DictionaryEntry("tea"));
         value.Binding.ShouldBe(

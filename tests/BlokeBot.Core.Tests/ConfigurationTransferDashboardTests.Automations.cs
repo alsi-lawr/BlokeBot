@@ -20,7 +20,6 @@ public sealed partial class ConfigurationTransferDashboardTests
         var sourceWidget = new DashboardWidget(
             new(Guid.NewGuid()),
             "Exact source",
-            new(0, 0, 4, 3, 0),
             new DashboardWidgetConfiguration.Automation(
                 new DashboardBinding.Configured(
                     new DashboardTarget.Automation(new(flow.Flow), new(flow.Nodes[1]))
@@ -52,7 +51,9 @@ public sealed partial class ConfigurationTransferDashboardTests
                     HostId = source,
                     Name = "Operator",
                     Revision = 8,
-                    DocumentJson = DashboardDocuments.Serialize(new(12, [sourceWidget])),
+                    DocumentJson = DashboardDocuments.Serialize(
+                        DashboardDocument.Create(12, (sourceWidget, new(0, 0, 4, 3, 0)))
+                    ),
                 }
             );
             _ = await db.SaveChangesAsync();
@@ -151,7 +152,10 @@ public sealed partial class ConfigurationTransferDashboardTests
                     Name = "Operator",
                     Revision = 1,
                     DocumentJson = DashboardDocuments.Serialize(
-                        new(12, [new(new(Guid.NewGuid()), "Chosen", new(0, 0, 4, 3, 0), config)])
+                        DashboardDocument.Create(
+                            12,
+                            (new(new(Guid.NewGuid()), "Chosen", config), new(0, 0, 4, 3, 0))
+                        )
                     ),
                 }
             );

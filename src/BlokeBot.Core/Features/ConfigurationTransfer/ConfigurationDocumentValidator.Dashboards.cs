@@ -55,6 +55,31 @@ internal static partial class ConfigurationDocumentValidator
             {
                 return widgetsIssue;
             }
+            var ids = layout.Widgets.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+            bool ValidArrangement(DashboardArrangementV1 arrangement) =>
+                arrangement is not null
+                && arrangement.Placements is not null
+                && arrangement.Placements.Count == ids.Count
+                && arrangement.Placements.All(p =>
+                    p is not null
+                    && p.Placement is not null
+                    && p.WidgetId is not null
+                    && ids.Contains(p.WidgetId)
+                )
+                && arrangement
+                    .Placements.Select(p => p.WidgetId)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count() == ids.Count;
+            if (
+                !ValidArrangement(layout.Desktop)
+                || (layout.Phone is not null && !ValidArrangement(layout.Phone))
+            )
+            {
+                return new(
+                    path,
+                    "Each arrangement must place every widget exactly once using its exported widget ID."
+                );
+            }
             foreach (var widget in layout.Widgets)
             {
                 if (

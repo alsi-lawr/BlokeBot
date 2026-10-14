@@ -291,7 +291,7 @@ public partial class DashboardWidgetControl
                 var bindings = await _bindingReader.ReadAsync(
                     session,
                     host,
-                    new(Math.Max(12, widget.Placement.Column + widget.Placement.Width), [widget]),
+                    DashboardDocument.Create(12, (widget, new(0, 0, 6, 4, 0))),
                     CancellationToken.None
                 );
                 if (!Current(generation, widget, host) || !Visible)

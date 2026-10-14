@@ -46,6 +46,23 @@ public sealed partial class ConfigurationTransferDashboardTests
                 new DashboardReferenceV1.Guessing("prediction", "profile")
             )
         );
+        layout = layout with
+        {
+            Desktop = layout.Desktop with { Columns = 16, CellHeight = 72 },
+            Phone = new(
+                3,
+                96,
+                [
+                    .. layout.Widgets.Select(
+                        (w, index) =>
+                            new DashboardWidgetPlacementV1(
+                                w.Id,
+                                new(0, (index * 6) + 1, 3, 4, index)
+                            )
+                    ),
+                ]
+            ),
+        };
         var profile = new GuessingProfileV1(
             "profile",
             "Prediction",
@@ -74,6 +91,17 @@ public sealed partial class ConfigurationTransferDashboardTests
         ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
         var original = (await DashboardsAsync(database, host)).Single();
         var stored = DashboardDocuments.Deserialize(original.DocumentJson);
+        stored.Desktop.Columns.ShouldBe(16);
+        stored.Desktop.CellHeight.ShouldBe(72);
+        stored.Phone!.Columns.ShouldBe(3);
+        stored.Phone.CellHeight.ShouldBe(96);
+        stored
+            .Widgets.Select(w => w.Id)
+            .ShouldBe(stored.Desktop.Placements.Select(p => p.WidgetId));
+        stored.Widgets.Select(w => w.Id).ShouldBe(stored.Phone.Placements.Select(p => p.WidgetId));
+        stored
+            .Phone.Placements.Select(p => p.Placement)
+            .ShouldBe([new(0, 1, 3, 4, 0), new(0, 7, 3, 4, 1), new(0, 13, 3, 4, 2)]);
         await using (var read = await database.CreateDbContextAsync())
         {
             var value = stored
@@ -138,6 +166,23 @@ public sealed partial class ConfigurationTransferDashboardTests
         preserved.DocumentJson.ShouldBe(original.DocumentJson);
         (await DashboardsAsync(database, source)).ShouldBeEmpty();
 
+        foreach (var copy in copies)
+        {
+            var copyDocument = DashboardDocuments.Deserialize(copy.DocumentJson);
+            copyDocument.Desktop.Columns.ShouldBe(stored.Desktop.Columns);
+            copyDocument.Desktop.CellHeight.ShouldBe(stored.Desktop.CellHeight);
+            copyDocument.Phone!.Columns.ShouldBe(stored.Phone.Columns);
+            copyDocument.Phone.CellHeight.ShouldBe(stored.Phone.CellHeight);
+            copyDocument
+                .Phone.Placements.Select(p => p.Placement)
+                .ShouldBe(stored.Phone.Placements.Select(p => p.Placement));
+            copyDocument
+                .Desktop.Placements.Select(p => p.WidgetId)
+                .ShouldBe(copyDocument.Widgets.Select(w => w.Id));
+            copyDocument
+                .Phone.Placements.Select(p => p.WidgetId)
+                .ShouldBe(copyDocument.Widgets.Select(w => w.Id));
+        }
         boundary.Active = true;
         var failed = await coordinator.ApplyAsync(
             Session(host),

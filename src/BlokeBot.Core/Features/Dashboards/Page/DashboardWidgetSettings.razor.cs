@@ -15,7 +15,7 @@ public partial class DashboardWidgetSettings
     public required AuthenticatedSession Session { get; set; }
 
     [Parameter]
-    public int Columns { get; set; }
+    public required DashboardPlacementTransport Placement { get; set; }
 
     [Parameter]
     public EventCallback<DashboardWidgetView> Changed { get; set; }
@@ -156,19 +156,19 @@ public partial class DashboardWidgetSettings
 
     private IReadOnlyList<PlacementInput> _placementFields =>
         [
-            new(PlacementField.Column, "Column", _widget.Placement.Column + 1, 1),
-            new(PlacementField.Row, "Row", _widget.Placement.Row + 1, 1),
-            new(PlacementField.Width, "Width (columns)", _widget.Placement.Width, 1),
-            new(PlacementField.Height, "Height (rows)", _widget.Placement.Height, 1),
+            new(PlacementField.Column, "Column", Placement.Column + 1, 1),
+            new(PlacementField.Row, "Row", Placement.Row + 1, 1),
+            new(PlacementField.Width, "Width (columns)", Placement.Width, 1),
+            new(PlacementField.Height, "Height (rows)", Placement.Height, 1),
         ];
 
-    private Task PlacementAsync(PlacementField field, ChangeEventArgs args)
+    private Task PlacementAsync(PlacementField field, int value)
     {
-        if (!int.TryParse(args.Value?.ToString(), out var value) || value < 1)
+        if (value < 1)
         {
             return Task.CompletedTask;
         }
-        var p = _widget.Placement;
+        var p = Placement;
         var changed = field switch
         {
             PlacementField.Column => p with { Column = value - 1 },

@@ -33,18 +33,20 @@ public sealed partial class DashboardConfigurationTests
         await using var fixture = await Fixture.CreateAsync(database);
         var initial = await fixture.CreateAsync();
         interleaving.Coordinate = true;
-        var first = Save(
-            fixture,
-            initial,
-            Document(new DashboardWidgetConfiguration.Poll(_unconfigured)),
-            "First"
-        );
-        var second = Save(
-            fixture,
-            initial,
-            Document(new DashboardWidgetConfiguration.Giveaway(_unconfigured)),
-            "Second"
-        );
+        var firstDocument = Document(new DashboardWidgetConfiguration.Poll(_unconfigured));
+        firstDocument = firstDocument with
+        {
+            Desktop = firstDocument.Desktop with { Columns = 10, CellHeight = 72 },
+            Phone = firstDocument.Phone! with { Columns = 5, CellHeight = 88 },
+        };
+        var secondDocument = Document(new DashboardWidgetConfiguration.Giveaway(_unconfigured));
+        secondDocument = secondDocument with
+        {
+            Desktop = secondDocument.Desktop with { Columns = 16, CellHeight = 96 },
+            Phone = secondDocument.Phone! with { Columns = 6, CellHeight = 64 },
+        };
+        var first = Save(fixture, initial, firstDocument, "First");
+        var second = Save(fixture, initial, secondDocument, "Second");
         var results = await Task.WhenAll(
             fixture.Service.SaveAsync(fixture.Owner, first, _ct),
             fixture.Service.SaveAsync(fixture.Owner, second, _ct)
@@ -59,12 +61,13 @@ public sealed partial class DashboardConfigurationTests
                     ? second.Document.Widgets.Single().Configuration
                     : first.Document.Widgets.Single().Configuration
             );
+        DashboardArrangements.Equivalent(conflict.Current.Document, winner.Document).ShouldBeTrue();
         conflict.Current.Name.ShouldBe(winner.Name);
         conflict.Current.Revision.ShouldBe(winner.Revision);
         var persisted = await fixture.ReadAsync(initial.Id);
         persisted.Name.ShouldBe(winner.Name);
         persisted.Revision.Value.ShouldBe(initial.Revision.Value + 1);
-        persisted.Document.Widgets.Single().ShouldBe(winner.Document.Widgets.Single());
+        DashboardArrangements.Equivalent(persisted.Document, winner.Document).ShouldBeTrue();
     }
 
     [Test]

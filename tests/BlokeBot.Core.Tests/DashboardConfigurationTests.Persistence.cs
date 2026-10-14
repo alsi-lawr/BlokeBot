@@ -66,6 +66,29 @@ public sealed partial class DashboardConfigurationTests
             new DashboardWidgetConfiguration.Giveaway(Configured(new DashboardTarget.Giveaway())),
             new DashboardWidgetConfiguration.Guessing(Configured(new DashboardTarget.Guessing(41)))
         );
+        document = document with
+        {
+            Desktop = document.Desktop with { Columns = 16, CellHeight = 80 },
+            Phone = document.Phone! with
+            {
+                Columns = 5,
+                CellHeight = 96,
+                Placements =
+                [
+                    .. document.Phone.Placements.Select(p =>
+                        p with
+                        {
+                            Placement = p.Placement with
+                            {
+                                Column = 1,
+                                Row = (p.Placement.Row * 2) + 1,
+                                Height = 4,
+                            },
+                        }
+                    ),
+                ],
+            },
+        };
         var saved = Saved(
             await fixture.Service.SaveAsync(fixture.Owner, Save(fixture, first, document), _ct)
         );
@@ -73,7 +96,7 @@ public sealed partial class DashboardConfigurationTests
         loaded.Id.ShouldBe(first.Id);
         loaded.Name.ShouldBe(saved.Name);
         loaded.Revision.ShouldBe(saved.Revision);
-        loaded.Document.Columns.ShouldBe(document.Columns);
+        DashboardArrangements.Equivalent(loaded.Document, document).ShouldBeTrue();
         loaded.Document.Widgets.Length.ShouldBe(document.Widgets.Length);
         for (var index = 0; index < document.Widgets.Length; index++)
         {

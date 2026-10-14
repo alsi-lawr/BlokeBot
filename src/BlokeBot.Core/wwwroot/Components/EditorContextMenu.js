@@ -25,8 +25,8 @@ export function createEditorMenu(root, owner) {
     }
     function position() {
         const bounds = popup.getBoundingClientRect();
-        popup.style.left = `${Math.max(8, Math.min(anchor.x, window.innerWidth - bounds.width - 8))}px`;
-        popup.style.top = `${Math.max(8, Math.min(anchor.y, window.innerHeight - bounds.height - 8))}px`;
+        popup.style.left = `${Math.max(8, Math.min(anchor.x, window.document.documentElement.clientWidth - bounds.width - 8))}px`;
+        popup.style.top = `${Math.max(8, Math.min(anchor.y, window.document.documentElement.clientHeight - bounds.height - 8))}px`;
     }
     function refresh() {
         if (!invocation && !opening) return;

@@ -15,7 +15,10 @@ public sealed class DashboardPageInteractionTests
     [Arguments("Undo")]
     [Arguments("Redo")]
     [Arguments("Delete First")]
-    public async Task WithheldAndQueuedPlacementsCannotReverseLocalBoundary_NewOriginStillApplies(
+    [Arguments("Arrangement")]
+    [Arguments("Columns")]
+    [Arguments("Cell height")]
+    public async Task QueuedPlacementsCannotReverseLocalBoundary_NewOriginStillApplies(
         string boundary
     )
     {
@@ -23,17 +26,11 @@ public sealed class DashboardPageInteractionTests
         var first = new DashboardWidget(
             new(Guid.NewGuid()),
             "First",
-            new(0, 0, 4, 3, 0),
             new DashboardWidgetConfiguration.Giveaway(
                 new DashboardBinding.Unconfigured(DashboardBindingIssue.NotSelected, null)
             )
         );
-        var second = first with
-        {
-            Id = new(Guid.NewGuid()),
-            Label = "Second",
-            Placement = new(4, 0, 4, 3, 1),
-        };
+        var second = first with { Id = new(Guid.NewGuid()), Label = "Second" };
         var dashboard = Guid.NewGuid();
         int hostId;
         await using (var db = await database.CreateDbContextAsync())
@@ -49,7 +46,13 @@ public sealed class DashboardPageInteractionTests
                     HostId = hostId,
                     Name = "Baseline",
                     Revision = 1,
-                    DocumentJson = DashboardDocuments.Serialize(new(12, [first, second])),
+                    DocumentJson = DashboardDocuments.Serialize(
+                        DashboardDocument.Create(
+                            12,
+                            (first, new(0, 0, 4, 3, 0)),
+                            (second, new(4, 0, 4, 3, 1))
+                        )
+                    ),
                 }
             );
             _ = await db.SaveChangesAsync();
@@ -81,42 +84,45 @@ public sealed class DashboardPageInteractionTests
         var route = (long)create.Arguments[2]!;
         long Origin() => (long)grid.Invocations["sync"].Last().Arguments[3]!;
         var oldOrigin = Origin();
-        var confirmation = ui.JSInterop.Setup<bool>("confirm", _ => true);
-        Task withheld = Task.CompletedTask;
-        Task queued = Task.CompletedTask;
-        await page.InvokeAsync(() =>
+        switch (boundary)
         {
-            withheld = page.Instance.PlacementChanged(
+            case "Arrangement":
+                page.Find("#dashboard-arrangement").Change("Phone");
+                break;
+            case "Columns":
+                page.Find("#dashboard-columns").Change("16");
+                break;
+            case "Cell height":
+                page.Find("#dashboard-cell-height").Change("96");
+                break;
+            default:
+                await page.Find($"button[aria-label='{boundary}']").ClickAsync(new());
+                break;
+        }
+        page.WaitForAssertion(() => Origin().ShouldBeGreaterThan(oldOrigin));
+        await page.InvokeAsync(() =>
+            page.Instance.PlacementChanged(
                 route,
                 oldOrigin,
                 first.Id.Value.ToString(),
-                new(0, 0, 8, 3),
-                true,
+                new(0, 10, 4, 3),
+                false,
                 1
-            );
-        });
-        page.WaitForAssertion(() => confirmation.Invocations.ShouldNotBeEmpty());
+            )
+        );
         await page.InvokeAsync(() =>
-        {
-            queued = page.Instance.PlacementChanged(
+            page.Instance.PlacementChanged(
                 route,
                 oldOrigin,
-                first.Id.Value.ToString(),
-                new(2, 1, 4, 3),
+                second.Id.Value.ToString(),
+                new(2, 12, 4, 3),
                 false,
                 2
-            );
-        });
-        withheld.IsCompleted.ShouldBeFalse();
-        queued.IsCompleted.ShouldBeFalse();
-
-        await page.Find($"button[aria-label='{boundary}']").ClickAsync(new());
-        page.WaitForAssertion(() => Origin().ShouldBeGreaterThan(oldOrigin));
-        _ = confirmation.SetResult(true);
-        await Task.WhenAll(withheld, queued).WaitAsync(TimeSpan.FromSeconds(5));
+            )
+        );
         page.Find("#dashboard-name")
             .GetAttribute("value")
-            .ShouldBe(boundary is "Redo" or "Delete First" ? "Renamed" : "Baseline");
+            .ShouldBe(boundary is not ("Cancel changes" or "Undo") ? "Renamed" : "Baseline");
         page.Find("button[aria-label='Save dashboard']").Click();
         page.WaitForAssertion(() =>
             page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue()
@@ -127,6 +133,14 @@ public sealed class DashboardPageInteractionTests
             var document = DashboardDocuments.Deserialize(saved!.DocumentJson);
             DashboardWidget[] expected = boundary == "Delete First" ? [second] : [first, second];
             document.Widgets.ShouldBe(expected);
+            document
+                .Desktop.Placements.Single(p => p.WidgetId == second.Id)
+                .Placement.ShouldBe(new(4, 0, 4, 3, 1));
+            document
+                .Phone!.Placements.Single(p => p.WidgetId == second.Id)
+                .Placement.ShouldBe(new(0, 3, 4, 3, 1));
+            document.Desktop.Columns.ShouldBe(boundary == "Columns" ? 16 : 12);
+            document.Desktop.CellHeight.ShouldBe(boundary == "Cell height" ? 96 : 56);
         }
 
         var newOrigin = Origin();
@@ -135,7 +149,7 @@ public sealed class DashboardPageInteractionTests
                 route,
                 newOrigin,
                 second.Id.Value.ToString(),
-                new(8, 4, 4, 3),
+                new(0, 15, 4, 3),
                 false,
                 3
             )
@@ -144,7 +158,9 @@ public sealed class DashboardPageInteractionTests
         await page.Find("button[aria-label='Undo']").ClickAsync(new());
         page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
 
-        _ = flush.SetResult([new(second.Id.Value.ToString(), new(8, 4, 4, 3), false, 4, Origin())]);
+        _ = flush.SetResult([
+            new(second.Id.Value.ToString(), new(0, 15, 4, 3), false, 4, Origin()),
+        ]);
         await page.Find("button[aria-label='Save dashboard']").ClickAsync(new());
         page.WaitForAssertion(() =>
             page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue()
@@ -153,7 +169,12 @@ public sealed class DashboardPageInteractionTests
         var row = await persisted.ChannelDashboards.FindAsync(dashboard);
         DashboardDocuments
             .Deserialize(row!.DocumentJson)
-            .Widgets.Single(w => w.Id == second.Id)
-            .Placement.ShouldBe(new(8, 4, 4, 3, 1));
+            .Arrangement(
+                boundary == "Arrangement"
+                    ? DashboardArrangementKind.Phone
+                    : DashboardArrangementKind.Desktop
+            )
+            .Placements.Single(w => w.WidgetId == second.Id)
+            .Placement.ShouldBe(new(0, 15, 4, 3, 1));
     }
 }

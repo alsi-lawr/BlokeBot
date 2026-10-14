@@ -10,15 +10,26 @@ public sealed record DashboardsSectionV1(
 public sealed record DashboardLayoutV1(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string Name,
-    [property: JsonRequired] int Columns,
-    [property: JsonRequired] IReadOnlyList<DashboardWidgetV1> Widgets
+    [property: JsonRequired] IReadOnlyList<DashboardWidgetV1> Widgets,
+    [property: JsonRequired] DashboardArrangementV1 Desktop,
+    DashboardArrangementV1? Phone
 );
 
 public sealed record DashboardWidgetV1(
     [property: JsonRequired] string Id,
     [property: JsonRequired] string Label,
-    [property: JsonRequired] DashboardPlacementV1 Placement,
     [property: JsonRequired] DashboardConfigurationV1 Configuration
+);
+
+public sealed record DashboardArrangementV1(
+    [property: JsonRequired] int Columns,
+    [property: JsonRequired] int CellHeight,
+    [property: JsonRequired] IReadOnlyList<DashboardWidgetPlacementV1> Placements
+);
+
+public sealed record DashboardWidgetPlacementV1(
+    [property: JsonRequired] string WidgetId,
+    [property: JsonRequired] DashboardPlacementV1 Placement
 );
 
 public sealed record DashboardPlacementV1(

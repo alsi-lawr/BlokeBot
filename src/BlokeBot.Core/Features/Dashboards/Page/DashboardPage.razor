@@ -49,13 +49,14 @@
         </div>
     }
     else {
-        <div @ref="_root" class="dashboard-composition" data-server-now="@_clock.GetUtcNow().ToString("O")" data-editing="@((_editing && !_busy).ToString().ToLowerInvariant())" data-server-dirty="@_dirty.ToString().ToLowerInvariant()">
+        <div @ref="_root" class="dashboard-composition" data-server-now="@_clock.GetUtcNow().ToString("O")" data-editing="@((_editing && !_busy).ToString().ToLowerInvariant())" data-server-dirty="@_dirty.ToString().ToLowerInvariant()" data-editor-menu-context="@_editorContext">
             <fieldset class="dashboard-edit-boundary" disabled="@(_busy && _editing)">
                 <EditorWorkspace Class="dashboard-workspace" Header="_workspaceHeader" aria-label="@(_editing ? "Dashboard editor workspace" : "Dashboard control workspace")">
                     <div class="dashboard-body">
-                        <div class="dashboard-grid" data-dashboard-grid data-columns="@_document.Columns" style="@($"--dashboard-columns: {_document.Columns}")">
-                            @foreach (var widget in _document.Widgets.OrderBy(w => w.Placement.Row).ThenBy(w => w.Placement.Column).ThenBy(w => w.Placement.Order)) {
-                                <div @key="widget.Id" class="dashboard-card" data-widget-id="@widget.Id.Value" style="@PlacementStyle(widget.Placement)">
+                        <div class="dashboard-grid @(_editing && _showSlots ? "dashboard-grid--slots" : null)" data-dashboard-grid tabindex="0" aria-label="Dashboard arrangement" data-columns="@_arrangement.Columns" data-arrangement="@_arrangementKind" style="@_gridStyle">
+                            @foreach (var widget in _orderedWidgets) {
+                                var placement = Placement(widget.Id);
+                                <div @key="widget.Id" class="dashboard-card" data-widget-id="@widget.Id.Value" style="@PlacementStyle(placement)">
                                     <TaskPanel Title="@widget.Label">
                                         <Actions>
                                             @if (_editing) {
@@ -71,10 +72,10 @@
                                         <Footer>
                                             @if (_editing) {
                                                 <div class="dashboard-card-layout">
-                                                    <EditorAction Label='@($"Move {widget.Label} left")'  Icon="arrow-left" Click="() => ChangePlacementAsync(widget, widget.Placement with { Column = Math.Max(0, widget.Placement.Column - 1) }, false)" />
-                                                    <EditorAction Label='@($"Move {widget.Label} right")'  Icon="arrow-right" Click="() => ChangePlacementAsync(widget, widget.Placement with { Column = widget.Placement.Column + 1 }, false)" />
-                                                    <EditorAction Label='@($"Narrow {widget.Label}")'  Icon="minus" Click="() => ChangePlacementAsync(widget, widget.Placement with { Width = Math.Max(1, widget.Placement.Width - 1) }, true)" />
-                                                    <EditorAction Label='@($"Widen {widget.Label}")'  Icon="add" Click="() => ChangePlacementAsync(widget, widget.Placement with { Width = widget.Placement.Width + 1 }, true)" />
+                                                    <EditorAction Label='@($"Move {widget.Label} left")'  Icon="arrow-left" Click="() => ChangePlacementAsync(widget, placement with { Column = Math.Max(0, placement.Column - 1) }, false)" />
+                                                    <EditorAction Label='@($"Move {widget.Label} right")'  Icon="arrow-right" Click="() => ChangePlacementAsync(widget, placement with { Column = placement.Column + 1 }, false)" />
+                                                    <EditorAction Label='@($"Narrow {widget.Label}")'  Icon="minus" Click="() => ChangePlacementAsync(widget, placement with { Width = Math.Max(1, placement.Width - 1) }, true)" />
+                                                    <EditorAction Label='@($"Widen {widget.Label}")'  Icon="add" Click="() => ChangePlacementAsync(widget, placement with { Width = placement.Width + 1 }, true)" />
                                                     <EditorAction Label='@($"Delete {widget.Label}")'  Icon="delete" Click="() => RemoveAsync(widget.Id)" />
                                                     <button class="dashboard-resize" data-grid-resize aria-label="Resize @widget.Label" type="button" @onkeydown="args => GridKeyAsync(widget, args, true)">
                                                         <EditorIcon Name="fullscreen" />
@@ -95,7 +96,7 @@
                                     }
                                 </header>
                                 @if (_selectedWidget is { } selected) {
-                                    <DashboardWidgetSettings @key="selected.Id" View="@(new DashboardWidgetView(selected))" HostId="HostId" Session="PageContext.Session" Columns="_document.Columns" Changed="view => ConfigureWidget(view.Widget)" PlacementChanged="placement => ChangePlacementAsync(selected, placement.ToPlacement(selected.Placement.Order), true)" />
+                                    <DashboardWidgetSettings @key="selected.Id" View="@(new DashboardWidgetView(selected))" HostId="HostId" Session="PageContext.Session" Placement="@(new DashboardPlacementTransport(Placement(selected.Id).Column, Placement(selected.Id).Row, Placement(selected.Id).Width, Placement(selected.Id).Height))" Changed="view => ConfigureWidget(view.Widget)" PlacementChanged="placement => ChangePlacementAsync(selected, placement.ToPlacement(Placement(selected.Id).Order), true)" />
                                 }
                                 else {
                                     <p class="text-slate-500">Select a widget to configure it.</p>
@@ -158,10 +159,25 @@
                 </div>
             }
         </div>
+        @if (_snapshot is not null) {
+            <div class="dashboard-grid-controls">
+                <label class="field"><span class="field__label">Arrangement</span>
+                    <select class="field__input" id="dashboard-arrangement" value="@_arrangementKind" @onchange="ArrangementChangedAsync">
+                        <option value="Desktop">Desktop</option><option value="Phone">Phone</option>
+                    </select>
+                </label>
+                @if (_editing) {
+                    <label class="field"><span class="field__label">Columns</span><input class="field__input" id="dashboard-columns" type="number" min="1" max="24" value="@_arrangement.Columns" @onchange="ColumnsChangedAsync" /></label>
+                    <label class="field"><span class="field__label">Cell height (px)</span><input class="field__input" id="dashboard-cell-height" type="number" min="24" max="240" step="8" value="@_arrangement.CellHeight" @onchange="CellHeightChangedAsync" /></label>
+                    <label class="dashboard-checkbox"><input id="dashboard-show-slots" type="checkbox" @bind="_showSlots" />Show slots</label>
+                }
+            </div>
+        }
         <div class="dashboard-toolbar-actions">
             @if (_editing) {
                 <span class="dashboard-save-state">@(_dirty ? "Unsaved" : "Saved")</span>
                 <EditorToolboxToggle @ref="_toggle" Open="_toolboxOpen" Controls="dashboard-toolbox" Toggle="ToggleToolboxAsync" />
+                <EditorContextMenu />
                 <EditorAction Label="Undo" Icon="undo" Disabled="@(_edit?.CanUndo != true)" Click="UndoAsync" />
                 <EditorAction Label="Redo" Icon="redo" Disabled="@(_edit?.CanRedo != true)" Click="RedoAsync" />
                 <EditorAction Label="Cancel changes" Icon="close" Click="CancelAsync" Disabled="_busy" />

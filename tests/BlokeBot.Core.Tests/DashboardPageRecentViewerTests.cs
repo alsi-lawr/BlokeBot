@@ -43,7 +43,6 @@ public sealed class DashboardPageRecentViewerTests
                 .Select(i => new DashboardWidget(
                     new(Guid.NewGuid()),
                     $"Value {i}",
-                    new(i % 2 * 6, i / 2 * 5, 6, 5, i),
                     new DashboardWidgetConfiguration.Value(
                         new DashboardBinding.Unconfigured(DashboardBindingIssue.NotSelected),
                         new DashboardValueSelection.Scalar()
@@ -57,7 +56,20 @@ public sealed class DashboardPageRecentViewerTests
                     HostId = hostId,
                     Name = "Thirty widgets",
                     Revision = 1,
-                    DocumentJson = DashboardDocuments.Serialize(new(12, widgets)),
+                    DocumentJson = DashboardDocuments.Serialize(
+                        DashboardDocument.Create(
+                            12,
+                            widgets
+                                .Select(
+                                    (widget, i) =>
+                                        (
+                                            widget,
+                                            new DashboardPlacement(i % 2 * 6, i / 2 * 5, 6, 5, i)
+                                        )
+                                )
+                                .ToArray()
+                        )
+                    ),
                 }
             );
             _ = await db.SaveChangesAsync();

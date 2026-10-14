@@ -130,18 +130,30 @@ public sealed partial class AutomationRuntimeTests
                     new(
                         "layout",
                         "Imported",
-                        12,
                         configs
                             .Select(
                                 (config, index) =>
                                     new DashboardWidgetV1(
                                         $"widget-{index}",
                                         $"Widget {index}",
-                                        new(index % 3 * 4, index / 3 * 3, 4, 3, index),
                                         config
                                     )
                             )
-                            .ToArray()
+                            .ToArray(),
+                        new(
+                            12,
+                            56,
+                            configs
+                                .Select(
+                                    (_, index) =>
+                                        new DashboardWidgetPlacementV1(
+                                            $"widget-{index}",
+                                            new(index % 3 * 4, index / 3 * 3, 4, 3, index)
+                                        )
+                                )
+                                .ToArray()
+                        ),
+                        null
                     ),
                 ])
             )
