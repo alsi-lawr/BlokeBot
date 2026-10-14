@@ -49,6 +49,11 @@ public partial class DashboardPage
         )
         {
             _edit?.Configure(widget);
+            if (_settingsFeedbackOwner == owner)
+            {
+                _settingsFeedbackOwner = null;
+                _feedback = null;
+            }
         }
         return Task.CompletedTask;
     }

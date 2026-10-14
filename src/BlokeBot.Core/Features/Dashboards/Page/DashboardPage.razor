@@ -86,6 +86,9 @@
                             @if (_settingsOpen && _selectedWidget is { } selected) {
                                 <div class="dashboard-settings-fields">
                                     <DashboardWidgetSettings @key="selected.Id" View="@(new DashboardWidgetView(selected))" Targets="_editorTargets" Placement="@(new DashboardPlacementTransport(Placement(selected.Id).Column, Placement(selected.Id).Row, Placement(selected.Id).Width, Placement(selected.Id).Height))" Changed="view => ConfigureWidget(view.Widget, settingsOwner)" PlacementChanged="placement => ChangeSettingsPlacementAsync(selected, placement, settingsOwner)" />
+                                    @if (_settingsFeedback is { } feedback) {
+                                        <p class="dashboard-feedback" role="status">@feedback</p>
+                                    }
                                 </div>
                             }
                         </dialog>

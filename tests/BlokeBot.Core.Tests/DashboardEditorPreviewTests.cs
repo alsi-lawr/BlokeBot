@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Globalization;
 using BlokeBot.Core.Features.Dashboards;
 using BlokeBot.Core.Features.Dashboards.Page;
 using BlokeBot.Persistence.Models;
@@ -133,6 +134,35 @@ public sealed class DashboardEditorPreviewTests
         page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
         reads.Count.ShouldBe(1);
         previews.ShouldAllBe(targets => ReferenceEquals(targets, metadata));
+    }
+
+    [Test]
+    [Arguments(300)]
+    [Arguments(86400)]
+    [Arguments(90000)]
+    [Arguments(31536000)]
+    public void CountdownPreviewRepresentsTheWholeSavedDuration(int seconds)
+    {
+        var duration = TimeSpan.FromSeconds(seconds);
+        var widget = new DashboardWidget(
+            new(Guid.NewGuid()),
+            "Break",
+            new DashboardWidgetConfiguration.Countdown(
+                new DashboardBinding.Configured(new DashboardTarget.Countdown("break")),
+                duration
+            )
+        );
+        var saved = DashboardDocuments.Deserialize(
+            DashboardDocuments.Serialize(DashboardDocument.Create(12, (widget, new(0, 0, 6, 5, 0))))
+        );
+        using var ui = new BunitContext();
+        var preview = ui.Render<DashboardWidgetPreview>(p =>
+            p.Add(x => x.View, new DashboardWidgetView(saved.Widgets.Single()))
+                .Add(x => x.Targets, new DashboardEditorTargets(new()))
+        );
+        TimeSpan
+            .Parse(preview.Find(".dashboard-value").TextContent, CultureInfo.InvariantCulture)
+            .ShouldBe(duration);
     }
 
     private sealed class PollMetadataReads : DbCommandInterceptor

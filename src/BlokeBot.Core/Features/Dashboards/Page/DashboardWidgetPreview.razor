@@ -19,7 +19,7 @@
                 <p class="dashboard-status">@_target@(value.Selection is DashboardValueSelection.DictionaryEntry entry ? $" · {entry.Key}" : string.Empty)</p>
                 break;
             case DashboardWidgetConfiguration.Countdown countdown:
-                <div class="dashboard-value">@countdown.DefaultDuration.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture)</div>
+                <div class="dashboard-value">@countdown.DefaultDuration.ToString("c", CultureInfo.InvariantCulture)</div>
                 <p class="dashboard-status">@((countdown.Binding as DashboardBinding.Configured)?.Target is DashboardTarget.Countdown timer ? timer.Name : null) · default duration</p>
                 <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="play" />Start countdown</button>
                 break;

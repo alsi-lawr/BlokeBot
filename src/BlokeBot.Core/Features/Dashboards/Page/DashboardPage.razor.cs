@@ -145,6 +145,15 @@ public partial class DashboardPage
         }
     }
 
+    protected override bool ShouldRender()
+    {
+        if (_settingsOpen && _selectedWidget is null)
+        {
+            HideSettings();
+        }
+        return base.ShouldRender();
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (
@@ -191,10 +200,6 @@ public partial class DashboardPage
             {
                 _focusToolbox = false;
                 await _toolbox.FocusSearchAsync();
-            }
-            if (_settingsOpen && _selectedWidget is null)
-            {
-                HideSettings();
             }
             await _grid.InvokeVoidAsync(
                 "syncSettings",

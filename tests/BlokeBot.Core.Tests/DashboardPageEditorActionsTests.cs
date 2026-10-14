@@ -717,6 +717,125 @@ public sealed class DashboardPageEditorActionsTests
         page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
     }
 
+    [Test]
+    public async Task UndoAddedModalTargetClosesWithRenderedOwnerAndPreservesReplacement()
+    {
+        await using var fixture = await Fixture.CreateAsync(true);
+        var page = fixture.Page;
+        page.Find("#dashboard-arrangement").Change("Phone");
+        var phone = fixture.Geometry;
+        page.Find("#dashboard-arrangement").Change("Desktop");
+        var desktop = fixture.Geometry;
+        await page.Find("button[aria-label='Add widget']").ClickAsync(new());
+        await page.Find("button[aria-label='Add Countdown']").ClickAsync(new());
+        var settings = page.FindComponent<DashboardWidgetSettings>();
+        settings.Instance.View.Widget.Id.Value.ShouldNotBe(fixture.First);
+        var owner = page.Find("[data-settings-owner]").GetAttribute("data-settings-owner")!;
+        var close = page.FindComponents<BlokeBot.Core.Components.EditorAction>()
+            .Single(action => action.Instance.Label == "Close settings")
+            .Instance.Click;
+        fixture
+            .Grid.Invocations["syncSettings"]
+            .Last()
+            .Arguments[1]
+            .ShouldBe(settings.Instance.View.Widget.Id.Value.ToString());
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Undo, fixture.Context)
+        );
+        var sync = fixture.Grid.Invocations["syncSettings"].Last();
+        sync.Arguments[1].ShouldBeNull();
+        sync.Arguments[0]
+            .ShouldBe(page.Find("[data-settings-owner]").GetAttribute("data-settings-owner"));
+        fixture.Geometry.ShouldBe(desktop);
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeFalse();
+        page.Find("#dashboard-arrangement").Change("Phone");
+        fixture.Geometry.ShouldBe(phone);
+        page.Find("#dashboard-arrangement").Change("Desktop");
+        await page.Find("button[aria-label='Configure Second']").ClickAsync(new());
+        await page.InvokeAsync(close.InvokeAsync);
+        await page.InvokeAsync(() => page.Instance.SettingsClosedAsync(owner));
+        fixture
+            .Grid.Invocations["syncSettings"]
+            .Last()
+            .Arguments[1]
+            .ShouldBe(fixture.Second.ToString());
+        page.FindComponent<DashboardWidgetSettings>().Instance.View.Widget.Label.ShouldBe("Second");
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task NumericRefusalIsOwnedByOpenSettingsAndDoesNotConsumeHistory()
+    {
+        await using var fixture = await Fixture.CreateAsync(true);
+        var page = fixture.Page;
+        var desktop = fixture.Geometry;
+        await page.Find("button[aria-label='Configure First']").ClickAsync(new());
+        await page.Find("input[data-placement-field='Width']").ChangeAsync(new() { Value = "13" });
+        var reason = page.Find("[data-dashboard-settings] [role='status']").TextContent;
+        reason.ShouldNotBeNullOrWhiteSpace();
+        fixture.Geometry.ShouldBe(desktop);
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
+        await page.Find("input[data-placement-field='Width']").ChangeAsync(new() { Value = "3" });
+        fixture.Placement(fixture.First).Width.ShouldBe(3);
+        page.FindAll("[data-dashboard-settings] [role='status']").ShouldBeEmpty();
+        await page.Find("button[aria-label='Close settings']").ClickAsync(new());
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
+        await page.Find("button[aria-label='Configure First']").ClickAsync(new());
+        await page.Find("input[data-placement-field='Width']").ChangeAsync(new() { Value = "13" });
+        var oldPlacement = page.FindComponent<DashboardWidgetSettings>().Instance.PlacementChanged;
+        await page.Find("button[aria-label='Close settings']").ClickAsync(new());
+        await page.Find("button[aria-label='Configure Second']").ClickAsync(new());
+        var changed = fixture.Geometry;
+        page.FindAll("[data-dashboard-settings] [role='status']").ShouldBeEmpty();
+        await page.InvokeAsync(() => oldPlacement.InvokeAsync(new(0, 0, 99, 3)));
+        fixture.Geometry.ShouldBe(changed);
+        page.FindAll("[data-dashboard-settings] [role='status']").ShouldBeEmpty();
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Undo, fixture.Context)
+        );
+        fixture.Geometry.ShouldBe(desktop);
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task DelayedNumericConfirmationCannotImportFeedbackIntoReplacementSettings()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        var original = fixture.Geometry;
+        await page.Find("button[aria-label='Configure First']").ClickAsync(new());
+        var placement = page.FindComponent<Bunit.TestDoubles.Stub<DashboardWidgetSettings>>()
+            .Instance.Parameters.Get(x => x.PlacementChanged);
+        var confirm = fixture.Ui.JSInterop.Setup<bool>("confirm", _ => true);
+        Task? changing = null;
+        await page.InvokeAsync(() =>
+        {
+            changing = placement.InvokeAsync(new(0, 0, 8, 3));
+        });
+        page.WaitForAssertion(() => confirm.Invocations.ShouldHaveSingleItem());
+        await page.Find("button[aria-label='Configure Second']").ClickAsync(new());
+        page.Find("#dashboard-columns").Change("3");
+        var reason = page.Find(".dashboard-feedback").TextContent;
+        _ = confirm.SetResult(true);
+        await changing!;
+        fixture.Geometry.ShouldBe(original);
+        page.Find(".dashboard-feedback").TextContent.ShouldBe(reason);
+        page.FindAll("[data-dashboard-settings] [role='status']").ShouldBeEmpty();
+        page.FindComponent<Bunit.TestDoubles.Stub<DashboardWidgetSettings>>()
+            .Instance.Parameters.Get(x => x.View)
+            .Widget.Label.ShouldBe("Second");
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         internal required SqliteBlokeBotDbFactory Database { get; init; }
