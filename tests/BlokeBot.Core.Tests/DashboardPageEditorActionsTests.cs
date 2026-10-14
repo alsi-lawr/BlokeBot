@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BlokeBot.Core.Features.Dashboards;
 using BlokeBot.Core.Features.Dashboards.Page;
 using BlokeBot.Persistence.Models;
@@ -10,6 +11,155 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class DashboardPageEditorActionsTests
 {
+    [Test]
+    [Arguments("Gesture", false)]
+    [Arguments("Gesture", true)]
+    [Arguments("Arrangement", false)]
+    [Arguments("Arrangement", true)]
+    [Arguments("Reload", false)]
+    [Arguments("Reload", true)]
+    public async Task DelayedToolboxCompletionPreservesNewerPendingEdit(
+        string boundary,
+        bool accept
+    )
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        await page.Find("button[aria-label='Configure First']").ClickAsync(new());
+        var confirm = fixture.Ui.JSInterop.Setup<bool>("confirm", _ => true);
+        Task? dropping = null;
+        await page.InvokeAsync(async () =>
+        {
+            await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
+            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin);
+            dropping = page.Instance.ToolboxDropped(
+                fixture.Route,
+                fixture.Origin,
+                "Countdown",
+                0,
+                0
+            );
+        });
+        page.WaitForAssertion(() => confirm.Invocations.ShouldHaveSingleItem());
+        if (boundary == "Arrangement")
+        {
+            page.Find("#dashboard-arrangement").Change("Phone");
+        }
+        else if (boundary == "Reload")
+        {
+            await page.InvokeAsync(() =>
+                page.Instance.SetParametersAsync(
+                    ParameterView.FromDictionary(
+                        new Dictionary<string, object?>
+                        {
+                            [nameof(DashboardPage.Dashboard)] = fixture.Dashboard,
+                        }
+                    )
+                )
+            );
+        }
+        await page.Find("button[aria-label='Configure Second']").ClickAsync(new());
+        page.Find("#dashboard-columns").Change("3");
+        var feedback = page.Find(".dashboard-feedback").TextContent;
+        await page.InvokeAsync(async () =>
+        {
+            await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
+            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin);
+        });
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
+        var geometry = fixture.Geometry;
+        var origin = fixture.Origin;
+        var focusRequests = fixture.Grid.Invocations.Count(i => i.Identifier == "focusPanel");
+        var cancellations = fixture.Grid.Invocations.Count(i => i.Identifier == "cancel");
+
+        _ = confirm.SetResult(accept);
+        await dropping!;
+
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
+        page.Find(".dashboard-feedback").TextContent.ShouldBe(feedback);
+        fixture.Geometry.ShouldBe(geometry);
+        fixture.Origin.ShouldBe(origin);
+        fixture.Grid.Invocations.Count(i => i.Identifier == "focusPanel").ShouldBe(focusRequests);
+        fixture.Grid.Invocations.Count(i => i.Identifier == "cancel").ShouldBe(cancellations);
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+        page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
+        var menu = await page.InvokeAsync(() =>
+            page.Instance.PrepareEditorMenuAsync(fixture.Context, false, null)
+        );
+        menu!.Target.ShouldBe("Second");
+        await page.InvokeAsync(() =>
+            page.Instance.PlacementChanged(
+                fixture.Route,
+                origin,
+                fixture.First.ToString(),
+                new(0, 6, 4, 3),
+                false,
+                1
+            )
+        );
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeFalse();
+        await page.Find("button[aria-label='Undo']").ClickAsync(new());
+        fixture.Geometry.ShouldBe(geometry);
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+    }
+
+    [Test]
+    [Arguments("Accept")]
+    [Arguments("Cancel")]
+    [Arguments("Bounds")]
+    public async Task CurrentToolboxDropFinalizesOnlyItsOwnPendingEdit(string outcome)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        var geometry = fixture.Geometry;
+        var confirm = fixture.Ui.JSInterop.Setup<bool>("confirm", _ => true);
+        Task? dropping = null;
+        await page.InvokeAsync(async () =>
+        {
+            await page.Instance.GestureStarted(fixture.Route, fixture.Origin);
+            await page.Instance.LocalEditStarted(fixture.Route, fixture.Origin);
+            dropping = page.Instance.ToolboxDropped(
+                fixture.Route,
+                fixture.Origin,
+                "Countdown",
+                outcome == "Bounds" ? 99 : 0,
+                0
+            );
+        });
+        if (outcome != "Bounds")
+        {
+            page.WaitForAssertion(() => confirm.Invocations.ShouldHaveSingleItem());
+            _ = confirm.SetResult(outcome == "Accept");
+        }
+        await dropping!;
+        if (outcome == "Accept")
+        {
+            var menu = await page.InvokeAsync(() =>
+                page.Instance.PrepareEditorMenuAsync(fixture.Context, false, null)
+            );
+            menu!.Target.ShouldBe("Countdown");
+            fixture.CardCount.ShouldBe(1);
+            page.Find("#dashboard-arrangement").Change("Phone");
+            fixture.CardCount.ShouldBe(1);
+            await page.Find("button[aria-label='Undo']").ClickAsync(new());
+            fixture.CardCount.ShouldBe(2);
+            page.Find("#dashboard-arrangement").Change("Desktop");
+            fixture.Geometry.ShouldBe(geometry);
+            page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+            page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+            await page.Find("button[aria-label='Redo']").ClickAsync(new());
+            fixture.CardCount.ShouldBe(1);
+        }
+        else
+        {
+            fixture.Geometry.ShouldBe(geometry);
+            page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+            page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
+            page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
+        }
+    }
+
     [Test]
     [Arguments("Accept")]
     [Arguments("Cancel")]
@@ -272,12 +422,15 @@ public sealed class DashboardPageEditorActionsTests
         internal required BunitContext Ui { get; init; }
         internal required IRenderedComponent<DashboardPage> Page { get; init; }
         internal required BunitJSModuleInterop Grid { get; init; }
+        internal required BunitJSModuleInterop Module { get; init; }
         internal required NavigationManager Navigation { get; init; }
         internal required Guid Dashboard { get; init; }
         internal required Guid First { get; init; }
         internal required Guid Second { get; init; }
-        internal required long Route { get; init; }
+        internal long Route => (long)Module.Invocations["create"].Last().Arguments[2]!;
         internal long Origin => (long)Grid.Invocations["sync"].Last().Arguments[3]!;
+        internal string Geometry =>
+            JsonSerializer.Serialize(Grid.Invocations["sync"].Last().Arguments[0]);
         internal string Context =>
             Page.Find("[data-editor-menu-context]").GetAttribute("data-editor-menu-context")!;
         internal int CardCount => Page.FindAll("[data-widget-id]").Count;
@@ -344,11 +497,11 @@ public sealed class DashboardPageEditorActionsTests
                 Ui = ui,
                 Page = page,
                 Grid = grid,
+                Module = module,
                 Navigation = navigation,
                 Dashboard = dashboard,
                 First = first.Id.Value,
                 Second = second.Id.Value,
-                Route = (long)module.Invocations["create"].Single().Arguments[2]!,
             };
         }
 

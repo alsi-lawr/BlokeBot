@@ -125,7 +125,28 @@ public partial class DashboardPage
             return;
         }
         var placement = free with { Column = column, Row = row };
-        if (await ApplyPlacementAsync(_edit.ProposeAdd(widget, _arrangementKind, placement)))
+        var edit = _edit;
+        var gesture = _gestureGeneration;
+        var host = HostId;
+        var context = _editorContext;
+        var applied = await ApplyPlacementAsync(
+            edit.ProposeAdd(widget, _arrangementKind, placement)
+        );
+        if (
+            _disposed
+            || _loading
+            || !_editing
+            || _edit != edit
+            || generation != _loadGeneration
+            || interaction != _interactionGeneration
+            || gesture != _gestureGeneration
+            || host != HostId
+            || (!applied && context != _editorContext)
+        )
+        {
+            return;
+        }
+        if (applied)
         {
             _selected = widget.Id;
             _focusSettings = true;
