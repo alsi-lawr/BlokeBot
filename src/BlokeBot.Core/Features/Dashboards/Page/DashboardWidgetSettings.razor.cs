@@ -1,4 +1,3 @@
-using BlokeBot.Core.Auth.Sessions;
 using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Dashboards.Page;
@@ -9,13 +8,10 @@ public partial class DashboardWidgetSettings
     public required DashboardWidgetView View { get; set; }
 
     [Parameter]
-    public int HostId { get; set; }
+    public required DashboardPlacementTransport Placement { get; set; }
 
     [Parameter, EditorRequired]
-    public required AuthenticatedSession Session { get; set; }
-
-    [Parameter]
-    public required DashboardPlacementTransport Placement { get; set; }
+    public required DashboardEditorTargets Targets { get; set; }
 
     [Parameter]
     public EventCallback<DashboardWidgetView> Changed { get; set; }
@@ -23,54 +19,12 @@ public partial class DashboardWidgetSettings
     [Parameter]
     public EventCallback<DashboardPlacementTransport> PlacementChanged { get; set; }
     private DashboardWidget _widget => View.Widget;
-    private IReadOnlyList<DashboardTargetOption> _options = [];
-    private (int Host, DashboardWidgetKind Kind)? _loaded;
-    private string? _feedback;
-    private long _generation;
-    private bool _disposed;
+    private IReadOnlyList<DashboardTargetOption> _options =>
+        Targets.Options(DashboardWidgetKinds.Kind(_widget.Configuration));
     private string _selectedKey =>
         _widget.Configuration.Binding is DashboardBinding.Configured bound
             ? _options.FirstOrDefault(o => o.Target == bound.Target)?.Key ?? string.Empty
             : string.Empty;
-
-    protected override async Task OnParametersSetAsync()
-    {
-        var identity = (HostId, DashboardWidgetKinds.Kind(_widget.Configuration));
-        if (_loaded == identity)
-        {
-            return;
-        }
-        var generation = ++_generation;
-        _loaded = identity;
-        var result = await _targets.ReadAsync(
-            Session,
-            new(HostId),
-            identity.Item2,
-            CancellationToken.None
-        );
-        if (_disposed || generation != _generation)
-        {
-            return;
-        }
-        _ = result.Match(
-            loaded =>
-            {
-                _options = loaded.Value;
-                return 0;
-            },
-            denied =>
-            {
-                _feedback = $"Targets unavailable: {denied.Reason}.";
-                return 0;
-            }
-        );
-    }
-
-    public void Dispose()
-    {
-        _disposed = true;
-        ++_generation;
-    }
 
     private Task ChangeAsync(DashboardWidget widget) =>
         Changed.InvokeAsync(new DashboardWidgetView(widget));

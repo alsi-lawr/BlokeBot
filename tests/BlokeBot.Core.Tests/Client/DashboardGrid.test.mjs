@@ -8,7 +8,8 @@ import { placementFromPointer } from "../../../src/BlokeBot.Core/wwwroot/Feature
 const source = await readFile(new URL("../../../src/BlokeBot.Core/Features/Dashboards/Page/DashboardPage.razor.js", import.meta.url), "utf8");
 const menuAsset = new URL("../../../src/BlokeBot.Core/wwwroot/Components/EditorContextMenu.js", import.meta.url).href;
 const dragAsset = new URL("../../../src/BlokeBot.Core/wwwroot/Features/Dashboards/Page/DashboardGridDrag.js", import.meta.url).href;
-const { create } = await import(`data:text/javascript;base64,${Buffer.from(source.replace("../../../Components/EditorContextMenu.js", menuAsset).replace("./DashboardGridDrag.js", dragAsset)).toString("base64")}`);
+const settingsAsset = new URL("../../../src/BlokeBot.Core/wwwroot/Features/Dashboards/Page/DashboardSettingsDialog.js", import.meta.url).href;
+const { create } = await import(`data:text/javascript;base64,${Buffer.from(source.replace("../../../Components/EditorContextMenu.js", menuAsset).replace("./DashboardGridDrag.js", dragAsset).replace("./DashboardSettingsDialog.js", settingsAsset)).toString("base64")}`);
 const deferred = () => {
   let resolve;
   const promise = new Promise(r => { resolve = r; });
@@ -304,4 +305,18 @@ test("viewport teardown contains a synchronously disconnected interop callback",
     await queued();
     assert.equal(errors.length, 1);
   } finally { console.error = original; f.api.dispose(); }
+});
+
+test('right-click leaves selection to captured menu prepare, while primary card selection remains focused', () => {
+  const f = fixture();
+  const target = new Surface();
+  target.closest = selector => selector === '[data-widget-id]' ? f.card : null;
+  try {
+    let prevented = false;
+    f.grid.emit('pointerdown', { target, button: 2, preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+    assert.equal(f.card.focused, undefined);
+    f.grid.emit('pointerdown', { target, button: 0 });
+    assert.deepEqual(f.card.focused, { preventScroll: true });
+  } finally { f.api.dispose(); }
 });

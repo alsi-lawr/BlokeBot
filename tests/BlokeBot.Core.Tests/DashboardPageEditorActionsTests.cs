@@ -69,7 +69,9 @@ public sealed class DashboardPageEditorActionsTests
         page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
         var geometry = fixture.Geometry;
         var origin = fixture.Origin;
-        var focusRequests = fixture.Grid.Invocations.Count(i => i.Identifier == "focusPanel");
+        var focusRequests = fixture.Grid.Invocations.Count(i =>
+            i.Identifier == "focusSettingsFields"
+        );
         var cancellations = fixture.Grid.Invocations.Count(i => i.Identifier == "cancel");
 
         _ = confirm.SetResult(accept);
@@ -79,7 +81,9 @@ public sealed class DashboardPageEditorActionsTests
         page.Find(".dashboard-feedback").TextContent.ShouldBe(feedback);
         fixture.Geometry.ShouldBe(geometry);
         fixture.Origin.ShouldBe(origin);
-        fixture.Grid.Invocations.Count(i => i.Identifier == "focusPanel").ShouldBe(focusRequests);
+        fixture
+            .Grid.Invocations.Count(i => i.Identifier == "focusSettingsFields")
+            .ShouldBe(focusRequests);
         fixture.Grid.Invocations.Count(i => i.Identifier == "cancel").ShouldBe(cancellations);
         page.Find("button[aria-label='Undo']").HasAttribute("disabled").ShouldBeTrue();
         page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
@@ -553,6 +557,166 @@ public sealed class DashboardPageEditorActionsTests
         page.Find("button[aria-label='Redo']").HasAttribute("disabled").ShouldBeTrue();
     }
 
+    [Test]
+    [Arguments("Desktop")]
+    [Arguments("Phone")]
+    public async Task ContextualWidthAndMovementUseActiveArrangementAndOneAggregateHistory(
+        string arrangement
+    )
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        page.Find("#dashboard-arrangement").Change(arrangement);
+        var baseline = fixture.Geometry;
+        var selected = await page.InvokeAsync(() =>
+            page.Instance.PrepareEditorMenuAsync(fixture.Context, true, fixture.First)
+        );
+        selected!.MoveLeft.ShouldBeFalse();
+        selected.Narrow.ShouldBeTrue();
+        selected.MoveRight.ShouldBe(arrangement == "Desktop");
+        selected.Widen.ShouldBe(arrangement == "Desktop");
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Narrow, selected.Context)
+        );
+        fixture.Placement(fixture.First).Width.ShouldBe(3);
+        var narrow = fixture.Geometry;
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Widen, selected.Context)
+        );
+        fixture.Geometry.ShouldBe(narrow);
+        var current = await page.InvokeAsync(() =>
+            page.Instance.PrepareEditorMenuAsync(fixture.Context, false, null)
+        );
+        current!.MoveRight.ShouldBeTrue();
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.MoveRight, current.Context)
+        );
+        fixture.Placement(fixture.First).Column.ShouldBe(1);
+        fixture.Placement(fixture.First).Width.ShouldBe(3);
+        await page.Find("button[aria-label='Undo']").ClickAsync(new());
+        fixture.Geometry.ShouldBe(narrow);
+        await page.Find("button[aria-label='Undo']").ClickAsync(new());
+        fixture.Geometry.ShouldBe(baseline);
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+        page.Find("#dashboard-arrangement").Change(arrangement == "Desktop" ? "Phone" : "Desktop");
+        fixture.Placement(fixture.First).Width.ShouldBe(4);
+        fixture.Placement(fixture.First).Column.ShouldBe(0);
+        var empty = await page.InvokeAsync(() =>
+            page.Instance.PrepareEditorMenuAsync(fixture.Context, true, null)
+        );
+        empty!.Settings.ShouldBeFalse();
+        empty.Position.ShouldBeFalse();
+        empty.Narrow.ShouldBeFalse();
+        empty.MoveRight.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task SettingsCloseKeepsPageDraftAndHistoryReconcilesWithoutRevivingOldModalOwner()
+    {
+        await using var fixture = await Fixture.CreateAsync(true);
+        var page = fixture.Page;
+        var menu = await page.InvokeAsync(() =>
+            page.Instance.PrepareEditorMenuAsync(fixture.Context, true, fixture.First)
+        );
+        fixture.Grid.Invocations["syncSettings"].Last().Arguments[1].ShouldBeNull();
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Position, menu!.Context)
+        );
+        fixture.Grid.Invocations["focusSettingsFields"].Last().Arguments[1].ShouldBe(true);
+        var owner = page.Find("[data-settings-owner]").GetAttribute("data-settings-owner")!;
+        var close = page.FindComponents<BlokeBot.Core.Components.EditorAction>()
+            .Single(action => action.Instance.Label == "Close settings")
+            .Instance.Click;
+        var label = $"#dashboard-widget-{fixture.First}-label";
+        page.Find(label).Input("Edited in modal");
+        await page.Find("button[aria-label='Close settings']").ClickAsync(new());
+        fixture.Grid.Invocations["syncSettings"].Last().Arguments[1].ShouldBeNull();
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Unsaved");
+        await page.Find("button[aria-label='Configure Edited in modal']").ClickAsync(new());
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Undo, fixture.Context)
+        );
+        page.Find(label).GetAttribute("value").ShouldBe("First");
+        fixture
+            .Grid.Invocations["syncSettings"]
+            .Last()
+            .Arguments[1]
+            .ShouldBe(fixture.First.ToString());
+        await page.InvokeAsync(close.InvokeAsync);
+        await page.InvokeAsync(() => page.Instance.SettingsClosedAsync(owner));
+        fixture
+            .Grid.Invocations["syncSettings"]
+            .Last()
+            .Arguments[1]
+            .ShouldBe(fixture.First.ToString());
+        await page.InvokeAsync(() =>
+            page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Redo, fixture.Context)
+        );
+        page.Find(label).GetAttribute("value").ShouldBe("Edited in modal");
+        await page.Find("button[aria-label='Close settings']").ClickAsync(new());
+        await page.Find("button[aria-label='Save dashboard']").ClickAsync(new());
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var row = await db.ChannelDashboards.FindAsync(fixture.Dashboard);
+        DashboardDocuments
+            .Deserialize(row!.DocumentJson)
+            .Widgets.Single(w => w.Id.Value == fixture.First)
+            .Label.ShouldBe("Edited in modal");
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+    }
+
+    [Test]
+    [Arguments("Arrangement")]
+    [Arguments("Undo")]
+    [Arguments("Reload")]
+    public async Task CapturedSettingsCallbackCannotWriteAfterOwnerBoundary(string boundary)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var page = fixture.Page;
+        await page.Find("button[aria-label='Configure First']").ClickAsync(new());
+        var stub = page.FindComponent<Bunit.TestDoubles.Stub<DashboardWidgetSettings>>();
+        var changed = stub.Instance.Parameters.Get(x => x.Changed);
+        var view = stub.Instance.Parameters.Get(x => x.View);
+        var owner = page.Find("[data-settings-owner]").GetAttribute("data-settings-owner")!;
+        if (boundary == "Arrangement")
+        {
+            page.Find("#dashboard-arrangement").Change("Phone");
+        }
+        else if (boundary == "Undo")
+        {
+            page.Find("#dashboard-name").Input("Transient");
+            await page.InvokeAsync(() =>
+                page.Instance.ApplyEditorMenuAsync(DashboardEditorMenuAction.Undo, fixture.Context)
+            );
+        }
+        else
+        {
+            await page.InvokeAsync(() =>
+                page.Instance.SetParametersAsync(
+                    ParameterView.FromDictionary(
+                        new Dictionary<string, object?>
+                        {
+                            [nameof(DashboardPage.Dashboard)] = fixture.Dashboard,
+                        }
+                    )
+                )
+            );
+        }
+        await page.InvokeAsync(() =>
+            changed.InvokeAsync(
+                new DashboardWidgetView(view.Widget with { Label = "Obsolete callback" })
+            )
+        );
+        await page.InvokeAsync(() => page.Instance.SettingsClosedAsync(owner));
+        await page.Find("button[aria-label='Save dashboard']").ClickAsync(new());
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var row = await db.ChannelDashboards.FindAsync(fixture.Dashboard);
+        DashboardDocuments
+            .Deserialize(row!.DocumentJson)
+            .Widgets.Single(w => w.Id.Value == fixture.First)
+            .Label.ShouldBe("First");
+        page.Find(".dashboard-save-state").TextContent.ShouldBe("Saved");
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         internal required SqliteBlokeBotDbFactory Database { get; init; }
@@ -573,7 +737,15 @@ public sealed class DashboardPageEditorActionsTests
             Page.Find("[data-editor-menu-context]").GetAttribute("data-editor-menu-context")!;
         internal int CardCount => Page.FindAll("[data-widget-id]").Count;
 
-        internal static async Task<Fixture> CreateAsync()
+        internal DashboardPlacement Placement(Guid id) =>
+            JsonSerializer
+                .SerializeToElement(Grid.Invocations["sync"].Last().Arguments[0])
+                .EnumerateArray()
+                .Single(item => item.GetProperty("id").GetString() == id.ToString())
+                .GetProperty("placement")
+                .Deserialize<DashboardPlacement>()!;
+
+        internal static async Task<Fixture> CreateAsync(bool renderSettings = false)
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
             var first = new DashboardWidget(
@@ -612,13 +784,17 @@ public sealed class DashboardPageEditorActionsTests
             }
             var ui = UiTestContextFactory.Create(database, hostId);
             _ = ui.Services.AddSingleton<DashboardAuthority>();
+            _ = ui.Services.AddSingleton<DashboardTargetCatalog>();
             _ = ui.Services.AddSingleton<DashboardConfigurationService>();
             _ = ui.Services.AddSingleton(
                 TestEventBus.CreateContinueAndRecord<DashboardRecentViewersChanged>().Events
             );
             _ = ui.Services.AddSingleton<DashboardRecentViewers>();
             _ = ui.ComponentFactories.AddStub<DashboardWidgetControl>();
-            _ = ui.ComponentFactories.AddStub<DashboardWidgetSettings>();
+            if (!renderSettings)
+            {
+                _ = ui.ComponentFactories.AddStub<DashboardWidgetSettings>();
+            }
             var module = ui.JSInterop.SetupModule(
                 "./Features/Dashboards/Page/DashboardPage.razor.js"
             );

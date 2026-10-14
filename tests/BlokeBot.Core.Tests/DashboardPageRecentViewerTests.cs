@@ -76,6 +76,7 @@ public sealed class DashboardPageRecentViewerTests
         }
         await using var ui = UiTestContextFactory.Create(database, hostId);
         _ = ui.Services.AddSingleton<DashboardAuthority>();
+        _ = ui.Services.AddSingleton<DashboardTargetCatalog>();
         _ = ui.Services.AddSingleton<DashboardConfigurationService>();
         _ = ui.Services.AddSingleton(
             TestEventBus.CreateContinueAndRecord<DashboardRecentViewersChanged>().Events

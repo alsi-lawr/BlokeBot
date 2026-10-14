@@ -12,7 +12,6 @@ public partial class DashboardPage
     private bool _focusSettings;
     private string _search = string.Empty;
     private EditorToolbox? _toolbox;
-    private EditorToolboxToggle? _toggle;
     private DashboardWidget? _selectedWidget =>
         _document.Widgets.FirstOrDefault(w => w.Id == _selected);
     private IReadOnlyList<DashboardWidgetKind> _toolboxKinds =>
@@ -34,35 +33,20 @@ public partial class DashboardPage
     private async Task CloseToolboxAsync()
     {
         _toolboxOpen = false;
-        if (_toggle is not null)
+        if (_grid is not null)
         {
-            await _toggle.FocusAsync();
+            await _grid.InvokeVoidAsync("focusAdd");
         }
     }
 
-    private Task SettingsAsync(DashboardWidgetId id)
+    private Task ConfigureWidget(DashboardWidget widget, string owner)
     {
-        _selected = id;
-        _focusSettings = true;
-        return Task.CompletedTask;
-    }
-
-    private async Task CloseSettingsAsync()
-    {
-        var selected = _selected;
-        _selected = null;
-        if (_grid is not null && selected is not null)
-        {
-            await _grid.InvokeVoidAsync("focusSettings", selected.Value.Value.ToString());
-        }
-    }
-
-    private Task SettingsKeyAsync(KeyboardEventArgs args) =>
-        args.Key == "Escape" ? CloseSettingsAsync() : Task.CompletedTask;
-
-    private Task ConfigureWidget(DashboardWidget widget)
-    {
-        if (_editing)
+        if (
+            _editorActionsAvailable
+            && _settingsOpen
+            && owner == _settingsOwner
+            && _selected == widget.Id
+        )
         {
             _edit?.Configure(widget);
         }
@@ -85,8 +69,7 @@ public partial class DashboardPage
             && _edit.Add(widget, _arrangementKind, placement)
         )
         {
-            _selected = widget.Id;
-            _focusSettings = true;
+            ShowSettings(widget.Id);
         }
         await CloseToolboxAsync();
     }
@@ -148,8 +131,7 @@ public partial class DashboardPage
         }
         if (applied)
         {
-            _selected = widget.Id;
-            _focusSettings = true;
+            ShowSettings(widget.Id);
         }
         else
         {
@@ -276,11 +258,12 @@ public partial class DashboardPage
             if (_selected == id)
             {
                 _selected = null;
+                HideSettings();
             }
         });
-        if (_toggle is not null)
+        if (_grid is not null)
         {
-            await _toggle.FocusAsync();
+            await _grid.InvokeVoidAsync("focusGrid");
         }
     }
 
@@ -305,6 +288,7 @@ public partial class DashboardPage
         {
             _edit?.Cancel();
             _selected = null;
+            HideSettings();
             _feedback = null;
         });
 

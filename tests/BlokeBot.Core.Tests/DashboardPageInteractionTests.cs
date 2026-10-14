@@ -59,6 +59,7 @@ public sealed class DashboardPageInteractionTests
         }
         await using var ui = UiTestContextFactory.Create(database, hostId);
         _ = ui.Services.AddSingleton<DashboardAuthority>();
+        _ = ui.Services.AddSingleton<DashboardTargetCatalog>();
         _ = ui.Services.AddSingleton<DashboardConfigurationService>();
         _ = ui.Services.AddSingleton(
             TestEventBus.CreateContinueAndRecord<DashboardRecentViewersChanged>().Events
@@ -86,6 +87,22 @@ public sealed class DashboardPageInteractionTests
         var oldOrigin = Origin();
         switch (boundary)
         {
+            case "Delete First":
+                var menu = await page.InvokeAsync(() =>
+                    page.Instance.PrepareEditorMenuAsync(
+                        page.Find("[data-editor-menu-context]")
+                            .GetAttribute("data-editor-menu-context")!,
+                        true,
+                        first.Id.Value
+                    )
+                );
+                await page.InvokeAsync(() =>
+                    page.Instance.ApplyEditorMenuAsync(
+                        DashboardEditorMenuAction.Delete,
+                        menu!.Context
+                    )
+                );
+                break;
             case "Arrangement":
                 page.Find("#dashboard-arrangement").Change("Phone");
                 break;

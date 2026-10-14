@@ -6,8 +6,27 @@ namespace BlokeBot.Simulation;
 
 internal sealed partial class SimulationNativeTwitchDashboardOperations
 {
+    private bool _auditEnabled;
+
+    internal void EnableAudit() => _auditEnabled = true;
+
+    private int _auditPollReads;
+    private int _auditPredictionReads;
+    private int _auditPollVotes;
+
+    internal SimulationDashboardProviderCounts AuditCounts() =>
+        new(
+            Volatile.Read(ref _auditPollReads),
+            Volatile.Read(ref _auditPredictionReads),
+            Volatile.Read(ref _auditPollVotes)
+        );
+
     internal async Task<int?> AddPollVoteAsync(int hostId, CancellationToken ct)
     {
+        if (_auditEnabled)
+        {
+            _ = Interlocked.Increment(ref _auditPollVotes);
+        }
         int votes;
         lock (_gate)
         {
@@ -47,6 +66,10 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_auditEnabled)
+        {
+            _ = Interlocked.Increment(ref _auditPollReads);
+        }
         lock (_gate)
         {
             var host = ForHost(hostId);
@@ -67,6 +90,10 @@ internal sealed partial class SimulationNativeTwitchDashboardOperations
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_auditEnabled)
+        {
+            _ = Interlocked.Increment(ref _auditPredictionReads);
+        }
         lock (_gate)
         {
             var host = ForHost(hostId);

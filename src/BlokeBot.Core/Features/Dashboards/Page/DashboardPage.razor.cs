@@ -9,6 +9,11 @@ public partial class DashboardPage
     [Inject]
     private TimeProvider _clock { get; set; } = default!;
 
+    [Inject]
+    private DashboardTargetCatalog _targets { get; set; } = default!;
+
+    private DashboardEditorTargets _editorTargets = new(new());
+
     [Parameter]
     public Guid? Dashboard { get; set; }
     private IReadOnlyList<DashboardSummary> _dashboards = [];
@@ -82,6 +87,8 @@ public partial class DashboardPage
             _localDirty = false;
             _gestureActive = false;
             _selected = null;
+            HideSettings();
+            _editorTargets = new(new());
             await DisposeGridAsync();
             _acknowledged = 0;
             _arrangementChosen = false;
@@ -109,6 +116,17 @@ public partial class DashboardPage
                     if (_editing)
                     {
                         _edit = new(snapshot.Value);
+                        var targets = await DashboardEditorTargets.ReadAsync(
+                            _targets,
+                            PageContext.Session,
+                            host,
+                            CancellationToken.None
+                        );
+                        if (_disposed || generation != _loadGeneration || host.Value != HostId)
+                        {
+                            return;
+                        }
+                        _editorTargets = targets;
                     }
                 }
                 else
@@ -174,10 +192,23 @@ public partial class DashboardPage
                 _focusToolbox = false;
                 await _toolbox.FocusSearchAsync();
             }
-            if (_focusSettings)
+            if (_settingsOpen && _selectedWidget is null)
+            {
+                HideSettings();
+            }
+            await _grid.InvokeVoidAsync(
+                "syncSettings",
+                _settingsOwner,
+                _settingsOpen ? _selected?.Value.ToString() : null
+            );
+            if (_focusSettings && _settingsOpen)
             {
                 _focusSettings = false;
-                await _grid.InvokeVoidAsync("focusPanel");
+                await _grid.InvokeVoidAsync(
+                    "focusSettingsFields",
+                    _settingsOwner,
+                    _positionSettings
+                );
             }
         }
         catch (JSDisconnectedException) { }

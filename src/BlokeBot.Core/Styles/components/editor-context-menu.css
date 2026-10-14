@@ -12,4 +12,4 @@
 .editor-menu kbd{font:inherit;font-size:.66rem;color:var(--app-text-muted);}
 .editor-menu>p{padding:.5rem .65rem;border-top:1px solid var(--app-border);font-size:.7rem;line-height:1.45;color:var(--app-text-muted);}
 .editor-menu .editor-icon{width:16px;height:16px;}
-.editor-menu-opener:has([aria-expanded=true])>.editor-action-tip{display:none;}
+.editor-menu-opener.editor-action:not([data-tip-dismissed]):has(>button[aria-expanded=true])>.editor-action-tip{display:none;}

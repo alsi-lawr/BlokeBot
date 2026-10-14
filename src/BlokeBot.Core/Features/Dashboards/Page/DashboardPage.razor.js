@@ -1,5 +1,6 @@
 import { createEditorMenu, isEditable } from "../../../Components/EditorContextMenu.js";
 import { createGridDrag } from './DashboardGridDrag.js';
+import { createSettingsDialog } from './DashboardSettingsDialog.js';
 
 export function create(root, dotnet, generation, interaction) {
   const grid = root.querySelector("[data-dashboard-grid]");
@@ -77,6 +78,17 @@ export function create(root, dotnet, generation, interaction) {
     if (!state.disposed) console.error('Dashboard interaction failed', error);
   };
   const drag = createGridDrag(root, grid, state, dotnet, generation, report);
+  const dialog = root.querySelector('[data-dashboard-settings]');
+  const settings = dialog ? createSettingsDialog(root, dialog, dotnet, report) : null;
+  const selectCard = event => {
+    if (root.dataset.editing !== 'true' || isEditable(event.target)) return;
+    const card = event.target.closest('[data-widget-id]');
+    if (!card) return;
+    // Native secondary-button focus would race the menu's captured selection/context.
+    if (event.button === 2) { event.preventDefault(); return; }
+    if (event.button === 0 && !event.target.closest('button,a')) card.focus({ preventScroll: true });
+  };
+  grid.addEventListener('pointerdown', selectCard);
   const beforeUnload = (event) => {
     if (state.dirty || state.gesture) {
       event.preventDefault();
@@ -211,15 +223,19 @@ export function create(root, dotnet, generation, interaction) {
     focusName() {
       root.querySelector(".dashboard-toolbar-selection input")?.focus();
     },
-    focusSettings(id) {
-      root.querySelector(`[data-settings-for="${id}"]`)?.focus();
+    focusAdd() {
+      if (!state.disposed) root.querySelector('[data-dashboard-add]')?.focus();
     },
-    focusPanel() {
-      root.querySelector("[data-dashboard-settings] input")?.focus();
+    focusGrid() {
+      if (!state.disposed) grid.focus({ preventScroll: true });
     },
+    syncSettings: (owner, id) => settings?.sync(owner, id),
+    focusSettingsFields: (owner, position) => settings?.focus(owner, position),
     dispose() {
       state.disposed = true;
       menu?.dispose();
+      settings?.dispose();
+      grid.removeEventListener('pointerdown', selectCard);
       root.removeEventListener('keydown', historyKey);
       clearTimeout(timer);
       drag.dispose();

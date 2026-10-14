@@ -1,0 +1,51 @@
+@using BlokeBot.Core.Features.Dashboards
+@using System.Globalization
+<div class="dashboard-widget-preview" data-edit-preview inert>
+    @if (_widget.Configuration.Binding is DashboardBinding.Unconfigured) {
+        <p class="dashboard-unavailable">Choose a target in settings.</p>
+    }
+    else if (_widget.Configuration is not DashboardWidgetConfiguration.Countdown && _target is null) {
+        <p class="dashboard-unavailable">Target unavailable. Choose a new target in settings.</p>
+    }
+    else {
+        @switch (_widget.Configuration) {
+            case DashboardWidgetConfiguration.Automation automation:
+                <p class="dashboard-status">@_target</p>
+                @if (automation.Data is DashboardTextOverride.Replace replacement) { <p class="dashboard-preview-text">@replacement.Text</p> }
+                <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="play" />Run Manual Run</button>
+                break;
+            case DashboardWidgetConfiguration.Value value:
+                <div class="dashboard-value">—</div>
+                <p class="dashboard-status">@_target@(value.Selection is DashboardValueSelection.DictionaryEntry entry ? $" · {entry.Key}" : string.Empty)</p>
+                break;
+            case DashboardWidgetConfiguration.Countdown countdown:
+                <div class="dashboard-value">@countdown.DefaultDuration.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture)</div>
+                <p class="dashboard-status">@((countdown.Binding as DashboardBinding.Configured)?.Target is DashboardTarget.Countdown timer ? timer.Name : null) · default duration</p>
+                <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="play" />Start countdown</button>
+                break;
+            case DashboardWidgetConfiguration.Poll:
+                <p class="dashboard-target">@_target</p>
+                <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="play" />Start poll</button>
+                break;
+            case DashboardWidgetConfiguration.Prediction:
+                <p class="dashboard-target">@_target</p>
+                <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="play" />Start prediction</button>
+                break;
+            case DashboardWidgetConfiguration.Giveaway:
+                <div class="dashboard-value">—<small> entrants</small></div>
+                <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="gift" />Start giveaway</button>
+                break;
+            case DashboardWidgetConfiguration.Guessing:
+                <p class="dashboard-target">@_target</p>
+                <button class="btn-secondary dashboard-operation-preview" type="button" disabled><EditorIcon Name="play" />Start round</button>
+                break;
+        }
+    }
+    <span class="dashboard-preview-note">Preview</span>
+</div>
+@code {
+    [Parameter, EditorRequired] public required DashboardWidgetView View { get; set; }
+    [Parameter, EditorRequired] public required DashboardEditorTargets Targets { get; set; }
+    private DashboardWidget _widget => View.Widget;
+    private string? _target => Targets.Label(_widget.Configuration);
+}

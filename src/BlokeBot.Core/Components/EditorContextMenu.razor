@@ -8,6 +8,7 @@
         <div role="menu" aria-label="Editor actions" aria-describedby="@($"{_id}-target {_id}-history {_id}-note")">
             <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="undo"><EditorIcon Name="undo" /><span>Undo</span><kbd>Ctrl Z</kbd></button>
             <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="redo"><EditorIcon Name="redo" /><span>Redo</span><kbd>Ctrl Y</kbd></button>
+            @AdditionalItems
             <button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="delete"><EditorIcon Name="delete" /><span>Delete selected</span><kbd>Del</kbd></button>
         </div>
         <p id="@($"{_id}-note")" data-editor-menu-note></p>
@@ -15,5 +16,6 @@
 </span>
 
 @code {
+    [Parameter] public RenderFragment? AdditionalItems { get; set; }
     private readonly string _id = $"editor-menu-{Guid.NewGuid():N}";
 }

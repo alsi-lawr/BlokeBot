@@ -29,6 +29,9 @@ public partial class DashboardWidgetControl
     public bool Editing { get; set; }
 
     [Parameter]
+    public DashboardEditorTargets EditorTargets { get; set; } = new(new());
+
+    [Parameter]
     public bool Visible { get; set; } = true;
 
     [Parameter]

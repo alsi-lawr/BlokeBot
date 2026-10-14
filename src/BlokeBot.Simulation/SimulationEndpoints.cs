@@ -43,6 +43,7 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
         SimulationDashboardRecentViewersFixture.Map(app);
+        SimulationDashboardAuditFixture.Map(app);
         app.MapViewerPortalMockup();
         app.MapFullOverlayFixtures();
         SimulationAutomationAuthoringFixture.MapEvidence(app);

@@ -54,7 +54,11 @@ public partial class DashboardPage
     private Task SwitchArrangementAsync(DashboardArrangementKind kind) =>
         kind == _arrangementKind
             ? Task.CompletedTask
-            : CancelGestureAsync(() => _arrangementKind = kind);
+            : CancelGestureAsync(() =>
+            {
+                _arrangementKind = kind;
+                HideSettings();
+            });
 
     private Task ColumnsChangedAsync(ChangeEventArgs args) => GridChangedAsync(args, true);
 

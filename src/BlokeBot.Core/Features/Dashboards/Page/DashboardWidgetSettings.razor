@@ -1,6 +1,4 @@
 @using BlokeBot.Core.Features.Dashboards
-@inject DashboardTargetCatalog _targets
-@implements IDisposable
 <Field Id='@($"dashboard-widget-{_widget.Id.Value}-label")' Label="Label" Value="@_widget.Label" ValueChanged="value => ChangeAsync(_widget with { Label = value })" />
 @if (_widget.Configuration is DashboardWidgetConfiguration.Countdown countdown) {
     <Field Id='@($"dashboard-widget-{_widget.Id.Value}-timer-name")' Label="Timer name" Value="@(countdown.Binding is DashboardBinding.Configured { Target: DashboardTarget.Countdown target } ? target.Name : string.Empty)" ValueChanged="TimerNameAsync" />
@@ -46,11 +44,8 @@ else {
         @foreach (var field in _placementFields) {
             <label class="field">
                 <span class="field__label">@field.Label</span>
-                <input class="field__input" type="number" min="@field.Min" @bind:get="field.Value" @bind:set="value => PlacementAsync(field.Kind, value)" />
+                <input class="field__input" data-placement-field="@field.Kind" type="number" min="@field.Min" @bind:get="field.Value" @bind:set="value => PlacementAsync(field.Kind, value)" />
             </label>
         }
     </div>
 </details>
-@if (_feedback is not null) {
-    <p role="status">@_feedback</p>
-}

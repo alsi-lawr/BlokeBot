@@ -8,10 +8,7 @@
 @inherits AuthenticatedPageComponent
 @implements IAsyncDisposable
 @if (Editing) {
-    <p class="dashboard-kind">@DashboardWidgetKinds.Label(DashboardWidgetKinds.Kind(_widget.Configuration))</p>
-    <p class="dashboard-target">@(_widget.Configuration.Binding is DashboardBinding.Unconfigured ? "Choose a target in settings" : "Configured target")</p>
-    <button type="button" class="btn-secondary dashboard-operation-preview" disabled>
-        <EditorIcon Name="@DashboardWidgetKinds.Icon(DashboardWidgetKinds.Kind(_widget.Configuration))" />@_widget.Label</button>
+    <DashboardWidgetPreview View="View" Targets="EditorTargets" />
 }
 else if (_unavailable is not null) {
     <p class="dashboard-unavailable" role="status">@_unavailable</p>
