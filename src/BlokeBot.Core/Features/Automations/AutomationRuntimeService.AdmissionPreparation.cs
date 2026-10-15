@@ -65,6 +65,61 @@ public sealed partial class AutomationRuntimeService
             AutomationRuntimeSerialization.RestoreDefinition(
                 AutomationRuntimeSerialization.SerializeDefinition(flow)
             );
+        var schemas = await AutomationCommandSource.LoadAsync(
+            db,
+            context.HostId,
+            cancellationToken
+        );
+        foreach (var source in sources)
+        {
+            if (
+                catalog.ValidatePersistedDefinition(Definition(source))
+                    is AutomationConfigurationCheck.Valid
+                    {
+                        Configuration: CustomCommandSourceConfiguration command
+                    }
+                && schemas.ContainsKey(command.CommandId.Value)
+                && (
+                    context.CommandArguments is not { Schema: not null } prepared
+                    || prepared.CommandId != command.CommandId.Value
+                )
+            )
+            {
+                return new AdmissionPreparation.Rejected(
+                    AutomationAdmissionRejectionReason.SourceConfiguration
+                );
+            }
+        }
+        original = original with
+        {
+            Flow = original.Flow with
+            {
+                Nodes =
+                [
+                    .. original.Flow.Nodes.Select(node =>
+                        catalog.ValidatePersistedDefinition(
+                            AutomationRuntimeSerialization.Definition(node)
+                        )
+                            is AutomationConfigurationCheck.Valid
+                            {
+                                Configuration: CustomCommandSourceConfiguration
+                            } valid
+                            ? node with
+                            {
+                                Contract = AutomationCommandSource.Contract(
+                                    new(node.Id),
+                                    AutomationCommandSource.Project(
+                                        valid.Definition,
+                                        valid.Configuration,
+                                        schemas
+                                    )
+                                ),
+                            }
+                            : node
+                    ),
+                ],
+            },
+        };
         var runs = ImmutableArray.CreateBuilder<PreparedAdmissionRun>();
         foreach (var source in sources)
         {

@@ -14,6 +14,8 @@ public sealed class CustomCommandEditor
 
     public bool SingleArgument { get; set; }
 
+    public CustomCommandArgumentSchema? ArgumentSchema { get; set; }
+
     public bool AllowEveryone { get; set; } = true;
 
     public bool AllowModerators { get; set; }
@@ -52,6 +54,10 @@ public sealed class CustomCommandEditor
                 return;
             }
 
+            if (value != CustomCommandActionKind.Automation)
+            {
+                ArgumentSchema = null;
+            }
             Action = value switch
             {
                 CustomCommandActionKind.Message => new MessageCustomCommandActionEditor

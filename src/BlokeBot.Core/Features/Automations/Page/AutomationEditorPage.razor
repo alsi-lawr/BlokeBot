@@ -261,7 +261,7 @@
                             <div class="automation-authoring-content">
                                 @if (_authoringTask == AutomationAuthoringTask.Scenarios)
                                 {
-                                    <AutomationScenarioPanel Editor="_scenario" Saved="_savedScenarios" Nodes="_editor.Nodes" Fields="_scenarioFields" Busy="_busy" CanSave="@(_editor.Id is not null)" InvalidInputs="@(_invalidFixtureInputs.Count > 0)" InputValidity="SetFixtureValidity" Select="SelectScenario" SourceChanged="SelectScenarioSource" New="NewScenario" Generate="GenerateScenarioFixture" Run="RunScenarioAsync" Save="SaveScenarioAsync" Duplicate="DuplicateScenarioAsync" Delete="DeleteScenarioAsync" Cancel="() => _scenarioCancellation?.Cancel()" />
+                                    <AutomationScenarioPanel Editor="_scenario" Saved="_savedScenarios" Nodes="_editor.Nodes" Fields="_scenarioFields" CommandSchemas="_commandSchemas" Busy="_busy" CanSave="@(_editor.Id is not null)" InvalidInputs="@(_invalidFixtureInputs.Count > 0)" InputValidity="SetFixtureValidity" Select="SelectScenario" SourceChanged="SelectScenarioSource" New="NewScenario" Generate="GenerateScenarioFixture" Run="RunScenarioAsync" Save="SaveScenarioAsync" Duplicate="DuplicateScenarioAsync" Delete="DeleteScenarioAsync" Cancel="() => _scenarioCancellation?.Cancel()" />
                                 }
                                 else if (_authoringTask == AutomationAuthoringTask.Extraction)
                                 {

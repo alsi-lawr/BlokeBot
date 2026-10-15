@@ -27,6 +27,12 @@ internal interface IOverlayConfigurationTransferAdapter
 
 internal interface IAutomationConfigurationTransferAdapter
 {
+    Task<CustomCommands.CustomCommandConfigurationSaveFailure.ArgumentDependency?> ValidateCommandArgumentsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken cancellationToken
+    );
+
     Task<ConfigurationSectionPreview> PreviewAsync(
         BlokeBotDbContext db,
         BotHost host,
@@ -88,6 +94,18 @@ internal sealed class UnavailableAutomationConfigurationTransferAdapter
     : IAutomationConfigurationTransferAdapter
 {
     internal static UnavailableAutomationConfigurationTransferAdapter Instance { get; } = new();
+
+    public Task<CustomCommands.CustomCommandConfigurationSaveFailure.ArgumentDependency?> ValidateCommandArgumentsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken cancellationToken
+    ) =>
+        Automations.AutomationCommandSourceCompatibility.CheckFinalAsync(
+            db,
+            hostId,
+            null,
+            cancellationToken
+        );
 
     public Task<ConfigurationSectionPreview> PreviewAsync(
         BlokeBotDbContext db,

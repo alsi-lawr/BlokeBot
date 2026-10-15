@@ -97,6 +97,7 @@ public sealed partial class CustomCommandConfigurationGraphWriter
             command.Name = TemporaryName("command", editor.Id);
             command.Enabled = editor.Enabled;
             command.SingleArgument = editor.SingleArgument;
+            command.ArgumentSchema = editor.ArgumentSchema;
             command.AllowEveryone = editor.AllowEveryone;
             command.AllowModerators = editor.AllowModerators;
             command.CooldownSeconds = editor.CooldownSeconds;

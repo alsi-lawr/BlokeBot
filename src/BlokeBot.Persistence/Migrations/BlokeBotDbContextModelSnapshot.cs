@@ -4555,6 +4555,9 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<bool>("AllowModerators")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ArgumentSchema")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CooldownScope")
                         .IsRequired()
                         .HasMaxLength(32)

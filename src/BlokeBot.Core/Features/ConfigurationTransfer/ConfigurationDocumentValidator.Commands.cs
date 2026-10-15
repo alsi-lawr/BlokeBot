@@ -75,6 +75,23 @@ internal static partial class ConfigurationDocumentValidator
         foreach (var command in section.Commands)
         {
             var path = $"sections.customCommands.commands[{command.Id}]";
+            if (
+                CustomCommands.CustomCommandArguments.Validate(command.ArgumentSchema) is
+                { } schemaError
+            )
+            {
+                return new($"{path}.argumentSchema", schemaError);
+            }
+            if (
+                command.ArgumentSchema is not null
+                && command.Action.Type != CustomCommandActionTypeV1.Automation
+            )
+            {
+                return new(
+                    $"{path}.argumentSchema",
+                    "Named arguments require an Automation action."
+                );
+            }
             if (Limit($"{path}.aliases", command.Aliases.Count) is { } aliasLimit)
             {
                 return aliasLimit;

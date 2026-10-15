@@ -8,7 +8,7 @@ namespace BlokeBot.Core.Features.ConfigurationTransfer;
 public sealed class ConfigurationDocumentCodec
 {
     public const string Format = "blokebot.channel-configuration";
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
     public const int MaximumRecordsPerCollection = 1_000;
 
     private static readonly JsonSerializerOptions _headerOptions = CreateOptions(
@@ -47,7 +47,7 @@ public sealed class ConfigurationDocumentCodec
 
             var document = header.Version switch
             {
-                CurrentVersion => JsonSerializer.Deserialize<ConfigurationDocumentV2>(
+                2 or CurrentVersion => JsonSerializer.Deserialize<ConfigurationDocumentV2>(
                     json.Span,
                     _documentOptions
                 ),
@@ -91,7 +91,18 @@ public sealed class ConfigurationDocumentCodec
     }
 
     public byte[] Serialize(ConfigurationDocumentV2 document) =>
-        JsonSerializer.SerializeToUtf8Bytes(document, _documentOptions);
+        JsonSerializer.SerializeToUtf8Bytes(
+            document with
+            {
+                Version =
+                    document.Sections.CustomCommands?.Commands.Any(command =>
+                        command.ArgumentSchema is not null
+                    ) == true
+                        ? CurrentVersion
+                        : document.Version,
+            },
+            _documentOptions
+        );
 
     private static ConfigurationDocumentParseOutcome.Invalid InsufficientMemory() =>
         new(

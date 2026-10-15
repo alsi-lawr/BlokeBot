@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bingo;
@@ -109,7 +110,7 @@ internal sealed partial class CustomCommandExecutionService(
             }
         }
 
-        if (command.SingleArgument)
+        if (command.SingleArgument && command.ArgumentSchema is null)
         {
             args = SingleArgument(context.Message.Text);
         }
@@ -134,59 +135,35 @@ internal sealed partial class CustomCommandExecutionService(
 
         if (automationAction is not null)
         {
-            var automationStreamRequired = RequiresStream(command.InvocationLimit);
-            var automationStream = await StreamIdAsync(true, hostLogin, ct);
-            if (automationStreamRequired && automationStream is StreamIdentity.Offline)
-            {
-                return new CustomCommandExecutionOutcome.StreamOffline();
-            }
-
-            if (
-                automationStreamRequired
-                && automationStream is StreamIdentity.Unavailable streamUnavailable
-            )
-            {
-                return new CustomCommandExecutionOutcome.StreamUnavailable(
-                    streamUnavailable.Failure
-                );
-            }
-
-            // Bot-authored commands must be allowed to trigger custom commands too.
-            var trigger = new AutomationTrigger(
-                CustomCommandAutomationContext.Create(
-                    host,
-                    command,
-                    alias,
-                    context.Message,
-                    args,
-                    automationStream is StreamIdentity.Available live ? live.StreamId : null,
-                    clock.GetUtcNow()
-                ),
-                new CustomCommandSourceConfiguration(new(command.Id))
-            );
-            var automation = await automations.DispatchAsync(
-                new(
-                    trigger,
+            var parsed = command.ArgumentSchema is { } schema
+                ? CustomCommandArguments.Parse(
                     command.Id,
-                    command.CooldownScope,
-                    context.Message.Login,
-                    Cooldown(command),
-                    command.InvocationLimit == CustomCommandInvocationLimit.Unlimited
-                        ? null
-                        : ClaimRequest(host.Id, command, context.Message, automationStream)
-                ),
-                ct
+                    alias,
+                    schema,
+                    CustomCommandArguments.OriginalTail(context.Message.Text)
+                )
+                : new CustomCommandArgumentParse.Prepared(
+                    new(command.Id, null, ImmutableDictionary<string, AutomationValue>.Empty)
+                );
+            return await parsed.Match(
+                prepared =>
+                    DispatchPreparedAutomationAsync(
+                        host,
+                        hostLogin,
+                        command,
+                        alias,
+                        context,
+                        args,
+                        prepared,
+                        ct
+                    ),
+                async rejected =>
+                {
+                    await context.ReplyAsync(rejected.Message, ct);
+                    return (CustomCommandExecutionOutcome)
+                        new CustomCommandExecutionOutcome.Handled();
+                }
             );
-            return automation switch
-            {
-                CustomCommandAutomationDispatchOutcome.Dispatched dispatched =>
-                    new CustomCommandExecutionOutcome.Automation(dispatched.Dispatch),
-                CustomCommandAutomationDispatchOutcome.Cooldown =>
-                    new CustomCommandExecutionOutcome.Cooldown(),
-                CustomCommandAutomationDispatchOutcome.AlreadyUsed =>
-                    new CustomCommandExecutionOutcome.AlreadyUsed(),
-                _ => throw new UnreachableException("Unknown automation dispatch outcome."),
-            };
         }
 
         var preparation = await PrepareInvocationAsync(
@@ -212,6 +189,73 @@ internal sealed partial class CustomCommandExecutionService(
                 return rejected.Outcome;
             }
         );
+    }
+
+    private async Task<CustomCommandExecutionOutcome> DispatchPreparedAutomationAsync(
+        BotHost host,
+        string hostLogin,
+        CustomCommand command,
+        string alias,
+        ChatCommandContext context,
+        IReadOnlyList<string> args,
+        CustomCommandArgumentParse.Prepared prepared,
+        CancellationToken ct
+    )
+    {
+        var automationStreamRequired = RequiresStream(command.InvocationLimit);
+        var automationStream = await StreamIdAsync(true, hostLogin, ct);
+        if (automationStreamRequired && automationStream is StreamIdentity.Offline)
+        {
+            return new CustomCommandExecutionOutcome.StreamOffline();
+        }
+
+        if (
+            automationStreamRequired
+            && automationStream is StreamIdentity.Unavailable streamUnavailable
+        )
+        {
+            return new CustomCommandExecutionOutcome.StreamUnavailable(streamUnavailable.Failure);
+        }
+
+        // Bot-authored commands must be allowed to trigger custom commands too.
+        var trigger = new AutomationTrigger(
+            CustomCommandAutomationContext.Create(
+                host,
+                command,
+                alias,
+                context.Message,
+                args,
+                automationStream is StreamIdentity.Available live ? live.StreamId : null,
+                clock.GetUtcNow()
+            ) with
+            {
+                CommandArguments = prepared.Arguments,
+            },
+            new CustomCommandSourceConfiguration(new(command.Id))
+        );
+        var automation = await automations.DispatchAsync(
+            new(
+                trigger,
+                command.Id,
+                command.CooldownScope,
+                context.Message.Login,
+                Cooldown(command),
+                command.InvocationLimit == CustomCommandInvocationLimit.Unlimited
+                    ? null
+                    : ClaimRequest(host.Id, command, context.Message, automationStream)
+            ),
+            ct
+        );
+        return automation switch
+        {
+            CustomCommandAutomationDispatchOutcome.Dispatched dispatched =>
+                new CustomCommandExecutionOutcome.Automation(dispatched.Dispatch),
+            CustomCommandAutomationDispatchOutcome.Cooldown =>
+                new CustomCommandExecutionOutcome.Cooldown(),
+            CustomCommandAutomationDispatchOutcome.AlreadyUsed =>
+                new CustomCommandExecutionOutcome.AlreadyUsed(),
+            _ => throw new UnreachableException("Unknown automation dispatch outcome."),
+        };
     }
 
     private async Task<StreamIdentity> StreamIdAsync(

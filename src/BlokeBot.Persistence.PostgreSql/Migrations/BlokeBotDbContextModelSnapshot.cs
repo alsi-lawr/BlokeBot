@@ -4694,6 +4694,9 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<bool>("AllowModerators")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ArgumentSchema")
+                        .HasColumnType("text");
+
                     b.Property<string>("CooldownScope")
                         .IsRequired()
                         .HasMaxLength(32)

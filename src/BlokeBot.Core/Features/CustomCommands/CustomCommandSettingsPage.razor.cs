@@ -28,6 +28,7 @@ public partial class CustomCommandSettingsPage
         Basics,
         Access,
         Action,
+        Arguments,
         FineTuning,
     }
 
@@ -883,6 +884,14 @@ public partial class CustomCommandSettingsPage
             Append(result, command.CooldownScope);
             Append(result, command.InvocationLimit);
             Append(result, command.SingleArgument);
+            Append(
+                result,
+                command.ArgumentSchema is null
+                    ? string.Empty
+                    : BlokeBot.Persistence.Models.CustomCommandArgumentSchema.Serialize(
+                        command.ArgumentSchema
+                    )
+            );
             Append(result, command.ActionKind);
             Append(result, command.Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId);
             Append(result, command.Action.ReplyRoutes.OneArgumentMessageLibraryEntryId);
@@ -981,6 +990,7 @@ public partial class CustomCommandSettingsPage
             CustomCommandValidationFieldKind.Name or CustomCommandValidationFieldKind.Aliases =>
                 CustomCommandStage.Basics,
             CustomCommandValidationFieldKind.AllowedUsers => CustomCommandStage.Access,
+            CustomCommandValidationFieldKind.Arguments => CustomCommandStage.Arguments,
             CustomCommandValidationFieldKind.Cooldown
             or CustomCommandValidationFieldKind.CooldownScope
             or CustomCommandValidationFieldKind.InvocationLimit
@@ -995,7 +1005,9 @@ public partial class CustomCommandSettingsPage
             builtInAliasCollision => CommandAliasesTarget(builtInAliasCollision.Alias),
             customAliasCollision => CommandAliasesTarget(customAliasCollision.Alias),
             _ => null,
-            cueReference => CommandTarget(cueReference.CommandId, cueReference.Field)
+            cueReference => CommandTarget(cueReference.CommandId, cueReference.Field),
+            dependency =>
+                CommandTarget(dependency.CommandId, CustomCommandValidationFieldKind.Arguments)
         );
 
     private CustomCommandConfigurationValidationTarget? CommandAliasesTarget(string alias)

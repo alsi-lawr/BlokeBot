@@ -155,6 +155,26 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasKey(static x => x.Id);
             _ = b.HasAlternateKey(static x => new { x.HostId, x.Id });
             _ = b.Property(static x => x.Name).HasMaxLength(128);
+            b.Property(static x => x.ArgumentSchema)
+                .HasConversion(
+                    static schema => CustomCommandArgumentSchema.Serialize(schema!),
+                    static json => CustomCommandArgumentSchema.Deserialize(json)
+                )
+                .Metadata.SetValueComparer(
+                    new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<CustomCommandArgumentSchema?>(
+                        (left, right) =>
+                            left == null
+                                ? right == null
+                                : right != null
+                                    && CustomCommandArgumentSchema.Serialize(left)
+                                        == CustomCommandArgumentSchema.Serialize(right),
+                        schema =>
+                            schema == null
+                                ? 0
+                                : CustomCommandArgumentSchema.Serialize(schema).GetHashCode(),
+                        schema => schema
+                    )
+                );
             _ = b.Property(static x => x.AllowEveryone).HasDefaultValue(true);
             _ = b.Property(static x => x.CooldownScope)
                 .HasConversion(

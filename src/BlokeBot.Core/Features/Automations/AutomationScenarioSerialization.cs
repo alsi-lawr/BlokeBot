@@ -76,7 +76,8 @@ internal static class AutomationScenarioSerialization
                 ],
                 fixture.Configurations,
                 fixture.Effects,
-                fixture.SyntheticRecipe
+                fixture.SyntheticRecipe,
+                fixture.CommandArgumentTail
             ),
             _options
         );
@@ -116,6 +117,7 @@ internal static class AutomationScenarioSerialization
         )
         {
             SyntheticRecipe = document.SyntheticRecipe,
+            CommandArgumentTail = document.CommandArgumentTail,
         };
     }
 
@@ -136,6 +138,7 @@ internal static class AutomationScenarioSerialization
         ImmutableArray<Input> ConnectedInputs,
         ImmutableArray<AutomationScenarioConfiguration> Configurations,
         ImmutableArray<AutomationScenarioEffect> Effects,
-        AutomationScenarioSyntheticRecipe? SyntheticRecipe = null
+        AutomationScenarioSyntheticRecipe? SyntheticRecipe = null,
+        string? CommandArgumentTail = null
     );
 }

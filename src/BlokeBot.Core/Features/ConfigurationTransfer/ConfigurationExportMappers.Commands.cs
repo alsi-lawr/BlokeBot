@@ -131,7 +131,8 @@ internal static partial class ConfigurationExportMappers
             value.CooldownScope,
             value.InvocationLimit,
             Action(value.Action, replyIds, counterIds, references),
-            value.SingleArgument
+            value.SingleArgument,
+            value.ArgumentSchema
         );
 
     private static CustomCommandActionV1 Action(

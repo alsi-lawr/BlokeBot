@@ -12,6 +12,8 @@ public sealed class CustomCommand
 
     public bool SingleArgument { get; set; }
 
+    public CustomCommandArgumentSchema? ArgumentSchema { get; set; }
+
     public bool AllowEveryone { get; set; } = true;
 
     public bool AllowModerators { get; set; }

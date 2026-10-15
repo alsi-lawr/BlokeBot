@@ -17,6 +17,10 @@ internal sealed record ConfigurationImportReferencePlan(
 )
 {
     internal HostFeatureFlags? EnabledFeatures { get; init; }
+    internal IReadOnlyDictionary<
+        string,
+        CustomCommandArgumentSchema?
+    > PlannedCommandSchemas { get; init; } = new Dictionary<string, CustomCommandArgumentSchema?>();
 
     internal static async Task<ConfigurationImportReferencePlan> BuildAsync(
         BlokeBotDbContext db,
@@ -211,8 +215,43 @@ internal sealed record ConfigurationImportReferencePlan(
                     (importedFlags & feature) == feature ? enabled | feature : enabled & ~feature;
             }
         }
+        var plannedSchemas = new Dictionary<string, CustomCommandArgumentSchema?>();
+        if (
+            selection.Sections.FirstOrDefault(section =>
+                section.Section == ConfigurationSectionId.CustomCommands
+            )
+                is { } commandSelection
+            && document.Sections.CustomCommands is { } commandSection
+        )
+        {
+            var existingCommands = await db
+                .CustomCommands.AsNoTracking()
+                .Where(command => command.HostId == hostId)
+                .Select(command => command.Name)
+                .ToArrayAsync(cancellationToken);
+            foreach (
+                var command in commandSection.Commands.Where(command =>
+                    !ConfigurationConflictIds.SkipsCustomCommand(
+                        command,
+                        commandSelection.ItemResolutions
+                    )
+                )
+            )
+            {
+                if (
+                    commandSelection.Strategy != ImportConflictStrategy.AddMissing
+                    || !existingCommands.Any(name =>
+                        NormalizeName(name) == NormalizeName(command.Name)
+                    )
+                )
+                {
+                    plannedSchemas[command.Name] = command.ArgumentSchema;
+                }
+            }
+        }
         return new(overlayIds, cueIds, mediaTargets, commandNames, rewardNames, issues)
         {
+            PlannedCommandSchemas = plannedSchemas,
             EnabledFeatures = enabled,
         };
     }

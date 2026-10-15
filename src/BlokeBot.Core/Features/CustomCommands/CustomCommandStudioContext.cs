@@ -31,6 +31,8 @@ public sealed class CustomCommandStudioContext
     public required Action<bool> SetAccessOpen { get; init; }
     public required Func<bool> ActionOpen { get; init; }
     public required Action<bool> SetActionOpen { get; init; }
+    public required Func<bool> ArgumentsOpen { get; init; }
+    public required Action<bool> SetArgumentsOpen { get; init; }
     public required Func<bool> FineTuningOpen { get; init; }
     public required Action<bool> SetFineTuningOpen { get; init; }
     public required Func<CustomCommandEditor, string> BasicsSummary { get; init; }

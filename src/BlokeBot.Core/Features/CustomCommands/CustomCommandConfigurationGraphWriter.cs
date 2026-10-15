@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -32,9 +33,39 @@ public sealed partial class CustomCommandConfigurationGraphWriter(
         int hostId,
         CustomCommandConfigurationSaveCommand command,
         CancellationToken ct,
-        bool validateOverlayCueReferences = true
+        bool validateOverlayCueReferences = true,
+        bool validateArgumentDependencies = true
     )
     {
+        if (validateOverlayCueReferences)
+        {
+            var cueFailure = await ValidateOverlayCueReferencesAsync(hostId, command.Commands, ct);
+            if (cueFailure is not null)
+            {
+                return cueFailure;
+            }
+        }
+
+        _ = await MainDatabaseStatements.LockHostAsync(db, hostId, ct);
+        if (
+            validateArgumentDependencies
+            && await AutomationCommandSourceCompatibility.CheckAsync(
+                db,
+                hostId,
+                command.Commands.ToDictionary(
+                    value => value.Id,
+                    value =>
+                        value.Action is CustomCommandActionValue.Automation
+                            ? value.ArgumentSchema
+                            : null
+                ),
+                ct
+            )
+                is { } dependency
+        )
+        {
+            return dependency;
+        }
         var now = clock.GetUtcNow().UtcDateTime;
         var messageEntries = await db
             .CustomMessageLibraryEntries.Include(x => x.Variants)
@@ -53,15 +84,6 @@ public sealed partial class CustomCommandConfigurationGraphWriter(
             .Include(x => x.DeliveryPolicy)
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
-
-        if (validateOverlayCueReferences)
-        {
-            var cueFailure = await ValidateOverlayCueReferencesAsync(hostId, command.Commands, ct);
-            if (cueFailure is not null)
-            {
-                return cueFailure;
-            }
-        }
 
         var staleEntity = FindStaleEntity(
             command,

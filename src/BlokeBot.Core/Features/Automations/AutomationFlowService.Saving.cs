@@ -48,7 +48,12 @@ public sealed partial class AutomationFlowService
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        if (draft.Nodes.Any(node => node.Definition.TypeId == AutomationSubflowDefinitions.Invoke))
+        if (
+            draft.Nodes.Any(node =>
+                node.Definition.TypeId == AutomationSubflowDefinitions.Invoke
+                || node.Definition.TypeId == AutomationDefinitionIds.CustomCommandSource.Value
+            )
+        )
         {
             if (
                 await MainDatabaseStatements.LockHostAsync(

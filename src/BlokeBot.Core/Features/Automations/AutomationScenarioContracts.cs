@@ -40,6 +40,8 @@ public sealed record AutomationScenarioFixture(
     ImmutableArray<AutomationScenarioEffect> Effects
 )
 {
+    public string? CommandArgumentTail { get; init; }
+
     public AutomationScenarioSyntheticRecipe? SyntheticRecipe { get; init; }
 }
 

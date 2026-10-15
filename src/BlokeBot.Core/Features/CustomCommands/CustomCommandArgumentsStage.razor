@@ -1,0 +1,98 @@
+@using BlokeBot.Persistence.Models
+
+@if (Command.ActionKind == CustomCommandActionKind.Automation)
+{
+    <StudioStage Key="arguments" Number="4" Title="Arguments" Summary="@(Command.ArgumentSchema is null ? "Use raw arguments" : $"{Command.ArgumentSchema.Fields.Length} required fields")" Open="@Context.ArgumentsOpen()" OpenChanged="Context.SetArgumentsOpen">
+        <div class="space-y-4">
+            <div class="studio-switch-row"><span id="@($"command-{Command.Id}-named-label")">Named arguments</span>
+                <button type="button" class="studio-toggle" role="switch" aria-checked="@(Command.ArgumentSchema is not null ? "true" : "false")" aria-labelledby="@($"command-{Command.Id}-named-label")" @onclick="() => ToggleAsync(new ChangeEventArgs { Value = Command.ArgumentSchema is null })"></button>
+            </div>
+            @if (Command.ArgumentSchema is { } schema)
+            {
+                @for (var index = 0; index < schema.Fields.Length; index++)
+                {
+                    var position = index;
+                    var field = schema.Fields[index];
+                    <div class="space-y-3 border-b border-border pb-4" @key="position">
+                        <div class="flex items-center gap-2">
+                            <span class="mr-auto text-xs text-muted-foreground">@(position + 1)</span>
+                            <button type="button" class="btn-secondary px-2" title="Move up" aria-label="@($"Move {field.Name} up")" disabled="@(position == 0)" @onclick="() => MoveAsync(position, -1)"><span aria-hidden="true">↑</span></button>
+                            <button type="button" class="btn-secondary px-2" title="Move down" aria-label="@($"Move {field.Name} down")" disabled="@(position == schema.Fields.Length - 1)" @onclick="() => MoveAsync(position, 1)"><span aria-hidden="true">↓</span></button>
+                            <button type="button" class="btn-secondary px-2 text-red-700" title="@($"Remove {field.Name}")" aria-label="@($"Remove {field.Name}")" @onclick="() => RemoveAsync(position)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" /></svg>
+                            </button>
+                        </div>
+                        <div class="studio-grid">
+                            <div class="studio-span-6"><Field Id="@($"command-{Command.Id}-argument-{position}")" Label="Name" Value="@field.Name" ValueChanged="(string value) => SetAsync(position, field with { Name = value })" ErrorMessage="@(position == 0 ? Context.Validation.Message(Target) : null)" FocusRequest="@(position == 0 ? Context.Validation.FocusRequest(Target) : 0)" /></div>
+                            <div class="studio-span-6"><label class="field"><span class="field__label">Type</span><select class="field__input" value="@field.Kind" @onchange="args => KindAsync(position, args.Value?.ToString())"><option value="Number">Number</option><option value="Token">Word</option><option value="RemainingText">Remaining text</option></select></label></div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"><span>Required</span><span>@LimitSummary(field)</span></div>
+                        @if (field.Kind != CustomCommandArgumentKind.Token)
+                        {
+                            <details><summary class="text-sm font-semibold">Limits</summary><div class="studio-grid mt-3">
+                                @if (field.Kind == CustomCommandArgumentKind.Number)
+                                {
+                                    <div class="studio-span-6"><label class="field"><span class="field__label">Minimum (exclusive)</span><input class="field__input" type="number" step="any" @bind:get="field.ExclusiveMinimum" @bind:set="(decimal? value) => SetAsync(position, field with { ExclusiveMinimum = value })" /></label></div>
+                                    <div class="studio-span-6"><label class="field"><span class="field__label">Maximum</span><input class="field__input" type="number" step="any" @bind:get="field.Maximum" @bind:set="(decimal? value) => SetAsync(position, field with { Maximum = value })" /></label></div>
+                                }
+                                else
+                                {
+                                    <div class="studio-span-6"><label class="field"><span class="field__label">Maximum words</span><input class="field__input" type="number" min="1" max="50" @bind:get="field.MaximumWords" @bind:set="(int? value) => SetAsync(position, field with { MaximumWords = value })" /></label></div>
+                                }
+                            </div></details>
+                        }
+                    </div>
+                }
+                @if (schema.Fields.IsEmpty && Context.Validation.Message(Target) is { } error)
+                {
+                    <p class="field__error" role="alert">@error</p>
+                }
+                <button type="button" class="btn-secondary" @onclick="AddAsync">+ Add argument</button>
+                <div class="studio-chat-preview"><p class="text-xs text-muted-foreground">Usage</p><code class="block text-sm wrap-anywhere">@CustomCommandArguments.Usage(CommandAliasNormalizer.SplitPreservingOrder(Command.Aliases).FirstOrDefault() ?? "command", schema)</code></div>
+                <div class="flex flex-wrap gap-3 text-xs text-muted-foreground" aria-label="Command outputs">@foreach (var field in schema.Fields) { <span><strong>@field.Name</strong> @(field.Kind == CustomCommandArgumentKind.Number ? "Number" : "Text")</span> }<span>+ existing Arguments</span></div>
+                <details><summary class="text-sm">Input rules</summary><p class="text-xs text-muted-foreground">All fields are required. Quotes are literal. Remaining text goes last and keeps internal and trailing whitespace. Up to 500 characters and 50 words. Invalid input does not start an automation. Connect named outputs to inputs; they are not expression variables. Schema exports need an updated app.</p></details>
+            }
+        </div>
+    </StudioStage>
+}
+
+@code {
+    [Parameter, EditorRequired] public required CustomCommandEditor Command { get; set; }
+    [Parameter, EditorRequired] public required CustomCommandStudioContext Context { get; set; }
+    private CustomCommandConfigurationValidationTarget Target => CustomCommandEditorIds.CommandTarget(Command.Id, CustomCommandValidationFieldKind.Arguments);
+    private async Task ToggleAsync(ChangeEventArgs args)
+    {
+        Command.ArgumentSchema = args.Value is true ? new([new("seconds", CustomCommandArgumentKind.Number, 0m), new("name", CustomCommandArgumentKind.RemainingText)]) : null;
+        await Context.SingleArgumentChanged.InvokeAsync();
+    }
+    private async Task SetAsync(int index, CustomCommandArgumentField field)
+    {
+        Command.ArgumentSchema = Command.ArgumentSchema! with { Fields = Command.ArgumentSchema.Fields.SetItem(index, field) };
+        await Context.SingleArgumentChanged.InvokeAsync();
+    }
+    private static string LimitSummary(CustomCommandArgumentField field) => field.Kind switch
+    {
+        CustomCommandArgumentKind.Number => string.Join("; ", new[] { field.ExclusiveMinimum is { } min ? $"Greater than {min.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : null, field.Maximum is { } max ? $"At most {max.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : null }.OfType<string>()),
+        CustomCommandArgumentKind.Token => "One word",
+        CustomCommandArgumentKind.RemainingText => field.MaximumWords is { } words ? $"Up to {words} words" : "Remaining text",
+    };
+    private Task KindAsync(int index, string? kind) => Enum.TryParse<CustomCommandArgumentKind>(kind, out var value)
+        ? SetAsync(index, new(Command.ArgumentSchema!.Fields[index].Name, value)) : Task.CompletedTask;
+    private async Task RemoveAsync(int index)
+    {
+        Command.ArgumentSchema = Command.ArgumentSchema! with { Fields = Command.ArgumentSchema.Fields.RemoveAt(index) };
+        await Context.SingleArgumentChanged.InvokeAsync();
+    }
+    private async Task AddAsync()
+    {
+        Command.ArgumentSchema = Command.ArgumentSchema! with { Fields = Command.ArgumentSchema.Fields.Add(new("field", CustomCommandArgumentKind.Token)) };
+        await Context.SingleArgumentChanged.InvokeAsync();
+    }
+    private async Task MoveAsync(int index, int direction)
+    {
+        var fields = Command.ArgumentSchema!.Fields;
+        var next = fields.SetItem(index, fields[index + direction]).SetItem(index + direction, fields[index]);
+        Command.ArgumentSchema = new(next);
+        await Context.SingleArgumentChanged.InvokeAsync();
+    }
+}

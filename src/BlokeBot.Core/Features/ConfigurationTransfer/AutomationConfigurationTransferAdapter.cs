@@ -13,6 +13,18 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
     AutomationScenarioService scenarios
 ) : IAutomationConfigurationTransferAdapter
 {
+    public Task<CustomCommands.CustomCommandConfigurationSaveFailure.ArgumentDependency?> ValidateCommandArgumentsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken cancellationToken
+    ) =>
+        AutomationCommandSourceCompatibility.CheckFinalAsync(
+            db,
+            hostId,
+            catalog,
+            cancellationToken
+        );
+
     public async Task<ConfigurationSectionPreview> PreviewAsync(
         BlokeBotDbContext db,
         BotHost host,

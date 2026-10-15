@@ -8,8 +8,13 @@ internal static partial class ConfigurationDocumentValidator
     public static ConfigurationValidationIssue? Validate(ConfigurationDocumentV2 document) =>
         !string.Equals(document.Format, ConfigurationDocumentCodec.Format, StringComparison.Ordinal)
             ? new("format", $"Expected format '{ConfigurationDocumentCodec.Format}'.")
-        : document.Version != ConfigurationDocumentCodec.CurrentVersion
+        : document.Version is not (2 or ConfigurationDocumentCodec.CurrentVersion)
             ? new("version", $"Format version {document.Version} is not supported.")
+        : document.Version < 3
+        && document.Sections.CustomCommands?.Commands.Any(command =>
+            command.ArgumentSchema is not null
+        ) == true
+            ? new("version", "Named command arguments require format version 3 and an updated app.")
         : string.IsNullOrWhiteSpace(document.Source.ChannelLogin)
             ? new("source.channelLogin", "The source channel login is required.")
         : document.ExportedAtUtc.Offset != TimeSpan.Zero

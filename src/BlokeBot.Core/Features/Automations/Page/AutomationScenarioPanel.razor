@@ -1,5 +1,7 @@
 @using System.Collections.Immutable
 @using System.Globalization
+@using BlokeBot.Core.Features.CustomCommands
+@using BlokeBot.Persistence.Models
 
 @if (Editor is not null)
 {
@@ -23,7 +25,21 @@
         </label>
         <section class="automation-authoring-section">
         <h3>Source fields</h3>
-            @foreach (var field in Fields)
+            @if (CommandSchema is { } schema)
+            {
+                <label class="field"><span class="field__label">Arguments after the command</span>
+                    <textarea class="field__input" value="@Editor.Fixture.CommandArgumentTail" @oninput="args => Editor.SetCommandArgumentTail(args.Value?.ToString() ?? string.Empty)"></textarea>
+                </label>
+                @(CustomCommandArguments.Parse(CommandId, "command", schema, Editor.Fixture.CommandArgumentTail ?? string.Empty).Match<RenderFragment>(
+                    prepared => @<div>
+                        @foreach (var field in schema.Fields)
+                        {
+                            <p class="text-sm"><strong>@field.Name</strong> (@(field.Kind == CustomCommandArgumentKind.Number ? "Number" : "Text")): <output class="whitespace-pre-wrap">@DisplayArgument(prepared.Arguments.Values[field.Name])</output></p>
+                        }
+                    </div>,
+                    rejected => @<p role="status">@rejected.Message</p>))
+            }
+            @foreach (var field in Fields.Where(field => CommandSchema is null || (field.Id.Value != "arguments" && !field.Id.Value.StartsWith("argument.", StringComparison.Ordinal))))
             {
                 <AutomationFixtureValueInput @key="(Editor, field.Id)" Label="@field.Name" Value="@Editor.SourceValue(field)" ValueType="field.ValueType" Nullable="@(field.Nullability == AutomationPortNullability.Nullable)" Changed="value => Editor.SetSourceValue(field, value)" ValidityChanged="valid => InputValidity.InvokeAsync(new(field.Id.Value, valid))" />
             }
@@ -102,7 +118,7 @@
         }
     </div>
     <footer class="automation-authoring-footer">
-    <button class="btn-primary" type="button" disabled="@(Busy || InvalidInputs)" data-automation-run-scenario @onclick="Run">Run scenario</button>
+    <button class="btn-primary" type="button" disabled="@(Busy || InvalidInputs || CommandArgumentsInvalid)" data-automation-run-scenario @onclick="Run">Run scenario</button>
     <button class="btn-secondary" type="button" disabled="@(Busy || !CanSave || InvalidInputs)" data-automation-save-scenario @onclick="Save">Save scenario</button>@if (Busy) { <button class="btn-secondary" type="button" @onclick="Cancel">Cancel</button> }</footer>
 }
 else
@@ -114,6 +130,14 @@ else
 }
 
 @code {
+    [Parameter] public IReadOnlyDictionary<int, CustomCommandArgumentSchema> CommandSchemas { get; set; } = ImmutableDictionary<int, CustomCommandArgumentSchema>.Empty;
+    private int CommandId => Nodes.FirstOrDefault(node => node.Id == Editor?.Fixture.SourceNodeId) is { } node
+        && node.Definition.Id == AutomationDefinitionIds.CustomCommandSource
+        && int.TryParse(node.Value(new("custom-command-id")), out var id) ? id : 0;
+    private bool CommandArgumentsInvalid => CommandSchema is { } schema && Editor is not null && CustomCommandArguments.Parse(CommandId, "command", schema, Editor.Fixture.CommandArgumentTail ?? string.Empty).Match(_ => false, _ => true);
+    private CustomCommandArgumentSchema? CommandSchema => CommandSchemas.GetValueOrDefault(CommandId);
+    private static string DisplayArgument(AutomationValue value) => value switch { AutomationValue.Number number => number.Value.ToString(CultureInfo.InvariantCulture), AutomationValue.Text text => text.Value, _ => string.Empty };
+
     [Parameter] public AutomationScenarioEditor? Editor { get; set; }
     [Parameter] public ImmutableArray<AutomationScenarioSnapshot> Saved { get; set; } = [];
     [Parameter] public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];

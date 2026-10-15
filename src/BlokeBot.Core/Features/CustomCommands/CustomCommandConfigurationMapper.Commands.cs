@@ -18,6 +18,7 @@ internal static partial class CustomCommandConfigurationMapper
             ),
             Enabled = command.Enabled,
             SingleArgument = command.SingleArgument,
+            ArgumentSchema = command.ArgumentSchema,
             AllowEveryone = command.AllowEveryone,
             AllowModerators = command.AllowModerators,
             AllowedUsers = command

@@ -41,7 +41,13 @@ public sealed partial class AutomationFlowService
     ) =>
         flow.HostId == hostId.Value
         && RestoreFrozenDraft(flow) is AutomationFlowDraftRestoreOutcome.Available restored
-            ? ValidateAsync(restored.Draft, AutomationGraphAdmission.Frozen, cancellationToken)
+            ? ValidateAsync(
+                restored.Draft,
+                AutomationGraphAdmission.Frozen,
+                cancellationToken,
+                frozenContracts: flow.Nodes.Where(node => node.Contract is not null)
+                    .ToDictionary(node => new AutomationNodeId(node.Id), node => node.Contract!)
+            )
             : Task.FromResult<AutomationGraphValidation>(new(null, [MalformedGraphError()]));
 
     internal Task<AutomationGraphValidation> ValidateSubflowAsync(
@@ -79,7 +85,8 @@ public sealed partial class AutomationFlowService
         CancellationToken cancellationToken,
         BlokeBotDbContext db,
         AutomationSubflowInterface? contract = null,
-        AutomationSubflowId? owner = null
+        AutomationSubflowId? owner = null,
+        IReadOnlyDictionary<int, CustomCommandArgumentSchema>? commandSchemas = null
     ) =>
         ValidateAsync(
             draft,
@@ -88,7 +95,8 @@ public sealed partial class AutomationFlowService
             contract,
             owner,
             resolved: resolved,
-            preparationDb: db
+            preparationDb: db,
+            commandSchemaOverrides: commandSchemas
         );
 
     private async Task<AutomationGraphValidation> ValidateAsync(
@@ -99,7 +107,10 @@ public sealed partial class AutomationFlowService
         AutomationSubflowId? publishing = null,
         AutomationSubflowRevision? preparedCandidate = null,
         AutomationSubflowClosure? resolved = null,
-        BlokeBotDbContext? preparationDb = null
+        BlokeBotDbContext? preparationDb = null,
+        IReadOnlyDictionary<AutomationNodeId, AutomationSubflowNodeContract>? frozenContracts =
+            null,
+        IReadOnlyDictionary<int, CustomCommandArgumentSchema>? commandSchemaOverrides = null
     )
     {
         await using var ownedDb = preparationDb is null
@@ -159,6 +170,13 @@ public sealed partial class AutomationFlowService
             errors.Add(new(null, "canvas-settings-invalid", "Select a supported flow layout."));
         }
 
+        var commandSchemas =
+            commandSchemaOverrides
+            ?? (
+                admission == AutomationGraphAdmission.Frozen
+                    ? ImmutableDictionary<int, CustomCommandArgumentSchema>.Empty
+                    : await AutomationCommandSource.LoadAsync(db, draft.HostId, cancellationToken)
+            );
         var definitions = new Dictionary<AutomationNodeId, AutomationDefinitionDescriptor>();
         var nodes = new Dictionary<AutomationNodeId, AutomationFlowDraftNode>();
         foreach (var node in draft.Nodes)
@@ -192,7 +210,15 @@ public sealed partial class AutomationFlowService
                 is AutomationConfigurationCheck.Valid valid
             )
             {
-                definitions[node.Id] = valid.Definition;
+                definitions[node.Id] =
+                    admission == AutomationGraphAdmission.Frozen
+                    && frozenContracts?.GetValueOrDefault(node.Id) is { } contract
+                        ? AutomationCommandSource.ApplyContract(valid.Definition, contract)
+                        : AutomationCommandSource.Project(
+                            valid.Definition,
+                            valid.Configuration,
+                            commandSchemas
+                        );
             }
         }
 

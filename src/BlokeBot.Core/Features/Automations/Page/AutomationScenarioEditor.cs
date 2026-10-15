@@ -12,6 +12,14 @@ public sealed class AutomationScenarioEditor(AutomationScenarioFixture fixture)
 
     public void Replace(AutomationScenarioFixture replacement) => Fixture = replacement;
 
+    public void SetCommandArgumentTail(string value) =>
+        Fixture = Fixture with
+        {
+            CommandArgumentTail = value,
+            Context = Fixture.Context with { CommandArguments = null },
+            SyntheticRecipe = null,
+        };
+
     public void SetClock(DateTimeOffset value) =>
         Fixture = Fixture with { ClockUtc = value, SyntheticRecipe = null };
 

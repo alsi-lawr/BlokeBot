@@ -169,6 +169,18 @@ public sealed partial class AutomationRuntimeService(
                     new(AutomationDispatchStatus.HostNotFound, [])
                 );
             }
+            if (
+                !await AutomationCommandSource.PreparedIsCurrentAsync(
+                    db,
+                    context,
+                    cancellationToken
+                )
+            )
+            {
+                return new CustomCommandAutomationAdmissionOutcome.Dispatched(
+                    new(AutomationDispatchStatus.InvalidFlow, [])
+                );
+            }
             dispatch = await AdmitAsync(
                 db,
                 context,

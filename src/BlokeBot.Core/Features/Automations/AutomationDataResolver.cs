@@ -377,7 +377,7 @@ internal sealed class AutomationDataResolver(
 
         if (descriptor.Kind == AutomationNodeKind.Source)
         {
-            return ResolveSource(outputPort, context) is { } source
+            return ResolveSource(outputPort, context, valid.Configuration) is { } source
                 ? new AutomationValueResolution.Available(source)
                 : Unavailable();
         }
@@ -620,47 +620,49 @@ internal sealed class AutomationDataResolver(
 
     private static AutomationResolvedValue? ResolveSource(
         AutomationPortMetadata port,
-        AutomationContext context
+        AutomationContext context,
+        AutomationConfiguration configuration
     ) =>
-        port.Sensitivity != AutomationDataSensitivity.Safe
-            ? null
-            : port.Id.Value switch
-            {
-                "actor" when context.Actor is { } actor => new(
-                    new AutomationValue.Actor(new(actor.Login, actor.DisplayName)),
-                    [
-                        AutomationValueProvenance.PublicDisplayName,
-                        AutomationValueProvenance.PublicLogin,
-                    ]
+        configuration is CustomCommandSourceConfiguration command
+        && context.CommandArguments is { } prepared
+        && prepared.CommandId == command.CommandId.Value
+        && prepared.Values.TryGetValue(
+            port.Id.Value.StartsWith("argument.", StringComparison.Ordinal)
+                ? port.Id.Value[9..]
+                : string.Empty,
+            out var argument
+        )
+        && AutomationPureHandlerRegistry.ValueType(argument) == port.ValueType
+            ? new(argument, [AutomationValueProvenance.PublicChat])
+        : port.Sensitivity != AutomationDataSensitivity.Safe ? null
+        : port.Id.Value switch
+        {
+            "actor" when context.Actor is { } actor => new(
+                new AutomationValue.Actor(new(actor.Login, actor.DisplayName)),
+                [AutomationValueProvenance.PublicDisplayName, AutomationValueProvenance.PublicLogin]
+            ),
+            "actor" when port.Nullability == AutomationPortNullability.Nullable => new(
+                new AutomationValue.Null(AutomationPortValueType.Actor),
+                [AutomationValueProvenance.PublicDisplayName, AutomationValueProvenance.PublicLogin]
+            ),
+            "channel" => new(
+                new AutomationValue.Channel(
+                    new(context.Channel.Login, context.Channel.DisplayName)
                 ),
-                "actor" when port.Nullability == AutomationPortNullability.Nullable => new(
-                    new AutomationValue.Null(AutomationPortValueType.Actor),
-                    [
-                        AutomationValueProvenance.PublicDisplayName,
-                        AutomationValueProvenance.PublicLogin,
-                    ]
-                ),
-                "channel" => new(
-                    new AutomationValue.Channel(
-                        new(context.Channel.Login, context.Channel.DisplayName)
-                    ),
-                    [
-                        AutomationValueProvenance.PublicDisplayName,
-                        AutomationValueProvenance.PublicLogin,
-                    ]
-                ),
-                "arguments" => new(
-                    new AutomationValue.Arguments([
-                        .. context.Arguments.Select(static argument => new AutomationValueArgument(
-                            argument.Position,
-                            argument.Value,
-                            [AutomationValueProvenance.PublicChat]
-                        )),
-                    ]),
-                    [AutomationValueProvenance.PublicChat]
-                ),
-                _ => ResolvePluginSource(port, context),
-            };
+                [AutomationValueProvenance.PublicDisplayName, AutomationValueProvenance.PublicLogin]
+            ),
+            "arguments" => new(
+                new AutomationValue.Arguments([
+                    .. context.Arguments.Select(static argument => new AutomationValueArgument(
+                        argument.Position,
+                        argument.Value,
+                        [AutomationValueProvenance.PublicChat]
+                    )),
+                ]),
+                [AutomationValueProvenance.PublicChat]
+            ),
+            _ => ResolvePluginSource(port, context),
+        };
 
     private static AutomationResolvedValue? ResolvePluginSource(
         AutomationPortMetadata port,

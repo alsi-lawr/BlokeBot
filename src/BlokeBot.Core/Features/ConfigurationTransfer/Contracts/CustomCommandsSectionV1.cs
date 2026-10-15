@@ -39,7 +39,9 @@ public sealed record CustomCommandV1(
     [property: JsonRequired] CustomCommandCooldownScope CooldownScope,
     [property: JsonRequired] CustomCommandInvocationLimit InvocationLimit,
     [property: JsonRequired] CustomCommandActionV1 Action,
-    bool SingleArgument = false
+    bool SingleArgument = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        CustomCommandArgumentSchema? ArgumentSchema = null
 );
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

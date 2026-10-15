@@ -42,6 +42,35 @@ internal sealed partial class AutomationConfigurationTransferAdapter
             .Where(command => command.HostId == hostId)
             .Select(command => new CommandMatch(command.Id, command.Name))
             .ToArrayAsync(cancellationToken);
+        var commandSchemas = (
+            await AutomationCommandSource.LoadAsync(db, new(hostId), cancellationToken)
+        ).ToDictionary();
+        if (allowPlannedCommands)
+        {
+            foreach (var pair in references.CommandNames)
+            {
+                var name = pair.Value;
+                var found = commands.SingleOrDefault(command => SameName(command.Name, name));
+                var commandId = found is not null
+                    ? found.Id
+                    : int.MaxValue - references.CommandNames.Keys.ToList().IndexOf(pair.Key);
+                var planned = references.PlannedCommandSchemas.FirstOrDefault(value =>
+                    SameName(value.Key, name)
+                );
+                if (planned.Key is null)
+                {
+                    continue;
+                }
+                if (planned.Value is { } schema)
+                {
+                    commandSchemas[commandId] = schema;
+                }
+                else
+                {
+                    _ = commandSchemas.Remove(commandId);
+                }
+            }
+        }
         var rewards = await db
             .TwitchCustomRewards.AsNoTracking()
             .Where(reward => reward.HostId == hostId)
@@ -106,7 +135,8 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 cancellationToken,
                 db,
                 imported.Interface,
-                subflowIds[imported.Id]
+                subflowIds[imported.Id],
+                commandSchemas
             );
             AddErrors(imported.Id, validation, issues);
             AddErrors(
@@ -201,7 +231,8 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     new([.. revisions]),
                     AutomationFlowService.AutomationGraphAdmission.ConfigurationTransfer,
                     cancellationToken,
-                    db
+                    db,
+                    commandSchemas: commandSchemas
                 ),
                 issues
             );

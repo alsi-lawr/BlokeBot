@@ -116,7 +116,8 @@ public sealed record CustomCommandValue
         CustomCommandCooldownScope cooldownScope,
         CustomCommandInvocationLimit invocationLimit,
         CustomCommandActionValue action,
-        bool singleArgument = false
+        bool singleArgument = false,
+        CustomCommandArgumentSchema? argumentSchema = null
     )
     {
         Id = id;
@@ -131,6 +132,7 @@ public sealed record CustomCommandValue
         InvocationLimit = invocationLimit;
         Action = action;
         SingleArgument = singleArgument;
+        ArgumentSchema = argumentSchema;
     }
 
     public int Id { get; }
@@ -156,6 +158,8 @@ public sealed record CustomCommandValue
     public CustomCommandActionValue Action { get; }
 
     public bool SingleArgument { get; }
+
+    public CustomCommandArgumentSchema? ArgumentSchema { get; }
 }
 
 public sealed record CustomCounterValue(int Id, string Name, long Value);
@@ -233,33 +237,50 @@ public abstract record CustomCommandConfigurationSaveFailure
 
     public abstract string Message { get; }
 
-    public TResult Match<TResult>(
+    public abstract TResult Match<TResult>(
         Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
         Func<CustomAliasCollision, TResult> customAliasCollision,
         Func<StaleEntity, TResult> staleEntity,
-        Func<OverlayCueReference, TResult> overlayCueReference
-    ) =>
-        this switch
-        {
-            BuiltInAliasCollision value => builtInAliasCollision(value),
-            CustomAliasCollision value => customAliasCollision(value),
-            StaleEntity value => staleEntity(value),
-            OverlayCueReference value => overlayCueReference(value),
-            _ => throw new UnreachableException("Unknown custom command save failure."),
-        };
+        Func<OverlayCueReference, TResult> overlayCueReference,
+        Func<ArgumentDependency, TResult> argumentDependency
+    );
 
     public sealed record BuiltInAliasCollision(string Alias) : CustomCommandConfigurationSaveFailure
     {
+        public override TResult Match<TResult>(
+            Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
+            Func<CustomAliasCollision, TResult> customAliasCollision,
+            Func<StaleEntity, TResult> staleEntity,
+            Func<OverlayCueReference, TResult> overlayCueReference,
+            Func<ArgumentDependency, TResult> argumentDependency
+        ) => builtInAliasCollision(this);
+
         public override string Message => $"!{Alias} is already used by another bot command.";
     }
 
     public sealed record CustomAliasCollision(string Alias) : CustomCommandConfigurationSaveFailure
     {
+        public override TResult Match<TResult>(
+            Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
+            Func<CustomAliasCollision, TResult> customAliasCollision,
+            Func<StaleEntity, TResult> staleEntity,
+            Func<OverlayCueReference, TResult> overlayCueReference,
+            Func<ArgumentDependency, TResult> argumentDependency
+        ) => customAliasCollision(this);
+
         public override string Message => $"!{Alias} is already used by another custom command.";
     }
 
     public sealed record StaleEntity(string EntityName) : CustomCommandConfigurationSaveFailure
     {
+        public override TResult Match<TResult>(
+            Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
+            Func<CustomAliasCollision, TResult> customAliasCollision,
+            Func<StaleEntity, TResult> staleEntity,
+            Func<OverlayCueReference, TResult> overlayCueReference,
+            Func<ArgumentDependency, TResult> argumentDependency
+        ) => staleEntity(this);
+
         public override string Message =>
             $"A {EntityName} you edited is no longer available. Reload the page and try again.";
     }
@@ -270,6 +291,34 @@ public abstract record CustomCommandConfigurationSaveFailure
         string Detail
     ) : CustomCommandConfigurationSaveFailure
     {
+        public override TResult Match<TResult>(
+            Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
+            Func<CustomAliasCollision, TResult> customAliasCollision,
+            Func<StaleEntity, TResult> staleEntity,
+            Func<OverlayCueReference, TResult> overlayCueReference,
+            Func<ArgumentDependency, TResult> argumentDependency
+        ) => overlayCueReference(this);
+
         public override string Message => Detail;
+    }
+
+    public sealed record ArgumentDependency(
+        int CommandId,
+        Guid FlowId,
+        Guid SourceNodeId,
+        string Field,
+        string FlowName
+    ) : CustomCommandConfigurationSaveFailure
+    {
+        public override string Message =>
+            $"Disconnect or replace '{Field}' in automation '{FlowName}' before changing this command's arguments. The saved command is unchanged.";
+
+        public override TResult Match<TResult>(
+            Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
+            Func<CustomAliasCollision, TResult> customAliasCollision,
+            Func<StaleEntity, TResult> staleEntity,
+            Func<OverlayCueReference, TResult> overlayCueReference,
+            Func<ArgumentDependency, TResult> argumentDependency
+        ) => argumentDependency(this);
     }
 }

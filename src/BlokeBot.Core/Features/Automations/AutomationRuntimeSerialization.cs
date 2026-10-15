@@ -178,7 +178,21 @@ internal static class AutomationRuntimeSerialization
                 context
                     .Variables.ForExecution()
                     .Select(static pair => Persist(pair.Key, pair.Value))
-                    .ToImmutableArray()
+                    .ToImmutableArray(),
+                context.CommandArguments is { } prepared
+                    ? new PersistedCommandArguments(
+                        prepared.CommandId,
+                        prepared.Schema,
+                        [
+                            .. prepared.Values.Select(pair =>
+                                Persist(
+                                    new(pair.Key),
+                                    new(pair.Value, AutomationDataSensitivity.Sensitive)
+                                )
+                            ),
+                        ]
+                    )
+                    : null
             ),
             _options
         );
@@ -204,7 +218,18 @@ internal static class AutomationRuntimeSerialization
                         AutomationVariableName,
                         AutomationVariable
                     >(new(variable.Name), Restore(variable)))
-                )
+                ),
+                context.CommandArguments is { } prepared
+                    ? new(
+                        prepared.CommandId,
+                        prepared.Schema,
+                        prepared.Values.ToImmutableDictionary(
+                            value => value.Name,
+                            value => Restore(value).Value,
+                            StringComparer.Ordinal
+                        )
+                    )
+                    : null
             )
         );
     }
@@ -473,7 +498,17 @@ internal static class AutomationRuntimeSerialization
         AutomationStream? Stream,
         AutomationTimestamps Timestamps,
         ImmutableArray<AutomationArgument> Arguments,
-        ImmutableArray<PersistedVariable> Variables
+        ImmutableArray<PersistedVariable> Variables,
+        [property: System.Text.Json.Serialization.JsonIgnore(
+            Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        )]
+            PersistedCommandArguments? CommandArguments = null
+    );
+
+    private sealed record PersistedCommandArguments(
+        int CommandId,
+        BlokeBot.Persistence.Models.CustomCommandArgumentSchema? Schema,
+        ImmutableArray<PersistedVariable> Values
     );
 
     private sealed record PersistedVariable(

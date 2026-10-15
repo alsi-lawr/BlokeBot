@@ -80,6 +80,7 @@ public sealed partial class ConfigurationTransferCoordinator
                 );
             }
 
+            _ = await MainDatabaseStatements.LockHostAsync(db, host.Id, cancellationToken);
             var watchWrite = Option<WatchTimeConfigurationWrite>.None;
             var planned = new Dictionary<ConfigurationSectionId, ConfigurationSectionPreview>();
             var references = await ConfigurationImportReferencePlan.BuildAsync(
@@ -219,6 +220,13 @@ public sealed partial class ConfigurationTransferCoordinator
                     issues.AddRange(pointsStage.Issues);
                     watchWrite = pointsStage.WatchWrite;
                 }
+            }
+            if (
+                await _automations.ValidateCommandArgumentsAsync(db, host.Id, cancellationToken) is
+                { } dependency
+            )
+            {
+                issues.Add(new("sections.customCommands.commands", dependency.Message));
             }
             if (issues.Count > 0)
             {

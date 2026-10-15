@@ -132,6 +132,8 @@
                 SetAccessOpen = open => _openStages.Set(CustomCommandStage.Access, open),
                 ActionOpen = () => _openStages.IsOpen(CustomCommandStage.Action),
                 SetActionOpen = open => _openStages.Set(CustomCommandStage.Action, open),
+                ArgumentsOpen = () => _openStages.IsOpen(CustomCommandStage.Arguments),
+                SetArgumentsOpen = open => _openStages.Set(CustomCommandStage.Arguments, open),
                 FineTuningOpen = () => _openStages.IsOpen(CustomCommandStage.FineTuning),
                 SetFineTuningOpen = open => _openStages.Set(CustomCommandStage.FineTuning, open),
                 BasicsSummary = BasicsSummary,

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations.Page;
@@ -13,6 +14,12 @@ public partial class AutomationEditorPage
         if (!_hasChanges || HostId != host)
         {
             await LoadAsync();
+        }
+        else
+        {
+            await LoadReferenceChoicesAsync();
+            RefreshScenarioFields();
+            StateHasChanged();
         }
     }
 
@@ -149,9 +156,18 @@ public partial class AutomationEditorPage
         StateHasChanged();
     }
 
+    private IReadOnlyDictionary<int, CustomCommandArgumentSchema> _commandSchemas =
+        ImmutableDictionary<int, CustomCommandArgumentSchema>.Empty;
+
     private async Task LoadReferenceChoicesAsync()
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
+        _commandSchemas = await AutomationCommandSource.LoadAsync(
+            db,
+            new(HostId),
+            CancellationToken.None
+        );
+        RefreshCommandSourceDefinitions();
         _referenceChoices[AutomationReferenceKind.CustomCommand] = await db
             .CustomCommands.AsNoTracking()
             .Where(command => command.HostId == HostId)
@@ -244,7 +260,11 @@ public partial class AutomationEditorPage
                 _editor = null;
                 return false;
             }
-            definitions[node.Id] = valid.Definition;
+            definitions[node.Id] = AutomationCommandSource.Project(
+                valid.Definition,
+                valid.Configuration,
+                _commandSchemas
+            );
         }
 
         var restoredEditor = AutomationEditorState.Restore(snapshot, definitions);

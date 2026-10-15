@@ -254,7 +254,8 @@ public sealed partial class CustomCommandConfigurationTransferAdapter(
                         hostId,
                         command,
                         cancellationToken,
-                        validateOverlayCueReferences: false
+                        validateOverlayCueReferences: false,
+                        validateArgumentDependencies: false
                     );
                     return failure is null
                         ? []

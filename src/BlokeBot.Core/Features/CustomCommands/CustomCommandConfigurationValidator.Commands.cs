@@ -92,6 +92,25 @@ public static partial class CustomCommandConfigurationValidator
                 ),
                 _ => InvalidAction(editor.Id, names[index], replyRoutes, errors),
             };
+            if (CustomCommandArguments.Validate(editor.ArgumentSchema) is { } schemaError)
+            {
+                AddError(
+                    errors,
+                    schemaError,
+                    CommandTarget(editor.Id, CustomCommandValidationFieldKind.Arguments)
+                );
+            }
+            if (
+                editor.ArgumentSchema is not null
+                && editor.ActionKind != CustomCommandActionKind.Automation
+            )
+            {
+                AddError(
+                    errors,
+                    "Named arguments are available for Automation commands only.",
+                    CommandTarget(editor.Id, CustomCommandValidationFieldKind.Arguments)
+                );
+            }
             var aliases = CommandAliasNormalizer.SplitPreservingOrder(editor.Aliases).ToArray();
             if (aliases.Length == 0)
             {
@@ -134,7 +153,8 @@ public static partial class CustomCommandConfigurationValidator
                     editor.CooldownScope,
                     editor.InvocationLimit,
                     action,
-                    editor.SingleArgument
+                    editor.SingleArgument,
+                    editor.ArgumentSchema
                 )
             );
         }

@@ -91,6 +91,20 @@ public sealed partial class AutomationScenarioService
             return new(null, errors.ToImmutable());
         }
         var configured = ApplyConfigurations(draft, fixture);
+        await using var commandDb = preparationDb is null
+            ? await dbFactory.CreateDbContextAsync(cancellationToken)
+            : null;
+        var preparedCommand = await PrepareCommandArgumentsAsync(
+            preparationDb ?? commandDb!,
+            configured,
+            fixture,
+            cancellationToken
+        );
+        if (preparedCommand.Error is { } commandError)
+        {
+            return new(null, [commandError]);
+        }
+        fixture = preparedCommand.Fixture;
         var validation =
             resolved is not null
                 ? await flows.ValidatePreparedAsync(

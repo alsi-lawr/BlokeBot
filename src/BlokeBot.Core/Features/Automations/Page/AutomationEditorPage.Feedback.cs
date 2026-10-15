@@ -74,8 +74,37 @@ public partial class AutomationEditorPage
         _operationFailed = true;
     }
 
+    private void RefreshCommandSourceDefinitions()
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+        foreach (
+            var node in _editor.Nodes.Where(node =>
+                node.Definition.Id == AutomationDefinitionIds.CustomCommandSource
+            )
+        )
+        {
+            if (
+                _catalogService.DescribeForAuthoring(new(HostId), node.Draft())
+                is AutomationConfigurationCheck.Valid valid
+            )
+            {
+                node.RefreshCommandDefinition(
+                    AutomationCommandSource.Project(
+                        valid.Definition,
+                        valid.Configuration,
+                        _commandSchemas
+                    )
+                );
+            }
+        }
+    }
+
     private void EditorChanged()
     {
+        RefreshCommandSourceDefinitions();
         if (_editor is null || !_history.Record(_editor))
         {
             return;

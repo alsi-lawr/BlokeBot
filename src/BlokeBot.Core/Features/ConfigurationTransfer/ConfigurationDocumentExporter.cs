@@ -151,6 +151,15 @@ public sealed class ConfigurationDocumentExporter(
                     dashboards
                 )
             );
+            document = document with
+            {
+                Version =
+                    document.Sections.CustomCommands?.Commands.Any(command =>
+                        command.ArgumentSchema is not null
+                    ) == true
+                        ? ConfigurationDocumentCodec.CurrentVersion
+                        : 2,
+            };
             if (ConfigurationDocumentValidator.ValidateDashboards(document) is { } validation)
             {
                 return new ConfigurationExportOutcome.Unsupported(validation.Message);

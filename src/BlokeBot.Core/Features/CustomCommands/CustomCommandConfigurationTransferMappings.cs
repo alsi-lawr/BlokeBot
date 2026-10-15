@@ -129,6 +129,7 @@ public sealed partial class CustomCommandConfigurationTransferAdapter
             CooldownScope = value.CooldownScope,
             InvocationLimit = value.InvocationLimit,
             SingleArgument = value.SingleArgument,
+            ArgumentSchema = value.ArgumentSchema,
             Action = value.Action.Type switch
             {
                 CustomCommandActionTypeV1.Counter => new CounterCustomCommandActionEditor

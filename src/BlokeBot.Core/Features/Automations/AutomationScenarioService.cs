@@ -83,12 +83,52 @@ public sealed partial class AutomationScenarioService(
         {
             return new AutomationScenarioRunOutcome.Invalid(validation.Errors);
         }
-        var traceId = Guid.NewGuid();
-        var expansion = AutomationFrozenSubflows.Freeze(
-            AutomationScenarioGraph.FreezeGraph(configured),
-            traceId,
-            closure
+        var preparedCommand = await PrepareCommandArgumentsAsync(
+            graphDb,
+            configured,
+            fixture,
+            cancellationToken
         );
+        if (preparedCommand.Error is { } commandError)
+        {
+            return new AutomationScenarioRunOutcome.Invalid([commandError]);
+        }
+        fixture = preparedCommand.Fixture;
+        var schemas = await AutomationCommandSource.LoadAsync(
+            graphDb,
+            draft.HostId,
+            cancellationToken
+        );
+        var root = AutomationScenarioGraph.FreezeGraph(configured);
+        root = root with
+        {
+            Nodes =
+            [
+                .. root.Nodes.Select(node =>
+                    catalog.ValidatePersistedDefinition(
+                        AutomationRuntimeSerialization.Definition(node)
+                    )
+                        is AutomationConfigurationCheck.Valid
+                        {
+                            Configuration: CustomCommandSourceConfiguration
+                        } valid
+                        ? node with
+                        {
+                            Contract = AutomationCommandSource.Contract(
+                                new(node.Id),
+                                AutomationCommandSource.Project(
+                                    valid.Definition,
+                                    valid.Configuration,
+                                    schemas
+                                )
+                            ),
+                        }
+                        : node
+                ),
+            ],
+        };
+        var traceId = Guid.NewGuid();
+        var expansion = AutomationFrozenSubflows.Freeze(root, traceId, closure);
         if (expansion is null)
         {
             return new AutomationScenarioRunOutcome.Invalid([

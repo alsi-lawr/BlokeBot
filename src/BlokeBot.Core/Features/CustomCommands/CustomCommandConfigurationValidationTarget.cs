@@ -46,6 +46,7 @@ public enum CustomCommandValidationFieldKind
     Day,
     TimeZone,
     Identity,
+    Arguments,
 }
 
 public sealed record CustomCommandConfigurationValidationTarget(

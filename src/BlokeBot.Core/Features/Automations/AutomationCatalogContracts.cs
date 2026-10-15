@@ -468,7 +468,8 @@ public sealed record AutomationContext(
     AutomationStream? Stream,
     AutomationTimestamps Timestamps,
     ImmutableArray<AutomationArgument> Arguments,
-    AutomationVariableSet Variables
+    AutomationVariableSet Variables,
+    BlokeBot.Core.Features.CustomCommands.AutomationCommandArguments? CommandArguments = null
 )
 {
     public AutomationHostId HostId => Channel.HostId;

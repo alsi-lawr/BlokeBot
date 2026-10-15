@@ -89,7 +89,8 @@ public partial class AutomationEditorPage
             _editor is not null && _scenario is not null
                 ? _scenariosService.SourceFields(
                     _editor.Draft(new(HostId)),
-                    _scenario.Fixture.SourceNodeId
+                    _scenario.Fixture.SourceNodeId,
+                    _commandSchemas
                 )
                 : [];
 

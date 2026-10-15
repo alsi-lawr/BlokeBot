@@ -1,7 +1,7 @@
 @using BlokeBot.Persistence.Models
 
                             <StudioStage Key="fine-tuning"
-                                         Number="4"
+                                         Number="@(Command.ActionKind == CustomCommandActionKind.Automation ? 5 : 4)"
                                          Title="Fine-tuning"
                                          Summary="@Context.CommandAdvancedSummary(Command)"
                                          Open="@Context.FineTuningOpen()"

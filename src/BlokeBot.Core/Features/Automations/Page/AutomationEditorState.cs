@@ -164,6 +164,17 @@ public sealed partial class AutomationEditorNode
         return Definition.PluginProvenance is null && current.PluginProvenance is null;
     }
 
+    internal void RefreshCommandDefinition(AutomationDefinitionDescriptor definition)
+    {
+        if (
+            Definition.Id == AutomationDefinitionIds.CustomCommandSource
+            && definition.Id == Definition.Id
+        )
+        {
+            Definition = definition;
+        }
+    }
+
     internal AutomationCanvasPosition Position { get; set; }
 
     internal AutomationNodeFailurePolicy FailurePolicy { get; set; }
