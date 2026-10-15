@@ -61,6 +61,8 @@ else
         {
             <div class="automation-inspector-cel-help">
                 <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
+                <p>Outputs use only this node's declared inputs. Convert numeric Text with <code>decimal(text)</code>: the input must exist and contain a finite number with a dot decimal separator.</p>
+                <p><code>join(args, start, end, separator)</code> joins an Arguments range. All four arguments are required. End is exclusive; both indices clamp to 0..size(args). Empty or reversed ranges return empty Text. Token text and the supplied separator are kept unchanged.</p>
             </div>
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">
                 <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><button class="automation-icon-button" type="button" aria-label="Add input" title="Add input" @onclick="AddTransformInputAsync"><EditorIcon Name="add" /></button></div>
@@ -134,7 +136,7 @@ else
                         <strong>@(IsDelayDuration(input) ? "Command argument example" : "Available name for this input")</strong>
                         @if (IsDelayDuration(input))
                         {
-                            <span>Convert the first command argument to milliseconds: <code>int(arguments[0])</code>. The result must be a positive whole number.</span>
+                            <span>When the first command argument is seconds, use <code>decimal(arguments[0]) * 1000</code>. Delay requires positive whole milliseconds. Check argument count and duration in the flow before sending a start message.</span>
                         }
                         else if (AutomationCelCompletions.ForRestrictedInput(input).IsEmpty)
                         {

@@ -51,13 +51,27 @@ internal static partial class AutomationCelStaticTypes
                 return true;
             case "decimal"
                 when inferred.Length == 1
-                    && inferred[0].ValueType == AutomationPortValueType.Number
+                    && inferred[0].ValueType
+                        is AutomationPortValueType.Text
+                            or AutomationPortValueType.Number
                     && !inferred[0].CanBeNull:
                 type = new(
                     AutomationPortValueType.Number,
                     CanBeNull: false,
                     AutomationCelNumberKind.Decimal
                 );
+                return true;
+            case AutomationCelFunctions.JoinName
+                when inferred.Length == 4
+                    && inferred[0].ValueType == AutomationPortValueType.Arguments
+                    && !inferred[0].CanBeNull
+                    && inferred[1].NumberKind == AutomationCelNumberKind.Integer
+                    && !inferred[1].CanBeNull
+                    && inferred[2].NumberKind == AutomationCelNumberKind.Integer
+                    && !inferred[2].CanBeNull
+                    && inferred[3].ValueType == AutomationPortValueType.Text
+                    && !inferred[3].CanBeNull:
+                type = Text();
                 return true;
             case "double"
                 when inferred.Length == 1

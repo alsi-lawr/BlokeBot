@@ -25,7 +25,7 @@ internal abstract record AutomationExpressionResult
 
 public sealed class AutomationExpressionService
 {
-    private readonly CelEnvironment _environment = new([], string.Empty);
+    private readonly CelEnvironment _environment = AutomationCelFunctions.CreateEnvironment();
 
     internal AutomationExpressionCheck Validate(AutomationExpressionSource expression)
     {

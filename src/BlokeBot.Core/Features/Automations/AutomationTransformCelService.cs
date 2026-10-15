@@ -180,7 +180,7 @@ internal sealed partial class AutomationTransformCelService
 
     internal static CelEnvironment CreateEnvironment()
     {
-        var environment = new CelEnvironment([], string.Empty);
+        var environment = AutomationCelFunctions.CreateEnvironment();
         environment.RegisterFunction(
             AutomationCelTransform.FunctionName,
             [typeof(decimal)],

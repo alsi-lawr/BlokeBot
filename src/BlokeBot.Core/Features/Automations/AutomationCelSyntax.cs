@@ -11,6 +11,7 @@ internal static class AutomationCelSyntax
     private static readonly ImmutableHashSet<string> _allowedFunctions = ImmutableHashSet.Create(
         StringComparer.Ordinal,
         AutomationCelTransform.FunctionName,
+        AutomationCelFunctions.JoinName,
         "bool",
         "decimal",
         "double",
