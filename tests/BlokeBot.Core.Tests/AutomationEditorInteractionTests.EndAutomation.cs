@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Automations.Page;
 using Bunit;
@@ -15,8 +16,16 @@ public sealed partial class AutomationEditorInteractionTests
         await using var f = await AutomationEditorPageFixture.CreateAsync();
         var page = f.Page;
         page.Find("[data-automation-toolbox-toggle]").Click();
-        page.Find("[data-automation-toolbox-search]").Input("End automation");
-        page.Find("button[aria-label^='End automation.']").Click();
+        var definition = page.FindComponent<AutomationToolbox>()
+            .Instance.Definitions.Single(item =>
+                item.Id == AutomationDefinitionIds.EndAutomationControl
+            );
+        page.Find("[data-automation-toolbox-search]").Input(definition.Display.Name);
+        var row = page.FindComponents<EditorToolboxRow>()
+            .Single(item =>
+                item.FindComponent<AutomationNodeIcon>().Instance.DefinitionId == definition.Id
+            );
+        await page.InvokeAsync(row.Instance.Activate.InvokeAsync);
         var canvas = page.FindComponent<AutomationFlowCanvas>();
         var end = canvas.Instance.Nodes.Single(node =>
             node.Definition.Id == AutomationDefinitionIds.EndAutomationControl
