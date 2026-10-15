@@ -23,6 +23,9 @@ internal sealed partial class ExpandedAutomationRuntime
             .Hosts.Where(h => h.TwitchUserId == stream.BroadcasterUserId)
             .Select(h => (int?)h.Id)
             .SingleOrDefaultAsync(cancellation);
+        var observedConnection = hostId is { } observedHost
+            ? ConnectionId(observedHost)
+            : Guid.Empty;
         // An older offline delivery must not erase a subsequently observed stream.
         var deleted = await db
             .AutomationStreamObservations.Where(s =>
@@ -31,9 +34,11 @@ internal sealed partial class ExpandedAutomationRuntime
             .ExecuteDeleteAsync(cancellation);
         if (deleted > 0 && hostId is { } id)
         {
-            _ = _liveObserved.TryRemove(id, out _);
-            _uptimeReadiness[id] =
-                "The current stream ended. Waiting for a new live stream observation.";
+            ObserveStreamReadiness(
+                id,
+                observedConnection,
+                "The current stream ended. Waiting for a new live stream observation."
+            );
             var host = await db.Hosts.AsNoTracking().SingleAsync(h => h.Id == id, cancellation);
             await PublishObservationReadinessAsync(host);
         }
@@ -42,15 +47,18 @@ internal sealed partial class ExpandedAutomationRuntime
     private async Task UptimeAsync(
         BotHost host,
         ImmutableArray<AutomationConfiguration> sources,
+        Guid observedConnection,
         CancellationToken ct
     )
     {
         var liveness = await LiveAsync(host, ct);
         if (liveness is HostStreamLivenessOutcome.Offline)
         {
-            _ = _liveObserved.TryRemove(host.Id, out _);
-            _uptimeReadiness[host.Id] =
-                "The channel is confirmed offline. Uptime and live-only occurrences are skipped, not deferred.";
+            ObserveStreamReadiness(
+                host.Id,
+                observedConnection,
+                "The channel is confirmed offline. Uptime and live-only occurrences are skipped, not deferred."
+            );
             await using var gone = await dbFactory.CreateDbContextAsync(ct);
             _ = await gone
                 .AutomationStreamObservations.Where(s => s.HostId == host.Id)
@@ -59,21 +67,24 @@ internal sealed partial class ExpandedAutomationRuntime
         }
         if (liveness is not HostStreamLivenessOutcome.Live live)
         {
-            _ = _liveObserved.TryRemove(host.Id, out _);
-            _uptimeReadiness[host.Id] =
-                "Twitch live status is unavailable. No offline status or uptime trigger is inferred; retry when the provider connection recovers.";
+            ObserveStreamReadiness(
+                host.Id,
+                observedConnection,
+                "Twitch live status is unavailable. No offline status or uptime trigger is inferred; retry when the provider connection recovers."
+            );
             return;
         }
         var observation = await ObserveStreamAsync(host, live, ct);
         if (observation is null)
         {
-            _ = _liveObserved.TryRemove(host.Id, out _);
-            _uptimeReadiness[host.Id] =
-                "The current Twitch stream could not be confirmed. Try again.";
+            ObserveStreamReadiness(
+                host.Id,
+                observedConnection,
+                "The current Twitch stream could not be confirmed. Try again."
+            );
             return;
         }
-        _ = _uptimeReadiness.TryRemove(host.Id, out _);
-        _liveObserved[host.Id] = ConnectionId(host.Id);
+        ObserveStreamReadiness(host.Id, observedConnection, null);
         var now = clock.GetUtcNow();
         foreach (var uptime in sources.OfType<UptimeSourceConfiguration>())
         {
@@ -217,6 +228,7 @@ internal sealed partial class ExpandedAutomationRuntime
         }
         var first = false;
         string streamId = "";
+        var observedConnection = CaptureStreamConnection(host);
         if (
             sources
                 .OfType<ChatMatchSourceConfiguration>()
@@ -227,8 +239,7 @@ internal sealed partial class ExpandedAutomationRuntime
             var observation = await ObserveStreamAsync(host, live, cancellation);
             if (observation is not null)
             {
-                _ = _uptimeReadiness.TryRemove(host.Id, out _);
-                _liveObserved[host.Id] = ConnectionId(host.Id);
+                ObserveStreamReadiness(host.Id, observedConnection, null);
             }
             streamId = live.StreamId;
             await using var db = await dbFactory.CreateDbContextAsync(cancellation);

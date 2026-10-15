@@ -50,11 +50,13 @@
                        Title="Connect this channel again"
                        Description="@ReconnectDescription(available)">
                 <Actions>
-                    <AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition"
-                                     Url="/oauth/broadcaster/start?automations=true"
-                                     PopupName="blokebot-broadcaster-oauth"
-                                     OpeningText="Opening..."
-                                     OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton>
+                    <span data-automation-events-reconnect data-missing-scopes="@string.Join(' ', available.MissingBroadcasterScopes)">
+                        <AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition"
+                                         Url="/oauth/broadcaster/start?automations=true"
+                                         PopupName="blokebot-broadcaster-oauth"
+                                         OpeningText="Opening..."
+                                         OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton>
+                    </span>
                 </Actions>
             </PageState>
         }

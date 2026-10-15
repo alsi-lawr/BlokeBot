@@ -54,13 +54,10 @@ internal sealed partial class ExpandedAutomationRuntime(
             {
                 _ = _nextSchedules.TryRemove(key, out _);
             }
-            _connections[host.Id] = Guid.NewGuid();
-            _ = _publishedReadiness.TryRemove(host.Id, out _);
+            ResetObservationConnection(host.Id);
             _ = _ads.TryRemove(host.Id, out _);
             _ = _polls.TryRemove(host.Id, out _);
             _ = _readiness.TryRemove(host.Id, out _);
-            _ = _uptimeReadiness.TryRemove(host.Id, out _);
-            _ = _liveObserved.TryRemove(host.Id, out _);
             _ = _metadata.TryRemove(host.Id, out _);
         }
     }
@@ -92,8 +89,7 @@ internal sealed partial class ExpandedAutomationRuntime(
     private readonly ConcurrentDictionary<int, AdObservation> _ads = new();
     private readonly ConcurrentDictionary<int, DateTimeOffset> _polls = new();
     private readonly ConcurrentDictionary<int, string> _readiness = new();
-    private readonly ConcurrentDictionary<int, string> _uptimeReadiness = new();
-    private readonly ConcurrentDictionary<int, Guid> _liveObserved = new();
+    private readonly Dictionary<int, StreamReadiness> _streamReadiness = new();
     private readonly ConcurrentDictionary<int, ObservationReadiness> _publishedReadiness = new();
     private readonly ConcurrentDictionary<int, MetadataObservation> _metadata = new();
     private readonly Lock _observationGate = new();
@@ -114,29 +110,85 @@ internal sealed partial class ExpandedAutomationRuntime(
             : configuration
                 is UptimeSourceConfiguration
                     or ChatMatchSourceConfiguration { Kind: ChatMatchKind.FirstObserved }
-                ? _uptimeReadiness.GetValueOrDefault(hostId)
-                    ?? (
-                        _liveObserved.GetValueOrDefault(hostId) == ConnectionId(hostId)
-                            ? null
-                            : "Waiting for Twitch to confirm the current live stream."
-                    )
+                ? CurrentStreamReadiness(hostId) is { } observed
+                    ? observed.Reason
+                    : "Waiting for Twitch to confirm the current live stream."
                 : null;
+
+    private Guid CaptureStreamConnection(BotHost host)
+    {
+        lock (_observationGate)
+        {
+            _observedHosts[host.Id] = host;
+            return ConnectionId(host.Id);
+        }
+    }
+
+    private void ResetObservationConnection(int hostId)
+    {
+        lock (_observationGate)
+        {
+            _connections[hostId] = Guid.NewGuid();
+            _ = _streamReadiness.Remove(hostId);
+            _ = _publishedReadiness.TryRemove(hostId, out _);
+        }
+    }
+
+    private void ObserveStreamReadiness(int hostId, Guid observedConnection, string? reason)
+    {
+        lock (_observationGate)
+        {
+            if (ConnectionId(hostId) == observedConnection)
+            {
+                _streamReadiness[hostId] = new(observedConnection, reason);
+            }
+        }
+    }
+
+    private void ClearStreamReadiness(int hostId, Guid observedConnection)
+    {
+        lock (_observationGate)
+        {
+            if (ConnectionId(hostId) == observedConnection)
+            {
+                _ = _streamReadiness.Remove(hostId);
+            }
+        }
+    }
+
+    private StreamReadiness? CurrentStreamReadiness(int hostId)
+    {
+        lock (_observationGate)
+        {
+            return
+                _streamReadiness.GetValueOrDefault(hostId) is { } observed
+                && observed.Connection == ConnectionId(hostId)
+                ? observed
+                : null;
+        }
+    }
+
+    private sealed record StreamReadiness(Guid Connection, string? Reason);
 
     private async Task PublishObservationReadinessAsync(BotHost host)
     {
-        var current = new ObservationReadiness(
-            Connected(host),
-            _liveObserved.GetValueOrDefault(host.Id) == ConnectionId(host.Id),
-            _uptimeReadiness.GetValueOrDefault(host.Id),
-            _ads.ContainsKey(host.Id),
-            _ads.GetValueOrDefault(host.Id) is { Duration: > 0 },
-            _readiness.GetValueOrDefault(host.Id)
-        );
-        if (_publishedReadiness.TryGetValue(host.Id, out var previous) && previous == current)
+        lock (_observationGate)
         {
-            return;
+            var stream = CurrentStreamReadiness(host.Id);
+            var current = new ObservationReadiness(
+                Connected(host),
+                stream is { Reason: null },
+                stream?.Reason,
+                _ads.ContainsKey(host.Id),
+                _ads.GetValueOrDefault(host.Id) is { Duration: > 0 },
+                _readiness.GetValueOrDefault(host.Id)
+            );
+            if (_publishedReadiness.TryGetValue(host.Id, out var previous) && previous == current)
+            {
+                return;
+            }
+            _publishedReadiness[host.Id] = current;
         }
-        _publishedReadiness[host.Id] = current;
         if (uiChanges is not null)
         {
             await uiChanges.SourceReadinessChangedAsync(new(host.Id));
@@ -289,11 +341,8 @@ internal sealed partial class ExpandedAutomationRuntime(
             _ = _ads.TryRemove(change.HostId, out _);
             _ = _polls.TryRemove(change.HostId, out _);
             _ = _readiness.TryRemove(change.HostId, out _);
-            _ = _uptimeReadiness.TryRemove(change.HostId, out _);
-            _ = _liveObserved.TryRemove(change.HostId, out _);
             _ = _metadata.TryRemove(change.HostId, out _);
-            _connections[change.HostId] = Guid.NewGuid();
-            _ = _publishedReadiness.TryRemove(change.HostId, out _);
+            ResetObservationConnection(change.HostId);
         }
         return ValueTask.FromResult<HostFeatureAutomaticWorkResult>(
             new HostFeatureAutomaticWorkResult.Complete()
@@ -311,16 +360,14 @@ internal sealed partial class ExpandedAutomationRuntime(
             var connected = Connected(host);
             if (_wasConnected.TryGetValue(host.Id, out var old) && old && !connected)
             {
-                _connections[host.Id] = Guid.NewGuid();
-                _ = _publishedReadiness.TryRemove(host.Id, out _);
+                ResetObservationConnection(host.Id);
                 _ = _metadata.TryRemove(host.Id, out _);
                 _ = _ads.TryRemove(host.Id, out _);
                 _ = _polls.TryRemove(host.Id, out _);
                 _ = _readiness.TryRemove(host.Id, out _);
-                _ = _uptimeReadiness.TryRemove(host.Id, out _);
-                _ = _liveObserved.TryRemove(host.Id, out _);
             }
             _wasConnected[host.Id] = connected;
+            var observedConnection = CaptureStreamConnection(host);
             var sources = await SourcesAsync(host, ct);
             _ = GoalEpoch(host.Id, sources.OfType<GoalSourceConfiguration>());
             if (!sources.OfType<AdTimingSourceConfiguration>().Any())
@@ -337,8 +384,7 @@ internal sealed partial class ExpandedAutomationRuntime(
                 )
             )
             {
-                _ = _uptimeReadiness.TryRemove(host.Id, out _);
-                _ = _liveObserved.TryRemove(host.Id, out _);
+                ClearStreamReadiness(host.Id, observedConnection);
             }
             await countdowns.TickAsync(
                 host,
@@ -416,7 +462,7 @@ internal sealed partial class ExpandedAutomationRuntime(
                     .Any(s => s.Kind == ChatMatchKind.FirstObserved)
             )
             {
-                await UptimeAsync(host, sources, ct);
+                await UptimeAsync(host, sources, observedConnection, ct);
             }
             if (
                 sources.OfType<AdTimingSourceConfiguration>().Any()

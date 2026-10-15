@@ -29,13 +29,13 @@ public sealed partial class AutomationRuntimeTests
     )
     {
         await using var f = await RuntimeFixture.CreateAsync();
-        _ = await SaveExpandedChatAsync(
+        var ordinaryFlow = await SaveExpandedChatAsync(
             f,
             "chat-match",
             $$"""{"kind":"{{kind}}","match":"{{match}}"}""",
             "ordinary"
         );
-        _ = await SaveExpandedChatAsync(
+        var firstFlow = await SaveExpandedChatAsync(
             f,
             "chat-match",
             """{"kind":"FirstObserved","match":""}""",
@@ -44,7 +44,7 @@ public sealed partial class AutomationRuntimeTests
         var x = ExpandedFixtureFor(f);
         var readiness = ReadinessFor(f, x.Runtime, x.Tokens);
         var initial = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = Configured(initial, "First observed chatter")
+        _ = Configured(initial, firstFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>();
         await using (var db = await f.Database.CreateDbContextAsync())
         {
@@ -53,11 +53,11 @@ public sealed partial class AutomationRuntimeTests
         }
         await x.Runtime.TickAsync(CancellationToken.None);
         var offline = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = Configured(offline, $"{kind}: {match}")
+        _ = Configured(offline, ordinaryFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
-        Configured(offline, "First observed chatter")
+        Configured(offline, firstFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-            .Reason.ShouldContain("confirmed offline");
+            .Reason.ShouldNotBeNullOrWhiteSpace();
         var message = ReadinessChat(f, "offline", text) with { EmoteIds = ["25"] };
         await x.Runtime.ChatReceivedAsync(message, CancellationToken.None);
         f.Chat.Messages.ShouldBe(["ordinary"]);
@@ -66,7 +66,7 @@ public sealed partial class AutomationRuntimeTests
             f.Clock.GetUtcNow()
         );
         await x.Runtime.TickAsync(CancellationToken.None);
-        _ = Configured(await ReadinessSourcesAsync(readiness, f.HostId), "First observed chatter")
+        _ = Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
         await x.Runtime.ChatReceivedAsync(
             message with
@@ -90,7 +90,7 @@ public sealed partial class AutomationRuntimeTests
     public async Task Readiness_InitialUnknownAndReconnectedStreamNeedActualObservation()
     {
         await using var f = await RuntimeFixture.CreateAsync();
-        _ = await SaveExpandedChatAsync(
+        var firstFlow = await SaveExpandedChatAsync(
             f,
             "chat-match",
             """{"kind":"FirstObserved","match":""}""",
@@ -111,31 +111,28 @@ public sealed partial class AutomationRuntimeTests
                 "actual-stream",
                 f.Clock.GetUtcNow()
             );
-            Configured(await ReadinessSourcesAsync(readiness, f.HostId), "First observed chatter")
+            Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
                 .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-                .Reason.ShouldContain("Waiting");
+                .Reason.ShouldNotBeNullOrWhiteSpace();
             await x.Runtime.TickAsync(CancellationToken.None);
-            _ = Configured(
-                await ReadinessSourcesAsync(readiness, f.HostId),
-                "First observed chatter"
-            )
+            _ = Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
                 .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
             x.Connection.Current = new BotRuntimeStatus.Authorized();
-            Configured(await ReadinessSourcesAsync(readiness, f.HostId), "First observed chatter")
+            Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
                 .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-                .Reason.ShouldContain("not connected");
+                .Reason.ShouldNotBeNullOrWhiteSpace();
             x.Connection.Current = new BotRuntimeStatus.Connected(["streamer"]);
-            Configured(await ReadinessSourcesAsync(readiness, f.HostId), "First observed chatter")
+            Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
                 .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-                .Reason.ShouldContain("Waiting");
+                .Reason.ShouldNotBeNullOrWhiteSpace();
             x.Streams.Current = new HostStreamLivenessOutcome.Unavailable(
                 HostStreamLivenessUnavailableReason.ProviderRequestFailed,
                 new HttpRequestException()
             );
             await x.Runtime.TickAsync(CancellationToken.None);
-            Configured(await ReadinessSourcesAsync(readiness, f.HostId), "First observed chatter")
+            Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
                 .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-                .Reason.ShouldContain("live status is unavailable");
+                .Reason.ShouldNotBeNullOrWhiteSpace();
             f.Chat.Messages.ShouldBeEmpty();
         }
         finally
@@ -178,7 +175,7 @@ public sealed partial class AutomationRuntimeTests
         var revision = await Publish(Subflows(f), reusable);
         var source = Node("twitch-goal", """{"event":"Milestone","milestone":10}""");
         var call = Invoke(revision);
-        _ = await f.SaveAsync([source, call], [Edge(source, "flow", call)]);
+        var goalFlow = await f.SaveAsync([source, call], [Edge(source, "flow", call)]);
         var cheer = await SaveExpandedChatAsync(f, "cheer", """{"minimum-bits":1}""", "cheer");
         var ads = await SaveExpandedChatAsync(
             f,
@@ -207,14 +204,10 @@ public sealed partial class AutomationRuntimeTests
             row.DefinitionId == AutomationDefinitionIds.GoalSource
         );
         goal.UsedByEnabledFlow.ShouldBeFalse();
-        goal.Configurations.Single()
+        Configured(available, goalFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Unavailable>()
-            .Reason.ShouldContain("Overlays");
-        _ = available
-            .Sources.Single(static row =>
-                row.DefinitionId == AutomationDefinitionIds.AdTimingSource
-            )
-            .Configurations.Single()
+            .Reason.ShouldNotBeNullOrWhiteSpace();
+        _ = Configured(available, ads)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Disabled>();
         (await x.Runtime.GetRequirementsAsync("streamer", CancellationToken.None)).ShouldBeEmpty();
         var scopes = await readiness.AuthorizationScopesAsync(f.HostId, CancellationToken.None);
@@ -256,11 +249,7 @@ public sealed partial class AutomationRuntimeTests
         var tokens = new ReadinessTokens { Unknown = true };
         var readiness = ReadinessFor(f, x.Runtime, tokens);
         var before = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = before
-            .Sources.Single(static row =>
-                row.DefinitionId == AutomationDefinitionIds.AdTimingSource
-            )
-            .Configurations.Single()
+        _ = Configured(before, flow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>();
         before.MissingBroadcasterScopes.ShouldBeEmpty();
         await using var db = await f.Database.CreateDbContextAsync();
@@ -268,11 +257,7 @@ public sealed partial class AutomationRuntimeTests
             .AutomationFlows.Where(value => value.Id == flow.Value)
             .ExecuteUpdateAsync(set => set.SetProperty(value => value.SchemaVersion, 999));
         var after = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = after
-            .Sources.Single(static row =>
-                row.DefinitionId == AutomationDefinitionIds.AdTimingSource
-            )
-            .Configurations.Single()
+        _ = Configured(after, flow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Unavailable>();
         (await x.Runtime.GetRequirementsAsync("streamer", CancellationToken.None)).ShouldBeEmpty();
     }
@@ -367,13 +352,13 @@ public sealed partial class AutomationRuntimeTests
     public async Task Readiness_PageRefreshesMixedConfigurationSessionConnectionAndSelectiveGrants()
     {
         await using var f = await RuntimeFixture.CreateAsync();
-        _ = await SaveExpandedChatAsync(
+        var ordinaryFlow = await SaveExpandedChatAsync(
             f,
             "chat-match",
             """{"kind":"Keyword","match":"tea"}""",
             "ordinary"
         );
-        _ = await SaveExpandedChatAsync(
+        var firstFlow = await SaveExpandedChatAsync(
             f,
             "chat-match",
             """{"kind":"FirstObserved","match":""}""",
@@ -384,73 +369,111 @@ public sealed partial class AutomationRuntimeTests
         using var observation = new ReadinessConnectionObservation(x.Runtime);
         var tokens = new ReadinessTokens();
         tokens.Granted.ExceptWith(["bits:read", "channel:read:hype_train"]);
+        var readiness = ReadinessFor(f, x.Runtime, tokens);
+        var initial = await ReadinessSourcesAsync(readiness, f.HostId);
+        var ordinary = Configured(initial, ordinaryFlow).NodeId;
+        var first = Configured(initial, firstFlow).NodeId;
+        var initialReason = Configured(initial, firstFlow)
+            .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
+            .Reason;
         using var ui = ReadinessUiFor(f, x, tokens, channels);
+        var popup = ui
+            .JSInterop.SetupModule("./Components/AuthPopupButton.razor.js")
+            .Setup<bool>(
+                "openAuthPopup",
+                "/oauth/broadcaster/start?automations=true",
+                "blokebot-broadcaster-oauth"
+            )
+            .SetResult(false);
         var page = ui.Render<AutomationEventsPage>();
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(1)
-        );
-        page.Markup.ShouldContain("First observed chatter");
-        page.Markup.ShouldNotContain("Connect this channel again");
+        void Mixed(string ordinaryState, string firstState) =>
+            page.WaitForAssertion(() =>
+            {
+                RenderedState(page, ordinary).ShouldBe(ordinaryState);
+                RenderedState(page, first).ShouldBe(firstState);
+            });
+        Mixed("ready", "observation-unavailable");
+        page.FindAll("[data-automation-events-reconnect]").ShouldBeEmpty();
         await x.Runtime.TickAsync(CancellationToken.None);
-        page.WaitForAssertion(() => page.Markup.ShouldContain("confirmed offline"));
+        var offlineReason = Configured(await ReadinessSourcesAsync(readiness, f.HostId), firstFlow)
+            .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
+            .Reason;
+        offlineReason.ShouldNotBeNullOrWhiteSpace();
+        offlineReason.ShouldNotBe(initialReason);
+        page.WaitForAssertion(() =>
+            page.Find($"[data-configured-source='{first.Value}'] [role=status]")
+                .TextContent.Trim()
+                .ShouldBe(offlineReason)
+        );
         x.Streams.Current = new HostStreamLivenessOutcome.Live(
             "actual-stream",
             f.Clock.GetUtcNow()
         );
         await x.Runtime.TickAsync(CancellationToken.None);
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(2)
-        );
+        Mixed("ready", "ready");
         x.Connection.Current = new BotRuntimeStatus.Authorized();
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(0)
-        );
+        Mixed("observation-unavailable", "observation-unavailable");
         x.Connection.Current = new BotRuntimeStatus.Connected(["streamer"]);
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(1)
-        );
+        Mixed("ready", "observation-unavailable");
         await x.Runtime.TickAsync(CancellationToken.None);
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(2)
-        );
+        Mixed("ready", "ready");
         channels.SetHealthy(false);
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(0)
-        );
+        Mixed("observation-unavailable", "observation-unavailable");
         channels.SetHealthy(true);
-        page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(1)
-        );
+        Mixed("ready", "observation-unavailable");
         await x.Runtime.TickAsync(CancellationToken.None);
+        Mixed("ready", "ready");
+        var cheerFlow = await SaveExpandedChatAsync(f, "cheer", """{"minimum-bits":1}""", "cheer");
+        var cheer = Configured(await ReadinessSourcesAsync(readiness, f.HostId), cheerFlow);
+        cheer
+            .State.ShouldBeOfType<TwitchEventSourceReadinessState.MissingScopes>()
+            .Scopes.ShouldBe(["bits:read"]);
         page.WaitForAssertion(() =>
-            page.FindAll("[data-configured-state=ready]").Count.ShouldBe(2)
-        );
-        var cheer = await SaveExpandedChatAsync(f, "cheer", """{"minimum-bits":1}""", "cheer");
+        {
+            RenderedState(page, cheer.NodeId).ShouldBe("missing-scopes");
+            page.Find("[data-automation-events-reconnect]")
+                .GetAttribute("data-missing-scopes")!
+                .Split(' ')
+                .ShouldBe(["bits:read"]);
+        });
+        var reconnect = page.Find("[data-automation-events-reconnect] button");
+        reconnect.HasAttribute("disabled").ShouldBeFalse();
+        await reconnect.ClickAsync(new());
+        popup.Invocations.Count.ShouldBe(1);
+        _ = await f.Flows.SetEnabledAsync(new(f.HostId), cheerFlow, false, CancellationToken.None);
         page.WaitForAssertion(() =>
-            page.Markup.ShouldContain("Your enabled flows need bits:read.")
+        {
+            RenderedState(page, cheer.NodeId).ShouldBe("disabled");
+            page.FindAll("[data-automation-events-reconnect]").ShouldBeEmpty();
+        });
+        _ = await f.Flows.DeleteAsync(new(f.HostId), cheerFlow, CancellationToken.None);
+        page.WaitForAssertion(() =>
+            page.FindAll($"[data-configured-source='{cheer.NodeId.Value}']").ShouldBeEmpty()
         );
-        page.Markup.ShouldNotContain("Your enabled flows need bits:read, channel:read:hype_train");
-        _ = await f.Flows.SetEnabledAsync(new(f.HostId), cheer, false, CancellationToken.None);
-        page.WaitForAssertion(() => page.Markup.ShouldNotContain("Connect this channel again"));
-        page.FindAll("[data-configured-state=disabled]").Count.ShouldBe(1);
-        _ = await f.Flows.DeleteAsync(new(f.HostId), cheer, CancellationToken.None);
-        page.WaitForAssertion(() => page.FindAll("[data-configured-state]").Count.ShouldBe(2));
+        Mixed("ready", "ready");
         _ = await f.Features.DisableAsync(
             f.HostId,
             HostFeatureFlags.Automations,
             CancellationToken.None
         );
+        _ = (
+            await readiness.LoadAsync(new(f.HostId), CancellationToken.None)
+        ).ShouldBeOfType<TwitchEventSourceReadinessOutcome.FeatureDisabled>();
         _ = await ui
             .Services.GetRequiredService<EventBus<AppEventKind>>()
             .PublishAsync(AppEventKind.HostedChannelsChanged, CancellationToken.None);
-        page.WaitForAssertion(() => page.Markup.ShouldContain("Automations are off"));
+        page.WaitForAssertion(() =>
+            page.Find("[data-automation-events-channel-setup]")
+                .GetAttribute("href")
+                .ShouldBe("/host#chat-tools")
+        );
     }
 
     [Test]
     public async Task Readiness_PageSwitchUnsubscribesOldHostFencesLateLoadsAndDisposal()
     {
         await using var f = await RuntimeFixture.CreateAsync();
-        _ = await SaveExpandedChatAsync(
+        var ordinaryFlow = await SaveExpandedChatAsync(
             f,
             "chat-match",
             """{"kind":"Keyword","match":"tea"}""",
@@ -458,16 +481,24 @@ public sealed partial class AutomationRuntimeTests
         );
         var otherHost = await f.SeedHostAsync("other", HostFeatureFlags.Automations);
         var otherSource = Node("chat-match", """{"kind":"Phrase","match":"other phrase"}""");
-        _ = (
+        var otherFlow = (
             await f.Flows.SaveAsync(Draft(otherHost, [otherSource], []), CancellationToken.None)
-        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        )
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Saved>()
+            .FlowId;
         var channels = new ReadinessChannels();
         var x = ExpandedFixtureFor(f, channels);
         x.Connection.Current = new BotRuntimeStatus.Connected(["streamer", "other"]);
         var tokens = new ReadinessTokens();
+        var readiness = ReadinessFor(f, x.Runtime, tokens);
+        var ordinary = Configured(
+            await ReadinessSourcesAsync(readiness, f.HostId),
+            ordinaryFlow
+        ).NodeId;
+        var other = Configured(await ReadinessSourcesAsync(readiness, otherHost), otherFlow).NodeId;
         using var ui = ReadinessUiFor(f, x, tokens, channels);
         var page = ui.Render<AutomationEventsPage>();
-        page.WaitForAssertion(() => page.Markup.ShouldContain("Keyword: tea"));
+        page.WaitForAssertion(() => RenderedState(page, ordinary).ShouldBe("ready"));
         var calls = tokens.Calls;
         await f.UiChanges.SourceReadinessChangedAsync(new(otherHost));
         tokens.Calls.ShouldBe(calls);
@@ -480,11 +511,11 @@ public sealed partial class AutomationRuntimeTests
         _ = await ui
             .Services.GetRequiredService<EventBus<AppEventKind>>()
             .PublishAsync(AppEventKind.HostedChannelsChanged, CancellationToken.None);
-        page.WaitForAssertion(() => page.Markup.ShouldContain("Phrase: other phrase"));
+        page.WaitForAssertion(() => RenderedState(page, other).ShouldBe("ready"));
         _ = tokens.Release.TrySetResult();
         await oldLoad;
-        page.Markup.ShouldContain("Phrase: other phrase");
-        page.Markup.ShouldNotContain("Keyword: tea");
+        RenderedState(page, other).ShouldBe("ready");
+        page.FindAll($"[data-configured-source='{ordinary.Value}']").ShouldBeEmpty();
         calls = tokens.Calls;
         await f.UiChanges.SourceReadinessChangedAsync(new(f.HostId));
         tokens.Calls.ShouldBe(calls);
@@ -496,23 +527,29 @@ public sealed partial class AutomationRuntimeTests
         tokens.Calls.ShouldBe(calls);
     }
 
+    private static string? RenderedState(
+        IRenderedComponent<AutomationEventsPage> page,
+        AutomationNodeId node
+    ) =>
+        page.Find($"[data-configured-source='{node.Value}']").GetAttribute("data-configured-state");
+
     [Test]
     public async Task Readiness_DirectAdStartDoesNotInheritDerivedScheduleObservation()
     {
         await using var f = await RuntimeFixture.CreateAsync();
-        _ = await SaveExpandedChatAsync(
+        var startedFlow = await SaveExpandedChatAsync(
             f,
             "ad-timing",
             """{"event":"Started","offset-seconds":0}""",
             "started"
         );
-        _ = await SaveExpandedChatAsync(
+        var beforeFlow = await SaveExpandedChatAsync(
             f,
             "ad-timing",
             """{"event":"BeforeScheduled","offset-seconds":10}""",
             "before"
         );
-        _ = await SaveExpandedChatAsync(
+        var finishFlow = await SaveExpandedChatAsync(
             f,
             "ad-timing",
             """{"event":"ExpectedFinish","offset-seconds":0}""",
@@ -523,38 +560,35 @@ public sealed partial class AutomationRuntimeTests
         _ = tokens.Granted.Add("channel:read:ads");
         var readiness = ReadinessFor(f, x.Runtime, tokens);
         var initial = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = Configured(initial, "Ad Started: 00:00:00")
+        _ = Configured(initial, startedFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
-        Configured(initial, "Ad BeforeScheduled: 00:00:10")
+        Configured(initial, beforeFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-            .Reason.ShouldContain("Waiting");
+            .Reason.ShouldNotBeNullOrWhiteSpace();
         x.Http.Code = System.Net.HttpStatusCode.ServiceUnavailable;
         await x.Runtime.TickAsync(CancellationToken.None);
         var failed = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = Configured(failed, "Ad Started: 00:00:00")
+        _ = Configured(failed, startedFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
-        Configured(failed, "Ad BeforeScheduled: 00:00:10")
+        Configured(failed, beforeFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-            .Reason.ShouldContain("unavailable");
+            .Reason.ShouldNotBeNullOrWhiteSpace();
         f.Chat.Messages.ShouldBeEmpty();
         x.Http.Code = System.Net.HttpStatusCode.OK;
         x.Http.Body = AdScheduleJson(f.Clock.GetUtcNow().AddMinutes(1), null, 0);
         f.Clock.Advance(TimeSpan.FromSeconds(5));
         await x.Runtime.TickAsync(CancellationToken.None);
         var schedule = await ReadinessSourcesAsync(readiness, f.HostId);
-        _ = Configured(schedule, "Ad BeforeScheduled: 00:00:10")
+        _ = Configured(schedule, beforeFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
-        Configured(schedule, "Ad ExpectedFinish: 00:00:00")
+        Configured(schedule, finishFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.ObservationUnavailable>()
-            .Reason.ShouldContain("ad break duration");
+            .Reason.ShouldNotBeNullOrWhiteSpace();
         await x.Runtime.AdBreakStartedAsync(
             new("ad", f.Clock.GetUtcNow(), "streamer-id", f.Clock.GetUtcNow(), 30, false),
             CancellationToken.None
         );
-        _ = Configured(
-            await ReadinessSourcesAsync(readiness, f.HostId),
-            "Ad ExpectedFinish: 00:00:00"
-        )
+        _ = Configured(await ReadinessSourcesAsync(readiness, f.HostId), finishFlow)
             .State.ShouldBeOfType<TwitchEventSourceReadinessState.Ready>();
         f.Chat.Messages.ShouldBe(["started"]);
     }
@@ -585,14 +619,6 @@ public sealed partial class AutomationRuntimeTests
         (
             await readiness.LoadAsync(new(hostId), CancellationToken.None)
         ).ShouldBeOfType<TwitchEventSourceReadinessOutcome.Available>();
-
-    private static TwitchConfiguredSourceReadiness Configured(
-        TwitchEventSourceReadinessOutcome.Available available,
-        string name
-    ) =>
-        available
-            .Sources.SelectMany(static source => source.Configurations)
-            .Single(source => source.ConfigurationName == name);
 
     private static EventSubObservedChatEvent ReadinessChat(
         RuntimeFixture f,

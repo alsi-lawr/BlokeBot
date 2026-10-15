@@ -232,23 +232,21 @@ public sealed class TwitchEventSourceReadinessService
         BotHost host,
         TwitchEventSourceReadinessState grantState
     ) =>
-        source.Eligibility switch
-        {
-            AutomationSourceEligibility.Disabled => new TwitchEventSourceReadinessState.Disabled(),
-            AutomationSourceEligibility.Unavailable unavailable =>
-                new TwitchEventSourceReadinessState.Unavailable(unavailable.Reason),
-            AutomationSourceEligibility.Enabled => grantState
-                is not TwitchEventSourceReadinessState.Ready
-                ? grantState
-            : !_expanded.Connected(host)
-                ? new TwitchEventSourceReadinessState.ObservationUnavailable(
-                    "The bot is not connected to this channel. Suppressed or missed events are not replayed."
-                )
-            : _expanded.ObservationReason(host.Id, source.Configuration!) is { } reason
-                ? new TwitchEventSourceReadinessState.ObservationUnavailable(reason)
-            : new TwitchEventSourceReadinessState.Ready(),
-            _ => throw new InvalidOperationException("Unknown configured source eligibility."),
-        };
+        source.Eligibility.Match<TwitchEventSourceReadinessState>(
+            _ =>
+                grantState is not TwitchEventSourceReadinessState.Ready ? grantState
+                : !_expanded.Connected(host)
+                    ? new TwitchEventSourceReadinessState.ObservationUnavailable(
+                        "The bot is not connected to this channel. Suppressed or missed events are not replayed."
+                    )
+                : _expanded.ObservationReason(host.Id, source.Configuration!) is { } reason
+                    ? new TwitchEventSourceReadinessState.ObservationUnavailable(reason)
+                : new TwitchEventSourceReadinessState.Ready(),
+            static _ => new TwitchEventSourceReadinessState.Disabled(),
+            static unavailable => new TwitchEventSourceReadinessState.Unavailable(
+                unavailable.Reason
+            )
+        );
 
     private static string ConfigurationName(
         AutomationConfiguration? configuration,

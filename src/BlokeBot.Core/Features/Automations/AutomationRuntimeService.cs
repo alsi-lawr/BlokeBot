@@ -2183,11 +2183,38 @@ internal abstract record AutomationSourceEligibility
 {
     private AutomationSourceEligibility() { }
 
-    internal sealed record Enabled : AutomationSourceEligibility;
+    internal abstract TResult Match<TResult>(
+        Func<Enabled, TResult> enabled,
+        Func<Disabled, TResult> disabled,
+        Func<Unavailable, TResult> unavailable
+    );
 
-    internal sealed record Disabled : AutomationSourceEligibility;
+    internal sealed record Enabled : AutomationSourceEligibility
+    {
+        internal override TResult Match<TResult>(
+            Func<Enabled, TResult> enabled,
+            Func<Disabled, TResult> disabled,
+            Func<Unavailable, TResult> unavailable
+        ) => enabled(this);
+    }
 
-    internal sealed record Unavailable(string Reason) : AutomationSourceEligibility;
+    internal sealed record Disabled : AutomationSourceEligibility
+    {
+        internal override TResult Match<TResult>(
+            Func<Enabled, TResult> enabled,
+            Func<Disabled, TResult> disabled,
+            Func<Unavailable, TResult> unavailable
+        ) => disabled(this);
+    }
+
+    internal sealed record Unavailable(string Reason) : AutomationSourceEligibility
+    {
+        internal override TResult Match<TResult>(
+            Func<Enabled, TResult> enabled,
+            Func<Disabled, TResult> disabled,
+            Func<Unavailable, TResult> unavailable
+        ) => unavailable(this);
+    }
 }
 
 internal sealed record AutomationConfiguredSource(
