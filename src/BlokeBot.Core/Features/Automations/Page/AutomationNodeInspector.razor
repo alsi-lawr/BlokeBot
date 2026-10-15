@@ -61,8 +61,8 @@ else
         {
             <div class="automation-inspector-cel-help">
                 <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
-                <p>Outputs use only this node's declared inputs. Convert numeric Text with <code>decimal(text)</code>: the input must exist and contain a finite number with a dot decimal separator.</p>
-                <p><code>join(args, start, end, separator)</code> joins an Arguments range. All four arguments are required. End is exclusive; both indices clamp to 0..size(args). Empty or reversed ranges return empty Text. Token text and the supplied separator are kept unchanged.</p>
+                <p>Declare an input name and type, then bind its source below. Flow schedules nodes; it does not import values. A Data connection supplies a value when requested.</p>
+                <p>Outputs compute from declared inputs only, not other outputs. Connect an output to a consumer. A Boolean output is data, not a Flow branch.</p>
             </div>
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">
                 <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><button class="automation-icon-button" type="button" aria-label="Add input" title="Add input" @onclick="AddTransformInputAsync"><EditorIcon Name="add" /></button></div>
@@ -133,21 +133,29 @@ else
                 {
                     <label class="automation-field"><span>Calculate a value</span><textarea aria-label="@input.Name input expression" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" aria-describedby="@(fieldErrors.Count > 0 ? FieldId(Node.Id, fieldId) + "-errors" : null)" value="@binding.Expression?.Source" @oninput="args => SetExpressionAsync(fieldId, args.Value)"></textarea></label>
                     <div class="automation-cel-completions" aria-label="Available names for @input.Name">
-                        <strong>@(IsDelayDuration(input) ? "Command argument example" : "Available name for this input")</strong>
+                        <strong>@(Node.IsCelTransform ? "Safe trigger names" : "Common public names")</strong>
+                        @foreach (var completion in AutomationCelCompletions.ForInput(Node))
+                        {
+                            <span><code>@completion.Name</code><em>@completion.TypeLabel</em></span>
+                        }
+                        <span>@(Node.IsCelTransform ? "Only trigger names here; declared inputs are for outputs." : "Other names depend on the run. Save checks compilation; runtime checks availability and result type.")</span>
+                        <strong>Examples · @AutomationConnections.TypeLabel(input) · @(input.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</strong>
+                        @foreach (var example in AutomationCelCompletions.InputExamples(Node, input))
+                        {
+                            <span><code>@example</code></span>
+                        }
                         @if (IsDelayDuration(input))
                         {
-                            <span>When the first command argument is seconds, use <code>decimal(arguments[0]) * 1000</code>. Delay requires positive whole milliseconds. Check argument count and duration in the flow before sending a start message.</span>
+                            <span>This example converts the first argument from seconds to milliseconds. Check argument count, numeric text and a positive whole-millisecond duration in the flow before effects. A later out-of-range due time can still fail.</span>
                         }
-                        else if (AutomationCelCompletions.ForRestrictedInput(input).IsEmpty)
+                        @if (!Node.IsCelTransform)
                         {
-                            <span>No available name has the required type.</span>
-                        }
-                        else
-                        {
-                            @foreach (var completion in AutomationCelCompletions.ForRestrictedInput(input))
+                            <strong>Selected functions · non-null inputs</strong>
+                            @foreach (var signature in AutomationCelCompletions.OrdinaryFunctions)
                             {
-                                <span><code>@completion.Name</code><em>@completion.ValueType</em></span>
+                                <span><code>@signature</code></span>
                             }
+                            <span>Check argument count before indexing and finite numeric Text before conversion. Use a dot for fractions. Join requires four arguments: end is exclusive, indices clamp to 0..count, and the separator is kept exactly.</span>
                         }
                     </div>
                 }
@@ -245,16 +253,35 @@ else
                         <div class="field"><label class="field__label" for="@DeclarationFieldId(output.PortId, "required")">Required?</label><select class="field__input" id="@DeclarationFieldId(output.PortId, "required")" value="@output.Nullability" @onchange="args => UpdateTransformOutputAsync(output, nullability: args.Value?.ToString())"><option value="@AutomationPortNullability.NonNullable">Required</option><option value="@AutomationPortNullability.Nullable">Optional</option></select></div>
                         <div class="field automation-transform-cel"><label class="field__label" for="@DeclarationFieldId(output.PortId, "expression")">CEL expression</label><textarea class="field__input" id="@DeclarationFieldId(output.PortId, "expression")" aria-invalid="@(Errors.Any(error => error.NodeId == Node.Id && error.PortId == output.PortId) ? "true" : null)" aria-describedby="@(Errors.Any(error => error.NodeId == Node.Id && error.PortId == output.PortId) ? DeclarationFieldId(output.PortId, "errors") : null)" value="@output.Source" @oninput="args => UpdateTransformOutputAsync(output, source: args.Value?.ToString())"></textarea></div>
                         <div id="@DeclarationFieldId(output.PortId, "errors")">@foreach (var error in Errors.Where(error => error.NodeId == Node.Id && error.PortId == output.PortId)) { <span class="automation-field-error" role="alert">@(error.Diagnostic is { } diagnostic ? $"{diagnostic.Summary}. {diagnostic.Correction}" : error.Message)</span> }</div>
+                        @if (AutomationCelCompletions.OutputExamples(Node, output) is { IsEmpty: false } examples)
+                        {
+                            <div class="automation-cel-completions automation-transform-cel" aria-label="Example expressions for @output.DisplayName">
+                                <strong>Examples · @output.ValueType · @(output.Nullability == AutomationPortNullability.Nullable ? "can be null" : "required")</strong>
+                                @foreach (var example in examples)
+                                {
+                                    <span><code>@example</code></span>
+                                }
+                            </div>
+                        }
                         <button class="automation-icon-button automation-declaration-remove" type="button" aria-label="Remove output @output.DisplayName" title="Remove output @output.DisplayName" @onclick="() => RemoveTransformOutputAsync(output.PortId)"><EditorIcon Name="delete" /></button>
                     </div>
                 }
                 <div class="automation-cel-completions" aria-label="Available output CEL names">
-                    <strong>Available node inputs</strong>
+                    <strong>Declared input names</strong>
                     @foreach (var completion in AutomationCelCompletions.ForOutput(Node))
                     {
-                        <span><code>@completion.Name</code><em>@completion.ValueType</em></span>
+                        <span><code>@completion.Name</code><em>@completion.TypeLabel</em></span>
                     }
-                    <span><code>format_number(number[, 0..6])</code><em>Text</em></span>
+                    @if (Node.TransformInputs.Count == 0)
+                    {
+                        <span>No input is declared. Add and bind an input to use a source value.</span>
+                    }
+                    <strong>Selected functions · non-null inputs</strong>
+                    @foreach (var signature in AutomationCelCompletions.TransformFunctions)
+                    {
+                        <span><code>@signature</code></span>
+                    }
+                    <span>Check argument count before indexing. Numeric Text must contain a finite invariant number, using a dot for fractions. Join requires all four arguments; end is exclusive, indices clamp to 0..count, and the separator is kept exactly.</span>
                 </div>
             </section>
         }

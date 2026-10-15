@@ -1063,42 +1063,6 @@ public sealed partial class AutomationEditorInteractionTests
         retained.TargetPortId.ShouldBe(originalInput.PortId);
     }
 
-    [Test]
-    public void TypedEditor_CelCompletion_UsesDeclaredInputsAndArgumentsOnlyRestrictedScope()
-    {
-        var registered = new CoreAutomationCatalogModule()
-            .Definitions.Select(static definition => definition.Descriptor)
-            .Single(static definition => definition.Id == AutomationDefinitionIds.CelTransform);
-        var transform = AutomationEditorNode.Create(registered, new(new(48), new(72)));
-        var input = transform.TransformInputs.Single();
-        transform.UpdateTransformInput(
-            input.PortId,
-            "Actor",
-            AutomationPortValueType.Actor,
-            AutomationPortNullability.NonNullable
-        );
-        transform.AddTransformInput();
-        var arguments = transform.TransformInputs.Last();
-        transform.UpdateTransformInput(
-            arguments.PortId,
-            "Arguments",
-            AutomationPortValueType.Arguments,
-            AutomationPortNullability.NonNullable
-        );
-
-        AutomationCelCompletions
-            .ForOutput(transform)
-            .Select(static item => item.Name)
-            .ShouldBe(["value", "value.display_name", "value.login", arguments.Identifier.Value]);
-        var argumentsPort = transform.Definition.Inputs.Single(port => port.Id == arguments.PortId);
-        AutomationCelCompletions
-            .ForRestrictedInput(argumentsPort)
-            .ShouldBe([new("arguments", AutomationPortValueType.Arguments)]);
-        AutomationCelCompletions
-            .ForRestrictedInput(transform.Definition.Inputs.Single(port => port.Id == input.PortId))
-            .ShouldBeEmpty();
-    }
-
     private static AutomationEditorNode CelTransformNode() =>
         AutomationEditorNode.Create(
             new CoreAutomationCatalogModule()
