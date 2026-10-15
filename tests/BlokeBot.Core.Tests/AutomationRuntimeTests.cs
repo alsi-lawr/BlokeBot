@@ -4340,7 +4340,7 @@ public sealed partial class AutomationRuntimeTests
             await stop.NewRuntime().ResumeAsync(new(stopRunId), CancellationToken.None)
         ).Status.ShouldBe(AutomationResumeStatus.Failed);
         stopChat.Messages.ShouldBe(["stop interrupted"]);
-        stopChanges.ShouldBe([AutomationFlowRunState.Failed]);
+        stopChanges.ShouldBeEmpty();
 
         var continueEntered = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
@@ -5834,7 +5834,8 @@ public sealed partial class AutomationRuntimeTests
                 null,
             IAutomationIntegerEntropy? integerEntropy = null,
             IInterceptor[]? databaseInterceptors = null,
-            bool migrateSchema = false
+            bool migrateSchema = false,
+            IPublicChatMessageSender? executionChat = null
         )
         {
             var database = migrateSchema
@@ -5888,7 +5889,7 @@ public sealed partial class AutomationRuntimeTests
             );
             var actions = new AutomationActionExecutor(
                 features,
-                chat,
+                executionChat ?? chat,
                 overlays,
                 expressions,
                 countdowns

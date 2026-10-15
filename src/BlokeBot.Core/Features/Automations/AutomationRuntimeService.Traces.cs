@@ -1,6 +1,5 @@
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
 
@@ -54,27 +53,6 @@ public sealed partial class AutomationRuntimeService
                 cancellationToken,
                 flow.Nodes.Single(node => node.Id == id),
                 due: due
-            );
-        }
-    }
-
-    private async Task TraceCancellationAsync(
-        AutomationRunId id,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var run = await db
-            .AutomationFlowRuns.AsNoTracking()
-            .SingleOrDefaultAsync(run => run.Id == id.Value, cancellationToken);
-        if (run is not null)
-        {
-            await TraceAsync(
-                db,
-                run,
-                AutomationTraceEventKind.Cancellation,
-                cancellationToken,
-                outcome: AutomationTraceOutcome.Cancelled
             );
         }
     }
