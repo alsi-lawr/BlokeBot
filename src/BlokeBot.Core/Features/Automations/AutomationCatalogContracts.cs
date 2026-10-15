@@ -338,6 +338,8 @@ public sealed record ConditionControlConfiguration(bool Predicate) : AutomationC
 
 public sealed record DelayControlConfiguration(TimeSpan Duration) : AutomationConfiguration;
 
+public sealed record EndAutomationControlConfiguration : AutomationConfiguration;
+
 public sealed record PersistedAutomationNodeDefinition(
     string TypeId,
     int SchemaVersion,

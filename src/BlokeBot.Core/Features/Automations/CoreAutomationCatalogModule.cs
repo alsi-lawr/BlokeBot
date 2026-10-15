@@ -19,6 +19,8 @@ public static partial class AutomationDefinitionIds
 
     public static AutomationDefinitionId DelayControl { get; } = new("delay");
 
+    public static AutomationDefinitionId EndAutomationControl { get; } = new("end-automation");
+
     public static AutomationDefinitionId StreamOnlineSource { get; } = new("stream-online");
 
     public static AutomationDefinitionId StreamOfflineSource { get; } = new("stream-offline");
@@ -119,6 +121,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
         PlayOverlayCueAction(),
         ConditionControl(),
         DelayControl(),
+        EndAutomationControl(),
     ];
 
     private static AutomationDefinition<CustomCommandSourceConfiguration> CustomCommandSource() =>
@@ -371,6 +374,24 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             ),
             ParseCondition,
             ValidateCondition
+        );
+
+    private static AutomationDefinition<EndAutomationControlConfiguration> EndAutomationControl() =>
+        new(
+            new(
+                AutomationDefinitionIds.EndAutomationControl,
+                AutomationNodeKind.Control,
+                AutomationDefinitionScope.Host,
+                _schema,
+                new("End automation", "Finishes this branch. Other branches continue.", "Control"),
+                [_flowInput],
+                [],
+                [],
+                AutomationActionCapabilities.None,
+                AutomationActionRetrySafety.NotApplicable
+            ),
+            static _ => Parsed(new EndAutomationControlConfiguration()),
+            static _ => AutomationValidationResult.Valid
         );
 
     private static AutomationDefinition<DelayControlConfiguration> DelayControl() =>

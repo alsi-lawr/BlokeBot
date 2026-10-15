@@ -49,6 +49,10 @@ internal static class AutomationScenarioSimulation
                 || (
                     valid.Definition.Id.Value == "delay"
                     && valid.Configuration is DelayControlConfiguration
+                )
+                || (
+                    valid.Definition.Id == AutomationDefinitionIds.EndAutomationControl
+                    && valid.Configuration is EndAutomationControlConfiguration
                 ),
             AutomationNodeKind.Action => _effectContracts.TryGetValue(
                 valid.Definition.Id.Value,
@@ -65,6 +69,7 @@ internal static class AutomationScenarioSimulation
     ) =>
         configuration switch
         {
+            EndAutomationControlConfiguration => AutomationNodeEvaluation.End(now),
             ConditionControlConfiguration => AutomationNodeEvaluation.Condition(inputs, now),
             DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(delay, inputs, now),
             SendChatActionConfiguration

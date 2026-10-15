@@ -2,6 +2,13 @@ namespace BlokeBot.Core.Features.Automations;
 
 internal static class AutomationNodeEvaluation
 {
+    internal static AutomationNodeExecution End(DateTime now) =>
+        new AutomationNodeExecution.Succeeded(
+            "branch-ended",
+            new AutomationOutputSelection.Selected([]),
+            now
+        );
+
     internal static AutomationNodeExecution Delay(
         DelayControlConfiguration configuration,
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,

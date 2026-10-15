@@ -1721,6 +1721,9 @@ public sealed partial class AutomationRuntimeService(
                     inputs,
                     cancellationToken
                 ),
+            EndAutomationControlConfiguration => AutomationNodeEvaluation.End(
+                clock.GetUtcNow().UtcDateTime
+            ),
             ConditionControlConfiguration => AutomationNodeEvaluation.Condition(
                 inputs,
                 clock.GetUtcNow().UtcDateTime
