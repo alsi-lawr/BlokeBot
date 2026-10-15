@@ -714,7 +714,8 @@ public sealed partial class AutomationRuntimeService(
             var now = clock.GetUtcNow().UtcDateTime;
             var pending = run
                 .NodeRuns.Where(static value => value.Status == AutomationNodeRunStatus.Pending)
-                .OrderBy(static value => value.Sequence)
+                .OrderBy(value => value.AvailableAtUtc > now)
+                .ThenBy(static value => value.Sequence)
                 .FirstOrDefault();
             if (pending is null)
             {
