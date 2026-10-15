@@ -118,39 +118,6 @@ internal static class AutomationCelSyntax
         }
     }
 
-    internal static bool Validate(
-        string source,
-        IReadOnlyDictionary<string, AutomationCelTransformInput> inputs
-    )
-    {
-        if (!TryAnalyze(source, out var analysis) || analysis.HasCompositeConstructor)
-        {
-            return false;
-        }
-
-        if (!AllowedFunctions(analysis))
-        {
-            return false;
-        }
-
-        foreach (var reference in analysis.References)
-        {
-            var separator = reference.IndexOf('.');
-            var root = separator < 0 ? reference : reference[..separator];
-            if (!inputs.TryGetValue(root, out var input))
-            {
-                return false;
-            }
-
-            if (separator >= 0 && !AllowedField(input.ValueType, reference[(separator + 1)..]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     internal static AutomationDiagnostic? Diagnose(
         string source,
         IReadOnlyDictionary<string, AutomationCelStaticType> symbols
@@ -319,16 +286,6 @@ internal static class AutomationCelSyntax
                 return false;
         }
     }
-
-    internal static bool AllowedField(AutomationPortValueType type, string field) =>
-        type switch
-        {
-            AutomationPortValueType.Actor or AutomationPortValueType.Channel => field
-                is "login"
-                    or "display_name",
-            AutomationPortValueType.Stream => field is "title" or "game_name" or "started_at",
-            _ => false,
-        };
 }
 
 internal sealed record AutomationCelAnalysis(
