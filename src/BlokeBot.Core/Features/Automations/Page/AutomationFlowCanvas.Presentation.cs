@@ -192,7 +192,7 @@ public partial class AutomationFlowCanvas
             "condition-true" => "Yes branch",
             "condition-false" => "No branch",
             "delayed" => "Virtual delay",
-            "action-simulated" => "Succeeded",
+            "action-simulated" => "Hypothetical",
             _ => outcome.State == AutomationNodeRunState.Failed ? "Failed" : outcome.OutcomeCode,
         };
 

@@ -5817,7 +5817,16 @@ public sealed partial class AutomationRuntimeTests
         internal AutomationActionExecutor Actions { get; }
         internal AutomationRuntimeService Runtime { get; }
         internal AutomationFlowService Flows { get; }
-        internal AutomationScenarioService Scenarios => new(Database, Catalog, Flows, Clock);
+        internal AutomationScenarioService Scenarios =>
+            new(
+                Database,
+                Catalog,
+                Flows,
+                Clock,
+                Expressions,
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
+            );
         internal AutomationRunQueryService Queries { get; }
         internal int HostId { get; }
         internal AutomationCountdownService Countdowns { get; private init; } = null!;

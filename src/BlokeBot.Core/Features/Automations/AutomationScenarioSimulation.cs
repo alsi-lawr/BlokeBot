@@ -63,7 +63,10 @@ internal static class AutomationScenarioSimulation
 
     internal static AutomationNodeExecution Evaluate(
         AutomationConfiguration configuration,
+        AutomationNativeActionPreparation preparation,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationExpressionSource> fields,
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
+        AutomationContext context,
         AutomationScenarioEffectResult effectResult,
         DateTime now
     ) =>
@@ -72,11 +75,46 @@ internal static class AutomationScenarioSimulation
             EndAutomationControlConfiguration => AutomationNodeEvaluation.End(now),
             ConditionControlConfiguration => AutomationNodeEvaluation.Condition(inputs, now),
             DelayControlConfiguration delay => AutomationNodeEvaluation.Delay(delay, inputs, now),
-            SendChatActionConfiguration
-                when !inputs.TryGetValue(new("message"), out var message)
-                    || AutomationPublicSinkAdmission.AdmitText(message)
-                        is not AutomationPublicTextAdmission.Admitted =>
-                new AutomationNodeExecution.Failed("sensitive-output-blocked"),
+            SendChatActionConfiguration => Prepared(
+                AutomationNativeActionPreparation.Chat(inputs, context),
+                effectResult,
+                now
+            ),
+            PlayOverlayCueActionConfiguration cue => Prepared(
+                preparation.Cue(cue, fields, context),
+                effectResult,
+                now
+            ),
+            FulfilRedemptionActionConfiguration or CancelRedemptionActionConfiguration => Prepared(
+                AutomationNativeActionPreparation.Redemption(context),
+                effectResult,
+                now
+            ),
+            SendShoutoutActionConfiguration => Prepared(
+                AutomationNativeActionPreparation.Shoutout(context),
+                effectResult,
+                now
+            ),
+            StartPollActionConfiguration poll => Prepared(
+                preparation.Poll(poll, fields, context),
+                effectResult,
+                now
+            ),
+            CreateMarkerActionConfiguration marker => Prepared(
+                preparation.Marker(marker, fields, context),
+                effectResult,
+                now
+            ),
+            StartPredictionActionConfiguration prediction => Prepared(
+                preparation.Prediction(prediction, fields, context),
+                effectResult,
+                now
+            ),
+            ResolvePredictionActionConfiguration resolve => Prepared(
+                preparation.PredictionOutcome(resolve, fields, context),
+                effectResult,
+                now
+            ),
             CountdownActionConfiguration { Operation: CountdownOperation.Start } =>
                 AutomationNodeEvaluation.Action(
                     effectResult switch
@@ -93,12 +131,32 @@ internal static class AutomationScenarioSimulation
                     now,
                     "action-simulated"
                 ),
-            _ => AutomationNodeEvaluation.Action(
-                effectResult == AutomationScenarioEffectResult.Failed
-                    ? new AutomationActionOutcome.Failed("simulated-action-failed")
-                    : new AutomationActionOutcome.Succeeded(),
-                now,
-                "action-simulated"
-            ),
+            EndPollActionConfiguration
+            or CreateClipActionConfiguration
+            or LockPredictionActionConfiguration
+            or CancelPredictionActionConfiguration => Effect(effectResult, now),
+            _ => new AutomationNodeExecution.Failed("simulation-unsupported"),
         };
+
+    private static AutomationNodeExecution Prepared<T>(
+        AutomationNativePreparation<T> prepared,
+        AutomationScenarioEffectResult effectResult,
+        DateTime now
+    ) =>
+        prepared.Match(
+            _ => Effect(effectResult, now),
+            failed => new AutomationNodeExecution.Failed(failed.Code)
+        );
+
+    private static AutomationNodeExecution Effect(
+        AutomationScenarioEffectResult effectResult,
+        DateTime now
+    ) =>
+        AutomationNodeEvaluation.Action(
+            effectResult == AutomationScenarioEffectResult.Failed
+                ? new AutomationActionOutcome.Failed("simulated-action-failed")
+                : new AutomationActionOutcome.Succeeded(),
+            now,
+            "action-simulated"
+        );
 }

@@ -161,7 +161,10 @@ public sealed class PluginAutomationRemovalTests
             database,
             catalog,
             flows,
-            TimeProvider.System
+            TimeProvider.System,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
         );
         var source = registry.Current.Descriptors.Single(value =>
             value.Kind == AutomationNodeKind.Source

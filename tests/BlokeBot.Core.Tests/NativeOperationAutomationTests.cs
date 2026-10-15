@@ -19,7 +19,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class NativeOperationAutomationTests
+public sealed partial class NativeOperationAutomationTests
 {
     private static readonly DateTimeOffset _start = new(2026, 8, 7, 15, 0, 0, TimeSpan.Zero);
 
@@ -952,10 +952,11 @@ public sealed class NativeOperationAutomationTests
         internal int HostId { get; private set; }
 
         internal static async Task<NativeFixture> CreateAsync(
-            HostFeatureFlags hostFeatures = AllFeatures
+            HostFeatureFlags hostFeatures = AllFeatures,
+            Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[]? interceptors = null
         )
         {
-            var database = await SqliteBlokeBotDbFactory.CreateAsync();
+            var database = await SqliteBlokeBotDbFactory.CreateAsync(interceptors ?? []);
             var clock = new MutableTimeProvider(_start);
             var chat = new RecordingChatSender();
             var shoutouts = new RecordingShoutoutOperations();
@@ -976,7 +977,7 @@ public sealed class NativeOperationAutomationTests
                 ]),
                 features,
                 expressions,
-                [new AutomationCelTransformHandler()]
+                [new AutomationCelTransformHandler(), new AutomationRandomNumberHandler()]
             );
             var overlays = new NoOverlayCues();
             AutomationRuntimeService flowRuntime = null!;
@@ -1287,6 +1288,7 @@ public sealed class NativeOperationAutomationTests
     private sealed class RecordingChatSender : IPublicChatMessageSender
     {
         internal ConcurrentQueue<string> Messages { get; } = [];
+        internal ConcurrentQueue<PublicChatDeliveryDeadline> Deadlines { get; } = [];
 
         public ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,
@@ -1296,6 +1298,7 @@ public sealed class NativeOperationAutomationTests
         )
         {
             Messages.Enqueue(message);
+            Deadlines.Enqueue(deadline);
             return ValueTask.FromResult<PublicChatSendOutcome>(
                 new PublicChatSendOutcome.Accepted()
             );

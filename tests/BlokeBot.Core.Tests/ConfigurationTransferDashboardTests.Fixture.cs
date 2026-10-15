@@ -30,7 +30,10 @@ public sealed partial class ConfigurationTransferDashboardTests
             database,
             components.Catalog,
             components.Flows,
-            TimeProvider.System
+            TimeProvider.System,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
         );
         var automations = new AutomationConfigurationTransferAdapter(
             components.Flows,
@@ -66,7 +69,15 @@ public sealed partial class ConfigurationTransferDashboardTests
             components.Catalog,
             components.Flows,
             TimeProvider.System,
-            new(database, components.Catalog, components.Flows, TimeProvider.System)
+            new(
+                database,
+                components.Catalog,
+                components.Flows,
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
+            )
         );
     }
 

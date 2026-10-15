@@ -8,9 +8,14 @@ public sealed partial class AutomationScenarioService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationCatalogService catalog,
     AutomationFlowService flows,
-    TimeProvider clock
+    TimeProvider clock,
+    AutomationExpressionService expressions,
+    BotSettings settings,
+    OAuthAuthorizationScopeSet channelRequiredScopes
 )
 {
+    private readonly AutomationNativeActionPreparation _nativePreparation = new(expressions);
+
     public const int MaximumScenariosPerFlow = 32;
     public const int MaximumFixtureBytes = 65_536;
     public const int MaximumGraphNodes = 256;
@@ -323,18 +328,47 @@ public sealed partial class AutomationScenarioService(
                     }
                     continue;
                 }
-                var execution = inputs.Match<AutomationNodeExecution>(
-                    available =>
-                        AutomationScenarioSimulation.Evaluate(
+                var execution = await inputs.Match<Task<AutomationNodeExecution>>(
+                    async available =>
+                        await MissingPrerequisiteAsync(
+                            draft.HostId,
                             valid.Configuration,
-                            available.FieldValues,
-                            fixture
-                                .Effects.FirstOrDefault(effect => effect.NodeId.Value == node.Id)
-                                ?.Result
-                                ?? AutomationScenarioEffectResult.Succeeded,
-                            now
-                        ),
-                    failed => new AutomationNodeExecution.Failed(failed.Code, failed.Diagnostic)
+                            context,
+                            cancellationToken
+                        )
+                            is { } code
+                            ? new AutomationNodeExecution.Failed(code)
+                        : AutomationRuntimeSerialization.RestoreInputBindings(
+                            node.InputBindingsJson,
+                            new(node.DefinitionId)
+                        )
+                            is AutomationInputBindingsRestoreOutcome.Available restored
+                            ? AutomationScenarioSimulation.Evaluate(
+                                valid.Configuration,
+                                _nativePreparation,
+                                restored
+                                    .Bindings.Where(static pair =>
+                                        pair.Value.Mode == AutomationInputBindingMode.Expression
+                                    )
+                                    .ToImmutableDictionary(
+                                        static pair => pair.Key,
+                                        static pair => pair.Value.Expression!
+                                    ),
+                                available.FieldValues,
+                                context,
+                                fixture
+                                    .Effects.FirstOrDefault(effect =>
+                                        effect.NodeId.Value == node.Id
+                                    )
+                                    ?.Result
+                                    ?? AutomationScenarioEffectResult.Succeeded,
+                                now
+                            )
+                        : new AutomationNodeExecution.Failed("binding-invalid"),
+                    failed =>
+                        Task.FromResult<AutomationNodeExecution>(
+                            new AutomationNodeExecution.Failed(failed.Code, failed.Diagnostic)
+                        )
                 );
                 var diagnostics = inputs.Match(
                     resolved => AutomationDataValueSerialization.Diagnostics(resolved.PortValues),

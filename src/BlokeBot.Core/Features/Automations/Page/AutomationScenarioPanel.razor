@@ -42,7 +42,8 @@
         </div>
         </details>
         <section class="automation-authoring-section">
-        <h3>Action outcomes</h3>
+        <h3>Hypothetical action outcomes</h3>
+        <p>Actions are not sent to Twitch. Known missing permissions fail; current Twitch approval, eligibility and live state are not checked.</p>
             @foreach (var node in Nodes.Where(node => node.Definition.Kind == AutomationNodeKind.Action))
             {
                 <label class="automation-effect-choice">
@@ -53,12 +54,12 @@
                 <select aria-label="@($"{node.EffectiveName} result")" data-scenario-effect-node="@node.Id.Value" value="@selectedEffect" @onchange="args => SetEffect(node.Id, args)">
                 @if (start)
                 {
-                    <option value="Started">Started</option>
-                    <option value="AlreadyRunning">Already running</option>
+                    <option value="Started">Would start</option>
+                    <option value="AlreadyRunning">Would already be running</option>
                 }
                 else
                 {
-                    <option value="Succeeded">Success</option>
+                    <option value="Succeeded">Would succeed</option>
                 }
                 <option value="Failed">Failure</option>
                 </select>

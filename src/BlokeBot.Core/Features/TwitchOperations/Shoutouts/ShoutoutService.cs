@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
@@ -23,7 +24,7 @@ public sealed class ShoutoutService(
 
     private const HostFeatureFlags _feature = HostFeatureFlags.RaidCollaboration;
 
-    private static readonly string[] _requiredScopes =
+    internal static ImmutableArray<string> RequiredScopes { get; } =
     [
         Scopes.UserReadModeratedChannels,
         Scopes.ModeratorReadShoutouts,
@@ -117,7 +118,7 @@ public sealed class ShoutoutService(
 
         var account = await accounts.GetActiveTokenStatusAsync(
             host.Login,
-            _requiredScopes,
+            RequiredScopes,
             cancellationToken
         );
         return await account.Status.Match(
@@ -248,7 +249,7 @@ public sealed class ShoutoutService(
         CancellationToken cancellationToken
     )
     {
-        if (ScopeSet.Missing(grantedScopes, _requiredScopes).Length > 0)
+        if (ScopeSet.Missing(grantedScopes, RequiredScopes).Length > 0)
         {
             return new ShoutoutOperationOutcome.NotReady(
                 "Reconnect the bot account with both Twitch shoutout permissions."

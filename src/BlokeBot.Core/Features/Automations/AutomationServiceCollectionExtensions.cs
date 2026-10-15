@@ -101,7 +101,15 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddSingleton<AutomationFlowService>();
         services.TryAddSingleton<AutomationSubflowService>();
         services.TryAddSingleton<AutomationSubflowCurrentDataConversion>();
-        services.TryAddSingleton<AutomationScenarioService>();
+        services.TryAddSingleton(p => new AutomationScenarioService(
+            p.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
+            p.GetRequiredService<AutomationCatalogService>(),
+            p.GetRequiredService<AutomationFlowService>(),
+            p.GetRequiredService<TimeProvider>(),
+            p.GetRequiredService<AutomationExpressionService>(),
+            p.GetRequiredService<BotSettings>(),
+            p.GetRequiredService<ChannelBotOAuthService>().RequestedScopes()
+        ));
         services.TryAddSingleton<AutomationTraceStore>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, AutomationTraceCleanupWorker>()

@@ -249,7 +249,10 @@ public sealed partial class ConfigurationTransferOverlayCredentialTests
                     Database,
                     automation.Catalog,
                     automation.Flows,
-                    TimeProvider.System
+                    TimeProvider.System,
+                    new AutomationExpressionService(),
+                    BotSettings.FromOptions(new BotOptions()),
+                    OAuthAuthorizationScopeSet.Create(["channel:bot"])
                 )
             );
             return (

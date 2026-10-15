@@ -70,7 +70,10 @@ public sealed partial class ConfigurationTransferAutomationTests
             database,
             transfer.Catalog,
             transfer.FlowService,
-            TimeProvider.System
+            TimeProvider.System,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
         );
         AutomationFlowDraft sourceDraft;
         await using (var db = await database.CreateDbContextAsync())
@@ -556,7 +559,15 @@ public sealed partial class ConfigurationTransferAutomationTests
             transfer.Catalog,
             transfer.FlowService,
             TimeProvider.System,
-            new(database, transfer.Catalog, transfer.FlowService, TimeProvider.System)
+            new(
+                database,
+                transfer.Catalog,
+                transfer.FlowService,
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
+            )
         ).ExportAsync(
             hostId,
             new(

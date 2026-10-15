@@ -143,7 +143,10 @@ public sealed class ConfigurationTransferContractTests
                 database,
                 automation.Catalog,
                 automation.Flows,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         );
 
@@ -263,7 +266,10 @@ public sealed class ConfigurationTransferContractTests
                 database,
                 automation.Catalog,
                 automation.Flows,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         );
 
@@ -337,7 +343,10 @@ public sealed class ConfigurationTransferContractTests
                     database,
                     automation.Catalog,
                     automation.Flows,
-                    TimeProvider.System
+                    TimeProvider.System,
+                    new AutomationExpressionService(),
+                    BotSettings.FromOptions(new BotOptions()),
+                    OAuthAuthorizationScopeSet.Create(["channel:bot"])
                 )
             ).ExportAsync(
                 hostId,
@@ -396,7 +405,10 @@ public sealed class ConfigurationTransferContractTests
                 database,
                 automation.Catalog,
                 automation.Flows,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         ).ExportAsync(
             hostId,
@@ -444,7 +456,10 @@ public sealed class ConfigurationTransferContractTests
                     database,
                     automation.Catalog,
                     automation.Flows,
-                    TimeProvider.System
+                    TimeProvider.System,
+                    new AutomationExpressionService(),
+                    BotSettings.FromOptions(new BotOptions()),
+                    OAuthAuthorizationScopeSet.Create(["channel:bot"])
                 )
             ).ExportAsync(
                 hostId,
@@ -505,7 +520,10 @@ public sealed class ConfigurationTransferContractTests
                 database,
                 automation.Catalog,
                 automation.Flows,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         ).ExportAsync(
             hostId,

@@ -184,7 +184,7 @@ public partial class AutomationEditorPage
                 case AutomationScenarioRunOutcome.Completed completed:
                     _sampleOutcomes = completed.Nodes;
                     trace = completed.TraceId;
-                    _traceTitle = "Test run succeeded";
+                    _traceTitle = "Hypothetical test completed";
                     break;
                 case AutomationScenarioRunOutcome.Failed failed:
                     _sampleOutcomes = failed.Nodes;

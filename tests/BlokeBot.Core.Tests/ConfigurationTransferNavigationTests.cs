@@ -112,7 +112,10 @@ public sealed class ConfigurationTransferNavigationTests
             database,
             services.Catalog,
             services.Flows,
-            TimeProvider.System
+            TimeProvider.System,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
         );
         var fixtureJson = AutomationScenarioSerialization.Serialize(
             scenarios.CreatePortableFixture(draft, source.Id)

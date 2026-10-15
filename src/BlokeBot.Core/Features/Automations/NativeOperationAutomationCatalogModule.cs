@@ -66,6 +66,34 @@ public static class NativeOperationAutomations
     internal static HostFeatureFlags BackingFeature(string definitionId) =>
         _backingFeatures.GetValueOrDefault(definitionId, HostFeatureFlags.None);
 
+    internal static AutomationValidationResult ValidateMarkerDescription(string description) =>
+        description.Trim() switch
+        {
+            [] => AutomationValidationResult.Invalid(
+                new AutomationValidationTarget.Field(new("description")),
+                "Enter a marker description."
+            ),
+            { Length: > MarkerDescriptionMaximumLength } => AutomationValidationResult.Invalid(
+                new AutomationValidationTarget.Field(new("description")),
+                "Use 140 characters or fewer in the marker description."
+            ),
+            _ => AutomationValidationResult.Valid,
+        };
+
+    internal static AutomationValidationResult ValidateOutcomeIdentifier(string outcomeId) =>
+        outcomeId.Trim() switch
+        {
+            [] => AutomationValidationResult.Invalid(
+                new AutomationValidationTarget.Field(new("winning-outcome-id")),
+                "Enter the outcome ID."
+            ),
+            { Length: > OutcomeIdentifierMaximumLength } => AutomationValidationResult.Invalid(
+                new AutomationValidationTarget.Field(new("winning-outcome-id")),
+                "Use 128 characters or fewer in the outcome ID."
+            ),
+            _ => AutomationValidationResult.Valid,
+        };
+
     internal static ImmutableArray<string> SplitEntries(string multiline) =>
         [
             .. multiline
@@ -662,20 +690,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
 
     private static AutomationValidationResult ValidateCreateMarker(
         CreateMarkerActionConfiguration configuration
-    ) =>
-        configuration.Description.Trim() switch
-        {
-            [] => AutomationValidationResult.Invalid(
-                new AutomationValidationTarget.Field(new("description")),
-                "Enter a marker description."
-            ),
-            { Length: > NativeOperationAutomations.MarkerDescriptionMaximumLength } =>
-                AutomationValidationResult.Invalid(
-                    new AutomationValidationTarget.Field(new("description")),
-                    "Use 140 characters or fewer in the marker description."
-                ),
-            _ => AutomationValidationResult.Valid,
-        };
+    ) => NativeOperationAutomations.ValidateMarkerDescription(configuration.Description);
 
     private static AutomationConfigurationParseResult ParseStartPrediction(JsonElement json) =>
         !TryReadString(json, "title", out var title)
@@ -725,18 +740,5 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
 
     private static AutomationValidationResult ValidateResolvePrediction(
         ResolvePredictionActionConfiguration configuration
-    ) =>
-        configuration.WinningOutcomeId.Trim() switch
-        {
-            [] => AutomationValidationResult.Invalid(
-                new AutomationValidationTarget.Field(new("winning-outcome-id")),
-                "Enter the outcome ID."
-            ),
-            { Length: > NativeOperationAutomations.OutcomeIdentifierMaximumLength } =>
-                AutomationValidationResult.Invalid(
-                    new AutomationValidationTarget.Field(new("winning-outcome-id")),
-                    "Use 128 characters or fewer in the outcome ID."
-                ),
-            _ => AutomationValidationResult.Valid,
-        };
+    ) => NativeOperationAutomations.ValidateOutcomeIdentifier(configuration.WinningOutcomeId);
 }

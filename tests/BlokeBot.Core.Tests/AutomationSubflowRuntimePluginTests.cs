@@ -60,7 +60,10 @@ public sealed partial class AutomationRuntimeTests
             fixture.Database,
             plugin.Catalog,
             plugin.Flows,
-            fixture.Clock
+            fixture.Clock,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
         );
         _ = (
             await scenarios.RunAsync(

@@ -117,7 +117,10 @@ public sealed partial class ConfigurationTransferAutomationTests
                 database,
                 transfer.Catalog,
                 transfer.FlowService,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         ).ExportAsync(
             hostId,
@@ -273,7 +276,10 @@ public sealed partial class ConfigurationTransferAutomationTests
                 database,
                 transfer.Catalog,
                 transfer.FlowService,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         ).ExportAsync(
             hostId,
@@ -1634,7 +1640,10 @@ public sealed partial class ConfigurationTransferAutomationTests
                 database,
                 transfer.Catalog,
                 transfer.FlowService,
-                TimeProvider.System
+                TimeProvider.System,
+                new AutomationExpressionService(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
             )
         ).ExportAsync(
             hostId,
@@ -1714,7 +1723,10 @@ public sealed partial class ConfigurationTransferAutomationTests
                     database,
                     services.Catalog,
                     services.Flows,
-                    TimeProvider.System
+                    TimeProvider.System,
+                    new AutomationExpressionService(),
+                    BotSettings.FromOptions(new BotOptions()),
+                    OAuthAuthorizationScopeSet.Create(["channel:bot"])
                 )
             )
         );

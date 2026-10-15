@@ -88,7 +88,10 @@ public sealed partial class AutomationRuntimeTests
             fixture.Database,
             fixture.Catalog,
             fixture.Flows,
-            fixture.Clock
+            fixture.Clock,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
         );
         var second = await restarted.RunSavedAsync(
             new(fixture.HostId),
@@ -560,7 +563,7 @@ public sealed partial class AutomationRuntimeTests
         }
     }
 
-    private sealed class ScenarioWriteGuard : DbCommandInterceptor
+    internal sealed class ScenarioWriteGuard : DbCommandInterceptor
     {
         internal bool Armed { get; set; }
         internal int Writes { get; private set; }
