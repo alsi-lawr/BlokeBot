@@ -294,7 +294,8 @@ public sealed partial class AutomationRuntimeTests
         using var cancellation = new CancellationTokenSource();
         var cut = new DrainCommitCancellation(cancellation);
         await using var fixture = await RuntimeFixture.CreateAsync(databaseInterceptors: [cut]);
-        var revision = await Publish(Subflows(fixture), FanoutSubflow(fixture.HostId));
+        var draft = FanoutSubflow(fixture.HostId);
+        var revision = await Publish(Subflows(fixture), draft);
         var caller = Caller(fixture.HostId, revision, DrainValues());
         var parent = Node("send-chat", """{"message":"parent-after"}""");
         caller = caller with
@@ -317,32 +318,74 @@ public sealed partial class AutomationRuntimeTests
         );
         cut.Armed.ShouldBeFalse();
         fixture.Chat.Messages.ShouldBe(["inner"]);
+        AutomationFrozenInvocation invocation;
         await using (var db = await fixture.Database.CreateDbContextAsync())
         {
             var run = await db.AutomationFlowRuns.Include(run => run.NodeRuns).SingleAsync();
             run.ExecutionLeaseId.ShouldBeNull();
-            run.NodeRuns.ShouldNotContain(node =>
-                node.Status == AutomationNodeRunStatus.Pending
-                || node.Status == AutomationNodeRunStatus.Running
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>()
+                .Flow;
+            invocation = frozen.Invocations.Single(value =>
+                value.CallerId == caller.Nodes[1].Id.Value
             );
+            var pending = run
+                .NodeRuns.Where(node => node.Status == AutomationNodeRunStatus.Pending)
+                .ShouldHaveSingleItem();
+            pending.NodeId.ShouldBe(invocation.ExitId);
+            pending.AvailableAtUtc.ShouldBeLessThanOrEqualTo(fixture.Clock.GetUtcNow().UtcDateTime);
+            run.NodeRuns.ShouldNotContain(node => node.Status == AutomationNodeRunStatus.Running);
+            var child = frozen.Nodes.Single(node =>
+                node.AuthorNodeId == draft.Graph.Nodes[3].Id.Value
+                && node.Invocation?.Id == invocation.EntryId
+            );
+            var committed = run.NodeRuns.Single(node => node.NodeId == child.Id);
+            committed.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+            committed.OutcomeCode.ShouldBe("action-succeeded");
             var boundary = run.NodeRuns.Single(node => node.NodeId == caller.Nodes[1].Id.Value);
             boundary.Status.ShouldBe(AutomationNodeRunStatus.Waiting);
             boundary.OutputJson.ShouldBeNull();
         }
-        await (restart ? fixture.NewRuntime() : fixture.Runtime).ResumeDueAsync(
-            CancellationToken.None
-        );
+        var recovery = restart ? fixture.NewRuntime() : fixture.Runtime;
+        await recovery.ResumeDueAsync(CancellationToken.None);
+        await recovery.ResumeDueAsync(CancellationToken.None);
         fixture.Chat.Messages.ShouldBe(["inner", "parent-after"]);
         var trace = await ReadTraceAsync(fixture, new(id.Value));
-        trace
-            .Events.Count(item => item.Event.Kind == AutomationTraceEventKind.SubflowExit)
-            .ShouldBe(1);
+        var childResult = trace
+            .Events.Where(item =>
+                item.Event.Kind == AutomationTraceEventKind.Result
+                && item.Event.Node?.Id == draft.Graph.Nodes[3].Id
+                && item.Event.Invocation.Id == invocation.EntryId
+            )
+            .ShouldHaveSingleItem();
+        childResult.Event.Outcome.ShouldBe(AutomationTraceOutcome.Succeeded);
+        var exit = trace
+            .Events.Where(item => item.Event.Kind == AutomationTraceEventKind.SubflowExit)
+            .ShouldHaveSingleItem();
+        exit.Event.Invocation.Id.ShouldBe(invocation.EntryId);
+        exit.Event.Node.ShouldNotBeNull().Id.ShouldBe(draft.Graph.Nodes[1].Id);
+        exit.Event.Outcome.ShouldBe(AutomationTraceOutcome.Succeeded);
+        exit.Sequence.ShouldBeGreaterThan(childResult.Sequence);
+        var parentAttempt = trace
+            .Events.Where(item =>
+                item.Event.Kind == AutomationTraceEventKind.Attempt
+                && item.Event.Node?.Id == parent.Id
+            )
+            .ShouldHaveSingleItem();
+        parentAttempt.Sequence.ShouldBeGreaterThan(exit.Sequence);
         trace
             .Events.Count(item => item.Event.Kind == AutomationTraceEventKind.Terminal)
             .ShouldBe(1);
         await using var terminal = await fixture.Database.CreateDbContextAsync();
-        (await terminal.AutomationFlowRuns.SingleAsync()).Status.ShouldBe(
-            AutomationFlowRunStatus.Completed
+        var completed = await terminal
+            .AutomationFlowRuns.Include(run => run.NodeRuns)
+            .SingleAsync();
+        completed.Status.ShouldBe(AutomationFlowRunStatus.Completed);
+        completed.NodeRuns.ShouldNotContain(node =>
+            node.Status == AutomationNodeRunStatus.Pending
+            || node.Status == AutomationNodeRunStatus.Running
+            || node.Status == AutomationNodeRunStatus.Waiting
         );
         (await terminal.AutomationSubflowRunReferences.CountAsync()).ShouldBe(0);
     }
