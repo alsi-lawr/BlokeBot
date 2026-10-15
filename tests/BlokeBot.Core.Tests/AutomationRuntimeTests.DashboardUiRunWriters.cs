@@ -178,6 +178,9 @@ public sealed partial class AutomationRuntimeTests
     {
         internal List<AutomationFlowRunState> States { get; } = [];
 
+        public Task SourceReadinessChangedAsync(AutomationHostId host) =>
+            fixture.UiChanges.SourceReadinessChangedAsync(host);
+
         public async Task RunChangedAsync(AutomationHostId host, AutomationRunId run)
         {
             var current = (

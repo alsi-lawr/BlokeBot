@@ -195,6 +195,7 @@ public sealed partial class AutomationFlowService
         );
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await PublishSourceReadinessAsync(draft.HostId);
         await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowSaveOutcome.Saved(new(flow.Id));
     }
@@ -341,9 +342,13 @@ public sealed partial class AutomationFlowService
         flow.IsEnabled = enabled;
         flow.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
         _ = await db.SaveChangesAsync(cancellationToken);
+        await PublishSourceReadinessAsync(hostId);
         await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowEnableOutcome.Updated();
     }
+
+    private Task PublishSourceReadinessAsync(AutomationHostId hostId) =>
+        uiChanges?.SourceReadinessChangedAsync(hostId) ?? Task.CompletedTask;
 
     private async Task ReconcileEventSubAsync(CancellationToken cancellationToken)
     {

@@ -11,7 +11,8 @@ public sealed partial class AutomationFlowService(
     AutomationExpressionService expressions,
     IOverlayCueAdmissionService overlayCues,
     TimeProvider clock,
-    IEventSubChannelReconciliationTrigger? eventSub = null
+    IEventSubChannelReconciliationTrigger? eventSub = null,
+    IAutomationUiChangePublisher? uiChanges = null
 )
 {
     public async Task<AutomationFlowQueryOutcome> ListAsync(
@@ -120,6 +121,7 @@ public sealed partial class AutomationFlowService(
             return new AutomationFlowDeleteOutcome.FlowNotFound();
         }
 
+        await PublishSourceReadinessAsync(hostId);
         await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowDeleteOutcome.Deleted();
     }

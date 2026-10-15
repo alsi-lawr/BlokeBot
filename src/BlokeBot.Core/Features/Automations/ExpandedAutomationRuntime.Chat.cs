@@ -24,11 +24,19 @@ internal sealed partial class ExpandedAutomationRuntime
             .Select(h => (int?)h.Id)
             .SingleOrDefaultAsync(cancellation);
         // An older offline delivery must not erase a subsequently observed stream.
-        _ = await db
+        var deleted = await db
             .AutomationStreamObservations.Where(s =>
                 s.HostId == hostId && s.StartedAtUtc <= stream.MessageTimestamp.UtcDateTime
             )
             .ExecuteDeleteAsync(cancellation);
+        if (deleted > 0 && hostId is { } id)
+        {
+            _ = _liveObserved.TryRemove(id, out _);
+            _uptimeReadiness[id] =
+                "The current stream ended. Waiting for a new live stream observation.";
+            var host = await db.Hosts.AsNoTracking().SingleAsync(h => h.Id == id, cancellation);
+            await PublishObservationReadinessAsync(host);
+        }
     }
 
     private async Task UptimeAsync(
@@ -40,6 +48,7 @@ internal sealed partial class ExpandedAutomationRuntime
         var liveness = await LiveAsync(host, ct);
         if (liveness is HostStreamLivenessOutcome.Offline)
         {
+            _ = _liveObserved.TryRemove(host.Id, out _);
             _uptimeReadiness[host.Id] =
                 "The channel is confirmed offline. Uptime and live-only occurrences are skipped, not deferred.";
             await using var gone = await dbFactory.CreateDbContextAsync(ct);
@@ -50,16 +59,21 @@ internal sealed partial class ExpandedAutomationRuntime
         }
         if (liveness is not HostStreamLivenessOutcome.Live live)
         {
+            _ = _liveObserved.TryRemove(host.Id, out _);
             _uptimeReadiness[host.Id] =
                 "Twitch live status is unavailable. No offline status or uptime trigger is inferred; retry when the provider connection recovers.";
             return;
         }
-        _ = _uptimeReadiness.TryRemove(host.Id, out _);
         var observation = await ObserveStreamAsync(host, live, ct);
         if (observation is null)
         {
+            _ = _liveObserved.TryRemove(host.Id, out _);
+            _uptimeReadiness[host.Id] =
+                "The current Twitch stream could not be confirmed. Try again.";
             return;
         }
+        _ = _uptimeReadiness.TryRemove(host.Id, out _);
+        _liveObserved[host.Id] = ConnectionId(host.Id);
         var now = clock.GetUtcNow();
         foreach (var uptime in sources.OfType<UptimeSourceConfiguration>())
         {
@@ -210,7 +224,12 @@ internal sealed partial class ExpandedAutomationRuntime
             && await LiveAsync(host, cancellation) is HostStreamLivenessOutcome.Live live
         )
         {
-            _ = await ObserveStreamAsync(host, live, cancellation);
+            var observation = await ObserveStreamAsync(host, live, cancellation);
+            if (observation is not null)
+            {
+                _ = _uptimeReadiness.TryRemove(host.Id, out _);
+                _liveObserved[host.Id] = ConnectionId(host.Id);
+            }
             streamId = live.StreamId;
             await using var db = await dbFactory.CreateDbContextAsync(cancellation);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
@@ -248,6 +267,7 @@ internal sealed partial class ExpandedAutomationRuntime
                 first = true;
             }
             await transaction.CommitAsync(cancellation);
+            await PublishObservationReadinessAsync(host);
         }
         var context = Create(
             host,

@@ -1197,7 +1197,10 @@ public sealed partial class AutomationRuntimeTests
             }
         );
 
-    private static ExpandedFixture ExpandedFixtureFor(RuntimeFixture f)
+    private static ExpandedFixture ExpandedFixtureFor(
+        RuntimeFixture f,
+        IEventSubChannelStatusAccessor? channels = null
+    )
     {
         var streams = new ExpandedStreams();
         var tokens = new ExpandedTokens();
@@ -1207,7 +1210,6 @@ public sealed partial class AutomationRuntimeTests
             new(
                 f.Database,
                 f.Runtime,
-                f.Catalog,
                 f.Countdowns,
                 f.Clock,
                 streams,
@@ -1216,7 +1218,9 @@ public sealed partial class AutomationRuntimeTests
                 new HelixClient(http, TwitchEndpointPolicy.Default),
                 BotSettings.FromOptions(new BotOptions()),
                 connection,
-                NullLogger<ExpandedAutomationRuntime>.Instance
+                NullLogger<ExpandedAutomationRuntime>.Instance,
+                channels,
+                f.UiChanges
             ),
             streams,
             tokens,
@@ -1235,7 +1239,6 @@ public sealed partial class AutomationRuntimeTests
         new(
             database,
             runtime,
-            catalog,
             new AutomationCountdownService(
                 database,
                 clock,
@@ -1307,13 +1310,16 @@ public sealed partial class AutomationRuntimeTests
 
     private sealed class ExpandedConnection : IBotRuntimeStatusAccessor
     {
-        public event Action? Changed
+        public event Action? Changed;
+        public BotRuntimeStatus Current
         {
-            add { }
-            remove { }
-        }
-        public BotRuntimeStatus Current { get; set; } =
-            new BotRuntimeStatus.Connected(["streamer"]);
+            get;
+            set
+            {
+                field = value;
+                Changed?.Invoke();
+            }
+        } = new BotRuntimeStatus.Connected(["streamer"]);
     }
 
     private sealed class ExpandedHttp : IHttpClientFactory

@@ -323,6 +323,7 @@ internal sealed partial class ExpandedAutomationRuntime
             false,
             cancellation
         );
+        await PublishObservationReadinessAsync(host);
     }
 
     private async Task PollAdsAsync(
@@ -343,7 +344,7 @@ internal sealed partial class ExpandedAutomationRuntime
         {
             _ = _ads.TryRemove(host.Id, out _);
             _readiness[host.Id] =
-                "Reconnect the broadcaster with channel:read:ads; no derived ad deadlines are active.";
+                "Twitch ad authorization is unavailable; no derived ad deadlines are active.";
             return;
         }
         HelixAdScheduleOutcome response;
@@ -368,7 +369,7 @@ internal sealed partial class ExpandedAutomationRuntime
         {
             _ = _ads.TryRemove(host.Id, out _);
             _readiness[host.Id] =
-                "The Twitch ad schedule is unavailable. Reconnect/check channel eligibility; superseded deadlines are discarded.";
+                "The Twitch ad schedule is unavailable. Check channel eligibility or wait for provider recovery; superseded deadlines are discarded.";
             return;
         }
         _ = _readiness.TryRemove(host.Id, out _);

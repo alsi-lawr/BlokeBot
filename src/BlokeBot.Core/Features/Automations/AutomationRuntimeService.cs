@@ -525,12 +525,21 @@ public sealed partial class AutomationRuntimeService(
     internal async Task<IReadOnlySet<string>> EnabledSourceDefinitionIdsAsync(
         AutomationHostId hostId,
         CancellationToken cancellationToken
+    ) =>
+        (await ConfiguredSourcesAsync(hostId, cancellationToken))
+            .Where(static source => source.Eligibility is AutomationSourceEligibility.Enabled)
+            .Select(static source => source.DefinitionId.Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+    internal async Task<ImmutableArray<AutomationConfiguredSource>> ConfiguredSourcesAsync(
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
     )
     {
         var gate = await AdmissionGateAsync(hostId, cancellationToken);
         if (gate is not AutomationRuntimeGate.Enabled)
         {
-            return new HashSet<string>(StringComparer.Ordinal);
+            return [];
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -538,27 +547,50 @@ public sealed partial class AutomationRuntimeService(
             .AutomationFlows.AsNoTracking()
             .Include(static flow => flow.Nodes)
             .Include(static flow => flow.Edges)
-            .Where(flow =>
-                flow.HostId == hostId.Value
-                && flow.IsEnabled
-                && flow.SchemaVersion == AutomationFlowSchema.CurrentVersion
-            )
+            .Where(flow => flow.HostId == hostId.Value)
+            .OrderBy(static flow => flow.Name)
+            .ThenBy(static flow => flow.Id)
             .ToArrayAsync(cancellationToken);
-        var definitionIds = new HashSet<string>(StringComparer.Ordinal);
+        var enabledFeatures = await db
+            .Hosts.Where(host => host.Id == hostId.Value)
+            .Select(static host => host.EnabledFeatures)
+            .SingleAsync(cancellationToken);
+        var sources = ImmutableArray.CreateBuilder<AutomationConfiguredSource>();
         foreach (var flow in flows)
         {
-            if (!await ValidFlowAsync(flow, hostId, cancellationToken))
-            {
-                continue;
-            }
-
+            var eligibility = await SourceEligibilityAsync(
+                flow,
+                hostId,
+                enabledFeatures,
+                db,
+                cancellationToken
+            );
+            var restoredFlow = AutomationFlowService.RestoreDraft(flow);
             foreach (var node in flow.Nodes.Where(IsSourceDefinition))
             {
-                _ = definitionIds.Add(node.DefinitionId);
+                var configuration =
+                    restoredFlow is AutomationFlowDraftRestoreOutcome.Available restored
+                    && catalog.ValidatePersistedDefinition(
+                        restored
+                            .Draft.Nodes.Single(candidate => candidate.Id.Value == node.Id)
+                            .Definition
+                    )
+                        is AutomationConfigurationCheck.Valid valid
+                        ? valid.Configuration
+                        : null;
+                sources.Add(
+                    new(
+                        new(flow.Id),
+                        flow.Name,
+                        new(node.Id),
+                        new(node.DefinitionId),
+                        configuration,
+                        eligibility
+                    )
+                );
             }
         }
-
-        return definitionIds;
+        return sources.ToImmutable();
     }
 
     public async Task<AutomationResumeOutcome> ResumeAsync(
@@ -1841,10 +1873,91 @@ public sealed partial class AutomationRuntimeService(
         {
             return false;
         }
-
         var validation = await flowService.ValidateAsync(restored.Draft, cancellationToken);
         return validation.Gate is null
             && validation.Errors.All(static error => error.Code == "capability-unavailable");
+    }
+
+    private async Task<AutomationSourceEligibility> SourceEligibilityAsync(
+        AutomationFlow flow,
+        AutomationHostId hostId,
+        HostFeatureFlags enabledFeatures,
+        BlokeBotDbContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!flow.IsEnabled)
+        {
+            return new AutomationSourceEligibility.Disabled();
+        }
+        if (flow.SchemaVersion != AutomationFlowSchema.CurrentVersion)
+        {
+            return new AutomationSourceEligibility.Unavailable(
+                "This saved flow needs a supported current schema before its sources can run."
+            );
+        }
+        if (
+            AutomationFlowService.RestoreDraft(flow)
+                is not AutomationFlowDraftRestoreOutcome.Available restored
+            || restored.Draft.HostId != hostId
+        )
+        {
+            return new AutomationSourceEligibility.Unavailable(
+                "The saved flow is invalid. Repair it before enabling its sources."
+            );
+        }
+        var resolved = await AutomationSubflowStore.LoadClosureAsync(
+            db,
+            hostId,
+            AutomationSubflowStore
+                .Calls(restored.Draft.Nodes)
+                .Select(static call => call.SubflowId),
+            null,
+            cancellationToken
+        );
+        if (resolved is not AutomationSubflowClosureOutcome.Available current)
+        {
+            return new AutomationSourceEligibility.Unavailable(
+                "A called subflow is unavailable. Repair the flow before using its sources."
+            );
+        }
+        var validation = await flowService.ValidatePreparedAsync(
+            restored.Draft,
+            current.Closure,
+            AutomationFlowService.AutomationGraphAdmission.Saved,
+            cancellationToken,
+            db
+        );
+        if (
+            validation.Gate is not null
+            || validation.Errors.Any(static error => error.Code != "capability-unavailable")
+        )
+        {
+            return new AutomationSourceEligibility.Unavailable(
+                "The saved flow is invalid. Repair it before using its sources."
+            );
+        }
+        var original = (
+            (AutomationDefinitionRestoreOutcome.Available)
+                AutomationRuntimeSerialization.RestoreDefinition(
+                    AutomationRuntimeSerialization.SerializeDefinition(flow)
+                )
+        ).Flow;
+        var frozen = AutomationFrozenSubflows.Freeze(original, Guid.NewGuid(), current.Closure);
+        if (frozen is null || FreezeExecutionFences(frozen.Flow) is not { } frozenFlow)
+        {
+            return new AutomationSourceEligibility.Unavailable(
+                "The flow's execution definitions are unavailable. Repair the flow before using its sources."
+            );
+        }
+        var required = AutomationRequiredFeatures.ForDefinitions(
+            frozenFlow.Nodes.Select(static node => node.DefinitionId)
+        );
+        return enabledFeatures.Contains(required)
+            ? new AutomationSourceEligibility.Enabled()
+            : new AutomationSourceEligibility.Unavailable(
+                $"Enable the flow's required channel features: {AutomationRequiredFeatures.BackingFeatures(required & ~enabledFeatures)}."
+            );
     }
 
     private static PersistedAutomationNodeDefinition Definition(AutomationFlowNode node) =>
@@ -2065,3 +2178,23 @@ public sealed partial class AutomationRuntimeService(
         Stopped,
     }
 }
+
+internal abstract record AutomationSourceEligibility
+{
+    private AutomationSourceEligibility() { }
+
+    internal sealed record Enabled : AutomationSourceEligibility;
+
+    internal sealed record Disabled : AutomationSourceEligibility;
+
+    internal sealed record Unavailable(string Reason) : AutomationSourceEligibility;
+}
+
+internal sealed record AutomationConfiguredSource(
+    AutomationFlowId FlowId,
+    string FlowName,
+    AutomationNodeId NodeId,
+    AutomationDefinitionId DefinitionId,
+    AutomationConfiguration? Configuration,
+    AutomationSourceEligibility Eligibility
+);

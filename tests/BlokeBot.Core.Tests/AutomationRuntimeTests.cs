@@ -5893,7 +5893,14 @@ public sealed partial class AutomationRuntimeTests
                 expressions,
                 countdowns
             );
-            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
+            var flows = new AutomationFlowService(
+                database,
+                catalog,
+                expressions,
+                overlays,
+                clock,
+                uiChanges: uiChanges
+            );
             runtime = new AutomationRuntimeService(
                 database,
                 catalog,

@@ -72,7 +72,7 @@
                                 <strong class="text-slate-950">@source.Name</strong>
                                 <p class="mt-1 text-sm text-muted-foreground">@source.Description</p>
                             </div>
-                            <span class="@BadgeClass(source.State)" data-source-readiness>@StateLabel(source.State)</span>
+                            <span class="@BadgeClass(source.State)" data-source-readiness>@(source.UsedByEnabledFlow ? GrantLabel(source.State) : "No enabled flow")</span>
                         </div>
                         <dl class="mt-3 grid gap-1 text-sm text-muted-foreground">
                             <div class="flex flex-wrap gap-2">
@@ -90,20 +90,42 @@
                                 </dd>
                             </div>
                         </dl>
-                        @if (source.State is TwitchEventSourceReadinessState.MissingScopes missing)
+                        @if (source.Configurations.IsEmpty)
+                        {
+                            <p class="mt-3 text-sm text-muted-foreground">No saved flows use this source. Save and enable a flow to use it.</p>
+                        }
+                        else
+                        {
+                            <ul class="mt-3 grid gap-2" aria-label="Configured source readiness">
+                                @foreach (var configured in source.Configurations)
+                                {
+                                    <li @key="configured.NodeId" data-configured-source="@configured.NodeId.Value" data-configured-state="@StateToken(configured.State)">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="text-sm font-semibold text-slate-900">@configured.FlowName · @configured.ConfigurationName</span>
+                                            <span class="@BadgeClass(configured.State)">@StateLabel(configured.State)</span>
+                                        </div>
+                                        @if (StateReason(configured.State) is { } reason)
+                                        {
+                                            <p class="mt-1 text-sm text-muted-foreground" role="status">@reason</p>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        @if (source.UsedByEnabledFlow && source.State is TwitchEventSourceReadinessState.MissingScopes missing)
                         {
                             <p class="mt-3 text-sm text-amber-700" role="status" data-source-missing-scopes>
-                                Save and enable a flow using this source, then reconnect to Twitch to approve @FormatScopes(missing.Scopes). Until then this source stays inactive and starts no flows.
+                                Reconnect to Twitch to approve @FormatScopes(missing.Scopes).
                             </p>
                         }
-                        else if (source.State is TwitchEventSourceReadinessState.ObservationUnavailable unavailable)
+                        else if (source.UsedByEnabledFlow && source.State is TwitchEventSourceReadinessState.ObservationUnavailable unavailable)
                         {
                             <p class="mt-3 text-sm text-amber-700" role="status">@unavailable.Reason</p>
                         }
-                        else if (source.State is TwitchEventSourceReadinessState.BroadcasterNotConnected)
+                        else if (source.UsedByEnabledFlow && source.State is TwitchEventSourceReadinessState.BroadcasterNotConnected)
                         {
                             <p class="mt-3 text-sm text-amber-700" role="status" data-source-missing-scopes>
-                                Connect this channel's Twitch integration to activate this source.
+                                This source needs broadcaster approval when used by an enabled flow.
                             </p>
                         }
                     </article>

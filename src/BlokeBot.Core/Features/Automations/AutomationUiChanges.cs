@@ -11,6 +11,8 @@ internal abstract record AutomationUiChange
     internal sealed record Countdown(AutomationHostId Host, string Name) : AutomationUiChange;
 
     internal sealed record CountdownHost(AutomationHostId Host) : AutomationUiChange;
+
+    internal sealed record SourceReadiness(AutomationHostId Host) : AutomationUiChange;
 }
 
 internal sealed class AutomationUiChanges(
@@ -18,6 +20,9 @@ internal sealed class AutomationUiChanges(
     ILogger<AutomationUiChanges> log
 ) : IAutomationUiChangePublisher
 {
+    public Task SourceReadinessChangedAsync(AutomationHostId host) =>
+        PublishAsync(new AutomationUiChange.SourceReadiness(host));
+
     internal IDisposable Subscribe(
         AutomationUiChange identity,
         ObserverIdentity observer,

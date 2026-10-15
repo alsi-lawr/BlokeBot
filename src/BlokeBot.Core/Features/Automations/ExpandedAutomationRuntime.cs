@@ -13,7 +13,6 @@ namespace BlokeBot.Core.Features.Automations;
 internal sealed partial class ExpandedAutomationRuntime(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationRuntimeService runtime,
-    AutomationCatalogService catalog,
     AutomationCountdownService countdowns,
     TimeProvider clock,
     IHostStreamLivenessProvider streams,
@@ -23,7 +22,8 @@ internal sealed partial class ExpandedAutomationRuntime(
     BotSettings settings,
     IBotRuntimeStatusAccessor connection,
     ILogger<ExpandedAutomationRuntime> logger,
-    IEventSubChannelStatusAccessor? channels = null
+    IEventSubChannelStatusAccessor? channels = null,
+    IAutomationUiChangePublisher? uiChanges = null
 ) : IExpandedTwitchEventObserver, IEventSubExactRequirementSource, IHostFeatureActivationObserver
 {
     private readonly ConcurrentDictionary<(int Host, string Key), DateTimeOffset> _nextSchedules =
@@ -55,7 +55,12 @@ internal sealed partial class ExpandedAutomationRuntime(
                 _ = _nextSchedules.TryRemove(key, out _);
             }
             _connections[host.Id] = Guid.NewGuid();
+            _ = _publishedReadiness.TryRemove(host.Id, out _);
             _ = _ads.TryRemove(host.Id, out _);
+            _ = _polls.TryRemove(host.Id, out _);
+            _ = _readiness.TryRemove(host.Id, out _);
+            _ = _uptimeReadiness.TryRemove(host.Id, out _);
+            _ = _liveObserved.TryRemove(host.Id, out _);
             _ = _metadata.TryRemove(host.Id, out _);
         }
     }
@@ -88,20 +93,64 @@ internal sealed partial class ExpandedAutomationRuntime(
     private readonly ConcurrentDictionary<int, DateTimeOffset> _polls = new();
     private readonly ConcurrentDictionary<int, string> _readiness = new();
     private readonly ConcurrentDictionary<int, string> _uptimeReadiness = new();
+    private readonly ConcurrentDictionary<int, Guid> _liveObserved = new();
+    private readonly ConcurrentDictionary<int, ObservationReadiness> _publishedReadiness = new();
     private readonly ConcurrentDictionary<int, MetadataObservation> _metadata = new();
     private readonly Lock _observationGate = new();
 
     internal string? UnavailableReason(int hostId) => _readiness.GetValueOrDefault(hostId);
 
-    internal string? ObservationReason(int hostId, AutomationDefinitionId source) =>
-        source == AutomationDefinitionIds.AdTimingSource
-            ? !_polls.ContainsKey(hostId)
-                ? "Waiting for the current Twitch ad schedule. No derived deadline is assumed."
+    internal string? ObservationReason(int hostId, AutomationConfiguration configuration) =>
+        configuration is AdTimingSourceConfiguration { Event: not AdTimingKind.Started } ad
+            ? !_ads.ContainsKey(hostId) && !_readiness.ContainsKey(hostId)
+                ? "Waiting for Twitch's current ad schedule."
                 : UnavailableReason(hostId)
-            : source == AutomationDefinitionIds.UptimeSource
-            || source == AutomationDefinitionIds.ChatMatchSource
+                    ?? (
+                        ad.Event is AdTimingKind.Remaining or AdTimingKind.ExpectedFinish
+                        && _ads.GetValueOrDefault(hostId) is not { Duration: > 0 }
+                            ? "Waiting for a current ad break duration."
+                            : null
+                    )
+            : configuration
+                is UptimeSourceConfiguration
+                    or ChatMatchSourceConfiguration { Kind: ChatMatchKind.FirstObserved }
                 ? _uptimeReadiness.GetValueOrDefault(hostId)
+                    ?? (
+                        _liveObserved.GetValueOrDefault(hostId) == ConnectionId(hostId)
+                            ? null
+                            : "Waiting for Twitch to confirm the current live stream."
+                    )
                 : null;
+
+    private async Task PublishObservationReadinessAsync(BotHost host)
+    {
+        var current = new ObservationReadiness(
+            Connected(host),
+            _liveObserved.GetValueOrDefault(host.Id) == ConnectionId(host.Id),
+            _uptimeReadiness.GetValueOrDefault(host.Id),
+            _ads.ContainsKey(host.Id),
+            _ads.GetValueOrDefault(host.Id) is { Duration: > 0 },
+            _readiness.GetValueOrDefault(host.Id)
+        );
+        if (_publishedReadiness.TryGetValue(host.Id, out var previous) && previous == current)
+        {
+            return;
+        }
+        _publishedReadiness[host.Id] = current;
+        if (uiChanges is not null)
+        {
+            await uiChanges.SourceReadinessChangedAsync(new(host.Id));
+        }
+    }
+
+    private sealed record ObservationReadiness(
+        bool Connected,
+        bool LiveObserved,
+        string? UptimeReason,
+        bool AdObserved,
+        bool AdDurationObserved,
+        string? AdReason
+    );
 
     internal bool Connected(BotHost host) =>
         connection.Current is BotRuntimeStatus.Connected active
@@ -148,48 +197,13 @@ internal sealed partial class ExpandedAutomationRuntime(
     internal async Task<ImmutableArray<AutomationConfiguration>> SourcesAsync(
         BotHost host,
         CancellationToken ct
-    )
-    {
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
-        {
-            return [];
-        }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var nodes = await db
-            .AutomationFlowNodes.AsNoTracking()
-            .Where(n => n.Flow.HostId == host.Id && n.Flow.IsEnabled)
-            .ToArrayAsync(ct);
-        var sources = ImmutableArray.CreateBuilder<AutomationConfiguration>();
-        foreach (var n in nodes)
-        {
-            System.Text.Json.JsonDocument json;
-            try
-            {
-                json = System.Text.Json.JsonDocument.Parse(n.ConfigurationJson);
-            }
-            catch (System.Text.Json.JsonException)
-            {
-                continue;
-            }
-            using var configured = json;
-            if (
-                catalog.ValidatePersistedDefinition(
-                    new(n.DefinitionId, n.DefinitionSchemaVersion, json.RootElement.Clone())
-                )
-                    is AutomationConfigurationCheck.Valid
-                    {
-                        Definition.Kind: AutomationNodeKind.Source
-                    } valid
-                && host.EnabledFeatures.Contains(
-                    AutomationRequiredFeatures.ForDefinitions([n.DefinitionId])
-                )
-            )
-            {
-                sources.Add(valid.Configuration);
-            }
-        }
-        return sources.Distinct().ToImmutableArray();
-    }
+    ) =>
+        [
+            .. (await runtime.ConfiguredSourcesAsync(new(host.Id), ct))
+                .Where(static source => source.Eligibility is AutomationSourceEligibility.Enabled)
+                .Select(static source => source.Configuration!)
+                .Distinct(),
+        ];
 
     public async ValueTask<IReadOnlyList<EventSubExactSubscription>> GetRequirementsAsync(
         string channel,
@@ -210,6 +224,7 @@ internal sealed partial class ExpandedAutomationRuntime(
         {
             _ = _ads.TryRemove(host.Id, out _);
             _ = _polls.TryRemove(host.Id, out _);
+            _ = _readiness.TryRemove(host.Id, out _);
         }
         var result = new List<EventSubExactSubscription>();
         if (
@@ -272,8 +287,13 @@ internal sealed partial class ExpandedAutomationRuntime(
                 _ = _nextSchedules.TryRemove(key, out _);
             }
             _ = _ads.TryRemove(change.HostId, out _);
+            _ = _polls.TryRemove(change.HostId, out _);
+            _ = _readiness.TryRemove(change.HostId, out _);
+            _ = _uptimeReadiness.TryRemove(change.HostId, out _);
+            _ = _liveObserved.TryRemove(change.HostId, out _);
             _ = _metadata.TryRemove(change.HostId, out _);
             _connections[change.HostId] = Guid.NewGuid();
+            _ = _publishedReadiness.TryRemove(change.HostId, out _);
         }
         return ValueTask.FromResult<HostFeatureAutomaticWorkResult>(
             new HostFeatureAutomaticWorkResult.Complete()
@@ -292,8 +312,13 @@ internal sealed partial class ExpandedAutomationRuntime(
             if (_wasConnected.TryGetValue(host.Id, out var old) && old && !connected)
             {
                 _connections[host.Id] = Guid.NewGuid();
+                _ = _publishedReadiness.TryRemove(host.Id, out _);
                 _ = _metadata.TryRemove(host.Id, out _);
                 _ = _ads.TryRemove(host.Id, out _);
+                _ = _polls.TryRemove(host.Id, out _);
+                _ = _readiness.TryRemove(host.Id, out _);
+                _ = _uptimeReadiness.TryRemove(host.Id, out _);
+                _ = _liveObserved.TryRemove(host.Id, out _);
             }
             _wasConnected[host.Id] = connected;
             var sources = await SourcesAsync(host, ct);
@@ -302,6 +327,18 @@ internal sealed partial class ExpandedAutomationRuntime(
             {
                 _ = _ads.TryRemove(host.Id, out _);
                 _ = _polls.TryRemove(host.Id, out _);
+                _ = _readiness.TryRemove(host.Id, out _);
+            }
+            if (
+                !sources.Any(static source =>
+                    source
+                        is UptimeSourceConfiguration
+                            or ChatMatchSourceConfiguration { Kind: ChatMatchKind.FirstObserved }
+                )
+            )
+            {
+                _ = _uptimeReadiness.TryRemove(host.Id, out _);
+                _ = _liveObserved.TryRemove(host.Id, out _);
             }
             await countdowns.TickAsync(
                 host,
@@ -369,6 +406,7 @@ internal sealed partial class ExpandedAutomationRuntime(
             }
             if (!connected || !host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
             {
+                await PublishObservationReadinessAsync(host);
                 continue;
             }
             if (
@@ -395,6 +433,7 @@ internal sealed partial class ExpandedAutomationRuntime(
                     ct
                 );
             }
+            await PublishObservationReadinessAsync(host);
         }
     }
 
