@@ -187,9 +187,16 @@
         overflow-y: auto;
     }
 
-    .automation-editor--focus .automation-canvas-wrap,
-    .automation-editor--focus .automation-canvas-viewport {
+    .automation-editor--focus .automation-canvas-wrap {
+        display: flex;
+        flex-direction: column;
         height: 100%;
+        min-height: 0;
+    }
+
+    .automation-editor--focus .automation-canvas-viewport {
+        flex: 1;
+        height: auto;
         min-height: 0;
     }
 

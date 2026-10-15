@@ -302,9 +302,18 @@
 
     .automation-editor--authoring .automation-canvas-wrap,
     .automation-editor--trace .automation-canvas-wrap {
+        display: flex;
         flex: none;
+        flex-direction: column;
         height: 19rem;
         min-height: 19rem;
+    }
+
+    .automation-editor--authoring .automation-canvas-viewport,
+    .automation-editor--trace .automation-canvas-viewport {
+        flex: 1;
+        height: auto;
+        min-height: 0;
     }
 
     .automation-trace-panel {

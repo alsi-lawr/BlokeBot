@@ -91,9 +91,17 @@ public sealed partial class NativeOperationAutomationTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var sentSource = Node("shoutout-sent", "{}");
+        var sentAction = Node("send-chat", """{"message":"Sent shoutout"}""");
         var receivedSource = Node("shoutout-received", "{}");
-        _ = await fixture.SaveConnectedChatAsync(sentSource, "Sent to partner");
-        _ = await fixture.SaveConnectedChatAsync(receivedSource, "Received from partner");
+        var receivedAction = Node("send-chat", """{"message":"Received shoutout"}""");
+        var sentFlowId = await fixture.SaveAsync(
+            [sentSource, sentAction],
+            [Edge(sentSource, "flow", sentAction)]
+        );
+        var receivedFlowId = await fixture.SaveAsync(
+            [receivedSource, receivedAction],
+            [Edge(receivedSource, "flow", receivedAction)]
+        );
 
         await fixture.Runtime.ShoutoutOccurredAsync(
             fixture.Shoutout("message-1", EventSubShoutoutDirection.Sent),
@@ -105,7 +113,13 @@ public sealed partial class NativeOperationAutomationTests
         );
 
         (await fixture.RunCountAsync()).ShouldBe(1);
-        fixture.Chat.Messages.ShouldBe(["Sent to partner"]);
+        fixture.Chat.Messages.ShouldBe(["Sent shoutout"]);
+        var sentRun = await CompletedRunAsync(fixture, sentFlowId, sentSource, sentAction);
+        var sentContext = RestoredContext(sentRun);
+        sentContext.Actor.ShouldNotBeNull().Login.ShouldBe("partner");
+        sentContext.Actor.TwitchUserId.ShouldBe("partner-id");
+        SafeVariable(sentContext, "viewer_count").ShouldBe(new AutomationValue.Number(42));
+        await AssertReceiptAsync(fixture, sentSource, "message-1");
 
         await fixture.Runtime.ShoutoutOccurredAsync(
             fixture.Shoutout("message-2", EventSubShoutoutDirection.Received),
@@ -113,13 +127,21 @@ public sealed partial class NativeOperationAutomationTests
         );
 
         (await fixture.RunCountAsync()).ShouldBe(2);
-        fixture.Chat.Messages.ShouldContain("Received from partner");
-        (
-            await fixture.RunContextAsync(AutomationDefinitionIds.ShoutoutSentSource)
-        ).Actor!.Login.ShouldBe("partner");
-        (
-            await fixture.RunContextAsync(AutomationDefinitionIds.ShoutoutReceivedSource)
-        ).Actor!.Login.ShouldBe("partner");
+        fixture.Chat.Messages.ShouldBe(["Sent shoutout", "Received shoutout"]);
+        var receivedRun = await CompletedRunAsync(
+            fixture,
+            receivedFlowId,
+            receivedSource,
+            receivedAction
+        );
+        receivedRun.Id.ShouldNotBe(sentRun.Id);
+        receivedRun.SourceOccurrenceId.ShouldNotBe(sentRun.SourceOccurrenceId);
+        var receivedContext = RestoredContext(receivedRun);
+        receivedContext.Actor.ShouldNotBeNull().Login.ShouldBe("partner");
+        receivedContext.Actor.TwitchUserId.ShouldBe("partner-id");
+        SafeVariable(receivedContext, "viewer_count").ShouldBe(new AutomationValue.Number(42));
+        await AssertReceiptAsync(fixture, receivedSource, "message-2");
+        (await fixture.ReceiptCountAsync()).ShouldBe(2);
     }
 
     [Test]
@@ -127,9 +149,17 @@ public sealed partial class NativeOperationAutomationTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var startedSource = Node("poll-started", "{}");
+        var startedAction = Node("send-chat", """{"message":"Poll started"}""");
         var endedSource = Node("poll-ended", "{}");
-        _ = await fixture.SaveConnectedChatAsync(startedSource, "Started Favourite game?");
-        _ = await fixture.SaveConnectedChatAsync(endedSource, "Ended completed 7");
+        var endedAction = Node("send-chat", """{"message":"Poll ended"}""");
+        var startedFlowId = await fixture.SaveAsync(
+            [startedSource, startedAction],
+            [Edge(startedSource, "flow", startedAction)]
+        );
+        var endedFlowId = await fixture.SaveAsync(
+            [endedSource, endedAction],
+            [Edge(endedSource, "flow", endedAction)]
+        );
 
         await fixture.Runtime.PollChangedAsync(
             fixture.Poll("message-1", EventSubPollStage.Begin),
@@ -145,18 +175,32 @@ public sealed partial class NativeOperationAutomationTests
         );
 
         (await fixture.RunCountAsync()).ShouldBe(2);
-        fixture.Chat.Messages.ShouldBe(["Started Favourite game?", "Ended completed 7"]);
-        var started = await fixture.RunContextAsync(AutomationDefinitionIds.PollStartedSource);
-        started
-            .Variables.ForExecution()[new("poll_title")]
-            .Value.ShouldBe(new AutomationValue.Text("Favourite game?"));
-        var ended = await fixture.RunContextAsync(AutomationDefinitionIds.PollEndedSource);
-        ended
-            .Variables.ForExecution()[new("poll_status")]
-            .Value.ShouldBe(new AutomationValue.Text("completed"));
-        ended
-            .Variables.ForExecution()[new("total_votes")]
-            .Value.ShouldBe(new AutomationValue.Number(7));
+        fixture.Chat.Messages.ShouldBe(["Poll started", "Poll ended"]);
+        var startedRun = await CompletedRunAsync(
+            fixture,
+            startedFlowId,
+            startedSource,
+            startedAction
+        );
+        var endedRun = await CompletedRunAsync(fixture, endedFlowId, endedSource, endedAction);
+        endedRun.SourceOccurrenceId.ShouldNotBe(startedRun.SourceOccurrenceId);
+        var startedContext = RestoredContext(startedRun);
+        var endedContext = RestoredContext(endedRun);
+        SafeVariable(startedContext, "poll_title")
+            .ShouldBe(new AutomationValue.Text("Favourite game?"));
+        SafeVariable(startedContext, "poll_status").ShouldBe(new AutomationValue.Text("active"));
+        SafeVariable(endedContext, "poll_title")
+            .ShouldBe(new AutomationValue.Text("Favourite game?"));
+        SafeVariable(endedContext, "poll_status").ShouldBe(new AutomationValue.Text("completed"));
+        SafeVariable(endedContext, "total_votes").ShouldBe(new AutomationValue.Number(7));
+        await AssertReceiptAsync(fixture, startedSource, "message-1");
+        await AssertReceiptAsync(fixture, endedSource, "message-3");
+        await fixture.Runtime.PollChangedAsync(
+            fixture.Poll("message-3", EventSubPollStage.End, votes: 7, status: "completed"),
+            CancellationToken.None
+        );
+        (await fixture.RunCountAsync()).ShouldBe(2);
+        fixture.Chat.Messages.ShouldBe(["Poll started", "Poll ended"]);
     }
 
     [Test]
@@ -164,9 +208,17 @@ public sealed partial class NativeOperationAutomationTests
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var lockedSource = Node("prediction-locked", "{}");
+        var lockedAction = Node("send-chat", """{"message":"Prediction locked"}""");
         var endedSource = Node("prediction-ended", "{}");
-        _ = await fixture.SaveConnectedChatAsync(lockedSource, "Locked Will we win?");
-        _ = await fixture.SaveConnectedChatAsync(endedSource, "Winner Yes (yes)");
+        var endedAction = Node("send-chat", """{"message":"Prediction ended"}""");
+        var lockedFlowId = await fixture.SaveAsync(
+            [lockedSource, lockedAction],
+            [Edge(lockedSource, "flow", lockedAction)]
+        );
+        var endedFlowId = await fixture.SaveAsync(
+            [endedSource, endedAction],
+            [Edge(endedSource, "flow", endedAction)]
+        );
 
         await fixture.Runtime.PredictionChangedAsync(
             fixture.Prediction("message-1", EventSubPredictionStage.Lock, "locked"),
@@ -183,18 +235,39 @@ public sealed partial class NativeOperationAutomationTests
         );
 
         (await fixture.RunCountAsync()).ShouldBe(2);
-        fixture.Chat.Messages.ShouldBe(["Locked Will we win?", "Winner Yes (yes)"]);
-        var locked = await fixture.RunContextAsync(AutomationDefinitionIds.PredictionLockedSource);
-        locked
-            .Variables.ForExecution()[new("prediction_title")]
-            .Value.ShouldBe(new AutomationValue.Text("Will we win?"));
-        var ended = await fixture.RunContextAsync(AutomationDefinitionIds.PredictionEndedSource);
-        ended
-            .Variables.ForExecution()[new("winning_outcome_title")]
-            .Value.ShouldBe(new AutomationValue.Text("Yes"));
-        ended
-            .Variables.ForExecution()[new("winning_outcome_id")]
-            .Value.ShouldBe(new AutomationValue.Text("yes"));
+        fixture.Chat.Messages.ShouldBe(["Prediction locked", "Prediction ended"]);
+        var lockedRun = await CompletedRunAsync(fixture, lockedFlowId, lockedSource, lockedAction);
+        var endedRun = await CompletedRunAsync(fixture, endedFlowId, endedSource, endedAction);
+        endedRun.SourceOccurrenceId.ShouldNotBe(lockedRun.SourceOccurrenceId);
+        var lockedContext = RestoredContext(lockedRun);
+        var endedContext = RestoredContext(endedRun);
+        SafeVariable(lockedContext, "prediction_title")
+            .ShouldBe(new AutomationValue.Text("Will we win?"));
+        SafeVariable(lockedContext, "prediction_status")
+            .ShouldBe(new AutomationValue.Text("locked"));
+        lockedContext.Variables.ForExecution().ShouldNotContainKey(new("winning_outcome_id"));
+        lockedContext.Variables.ForExecution().ShouldNotContainKey(new("winning_outcome_title"));
+        SafeVariable(endedContext, "prediction_title")
+            .ShouldBe(new AutomationValue.Text("Will we win?"));
+        SafeVariable(endedContext, "prediction_status")
+            .ShouldBe(new AutomationValue.Text("resolved"));
+        SafeVariable(endedContext, "winning_outcome_id").ShouldBe(new AutomationValue.Text("yes"));
+        SafeVariable(endedContext, "winning_outcome_title")
+            .ShouldBe(new AutomationValue.Text("Yes"));
+        await AssertReceiptAsync(fixture, lockedSource, "message-1");
+        await AssertReceiptAsync(fixture, endedSource, "message-2");
+        await fixture.Runtime.PredictionChangedAsync(
+            fixture.Prediction(
+                "message-2",
+                EventSubPredictionStage.End,
+                "resolved",
+                winningOutcomeId: "yes"
+            ),
+            CancellationToken.None
+        );
+        (await fixture.RunCountAsync()).ShouldBe(2);
+        (await fixture.ReceiptCountAsync()).ShouldBe(2);
+        fixture.Chat.Messages.ShouldBe(["Prediction locked", "Prediction ended"]);
     }
 
     [Test]
@@ -251,21 +324,34 @@ public sealed partial class NativeOperationAutomationTests
         var source = Node("prediction-started", "{}");
         var action = Node("send-chat", """{"message":"Prediction!"}""");
         var edge = Edge(source, "flow", action);
+        var draft = Draft(fixture.HostId, [source, action], [edge]) with
+        {
+            Name = "Prediction alerts",
+            IsEnabled = false,
+        };
         var saved = (
-            await fixture.Flows.SaveAsync(
-                Draft(fixture.HostId, [source, action], [edge]) with
-                {
-                    IsEnabled = false,
-                },
+            await fixture.Flows.SaveAsync(draft, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        draft = draft with { Id = saved.FlowId };
+        var original = (
+            await fixture.Flows.ReadForAuthoringAsync(
+                new(fixture.HostId),
+                saved.FlowId,
                 CancellationToken.None
             )
-        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        ).ShouldBeOfType<AutomationFlowAuthoringReadOutcome.Editor>();
 
         await fixture.SetFeatureAsync(HostFeatureFlags.Predictions, enabled: false);
         var listed = (
             await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
-        listed.AuthoringEntries.ShouldHaveSingleItem().Id.ShouldBe(saved.FlowId);
+        listed.Flows.ShouldBeEmpty();
+        var repair = listed.AuthoringEntries.ShouldHaveSingleItem();
+        repair.Id.ShouldBe(saved.FlowId);
+        repair.Name.ShouldBe(draft.Name);
+        repair.IsEnabled.ShouldBeFalse();
+        repair.RequiresJson.ShouldBeFalse();
+        repair.Reason.ShouldNotBeNullOrWhiteSpace();
         var authoring = (
             await fixture.Flows.ReadForAuthoringAsync(
                 new(fixture.HostId),
@@ -273,20 +359,17 @@ public sealed partial class NativeOperationAutomationTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowAuthoringReadOutcome.Editor>();
-        authoring.Snapshot.Draft.Nodes.ShouldContain(node => node.Id == source.Id);
-        authoring.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
+        authoring.Snapshot.Draft.Id.ShouldBe(saved.FlowId);
+        AssertSameGraph(original.Original, authoring.Original);
+        authoring.Errors.ShouldContain(error =>
+            error.NodeId == source.Id && error.Code == "capability-unavailable"
+        );
         var validation = (
-            await fixture.Flows.ValidateDraftAsync(
-                Draft(fixture.HostId, [source, action], [edge]),
-                CancellationToken.None
-            )
+            await fixture.Flows.ValidateDraftAsync(draft, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
         validation.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
         var save = (
-            await fixture.Flows.SaveAsync(
-                Draft(fixture.HostId, [source, action], [edge]),
-                CancellationToken.None
-            )
+            await fixture.Flows.SaveAsync(draft, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
         save.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
         var enable = (
@@ -309,7 +392,27 @@ public sealed partial class NativeOperationAutomationTests
         after.Original.Edges.ShouldBe(authoring.Original.Edges, ignoreOrder: true);
         await using var db = await fixture.Database.CreateDbContextAsync();
         var retained = await db.AutomationFlows.SingleAsync();
+        retained.Id.ShouldBe(saved.FlowId.Value);
         retained.IsEnabled.ShouldBeFalse();
+
+        await fixture.SetFeatureAsync(HostFeatureFlags.Predictions, enabled: true);
+        var restored = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        restored.AuthoringEntries.ShouldBeEmpty();
+        var normal = restored.Flows.ShouldHaveSingleItem().Draft;
+        normal.Id.ShouldBe(saved.FlowId);
+        normal.Name.ShouldBe(draft.Name);
+        normal.IsEnabled.ShouldBeFalse();
+        var reopened = (
+            await fixture.Flows.ReadForAuthoringAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowAuthoringReadOutcome.Editor>();
+        reopened.Errors.ShouldBeEmpty();
+        AssertSameGraph(original.Original, reopened.Original);
     }
 
     [Test]
@@ -636,6 +739,80 @@ public sealed partial class NativeOperationAutomationTests
         fixture.Shoutouts.Sent.ShouldBeEmpty();
     }
 
+    private static async Task<AutomationFlowRun> CompletedRunAsync(
+        NativeFixture fixture,
+        AutomationFlowId flowId,
+        AutomationFlowDraftNode source,
+        AutomationFlowDraftNode action
+    )
+    {
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var run = await db
+            .AutomationFlowRuns.AsNoTracking()
+            .Include(run => run.NodeRuns)
+            .SingleAsync(run => run.HostId == fixture.HostId && run.FlowId == flowId.Value);
+        run.SourceNodeId.ShouldBe(source.Id.Value);
+        run.SourceDefinitionId.ShouldBe(source.Definition.TypeId);
+        run.Status.ShouldBe(AutomationFlowRunStatus.Completed);
+        _ = run.CompletedAtUtc.ShouldNotBeNull();
+        run.ExecutionLeaseId.ShouldBeNull();
+        var effect = run
+            .NodeRuns.Where(node => node.NodeId == action.Id.Value)
+            .ShouldHaveSingleItem();
+        effect.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+        effect.OutcomeCode.ShouldBe("action-succeeded");
+        return run;
+    }
+
+    private static AutomationContext RestoredContext(AutomationFlowRun run)
+    {
+        var context = AutomationRuntimeSerialization
+            .RestoreContext(run.ContextSchemaVersion, run.ContextJson)
+            .ShouldBeOfType<AutomationContextRestoreOutcome.Available>()
+            .Context;
+        context.Event.SourceDefinitionId.Value.ShouldBe(run.SourceDefinitionId);
+        context.Event.OccurrenceId.ShouldBe(run.SourceOccurrenceId);
+        return context;
+    }
+
+    private static AutomationValue SafeVariable(AutomationContext context, string name)
+    {
+        var variable = context.Variables.ForExecution()[new(name)];
+        variable.Sensitivity.ShouldBe(AutomationDataSensitivity.Safe);
+        context.Variables.SafeForExternalUse()[new(name)].ShouldBe(variable.Value);
+        return variable.Value;
+    }
+
+    private static async Task AssertReceiptAsync(
+        NativeFixture fixture,
+        AutomationFlowDraftNode source,
+        string messageId
+    )
+    {
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var sourceId = source.Definition.TypeId;
+        var receipt = await db
+            .AutomationEventReceipts.AsNoTracking()
+            .SingleAsync(receipt =>
+                receipt.HostId == fixture.HostId
+                && receipt.SourceDefinitionId == sourceId
+                && receipt.ProviderMessageId == messageId
+            );
+        receipt.ClaimedAtUtc.ShouldBe(fixture.Clock.GetUtcNow().UtcDateTime);
+        receipt.ExpiresAtUtc.ShouldBeGreaterThan(receipt.ClaimedAtUtc);
+    }
+
+    private static void AssertSameGraph(
+        AutomationAuthoredFlowSource expected,
+        AutomationAuthoredFlowSource actual
+    )
+    {
+        actual.SchemaVersion.ShouldBe(expected.SchemaVersion);
+        actual.Canvas.ShouldBe(expected.Canvas);
+        actual.Nodes.OrderBy(node => node.Id).ShouldBe(expected.Nodes.OrderBy(node => node.Id));
+        actual.Edges.OrderBy(edge => edge.Id).ShouldBe(expected.Edges.OrderBy(edge => edge.Id));
+    }
+
     private static TwitchEventSourceReadiness Source(
         TwitchEventSourceReadinessOutcome.Available available,
         string definitionId
@@ -663,7 +840,7 @@ public sealed partial class NativeOperationAutomationTests
                 ? ImmutableDictionary<
                     AutomationConfigurationFieldId,
                     AutomationInputBinding
-                >.Empty.Add(new("message"), new(messageMode, Expression: null))
+                >.Empty.Add(new("message"), new(AutomationInputBindingMode.Fixed, Expression: null))
                 : ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
