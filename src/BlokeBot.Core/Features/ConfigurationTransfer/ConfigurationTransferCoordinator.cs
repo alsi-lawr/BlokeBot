@@ -1,6 +1,7 @@
 using System.Data;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Points.Configuration;
@@ -81,6 +82,11 @@ public sealed partial class ConfigurationTransferCoordinator
             }
 
             _ = await MainDatabaseStatements.LockHostAsync(db, host.Id, cancellationToken);
+            var previousCommandSchemas = await AutomationCommandSource.LoadAsync(
+                db,
+                new(host.Id),
+                cancellationToken
+            );
             var watchWrite = Option<WatchTimeConfigurationWrite>.None;
             var planned = new Dictionary<ConfigurationSectionId, ConfigurationSectionPreview>();
             var references = await ConfigurationImportReferencePlan.BuildAsync(
@@ -222,7 +228,12 @@ public sealed partial class ConfigurationTransferCoordinator
                 }
             }
             if (
-                await _automations.ValidateCommandArgumentsAsync(db, host.Id, cancellationToken) is
+                await _automations.ValidateCommandArgumentsAsync(
+                    db,
+                    host.Id,
+                    previousCommandSchemas,
+                    cancellationToken
+                ) is
                 { } dependency
             )
             {

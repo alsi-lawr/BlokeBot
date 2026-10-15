@@ -30,6 +30,7 @@ internal interface IAutomationConfigurationTransferAdapter
     Task<CustomCommands.CustomCommandConfigurationSaveFailure.ArgumentDependency?> ValidateCommandArgumentsAsync(
         BlokeBotDbContext db,
         int hostId,
+        IReadOnlyDictionary<int, CustomCommandArgumentSchema> previousSchemas,
         CancellationToken cancellationToken
     );
 
@@ -98,11 +99,13 @@ internal sealed class UnavailableAutomationConfigurationTransferAdapter
     public Task<CustomCommands.CustomCommandConfigurationSaveFailure.ArgumentDependency?> ValidateCommandArgumentsAsync(
         BlokeBotDbContext db,
         int hostId,
+        IReadOnlyDictionary<int, CustomCommandArgumentSchema> previousSchemas,
         CancellationToken cancellationToken
     ) =>
         Automations.AutomationCommandSourceCompatibility.CheckFinalAsync(
             db,
             hostId,
+            previousSchemas,
             null,
             cancellationToken
         );

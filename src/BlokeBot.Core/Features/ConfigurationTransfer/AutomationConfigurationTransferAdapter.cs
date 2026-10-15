@@ -16,11 +16,13 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
     public Task<CustomCommands.CustomCommandConfigurationSaveFailure.ArgumentDependency?> ValidateCommandArgumentsAsync(
         BlokeBotDbContext db,
         int hostId,
+        IReadOnlyDictionary<int, CustomCommandArgumentSchema> previousSchemas,
         CancellationToken cancellationToken
     ) =>
         AutomationCommandSourceCompatibility.CheckFinalAsync(
             db,
             hostId,
+            previousSchemas,
             catalog,
             cancellationToken
         );

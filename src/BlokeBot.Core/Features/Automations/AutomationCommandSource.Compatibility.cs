@@ -72,6 +72,7 @@ internal static class AutomationCommandSourceCompatibility
     internal static async Task<CustomCommandConfigurationSaveFailure.ArgumentDependency?> CheckFinalAsync(
         BlokeBotDbContext db,
         int hostId,
+        IReadOnlyDictionary<int, CustomCommandArgumentSchema> previousSchemas,
         AutomationCatalogService? catalog,
         CancellationToken cancellationToken
     )
@@ -95,68 +96,102 @@ internal static class AutomationCommandSourceCompatibility
                 if (
                     !json.RootElement.TryGetProperty("custom-command-id", out var property)
                     || !property.TryGetInt32(out var commandId)
+                    || !previousSchemas.TryGetValue(commandId, out var previous)
                 )
                 {
                     continue;
                 }
+                _ = schemas.TryGetValue(commandId, out var next);
                 foreach (
                     var edge in flow.Edges.Where(edge =>
                         edge.SourceNodeId == source.Id
                         && edge.Kind == PersistedAutomationEdgeKind.Data
-                        && edge.SourcePortId.StartsWith("argument.", StringComparison.Ordinal)
                     )
                 )
                 {
+                    var oldField = previous.Fields.FirstOrDefault(field =>
+                        CustomCommandArguments.PortId(field.Name) == edge.SourcePortId
+                    );
+                    if (oldField is null)
+                    {
+                        continue;
+                    }
+                    var field = next?.Fields.FirstOrDefault(value => value.Name == oldField.Name);
+                    if (field is not null && ValueType(field) == ValueType(oldField))
+                    {
+                        continue;
+                    }
                     if (
-                        !schemas.TryGetValue(commandId, out var schema)
-                        || !schema.Fields.Any(field =>
-                            CustomCommandArguments.PortId(field.Name) == edge.SourcePortId
+                        field is null
+                        || !TargetAccepts(
+                            catalog,
+                            hostId,
+                            flow.Nodes.Single(node => node.Id == edge.TargetNodeId),
+                            edge.TargetPortId,
+                            ValueType(field)
                         )
                     )
                     {
-                        return new(commandId, flow.Id, source.Id, edge.SourcePortId, flow.Name);
-                    }
-                    var field = schema.Fields.Single(value =>
-                        CustomCommandArguments.PortId(value.Name) == edge.SourcePortId
-                    );
-                    var target = flow.Nodes.Single(node => node.Id == edge.TargetNodeId);
-                    var bindings = AutomationRuntimeSerialization.RestoreInputBindings(
-                        target.InputBindingsJson,
-                        new(target.DefinitionId)
-                    );
-                    if (catalog is null)
-                    {
-                        return new(commandId, flow.Id, source.Id, field.Name, flow.Name);
-                    }
-                    using var targetJson = JsonDocument.Parse(target.ConfigurationJson);
-                    if (
-                        bindings is AutomationInputBindingsRestoreOutcome.Available restored
-                        && catalog.ValidatePersistedDefinition(
-                            new(
-                                target.DefinitionId,
-                                target.DefinitionSchemaVersion,
-                                targetJson.RootElement
-                            ),
-                            restored.Bindings
-                        )
-                            is AutomationConfigurationCheck.Valid valid
-                        && valid.Definition.Inputs.SingleOrDefault(port =>
-                            port.Id.Value == edge.TargetPortId
-                        )
-                            is { } input
-                        && input.ValueType
-                            != (
-                                field.Kind == CustomCommandArgumentKind.Number
-                                    ? AutomationPortValueType.Number
-                                    : AutomationPortValueType.Text
-                            )
-                    )
-                    {
-                        return new(commandId, flow.Id, source.Id, field.Name, flow.Name);
+                        return new(commandId, flow.Id, source.Id, oldField.Name, flow.Name);
                     }
                 }
             }
         }
         return null;
+    }
+
+    private static AutomationPortValueType ValueType(CustomCommandArgumentField field) =>
+        field.Kind switch
+        {
+            CustomCommandArgumentKind.Number => AutomationPortValueType.Number,
+            CustomCommandArgumentKind.Token or CustomCommandArgumentKind.RemainingText =>
+                AutomationPortValueType.Text,
+        };
+
+    private static bool TargetAccepts(
+        AutomationCatalogService? catalog,
+        int hostId,
+        AutomationFlowNode target,
+        string portId,
+        AutomationPortValueType valueType
+    )
+    {
+        if (
+            catalog is null
+            || AutomationRuntimeSerialization.RestoreInputBindings(
+                target.InputBindingsJson,
+                new(target.DefinitionId)
+            )
+                is not AutomationInputBindingsRestoreOutcome.Available bindings
+        )
+        {
+            return false;
+        }
+        AutomationPluginProvenance? provenance = null;
+        if (
+            target.PluginProvenanceJson is not null
+            && !PluginAutomationCatalogRegistry.TryDeserializeProvenance(
+                target.PluginProvenanceJson,
+                out provenance
+            )
+        )
+        {
+            return false;
+        }
+        using var configuration = JsonDocument.Parse(target.ConfigurationJson);
+        return catalog.ValidatePreparedDefinition(
+                new(hostId),
+                new(
+                    target.DefinitionId,
+                    target.DefinitionSchemaVersion,
+                    configuration.RootElement,
+                    provenance
+                ),
+                bindings.Bindings
+            )
+                is AutomationConfigurationCheck.Valid valid
+            && valid.Definition.Inputs.Any(port =>
+                port.Id.Value == portId && port.ValueType == valueType
+            );
     }
 }
