@@ -8,19 +8,39 @@ internal abstract record AutomationExpressionCheck
 {
     private AutomationExpressionCheck() { }
 
-    internal sealed record Valid : AutomationExpressionCheck;
+    internal abstract T Match<T>(Func<Valid, T> valid, Func<Invalid, T> invalid);
 
-    internal sealed record Invalid : AutomationExpressionCheck;
+    internal sealed record Valid : AutomationExpressionCheck
+    {
+        internal override T Match<T>(Func<Valid, T> valid, Func<Invalid, T> invalid) => valid(this);
+    }
+
+    internal sealed record Invalid(AutomationDiagnostic? Diagnostic = null)
+        : AutomationExpressionCheck
+    {
+        internal override T Match<T>(Func<Valid, T> valid, Func<Invalid, T> invalid) =>
+            invalid(this);
+    }
 }
 
 internal abstract record AutomationExpressionResult
 {
     private AutomationExpressionResult() { }
 
-    internal sealed record Value(object? Result, bool UsesSensitiveValues)
-        : AutomationExpressionResult;
+    internal abstract T Match<T>(Func<Value, T> value, Func<Invalid, T> invalid);
 
-    internal sealed record Invalid : AutomationExpressionResult;
+    internal sealed record Value(object? Result, bool UsesSensitiveValues)
+        : AutomationExpressionResult
+    {
+        internal override T Match<T>(Func<Value, T> value, Func<Invalid, T> invalid) => value(this);
+    }
+
+    internal sealed record Invalid(AutomationDiagnostic? Diagnostic = null)
+        : AutomationExpressionResult
+    {
+        internal override T Match<T>(Func<Value, T> value, Func<Invalid, T> invalid) =>
+            invalid(this);
+    }
 }
 
 public sealed class AutomationExpressionService
@@ -34,7 +54,12 @@ public sealed class AutomationExpressionService
             || string.IsNullOrWhiteSpace(expression.Source)
         )
         {
-            return new AutomationExpressionCheck.Invalid();
+            return new AutomationExpressionCheck.Invalid(
+                AutomationDiagnostic.Expression(
+                    AutomationDiagnosticCategory.Compilation,
+                    expression.Source
+                )
+            );
         }
 
         try
@@ -44,7 +69,12 @@ public sealed class AutomationExpressionService
         }
         catch (CelException)
         {
-            return new AutomationExpressionCheck.Invalid();
+            return new AutomationExpressionCheck.Invalid(
+                AutomationDiagnostic.Expression(
+                    AutomationDiagnosticCategory.Compilation,
+                    expression.Source
+                )
+            );
         }
     }
 
@@ -58,13 +88,20 @@ public sealed class AutomationExpressionService
             || string.IsNullOrWhiteSpace(expression.Source)
         )
         {
-            return new AutomationExpressionResult.Invalid();
+            return new AutomationExpressionResult.Invalid(
+                AutomationDiagnostic.Expression(
+                    AutomationDiagnosticCategory.Compilation,
+                    expression.Source
+                )
+            );
         }
 
+        var category = AutomationDiagnosticCategory.Compilation;
         try
         {
             var evaluation = EvaluationContext(context);
             var program = _environment.Compile(expression.Source);
+            category = AutomationDiagnosticCategory.Evaluation;
             return new AutomationExpressionResult.Value(
                 program(evaluation.Values),
                 UsesSensitiveContext(expression.Source)
@@ -75,7 +112,9 @@ public sealed class AutomationExpressionService
         }
         catch (CelException)
         {
-            return new AutomationExpressionResult.Invalid();
+            return new AutomationExpressionResult.Invalid(
+                AutomationDiagnostic.Expression(category, expression.Source)
+            );
         }
     }
 
@@ -83,7 +122,9 @@ public sealed class AutomationExpressionService
     {
         if (string.IsNullOrWhiteSpace(template))
         {
-            return new AutomationExpressionResult.Invalid();
+            return new AutomationExpressionResult.Invalid(
+                AutomationDiagnostic.Expression(AutomationDiagnosticCategory.Compilation, template)
+            );
         }
 
         var output = new System.Text.StringBuilder();
@@ -102,21 +143,33 @@ public sealed class AutomationExpressionService
             var end = template.IndexOf('}', start + 2);
             if (end < 0)
             {
-                return new AutomationExpressionResult.Invalid();
+                return new AutomationExpressionResult.Invalid(
+                    AutomationDiagnostic.Expression(
+                        AutomationDiagnosticCategory.Compilation,
+                        template
+                    )
+                );
             }
 
             var source = template[(start + 2)..end];
-            var result = Evaluate(
-                new(AutomationExpressionLanguage.CurrentVersion, source),
-                context
-            );
-            if (result is not AutomationExpressionResult.Value value)
+            var invalid = Evaluate(
+                    new(AutomationExpressionLanguage.CurrentVersion, source),
+                    context
+                )
+                .Match<AutomationExpressionResult.Invalid?>(
+                    value =>
+                    {
+                        usesSensitiveValues |= value.UsesSensitiveValues;
+                        _ = output.Append(ToInvariantText(value.Result));
+                        return null;
+                    },
+                    failed => new(failed.Diagnostic?.Offset(start + 2))
+                );
+            if (invalid is not null)
             {
-                return new AutomationExpressionResult.Invalid();
+                return invalid;
             }
 
-            usesSensitiveValues |= value.UsesSensitiveValues;
-            _ = output.Append(ToInvariantText(value.Result));
             offset = end + 1;
         }
 
@@ -127,7 +180,9 @@ public sealed class AutomationExpressionService
     {
         if (string.IsNullOrWhiteSpace(template))
         {
-            return new AutomationExpressionCheck.Invalid();
+            return new AutomationExpressionCheck.Invalid(
+                AutomationDiagnostic.Expression(AutomationDiagnosticCategory.Compilation, template)
+            );
         }
 
         var offset = 0;
@@ -140,14 +195,25 @@ public sealed class AutomationExpressionService
             }
 
             var end = template.IndexOf('}', start + 2);
-            if (
-                end < 0
-                || Validate(
-                    new(AutomationExpressionLanguage.CurrentVersion, template[(start + 2)..end])
-                ) is AutomationExpressionCheck.Invalid
-            )
+            if (end < 0)
             {
-                return new AutomationExpressionCheck.Invalid();
+                return new AutomationExpressionCheck.Invalid(
+                    AutomationDiagnostic.Expression(
+                        AutomationDiagnosticCategory.Compilation,
+                        template
+                    )
+                );
+            }
+            var invalid = Validate(
+                    new(AutomationExpressionLanguage.CurrentVersion, template[(start + 2)..end])
+                )
+                .Match<AutomationExpressionCheck.Invalid?>(
+                    _ => null,
+                    failed => new(failed.Diagnostic?.Offset(start + 2))
+                );
+            if (invalid is not null)
+            {
+                return invalid;
             }
 
             offset = end + 1;

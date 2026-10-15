@@ -6,7 +6,8 @@ public sealed partial class AutomationRuntimeService
 {
     private async Task<AutomationRuntimeSerialization.PersistedNode> UnwindFailureAsync(
         AutomationNodeExecutionScope scope,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationDiagnostic? diagnostic = null
     )
     {
         var (db, run, _, node, flow, _) = scope;
@@ -59,7 +60,8 @@ public sealed partial class AutomationRuntimeService
                 failureNode,
                 failureNode.ContinueOnFailure
                     ? AutomationTraceOutcome.ContinuedAfterFailure
-                    : AutomationTraceOutcome.Failed
+                    : AutomationTraceOutcome.Failed,
+                diagnostic: diagnostic?.At(failureNode, new AutomationDiagnosticMember.Node())
             );
         }
         return failureNode;

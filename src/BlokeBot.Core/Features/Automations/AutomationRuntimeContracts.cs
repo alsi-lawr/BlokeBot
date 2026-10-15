@@ -116,7 +116,8 @@ public sealed record AutomationGraphError(
     string Message,
     AutomationConfigurationFieldId? FieldId = null,
     AutomationPortId? PortId = null,
-    AutomationSafeTriggerFieldId? SafeTriggerFieldId = null
+    AutomationSafeTriggerFieldId? SafeTriggerFieldId = null,
+    AutomationDiagnostic? Diagnostic = null
 );
 
 public abstract record AutomationFlowValidationOutcome

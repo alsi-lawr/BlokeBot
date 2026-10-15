@@ -9,44 +9,71 @@ internal sealed partial class AutomationTransformCelService
     internal static bool ValidateOutput(
         AutomationCelTransformOutput output,
         IReadOnlyDictionary<string, AutomationCelTransformInput> inputs
+    ) => ValidateOutput(output, inputs, out _);
+
+    internal static bool ValidateOutput(
+        AutomationCelTransformOutput output,
+        IReadOnlyDictionary<string, AutomationCelTransformInput> inputs,
+        out AutomationDiagnostic? diagnostic
     )
     {
-        if (string.IsNullOrWhiteSpace(output.Source))
-        {
-            return false;
-        }
-
-        if (
-            Segments(output.Source, output.ValueType == AutomationPortValueType.Text)
-            is not { } segments
-        )
-        {
-            return false;
-        }
-
-        var expressions = segments
-            .Where(static segment => segment.Source is not null)
-            .Select(static segment => segment.Source!)
-            .ToArray();
-        if (
-            expressions.Any(source =>
-                !AutomationCelSyntax.Validate(source, inputs) || !CanCompile(source)
-            )
-        )
-        {
-            return false;
-        }
-
+        diagnostic = null;
         var symbols = AutomationCelStaticTypes.ForInputs(inputs.Values);
-        return output.Source.Contains("${", StringComparison.Ordinal)
-            ? output.ValueType == AutomationPortValueType.Text
-                && expressions.All(source =>
-                    AutomationCelStaticTypes.TryInfer(source, symbols, out var type)
-                    && type.IsScalarOrNull
+        if (
+            string.IsNullOrWhiteSpace(output.Source)
+            || Segments(output.Source, output.ValueType == AutomationPortValueType.Text)
+                is not { } segments
+        )
+        {
+            diagnostic = AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.Compilation,
+                output.Source
+            ) with
+            {
+                Member = new AutomationDiagnosticMember.Output(output.PortId),
+            };
+            return false;
+        }
+        var interpolate = output.Source.Contains("${", StringComparison.Ordinal);
+        foreach (var segment in segments.Where(static segment => segment.Source is not null))
+        {
+            var source = segment.Source!;
+            diagnostic = AutomationCelSyntax.Diagnose(source, symbols);
+            if (diagnostic is null && !CanCompile(source))
+            {
+                diagnostic = AutomationDiagnostic.Expression(
+                    AutomationDiagnosticCategory.Compilation,
+                    source
+                );
+            }
+            if (diagnostic is null)
+            {
+                if (!AutomationCelStaticTypes.TryInfer(source, symbols, out var result))
+                {
+                    diagnostic = AutomationCelStaticTypes.DiagnoseType(source, symbols);
+                }
+                else if (
+                    interpolate
+                        ? output.ValueType != AutomationPortValueType.Text || !result.IsScalarOrNull
+                        : !result.IsAssignableTo(output.ValueType, output.Nullability)
                 )
-            : expressions.Length == 1
-                && AutomationCelStaticTypes.TryInfer(expressions[0], symbols, out var result)
-                && result.IsAssignableTo(output.ValueType, output.Nullability);
+                {
+                    diagnostic = AutomationDiagnostic.Expression(
+                        AutomationDiagnosticCategory.IncompatibleType,
+                        source
+                    );
+                }
+            }
+            if (diagnostic is not null)
+            {
+                diagnostic = diagnostic.Offset(segment.Offset) with
+                {
+                    Member = new AutomationDiagnosticMember.Output(output.PortId),
+                };
+                return false;
+            }
+        }
+        return true;
     }
 
     internal static AutomationCelIdentifierRewrite RenameIdentifier(
@@ -136,7 +163,7 @@ internal sealed partial class AutomationTransformCelService
                 return null;
             }
 
-            segments.Add(new(null, source[(start + 2)..end]));
+            segments.Add(new(null, source[(start + 2)..end], start + 2));
             offset = end + 1;
         }
 

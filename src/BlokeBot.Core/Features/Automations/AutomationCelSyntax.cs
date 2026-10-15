@@ -151,6 +151,72 @@ internal static class AutomationCelSyntax
         return true;
     }
 
+    internal static AutomationDiagnostic? Diagnose(
+        string source,
+        IReadOnlyDictionary<string, AutomationCelStaticType> symbols
+    )
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.Compilation,
+                source
+            );
+        }
+        try
+        {
+            var tree = new CelEnvironment([], string.Empty).Parse(source);
+            foreach (var node in tree.DescendantsAndSelf())
+            {
+                AutomationDiagnosticCategory? category = node switch
+                {
+                    CelParser.IdentOrGlobalCallContext call
+                        when call.LPAREN() is not null
+                            && !_allowedFunctions.Contains(call.id.Text) =>
+                        AutomationDiagnosticCategory.UnsupportedOperation,
+                    CelParser.MemberCallContext call
+                        when call.id.Text
+                            is not (
+                                "contains"
+                                or "endsWith"
+                                or "matches"
+                                or "size"
+                                or "startsWith"
+                            ) => AutomationDiagnosticCategory.UnsupportedOperation,
+                    CelParser.SelectContext select
+                        when TryPath(select, out var path) && !symbols.ContainsKey(path) =>
+                        AutomationDiagnosticCategory.UnavailableName,
+                    CelParser.IdentOrGlobalCallContext identifier
+                        when identifier.LPAREN() is null
+                            && !symbols.ContainsKey(identifier.id.Text) =>
+                        AutomationDiagnosticCategory.UnavailableName,
+                    CelParser.CreateListContext or CelParser.CreateStructContext =>
+                        AutomationDiagnosticCategory.UnsupportedOperation,
+                    _ => null,
+                };
+                if (category is { } rejected && node is Antlr4.Runtime.ParserRuleContext context)
+                {
+                    return new(
+                        rejected,
+                        new AutomationDiagnosticMember.Node(),
+                        new(
+                            context.Start.StartIndex,
+                            context.Stop.StopIndex - context.Start.StartIndex + 1
+                        )
+                    );
+                }
+            }
+            return null;
+        }
+        catch (CelException)
+        {
+            return AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.Compilation,
+                source
+            );
+        }
+    }
+
     internal static bool AllowedFunctions(AutomationCelAnalysis analysis) =>
         analysis.Functions.All(_allowedFunctions.Contains)
         && analysis.MemberFunctions.All(static function =>

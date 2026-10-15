@@ -14,6 +14,9 @@ public partial class AutomationEditorPage
         Extraction,
     }
 
+    private AutomationDiagnosticSite? _diagnosticSource;
+    private bool _diagnosticInspectorOpen;
+    private bool _restoreDiagnosticOpener;
     private AutomationAuthoringTask _authoringTask;
     private long _draftRevision;
     private bool _focusAuthoring;
@@ -77,6 +80,8 @@ public partial class AutomationEditorPage
 
     private void ResetAuthoring()
     {
+        _diagnosticSource = null;
+        _diagnosticInspectorOpen = false;
         _draftRevision++;
         _traceLoad++;
         _extractionQuery++;
@@ -163,6 +168,7 @@ public partial class AutomationEditorPage
     private async Task SelectTraceAsync(int sequence)
     {
         _selectedTrace = _tracePresentation?.Find(sequence);
+        _diagnosticSource = null;
         _revealSelectedTrace = true;
         _traceOffset = Math.Max(
             0,
@@ -184,6 +190,156 @@ public partial class AutomationEditorPage
         {
             ClearSelection();
         }
+        await RefreshDiagnosticSourceAsync();
+    }
+
+    private static bool HasDiagnosticMember(
+        AutomationEditorNode node,
+        AutomationDiagnosticSite site
+    ) =>
+        node.Id == site.NodeId
+        && node.Definition.Id == site.DefinitionId
+        && site.Member.Match(
+            input =>
+                node.Definition.Inputs.Any(port =>
+                    port.Id == input.PortId && port.BindingFieldId == input.FieldId
+                ),
+            output => node.TransformOutputs.Any(port => port.PortId == output.PortId),
+            _ => true
+        );
+
+    private async Task RefreshDiagnosticSourceAsync()
+    {
+        var selected = _selectedTrace;
+        var editor = _editor;
+        var host = HostId;
+        if (selected?.Entry.Event.Diagnostic?.Origin is not { } site)
+        {
+            return;
+        }
+        if (site.Invocation?.SubflowId is not { } subflow)
+        {
+            if (
+                _trace?.FlowId == editor?.Id
+                && editor?.Nodes.Any(node => HasDiagnosticMember(node, site)) is true
+            )
+            {
+                _diagnosticSource = site;
+            }
+            return;
+        }
+        var revision = await _subflowsService.LoadCurrentAsync(
+            new(host),
+            new(subflow),
+            CancellationToken.None
+        );
+        if (
+            host != HostId
+            || !ReferenceEquals(editor, _editor)
+            || !ReferenceEquals(selected, _selectedTrace)
+        )
+        {
+            return;
+        }
+        if (
+            revision is not null
+            && revision.Id.Value == site.Invocation.RevisionId
+            && RestoreAuthoringGraph(revision.Graph)
+                ?.Nodes.Any(node => HasDiagnosticMember(node, site))
+                is true
+        )
+        {
+            _diagnosticSource = site;
+        }
+    }
+
+    private async Task ShowDiagnosticSourceAsync()
+    {
+        if (_diagnosticSource is not { } site)
+        {
+            return;
+        }
+        var host = HostId;
+        if (site.Invocation?.SubflowId is { } subflow)
+        {
+            await RequestTransitionAsync(async () =>
+            {
+                var activationEditor = _editor;
+                var activationRevision = _draftRevision;
+                var request = ++_librarySelection;
+                var revision = await _subflowsService.LoadCurrentAsync(
+                    new(host),
+                    new(subflow),
+                    CancellationToken.None
+                );
+                if (
+                    host != HostId
+                    || !ReferenceEquals(activationEditor, _editor)
+                    || activationRevision != _draftRevision
+                    || request != _librarySelection
+                )
+                {
+                    return;
+                }
+                if (
+                    revision is null
+                    || revision.Id.Value != site.Invocation.RevisionId
+                    || RestoreAuthoringGraph(revision.Graph)
+                        ?.Nodes.Any(node => HasDiagnosticMember(node, site))
+                        is not true
+                )
+                {
+                    _diagnosticSource = null;
+                    _feedback = "The recorded source revision is unavailable.";
+                    return;
+                }
+                if (LoadSubflowEditor(revision))
+                {
+                    await FocusDiagnosticSourceAsync(site);
+                }
+            });
+            return;
+        }
+        if (
+            _trace?.FlowId == _editor?.Id
+            && _editor?.Nodes.Any(node => HasDiagnosticMember(node, site)) is true
+        )
+        {
+            await FocusDiagnosticSourceAsync(site);
+        }
+        else
+        {
+            _diagnosticSource = null;
+        }
+    }
+
+    private async Task FocusDiagnosticSourceAsync(AutomationDiagnosticSite site)
+    {
+        if (_pageModule is not null)
+        {
+            await _pageModule.InvokeVoidAsync("rememberDiagnosticOpener");
+        }
+        SetSingleNodeSelection(site.NodeId);
+        _diagnosticInspectorOpen = true;
+        _disclosedNodeId = site.NodeId;
+        _mobileInspectorOpen = true;
+        _focusInspectorAfterRender = true;
+        _validationFocusField = null;
+        _validationFocusPort = null;
+        _ = site.Member.Match(
+            input =>
+            {
+                _validationFocusField = input.FieldId.Value;
+                return true;
+            },
+            output =>
+            {
+                _validationFocusPort = output.PortId.Value;
+                return true;
+            },
+            _ => true
+        );
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SelectTraceRunAsync(string id)

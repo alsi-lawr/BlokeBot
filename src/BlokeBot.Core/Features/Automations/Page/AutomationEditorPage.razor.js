@@ -161,7 +161,7 @@ export function focusInspector(field = null, port = null) {
         ? inspector?.querySelector(`[data-automation-field="${CSS.escape(field)}"]`)
         : port !== null ? inspector?.querySelector(`[data-automation-output="${CSS.escape(port)}"]`) : null;
     const target = owner?.querySelector('[aria-invalid="true"]')
-        ?? owner?.querySelector('input,textarea,select,button') ?? inspector;
+        ?? owner?.querySelector('textarea') ?? owner?.querySelector('input,select,button') ?? inspector;
     target?.focus({ preventScroll: false });
 }
 
@@ -195,4 +195,16 @@ export function revealSelectedTrace() {
     if (bounds.top < viewport.top || bounds.bottom > viewport.bottom) {
         list.scrollTop += bounds.top - viewport.top - (viewport.height - bounds.height) / 2;
     }
+}
+
+let diagnosticOpener = null;
+
+export function rememberDiagnosticOpener() {
+    diagnosticOpener = document.activeElement?.matches('[data-automation-diagnostic-source]')
+        ? document.activeElement : document.querySelector('[data-automation-diagnostic-source]');
+}
+
+export function focusDiagnosticOpener() {
+    if (diagnosticOpener?.isConnected) diagnosticOpener.focus({ preventScroll: false });
+    diagnosticOpener = null;
 }

@@ -51,6 +51,7 @@ public partial class AutomationEditorPage
 
     private void SetSingleNodeSelection(AutomationNodeId? nodeId)
     {
+        _diagnosticInspectorOpen = false;
         if (_selectedNodeId != nodeId)
         {
             ResetCallSelector();
@@ -70,6 +71,7 @@ public partial class AutomationEditorPage
 
     private void ClearSelection()
     {
+        _diagnosticInspectorOpen = false;
         ResetCallSelector();
         _disclosedNodeId = null;
         _selectedNodeIds.Clear();
@@ -81,6 +83,8 @@ public partial class AutomationEditorPage
 
     private void CloseInspector()
     {
+        _restoreDiagnosticOpener = _diagnosticInspectorOpen;
+        _diagnosticInspectorOpen = false;
         if (_selectedNodeId is { } nodeId)
         {
             var focusMode =

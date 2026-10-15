@@ -147,6 +147,11 @@ public partial class AutomationEditorPage
             _validationFocusPort = null;
         }
 
+        if (_restoreDiagnosticOpener && _pageModule is not null)
+        {
+            _restoreDiagnosticOpener = false;
+            await _pageModule.InvokeVoidAsync("focusDiagnosticOpener");
+        }
         await EnsureCallSelectorAsync();
 
         if (_acceptedTransition is not { } transition)

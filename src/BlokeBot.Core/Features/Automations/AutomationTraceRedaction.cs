@@ -10,7 +10,8 @@ internal static class AutomationTraceRedaction
         AutomationTraceOutcome outcome = AutomationTraceOutcome.None,
         string? port = null,
         DateTime? due = null,
-        IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>? values = null
+        IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>? values = null,
+        AutomationDiagnostic? diagnostic = null
     ) =>
         new(
             kind,
@@ -51,6 +52,25 @@ internal static class AutomationTraceRedaction
                                 ? []
                                 : pair.Value.SafeTriggerFields
                         )),
-                ]
+                ],
+            diagnostic is null
+                ? null
+                : new(
+                    diagnostic.Category,
+                    diagnostic.Member,
+                    diagnostic.Span,
+                    Site(diagnostic.Origin, invocationId),
+                    Site(diagnostic.Affected, invocationId)
+                )
         );
+
+    private static AutomationDiagnosticSite? Site(AutomationDiagnosticSite? site, Guid root) =>
+        site is null
+            ? null
+            : site with
+            {
+                Invocation = site.Invocation is { } invocation
+                    ? AutomationFrozenSubflows.Trace(invocation, root)
+                    : null,
+            };
 }

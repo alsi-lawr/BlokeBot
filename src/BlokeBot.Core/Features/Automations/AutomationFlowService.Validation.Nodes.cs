@@ -68,7 +68,8 @@ public sealed partial class AutomationFlowService
                         "configuration-invalid",
                         error.Message,
                         error.Target is AutomationValidationTarget.Field field ? field.Id : null,
-                        error.Target is AutomationValidationTarget.Port port ? port.Id : null
+                        error.Target is AutomationValidationTarget.Port port ? port.Id : null,
+                        Diagnostic: error.Diagnostic
                     )
                 );
             }
@@ -214,7 +215,12 @@ public sealed partial class AutomationFlowService
                     || binding.Mode == AutomationInputBindingMode.Expression
                 )
                 && descriptor.Kind != AutomationNodeKind.Transform
-                && !ValidOrdinaryBindingExpression(descriptor, fieldId, expression)
+                && !ValidOrdinaryBindingExpression(
+                    descriptor,
+                    fieldId,
+                    expression,
+                    out var diagnostic
+                )
             )
             {
                 errors.Add(
@@ -222,7 +228,8 @@ public sealed partial class AutomationFlowService
                         node.Id,
                         "binding-expression-invalid",
                         "Enter a valid input expression.",
-                        fieldId
+                        fieldId,
+                        Diagnostic: diagnostic
                     )
                 );
             }
@@ -254,9 +261,11 @@ public sealed partial class AutomationFlowService
     private bool ValidOrdinaryBindingExpression(
         AutomationDefinitionDescriptor descriptor,
         AutomationConfigurationFieldId fieldId,
-        AutomationExpressionSource expression
+        AutomationExpressionSource expression,
+        out AutomationDiagnostic? diagnostic
     )
     {
+        diagnostic = null;
         if (
             expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
             || string.IsNullOrWhiteSpace(expression.Source)
@@ -266,12 +275,17 @@ public sealed partial class AutomationFlowService
         }
 
         var input = descriptor.Inputs.SingleOrDefault(port => port.BindingFieldId == fieldId);
-        return
+        var check =
             input is { ValueType: AutomationPortValueType.Text }
             && expression.Source.Contains("${", StringComparison.Ordinal)
-            ? expressions.ValidateTemplate(expression.Source)
-                is not AutomationExpressionCheck.Invalid
-            : expressions.Validate(expression) is not AutomationExpressionCheck.Invalid;
+                ? expressions.ValidateTemplate(expression.Source)
+                : expressions.Validate(expression);
+        var result = check.Match<(bool Valid, AutomationDiagnostic? Diagnostic)>(
+            _ => (true, null),
+            invalid => (false, invalid.Diagnostic)
+        );
+        diagnostic = result.Diagnostic;
+        return result.Valid;
     }
 
     private void ValidateSafeTriggerExpressions(
@@ -303,7 +317,15 @@ public sealed partial class AutomationFlowService
                     continue;
                 }
 
-                if (!service.Validate(binding.Expression, input, out _, out var invalidSafeField))
+                if (
+                    !service.Validate(
+                        binding.Expression,
+                        input,
+                        out _,
+                        out var invalidSafeField,
+                        out var diagnostic
+                    )
+                )
                 {
                     errors.Add(
                         new(
@@ -312,7 +334,8 @@ public sealed partial class AutomationFlowService
                             "Use only Safe trigger fields available on every Flow path.",
                             fieldId,
                             input.Id,
-                            invalidSafeField
+                            invalidSafeField,
+                            diagnostic
                         )
                     );
                 }

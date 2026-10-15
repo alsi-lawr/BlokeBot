@@ -85,6 +85,49 @@ internal static partial class AutomationCelStaticTypes
         }
     }
 
+    internal static AutomationDiagnostic DiagnoseType(
+        string source,
+        IReadOnlyDictionary<string, AutomationCelStaticType> symbols
+    )
+    {
+        try
+        {
+            var tree = new CelEnvironment([], string.Empty).Parse(source);
+            foreach (
+                var call in tree.DescendantsAndSelf()
+                    .OfType<Cel.Internal.CelParser.IdentOrGlobalCallContext>()
+                    .Reverse()
+            )
+            {
+                if (
+                    call.LPAREN() is not null
+                    && (call.exprList()?.expr() ?? []).All(argument =>
+                        TryInfer(argument, symbols, out _)
+                    )
+                    && !TryGlobalCall(call, symbols, out _)
+                )
+                {
+                    return new(
+                        AutomationDiagnosticCategory.UnsupportedOperation,
+                        new AutomationDiagnosticMember.Node(),
+                        new(call.Start.StartIndex, call.Stop.StopIndex - call.Start.StartIndex + 1)
+                    );
+                }
+            }
+        }
+        catch (CelException)
+        {
+            return AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.Compilation,
+                source
+            );
+        }
+        return AutomationDiagnostic.Expression(
+            AutomationDiagnosticCategory.IncompatibleType,
+            source
+        );
+    }
+
     private static void AddSymbol(
         IDictionary<string, AutomationCelStaticType> symbols,
         string name,

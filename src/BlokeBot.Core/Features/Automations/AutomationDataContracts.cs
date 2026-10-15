@@ -50,11 +50,22 @@ internal abstract record AutomationPureNodeResult
 {
     private AutomationPureNodeResult() { }
 
+    internal abstract T Match<T>(Func<Succeeded, T> succeeded, Func<Failed, T> failed);
+
     internal sealed record Succeeded(
         ImmutableDictionary<AutomationPortId, AutomationResolvedValue> Outputs
-    ) : AutomationPureNodeResult;
+    ) : AutomationPureNodeResult
+    {
+        internal override T Match<T>(Func<Succeeded, T> succeeded, Func<Failed, T> failed) =>
+            succeeded(this);
+    }
 
-    internal sealed record Failed(string Code) : AutomationPureNodeResult;
+    internal sealed record Failed(string Code, AutomationDiagnostic? Diagnostic = null)
+        : AutomationPureNodeResult
+    {
+        internal override T Match<T>(Func<Succeeded, T> succeeded, Func<Failed, T> failed) =>
+            failed(this);
+    }
 }
 
 internal interface IAutomationPureNodeHandler
@@ -65,4 +76,23 @@ internal interface IAutomationPureNodeHandler
         AutomationPureNodeInput input,
         CancellationToken cancellationToken
     );
+}
+
+internal abstract record AutomationValueResolution
+{
+    private AutomationValueResolution() { }
+
+    internal abstract T Match<T>(Func<Available, T> available, Func<Failed, T> failed);
+
+    internal sealed record Available(AutomationResolvedValue Value) : AutomationValueResolution
+    {
+        internal override T Match<T>(Func<Available, T> available, Func<Failed, T> failed) =>
+            available(this);
+    }
+
+    internal sealed record Failed(AutomationDiagnostic Diagnostic) : AutomationValueResolution
+    {
+        internal override T Match<T>(Func<Available, T> available, Func<Failed, T> failed) =>
+            failed(this);
+    }
 }

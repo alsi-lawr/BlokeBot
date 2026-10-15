@@ -950,74 +950,89 @@ public sealed partial class AutomationRuntimeService(
                 new RuntimeCheckpointStore(db, run, leaseId, clock),
                 cancellationToken
             );
-            if (inputs is not AutomationInputResolution.Available resolvedInputs)
-            {
-                executionGate = await EnforceExecutionGateAsync(
-                    db,
-                    run,
-                    leaseId,
-                    cancellationToken
-                );
-                if (executionGate == AutomationExecutionGate.OwnershipLost)
+            var resumed = await inputs.Match<Task<AutomationResumeOutcome?>>(
+                async resolvedInputs =>
                 {
-                    continue;
-                }
-                if (executionGate != AutomationExecutionGate.Open)
-                {
-                    return ExecutionBlocked(executionGate);
-                }
+                    await TraceAsync(
+                        db,
+                        run,
+                        AutomationTraceEventKind.ResolvedInputs,
+                        cancellationToken,
+                        node,
+                        values: resolvedInputs.PortValues
+                    );
+                    await TraceAsync(
+                        db,
+                        run,
+                        AutomationTraceEventKind.Attempt,
+                        cancellationToken,
+                        node
+                    );
+                    if (valid.Configuration is AutomationSubflowConfiguration)
+                    {
+                        _ = await CompleteBoundaryAsync(scope, resolvedInputs, cancellationToken);
+                        return null;
+                    }
+                    var result = await ExecuteNodeAsync(
+                        new(run.HostId),
+                        valid.Configuration,
+                        node,
+                        available.Context,
+                        resolvedInputs.FieldValues,
+                        cancellationToken
+                    );
+                    executionGate = await EnforceExecutionGateAsync(
+                        db,
+                        run,
+                        leaseId,
+                        cancellationToken
+                    );
+                    if (executionGate == AutomationExecutionGate.OwnershipLost)
+                    {
+                        return null;
+                    }
+                    if (executionGate != AutomationExecutionGate.Open)
+                    {
+                        return ExecutionBlocked(executionGate);
+                    }
 
-                if (await StopsFlowAsync(scope, "input-resolution-failed", cancellationToken))
-                {
-                    return new(AutomationResumeStatus.Failed);
-                }
-
-                continue;
-            }
-
-            await TraceAsync(
-                db,
-                run,
-                AutomationTraceEventKind.ResolvedInputs,
-                cancellationToken,
-                node,
-                values: resolvedInputs.PortValues
-            );
-            await TraceAsync(db, run, AutomationTraceEventKind.Attempt, cancellationToken, node);
-            if (valid.Configuration is AutomationSubflowConfiguration)
-            {
-                _ = await CompleteBoundaryAsync(scope, resolvedInputs, cancellationToken);
-                continue;
-            }
-            var result = await ExecuteNodeAsync(
-                new(run.HostId),
-                valid.Configuration,
-                node,
-                available.Context,
-                resolvedInputs.FieldValues,
-                cancellationToken
-            );
-            executionGate = await EnforceExecutionGateAsync(db, run, leaseId, cancellationToken);
-            if (executionGate == AutomationExecutionGate.OwnershipLost)
-            {
-                continue;
-            }
-            if (executionGate != AutomationExecutionGate.Open)
-            {
-                return ExecutionBlocked(executionGate);
-            }
-
-            var stopped = await result.Match(
-                async succeeded =>
-                {
-                    _ = await CompleteSuccessAsync(scope, succeeded, cancellationToken);
-                    return false;
+                    var stopped = await result.Match(
+                        async succeeded =>
+                        {
+                            _ = await CompleteSuccessAsync(scope, succeeded, cancellationToken);
+                            return false;
+                        },
+                        failure => StopsFlowAsync(scope, failure.Code, cancellationToken)
+                    );
+                    return stopped ? new(AutomationResumeStatus.Failed) : null;
                 },
-                failure => StopsFlowAsync(scope, failure.Code, cancellationToken)
+                async failure =>
+                {
+                    executionGate = await EnforceExecutionGateAsync(
+                        db,
+                        run,
+                        leaseId,
+                        cancellationToken
+                    );
+                    return executionGate switch
+                    {
+                        AutomationExecutionGate.OwnershipLost => null,
+                        AutomationExecutionGate.HostNotFound
+                        or AutomationExecutionGate.Invalidated => ExecutionBlocked(executionGate),
+                        AutomationExecutionGate.Open => await StopsFlowAsync(
+                            scope,
+                            "input-resolution-failed",
+                            cancellationToken,
+                            failure.Diagnostic
+                        )
+                            ? new(AutomationResumeStatus.Failed)
+                            : null,
+                    };
+                }
             );
-            if (stopped)
+            if (resumed is not null)
             {
-                return new(AutomationResumeStatus.Failed);
+                return resumed;
             }
         }
     }
@@ -1559,15 +1574,17 @@ public sealed partial class AutomationRuntimeService(
     private async Task<bool> StopsFlowAsync(
         AutomationNodeExecutionScope scope,
         string code,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationDiagnostic? diagnostic = null
     ) =>
-        await CompleteFailureAsync(scope, code, cancellationToken)
+        await CompleteFailureAsync(scope, code, cancellationToken, diagnostic)
         == AutomationFailureCompletion.Stopped;
 
     private async Task<AutomationFailureCompletion> CompleteFailureAsync(
         AutomationNodeExecutionScope scope,
         string code,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationDiagnostic? diagnostic = null
     )
     {
         var (db, run, nodeRun, node, flow, leaseId) = scope;
@@ -1589,7 +1606,8 @@ public sealed partial class AutomationRuntimeService(
             node,
             node.ContinueOnFailure
                 ? AutomationTraceOutcome.ContinuedAfterFailure
-                : AutomationTraceOutcome.Failed
+                : AutomationTraceOutcome.Failed,
+            diagnostic: diagnostic
         );
         if (
             nodeRun.Status == AutomationNodeRunStatus.Waiting
@@ -1608,7 +1626,7 @@ public sealed partial class AutomationRuntimeService(
         nodeRun.Status = node.ContinueOnFailure
             ? AutomationNodeRunStatus.ContinuedAfterFailure
             : AutomationNodeRunStatus.Failed;
-        var failureNode = await UnwindFailureAsync(scope, cancellationToken);
+        var failureNode = await UnwindFailureAsync(scope, cancellationToken, diagnostic);
         if (!failureNode.ContinueOnFailure)
         {
             run.Status = AutomationFlowRunStatus.Failed;
@@ -2120,7 +2138,8 @@ public sealed partial class AutomationRuntimeService(
         public async ValueTask FailAsync(
             AutomationRuntimeSerialization.PersistedNode node,
             string code,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            AutomationDiagnostic? diagnostic = null
         )
         {
             await using var transaction = await db.Database.BeginTransactionAsync(
@@ -2145,7 +2164,8 @@ public sealed partial class AutomationRuntimeService(
                     AutomationTraceEventKind.Outputs,
                     clock.GetUtcNow().UtcDateTime,
                     node,
-                    AutomationTraceOutcome.Failed
+                    AutomationTraceOutcome.Failed,
+                    diagnostic: diagnostic
                 ),
                 clock.GetUtcNow().UtcDateTime,
                 cancellationToken

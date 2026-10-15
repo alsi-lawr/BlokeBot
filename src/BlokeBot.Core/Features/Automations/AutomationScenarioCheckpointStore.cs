@@ -8,6 +8,7 @@ internal sealed class AutomationScenarioCheckpointStore(
         AutomationTraceEventKind,
         AutomationTraceOutcome,
         IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>?,
+        AutomationDiagnostic?,
         CancellationToken,
         Task
     > recordEvent
@@ -43,12 +44,14 @@ internal sealed class AutomationScenarioCheckpointStore(
             AutomationTraceEventKind.ResolvedInputs,
             AutomationTraceOutcome.None,
             inputs,
+            null,
             cancellationToken
         );
         await recordEvent(
             node,
             AutomationTraceEventKind.Attempt,
             AutomationTraceOutcome.None,
+            null,
             null,
             cancellationToken
         );
@@ -67,6 +70,7 @@ internal sealed class AutomationScenarioCheckpointStore(
             AutomationTraceEventKind.Outputs,
             AutomationTraceOutcome.Succeeded,
             outputs,
+            null,
             cancellationToken
         );
         return true;
@@ -75,7 +79,8 @@ internal sealed class AutomationScenarioCheckpointStore(
     public async ValueTask FailAsync(
         AutomationRuntimeSerialization.PersistedNode node,
         string code,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationDiagnostic? diagnostic = null
     )
     {
         _ = _running.Remove(node.Id);
@@ -85,6 +90,7 @@ internal sealed class AutomationScenarioCheckpointStore(
             AutomationTraceEventKind.Outputs,
             AutomationTraceOutcome.Failed,
             null,
+            diagnostic,
             cancellationToken
         );
     }

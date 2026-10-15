@@ -167,11 +167,18 @@ internal static partial class AutomationCelTransform
         );
         foreach (var output in configuration.Outputs)
         {
-            if (!AutomationTransformCelService.ValidateOutput(output, declaredInputs))
+            if (
+                !AutomationTransformCelService.ValidateOutput(
+                    output,
+                    declaredInputs,
+                    out var diagnostic
+                )
+            )
             {
                 return AutomationValidationResult.Invalid(
                     new AutomationValidationTarget.Port(output.PortId),
-                    "Repair this Transform output expression."
+                    "Repair this Transform output expression.",
+                    diagnostic
                 );
             }
         }

@@ -250,7 +250,7 @@
                         }
                         @if (_traceOpen)
                         {
-                            <AutomationTracePanel Title="@_traceTitle" Message="@_traceMessage" Snapshot="_trace" Presentation="_tracePresentation" Selected="_selectedTrace" Headers="_traceHeaders" Nodes="_editor.Nodes" Offset="_traceOffset" Select="SelectTraceAsync" Page="offset => _traceOffset = offset" SelectRun="SelectTraceRunAsync" EditScenario="OpenScenariosAsync" Close="CloseTrace" />
+                            <AutomationTracePanel Title="@_traceTitle" Message="@_traceMessage" Snapshot="_trace" Presentation="_tracePresentation" Selected="_selectedTrace" Headers="_traceHeaders" Nodes="_editor.Nodes" Offset="_traceOffset" Select="SelectTraceAsync" Page="offset => _traceOffset = offset" SelectRun="SelectTraceRunAsync" EditScenario="OpenScenariosAsync" SourceAvailable="@(_diagnosticSource is not null)" ShowSource="ShowDiagnosticSourceAsync" Close="CloseTrace" />
                         }
                     </div>
 

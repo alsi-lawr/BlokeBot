@@ -100,7 +100,8 @@ internal abstract record AutomationNodeExecution
         ) => succeeded(this);
     }
 
-    internal sealed record Failed(string Code) : AutomationNodeExecution
+    internal sealed record Failed(string Code, AutomationDiagnostic? Diagnostic = null)
+        : AutomationNodeExecution
     {
         internal override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,

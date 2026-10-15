@@ -15,7 +15,8 @@ public sealed partial class AutomationRuntimeService
         AutomationTraceOutcome outcome = AutomationTraceOutcome.None,
         string? port = null,
         DateTime? due = null,
-        IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>? values = null
+        IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>? values = null,
+        AutomationDiagnostic? diagnostic = null
     ) =>
         AutomationTraceStore.AppendAsync(
             db,
@@ -28,7 +29,8 @@ public sealed partial class AutomationRuntimeService
                 outcome,
                 port,
                 due,
-                values
+                values,
+                diagnostic
             ),
             clock.GetUtcNow().UtcDateTime,
             cancellationToken

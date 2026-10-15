@@ -131,7 +131,8 @@ public sealed partial class AutomationScenarioService(
             string? port = null,
             DateTime? due = null,
             IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>? values = null,
-            CancellationToken? token = null
+            CancellationToken? token = null,
+            AutomationDiagnostic? diagnostic = null
         ) =>
             AutomationTraceStore.AppendAsync(
                 traceDb,
@@ -144,7 +145,8 @@ public sealed partial class AutomationScenarioService(
                     outcome,
                     port,
                     due,
-                    values
+                    values,
+                    diagnostic
                 ),
                 clock.GetUtcNow().UtcDateTime,
                 token ?? cancellationToken
@@ -166,8 +168,8 @@ public sealed partial class AutomationScenarioService(
             )
         );
         var checkpoints = new AutomationScenarioCheckpointStore(
-            (node, kind, outcome, values, token) =>
-                Emit(kind, node, outcome, values: values, token: token)
+            (node, kind, outcome, values, diagnostic, token) =>
+                Emit(kind, node, outcome, values: values, token: token, diagnostic: diagnostic)
         );
         var entropy = new AutomationSeededIntegerEntropy(fixture.Seed);
         var pending = new Queue<PendingNode>();
@@ -321,22 +323,23 @@ public sealed partial class AutomationScenarioService(
                     }
                     continue;
                 }
-                var execution = inputs is AutomationInputResolution.Available available
-                    ? AutomationScenarioSimulation.Evaluate(
-                        valid.Configuration,
-                        available.FieldValues,
-                        fixture
-                            .Effects.FirstOrDefault(effect => effect.NodeId.Value == node.Id)
-                            ?.Result
-                            ?? AutomationScenarioEffectResult.Succeeded,
-                        now
-                    )
-                    : new AutomationNodeExecution.Failed(
-                        ((AutomationInputResolution.Failed)inputs).Code
-                    );
-                var diagnostics = inputs is AutomationInputResolution.Available resolved
-                    ? AutomationDataValueSerialization.Diagnostics(resolved.PortValues)
-                    : [];
+                var execution = inputs.Match<AutomationNodeExecution>(
+                    available =>
+                        AutomationScenarioSimulation.Evaluate(
+                            valid.Configuration,
+                            available.FieldValues,
+                            fixture
+                                .Effects.FirstOrDefault(effect => effect.NodeId.Value == node.Id)
+                                ?.Result
+                                ?? AutomationScenarioEffectResult.Succeeded,
+                            now
+                        ),
+                    failed => new AutomationNodeExecution.Failed(failed.Code, failed.Diagnostic)
+                );
+                var diagnostics = inputs.Match(
+                    resolved => AutomationDataValueSerialization.Diagnostics(resolved.PortValues),
+                    _ => []
+                );
                 var stopped = await execution.Match(
                     async succeeded =>
                     {
@@ -384,7 +387,8 @@ public sealed partial class AutomationScenarioService(
                             node,
                             node.ContinueOnFailure
                                 ? AutomationTraceOutcome.ContinuedAfterFailure
-                                : AutomationTraceOutcome.Failed
+                                : AutomationTraceOutcome.Failed,
+                            diagnostic: failed.Diagnostic
                         );
                         RecordOutcome(
                             new(
@@ -458,14 +462,22 @@ public sealed partial class AutomationScenarioService(
                             await checkpoints.FailAsync(
                                 failureNode,
                                 "subflow-failed",
-                                cancellationToken
+                                cancellationToken,
+                                failed.Diagnostic?.At(
+                                    failureNode,
+                                    new AutomationDiagnosticMember.Node()
+                                )
                             );
                             await Emit(
                                 AutomationTraceEventKind.Result,
                                 failureNode,
                                 failureNode.ContinueOnFailure
                                     ? AutomationTraceOutcome.ContinuedAfterFailure
-                                    : AutomationTraceOutcome.Failed
+                                    : AutomationTraceOutcome.Failed,
+                                diagnostic: failed.Diagnostic?.At(
+                                    failureNode,
+                                    new AutomationDiagnosticMember.Node()
+                                )
                             );
                         }
                         if (!failureNode.ContinueOnFailure)

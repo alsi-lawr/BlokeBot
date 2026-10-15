@@ -338,3 +338,11 @@
     font-size: 0.9rem;
     font-weight: 700;
 }
+
+.automation-trace-diagnostic {
+    display: flex;
+    flex: 1 0 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+}

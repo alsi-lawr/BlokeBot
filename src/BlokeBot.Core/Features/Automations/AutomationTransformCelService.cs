@@ -46,34 +46,51 @@ internal sealed partial class AutomationTransformCelService
             AutomationPortId,
             AutomationResolvedValue
         >();
-        try
+        foreach (var output in configuration.Outputs)
         {
-            foreach (var output in configuration.Outputs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var evaluated = Evaluate(output, bindings);
-                if (!TryAutomationValue(output, evaluated, out var value))
-                {
-                    return new AutomationPureNodeResult.Failed("output-invalid");
-                }
-
-                outputs.Add(
-                    output.PortId,
-                    new(value, provenance, safeTriggerFields, ValueFreeDiagnostic: true)
-                );
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
+            var failure = Evaluate(output, bindings)
+                .Match<AutomationPureNodeResult.Failed?>(
+                    evaluated =>
+                    {
+                        if (!TryAutomationValue(output, evaluated.Result, out var value))
+                        {
+                            return new(
+                                "output-invalid",
+                                new(
+                                    AutomationDiagnosticCategory.IncompatibleType,
+                                    new AutomationDiagnosticMember.Output(output.PortId),
+                                    new(0, output.Source.Length)
+                                )
+                            );
+                        }
+                        outputs.Add(
+                            output.PortId,
+                            new(value, provenance, safeTriggerFields, ValueFreeDiagnostic: true)
+                        );
+                        return null;
+                    },
+                    invalid =>
+                        new(
+                            "output-invalid",
+                            invalid.Diagnostic is { } diagnostic
+                                ? diagnostic with
+                                {
+                                    Member = new AutomationDiagnosticMember.Output(output.PortId),
+                                }
+                                : null
+                        )
+                );
+            if (failure is not null)
+            {
+                return failure;
+            }
         }
-        catch (Exception exception) when (exception is CelException or FormatException)
-        {
-            return new AutomationPureNodeResult.Failed("output-invalid");
-        }
-
+        cancellationToken.ThrowIfCancellationRequested();
         return new AutomationPureNodeResult.Succeeded(outputs.ToImmutable());
     }
 
-    private object? Evaluate(
+    private AutomationExpressionResult Evaluate(
         AutomationCelTransformOutput output,
         Dictionary<string, object?> bindings
     )
@@ -82,24 +99,40 @@ internal sealed partial class AutomationTransformCelService
             output.Source,
             output.ValueType == AutomationPortValueType.Text
         )!.Value;
-        if (
-            !output.Source.Contains("${", StringComparison.Ordinal)
-            && segments.Length == 1
-            && segments[0].Source is { } source
-        )
-        {
-            return _environment.Compile(source)(bindings);
-        }
-
+        var interpolate = output.Source.Contains("${", StringComparison.Ordinal);
         var text = new StringBuilder();
         foreach (var segment in segments)
         {
-            _ = segment.Literal is { } literal
-                ? text.Append(literal)
-                : text.Append(ToInvariantText(_environment.Compile(segment.Source!)(bindings)));
+            if (segment.Literal is { } literal)
+            {
+                _ = text.Append(literal);
+                continue;
+            }
+            object? value;
+            var category = AutomationDiagnosticCategory.Compilation;
+            try
+            {
+                var program = _environment.Compile(segment.Source!);
+                category = AutomationDiagnosticCategory.Evaluation;
+                value = program(bindings);
+            }
+            catch (Exception exception) when (exception is CelException or FormatException)
+            {
+                return new AutomationExpressionResult.Invalid(
+                    new(
+                        category,
+                        new AutomationDiagnosticMember.Output(output.PortId),
+                        new(segment.Offset, segment.Source!.Length)
+                    )
+                );
+            }
+            if (!interpolate)
+            {
+                return new AutomationExpressionResult.Value(value, false);
+            }
+            _ = text.Append(ToInvariantText(value));
         }
-
-        return text.ToString();
+        return new AutomationExpressionResult.Value(text.ToString(), false);
     }
 
     private static bool TryAutomationValue(
@@ -210,5 +243,5 @@ internal sealed partial class AutomationTransformCelService
             _ => value.ToString() ?? string.Empty,
         };
 
-    private sealed record AutomationCelSegment(string? Literal, string? Source);
+    private sealed record AutomationCelSegment(string? Literal, string? Source, int Offset = 0);
 }

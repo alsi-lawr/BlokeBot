@@ -48,13 +48,34 @@
     {
         <footer class="automation-trace-detail">
         <strong>Selected: @NodeName(selected)</strong>
-        @if (selected.Entry.Event is { Kind: AutomationTraceEventKind.Outputs, Outcome: AutomationTraceOutcome.Failed, Node.DefinitionId: var definitionId } && definitionId == AutomationDefinitionIds.CelTransform)
+        @if (selected.Entry.Event.Diagnostic is { } diagnostic)
+        {
+            <div class="automation-trace-diagnostic" role="status" data-automation-diagnostic>
+                <strong>@diagnostic.Summary</strong>
+                <span>@MemberLabel(diagnostic.Member)</span>
+                @if (diagnostic.Origin?.Invocation?.RevisionId is { } originRevision) { <span>Subflow revision @originRevision</span> }
+                <span>@diagnostic.Correction</span>
+                @if (SourceAvailable)
+                {
+                    <button class="btn-secondary" type="button" data-automation-diagnostic-source @onclick="ShowSource">@(diagnostic.Origin?.Invocation?.SubflowId is null ? "Show current source" : "Show published source")</button>
+                    <small>@(diagnostic.Origin?.Invocation?.SubflowId is null ? "The current draft may differ from this run." : "Opens the matching published revision.")</small>
+                }
+                else { <small>Source unavailable</small> }
+            </div>
+        }
+        else if (selected.Entry.Event is { Kind: AutomationTraceEventKind.Outputs, Outcome: AutomationTraceOutcome.Failed, Node.DefinitionId: var definitionId } && definitionId == AutomationDefinitionIds.CelTransform)
         {
             <p class="automation-trace-message" role="status">Check this Transform's supplied inputs and every output expression. For <code>decimal(text)</code>, supply an existing input containing a finite number with a dot decimal separator.</p>
         }
         <span>@selected.Context</span>@if (selected.RootNodeId is null || !Nodes.Any(node => node.Id == selected.RootNodeId)) { <span>Graph node unavailable</span> }@foreach (var value in selected.Entry.Event.Values) { <span>@value.PortId.Value · @value.ValueType</span> }<details>
         <summary>Event details</summary>
         <dl>
+        @if (selected.Entry.Event.Diagnostic is { } facts)
+        {
+            <dt>Origin node</dt><dd>@facts.Origin?.NodeId.Value</dd>
+            @if (facts.Span is { } span) { <dt>Recorded expression range</dt><dd>@span.Start–@(span.Start + span.Length) (offsets)</dd> }
+            @if (facts.Affected is { } affected) { <dt>Affected consumer</dt><dd>@affected.NodeId.Value · @MemberLabel(affected.Member)</dd> }
+        }
         <dt>Node</dt>
         <dd>@selected.Entry.Event.Node?.Id.Value</dd>
         <dt>Invocation</dt>
@@ -80,7 +101,12 @@
     [Parameter] public EventCallback<int> Page { get; set; }
     [Parameter] public EventCallback<string> SelectRun { get; set; }
     [Parameter] public EventCallback EditScenario { get; set; }
+    [Parameter] public bool SourceAvailable { get; set; }
+    [Parameter] public EventCallback ShowSource { get; set; }
     [Parameter] public EventCallback Close { get; set; }
+
+    private static string MemberLabel(AutomationDiagnosticMember member) => member.Match(
+        input => $"Input · {input.FieldId.Value}", output => $"Output · {output.PortId.Value}", _ => "Node");
 
     private string NodeName(AutomationTraceRow row) => row.Entry.Event.Node is not { } node ? row.Entry.Event.Kind.ToString()
         : row.Entry.Event.Invocation.ParentId is null && Nodes.FirstOrDefault(candidate => candidate.Id == node.Id && candidate.Definition.Id == node.DefinitionId) is { } current ? current.EffectiveName : node.DefinitionId.Value;

@@ -6,12 +6,23 @@ internal abstract record AutomationInputResolution
 {
     private AutomationInputResolution() { }
 
+    internal abstract T Match<T>(Func<Available, T> available, Func<Failed, T> failed);
+
     internal sealed record Available(
         ImmutableDictionary<AutomationPortId, AutomationResolvedValue> PortValues,
         ImmutableDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> FieldValues
-    ) : AutomationInputResolution;
+    ) : AutomationInputResolution
+    {
+        internal override T Match<T>(Func<Available, T> available, Func<Failed, T> failed) =>
+            available(this);
+    }
 
-    internal sealed record Failed(string Code) : AutomationInputResolution;
+    internal sealed record Failed(string Code, AutomationDiagnostic? Diagnostic = null)
+        : AutomationInputResolution
+    {
+        internal override T Match<T>(Func<Available, T> available, Func<Failed, T> failed) =>
+            failed(this);
+    }
 }
 
 internal abstract record AutomationPureCheckpoint
@@ -49,7 +60,8 @@ internal interface IAutomationPureCheckpointStore
     ValueTask FailAsync(
         AutomationRuntimeSerialization.PersistedNode node,
         string code,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationDiagnostic? diagnostic = null
     );
 }
 
@@ -190,6 +202,7 @@ internal sealed class AutomationDataResolver(
             }
 
             AutomationResolvedValue? resolved;
+            AutomationDiagnostic? diagnostic = null;
             if (
                 binding.Mode == AutomationInputBindingMode.Fixed
                 && valid.Configuration is AutomationCelTransformConfiguration transform
@@ -207,11 +220,16 @@ internal sealed class AutomationDataResolver(
                 && valid.Configuration is AutomationCelTransformConfiguration
             )
             {
-                resolved = _safeExpressions.Evaluate(binding.Expression!, input, context);
+                resolved = _safeExpressions.Evaluate(
+                    binding.Expression!,
+                    input,
+                    context,
+                    out diagnostic
+                );
             }
             else if (binding.Mode == AutomationInputBindingMode.Expression)
             {
-                resolved = ResolveExpression(binding.Expression!, input, context);
+                resolved = ResolveExpression(binding.Expression!, input, context, out diagnostic);
             }
             else if (
                 fixtures?.FirstOrDefault(fixture =>
@@ -246,7 +264,7 @@ internal sealed class AutomationDataResolver(
                     return new AutomationInputResolution.Failed("input-resolution-unavailable");
                 }
 
-                resolved = await ResolveOutputAsync(
+                var resolution = await ResolveOutputAsync(
                     hostId,
                     context,
                     flow,
@@ -258,11 +276,31 @@ internal sealed class AutomationDataResolver(
                     fixtures,
                     cancellationToken
                 );
+                resolved = resolution.Match<AutomationResolvedValue?>(
+                    available => available.Value,
+                    failed =>
+                    {
+                        diagnostic = failed.Diagnostic;
+                        return null;
+                    }
+                );
             }
 
             if (resolved is null || !Matches(input, resolved.Value))
             {
-                return new AutomationInputResolution.Failed("input-resolution-unavailable");
+                diagnostic ??= new(
+                    resolved is null
+                        ? AutomationDiagnosticCategory.InputUnavailable
+                        : AutomationDiagnosticCategory.IncompatibleType,
+                    new AutomationDiagnosticMember.Input(input.BindingFieldId.Value, input.Id)
+                );
+                return new AutomationInputResolution.Failed(
+                    "input-resolution-unavailable",
+                    diagnostic.At(
+                        consumer,
+                        new AutomationDiagnosticMember.Input(input.BindingFieldId.Value, input.Id)
+                    )
+                );
             }
 
             if (input.Sensitivity == AutomationDataSensitivity.Sensitive)
@@ -279,7 +317,7 @@ internal sealed class AutomationDataResolver(
         );
     }
 
-    private async ValueTask<AutomationResolvedValue?> ResolveOutputAsync(
+    private async ValueTask<AutomationValueResolution> ResolveOutputAsync(
         AutomationHostId hostId,
         AutomationContext context,
         AutomationRuntimeSerialization.PersistedFlow flow,
@@ -292,6 +330,15 @@ internal sealed class AutomationDataResolver(
         CancellationToken cancellationToken
     )
     {
+        AutomationValueResolution Unavailable(
+            AutomationDiagnosticCategory category = AutomationDiagnosticCategory.InputUnavailable
+        ) =>
+            new AutomationValueResolution.Failed(
+                new AutomationDiagnostic(
+                    category,
+                    new AutomationDiagnosticMember.Output(outputPortId)
+                ).At(producer, new AutomationDiagnosticMember.Output(outputPortId))
+            );
         if (
             AutomationFrozenSubflows.WithContract(
                 producer,
@@ -300,7 +347,7 @@ internal sealed class AutomationDataResolver(
             is not AutomationConfigurationCheck.Valid valid
         )
         {
-            return null;
+            return Unavailable();
         }
 
         var descriptor = valid.Definition;
@@ -310,7 +357,7 @@ internal sealed class AutomationDataResolver(
             || outputPort.ValueType == AutomationPortValueType.Flow
         )
         {
-            return null;
+            return Unavailable();
         }
 
         if (
@@ -324,18 +371,20 @@ internal sealed class AutomationDataResolver(
                     is AutomationPureCheckpoint.Available boundary
                 && boundary.Outputs.TryGetValue(outputPortId, out var value)
                 && Matches(outputPort, value.Value)
-                ? value
-                : null;
+                ? new AutomationValueResolution.Available(value)
+                : Unavailable();
         }
 
         if (descriptor.Kind == AutomationNodeKind.Source)
         {
-            return ResolveSource(outputPort, context);
+            return ResolveSource(outputPort, context) is { } source
+                ? new AutomationValueResolution.Available(source)
+                : Unavailable();
         }
 
         if (descriptor.Kind is not (AutomationNodeKind.Value or AutomationNodeKind.Transform))
         {
-            return null;
+            return Unavailable();
         }
 
         var outputs = await ResolvePureNodeAsync(
@@ -350,13 +399,32 @@ internal sealed class AutomationDataResolver(
             fixtures,
             cancellationToken
         );
-        return outputs?.GetValueOrDefault(outputPortId);
+        return outputs.Match<AutomationValueResolution>(
+            succeeded =>
+                succeeded.Outputs.TryGetValue(outputPortId, out var value)
+                    ? new AutomationValueResolution.Available(value)
+                    : Unavailable(),
+            failed =>
+            {
+                var diagnostic =
+                    failed.Diagnostic
+                    ?? new AutomationDiagnostic(
+                        AutomationDiagnosticCategory.ProducerFailed,
+                        new AutomationDiagnosticMember.Output(outputPortId)
+                    );
+                return new AutomationValueResolution.Failed(
+                    diagnostic.Origin is null
+                        ? diagnostic.At(
+                            producer,
+                            new AutomationDiagnosticMember.Output(outputPortId)
+                        )
+                        : diagnostic
+                );
+            }
+        );
     }
 
-    private async ValueTask<ImmutableDictionary<
-        AutomationPortId,
-        AutomationResolvedValue
-    >?> ResolvePureNodeAsync(
+    private async ValueTask<AutomationPureNodeResult> ResolvePureNodeAsync(
         AutomationHostId hostId,
         AutomationContext context,
         AutomationRuntimeSerialization.PersistedFlow flow,
@@ -371,13 +439,19 @@ internal sealed class AutomationDataResolver(
     {
         if (resolving.Contains(producer.Id))
         {
-            return null;
+            return new AutomationPureNodeResult.Failed("output-invalid");
         }
 
         var checkpoint = await checkpoints.ReadOrBeginAsync(producer, cancellationToken);
         if (checkpoint is AutomationPureCheckpoint.Failed)
         {
-            return null;
+            return new AutomationPureNodeResult.Failed(
+                "producer-failed",
+                new(
+                    AutomationDiagnosticCategory.HistoricalCauseUnavailable,
+                    new AutomationDiagnosticMember.Node()
+                )
+            );
         }
 
         var check = fixtures is not null
@@ -392,7 +466,7 @@ internal sealed class AutomationDataResolver(
         if (check is not AutomationConfigurationCheck.Valid valid)
         {
             await checkpoints.FailAsync(producer, "handler-unavailable", cancellationToken);
-            return null;
+            return new AutomationPureNodeResult.Failed("handler-unavailable");
         }
 
         var nextResolving = resolving.Add(producer.Id);
@@ -407,84 +481,111 @@ internal sealed class AutomationDataResolver(
             fixtures,
             cancellationToken
         );
-        if (inputs is not AutomationInputResolution.Available resolvedInputs)
-        {
-            await checkpoints.FailAsync(producer, "input-resolution-failed", cancellationToken);
-            return null;
-        }
-
-        if (checkpoint is AutomationPureCheckpoint.Available available)
-        {
-            if (ValidCheckpoint(descriptor, available.Outputs, resolvedInputs.PortValues))
+        return await inputs.Match<ValueTask<AutomationPureNodeResult>>(
+            async resolvedInputs =>
             {
-                return available.Outputs;
+                if (checkpoint is AutomationPureCheckpoint.Available available)
+                {
+                    if (ValidCheckpoint(descriptor, available.Outputs, resolvedInputs.PortValues))
+                    {
+                        return new AutomationPureNodeResult.Succeeded(available.Outputs);
+                    }
+
+                    await checkpoints.FailAsync(producer, "output-invalid", cancellationToken);
+                    return new AutomationPureNodeResult.Failed("output-invalid");
+                }
+
+                await checkpoints.RecordInputsAsync(
+                    producer,
+                    resolvedInputs.PortValues,
+                    cancellationToken
+                );
+
+                AutomationPureNodeResult result;
+                try
+                {
+                    result =
+                        valid.Configuration is PluginAutomationConfiguration pluginConfiguration
+                        && fixtures is null
+                        && pluginExecution is not null
+                            ? await pluginExecution.ExecutePureAsync(
+                                hostId,
+                                new(producer.DefinitionId),
+                                pluginConfiguration,
+                                resolvedInputs.PortValues,
+                                cancellationToken
+                            )
+                        : handlers.TryResolve(new(producer.DefinitionId), out var handler)
+                        && (fixtures is null || handler.Contract.SupportsScenarios)
+                            ? await handler.ExecuteAsync(
+                                new(
+                                    valid.Configuration,
+                                    resolvedInputs.PortValues,
+                                    executionIntegerEntropy
+                                ),
+                                cancellationToken
+                            )
+                        : new AutomationPureNodeResult.Failed("handler-unavailable");
+                }
+                catch (Exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    await checkpoints.FailAsync(producer, "handler-failed", cancellationToken);
+                    return new AutomationPureNodeResult.Failed("output-invalid");
+                }
+
+                return await result.Match<ValueTask<AutomationPureNodeResult>>(
+                    async succeeded =>
+                    {
+                        if (
+                            !AutomationPureHandlerRegistry.TryValidateResult(
+                                descriptor,
+                                succeeded,
+                                resolvedInputs.PortValues,
+                                out var outputs
+                            )
+                        )
+                        {
+                            await checkpoints.FailAsync(
+                                producer,
+                                "output-invalid",
+                                cancellationToken
+                            );
+                            return new AutomationPureNodeResult.Failed("output-invalid");
+                        }
+
+                        return await checkpoints.CompleteAsync(producer, outputs, cancellationToken)
+                            ? new AutomationPureNodeResult.Succeeded(outputs)
+                            : new AutomationPureNodeResult.Failed("output-invalid");
+                    },
+                    async failed =>
+                    {
+                        await checkpoints.FailAsync(
+                            producer,
+                            StableCode(failed.Code) ? failed.Code : "handler-failed",
+                            cancellationToken,
+                            failed.Diagnostic?.At(producer, failed.Diagnostic.Member)
+                        );
+                        return failed with
+                        {
+                            Diagnostic = failed.Diagnostic?.At(producer, failed.Diagnostic.Member),
+                        };
+                    }
+                );
+            },
+            async failure =>
+            {
+                await checkpoints.FailAsync(
+                    producer,
+                    "input-resolution-failed",
+                    cancellationToken,
+                    failure.Diagnostic
+                );
+                return new AutomationPureNodeResult.Failed(
+                    "input-resolution-failed",
+                    failure.Diagnostic
+                );
             }
-
-            await checkpoints.FailAsync(producer, "output-invalid", cancellationToken);
-            return null;
-        }
-
-        await checkpoints.RecordInputsAsync(producer, resolvedInputs.PortValues, cancellationToken);
-
-        AutomationPureNodeResult result;
-        try
-        {
-            result =
-                valid.Configuration is PluginAutomationConfiguration pluginConfiguration
-                && fixtures is null
-                && pluginExecution is not null
-                    ? await pluginExecution.ExecutePureAsync(
-                        hostId,
-                        new(producer.DefinitionId),
-                        pluginConfiguration,
-                        resolvedInputs.PortValues,
-                        cancellationToken
-                    )
-                : handlers.TryResolve(new(producer.DefinitionId), out var handler)
-                && (fixtures is null || handler.Contract.SupportsScenarios)
-                    ? await handler.ExecuteAsync(
-                        new(
-                            valid.Configuration,
-                            resolvedInputs.PortValues,
-                            executionIntegerEntropy
-                        ),
-                        cancellationToken
-                    )
-                : new AutomationPureNodeResult.Failed("handler-unavailable");
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            await checkpoints.FailAsync(producer, "handler-failed", cancellationToken);
-            return null;
-        }
-
-        if (result is AutomationPureNodeResult.Failed failed)
-        {
-            await checkpoints.FailAsync(
-                producer,
-                StableCode(failed.Code) ? failed.Code : "handler-failed",
-                cancellationToken
-            );
-            return null;
-        }
-
-        if (
-            result is not AutomationPureNodeResult.Succeeded succeeded
-            || !AutomationPureHandlerRegistry.TryValidateResult(
-                descriptor,
-                succeeded,
-                resolvedInputs.PortValues,
-                out var outputs
-            )
-        )
-        {
-            await checkpoints.FailAsync(producer, "output-invalid", cancellationToken);
-            return null;
-        }
-
-        return await checkpoints.CompleteAsync(producer, outputs, cancellationToken)
-            ? outputs
-            : null;
+        );
     }
 
     private static AutomationResolvedValue? ResolveFixed(
@@ -586,9 +687,11 @@ internal sealed class AutomationDataResolver(
     private AutomationResolvedValue? ResolveExpression(
         AutomationExpressionSource expression,
         AutomationPortMetadata port,
-        AutomationContext context
+        AutomationContext context,
+        out AutomationDiagnostic? diagnostic
     )
     {
+        diagnostic = null;
         if (string.IsNullOrWhiteSpace(expression.Source))
         {
             return null;
@@ -599,43 +702,72 @@ internal sealed class AutomationDataResolver(
             && expression.Source.Contains("${", StringComparison.Ordinal)
                 ? expressions.Interpolate(expression.Source, context)
                 : expressions.Evaluate(expression, context);
-        if (
-            port.Sensitivity != AutomationDataSensitivity.Safe
-            || evaluation
-                is not AutomationExpressionResult.Value { UsesSensitiveValues: false } evaluated
-        )
-        {
-            return null;
-        }
+        AutomationDiagnostic? failure = null;
+        var resolved = evaluation.Match<AutomationResolvedValue?>(
+            evaluated =>
+            {
+                if (
+                    port.Sensitivity != AutomationDataSensitivity.Safe
+                    || evaluated.UsesSensitiveValues
+                )
+                {
+                    failure = AutomationDiagnostic.Expression(
+                        AutomationDiagnosticCategory.UnavailableName,
+                        expression.Source
+                    );
+                    return null;
+                }
+                var provenance = ExpressionProvenance(expression.Source);
+                if (evaluated.Result is null)
+                {
+                    failure =
+                        port.Nullability == AutomationPortNullability.Nullable
+                            ? null
+                            : AutomationDiagnostic.Expression(
+                                AutomationDiagnosticCategory.IncompatibleType,
+                                expression.Source
+                            );
+                    return port.Nullability == AutomationPortNullability.Nullable
+                        ? new(new AutomationValue.Null(port.ValueType), provenance)
+                        : null;
+                }
 
-        var provenance = ExpressionProvenance(expression.Source);
-        if (evaluated.Result is null)
-        {
-            return port.Nullability == AutomationPortNullability.Nullable
-                ? new(new AutomationValue.Null(port.ValueType), provenance)
-                : null;
-        }
-
-        AutomationValue? value = port.ValueType switch
-        {
-            AutomationPortValueType.Text when evaluated.Result is string text =>
-                new AutomationValue.Text(text),
-            AutomationPortValueType.Number => Number(evaluated.Result),
-            AutomationPortValueType.Boolean when evaluated.Result is bool boolean =>
-                new AutomationValue.Boolean(boolean),
-            AutomationPortValueType.Timestamp when evaluated.Result is DateTimeOffset timestamp =>
-                new AutomationValue.Timestamp(timestamp),
-            AutomationPortValueType.Arguments
-                when evaluated.Result is IEnumerable<string> arguments =>
-                new AutomationValue.Arguments([
-                    .. arguments.Select(
-                        (argument, position) =>
-                            new AutomationValueArgument(position, argument, provenance)
-                    ),
-                ]),
-            _ => null,
-        };
-        return value is null ? null : new(value, provenance);
+                AutomationValue? value = port.ValueType switch
+                {
+                    AutomationPortValueType.Text when evaluated.Result is string text =>
+                        new AutomationValue.Text(text),
+                    AutomationPortValueType.Number => Number(evaluated.Result),
+                    AutomationPortValueType.Boolean when evaluated.Result is bool boolean =>
+                        new AutomationValue.Boolean(boolean),
+                    AutomationPortValueType.Timestamp
+                        when evaluated.Result is DateTimeOffset timestamp =>
+                        new AutomationValue.Timestamp(timestamp),
+                    AutomationPortValueType.Arguments
+                        when evaluated.Result is IEnumerable<string> arguments =>
+                        new AutomationValue.Arguments([
+                            .. arguments.Select(
+                                (argument, position) =>
+                                    new AutomationValueArgument(position, argument, provenance)
+                            ),
+                        ]),
+                    _ => null,
+                };
+                failure = value is null
+                    ? AutomationDiagnostic.Expression(
+                        AutomationDiagnosticCategory.IncompatibleType,
+                        expression.Source
+                    )
+                    : null;
+                return value is null ? null : new(value, provenance);
+            },
+            invalid =>
+            {
+                failure = invalid.Diagnostic;
+                return null;
+            }
+        );
+        diagnostic = failure;
+        return resolved;
     }
 
     private static ImmutableArray<AutomationValueProvenance> ExpressionProvenance(string source)

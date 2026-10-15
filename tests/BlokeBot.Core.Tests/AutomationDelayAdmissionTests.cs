@@ -124,7 +124,7 @@ public sealed partial class AutomationRuntimeTests
             Context(fixture.HostId),
             frozen,
             consumer,
-            new AutomationScenarioCheckpointStore((_, _, _, _, _) => Task.CompletedTask),
+            new AutomationScenarioCheckpointStore((_, _, _, _, _, _) => Task.CompletedTask),
             new CountingIntegerEntropy(0),
             [
                 new(
@@ -165,7 +165,7 @@ public sealed partial class AutomationRuntimeTests
             []
         );
         var checkpoint = new AutomationScenarioCheckpointStore(
-            (_, _, _, _, _) => Task.CompletedTask
+            (_, _, _, _, _, _) => Task.CompletedTask
         );
         var resolved = (
             await fixture.Catalog.Data.ResolveInputsAsync(

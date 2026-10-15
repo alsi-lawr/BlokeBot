@@ -224,7 +224,11 @@ public abstract record AutomationValidationTarget
     public sealed record Port(AutomationPortId Id) : AutomationValidationTarget;
 }
 
-public sealed record AutomationValidationError(AutomationValidationTarget Target, string Message);
+public sealed record AutomationValidationError(
+    AutomationValidationTarget Target,
+    string Message,
+    AutomationDiagnostic? Diagnostic = null
+);
 
 public sealed record AutomationValidationResult(ImmutableArray<AutomationValidationError> Errors)
 {
@@ -234,8 +238,9 @@ public sealed record AutomationValidationResult(ImmutableArray<AutomationValidat
 
     public static AutomationValidationResult Invalid(
         AutomationValidationTarget target,
-        string message
-    ) => new([new(target, message)]);
+        string message,
+        AutomationDiagnostic? diagnostic = null
+    ) => new([new(target, message, diagnostic)]);
 }
 
 public abstract record AutomationConfiguration;

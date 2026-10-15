@@ -49,10 +49,22 @@ internal sealed class AutomationSafeTriggerExpressionService
         AutomationPortMetadata target,
         out ImmutableArray<AutomationSafeTriggerViewField> references,
         out AutomationSafeTriggerFieldId? invalidField
+    ) => Validate(expression, target, out references, out invalidField, out _);
+
+    internal bool Validate(
+        AutomationExpressionSource expression,
+        AutomationPortMetadata target,
+        out ImmutableArray<AutomationSafeTriggerViewField> references,
+        out AutomationSafeTriggerFieldId? invalidField,
+        out AutomationDiagnostic? diagnostic
     )
     {
         references = [];
         invalidField = null;
+        diagnostic = AutomationCelSyntax.Diagnose(
+            expression.Source,
+            AutomationCelStaticTypes.ForSafeView()
+        );
         if (
             string.IsNullOrWhiteSpace(expression.Source)
             || expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
@@ -88,6 +100,10 @@ internal sealed class AutomationSafeTriggerExpressionService
         }
         catch (CelException)
         {
+            diagnostic ??= AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.Compilation,
+                expression.Source
+            );
             return false;
         }
 
@@ -99,9 +115,14 @@ internal sealed class AutomationSafeTriggerExpressionService
             ) || !result.IsAssignableTo(target.ValueType, target.Nullability)
         )
         {
+            diagnostic ??= AutomationCelStaticTypes.DiagnoseType(
+                expression.Source,
+                AutomationCelStaticTypes.ForSafeView()
+            );
             return false;
         }
 
+        diagnostic = null;
         references = resolved.ToImmutable();
         return true;
     }
@@ -110,9 +131,16 @@ internal sealed class AutomationSafeTriggerExpressionService
         AutomationExpressionSource expression,
         AutomationPortMetadata port,
         AutomationContext context
+    ) => Evaluate(expression, port, context, out _);
+
+    internal AutomationResolvedValue? Evaluate(
+        AutomationExpressionSource expression,
+        AutomationPortMetadata port,
+        AutomationContext context,
+        out AutomationDiagnostic? diagnostic
     )
     {
-        if (!Validate(expression, port, out var references))
+        if (!Validate(expression, port, out var references, out _, out diagnostic))
         {
             return null;
         }
@@ -120,6 +148,10 @@ internal sealed class AutomationSafeTriggerExpressionService
         var bindings = new Dictionary<string, object?>(StringComparer.Ordinal);
         if (references.Any() && !TryBindArguments(bindings, context))
         {
+            diagnostic = AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.InputUnavailable,
+                expression.Source
+            );
             return null;
         }
 
@@ -130,26 +162,36 @@ internal sealed class AutomationSafeTriggerExpressionService
         }
         catch (CelException)
         {
+            diagnostic = AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.Evaluation,
+                expression.Source
+            );
             return null;
         }
 
-        return !TryValue(evaluated, port, out var value)
-            ? null
-            : new(
-                value,
-                references
-                    .Select(static field => field.Provenance)
-                    .Append(AutomationValueProvenance.Generated)
-                    .Distinct()
-                    .Order()
-                    .ToImmutableArray(),
-                [
-                    .. references
-                        .Select(static field => field.Id)
-                        .Distinct()
-                        .OrderBy(static field => field.Value, StringComparer.Ordinal),
-                ]
+        if (!TryValue(evaluated, port, out var value))
+        {
+            diagnostic = AutomationDiagnostic.Expression(
+                AutomationDiagnosticCategory.IncompatibleType,
+                expression.Source
             );
+            return null;
+        }
+        return new(
+            value,
+            references
+                .Select(static field => field.Provenance)
+                .Append(AutomationValueProvenance.Generated)
+                .Distinct()
+                .Order()
+                .ToImmutableArray(),
+            [
+                .. references
+                    .Select(static field => field.Id)
+                    .Distinct()
+                    .OrderBy(static field => field.Value, StringComparer.Ordinal),
+            ]
+        );
     }
 
     private static bool TryBindArguments(

@@ -76,7 +76,11 @@ public sealed record AutomationTraceEventData(
     AutomationTraceRetry Retry,
     AutomationPortId? SelectedPort,
     DateTimeOffset? DueAtUtc,
-    ImmutableArray<AutomationTraceValue> Values
+    ImmutableArray<AutomationTraceValue> Values,
+    [property: System.Text.Json.Serialization.JsonIgnore(
+        Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    )]
+        AutomationDiagnostic? Diagnostic = null
 );
 
 public sealed record AutomationTraceEntry(int Sequence, AutomationTraceEventData Event);

@@ -128,7 +128,10 @@ public sealed partial class AutomationRuntimeTests
         );
         var panel = page.FindComponent<AutomationTracePanel>();
         panel.Instance.Selected!.Entry.Event.Node!.Id.ShouldBe(consumer.Id);
-        panel.FindAll(".automation-trace-detail [role=status]").ShouldBeEmpty();
+        panel
+            .Instance.Selected.Entry.Event.Diagnostic.ShouldNotBeNull()
+            .Origin.ShouldNotBeNull()
+            .NodeId.ShouldBe(producer.Id);
         await page.InvokeAsync(() => panel.Instance.Select.InvokeAsync(failed.Sequence));
         page.FindComponent<AutomationFlowCanvas>()
             .Instance.SelectedNodeIds.ShouldBe(new HashSet<AutomationNodeId> { producer.Id });
@@ -139,10 +142,20 @@ public sealed partial class AutomationRuntimeTests
             && call.Arguments.Contains(producer.Id.Value.ToString())
         );
         var advice = page.Find(".automation-trace-detail [role=status]");
-        // The rendered advice is the same generic remediation for numeric and nonnumeric failures, not a diagnosis.
+        // Native failures are opaque, but the recorded producer and output are known independently of current CEL.
         advice.TextContent.ShouldNotContain("private-");
         advice.TextContent.ShouldNotContain("args[99]");
         var selectedAdvice = advice.TextContent;
+        page.Find("[data-automation-diagnostic-source]").Click();
+        page.WaitForAssertion(() =>
+            page.FindComponent<AutomationNodeInspector>().Instance.Node!.Id.ShouldBe(producer.Id)
+        );
+        ui.JSInterop.Invocations.ShouldContain(call =>
+            call.Identifier == "focusInspector"
+            && call.Arguments.Contains(numericFailure ? "seconds" : "name")
+        );
+        page.Find("button[aria-label='Close Inspector']").Click();
+        ui.JSInterop.Invocations.ShouldContain(call => call.Identifier == "focusDiagnosticOpener");
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationTracePanel>()
                 .Instance.Select.InvokeAsync(
@@ -154,7 +167,10 @@ public sealed partial class AutomationRuntimeTests
                         .Sequence
                 )
         );
-        page.FindAll(".automation-trace-detail [role=status]").ShouldBeEmpty();
+        page.FindComponent<AutomationTracePanel>()
+            .Instance.Selected!.Entry.Event.Diagnostic.ShouldNotBeNull()
+            .Affected.ShouldNotBeNull()
+            .NodeId.ShouldBe(consumer.Id);
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationTracePanel>().Instance.Select.InvokeAsync(failed.Sequence)
         );
