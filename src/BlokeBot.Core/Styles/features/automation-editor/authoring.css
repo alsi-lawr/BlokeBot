@@ -12,7 +12,7 @@
 }
 
 .automation-workspace > .automation-canvas-wrap,
-.automation-workspace > .automation-list {
+.automation-workspace > .automation-list-view {
     flex: 1;
     height: auto;
     min-height: 0;
