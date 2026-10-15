@@ -89,16 +89,8 @@ public sealed partial class AutomationRuntimeService(
             null,
             cancellationToken,
             async (db, ct) =>
-            {
-                var acceptAfter = await db
-                    .AutomationSourceAdmissions.Where(h => h.HostId == context.Channel.HostId.Value)
-                    .Select(h => (DateTime?)h.AcceptEventsAfterUtc)
-                    .SingleOrDefaultAsync(ct);
-                return (
-                        acceptAfter is null
-                        || context.Timestamps.OccurredAtUtc.UtcDateTime > acceptAfter
-                    ) && (currentOccurrence is null || await currentOccurrence(db, ct));
-            },
+                await AcceptExpandedOccurrenceAsync(db, context, ct)
+                && (currentOccurrence is null || await currentOccurrence(db, ct)),
             selectedFlow,
             !deferExecution,
             selectedSource
@@ -141,329 +133,55 @@ public sealed partial class AutomationRuntimeService(
     )
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        await using var dispatchTransaction = await db.Database.BeginTransactionAsync(
-            cancellationToken
-        );
-        var hostExists = await MainDatabaseStatements.LockHostAsync(
-            db,
-            context.HostId.Value,
-            cancellationToken
-        );
-        if (hostExists == 0)
+        AutomationDispatchOutcome dispatch;
+        await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
         {
-            return Dispatched(AutomationDispatchStatus.HostNotFound);
-        }
-
-        var flows = await db
-            .AutomationFlows.AsNoTracking()
-            .Include(static flow => flow.Nodes)
-            .Include(static flow => flow.Edges)
-            .Where(flow =>
-                flow.HostId == context.HostId.Value
-                && (selectedFlow == null || flow.Id == selectedFlow.Value.Value)
-                && flow.IsEnabled
-                && flow.SchemaVersion == AutomationFlowSchema.CurrentVersion
-            )
-            .OrderBy(static flow => flow.Id)
-            .ToArrayAsync(cancellationToken);
-        var matching = new List<(AutomationFlow Flow, AutomationFlowNode Source)>();
-        var invalidFlow = false;
-        foreach (var flow in flows)
-        {
-            var potentialSources = flow
-                .Nodes.Where(node =>
-                    node.DefinitionId == context.Event.SourceDefinitionId.Value
-                    && IsSourceDefinition(node)
-                    && (selectedSource == null || node.Id == selectedSource.Value.Value)
-                )
-                .ToArray();
-            if (potentialSources.Length == 0)
-            {
-                continue;
-            }
-
-            if (
-                AutomationFlowService.RestoreDraft(flow)
-                is not AutomationFlowDraftRestoreOutcome.Available restored
-            )
-            {
-                invalidFlow = true;
-                continue;
-            }
-
-            var matchingSources = potentialSources
-                .Where(source =>
-                    catalog.ValidatePersistedDefinition(Definition(source))
-                        is AutomationConfigurationCheck.Valid valid
-                    && matches(valid.Configuration)
-                )
-                .ToArray();
-            if (matchingSources.Length == 0)
-            {
-                continue;
-            }
-
-            foreach (var source in matchingSources)
-            {
-                matching.Add((flow, source));
-            }
-        }
-
-        var accepted = ImmutableArray.CreateBuilder<AutomationRunId>();
-        var duplicateCount = 0;
-        var blockedCount = 0;
-
-        var host = await db
-            .Hosts.AsNoTracking()
-            .Where(value => value.Id == context.HostId.Value)
-            .Select(static value => new { value.EnabledFeatures, value.AutomationGeneration })
-            .SingleAsync(cancellationToken);
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
-        {
-            return Dispatched(AutomationDispatchStatus.FeatureDisabled);
-        }
-
-        if (currentOccurrence is not null && !await currentOccurrence(db, cancellationToken))
-        {
-            return Dispatched(AutomationDispatchStatus.Duplicate);
-        }
-
-        if (invalidFlow)
-        {
-            return Dispatched(AutomationDispatchStatus.InvalidFlow);
-        }
-
-        if (matching.Count == 0)
-        {
-            return Dispatched(AutomationDispatchStatus.NoMatchingFlow);
-        }
-
-        var drafts = matching
-            .Select(item => item.Flow)
-            .DistinctBy(flow => flow.Id)
-            .Select(flow =>
-                (
-                    (AutomationFlowDraftRestoreOutcome.Available)
-                        AutomationFlowService.RestoreDraft(flow)
-                ).Draft
-            )
-            .ToArray();
-        var resolved = await AutomationSubflowStore.LoadClosureAsync(
-            db,
-            context.HostId,
-            drafts
-                .SelectMany(draft => AutomationSubflowStore.Calls(draft.Nodes))
-                .Select(call => call.SubflowId),
-            null,
-            cancellationToken
-        );
-        if (resolved is not AutomationSubflowClosureOutcome.Available current)
-        {
-            return Dispatched(AutomationDispatchStatus.InvalidFlow);
-        }
-        foreach (var draft in drafts)
-        {
-            var validation = await flowService.ValidatePreparedAsync(
-                draft,
-                current.Closure,
-                AutomationFlowService.AutomationGraphAdmission.Saved,
-                cancellationToken,
-                db
-            );
-            if (
-                validation.Gate is not null
-                || validation.Errors.Any(error => error.Code != "capability-unavailable")
-            )
-            {
-                return Dispatched(AutomationDispatchStatus.InvalidFlow);
-            }
-        }
-
-        foreach (var (flow, source) in matching)
-        {
-            var runId = Guid.NewGuid();
-            var original = (
-                (AutomationDefinitionRestoreOutcome.Available)
-                    AutomationRuntimeSerialization.RestoreDefinition(
-                        AutomationRuntimeSerialization.SerializeDefinition(flow)
-                    )
-            ).Flow;
-            var frozen = AutomationFrozenSubflows.Freeze(original, runId, current.Closure);
-            if (frozen is null || FreezeExecutionFences(frozen.Flow) is not { } frozenFlow)
-            {
-                return Dispatched(AutomationDispatchStatus.InvalidFlow);
-            }
-            var requiredFeatures = AutomationRequiredFeatures.ForDefinitions(
-                frozenFlow.Nodes.Select(static node => node.DefinitionId)
-            );
-            if (!host.EnabledFeatures.Contains(requiredFeatures))
-            {
-                blockedCount++;
-                continue;
-            }
-
-            var now = clock.GetUtcNow().UtcDateTime;
-            var inserted = await MainDatabaseStatements.TryInsertAutomationFlowRunAsync(
-                db,
-                new(
-                    runId,
-                    flow.Id,
-                    flow.HostId,
-                    host.AutomationGeneration,
-                    requiredFeatures,
-                    AutomationContextSchema.CurrentVersion,
-                    context.Event.SourceDefinitionId.Value,
-                    source.Id,
-                    context.Event.OccurrenceId,
-                    AutomationRuntimeSerialization.SerializeContext(context),
-                    AutomationRuntimeSerialization.SerializeDefinition(frozenFlow),
-                    AutomationFlowRunStatus.Running,
-                    now
-                ),
-                cancellationToken
-            );
-            if (inserted == 0)
-            {
-                var duplicate = await db.AutomationFlowRuns.AnyAsync(
-                    value =>
-                        value.FlowId == flow.Id
-                        && value.SourceDefinitionId == context.Event.SourceDefinitionId.Value
-                        && value.SourceNodeId == source.Id
-                        && value.SourceOccurrenceId == context.Event.OccurrenceId,
-                    cancellationToken
-                );
-                if (duplicate)
-                {
-                    duplicateCount++;
-                }
-                else
-                {
-                    blockedCount++;
-                }
-
-                continue;
-            }
-
-            _ = db.AutomationNodeRuns.Add(
-                new()
-                {
-                    RunId = runId,
-                    NodeId = source.Id,
-                    Sequence = 0,
-                    Status = AutomationNodeRunStatus.Succeeded,
-                    AvailableAtUtc = now,
-                    StartedAtUtc = now,
-                    CompletedAtUtc = now,
-                    OutcomeCode = "source-received",
-                }
-            );
-            var traceRun = await db.AutomationFlowRuns.SingleAsync(
-                value => value.Id == runId,
+            await using var transaction = await db.Database.BeginTransactionAsync(
                 cancellationToken
             );
             if (
-                !(
-                    await AutomationSubflowRunReferences.AttachAsync(
-                        db,
-                        new(flow.HostId),
-                        new(runId),
-                        frozen.Closure,
-                        cancellationToken
-                    )
-                ).IsEmpty
-            )
-            {
-                return Dispatched(AutomationDispatchStatus.InvalidFlow);
-            }
-            var traceFlow = (
-                (AutomationDefinitionRestoreOutcome.Available)
-                    AutomationRuntimeSerialization.RestoreDefinition(traceRun.DefinitionJson)
-            ).Flow;
-            await AutomationTraceStore.CreateAsync(
-                db,
-                runId,
-                flow.HostId,
-                flow.Id,
-                runId,
-                now,
-                cancellationToken
-            );
-            await TraceAsync(
-                db,
-                traceRun,
-                AutomationTraceEventKind.Admission,
-                cancellationToken,
-                traceFlow.Nodes.Single(node => node.Id == source.Id),
-                AutomationTraceOutcome.Succeeded
-            );
-            var next = AutomationFlowTraversal.Outgoing(
-                traceFlow.Edges,
-                source.Id,
-                new AutomationOutputSelection.All()
-            );
-            AddPending(db, runId, next, now, 1);
-            await TraceScheduledAsync(db, traceRun, traceFlow, next, now, cancellationToken);
-            if (next.Length == 0)
-            {
-                var run = await db.AutomationFlowRuns.SingleAsync(
-                    value => value.Id == runId,
-                    cancellationToken
-                );
-                run.Status = AutomationFlowRunStatus.Completed;
-                run.CompletedAtUtc = now;
-                await CompleteTerminalAsync(
+                await MainDatabaseStatements.LockHostAsync(
                     db,
-                    run,
-                    AutomationTraceOutcome.Succeeded,
+                    context.HostId.Value,
                     cancellationToken
+                ) == 0
+            )
+            {
+                return new CustomCommandAutomationAdmissionOutcome.Dispatched(
+                    new(AutomationDispatchStatus.HostNotFound, [])
                 );
             }
-
-            _ = await db.SaveChangesAsync(cancellationToken);
-            accepted.Add(new(runId));
-        }
-
-        if (accepted.Count == 0)
-        {
-            return Dispatched(
-                duplicateCount == matching.Count ? AutomationDispatchStatus.Duplicate
-                : blockedCount > 0 ? AutomationDispatchStatus.FeatureDisabled
-                : AutomationDispatchStatus.NoMatchingFlow
+            dispatch = await AdmitAsync(
+                db,
+                context,
+                matches,
+                cancellationToken,
+                currentOccurrence,
+                selectedFlow,
+                selectedSource
             );
+            if (dispatch.Status != AutomationDispatchStatus.Accepted)
+            {
+                return new CustomCommandAutomationAdmissionOutcome.Dispatched(dispatch);
+            }
+            if (
+                claim is not null
+                && await claim(db, cancellationToken)
+                    is CustomCommandInvocationClaimOutcome.AlreadyUsed
+            )
+            {
+                return new CustomCommandAutomationAdmissionOutcome.AlreadyUsed();
+            }
+            await transaction.CommitAsync(cancellationToken);
         }
-
-        if (
-            claim is not null
-            && await claim(db, cancellationToken) is CustomCommandInvocationClaimOutcome.AlreadyUsed
-        )
-        {
-            return new CustomCommandAutomationAdmissionOutcome.AlreadyUsed();
-        }
-
-        await dispatchTransaction.CommitAsync(cancellationToken);
         onCommitted?.Invoke();
-        foreach (var acceptedRun in accepted)
-        {
-            await uiChanges.RunChangedAsync(context.HostId, acceptedRun);
-        }
-
-        foreach (
-            var runId in resumeImmediately
-                ? accepted.ToImmutable()
-                : ImmutableArray<AutomationRunId>.Empty
-        )
-        {
-            _ = await ResumeAsync(runId, cancellationToken);
-        }
-
-        return new CustomCommandAutomationAdmissionOutcome.Dispatched(
-            new(AutomationDispatchStatus.Accepted, accepted.ToImmutable())
+        await RunAdmittedAsync(
+            context.HostId,
+            dispatch.RunIds,
+            resumeImmediately,
+            cancellationToken
         );
-
-        static CustomCommandAutomationAdmissionOutcome Dispatched(
-            AutomationDispatchStatus status
-        ) => new CustomCommandAutomationAdmissionOutcome.Dispatched(new(status, []));
+        return new CustomCommandAutomationAdmissionOutcome.Dispatched(dispatch);
     }
 
     internal async Task<IReadOnlySet<int>> AvailableCustomCommandIdsAsync(

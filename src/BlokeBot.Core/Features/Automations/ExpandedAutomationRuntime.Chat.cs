@@ -226,8 +226,6 @@ internal sealed partial class ExpandedAutomationRuntime
         {
             return;
         }
-        var first = false;
-        string streamId = "";
         var observedConnection = CaptureStreamConnection(host);
         if (
             sources
@@ -241,74 +239,84 @@ internal sealed partial class ExpandedAutomationRuntime
             {
                 ObserveStreamReadiness(host.Id, observedConnection, null);
             }
-            streamId = live.StreamId;
-            await using var db = await dbFactory.CreateDbContextAsync(cancellation);
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
-            _ = await MainDatabaseStatements.LockHostAsync(db, host.Id, cancellation);
-            if (
-                !await db.Hosts.AnyAsync(
-                    h => h.Id == host.Id && (h.EnabledFeatures & HostFeatureFlags.Automations) != 0,
-                    cancellation
-                )
-                || await db.AutomationSourceAdmissions.AnyAsync(
-                    s =>
-                        s.HostId == host.Id
-                        && s.AcceptEventsAfterUtc >= message.Timestamp.UtcDateTime,
-                    cancellation
-                )
-            )
-            {
-                return;
-            }
-            if (
-                await db.AutomationStreamObservations.AnyAsync(
-                    s => s.HostId == host.Id && s.StreamId == live.StreamId,
-                    cancellation
-                )
-                && !await db.AutomationSeenViewers.AnyAsync(
-                    v => v.HostId == host.Id && v.ViewerId == message.ViewerId,
-                    cancellation
-                )
-            )
-            {
-                _ = db.AutomationSeenViewers.Add(
-                    new() { HostId = host.Id, ViewerId = message.ViewerId }
-                );
-                _ = await db.SaveChangesAsync(cancellation);
-                first = true;
-            }
-            await transaction.CommitAsync(cancellation);
-            await PublishObservationReadinessAsync(host);
-        }
-        var context = Create(
-            host,
-            AutomationDefinitionIds.ChatMatchSource,
-            message.MessageId,
-            message.Timestamp,
-            clock.GetUtcNow(),
-            [
-                Text("message-text", message.Text, true),
-                Text("message-id", message.MessageId, true),
-                Text("stream-id", streamId, true),
-            ],
-            new(message.ViewerId, message.ViewerLogin, message.ViewerName)
-        );
-        _ = await runtime.DispatchExpandedAsync(
-            context,
-            c =>
-                c is ChatMatchSourceConfiguration match
-                && match.Kind switch
+            await runtime.DispatchObservedAsync(
+                new(host.Id),
+                async (db, ct) =>
                 {
-                    ChatMatchKind.Keyword => KeywordMatches(message.Text, match.Match),
-                    ChatMatchKind.Phrase => message.Text.Contains(
-                        match.Match,
-                        StringComparison.OrdinalIgnoreCase
-                    ),
-                    ChatMatchKind.Emote => message.EmoteIds.Contains(match.Match),
-                    ChatMatchKind.FirstObserved => first,
+                    if (
+                        !await db.Hosts.AnyAsync(
+                            h =>
+                                h.Id == host.Id
+                                && (h.EnabledFeatures & HostFeatureFlags.Automations) != 0,
+                            ct
+                        )
+                        || await db.AutomationSourceAdmissions.AnyAsync(
+                            source =>
+                                source.HostId == host.Id
+                                && source.AcceptEventsAfterUtc >= message.Timestamp.UtcDateTime,
+                            ct
+                        )
+                    )
+                    {
+                        return [];
+                    }
+                    var first = false;
+                    if (
+                        await db.AutomationStreamObservations.AnyAsync(
+                            stream => stream.HostId == host.Id && stream.StreamId == live.StreamId,
+                            ct
+                        )
+                        && !await db.AutomationSeenViewers.AnyAsync(
+                            viewer =>
+                                viewer.HostId == host.Id && viewer.ViewerId == message.ViewerId,
+                            ct
+                        )
+                    )
+                    {
+                        _ = db.AutomationSeenViewers.Add(
+                            new() { HostId = host.Id, ViewerId = message.ViewerId }
+                        );
+                        _ = await db.SaveChangesAsync(ct);
+                        first = true;
+                    }
+                    return [Trigger(first, live.StreamId)];
                 },
-            cancellation
-        );
+                cancellation
+            );
+            await PublishObservationReadinessAsync(host);
+            return;
+        }
+        var trigger = Trigger(false, "");
+        _ = await runtime.DispatchExpandedAsync(trigger.Context, trigger.Matches, cancellation);
+
+        AutomationObservedTrigger Trigger(bool first, string streamId) =>
+            new(
+                Create(
+                    host,
+                    AutomationDefinitionIds.ChatMatchSource,
+                    message.MessageId,
+                    message.Timestamp,
+                    clock.GetUtcNow(),
+                    [
+                        Text("message-text", message.Text, true),
+                        Text("message-id", message.MessageId, true),
+                        Text("stream-id", streamId, true),
+                    ],
+                    new(message.ViewerId, message.ViewerLogin, message.ViewerName)
+                ),
+                c =>
+                    c is ChatMatchSourceConfiguration match
+                    && match.Kind switch
+                    {
+                        ChatMatchKind.Keyword => KeywordMatches(message.Text, match.Match),
+                        ChatMatchKind.Phrase => message.Text.Contains(
+                            match.Match,
+                            StringComparison.OrdinalIgnoreCase
+                        ),
+                        ChatMatchKind.Emote => message.EmoteIds.Contains(match.Match),
+                        ChatMatchKind.FirstObserved => first,
+                    }
+            );
     }
 
     internal static bool KeywordMatches(string text, string keyword)

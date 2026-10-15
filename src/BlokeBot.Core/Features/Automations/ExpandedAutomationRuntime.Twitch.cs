@@ -1,4 +1,3 @@
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using static BlokeBot.Core.Features.Automations.ExpandedAutomationContext;
@@ -26,89 +25,95 @@ internal sealed partial class ExpandedAutomationRuntime
         {
             return;
         }
-        var crossed = new List<long>();
-        await using (var db = await dbFactory.CreateDbContextAsync(cancellation))
-        {
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
-            _ = await MainDatabaseStatements.LockHostAsync(db, host.Id, cancellation);
-            var row = await db.AutomationGoalObservations.SingleOrDefaultAsync(
-                g => g.HostId == host.Id && g.GoalId == goal.GoalId,
-                cancellation
-            );
-            if (row is not null && (row.IsEnded || row.ObservedAtUtc >= goal.Timestamp.UtcDateTime))
-            {
-                return;
-            }
-            var baseline = row is null || row.ConnectionId != epoch;
-            if (row is null)
-            {
-                row = new() { HostId = host.Id, GoalId = goal.GoalId };
-                _ = db.AutomationGoalObservations.Add(row);
-            }
-            if (!baseline && goal.Stage == EventSubGoalStage.Progress)
-            {
-                foreach (
-                    var amount in sources
-                        .Where(s =>
-                            s.Event == GoalLifecycleKind.Milestone
-                            && row.CurrentAmount < s.Milestone
-                            && goal.CurrentAmount >= s.Milestone
-                        )
-                        .Select(s => s.Milestone)
-                        .Distinct()
-                )
-                {
-                    if (
-                        await db.AutomationGoalMilestones.AnyAsync(
-                            m =>
-                                m.HostId == host.Id
-                                && m.GoalId == goal.GoalId
-                                && m.Amount == amount,
-                            cancellation
-                        )
-                    )
-                    {
-                        continue;
-                    }
-                    _ = db.AutomationGoalMilestones.Add(
-                        new()
-                        {
-                            HostId = host.Id,
-                            GoalId = goal.GoalId,
-                            Amount = amount,
-                        }
-                    );
-                    crossed.Add(amount);
-                }
-            }
-            row.CurrentAmount = goal.CurrentAmount;
-            row.ObservedAtUtc = goal.Timestamp.UtcDateTime;
-            row.ConnectionId = epoch;
-            row.IsEnded = goal.Stage == EventSubGoalStage.End;
-            _ = await db.SaveChangesAsync(cancellation);
-            await transaction.CommitAsync(cancellation);
-        }
         var kind = goal.Stage switch
         {
             EventSubGoalStage.Begin => GoalLifecycleKind.Started,
             EventSubGoalStage.Progress => GoalLifecycleKind.Progressed,
             EventSubGoalStage.End => GoalLifecycleKind.Ended,
         };
-        _ = await EmitGoalAsync(host, goal, kind, 0, cancellation);
-        foreach (var amount in crossed)
-        {
-            _ = await EmitGoalAsync(host, goal, GoalLifecycleKind.Milestone, amount, cancellation);
-        }
+        var lifecycle = GoalTrigger(host, goal, kind, 0);
+        await runtime.DispatchObservedAsync(
+            new(host.Id),
+            async (db, ct) =>
+            {
+                var crossed = new List<long>();
+                var row = await db.AutomationGoalObservations.SingleOrDefaultAsync(
+                    g => g.HostId == host.Id && g.GoalId == goal.GoalId,
+                    ct
+                );
+                if (
+                    row is not null
+                    && (row.IsEnded || row.ObservedAtUtc >= goal.Timestamp.UtcDateTime)
+                )
+                {
+                    return [];
+                }
+                var baseline = row is null || row.ConnectionId != epoch;
+                if (row is null)
+                {
+                    row = new() { HostId = host.Id, GoalId = goal.GoalId };
+                    _ = db.AutomationGoalObservations.Add(row);
+                }
+                if (!baseline && goal.Stage == EventSubGoalStage.Progress)
+                {
+                    foreach (
+                        var amount in sources
+                            .Where(s =>
+                                s.Event == GoalLifecycleKind.Milestone
+                                && row.CurrentAmount < s.Milestone
+                                && goal.CurrentAmount >= s.Milestone
+                            )
+                            .Select(s => s.Milestone)
+                            .Distinct()
+                    )
+                    {
+                        if (
+                            await db.AutomationGoalMilestones.AnyAsync(
+                                m =>
+                                    m.HostId == host.Id
+                                    && m.GoalId == goal.GoalId
+                                    && m.Amount == amount,
+                                ct
+                            )
+                        )
+                        {
+                            continue;
+                        }
+                        _ = db.AutomationGoalMilestones.Add(
+                            new()
+                            {
+                                HostId = host.Id,
+                                GoalId = goal.GoalId,
+                                Amount = amount,
+                            }
+                        );
+                        crossed.Add(amount);
+                    }
+                }
+                row.CurrentAmount = goal.CurrentAmount;
+                row.ObservedAtUtc = goal.Timestamp.UtcDateTime;
+                row.ConnectionId = epoch;
+                row.IsEnded = goal.Stage == EventSubGoalStage.End;
+                _ = await db.SaveChangesAsync(ct);
+                return
+                [
+                    lifecycle,
+                    .. crossed.Select(amount =>
+                        GoalTrigger(host, goal, GoalLifecycleKind.Milestone, amount)
+                    ),
+                ];
+            },
+            cancellation
+        );
     }
 
-    private Task<AutomationDispatchOutcome> EmitGoalAsync(
+    private AutomationObservedTrigger GoalTrigger(
         BotHost host,
         EventSubGoalEvent goal,
         GoalLifecycleKind kind,
-        long amount,
-        CancellationToken ct
+        long amount
     ) =>
-        runtime.DispatchExpandedAsync(
+        new(
             Create(
                 host,
                 AutomationDefinitionIds.GoalSource,
@@ -127,10 +132,9 @@ internal sealed partial class ExpandedAutomationRuntime
                 ]
             ),
             c =>
-                c is GoalSourceConfiguration s
-                && s.Event == kind
-                && (kind != GoalLifecycleKind.Milestone || s.Milestone == amount),
-            ct
+                c is GoalSourceConfiguration source
+                && source.Event == kind
+                && (kind != GoalLifecycleKind.Milestone || source.Milestone == amount)
         );
 
     public async Task ChatSettingsChangedAsync(
