@@ -262,7 +262,7 @@ public sealed partial class AutomationRuntimeService
         var next = AutomationFlowTraversal.Schedule(
             flow.Edges,
             nextSource,
-            "complete",
+            new AutomationOutputSelection.Selected([new("complete")]),
             run.NodeRuns.Select(value => value.NodeId).ToHashSet()
         );
         AddPending(db, run.Id, next, now, run.NodeRuns.Max(value => value.Sequence) + 1);

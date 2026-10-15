@@ -168,14 +168,21 @@ public sealed partial class AutomationScenarioService
                     is not AutomationConfigurationCheck.Valid
                     {
                         Definition.Kind: AutomationNodeKind.Action
-                    }
+                    } validEffect
+                || (
+                    effect.Result
+                        is AutomationScenarioEffectResult.Started
+                            or AutomationScenarioEffectResult.AlreadyRunning
+                    && validEffect.Configuration
+                        is not CountdownActionConfiguration { Operation: CountdownOperation.Start }
+                )
             )
             {
                 errors.Add(
                     new(
                         effect.NodeId,
                         "scenario-effect-invalid",
-                        "Declare one success or failure result for an action node."
+                        "Declare an applicable result for this action node."
                     )
                 );
             }

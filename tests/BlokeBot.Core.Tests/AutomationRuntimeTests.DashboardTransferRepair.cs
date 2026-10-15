@@ -42,13 +42,13 @@ public sealed partial class AutomationRuntimeTests
         await using var f = await RuntimeFixture.CreateAsync();
         var manual = Node(AutomationDefinitionIds.ManualSource.Value, """{"data":"saved"}""");
         var flow = await f.SaveAsync([manual], []);
-        (
+        _ = (
             await f.Countdowns.ApplyAsync(
                 new(f.HostId),
                 new("existing", TimeSpan.FromSeconds(90), CountdownOperation.Start),
                 default
             )
-        ).ShouldBeTrue();
+        ).ShouldBeOfType<AutomationCountdownApplyOutcome.Started>();
         await using var initialRead = await f.Database.CreateDbContextAsync();
         var originalTimer = await initialRead.AutomationCountdowns.AsNoTracking().SingleAsync();
         var uiFixture = UiTestContextFactory.CreateWithAuthorization(f.Database, f.HostId);

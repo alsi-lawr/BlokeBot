@@ -29,10 +29,17 @@ public sealed class AutomationCountdownControlService(
         };
         return
             await catalog.ValidateForSaveAsync(hostId, definition, new(1), action, ct)
-                is AutomationConfigurationCheck.Valid
-            && await countdowns.ApplyAsync(hostId, action, ct)
-            ? await ReadAsync(hostId, action.Name, ct)
-            : new AutomationCountdownControlOutcome.Unavailable();
+                is not AutomationConfigurationCheck.Valid
+            ? new AutomationCountdownControlOutcome.Unavailable()
+            : await (await countdowns.ApplyAsync(hostId, action, ct)).Match(
+                _ => ReadAsync(hostId, action.Name, ct),
+                _ => ReadAsync(hostId, action.Name, ct),
+                _ => ReadAsync(hostId, action.Name, ct),
+                static _ =>
+                    Task.FromResult<AutomationCountdownControlOutcome>(
+                        new AutomationCountdownControlOutcome.Unavailable()
+                    )
+            );
     }
 
     public async Task<AutomationCountdownControlOutcome> ReadAsync(

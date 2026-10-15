@@ -52,7 +52,7 @@ public sealed class AutomationCountdownService(
         }
     }
 
-    internal async Task<bool> ApplyAsync(
+    internal async Task<AutomationCountdownApplyOutcome> ApplyAsync(
         AutomationHostId hostId,
         CountdownActionConfiguration action,
         CancellationToken cancellation
@@ -63,14 +63,14 @@ public sealed class AutomationCountdownService(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
         if (await MainDatabaseStatements.LockHostAsync(db, hostId.Value, cancellation) == 0)
         {
-            return false;
+            return new AutomationCountdownApplyOutcome.Unavailable();
         }
         var host = await db
             .Hosts.AsNoTracking()
             .SingleAsync(h => h.Id == hostId.Value, cancellation);
         if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
         {
-            return false;
+            return new AutomationCountdownApplyOutcome.Unavailable();
         }
         var timer = await db.AutomationCountdowns.SingleOrDefaultAsync(
             t => t.HostId == hostId.Value && t.Name == action.Name,
@@ -80,12 +80,13 @@ public sealed class AutomationCountdownService(
             timer is { IsRunning: true }
             && timer.ProcessId == ProcessId
             && timer.AutomationGeneration == host.AutomationGeneration;
-        if (
-            (action.Operation == CountdownOperation.Start && running)
-            || (action.Operation == CountdownOperation.Cancel && !running)
-        )
+        if (action.Operation == CountdownOperation.Start && running)
         {
-            return true;
+            return new AutomationCountdownApplyOutcome.AlreadyRunning();
+        }
+        if (action.Operation == CountdownOperation.Cancel && !running)
+        {
+            return new AutomationCountdownApplyOutcome.Applied();
         }
         var now = clock.GetUtcNow();
         timer ??= new() { HostId = hostId.Value, Name = action.Name };
@@ -119,7 +120,9 @@ public sealed class AutomationCountdownService(
             CountdownOperation.Cancel => CountdownLifecycle.Cancelled,
         };
         _ = await EmitAsync(host, timer, kind, TimeSpan.Zero, now, cancellation);
-        return true;
+        return action.Operation == CountdownOperation.Start
+            ? new AutomationCountdownApplyOutcome.Started()
+            : new AutomationCountdownApplyOutcome.Applied();
     }
 
     internal async Task TickAsync(
@@ -250,5 +253,57 @@ public sealed class AutomationCountdownService(
                     ),
                 deferExecution: true
             );
+    }
+}
+
+internal abstract record AutomationCountdownApplyOutcome
+{
+    private AutomationCountdownApplyOutcome() { }
+
+    internal abstract TResult Match<TResult>(
+        Func<Started, TResult> started,
+        Func<AlreadyRunning, TResult> alreadyRunning,
+        Func<Applied, TResult> applied,
+        Func<Unavailable, TResult> unavailable
+    );
+
+    internal sealed record Started : AutomationCountdownApplyOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyRunning, TResult> alreadyRunning,
+            Func<Applied, TResult> applied,
+            Func<Unavailable, TResult> unavailable
+        ) => started(this);
+    }
+
+    internal sealed record AlreadyRunning : AutomationCountdownApplyOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyRunning, TResult> alreadyRunning,
+            Func<Applied, TResult> applied,
+            Func<Unavailable, TResult> unavailable
+        ) => alreadyRunning(this);
+    }
+
+    internal sealed record Applied : AutomationCountdownApplyOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyRunning, TResult> alreadyRunning,
+            Func<Applied, TResult> applied,
+            Func<Unavailable, TResult> unavailable
+        ) => applied(this);
+    }
+
+    internal sealed record Unavailable : AutomationCountdownApplyOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyRunning, TResult> alreadyRunning,
+            Func<Applied, TResult> applied,
+            Func<Unavailable, TResult> unavailable
+        ) => unavailable(this);
     }
 }

@@ -397,7 +397,11 @@ public sealed partial class AutomationRuntimeService(
                 traceFlow.Nodes.Single(node => node.Id == source.Id),
                 AutomationTraceOutcome.Succeeded
             );
-            var next = AutomationFlowTraversal.Outgoing(traceFlow.Edges, source.Id, null);
+            var next = AutomationFlowTraversal.Outgoing(
+                traceFlow.Edges,
+                source.Id,
+                new AutomationOutputSelection.All()
+            );
             AddPending(db, runId, next, now, 1);
             await TraceScheduledAsync(db, traceRun, traceFlow, next, now, cancellationToken);
             if (next.Length == 0)
@@ -1003,25 +1007,17 @@ public sealed partial class AutomationRuntimeService(
                 return ExecutionBlocked(executionGate);
             }
 
-            if (result is AutomationNodeExecution.Failed failure)
-            {
-                if (await StopsFlowAsync(scope, failure.Code, cancellationToken))
+            var stopped = await result.Match(
+                async succeeded =>
                 {
-                    return new(AutomationResumeStatus.Failed);
-                }
-
-                continue;
-            }
-
-            if (
-                !await CompleteSuccessAsync(
-                    scope,
-                    (AutomationNodeExecution.Succeeded)result,
-                    cancellationToken
-                )
-            )
+                    _ = await CompleteSuccessAsync(scope, succeeded, cancellationToken);
+                    return false;
+                },
+                failure => StopsFlowAsync(scope, failure.Code, cancellationToken)
+            );
+            if (stopped)
             {
-                continue;
+                return new(AutomationResumeStatus.Failed);
             }
         }
     }
@@ -1166,7 +1162,7 @@ public sealed partial class AutomationRuntimeService(
                     var next = AutomationFlowTraversal.Schedule(
                         flow.Edges,
                         AutomationFrozenSubflows.Continuation(flow, failureNode).Id,
-                        "complete",
+                        new AutomationOutputSelection.Selected([new("complete")]),
                         run.NodeRuns.Select(node => node.NodeId).ToHashSet()
                     );
                     AddPending(db, run.Id, next, now, run.NodeRuns.Max(node => node.Sequence) + 1);
@@ -1362,7 +1358,7 @@ public sealed partial class AutomationRuntimeService(
                 var next in AutomationFlowTraversal.Schedule(
                     flow.Edges,
                     definitions[node.NodeId].Id,
-                    "complete",
+                    new AutomationOutputSelection.Selected([new("complete")]),
                     existingNodes
                 )
             )
@@ -1509,14 +1505,17 @@ public sealed partial class AutomationRuntimeService(
             node,
             AutomationTraceOutcome.Succeeded
         );
-        await TraceAsync(
-            db,
-            run,
-            AutomationTraceEventKind.Branch,
-            cancellationToken,
-            node,
-            port: succeeded.OutputPort
-        );
+        foreach (var port in succeeded.OutputSelection.BranchPorts)
+        {
+            await TraceAsync(
+                db,
+                run,
+                AutomationTraceEventKind.Branch,
+                cancellationToken,
+                node,
+                port: port?.Value
+            );
+        }
         if (
             node.DefinitionId == AutomationDefinitionIds.DelayControl.Value
             || succeeded.NextAvailableAtUtc > now
@@ -1534,7 +1533,7 @@ public sealed partial class AutomationRuntimeService(
         var next = AutomationFlowTraversal.Schedule(
             flow.Edges,
             node.Id,
-            succeeded.OutputPort,
+            succeeded.OutputSelection,
             run.NodeRuns.Select(static value => value.NodeId).ToHashSet()
         );
         AddPending(
@@ -1637,7 +1636,7 @@ public sealed partial class AutomationRuntimeService(
         var next = AutomationFlowTraversal.Schedule(
             flow.Edges,
             AutomationFrozenSubflows.Continuation(flow, failureNode).Id,
-            "complete",
+            new AutomationOutputSelection.Selected([new("complete")]),
             run.NodeRuns.Select(static value => value.NodeId).ToHashSet()
         );
         AddPending(db, run.Id, next, now, run.NodeRuns.Max(static value => value.Sequence) + 1);
@@ -1758,13 +1757,11 @@ public sealed partial class AutomationRuntimeService(
             context,
             cancellationToken
         );
-        return outcome is AutomationActionOutcome.Failed failed
-            ? new AutomationNodeExecution.Failed(failed.Code)
-            : new AutomationNodeExecution.Succeeded(
-                "plugin-succeeded",
-                "complete",
-                clock.GetUtcNow().UtcDateTime
-            );
+        return AutomationNodeEvaluation.Action(
+            outcome,
+            clock.GetUtcNow().UtcDateTime,
+            "plugin-succeeded"
+        );
     }
 
     private async Task<AutomationNodeExecution> ExecuteActionAsync(
@@ -1798,18 +1795,11 @@ public sealed partial class AutomationRuntimeService(
             context,
             cancellationToken
         );
-        return outcome switch
-        {
-            AutomationActionOutcome.Succeeded => new AutomationNodeExecution.Succeeded(
-                "action-succeeded",
-                "complete",
-                clock.GetUtcNow().UtcDateTime
-            ),
-            AutomationActionOutcome.Failed failed => new AutomationNodeExecution.Failed(
-                failed.Code
-            ),
-            _ => new AutomationNodeExecution.Failed("action-failed"),
-        };
+        return AutomationNodeEvaluation.Action(
+            outcome,
+            clock.GetUtcNow().UtcDateTime,
+            "action-succeeded"
+        );
     }
 
     private static void Invalidate(AutomationFlowRun run, DateTime now, string outcomeCode)

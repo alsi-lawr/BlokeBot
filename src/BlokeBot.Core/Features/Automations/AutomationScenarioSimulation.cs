@@ -7,6 +7,7 @@ internal static class AutomationScenarioSimulation
         Type
     >(StringComparer.Ordinal)
     {
+        ["start-countdown"] = typeof(CountdownActionConfiguration),
         ["send-chat"] = typeof(SendChatActionConfiguration),
         ["play-overlay-cue"] = typeof(PlayOverlayCueActionConfiguration),
         ["fulfil-redemption"] = typeof(FulfilRedemptionActionConfiguration),
@@ -71,8 +72,28 @@ internal static class AutomationScenarioSimulation
                     || AutomationPublicSinkAdmission.AdmitText(message)
                         is not AutomationPublicTextAdmission.Admitted =>
                 new AutomationNodeExecution.Failed("sensitive-output-blocked"),
-            _ => effectResult == AutomationScenarioEffectResult.Failed
-                ? new AutomationNodeExecution.Failed("simulated-action-failed")
-                : new AutomationNodeExecution.Succeeded("action-simulated", "complete", now),
+            CountdownActionConfiguration { Operation: CountdownOperation.Start } =>
+                AutomationNodeEvaluation.Action(
+                    effectResult switch
+                    {
+                        AutomationScenarioEffectResult.Succeeded
+                        or AutomationScenarioEffectResult.Started =>
+                            new AutomationActionOutcome.CountdownStarted(),
+                        AutomationScenarioEffectResult.AlreadyRunning =>
+                            new AutomationActionOutcome.CountdownAlreadyRunning(),
+                        AutomationScenarioEffectResult.Failed => new AutomationActionOutcome.Failed(
+                            "simulated-action-failed"
+                        ),
+                    },
+                    now,
+                    "action-simulated"
+                ),
+            _ => AutomationNodeEvaluation.Action(
+                effectResult == AutomationScenarioEffectResult.Failed
+                    ? new AutomationActionOutcome.Failed("simulated-action-failed")
+                    : new AutomationActionOutcome.Succeeded(),
+                now,
+                "action-simulated"
+            ),
         };
 }

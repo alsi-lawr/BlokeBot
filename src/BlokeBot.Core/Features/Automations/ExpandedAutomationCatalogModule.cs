@@ -449,6 +449,23 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
                         "Continues the flow.",
                         AutomationPortValueType.Flow
                     ),
+                    .. operation == CountdownOperation.Start
+                        ? new AutomationPortMetadata[]
+                        {
+                            new(
+                                new("started"),
+                                "Started",
+                                "Continues when a new countdown starts.",
+                                AutomationPortValueType.Flow
+                            ),
+                            new(
+                                new("already-running"),
+                                "Already running",
+                                "Continues when the countdown is already running and unchanged.",
+                                AutomationPortValueType.Flow
+                            ),
+                        }
+                        : [],
                 ],
                 [
                     NameField(),

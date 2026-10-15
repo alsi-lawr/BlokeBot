@@ -17,8 +17,10 @@ public sealed record AutomationScenarioConfiguration(
 
 public enum AutomationScenarioEffectResult
 {
-    Succeeded,
-    Failed,
+    Succeeded = 0,
+    Failed = 1,
+    Started = 2,
+    AlreadyRunning = 3,
 }
 
 public sealed record AutomationScenarioEffect(

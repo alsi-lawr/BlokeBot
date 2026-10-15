@@ -47,8 +47,19 @@
             {
                 <label class="automation-effect-choice">
                 <span>@node.EffectiveName</span>
-                <select aria-label="@($"{node.EffectiveName} result")" value="@(Editor.Fixture.Effects.FirstOrDefault(effect => effect.NodeId == node.Id)?.Result ?? AutomationScenarioEffectResult.Succeeded)" @onchange="args => SetEffect(node.Id, args)">
-                <option value="Succeeded">Success</option>
+                @{ var start = node.Definition.Id == AutomationDefinitionIds.StartCountdownAction;
+                   var effect = Editor.Fixture.Effects.FirstOrDefault(effect => effect.NodeId == node.Id)?.Result ?? AutomationScenarioEffectResult.Succeeded;
+                   var selectedEffect = start && effect == AutomationScenarioEffectResult.Succeeded ? AutomationScenarioEffectResult.Started : effect; }
+                <select aria-label="@($"{node.EffectiveName} result")" data-scenario-effect-node="@node.Id.Value" value="@selectedEffect" @onchange="args => SetEffect(node.Id, args)">
+                @if (start)
+                {
+                    <option value="Started">Started</option>
+                    <option value="AlreadyRunning">Already running</option>
+                }
+                else
+                {
+                    <option value="Succeeded">Success</option>
+                }
                 <option value="Failed">Failure</option>
                 </select>
                 </label>

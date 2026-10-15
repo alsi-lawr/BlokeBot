@@ -17,9 +17,52 @@ internal abstract record AutomationActionOutcome
 {
     private AutomationActionOutcome() { }
 
-    internal sealed record Succeeded : AutomationActionOutcome;
+    internal abstract TResult Match<TResult>(
+        Func<Succeeded, TResult> succeeded,
+        Func<CountdownStarted, TResult> countdownStarted,
+        Func<CountdownAlreadyRunning, TResult> countdownAlreadyRunning,
+        Func<Failed, TResult> failed
+    );
 
-    internal sealed record Failed(string Code) : AutomationActionOutcome;
+    internal sealed record Succeeded : AutomationActionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Succeeded, TResult> succeeded,
+            Func<CountdownStarted, TResult> countdownStarted,
+            Func<CountdownAlreadyRunning, TResult> countdownAlreadyRunning,
+            Func<Failed, TResult> failed
+        ) => succeeded(this);
+    }
+
+    internal sealed record CountdownStarted : AutomationActionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Succeeded, TResult> succeeded,
+            Func<CountdownStarted, TResult> countdownStarted,
+            Func<CountdownAlreadyRunning, TResult> countdownAlreadyRunning,
+            Func<Failed, TResult> failed
+        ) => countdownStarted(this);
+    }
+
+    internal sealed record CountdownAlreadyRunning : AutomationActionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Succeeded, TResult> succeeded,
+            Func<CountdownStarted, TResult> countdownStarted,
+            Func<CountdownAlreadyRunning, TResult> countdownAlreadyRunning,
+            Func<Failed, TResult> failed
+        ) => countdownAlreadyRunning(this);
+    }
+
+    internal sealed record Failed(string Code) : AutomationActionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Succeeded, TResult> succeeded,
+            Func<CountdownStarted, TResult> countdownStarted,
+            Func<CountdownAlreadyRunning, TResult> countdownAlreadyRunning,
+            Func<Failed, TResult> failed
+        ) => failed(this);
+    }
 }
 
 public sealed class AutomationActionExecutor(
@@ -49,13 +92,14 @@ public sealed class AutomationActionExecutor(
         {
             return configuration switch
             {
-                CountdownActionConfiguration countdown => await countdowns.ApplyAsync(
-                    hostId,
-                    countdown,
-                    cancellationToken
-                )
-                    ? new AutomationActionOutcome.Succeeded()
-                    : new AutomationActionOutcome.Failed("countdown-unavailable"),
+                CountdownActionConfiguration countdown => (
+                    await countdowns.ApplyAsync(hostId, countdown, cancellationToken)
+                ).Match<AutomationActionOutcome>(
+                    static _ => new AutomationActionOutcome.CountdownStarted(),
+                    static _ => new AutomationActionOutcome.CountdownAlreadyRunning(),
+                    static _ => new AutomationActionOutcome.Succeeded(),
+                    static _ => new AutomationActionOutcome.Failed("countdown-unavailable")
+                ),
                 SendChatActionConfiguration => await SendChatAsync(
                     hostId,
                     inputs,

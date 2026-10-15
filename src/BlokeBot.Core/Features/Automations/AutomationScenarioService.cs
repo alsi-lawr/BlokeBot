@@ -173,7 +173,7 @@ public sealed partial class AutomationScenarioService(
         var pending = new Queue<PendingNode>();
         var scheduled = new HashSet<Guid> { fixture.SourceNodeId.Value };
         var openInvocations = new HashSet<Guid>();
-        await Schedule(fixture.SourceNodeId.Value, null, now);
+        await Schedule(fixture.SourceNodeId.Value, new AutomationOutputSelection.All(), now);
         try
         {
             while (pending.Count > 0 || openInvocations.Count > 0)
@@ -259,7 +259,11 @@ public sealed partial class AutomationScenarioService(
                             AutomationTraceOutcome.Succeeded,
                             values: boundaryInputs.PortValues
                         );
-                        await Schedule(entry.Id, "complete", now);
+                        await Schedule(
+                            entry.Id,
+                            new AutomationOutputSelection.Selected([new("complete")]),
+                            now
+                        );
                     }
                     else
                     {
@@ -285,7 +289,11 @@ public sealed partial class AutomationScenarioService(
                             AutomationTraceOutcome.Succeeded,
                             values: boundaryInputs.PortValues
                         );
-                        await Schedule(node.Id, "complete", now);
+                        await Schedule(
+                            node.Id,
+                            new AutomationOutputSelection.Selected([new("complete")]),
+                            now
+                        );
                     }
                     RecordOutcome(
                         new(
@@ -329,135 +337,161 @@ public sealed partial class AutomationScenarioService(
                 var diagnostics = inputs is AutomationInputResolution.Available resolved
                     ? AutomationDataValueSerialization.Diagnostics(resolved.PortValues)
                     : [];
-                if (execution is AutomationNodeExecution.Failed failed)
-                {
-                    await Emit(
-                        AutomationTraceEventKind.Result,
-                        node,
-                        node.ContinueOnFailure
-                            ? AutomationTraceOutcome.ContinuedAfterFailure
-                            : AutomationTraceOutcome.Failed
-                    );
-                    RecordOutcome(
-                        new(
-                            new(node.Id),
-                            node.ContinueOnFailure
-                                ? AutomationNodeRunState.ContinuedAfterFailure
-                                : AutomationNodeRunState.Failed,
-                            failed.Code,
-                            diagnostics,
-                            new(now, TimeSpan.Zero)
-                        )
-                    );
-                    if (
-                        AutomationFrozenSubflows.Invocation(frozen, node.Id) is { } ownInvocation
-                        && openInvocations.Remove(ownInvocation.EntryId)
-                    )
+                var stopped = await execution.Match(
+                    async succeeded =>
                     {
-                        await Emit(
-                            AutomationTraceEventKind.SubflowExit,
-                            frozen.Nodes.Single(candidate => candidate.Id == ownInvocation.ExitId),
-                            AutomationTraceOutcome.Failed
-                        );
-                    }
-                    var failureNode = node;
-                    foreach (var invocation in AutomationFrozenSubflows.Unwind(frozen, node))
-                    {
-                        var dropped = pending
-                            .Where(item =>
-                                frozen.Nodes.Single(candidate => candidate.Id == item.Id).Invocation
-                                    is { } nested
-                                && frozen
-                                    .Invocations.Single(candidate => candidate.EntryId == nested.Id)
-                                    .Path.StartsWith(invocation.Path, StringComparison.Ordinal)
-                            )
-                            .Select(item => item.Id)
-                            .ToHashSet();
-                        var retained = pending.Where(item => !dropped.Contains(item.Id)).ToArray();
-                        pending.Clear();
-                        foreach (var item in retained)
-                        {
-                            pending.Enqueue(item);
-                        }
-                        await CloseOpen(
-                            AutomationTraceOutcome.Failed,
-                            cancellationToken,
-                            invocation.Path
-                        );
-                        failureNode = frozen.Nodes.Single(candidate =>
-                            candidate.Id == invocation.CallerId
-                        );
                         RecordOutcome(
                             new(
-                                new(failureNode.Id),
-                                failureNode.ContinueOnFailure
-                                    ? AutomationNodeRunState.ContinuedAfterFailure
-                                    : AutomationNodeRunState.Failed,
-                                "subflow-failed",
-                                [],
+                                new(node.Id),
+                                AutomationNodeRunState.Succeeded,
+                                succeeded.Code,
+                                diagnostics,
                                 new(now, TimeSpan.Zero)
                             )
                         );
-                        await checkpoints.FailAsync(
-                            failureNode,
-                            "subflow-failed",
-                            cancellationToken
-                        );
                         await Emit(
                             AutomationTraceEventKind.Result,
-                            failureNode,
-                            failureNode.ContinueOnFailure
+                            node,
+                            AutomationTraceOutcome.Succeeded
+                        );
+                        foreach (var port in succeeded.OutputSelection.BranchPorts)
+                        {
+                            await Emit(AutomationTraceEventKind.Branch, node, port: port?.Value);
+                        }
+                        if (
+                            node.DefinitionId == AutomationDefinitionIds.DelayControl.Value
+                            || succeeded.NextAvailableAtUtc > now
+                        )
+                        {
+                            await Emit(
+                                AutomationTraceEventKind.Delay,
+                                node,
+                                due: succeeded.NextAvailableAtUtc
+                            );
+                        }
+                        await Schedule(
+                            node.Id,
+                            succeeded.OutputSelection,
+                            succeeded.NextAvailableAtUtc
+                        );
+
+                        return false;
+                    },
+                    async failed =>
+                    {
+                        await Emit(
+                            AutomationTraceEventKind.Result,
+                            node,
+                            node.ContinueOnFailure
                                 ? AutomationTraceOutcome.ContinuedAfterFailure
                                 : AutomationTraceOutcome.Failed
                         );
-                    }
-                    if (!failureNode.ContinueOnFailure)
-                    {
-                        await CloseOpen(AutomationTraceOutcome.Failed, cancellationToken);
-                        await Emit(
-                            AutomationTraceEventKind.Terminal,
-                            outcome: AutomationTraceOutcome.Failed
+                        RecordOutcome(
+                            new(
+                                new(node.Id),
+                                node.ContinueOnFailure
+                                    ? AutomationNodeRunState.ContinuedAfterFailure
+                                    : AutomationNodeRunState.Failed,
+                                failed.Code,
+                                diagnostics,
+                                new(now, TimeSpan.Zero)
+                            )
                         );
-                        return new AutomationScenarioRunOutcome.Failed(
-                            outcomes.ToImmutable(),
-                            new(traceId)
-                        );
-                    }
-                    await Schedule(
-                        AutomationFrozenSubflows.Continuation(frozen, failureNode).Id,
-                        "complete",
-                        now
-                    );
-                }
-                else if (execution is AutomationNodeExecution.Succeeded succeeded)
-                {
-                    RecordOutcome(
-                        new(
-                            new(node.Id),
-                            AutomationNodeRunState.Succeeded,
-                            succeeded.Code,
-                            diagnostics,
-                            new(now, TimeSpan.Zero)
+                        if (
+                            AutomationFrozenSubflows.Invocation(frozen, node.Id)
+                                is { } ownInvocation
+                            && openInvocations.Remove(ownInvocation.EntryId)
                         )
-                    );
-                    await Emit(
-                        AutomationTraceEventKind.Result,
-                        node,
-                        AutomationTraceOutcome.Succeeded
-                    );
-                    await Emit(AutomationTraceEventKind.Branch, node, port: succeeded.OutputPort);
-                    if (
-                        node.DefinitionId == AutomationDefinitionIds.DelayControl.Value
-                        || succeeded.NextAvailableAtUtc > now
-                    )
-                    {
-                        await Emit(
-                            AutomationTraceEventKind.Delay,
-                            node,
-                            due: succeeded.NextAvailableAtUtc
+                        {
+                            await Emit(
+                                AutomationTraceEventKind.SubflowExit,
+                                frozen.Nodes.Single(candidate =>
+                                    candidate.Id == ownInvocation.ExitId
+                                ),
+                                AutomationTraceOutcome.Failed
+                            );
+                        }
+                        var failureNode = node;
+                        foreach (var invocation in AutomationFrozenSubflows.Unwind(frozen, node))
+                        {
+                            var dropped = pending
+                                .Where(item =>
+                                    frozen
+                                        .Nodes.Single(candidate => candidate.Id == item.Id)
+                                        .Invocation
+                                        is { } nested
+                                    && frozen
+                                        .Invocations.Single(candidate =>
+                                            candidate.EntryId == nested.Id
+                                        )
+                                        .Path.StartsWith(invocation.Path, StringComparison.Ordinal)
+                                )
+                                .Select(item => item.Id)
+                                .ToHashSet();
+                            var retained = pending
+                                .Where(item => !dropped.Contains(item.Id))
+                                .ToArray();
+                            pending.Clear();
+                            foreach (var item in retained)
+                            {
+                                pending.Enqueue(item);
+                            }
+                            await CloseOpen(
+                                AutomationTraceOutcome.Failed,
+                                cancellationToken,
+                                invocation.Path
+                            );
+                            failureNode = frozen.Nodes.Single(candidate =>
+                                candidate.Id == invocation.CallerId
+                            );
+                            RecordOutcome(
+                                new(
+                                    new(failureNode.Id),
+                                    failureNode.ContinueOnFailure
+                                        ? AutomationNodeRunState.ContinuedAfterFailure
+                                        : AutomationNodeRunState.Failed,
+                                    "subflow-failed",
+                                    [],
+                                    new(now, TimeSpan.Zero)
+                                )
+                            );
+                            await checkpoints.FailAsync(
+                                failureNode,
+                                "subflow-failed",
+                                cancellationToken
+                            );
+                            await Emit(
+                                AutomationTraceEventKind.Result,
+                                failureNode,
+                                failureNode.ContinueOnFailure
+                                    ? AutomationTraceOutcome.ContinuedAfterFailure
+                                    : AutomationTraceOutcome.Failed
+                            );
+                        }
+                        if (!failureNode.ContinueOnFailure)
+                        {
+                            await CloseOpen(AutomationTraceOutcome.Failed, cancellationToken);
+                            await Emit(
+                                AutomationTraceEventKind.Terminal,
+                                outcome: AutomationTraceOutcome.Failed
+                            );
+                            return true;
+                        }
+                        await Schedule(
+                            AutomationFrozenSubflows.Continuation(frozen, failureNode).Id,
+                            new AutomationOutputSelection.Selected([new("complete")]),
+                            now
                         );
+
+                        return false;
                     }
-                    await Schedule(node.Id, succeeded.OutputPort, succeeded.NextAvailableAtUtc);
+                );
+                if (stopped)
+                {
+                    return new AutomationScenarioRunOutcome.Failed(
+                        outcomes.ToImmutable(),
+                        new(traceId)
+                    );
                 }
             }
             await Emit(
@@ -582,13 +616,13 @@ public sealed partial class AutomationScenarioService(
             }
         }
 
-        async Task Schedule(Guid nodeId, string? port, DateTime due)
+        async Task Schedule(Guid nodeId, AutomationOutputSelection selection, DateTime due)
         {
             foreach (
                 var target in AutomationFlowTraversal.Schedule(
                     frozen.Edges,
                     nodeId,
-                    port,
+                    selection,
                     scheduled
                 )
             )
