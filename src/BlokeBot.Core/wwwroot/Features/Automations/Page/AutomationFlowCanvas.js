@@ -185,6 +185,17 @@ export function initialize(root, dotnet) {
       return;
     }
     if (isEditingControl(event.target)) return;
+    const focusedEdge = event.target instanceof Element
+      ? event.target.closest("[data-automation-edge]")
+      : null;
+    const focusedEdgeId = focusedEdge?.dataset.automationEdge ?? null;
+    if (focusedEdgeId !== null && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      event.stopPropagation();
+      setLocalSelection(state, [], focusedEdgeId);
+      void dotnet.invokeMethodAsync("SetSelectionFromCanvasAsync", [], focusedEdgeId);
+      return;
+    }
     if (moveSelectionByKeyboard(state, event.key)) {
       event.preventDefault();
       event.stopPropagation();
@@ -193,11 +204,13 @@ export function initialize(root, dotnet) {
     if (event.key !== "Delete" && event.key !== "Backspace") return;
     event.preventDefault();
     event.stopPropagation();
-    void dotnet.invokeMethodAsync(
-      "DeleteSelectionFromCanvasAsync",
-      selectionIds(root),
-      selectedEdgeId(root),
-    );
+    const edgeId = focusedEdgeId ?? selectedEdgeId(root);
+    const nodeIds = edgeId === null ? selectionIds(root) : [];
+    if (edgeId !== null) {
+      setLocalSelection(state, [], null);
+      root.focus({ preventScroll: true });
+    }
+    void dotnet.invokeMethodAsync("DeleteSelectionFromCanvasAsync", nodeIds, edgeId);
   });
   register(state, zoomReset, "click", () => {
     state.zoomIndex = defaultZoomIndex;

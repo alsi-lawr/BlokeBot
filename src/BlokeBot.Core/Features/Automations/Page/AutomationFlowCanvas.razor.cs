@@ -162,12 +162,20 @@ public partial class AutomationFlowCanvas
     }
 
     [JSInvokable]
-    public Task DeleteSelectionFromCanvasAsync(Guid[] nodeIds, Guid? edgeId) =>
-        edgeId is { } selectedEdge
-            ? DeleteEdge.InvokeAsync(selectedEdge)
-            : DeleteNodes.InvokeAsync(
+    public async Task DeleteSelectionFromCanvasAsync(Guid[] nodeIds, Guid? edgeId)
+    {
+        if (edgeId is { } selectedEdge)
+        {
+            await SelectionChanged.InvokeAsync(new([], null));
+            await DeleteEdge.InvokeAsync(selectedEdge);
+        }
+        else
+        {
+            await DeleteNodes.InvokeAsync(
                 nodeIds.Select(static id => new AutomationNodeId(id)).ToArray()
             );
+        }
+    }
 
     [JSInvokable]
     public Task ConnectFromCanvasAsync(

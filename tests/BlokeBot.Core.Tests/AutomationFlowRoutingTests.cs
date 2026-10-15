@@ -7,9 +7,9 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-// Behaviour probes for the production AutomationFlowCanvas routing module. Each
-// probe runs the real module inside Node.js against a scripted DOM double and
-// asserts committed routes, labels, counters, and scheduling behaviour only.
+// Behaviour probes for the production AutomationFlowCanvas module. Each probe
+// runs the real module inside Node.js against a scripted DOM double to exercise
+// routing, scheduling, and canvas keyboard ownership.
 public sealed class AutomationFlowRoutingTests
 {
     [Test]
@@ -113,6 +113,10 @@ public sealed class AutomationFlowRoutingTests
     [Test]
     public Task CtrlWheel_ZoomsCanvasAndSuppressesBrowserDefault() =>
         RunModuleProbeAsync(_scenario16);
+
+    [Test]
+    public Task FocusedConnection_ActivatesOrDeletesItsOwnIdentityAndDisposesKeyboardOwnership() =>
+        RunModuleProbeAsync(_focusedConnectionKeyboard);
 
     private static async Task RunModuleProbeAsync(string scenario)
     {
@@ -1393,5 +1397,60 @@ function dragNode(root, node, deltaX, deltaY, pointerId = 7) {
   moduleExports.dispose(zoomed.root);
   console.log("scenario 16 ok");
 }
+""";
+
+    private const string _focusedConnectionKeyboard = """
+const fixture = buildStandardFixture();
+const { root, a, e1, e2 } = fixture;
+const dotnet = makeDotnet();
+let recoveredFocus = 0;
+root.focus = (options) => {
+  assert.deepEqual(options, { preventScroll: true });
+  recoveredFocus += 1;
+};
+moduleExports.initialize(root, dotnet);
+flushAllScheduled();
+for (const key of ["Enter", " "]) {
+  a.classList.add("automation-node--selected");
+  e1.classList.add("automation-edge-group--selected");
+  let prevented = 0;
+  dispatch(root, "keydown", {
+    key, target: e2.querySelector(".automation-edge"),
+    preventDefault() { prevented += 1; },
+  });
+  assert.equal(prevented, 1, "SVG activation suppresses native scrolling");
+  assert.equal(a.classList.contains("automation-node--selected"), false);
+  assert.equal(e1.classList.contains("automation-edge-group--selected"), false);
+  assert.equal(e2.classList.contains("automation-edge-group--selected"), true);
+  assert.deepEqual(dotnet.calls.at(-1), {
+    method: "SetSelectionFromCanvasAsync", values: [[], "edge-2"],
+  });
+}
+assert.equal(recoveredFocus, 0, "activation does not move the user's focus");
+for (const key of ["Delete", "Backspace"]) {
+  a.classList.add("automation-node--selected");
+  e1.classList.add("automation-edge-group--selected");
+  const before = dotnet.calls.length;
+  dispatch(root, "keydown", { key, target: e2 });
+  assert.deepEqual(dotnet.calls.slice(before), [{
+    method: "DeleteSelectionFromCanvasAsync", values: [[], "edge-2"],
+  }], "focused identity is sent in one request, not an unawaited selection/delete pair");
+  assert.equal(root.querySelectorAll(".automation-node--selected").length, 0);
+  assert.equal(root.querySelectorAll(".automation-edge-group--selected").length, 0);
+  dispatch(root, "keydown", { key, target: root });
+  assert.deepEqual(dotnet.calls.at(-1), {
+    method: "DeleteSelectionFromCanvasAsync", values: [[], null],
+  }, "a repeated Delete cannot reuse the prior unrelated selection");
+}
+assert.equal(recoveredFocus, 2, "edge deletion recovers focus synchronously");
+const field = new FakeElement("input", { parent: root });
+const beforeEditing = dotnet.calls.length;
+for (const key of ["Enter", " ", "Delete", "Backspace"]) {
+  dispatch(root, "keydown", { key, target: field });
+}
+assert.equal(dotnet.calls.length, beforeEditing, "native field keys stay native");
+moduleExports.dispose(root);
+dispatch(root, "keydown", { key: "Delete", target: e2 });
+assert.equal(dotnet.calls.length, beforeEditing, "disposal releases canvas keyboard ownership");
 """;
 }

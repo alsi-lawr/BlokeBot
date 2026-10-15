@@ -128,11 +128,25 @@ public partial class AutomationFlowCanvas
         var target = Nodes.FirstOrDefault(node => node.Id == edge.TargetNodeId);
         var sourceName = source?.EffectiveName ?? "Unavailable source";
         var targetName = target?.EffectiveName ?? "Unavailable target";
+        var sourcePort = EdgePortLabel(source?.Definition.Outputs ?? [], edge.SourcePortId);
+        var targetPort = EdgePortLabel(target?.Definition.Inputs ?? [], edge.TargetPortId);
         var kind = edge.Kind == AutomationEdgeKind.Flow ? "Flow" : "Data";
+        var label =
+            $"{kind} connection from {sourceName}, output {sourcePort}, to {targetName}, input {targetPort}";
         var issue = AutomationConnections.Issue(edge, Nodes);
-        return issue is null
-            ? $"{kind} connection from {sourceName} to {targetName}"
-            : $"{kind} connection from {sourceName} to {targetName}. Needs repair. {issue}";
+        return issue is null ? label : $"{label}. Needs repair. {issue}";
+    }
+
+    private static string EdgePortLabel(
+        IReadOnlyList<AutomationPortMetadata> ports,
+        AutomationPortId portId
+    )
+    {
+        var port = ports.FirstOrDefault(port => port.Id == portId);
+        return port is null ? $"Unavailable port ({portId.Value})"
+            : ports.Count(candidate => candidate.Name == port.Name) > 1
+                ? $"{port.Name} ({portId.Value})"
+            : port.Name;
     }
 
     private static string EdgeMarker(AutomationFlowDraftEdge edge) =>
