@@ -37,6 +37,7 @@ public sealed class AutomationTraceStore(
                 FlowId = flowId,
                 ProductionRunId = runId,
                 SchemaVersion = SchemaVersion,
+                ObservedFailures = false,
                 CreatedAtUtc = now,
                 ExpiresAtUtc = now + Retention,
             }
@@ -57,9 +58,24 @@ public sealed class AutomationTraceStore(
         await using var transaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
-        var active = db.AutomationTraces.Where(trace =>
-            trace.Id == id && trace.ExpiresAtUtc > now && trace.Truncation == 0
+        var unexpired = db.AutomationTraces.Where(trace =>
+            trace.Id == id && trace.ExpiresAtUtc > now
         );
+        if (AutomationTraceOutcomeSummary.ObservesFailure(data))
+        {
+            _ = await unexpired.ExecuteUpdateAsync(
+                setters => setters.SetProperty(trace => trace.ObservedFailures, true),
+                cancellationToken
+            );
+        }
+        if (AutomationTraceOutcomeSummary.RootTerminal(id, data) is { } terminal)
+        {
+            _ = await unexpired.ExecuteUpdateAsync(
+                setters => setters.SetProperty(trace => trace.TerminalOutcome, (int)terminal),
+                cancellationToken
+            );
+        }
+        var active = unexpired.Where(trace => trace.Truncation == 0);
         var appended = await active
             .Where(trace =>
                 trace.EventCount < MaximumEvents && trace.ByteCount + bytes <= MaximumBytes
@@ -153,7 +169,8 @@ public sealed class AutomationTraceStore(
                                 _json
                             )!
                         )),
-                    ]
+                    ],
+                    new((AutomationTraceOutcome?)trace.TerminalOutcome, trace.ObservedFailures)
                 )
             );
     }
@@ -186,7 +203,8 @@ public sealed class AutomationTraceStore(
                 trace.ProductionRunId is { } run ? new(run) : null,
                 new(trace.CreatedAtUtc, TimeSpan.Zero),
                 new(trace.ExpiresAtUtc, TimeSpan.Zero),
-                (AutomationTraceTruncation)trace.Truncation
+                (AutomationTraceTruncation)trace.Truncation,
+                new((AutomationTraceOutcome?)trace.TerminalOutcome, trace.ObservedFailures)
             )),
         ];
     }

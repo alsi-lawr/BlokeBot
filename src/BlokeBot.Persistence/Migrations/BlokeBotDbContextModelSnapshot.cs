@@ -837,10 +837,16 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool?>("ObservedFailures")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid?>("ProductionRunId")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("SchemaVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TerminalOutcome")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Truncation")

@@ -24,6 +24,7 @@ public partial class AutomationEditorPage
     private bool _revealSelectedTrace;
     private string _traceTitle = "Execution trace";
     private string? _traceMessage;
+    private AutomationTraceId? _viewedTraceId;
     private AutomationTraceSnapshot? _trace;
     private AutomationTracePresentation? _tracePresentation;
     private AutomationTraceRow? _selectedTrace;
@@ -91,6 +92,8 @@ public partial class AutomationEditorPage
         _scenarioFields = [];
         _savedScenarios = [];
         _invalidFixtureInputs.Clear();
+        _currentScenarioResult = null;
+        _viewedTraceId = null;
         _trace = null;
         _tracePresentation = null;
         _selectedTrace = null;
@@ -118,15 +121,21 @@ public partial class AutomationEditorPage
         var editor = _editor;
         var host = HostId;
         var request = ++_traceLoad;
+        var version = _draftRevision;
         var outcome = await _tracesService.ReadAsync(new(host), id, CancellationToken.None);
-        if (request != _traceLoad || host != HostId || !ReferenceEquals(editor, _editor))
+        if (
+            request != _traceLoad
+            || version != _draftRevision
+            || host != HostId
+            || !ReferenceEquals(editor, _editor)
+        )
         {
             return;
         }
         _traceOpen = true;
+        _viewedTraceId = id;
         _trace = (outcome as AutomationTraceReadOutcome.Available)?.Trace;
         _tracePresentation = _trace is null ? null : AutomationTracePresentation.Create(_trace);
-        _sampleOutcomes = _tracePresentation?.RootOutcomes ?? [];
         _traceMessage = outcome switch
         {
             AutomationTraceReadOutcome.Expired => "This trace has expired.",
@@ -137,8 +146,7 @@ public partial class AutomationEditorPage
         _selectedTrace = null;
         if (
             _tracePresentation?.Rows.LastOrDefault(row =>
-                row.Entry.Event.Outcome == AutomationTraceOutcome.Failed
-                && row.Entry.Event.Node is not null
+                AutomationTraceOutcomeSummary.ObservesFailure(row.Entry.Event)
             ) is
             { } failure
         )
@@ -153,7 +161,12 @@ public partial class AutomationEditorPage
             await SelectTraceAsync(first.Entry.Sequence);
         }
         var headers = await _tracesService.ListAsync(new(host), editor?.Id, CancellationToken.None);
-        if (request == _traceLoad && host == HostId && ReferenceEquals(editor, _editor))
+        if (
+            request == _traceLoad
+            && version == _draftRevision
+            && host == HostId
+            && ReferenceEquals(editor, _editor)
+        )
         {
             _traceHeaders = headers;
         }

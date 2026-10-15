@@ -66,29 +66,58 @@ public partial class AutomationEditorPage
         }
     }
 
+    private AutomationTraceOutcomeSummary? _displayedRunSummary =>
+        _tracePresentation?.OutcomeSummary
+        ?? (
+            _viewingCurrentScenario && _currentScenarioResult is { } current
+                ? new(
+                    current.TerminalOutcome,
+                    current.Nodes.Any(outcome =>
+                        outcome.State
+                            is AutomationNodeRunState.Failed
+                                or AutomationNodeRunState.ContinuedAfterFailure
+                                or AutomationNodeRunState.Invalidated
+                    )
+                )
+                : null
+        );
+
     private string _runTitle =>
-        _sampleOutcomes.IsEmpty
-            ? _recentRuns.IsEmpty
-                ? "No runs yet"
-                : RecentRunTitle(_recentRuns[0])
-            : _sampleOutcomes.Any(static outcome => outcome.State == AutomationNodeRunState.Failed)
-                ? "Sample run failed"
-                : "Last sample run completed";
+        _displayedRunSummary is { } summary
+            ? $"{(_viewingCurrentScenario ? "Test" : _trace?.ProductionRunId is null ? "Historical test" : "Live run")} · {AutomationTracePresentation.StatusLabel(summary)}"
+        : _recentRuns.IsEmpty ? "No runs yet"
+        : RecentRunTitle(_recentRuns[0]);
 
     private string _runDescription =>
-        _sampleOutcomes.IsEmpty
-            ? _recentRuns.IsEmpty
-                ? string.Empty
-                : RecentRunDescription(_recentRuns[0])
-            : $"{_sampleOutcomes.Length} node outcomes";
+        _displayedRunSummary is not null
+            ? $"{_displayedOutcomes.Length} node outcomes · {(_viewingCurrentScenario ? "Hypothetical test" : "Recorded trace")}"
+        : _recentRuns.IsEmpty ? string.Empty
+        : RecentRunDescription(_recentRuns[0]);
+
+    private bool _runHasUnsuccessfulOutcome =>
+        _displayedRunSummary is { } summary
+            ? AutomationTracePresentation.IsUnsuccessful(summary)
+            : !_recentRuns.IsEmpty
+                && (
+                    _recentRuns[0].State
+                        is AutomationFlowRunState.Failed
+                            or AutomationFlowRunState.Invalidated
+                    || _recentRuns[0].FailedNode is not null
+                );
 
     private string _runIconClass =>
-        _runTitle.Contains("failed", StringComparison.OrdinalIgnoreCase)
+        _runHasUnsuccessfulOutcome
             ? "automation-run-icon automation-run-icon--failed"
             : "automation-run-icon";
-
     private string _runIcon =>
-        _runTitle.Contains("failed", StringComparison.OrdinalIgnoreCase) ? "!" : "✓";
+        _runHasUnsuccessfulOutcome ? "!"
+        : _displayedRunSummary is { } summary
+        && (
+            summary.TerminalOutcome != AutomationTraceOutcome.Succeeded
+            || summary.ObservedFailures is null
+        )
+            ? "?"
+        : "✓";
 
     private string _editorClass
     {

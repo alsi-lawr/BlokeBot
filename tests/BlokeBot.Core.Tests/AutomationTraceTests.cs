@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Automations.Page;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
@@ -213,9 +214,28 @@ public sealed partial class AutomationRuntimeTests
                 CancellationToken.None
             );
         }
+        var completed = await ReadTraceAsync(fixture, new(id));
         JsonSerializer
-            .Serialize(await ReadTraceAsync(fixture, new(id)))
-            .ShouldBe(JsonSerializer.Serialize(bounded));
+            .Serialize(completed.Events)
+            .ShouldBe(JsonSerializer.Serialize(bounded.Events));
+        completed.ByteCount.ShouldBe(bounded.ByteCount);
+        completed.ExpiresAtUtc.ShouldBe(bounded.ExpiresAtUtc);
+        completed.Truncation.ShouldBe(bounded.Truncation);
+        completed.OutcomeSummary.ShouldBe(new(AutomationTraceOutcome.Succeeded, false));
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            await AutomationTraceStore.AppendAsync(
+                db,
+                id,
+                TraceFailure(id, now),
+                now,
+                CancellationToken.None
+            );
+        }
+        var failed = await ReadTraceAsync(fixture, new(id));
+        JsonSerializer.Serialize(failed.Events).ShouldBe(JsonSerializer.Serialize(bounded.Events));
+        failed.OutcomeSummary.ShouldBe(new(AutomationTraceOutcome.Succeeded, true));
+        AutomationTracePresentation.Create(failed).FailureDetailsNotRetained.ShouldBeTrue();
         fixture.Clock.Advance(AutomationTraceStore.Retention);
         _ = (
             await traces.ReadAsync(new(fixture.HostId), new(id), CancellationToken.None)
@@ -255,11 +275,31 @@ public sealed partial class AutomationRuntimeTests
                 now,
                 CancellationToken.None
             );
+            await AutomationTraceStore.AppendAsync(
+                db,
+                id,
+                TraceFailure(id, now),
+                now,
+                CancellationToken.None
+            );
+            await AutomationTraceStore.AppendAsync(
+                db,
+                id,
+                AutomationTraceRedaction.Event(
+                    id,
+                    AutomationTraceEventKind.Terminal,
+                    now,
+                    outcome: AutomationTraceOutcome.Failed
+                ),
+                now,
+                CancellationToken.None
+            );
             await transaction.RollbackAsync();
         }
         var empty = await ReadTraceAsync(fixture, new(id));
         empty.Events.ShouldBeEmpty();
         empty.ByteCount.ShouldBe(0);
+        empty.OutcomeSummary.ShouldBe(new(null, false));
         await using (var db = await fixture.Database.CreateDbContextAsync())
         {
             await AutomationTraceStore.AppendAsync(
@@ -326,11 +366,14 @@ public sealed partial class AutomationRuntimeTests
                         await AutomationTraceStore.AppendAsync(
                             db,
                             id,
-                            AutomationTraceRedaction.Event(
-                                id,
-                                AutomationTraceEventKind.Resume,
-                                now.AddTicks(index)
-                            ),
+                            index == 0
+                                ? TraceFailure(id, now)
+                                : AutomationTraceRedaction.Event(
+                                    id,
+                                    AutomationTraceEventKind.Terminal,
+                                    now.AddTicks(index),
+                                    outcome: AutomationTraceOutcome.Succeeded
+                                ),
                             now,
                             CancellationToken.None
                         );
@@ -344,6 +387,7 @@ public sealed partial class AutomationRuntimeTests
             .Order()
             .ShouldBe(Enumerable.Range(0, 12).Select(index => now.Ticks + index));
         trace.Truncation.ShouldBe(AutomationTraceTruncation.None);
+        trace.OutcomeSummary.ShouldBe(new(AutomationTraceOutcome.Succeeded, true));
     }
 
     private static async Task AssertFailedAttemptTraceAsync(

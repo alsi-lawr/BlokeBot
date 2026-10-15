@@ -121,7 +121,7 @@ public partial class AutomationEditorPage
         CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];
-        _sampleOutcomes = [];
+        _currentScenarioResult = null;
         _feedback = null;
         _operationFailed = false;
         _nodeLibraryOpen = false;

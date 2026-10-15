@@ -162,6 +162,13 @@ public partial class AutomationEditorPage
         var fixture = scenario.Fixture;
         var draft = editor.Draft(new(HostId));
         var host = HostId;
+        _currentScenarioResult = null;
+        _traceLoad++;
+        _viewedTraceId = null;
+        _trace = null;
+        _tracePresentation = null;
+        _selectedTrace = null;
+        _traceOpen = false;
         _busy = true;
         _scenarioCancellation = new();
         try
@@ -183,14 +190,24 @@ public partial class AutomationEditorPage
             switch (outcome)
             {
                 case AutomationScenarioRunOutcome.Completed completed:
-                    _sampleOutcomes = completed.Nodes;
+                    _currentScenarioResult = new(
+                        completed.TraceId,
+                        version,
+                        AutomationTraceOutcome.Succeeded,
+                        completed.Nodes
+                    );
                     trace = completed.TraceId;
-                    _traceTitle = "Hypothetical test completed";
+                    _traceTitle = "Test trace";
                     break;
                 case AutomationScenarioRunOutcome.Failed failed:
-                    _sampleOutcomes = failed.Nodes;
+                    _currentScenarioResult = new(
+                        failed.TraceId,
+                        version,
+                        AutomationTraceOutcome.Failed,
+                        failed.Nodes
+                    );
                     trace = failed.TraceId;
-                    _traceTitle = "Test run failed";
+                    _traceTitle = "Test trace";
                     break;
                 case AutomationScenarioRunOutcome.Invalid invalid:
                     ShowValidation(invalid.Errors, "Correct the scenario or draft.");

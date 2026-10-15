@@ -854,10 +854,16 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("integer");
 
+                    b.Property<bool?>("ObservedFailures")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("ProductionRunId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TerminalOutcome")
                         .HasColumnType("integer");
 
                     b.Property<int>("Truncation")

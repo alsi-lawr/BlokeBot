@@ -12,6 +12,8 @@ public sealed class AutomationTrace
     public int EventCount { get; set; }
     public int ByteCount { get; set; }
     public int Truncation { get; set; }
+    public int? TerminalOutcome { get; set; }
+    public bool? ObservedFailures { get; set; }
 }
 
 public sealed class AutomationTraceEvent

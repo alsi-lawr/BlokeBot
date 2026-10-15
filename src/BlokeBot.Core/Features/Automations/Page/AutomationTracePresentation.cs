@@ -15,16 +15,65 @@ public sealed class AutomationTracePresentation
     private readonly ImmutableDictionary<int, AutomationTraceRow> _bySequence;
     public ImmutableArray<AutomationScenarioNodeOutcome> RootOutcomes { get; }
 
-    private AutomationTracePresentation(ImmutableArray<AutomationTraceRow> rows)
+    public AutomationTraceOutcomeSummary OutcomeSummary { get; }
+    public string Status => StatusLabel(OutcomeSummary);
+    public bool HasUnsuccessfulOutcome => IsUnsuccessful(OutcomeSummary);
+    public bool FailureDetailsNotRetained =>
+        OutcomeSummary.ObservedFailures == true
+        && !Rows.Any(row => AutomationTraceOutcomeSummary.ObservesFailure(row.Entry.Event));
+
+    public static string StatusLabel(AutomationTraceOutcomeSummary summary) =>
+        summary.TerminalOutcome switch
+        {
+            AutomationTraceOutcome.Succeeded when summary.ObservedFailures == true =>
+                "Completed with failures",
+            AutomationTraceOutcome.Succeeded when summary.ObservedFailures is null =>
+                "Completed · failure history unknown",
+            AutomationTraceOutcome.Succeeded => "Completed",
+            AutomationTraceOutcome.Failed => "Failed",
+            AutomationTraceOutcome.Invalidated => "Invalidated",
+            AutomationTraceOutcome.Cancelled => "Cancelled",
+            AutomationTraceOutcome.Interrupted => "Interrupted",
+            _ when summary.ObservedFailures == true => "Failures observed · completion unknown",
+            _ => "Completion unknown",
+        };
+
+    public static bool IsUnsuccessful(AutomationTraceOutcomeSummary summary) =>
+        summary.ObservedFailures == true
+        || summary.TerminalOutcome
+            is AutomationTraceOutcome.Failed
+                or AutomationTraceOutcome.Invalidated
+                or AutomationTraceOutcome.Cancelled
+                or AutomationTraceOutcome.Interrupted;
+
+    private AutomationTracePresentation(
+        AutomationTraceSnapshot trace,
+        ImmutableArray<AutomationTraceRow> rows
+    )
     {
         Rows = rows;
+        OutcomeSummary = new(
+            trace.OutcomeSummary?.TerminalOutcome
+                ?? trace
+                    .Events.Select(entry =>
+                        AutomationTraceOutcomeSummary.RootTerminal(trace.Id.Value, entry.Event)
+                    )
+                    .LastOrDefault(outcome => outcome is not null),
+            trace.OutcomeSummary?.ObservedFailures == true
+            || trace.Events.Any(entry => AutomationTraceOutcomeSummary.ObservesFailure(entry.Event))
+                ? true
+                : trace.OutcomeSummary?.ObservedFailures
+        );
         _bySequence = rows.ToImmutableDictionary(row => row.Entry.Sequence);
         RootOutcomes =
         [
             .. rows.Where(row =>
-                    row.Entry.Event.Invocation.ParentId is null
+                    row.Entry.Event.Invocation.Id == trace.Id.Value
+                    && row.Entry.Event.Invocation.ParentId is null
                     && row.Entry.Event.Node is not null
-                    && row.Entry.Event.Kind == AutomationTraceEventKind.Result
+                    && row.Entry.Event.Kind
+                        is AutomationTraceEventKind.Result
+                            or AutomationTraceEventKind.Outputs
                 )
                 .GroupBy(row => row.Entry.Event.Node!.Id)
                 .Select(group => group.Last().Entry.Event)
@@ -34,6 +83,7 @@ public sealed class AutomationTracePresentation
                             or AutomationTraceOutcome.Failed
                             or AutomationTraceOutcome.ContinuedAfterFailure
                             or AutomationTraceOutcome.Invalidated
+                            or AutomationTraceOutcome.Interrupted
                 )
                 .Select(data => new AutomationScenarioNodeOutcome(
                     data.Node!.Id,
@@ -42,7 +92,8 @@ public sealed class AutomationTracePresentation
                         AutomationTraceOutcome.Failed => AutomationNodeRunState.Failed,
                         AutomationTraceOutcome.ContinuedAfterFailure =>
                             AutomationNodeRunState.ContinuedAfterFailure,
-                        AutomationTraceOutcome.Invalidated => AutomationNodeRunState.Invalidated,
+                        AutomationTraceOutcome.Invalidated or AutomationTraceOutcome.Interrupted =>
+                            AutomationNodeRunState.Invalidated,
                         _ => AutomationNodeRunState.Succeeded,
                     },
                     data.Outcome == AutomationTraceOutcome.ContinuedAfterFailure
@@ -110,6 +161,6 @@ public sealed class AutomationTracePresentation
                 )
             );
         }
-        return new(rows.ToImmutable());
+        return new(trace, rows.ToImmutable());
     }
 }

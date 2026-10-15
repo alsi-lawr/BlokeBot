@@ -2,7 +2,7 @@
 
 <section class="automation-trace-panel" data-automation-trace aria-label="Execution trace">
     <header class="automation-trace-heading">
-    <h2>@Title</h2>
+    <h2>@Title@if (Presentation is { } status) { <small class="@(status.HasUnsuccessfulOutcome ? "automation-authoring-error" : null)"> · @status.Status</small> }</h2>
     <div class="automation-authoring-actions">
     <button class="btn-secondary" type="button" @onclick="EditScenario">Edit scenario</button>
     <button class="btn-secondary" type="button" @onclick="Close">Close trace</button>
@@ -44,6 +44,7 @@
         }
     }
     @if (Snapshot?.Truncation is not null and not AutomationTraceTruncation.None) { <p class="automation-trace-message" role="status">Trace truncated · @Snapshot.Events.Length recorded events</p> }
+    @if (Presentation?.FailureDetailsNotRetained == true) { <p class="automation-trace-message" role="status">Failure details were not retained in this trace.</p> }
     @if (Selected is { } selected)
     {
         <footer class="automation-trace-detail">
@@ -76,6 +77,11 @@
             @if (facts.Span is { } span) { <dt>Recorded expression range</dt><dd>@span.Start–@(span.Start + span.Length) (offsets)</dd> }
             @if (facts.Affected is { } affected) { <dt>Affected consumer</dt><dd>@affected.NodeId.Value · @MemberLabel(affected.Member)</dd> }
         }
+        <dt>Recorded time (UTC)</dt><dd>@selected.Entry.Event.TimeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.fff 'UTC'")</dd>
+        @if (selected.Entry.Event.Kind == AutomationTraceEventKind.Branch) { <dt>Selected branch</dt><dd>@(selected.Entry.Event.SelectedPort?.Value ?? "All outputs")</dd> }
+        @if (selected.Entry.Event.DueAtUtc is { } due) { <dt>Scheduled deadline (UTC)</dt><dd>@due.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.fff 'UTC'")</dd> }
+        @if (selected.Entry.Event.Kind == AutomationTraceEventKind.Resume) { <dt>Resume</dt><dd>Run resumed · not a per-node wake-up time</dd> }
+        @if (selected.Entry.Event.Retry == AutomationTraceRetry.NotRetried) { <dt>Retry</dt><dd>Not retried</dd> }
         <dt>Node</dt>
         <dd>@selected.Entry.Event.Node?.Id.Value</dd>
         <dt>Invocation</dt>

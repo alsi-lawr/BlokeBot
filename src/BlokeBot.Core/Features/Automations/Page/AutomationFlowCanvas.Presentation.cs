@@ -21,7 +21,11 @@ public partial class AutomationFlowCanvas
                 SelectedNodeIds.Contains(node.Id) ? "automation-node--selected" : string.Empty,
                 DisclosedNodeId == node.Id ? "automation-node--disclosed" : string.Empty,
                 invalid || Disconnected(node.Id) ? "automation-node--invalid" : string.Empty,
-                outcome?.State == AutomationNodeRunState.Failed ? "automation-node--failed"
+                outcome?.State
+                    is AutomationNodeRunState.Failed
+                        or AutomationNodeRunState.ContinuedAfterFailure
+                        or AutomationNodeRunState.Invalidated
+                    ? "automation-node--failed"
                 : outcome is not null ? "automation-node--ran"
                 : string.Empty,
             }.Where(static value => value.Length > 0)
@@ -207,7 +211,13 @@ public partial class AutomationFlowCanvas
             "condition-false" => "No branch",
             "delayed" => "Virtual delay",
             "action-simulated" => "Hypothetical",
-            _ => outcome.State == AutomationNodeRunState.Failed ? "Failed" : outcome.OutcomeCode,
+            _ => outcome.State switch
+            {
+                AutomationNodeRunState.Failed => "Failed",
+                AutomationNodeRunState.ContinuedAfterFailure => "Continued after failure",
+                AutomationNodeRunState.Invalidated => "Invalidated",
+                _ => outcome.OutcomeCode,
+            },
         };
 
     private static string OrientationToken(AutomationFlowOrientation orientation) =>

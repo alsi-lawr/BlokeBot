@@ -13,7 +13,29 @@ public partial class AutomationEditorPage
     private ImmutableArray<AutomationDefinitionDescriptor> _definitions = [];
     private ImmutableArray<AutomationFlowSnapshot> _flowSnapshots = [];
     private ImmutableArray<AutomationGraphError> _validationErrors = [];
-    private ImmutableArray<AutomationScenarioNodeOutcome> _sampleOutcomes = [];
+
+    private sealed record CurrentScenarioResult(
+        AutomationTraceId TraceId,
+        long DraftRevision,
+        AutomationTraceOutcome TerminalOutcome,
+        ImmutableArray<AutomationScenarioNodeOutcome> Nodes
+    );
+
+    private CurrentScenarioResult? _currentScenarioResult;
+    private bool _viewingCurrentScenario =>
+        _currentScenarioResult is { } current
+        && current.DraftRevision == _draftRevision
+        && (_viewedTraceId is null || _viewedTraceId == current.TraceId);
+    private ImmutableArray<AutomationScenarioNodeOutcome> _displayedOutcomes =>
+        _viewingCurrentScenario && _currentScenarioResult is { } current
+            ?
+            [
+                .. current.Nodes,
+                .. (_tracePresentation?.RootOutcomes ?? []).Where(outcome =>
+                    !current.Nodes.Any(node => node.NodeId == outcome.NodeId)
+                ),
+            ]
+            : _tracePresentation?.RootOutcomes ?? [];
     private ImmutableArray<AutomationRunSummary> _recentRuns = [];
     private readonly HashSet<AutomationNodeId> _selectedNodeIds = [];
     private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];

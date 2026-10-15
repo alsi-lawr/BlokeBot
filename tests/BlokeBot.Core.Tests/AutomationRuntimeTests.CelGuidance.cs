@@ -93,7 +93,9 @@ public sealed partial class AutomationRuntimeTests
         serialized.ShouldNotContain("private-");
         serialized.ShouldNotContain(numericFailure ? "decimal(args[0])" : "args[99]");
         var presentation = AutomationTracePresentation.Create(persisted);
-        presentation.RootOutcomes.ShouldNotContain(outcome => outcome.NodeId == producer.Id);
+        presentation
+            .RootOutcomes.Single(outcome => outcome.NodeId == producer.Id)
+            .State.ShouldBe(AutomationNodeRunState.Failed);
         presentation
             .RootOutcomes.Single(outcome => outcome.NodeId == consumer.Id)
             .State.ShouldBe(AutomationNodeRunState.Failed);
@@ -117,6 +119,7 @@ public sealed partial class AutomationRuntimeTests
         _ = ui.Services.AddSingleton<IOverlayCueAdmissionService>(new NoOverlayCues());
         _ = ui.Services.AddSingleton<TimeProvider>(fixture.Clock);
         _ = ui.Services.AddBlokeBotAutomations();
+        _ = ui.Services.AddSingleton(fixture.Scenarios);
         var page = ui.Render<AutomationEditorPage>();
         page.WaitForAssertion(() =>
             page.FindComponent<AutomationFlowCanvas>().Instance.Nodes.Count.ShouldBe(3)
@@ -176,6 +179,7 @@ public sealed partial class AutomationRuntimeTests
         );
         page.Find(".automation-trace-detail [role=status]").TextContent.ShouldBe(selectedAdvice);
         page.FindComponent<AutomationFlowCanvas>()
-            .Instance.SampleOutcomes.ShouldNotContain(outcome => outcome.NodeId == producer.Id);
+            .Instance.SampleOutcomes.Single(outcome => outcome.NodeId == producer.Id)
+            .State.ShouldBe(AutomationNodeRunState.Failed);
     }
 }

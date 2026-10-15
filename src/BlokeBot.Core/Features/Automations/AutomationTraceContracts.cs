@@ -85,6 +85,35 @@ public sealed record AutomationTraceEventData(
 
 public sealed record AutomationTraceEntry(int Sequence, AutomationTraceEventData Event);
 
+public sealed record AutomationTraceOutcomeSummary(
+    AutomationTraceOutcome? TerminalOutcome,
+    bool? ObservedFailures
+)
+{
+    internal static bool ObservesFailure(AutomationTraceEventData data) =>
+        data.Node is not null
+        && data.Kind
+            is AutomationTraceEventKind.Result
+                or AutomationTraceEventKind.Outputs
+                or AutomationTraceEventKind.SubflowExit
+        && data.Outcome
+            is AutomationTraceOutcome.Failed
+                or AutomationTraceOutcome.ContinuedAfterFailure
+                or AutomationTraceOutcome.Invalidated
+                or AutomationTraceOutcome.Interrupted;
+
+    internal static AutomationTraceOutcome? RootTerminal(
+        Guid traceId,
+        AutomationTraceEventData data
+    ) =>
+        data.Kind == AutomationTraceEventKind.Terminal
+        && data.Invocation.Id == traceId
+        && data.Invocation.ParentId is null
+        && data.Outcome != AutomationTraceOutcome.None
+            ? data.Outcome
+            : null;
+}
+
 public sealed record AutomationTraceSnapshot(
     AutomationTraceId Id,
     int SchemaVersion,
@@ -94,7 +123,8 @@ public sealed record AutomationTraceSnapshot(
     DateTimeOffset ExpiresAtUtc,
     int ByteCount,
     AutomationTraceTruncation Truncation,
-    ImmutableArray<AutomationTraceEntry> Events
+    ImmutableArray<AutomationTraceEntry> Events,
+    AutomationTraceOutcomeSummary? OutcomeSummary = null
 );
 
 public sealed record AutomationTraceSummary(
@@ -103,7 +133,8 @@ public sealed record AutomationTraceSummary(
     AutomationRunId? ProductionRunId,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset ExpiresAtUtc,
-    AutomationTraceTruncation Truncation
+    AutomationTraceTruncation Truncation,
+    AutomationTraceOutcomeSummary? OutcomeSummary = null
 );
 
 public abstract record AutomationTraceReadOutcome

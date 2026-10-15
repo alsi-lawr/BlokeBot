@@ -194,6 +194,8 @@ public partial class AutomationEditorPage
     private static string RecentRunTitle(AutomationRunSummary run) =>
         run.State switch
         {
+            AutomationFlowRunState.Completed when run.FailedNode is not null =>
+                "Live run · Completed with failures",
             AutomationFlowRunState.Completed => "Last live run completed",
             AutomationFlowRunState.Failed => "Last live run failed",
             AutomationFlowRunState.Waiting => "Live run waits",
@@ -204,9 +206,15 @@ public partial class AutomationEditorPage
     private string RecentRunDescription(AutomationRunSummary run)
     {
         var failed = run.FailedNode;
-        var failedName = failed is null
-            ? null
-            : _editor?.Nodes.FirstOrDefault(node => node.Id == failed.NodeId)?.EffectiveName;
+        var failedName =
+            failed is null ? null
+            : failed.Invocation?.ParentId is null
+                ? _editor
+                    ?.Nodes.FirstOrDefault(node =>
+                        node.Id == (failed.AuthorNodeId ?? failed.NodeId)
+                    )
+                    ?.EffectiveName
+            : null;
         return failedName is null
                 ? $"{run.Nodes.Length} node outcomes · {FormatTimestamp(run.StartedAtUtc)}"
             : failed!.State == AutomationNodeRunState.ContinuedAfterFailure
