@@ -7,33 +7,89 @@ public partial class AutomationNodeInspector
 {
     private void OpenSourcePicker(AutomationPortMetadata input, Guid? edgeId)
     {
+        _pickerNodeId = Node?.Id;
+        _addingTransformInput = false;
         _pickerInputId = input.Id;
         _pickerEdgeId = edgeId;
+        _pickerOpener = _sourceOpeners.GetValueOrDefault(input.Id);
+        _sourcePickerError = null;
+        var edge = edgeId is { } id ? Edges.FirstOrDefault(edge => edge.Id == id) : null;
         var choices = SourceChoices();
-        _selectedSource =
-            choices.FirstOrDefault(static choice => choice.Compatibility.IsCompatible)
-            ?? choices.FirstOrDefault();
+        _selectedSource = edge is null
+            ? choices.FirstOrDefault(static choice => choice.Compatibility.IsCompatible)
+                ?? choices.FirstOrDefault()
+            : choices.FirstOrDefault(choice =>
+                choice.Node.Id == edge.SourceNodeId && choice.Port.Id == edge.SourcePortId
+            );
         _pickerNeedsFocus = true;
+    }
+
+    private void OpenTransformInputSourcePicker()
+    {
+        _pickerNodeId = Node?.Id;
+        _addingTransformInput = true;
+        _pickerInputId = null;
+        _pickerEdgeId = null;
+        _pickerOpener = _addInputOpener;
+        _sourcePickerError = null;
+        _newInputNameEdited = false;
+        _newInputIdentifierEdited = false;
+        _selectedSource = null;
+        if (
+            SourceChoices().FirstOrDefault(static choice => choice.Compatibility.IsCompatible) is
+            { } first
+        )
+        {
+            SelectSource(first);
+        }
+        _pickerNeedsFocus = true;
+    }
+
+    private void CloseSourcePicker()
+    {
+        _pickerNodeId = null;
+        _pickerInputId = null;
+        _pickerEdgeId = null;
+        _addingTransformInput = false;
+        _selectedSource = null;
+        _sourceReferences.Clear();
+        _sourcePickerError = null;
+    }
+
+    private string? _newInputDiagnostic =>
+        _addingTransformInput
+            ? Node?.TransformInputNameDiagnostic(_newInputName, _newInputIdentifier)
+            : null;
+
+    private void SetNewInputName(ChangeEventArgs args)
+    {
+        _newInputName = args.Value?.ToString() ?? string.Empty;
+        _newInputNameEdited = true;
+    }
+
+    private void SetNewInputIdentifier(ChangeEventArgs args)
+    {
+        _newInputIdentifier = args.Value?.ToString() ?? string.Empty;
+        _newInputIdentifierEdited = true;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (
-            _pickerNeedsFocus
-            && _selectedSource is { } source
-            && _sourceReferences.TryGetValue(source, out var reference)
-        )
+        if (_pickerNeedsFocus)
         {
             _pickerNeedsFocus = false;
+            var reference =
+                _selectedSource is { } source
+                && _sourceReferences.TryGetValue(source, out var choiceReference)
+                    ? choiceReference
+                    : _pickerDialog;
             await reference.FocusAsync();
         }
     }
 
     private async Task CancelSourcePickerAsync()
     {
-        _pickerInputId = null;
-        _pickerEdgeId = null;
-        _selectedSource = null;
+        CloseSourcePicker();
         await InvokeAsync(StateHasChanged);
         await _pickerOpener.FocusAsync();
     }
@@ -41,7 +97,23 @@ public partial class AutomationNodeInspector
     private Task HandlePickerKeyAsync(KeyboardEventArgs args) =>
         args.Key == "Escape" ? CancelSourcePickerAsync() : Task.CompletedTask;
 
-    private void SelectSource(AutomationSourceChoice choice) => _selectedSource = choice;
+    private void SelectSource(AutomationSourceChoice choice)
+    {
+        _selectedSource = choice;
+        _sourcePickerError = null;
+        if (!_addingTransformInput)
+        {
+            return;
+        }
+        if (!_newInputNameEdited)
+        {
+            _newInputName = choice.Port.Name;
+        }
+        if (!_newInputIdentifierEdited)
+        {
+            _newInputIdentifier = Node!.SuggestedTransformInputIdentifier(choice.Port);
+        }
+    }
 
     private async Task HandleSourceChoiceKeyAsync(
         AutomationSourceChoice choice,
@@ -63,9 +135,9 @@ public partial class AutomationNodeInspector
             return;
         }
 
-        _selectedSource = choices[target];
+        SelectSource(choices[target]);
         await InvokeAsync(StateHasChanged);
-        if (_sourceReferences.TryGetValue(_selectedSource, out var reference))
+        if (_sourceReferences.TryGetValue(choices[target], out var reference))
         {
             await reference.FocusAsync();
         }
@@ -73,35 +145,60 @@ public partial class AutomationNodeInspector
 
     private async Task ConnectSelectedSourceAsync()
     {
-        if (
-            Node is null
-            || _pickerInputId is not { } inputId
-            || _selectedSource is not { Compatibility.IsCompatible: true } source
-        )
+        if (Node is null || Node.Id != _pickerNodeId || _selectedSource is not { } selected)
         {
             return;
         }
-        var request = new AutomationConnectionRequest(
-            source.Node.Id,
-            source.Port.Id,
-            Node.Id,
-            inputId
-        );
-        if (_pickerEdgeId is { } edgeId)
+        var source = SourceChoices()
+            .FirstOrDefault(choice =>
+                choice.Node.Id == selected.Node.Id && choice.Port == selected.Port
+            );
+        if (source?.Compatibility.IsCompatible != true)
         {
-            await Repair.InvokeAsync(new(edgeId, request));
+            _sourcePickerError =
+                "This source changed or became unavailable. Choose a current source.";
+            return;
         }
-        else
+        if (_addingTransformInput)
         {
-            await Connect.InvokeAsync(request);
+            if (_newInputDiagnostic is not null)
+            {
+                return;
+            }
+            await AddInputFromSource.InvokeAsync(
+                new(source.Node.Id, source.Port, Node.Id, _newInputName, _newInputIdentifier)
+            );
+        }
+        else if (_pickerInputId is { } inputId)
+        {
+            var request = new AutomationConnectionRequest(
+                source.Node.Id,
+                source.Port.Id,
+                Node.Id,
+                inputId
+            );
+            if (_pickerEdgeId is { } edgeId)
+            {
+                await Repair.InvokeAsync(new(edgeId, request));
+            }
+            else
+            {
+                await Connect.InvokeAsync(request);
+            }
         }
         await CancelSourcePickerAsync();
     }
 
-    private IReadOnlyList<AutomationSourceChoice> SourceChoices() =>
-        Node is not { } node
-        || _pickerInputId is not { } inputId
-        || node.Definition.Inputs.FirstOrDefault(port => port.Id == inputId) is not { } input
+    private IReadOnlyList<AutomationSourceChoice> SourceChoices()
+    {
+        if (Node is not { } node || node.Id != _pickerNodeId)
+        {
+            return [];
+        }
+        var input = _pickerInputId is { } inputId
+            ? node.Definition.Inputs.FirstOrDefault(port => port.Id == inputId)
+            : null;
+        return !_addingTransformInput && input is null
             ? []
             : Nodes
                 .Where(candidate => candidate.Id != node.Id)
@@ -113,7 +210,14 @@ public partial class AutomationNodeInspector
                         .Select(port => new AutomationSourceChoice(
                             candidate,
                             port,
-                            AutomationConnections.Compatibility(candidate, port, Node, input)
+                            AutomationConnections.Compatibility(
+                                candidate,
+                                port,
+                                node,
+                                _addingTransformInput
+                                    ? AutomationEditorNode.SourceDerivedTransformInput(port)
+                                    : input!
+                            )
                         ))
                 )
                 .OrderByDescending(static choice => choice.Compatibility.IsCompatible)
@@ -123,6 +227,7 @@ public partial class AutomationNodeInspector
                 )
                 .ThenBy(static choice => choice.Port.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+    }
 
     private AutomationFlowDraftEdge? IncomingDataEdge(AutomationPortId portId) =>
         Node is null

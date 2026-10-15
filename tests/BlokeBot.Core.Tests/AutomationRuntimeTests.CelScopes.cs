@@ -323,7 +323,7 @@ public sealed partial class AutomationRuntimeTests
         removedDiagnostic
             .ShouldNotBeNull()
             .Category.ShouldBe(AutomationDiagnosticCategory.UnavailableName);
-        inspector.Find("button[aria-label='Add input']").Click();
+        inspector.Find("button[aria-label='Declare input manually']").Click();
         inspector.Find(".automation-input-editor input[type=text]").Input("4.25");
         _ = ScopeOutputExample(inspector, node, outputId);
         ScopeAssertFixedOutput(node, new AutomationValue.Number(4.25m));

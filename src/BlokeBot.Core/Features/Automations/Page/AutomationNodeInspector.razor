@@ -61,11 +61,11 @@ else
         {
             <div class="automation-inspector-cel-help">
                 <div><a href="https://www.blokebot.com/automations#write-cel-expressions">BlokeBot guide to CEL expressions</a><a href="https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md">Official introduction to CEL</a></div>
-                <p>Declare an input name and type, then bind its source below. Flow schedules nodes; it does not import values. A Data connection supplies a value when requested.</p>
+                <p>Choose a Data source to create an input, or declare one manually. Flow schedules nodes; it does not import values. A Data connection supplies a value when requested.</p>
                 <p>Outputs compute from declared inputs only, not other outputs. Connect an output to a consumer. A Boolean output is data, not a Flow branch.</p>
             </div>
             <section class="automation-inspector-section automation-transform-schema" aria-labelledby="automation-transform-inputs-heading">
-                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><button class="automation-icon-button" type="button" aria-label="Add input" title="Add input" @onclick="AddTransformInputAsync"><EditorIcon Name="add" /></button></div>
+                <div class="automation-inspector-section-heading"><h3 id="automation-transform-inputs-heading">Inputs</h3><div class="automation-authoring-actions"><button class="automation-icon-button" type="button" aria-label="Declare input manually" title="Declare input manually" @onclick="AddTransformInputAsync"><EditorIcon Name="variables" /></button><button class="automation-icon-button" type="button" aria-label="Add input from source" title="Add input from source" aria-haspopup="dialog" @ref="_addInputOpener" @onclick="OpenTransformInputSourcePicker"><EditorIcon Name="add" /></button></div></div>
                 @foreach (var input in Node.TransformInputs)
                 {
                     <div class="automation-transform-declaration" @key="input.PortId">
@@ -179,8 +179,11 @@ else
                             }
                         </div>
                     }
+                }
+                @if (binding.Mode is AutomationInputBindingMode.Connected or AutomationInputBindingMode.Expression)
+                {
                     <div class="automation-repair-actions">
-                        <button type="button" data-automation-source-picker-open aria-haspopup="dialog" aria-expanded="@(_pickerInputId == input.Id ? "true" : "false")" @ref="_pickerOpener" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : "Repair source")</button>
+                        <button type="button" data-automation-source-picker-open aria-haspopup="dialog" aria-expanded="@(_pickerInputId == input.Id ? "true" : "false")" @ref="_sourceOpeners[input.Id]" @onclick="() => OpenSourcePicker(input, edge?.Id)">@(edge is null ? "Choose source" : issue is null ? "Change source" : "Repair source")</button>
                         @if (edge is not null)
                         {
                             <button class="automation-danger-button" type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)">Disconnect</button>
@@ -309,18 +312,31 @@ else
 
         <footer class="automation-inspector-footer"><button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)"><EditorIcon Name="delete" />Delete node</button><button class="btn-primary" type="button" @onclick="ChangedAsync"><EditorIcon Name="apply" />Apply</button></footer>
 
-        @if (_pickerInputId is not null)
+        @if (_pickerNodeId == Node.Id)
         {
             <div class="automation-source-picker-backdrop" @onclick="CancelSourcePickerAsync">
-                <section class="automation-source-picker" role="dialog" aria-modal="true" aria-labelledby="automation-source-picker-title" @onkeydown="HandlePickerKeyAsync" @onclick:stopPropagation="true">
-                    <header><div><span class="automation-inspector-eyebrow">Use another node</span><h3 id="automation-source-picker-title">Choose a source and port</h3></div><button class="automation-icon-button" type="button" aria-label="Cancel source choice" @onclick="CancelSourcePickerAsync"><EditorIcon Name="close" /></button></header>
+                <section class="automation-source-picker" role="dialog" aria-modal="true" aria-labelledby="automation-source-picker-title" tabindex="-1" @ref="_pickerDialog" @onkeydown="HandlePickerKeyAsync" @onclick:stopPropagation="true">
+                    <header><div><span class="automation-inspector-eyebrow">Use another node</span><h3 id="automation-source-picker-title">@(_addingTransformInput ? "Add input from source" : "Choose a source and port")</h3></div><button class="automation-icon-button" type="button" aria-label="Cancel source choice" @onclick="CancelSourcePickerAsync"><EditorIcon Name="close" /></button></header>
+                    @if (_pickerEdgeId is { } currentEdgeId && Edges.FirstOrDefault(edge => edge.Id == currentEdgeId) is { } currentEdge && _selectedSource is null)
+                    {
+                        <div class="automation-binding-card automation-binding-card--invalid"><strong>@ConnectedSourceLabel(currentEdge)</strong><span class="automation-connection-diagnostic">Current output is unavailable. Choose a replacement.</span></div>
+                    }
                     <div class="automation-source-picker-options" role="radiogroup" aria-label="Available source ports">
                         @foreach (var choice in SourceChoices())
                         {
-                            <button type="button" role="radio" class="@(choice == _selectedSource ? "automation-source-picker-option automation-source-picker-option--selected" : "automation-source-picker-option")" aria-checked="@(choice == _selectedSource ? "true" : "false")" tabindex="@(choice == _selectedSource ? 0 : -1)" @ref="_sourceReferences[choice]" @onclick="() => SelectSource(choice)" @onkeydown="args => HandleSourceChoiceKeyAsync(choice, args)"><span><strong>@choice.Node.EffectiveName · @choice.Port.Name</strong><small>@choice.Node.Definition.Display.Name · @AutomationConnections.TypeLabel(choice.Port)</small></span><em>@choice.Compatibility.Reason</em></button>
+                            <button type="button" role="radio" class="@(choice == _selectedSource ? "automation-source-picker-option automation-source-picker-option--selected" : "automation-source-picker-option")" aria-checked="@(choice == _selectedSource ? "true" : "false")" tabindex="@(choice == _selectedSource || (_selectedSource is null && choice == SourceChoices().FirstOrDefault()) ? 0 : -1)" @ref="_sourceReferences[choice]" @onclick="() => SelectSource(choice)" @onkeydown="args => HandleSourceChoiceKeyAsync(choice, args)"><span><strong>@choice.Node.EffectiveName · @choice.Port.Name</strong><small>@choice.Node.Definition.Display.Name · @AutomationConnections.TypeLabel(choice.Port)</small></span><em>@(choice.Compatibility.IsCompatible && _addingTransformInput ? (choice.Port.Nullability == AutomationPortNullability.Nullable ? "Optional" : "Required") : choice.Compatibility.Reason)</em></button>
                         }
                     </div>
-                    <footer><button type="button" @onclick="CancelSourcePickerAsync">Cancel</button><button class="btn-primary" type="button" data-automation-source-picker-complete disabled="@(_selectedSource?.Compatibility.IsCompatible != true)" @onclick="ConnectSelectedSourceAsync">Connect</button></footer>
+                    @if (_addingTransformInput)
+                    {
+                        <div class="space-y-3">
+                            <div class="field"><label class="field__label" for="automation-new-input-name">Input name</label><input class="field__input" id="automation-new-input-name" value="@_newInputName" @oninput="SetNewInputName" /></div>
+                            <div class="field"><label class="field__label" for="automation-new-input-identifier">CEL name</label><input class="field__input" id="automation-new-input-identifier" value="@_newInputIdentifier" aria-invalid="@(_newInputDiagnostic is null ? null : "true")" aria-describedby="automation-new-input-error" @oninput="SetNewInputIdentifier" /></div>
+                            @if (_newInputDiagnostic is { } nameError) { <span id="automation-new-input-error" class="automation-field-error" role="alert">@nameError</span> }
+                        </div>
+                    }
+                    @if (_sourcePickerError is { } pickerError) { <span class="automation-field-error" role="alert">@pickerError</span> }
+                    <footer><button type="button" @onclick="CancelSourcePickerAsync">Cancel</button><button class="btn-primary" type="button" data-automation-source-picker-complete disabled="@(_selectedSource?.Compatibility.IsCompatible != true || _newInputDiagnostic is not null)" @onclick="ConnectSelectedSourceAsync">@(_addingTransformInput ? "Add input" : "Connect")</button></footer>
                 </section>
             </div>
         }

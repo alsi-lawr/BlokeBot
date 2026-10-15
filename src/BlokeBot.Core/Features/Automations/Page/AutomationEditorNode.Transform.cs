@@ -30,6 +30,71 @@ public sealed partial class AutomationEditorNode
         RefreshTransformDefinition();
     }
 
+    internal string? TransformInputNameDiagnostic(string displayName, string identifier) =>
+        string.IsNullOrWhiteSpace(displayName) ? "Enter an input name."
+        : !AutomationCelSyntax.IsIdentifier(identifier)
+        || AutomationCelSyntax.ReservedIdentifiers.Contains(identifier)
+        || TransformInputs.Any(input => input.Identifier.Value == identifier)
+            ? "Use a unique CEL name: letters, digits and underscores, not starting with a digit or a reserved word."
+        : null;
+
+    internal string SuggestedTransformInputIdentifier(AutomationPortMetadata source)
+    {
+        var name =
+            source.ValueType == AutomationPortValueType.Arguments
+                ? "args"
+                : source.Id.Value.Split('.').Last();
+        if (
+            !AutomationCelSyntax.IsIdentifier(name)
+            || AutomationCelSyntax.ReservedIdentifiers.Contains(name)
+        )
+        {
+            name = "input";
+        }
+        return TransformInputs.Any(input => input.Identifier.Value == name)
+            ? NextTransformSequence(TransformInputs.Select(input => input.Identifier.Value), name)
+            : name;
+    }
+
+    internal static AutomationPortMetadata SourceDerivedTransformInput(
+        AutomationPortMetadata source
+    ) =>
+        new(
+            new("prospective-input"),
+            source.Name,
+            string.Empty,
+            source.ValueType,
+            Nullability: source.Nullability,
+            BindingFieldId: new("prospective-binding")
+        );
+
+    internal AutomationCelTransformInput? AddTransformInputFromSource(
+        AutomationPortMetadata source,
+        string displayName,
+        string identifier
+    )
+    {
+        if (_transform is null || TransformInputNameDiagnostic(displayName, identifier) is not null)
+        {
+            return null;
+        }
+
+        var input = new AutomationCelTransformInput(
+            new($"input-{Guid.NewGuid():N}"),
+            new(identifier),
+            displayName,
+            new($"binding-{Guid.NewGuid():N}"),
+            source.ValueType,
+            source.Nullability,
+            new AutomationValue.Null(source.ValueType)
+        );
+        _transform = _transform with { Inputs = _transform.Inputs.Add(input) };
+        _values[input.BindingFieldId] = string.Empty;
+        _bindings[input.BindingFieldId] = new(AutomationInputBindingMode.Connected, null);
+        RefreshTransformDefinition();
+        return input;
+    }
+
     internal void AddTransformOutput()
     {
         if (_transform is null)
@@ -100,9 +165,11 @@ public sealed partial class AutomationEditorNode
 
         var current = _transform.Inputs[index];
         var fixedValue =
-            IsComplexFixedValue(valueType) && current.ValueType != valueType
+            current.ValueType == valueType && current.Nullability == nullability
+                ? current.FixedValue
+            : IsComplexFixedValue(valueType) && current.ValueType != valueType
                 ? CanonicalComplexFixedValue(valueType)
-                : ParseFixedValue(_values[current.BindingFieldId], valueType, nullability);
+            : ParseFixedValue(_values[current.BindingFieldId], valueType, nullability);
         _transform = _transform with
         {
             Inputs = _transform.Inputs.SetItem(

@@ -162,16 +162,7 @@ public sealed partial class AutomationEditorNode
                 writer.WriteString("type", input.ValueType.ToString());
                 writer.WriteString("nullability", input.Nullability.ToString());
                 writer.WritePropertyName("fixed");
-                WriteAutomationValue(
-                    writer,
-                    IsComplexFixedValue(input.ValueType)
-                        ? input.FixedValue
-                        : ParseFixedValue(
-                            _values[input.BindingFieldId],
-                            input.ValueType,
-                            input.Nullability
-                        )
-                );
+                WriteAutomationValue(writer, input.FixedValue);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

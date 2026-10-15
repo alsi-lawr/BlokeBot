@@ -4,7 +4,17 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationNodeInspector
 {
+    private AutomationNodeId? _pickerNodeId;
     private AutomationPortId? _pickerInputId;
+    private bool _addingTransformInput;
+    private string _newInputName = string.Empty;
+    private string _newInputIdentifier = string.Empty;
+    private bool _newInputNameEdited;
+    private bool _newInputIdentifierEdited;
+    private string? _sourcePickerError;
+    private ElementReference _addInputOpener;
+    private ElementReference _pickerDialog;
+    private readonly Dictionary<AutomationPortId, ElementReference> _sourceOpeners = [];
     private Guid? _pickerEdgeId;
     private AutomationSourceChoice? _selectedSource;
     private ElementReference _pickerOpener;
@@ -54,6 +64,9 @@ public partial class AutomationNodeInspector
 
     [Parameter]
     public EventCallback Changed { get; set; }
+
+    [Parameter]
+    public EventCallback<AutomationTransformInputSourceRequest> AddInputFromSource { get; set; }
 
     [Parameter]
     public EventCallback ClearSelection { get; set; }
@@ -174,4 +187,12 @@ internal sealed record AutomationSourceChoice(
     AutomationEditorNode Node,
     AutomationPortMetadata Port,
     AutomationConnectionCompatibility Compatibility
+);
+
+public sealed record AutomationTransformInputSourceRequest(
+    AutomationNodeId SourceNodeId,
+    AutomationPortMetadata SourcePort,
+    AutomationNodeId TargetNodeId,
+    string DisplayName,
+    string Identifier
 );

@@ -899,7 +899,7 @@ public sealed partial class AutomationEditorInteractionTests
                 .Add(component => component.Changed, () => changes++)
         );
         var renamed = transform.TransformInputs.Single();
-        inspector.Find("[aria-label='Add input']").Click();
+        inspector.Find("[aria-label='Declare input manually']").Click();
         inspector.Find("[aria-label='Add output']").Click();
         CelNameField(inspector, transform.TransformInputs.Last().PortId).Change("value12");
         ExpressionField(inspector, transform.TransformOutputs.First().PortId)
@@ -949,7 +949,7 @@ public sealed partial class AutomationEditorInteractionTests
                 .Add(component => component.Changed, () => changes++)
         );
         var declared = transform.TransformInputs.Single();
-        inspector.Find("[aria-label='Add input']").Click();
+        inspector.Find("[aria-label='Declare input manually']").Click();
         ExpressionField(inspector, transform.TransformOutputs.Single().PortId).Input("value");
         changes = 0;
 
@@ -996,7 +996,7 @@ public sealed partial class AutomationEditorInteractionTests
             .TransformInputs.Single()
             .Nullability.ShouldBe(AutomationPortNullability.NonNullable);
 
-        inspector.Find("[aria-label='Add input']").Click();
+        inspector.Find("[aria-label='Declare input manually']").Click();
         transform.TransformInputs.Count.ShouldBe(2);
         inspector.FindAll("[aria-label^='Remove input']")[1].Click();
         transform.TransformInputs.Single().PortId.ShouldBe(declaredInput.PortId);
@@ -1179,7 +1179,22 @@ public sealed partial class AutomationEditorInteractionTests
         );
         var opener = inspector.Find("button[aria-haspopup=dialog]");
         opener.Click();
-        inspector.Find("[role=radiogroup] [role=radio][aria-checked=true]").Click();
+        var input = target.Definition.Inputs.Single();
+        var source = nodes.First(node =>
+            node.Definition.Outputs.Any(output =>
+                AutomationConnections.Compatibility(node, output, target, input).IsCompatible
+            )
+        );
+        var output = source.Definition.Outputs.First(port =>
+            AutomationConnections.Compatibility(source, port, target, input).IsCompatible
+        );
+        inspector
+            .FindAll("[role=radio]")
+            .Single(button =>
+                button.QuerySelector("strong")!.TextContent
+                == $"{source.EffectiveName} · {output.Name}"
+            )
+            .Click();
         var focusCalls = FocusCalls(context);
 
         inspector.Find("button[data-automation-source-picker-complete]").Click();
@@ -1363,11 +1378,32 @@ public sealed partial class AutomationEditorInteractionTests
 
         internal static async Task<AutomationEditorPageFixture> CreateAsync(
             bool includeUnavailableFlow = false,
-            IEnumerable<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>? interceptors = null
+            IEnumerable<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>? interceptors =
+                null,
+            bool typedCommand = false
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync([.. interceptors ?? []]);
             var hostId = await SeedHostAsync(database);
+            if (typedCommand)
+            {
+                await using var db = await database.CreateDbContextAsync();
+                var host = await db.Hosts.SingleAsync();
+                host.EnabledFeatures |= HostFeatureFlags.CustomCommands;
+                _ = db.CustomCommands.Add(
+                    new CustomCommand
+                    {
+                        Id = 7,
+                        HostId = hostId,
+                        Name = "timer",
+                        CreatedAtUtc = DateTime.UtcNow,
+                        UpdatedAtUtc = DateTime.UtcNow,
+                        Action = new AutomationCustomCommandAction { HostId = hostId },
+                        ArgumentSchema = CustomCommandArgumentTests.TimerSchema,
+                    }
+                );
+                _ = await db.SaveChangesAsync();
+            }
             var ui = UiTestContextFactory.CreateWithAuthorization(database, hostId);
             var context = ui.Context;
             _ = context.Services.AddSingleton<IOverlayCueAdmissionService>(
@@ -1377,7 +1413,16 @@ public sealed partial class AutomationEditorInteractionTests
                 new UnavailablePublicChatMessageSender()
             );
             _ = context.Services.AddBlokeBotAutomations();
-            var editor = AvailableEditor();
+            _ = context.Services.AddSingleton(provider => new AutomationScenarioService(
+                database,
+                provider.GetRequiredService<AutomationCatalogService>(),
+                provider.GetRequiredService<AutomationFlowService>(),
+                provider.GetRequiredService<TimeProvider>(),
+                provider.GetRequiredService<AutomationExpressionService>(),
+                BotSettings.FromOptions(new BotOptions()),
+                OAuthAuthorizationScopeSet.Create(["channel:bot"])
+            ));
+            var editor = AvailableEditor(typedCommand);
             _ = (
                 await context
                     .Services.GetRequiredService<AutomationFlowService>()
@@ -1411,15 +1456,24 @@ public sealed partial class AutomationEditorInteractionTests
             return host.Id;
         }
 
-        private static AutomationEditorState AvailableEditor()
+        private static AutomationEditorState AvailableEditor(bool typedCommand = false)
         {
             var editor = AutomationEditorState.Create("Available flow");
             var definitions = ProductionDefinitions();
             var source = editor.AddNode(
-                definitions.Single(static definition =>
-                    definition.Id == AutomationDefinitionIds.StreamOnlineSource
+                definitions.Single(definition =>
+                    definition.Id
+                    == (
+                        typedCommand
+                            ? AutomationDefinitionIds.CustomCommandSource
+                            : AutomationDefinitionIds.StreamOnlineSource
+                    )
                 )
             );
+            if (typedCommand)
+            {
+                source.SetValue(new("custom-command-id"), "7");
+            }
             var target = editor.AddNode(
                 definitions.Single(static definition =>
                     definition.Id == AutomationDefinitionIds.SendChatAction

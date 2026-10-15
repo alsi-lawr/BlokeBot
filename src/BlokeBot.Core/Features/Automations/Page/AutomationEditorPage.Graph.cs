@@ -59,24 +59,82 @@ public partial class AutomationEditorPage
         }
     }
 
+    private void AddTransformInputFromSource(AutomationTransformInputSourceRequest request)
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+        var source = _editor.Nodes.FirstOrDefault(node => node.Id == request.SourceNodeId);
+        var target = _editor.Nodes.FirstOrDefault(node => node.Id == request.TargetNodeId);
+        var output = source?.Definition.Outputs.FirstOrDefault(port =>
+            port.Id == request.SourcePort.Id
+        );
+        if (
+            source is null
+            || target is not { IsCelTransform: true }
+            || output != request.SourcePort
+            || output.ValueType == AutomationPortValueType.Flow
+            || !AutomationConnections
+                .Compatibility(
+                    source,
+                    output,
+                    target,
+                    AutomationEditorNode.SourceDerivedTransformInput(output)
+                )
+                .IsCompatible
+            || target.AddTransformInputFromSource(output, request.DisplayName, request.Identifier)
+                is not { } input
+        )
+        {
+            ShowTimedValidationFeedback(
+                "Choose a current compatible source and a unique CEL name.",
+                failed: true
+            );
+            return;
+        }
+        _editor.Edges.Add(
+            new(
+                Guid.NewGuid(),
+                AutomationEdgeKind.Data,
+                source.Id,
+                output.Id,
+                target.Id,
+                input.PortId
+            )
+        );
+        EditorChanged();
+    }
+
     private void ConnectNodes(AutomationConnectionRequest request)
     {
+        if (_editor is null || ConnectionDetails(_editor, request) is not { } connection)
+        {
+            return;
+        }
+        var existing = _editor.Edges.FirstOrDefault(edge =>
+            edge.Kind == AutomationEdgeKind.Data
+            && edge.TargetNodeId == request.TargetNodeId
+            && edge.TargetPortId == request.TargetPortId
+        );
+        if (existing is not null)
+        {
+            if (
+                existing.SourceNodeId == request.SourceNodeId
+                && existing.SourcePortId == request.SourcePortId
+            )
+            {
+                SetConnectedMode(_editor, request);
+                EditorChanged();
+            }
+            return;
+        }
         if (
-            _editor is null
-            || ConnectionDetails(_editor, request) is not { } connection
-            || _editor.Edges.Any(edge =>
+            _editor.Edges.Any(edge =>
                 edge.SourceNodeId == request.SourceNodeId
                 && edge.SourcePortId == request.SourcePortId
                 && edge.TargetNodeId == request.TargetNodeId
                 && edge.TargetPortId == request.TargetPortId
-            )
-            || (
-                connection.Kind == AutomationEdgeKind.Data
-                && _editor.Edges.Any(edge =>
-                    edge.Kind == AutomationEdgeKind.Data
-                    && edge.TargetNodeId == request.TargetNodeId
-                    && edge.TargetPortId == request.TargetPortId
-                )
             )
         )
         {
@@ -92,11 +150,35 @@ public partial class AutomationEditorPage
             request.TargetPortId
         );
         _editor.Edges.Add(edge);
-        _selectedEdgeId = edge.Id;
-        _disclosedNodeId = null;
-        _selectedNodeIds.Clear();
-        _selectedNodeId = null;
+        if (connection.Kind == AutomationEdgeKind.Data)
+        {
+            SetConnectedMode(_editor, request);
+        }
+        else
+        {
+            _selectedEdgeId = edge.Id;
+            _disclosedNodeId = null;
+            _selectedNodeIds.Clear();
+            _selectedNodeId = null;
+        }
         EditorChanged();
+    }
+
+    private static void SetConnectedMode(
+        AutomationEditorState editor,
+        AutomationConnectionRequest request
+    )
+    {
+        var target = editor.Nodes.Single(node => node.Id == request.TargetNodeId);
+        if (
+            target
+                .Definition.Inputs.Single(port => port.Id == request.TargetPortId)
+                .BindingFieldId is
+            { } field
+        )
+        {
+            target.SetBindingMode(field, AutomationInputBindingMode.Connected);
+        }
     }
 
     private void RepairConnection(AutomationRepairConnectionRequest request)
@@ -120,6 +202,10 @@ public partial class AutomationEditorPage
             TargetNodeId = request.Connection.TargetNodeId,
             TargetPortId = request.Connection.TargetPortId,
         };
+        if (connection.Kind == AutomationEdgeKind.Data)
+        {
+            SetConnectedMode(_editor, request.Connection);
+        }
         _selectedEdgeId = request.EdgeId;
         _disclosedNodeId = null;
         EditorChanged();

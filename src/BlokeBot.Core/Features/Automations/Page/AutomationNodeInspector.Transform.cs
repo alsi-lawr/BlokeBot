@@ -4,6 +4,11 @@ public partial class AutomationNodeInspector
 {
     protected override void OnParametersSet()
     {
+        if (_pickerNodeId is { } pickerNodeId && Node?.Id != pickerNodeId)
+        {
+            CloseSourcePicker();
+        }
+
         if (_rejectedRenameNodeId is { } nodeId && Node?.Id != nodeId)
         {
             _rejectedRenameNodeId = null;

@@ -305,6 +305,24 @@ public sealed partial class AutomationEditorNode
             return;
         }
         _values[ValueField(fieldId)] = value;
+        if (_transform is not null)
+        {
+            var index = IndexOf(_transform.Inputs, input => input.BindingFieldId == fieldId);
+            if (index >= 0 && !IsComplexFixedValue(_transform.Inputs[index].ValueType))
+            {
+                var input = _transform.Inputs[index];
+                _transform = _transform with
+                {
+                    Inputs = _transform.Inputs.SetItem(
+                        index,
+                        input with
+                        {
+                            FixedValue = ParseFixedValue(value, input.ValueType, input.Nullability),
+                        }
+                    ),
+                };
+            }
+        }
     }
 
     internal bool SetComplexFixedValue(AutomationPortId portId, string source)
