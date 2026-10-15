@@ -19,7 +19,8 @@ public sealed partial class AutomationRuntimeTests
             f.Flows,
             f.Actions,
             f.Clock,
-            changes
+            changes,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AutomationRuntimeService>.Instance
         );
         var source = Node("manual-run", """{"data":"go"}""");
         var delay = Node("delay", """{"duration-milliseconds":1000}""");
@@ -85,7 +86,8 @@ public sealed partial class AutomationRuntimeTests
             f.Flows,
             f.Actions,
             f.Clock,
-            changes
+            changes,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AutomationRuntimeService>.Instance
         );
         var source = Node("manual-run", """{"data":"go"}""");
         var chat = Node("send-chat", """{"message":"done"}""");
@@ -130,7 +132,8 @@ public sealed partial class AutomationRuntimeTests
             f.Flows,
             f.Actions,
             f.Clock,
-            changes
+            changes,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AutomationRuntimeService>.Instance
         );
         var source = Node("manual-run", """{"data":"go"}""");
         var action = Node("send-chat", """{"message":"one effect"}""");

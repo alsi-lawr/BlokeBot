@@ -272,6 +272,26 @@ public enum AutomationDispatchStatus
 public sealed record AutomationDispatchOutcome(
     AutomationDispatchStatus Status,
     ImmutableArray<AutomationRunId> RunIds
+)
+{
+    public ImmutableArray<AutomationAdmissionRejection> Rejections { get; init; } = [];
+}
+
+public enum AutomationAdmissionRejectionReason
+{
+    SourceReconstruction,
+    SourceConfiguration,
+    SubflowClosure,
+    GraphValidation,
+    ExecutionUnavailable,
+    SubflowReferences,
+    FeatureDisabled,
+}
+
+public sealed record AutomationAdmissionRejection(
+    AutomationFlowId FlowId,
+    ImmutableArray<AutomationNodeId> SourceNodeIds,
+    AutomationAdmissionRejectionReason Reason
 );
 
 public enum AutomationResumeStatus

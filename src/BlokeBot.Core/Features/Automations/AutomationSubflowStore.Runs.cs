@@ -48,38 +48,10 @@ internal static class AutomationSubflowRunReferences
                 ),
             ];
         }
-        var ids = closure.Revisions.Select(revision => revision.Id.Value).ToArray();
-        var rows = await db
-            .AutomationSubflowRevisions.AsNoTracking()
-            .Where(row => row.HostId == hostId.Value && ids.Contains(row.Id))
-            .Select(row => row.SnapshotJson)
-            .ToArrayAsync(cancellationToken);
-        var authoritative = new AutomationSubflowClosure([
-            .. rows.Select(AutomationSubflowSerialization.Restore),
-        ]);
-        if (
-            closure.Revisions.Select(revision => revision.SubflowId).Distinct().Count()
-                != closure.Revisions.Length
-            || closure.Revisions.Any(revision =>
-                !AutomationSubflowStore.ValidateCalls(revision.Graph, closure).IsEmpty
-            )
-            || authoritative.Revisions.Length != closure.Revisions.Length
-            || closure.Revisions.Any(revision =>
-                !authoritative.Revisions.Any(stored =>
-                    stored.Id == revision.Id
-                    && AutomationSubflowSerialization.Serialize(stored)
-                        == AutomationSubflowSerialization.Serialize(revision)
-                )
-            )
-        )
+        var errors = await ValidateClosureAsync(db, hostId, closure, cancellationToken);
+        if (!errors.IsEmpty)
         {
-            return
-            [
-                AutomationSubflowStore.Error(
-                    "subflow-closure-invalid",
-                    "Attach the complete immutable revision closure."
-                ),
-            ];
+            return errors;
         }
         var existing = await db
             .AutomationSubflowRunReferences.Where(row => row.RunId == runId.Value)
@@ -112,6 +84,52 @@ internal static class AutomationSubflowRunReferences
             );
         }
         return [];
+    }
+
+    internal static async Task<ImmutableArray<AutomationGraphError>> ValidateClosureAsync(
+        BlokeBotDbContext db,
+        AutomationHostId hostId,
+        AutomationSubflowClosure closure,
+        CancellationToken cancellationToken
+    )
+    {
+        if (db.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException(
+                "Validate references inside the admission transaction."
+            );
+        }
+        var ids = closure.Revisions.Select(revision => revision.Id.Value).ToArray();
+        var rows = await db
+            .AutomationSubflowRevisions.AsNoTracking()
+            .Where(row => row.HostId == hostId.Value && ids.Contains(row.Id))
+            .Select(row => row.SnapshotJson)
+            .ToArrayAsync(cancellationToken);
+        var authoritative = new AutomationSubflowClosure([
+            .. rows.Select(AutomationSubflowSerialization.Restore),
+        ]);
+        return
+            closure.Revisions.Select(revision => revision.SubflowId).Distinct().Count()
+                != closure.Revisions.Length
+            || closure.Revisions.Any(revision =>
+                !AutomationSubflowStore.ValidateCalls(revision.Graph, closure).IsEmpty
+            )
+            || authoritative.Revisions.Length != closure.Revisions.Length
+            || closure.Revisions.Any(revision =>
+                !authoritative.Revisions.Any(stored =>
+                    stored.Id == revision.Id
+                    && AutomationSubflowSerialization.Serialize(stored)
+                        == AutomationSubflowSerialization.Serialize(revision)
+                )
+            )
+            ?
+            [
+                AutomationSubflowStore.Error(
+                    "subflow-closure-invalid",
+                    "Attach the complete immutable revision closure."
+                ),
+            ]
+            : [];
     }
 
     internal static async Task<AutomationSubflowClosure> LoadAsync(

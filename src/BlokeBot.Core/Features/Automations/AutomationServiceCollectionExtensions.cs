@@ -123,6 +123,7 @@ public static class AutomationServiceCollectionExtensions
                 provider.GetRequiredService<AutomationActionExecutor>(),
                 provider.GetRequiredService<TimeProvider>(),
                 provider.GetRequiredService<IAutomationUiChangePublisher>(),
+                provider.GetRequiredService<ILogger<AutomationRuntimeService>>(),
                 provider.GetServices<IAutomationRunCompletionObserver>()
             );
             if (PluginExecution(provider) is { } pluginExecution)

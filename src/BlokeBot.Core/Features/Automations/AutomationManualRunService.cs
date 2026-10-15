@@ -81,6 +81,8 @@ public sealed class AutomationManualRunService(
         var invocation = Guid.NewGuid().ToString();
         var now = clock.GetUtcNow();
         var runs = System.Collections.Immutable.ImmutableArray.CreateBuilder<AutomationRunId>();
+        var rejections =
+            System.Collections.Immutable.ImmutableArray.CreateBuilder<AutomationAdmissionRejection>();
         var status = AutomationDispatchStatus.NoMatchingFlow;
         foreach (var manual in configured.Distinct())
         {
@@ -98,6 +100,7 @@ public sealed class AutomationManualRunService(
                 selectedFlow: flowId
             );
             runs.AddRange(observed.RunIds);
+            rejections.AddRange(observed.Rejections);
             if (
                 observed.Status == AutomationDispatchStatus.Accepted
                 || status != AutomationDispatchStatus.Accepted
@@ -106,7 +109,10 @@ public sealed class AutomationManualRunService(
                 status = observed.Status;
             }
         }
-        var outcome = new AutomationDispatchOutcome(status, runs.ToImmutable());
+        var outcome = new AutomationDispatchOutcome(status, runs.ToImmutable())
+        {
+            Rejections = rejections.ToImmutable(),
+        };
         return new AutomationManualRunOutcome.Dispatched(outcome);
     }
 

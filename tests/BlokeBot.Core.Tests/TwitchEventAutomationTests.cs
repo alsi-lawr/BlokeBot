@@ -890,7 +890,13 @@ public sealed class TwitchEventAutomationTests
                 flows,
                 actions,
                 clock,
-                TestAutomationUiChanges.Create()
+                TestAutomationUiChanges.Create(),
+                Microsoft
+                    .Extensions
+                    .Logging
+                    .Abstractions
+                    .NullLogger<AutomationRuntimeService>
+                    .Instance
             );
             var runtime = new TwitchEventAutomationRuntime(
                 database,

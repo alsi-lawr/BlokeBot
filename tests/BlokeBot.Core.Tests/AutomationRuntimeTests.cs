@@ -12,6 +12,7 @@ using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -5831,6 +5832,8 @@ public sealed partial class AutomationRuntimeTests
         internal int HostId { get; }
         internal AutomationCountdownService Countdowns { get; private init; } = null!;
         internal AutomationUiChanges UiChanges { get; private init; } = null!;
+        internal ILogger<AutomationRuntimeService> Logger { get; private init; } =
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AutomationRuntimeService>.Instance;
 
         internal static async Task<RuntimeFixture> CreateAsync(
             IEnumerable<bool>? chatAdmissions = null,
@@ -5844,7 +5847,8 @@ public sealed partial class AutomationRuntimeTests
             IAutomationIntegerEntropy? integerEntropy = null,
             IInterceptor[]? databaseInterceptors = null,
             bool migrateSchema = false,
-            IPublicChatMessageSender? executionChat = null
+            IPublicChatMessageSender? executionChat = null,
+            ILogger<AutomationRuntimeService>? logger = null
         )
         {
             var database = migrateSchema
@@ -5917,7 +5921,14 @@ public sealed partial class AutomationRuntimeTests
                 flows,
                 actions,
                 clock,
-                uiChanges
+                uiChanges,
+                logger
+                    ?? Microsoft
+                        .Extensions
+                        .Logging
+                        .Abstractions
+                        .NullLogger<AutomationRuntimeService>
+                        .Instance
             );
             var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
@@ -5955,11 +5966,19 @@ public sealed partial class AutomationRuntimeTests
             {
                 Countdowns = countdowns,
                 UiChanges = uiChanges,
+                Logger =
+                    logger
+                    ?? Microsoft
+                        .Extensions
+                        .Logging
+                        .Abstractions
+                        .NullLogger<AutomationRuntimeService>
+                        .Instance,
             };
         }
 
         internal AutomationRuntimeService NewRuntime() =>
-            new(Database, Catalog, Flows, Actions, Clock, UiChanges);
+            new(Database, Catalog, Flows, Actions, Clock, UiChanges, Logger);
 
         internal async Task<AutomationFlowId> SaveAsync(
             ImmutableArray<AutomationFlowDraftNode> nodes,

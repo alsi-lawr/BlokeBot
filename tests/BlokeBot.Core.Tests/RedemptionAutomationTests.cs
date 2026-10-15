@@ -888,6 +888,12 @@ public sealed class RedemptionAutomationTests
                 actions,
                 clock,
                 TestAutomationUiChanges.Create(),
+                Microsoft
+                    .Extensions
+                    .Logging
+                    .Abstractions
+                    .NullLogger<AutomationRuntimeService>
+                    .Instance,
                 [policyObserver]
             );
             var runtime = new TwitchEventAutomationRuntime(

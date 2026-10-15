@@ -1184,7 +1184,13 @@ public sealed partial class NativeOperationAutomationTests
                 flows,
                 executor,
                 clock,
-                TestAutomationUiChanges.Create()
+                TestAutomationUiChanges.Create(),
+                Microsoft
+                    .Extensions
+                    .Logging
+                    .Abstractions
+                    .NullLogger<AutomationRuntimeService>
+                    .Instance
             );
             var runtime = new TwitchEventAutomationRuntime(
                 database,

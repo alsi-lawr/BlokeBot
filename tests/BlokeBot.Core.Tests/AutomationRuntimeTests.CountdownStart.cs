@@ -233,7 +233,8 @@ public sealed partial class AutomationRuntimeTests
             f.Flows,
             actions,
             f.Clock,
-            f.UiChanges
+            f.UiChanges,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AutomationRuntimeService>.Instance
         );
         var manual = new AutomationManualRunService(f.Database, runtime, f.Catalog, f.Clock);
         var failed = (await manual.RunAsync(new(f.HostId), flow, default))

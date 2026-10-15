@@ -14,9 +14,27 @@ public sealed partial class AutomationRuntimeService(
     AutomationActionExecutor actions,
     TimeProvider clock,
     IAutomationUiChangePublisher uiChanges,
+    ILogger<AutomationRuntimeService> logger,
     IEnumerable<IAutomationRunCompletionObserver>? runCompletionObservers = null
 ) : IPluginAutomationRunDispatcher
 {
+    private void ReportAdmissionRejection(
+        AutomationHostId hostId,
+        AutomationAdmissionRejection rejection
+    )
+    {
+        foreach (var source in rejection.SourceNodeIds)
+        {
+            logger.LogWarning(
+                "Automation admission rejected for host {HostId}, flow {FlowId}, source {SourceNodeId}: {Reason}",
+                hostId.Value,
+                rejection.FlowId.Value,
+                source.Value,
+                rejection.Reason
+            );
+        }
+    }
+
     private readonly Lock _initializationGate = new();
     private readonly IAutomationRunCompletionObserver[] _runCompletionObservers =
     [

@@ -65,7 +65,15 @@ public sealed partial class AutomationRuntimeTests
             clock,
             uiChanges: changes
         );
-        runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock, changes);
+        runtime = new AutomationRuntimeService(
+            database,
+            catalog,
+            flows,
+            actions,
+            clock,
+            changes,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<AutomationRuntimeService>.Instance
+        );
         var source = Node(
             "countdown-lifecycle",
             """{"name":"race","event":"Started","remaining-seconds":0}"""

@@ -161,7 +161,8 @@ public sealed partial class AutomationRuntimeTests
             plugin.Flows,
             fixture.Actions,
             fixture.Clock,
-            fixture.UiChanges
+            fixture.UiChanges,
+            fixture.Logger
         );
         restarted.UsePluginExecution(plugin.Execution);
         (await restarted.ResumeAsync(runId, CancellationToken.None)).Status.ShouldBe(
@@ -250,7 +251,8 @@ public sealed partial class AutomationRuntimeTests
 
     private static async Task<SubflowPluginServices> SubflowPlugin(
         RuntimeFixture fixture,
-        bool required = false
+        bool required = false,
+        IEnumerable<IAutomationCatalogModule>? additionalModules = null
     )
     {
         var manifest = PluginManifestToml
@@ -284,7 +286,7 @@ public sealed partial class AutomationRuntimeTests
         );
         snapshots.Publish(state);
         var definitions = new AutomationDefinitionCatalog(
-            [new CoreAutomationCatalogModule()],
+            [new CoreAutomationCatalogModule(), .. additionalModules ?? []],
             registry
         );
         var invoker = new SubflowRecordingInvoker();
@@ -308,7 +310,8 @@ public sealed partial class AutomationRuntimeTests
             flows,
             fixture.Actions,
             fixture.Clock,
-            fixture.UiChanges
+            fixture.UiChanges,
+            fixture.Logger
         );
         runtime.UsePluginExecution(execution);
         var descriptor = (
