@@ -91,11 +91,15 @@ public sealed partial class ConfigurationTransferDashboardTests
             .ApplyAsync(
                 Session(destination),
                 document,
-                Selection(
-                    destination,
-                    ImportConflictStrategy.Merge,
-                    ConfigurationSectionId.Dashboards,
-                    ConfigurationSectionId.Automations
+                await ReviewedAutomationsAsync(
+                    database,
+                    document,
+                    Selection(
+                        destination,
+                        ImportConflictStrategy.Merge,
+                        ConfigurationSectionId.Dashboards,
+                        ConfigurationSectionId.Automations
+                    )
                 ),
                 new("owner", "streamer"),
                 default
@@ -195,7 +199,11 @@ public sealed partial class ConfigurationTransferDashboardTests
                     .ApplyAsync(
                         Session(destination),
                         doc,
-                        Selection(destination, ImportConflictStrategy.AddMissing, sections),
+                        await ReviewedAutomationsAsync(
+                            database,
+                            doc,
+                            Selection(destination, ImportConflictStrategy.AddMissing, sections)
+                        ),
                         new("owner", "streamer"),
                         default
                     )

@@ -61,7 +61,7 @@ public sealed partial class ConfigurationTransferAutomationTests
                 .ApplyAsync(
                     Session(hostId),
                     document,
-                    AutomationSelection(hostId),
+                    await ReviewImportEffectsAsync(database, document, AutomationSelection(hostId)),
                     new("destination-id", "destination"),
                     CancellationToken.None
                 )
@@ -81,7 +81,11 @@ public sealed partial class ConfigurationTransferAutomationTests
                 .ApplyAsync(
                     Session(hostId),
                     exported.Document,
-                    AutomationSelection(hostId),
+                    await ReviewImportEffectsAsync(
+                        database,
+                        exported.Document,
+                        AutomationSelection(hostId)
+                    ),
                     new("destination-id", "destination"),
                     CancellationToken.None
                 )

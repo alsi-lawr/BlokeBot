@@ -38,33 +38,7 @@ public partial class AutomationEditorPage
         : _validated ? "automation-validation automation-validation--ready"
         : "automation-validation";
 
-    private string _impactWarning
-    {
-        get
-        {
-            var capabilities = CurrentCapabilities();
-            var effects = new List<string>();
-            if (capabilities.HasFlag(AutomationActionCapabilities.SendsChat))
-            {
-                effects.Add("send public chat messages");
-            }
-            if (capabilities.HasFlag(AutomationActionCapabilities.PlaysOverlays))
-            {
-                effects.Add("play overlay cues");
-            }
-            if (capabilities.HasFlag(AutomationActionCapabilities.ChangesPoints))
-            {
-                effects.Add("change channel points");
-            }
-            if (capabilities.HasFlag(AutomationActionCapabilities.CallsTwitchApi))
-            {
-                effects.Add("call Twitch");
-            }
-            return effects.Count == 0
-                ? "It will respond to live events when enabled."
-                : $"It can {string.Join(", ", effects)} when a live event reaches the connected action.";
-        }
-    }
+    private string _impactWarning => _enableReview?.Effects.Description ?? string.Empty;
 
     private AutomationTraceOutcomeSummary? _displayedRunSummary =>
         _tracePresentation?.OutcomeSummary

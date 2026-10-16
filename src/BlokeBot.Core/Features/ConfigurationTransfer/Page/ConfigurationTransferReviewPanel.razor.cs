@@ -34,6 +34,21 @@ public partial class ConfigurationTransferReviewPanel
     public bool Busy { get; set; }
 
     [Parameter]
+    public bool AutomationEffectsApproved { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> AutomationEffectsApprovedChanged { get; set; }
+
+    private bool _requiresEffectApproval =>
+        SelectedSections.Contains(ConfigurationSectionId.Automations)
+        && Preview
+            .Sections.FirstOrDefault(section =>
+                section.Section == ConfigurationSectionId.Automations
+            )
+            ?.AutomationReview?.RequiresApproval
+            is true;
+
+    [Parameter]
     public bool AllConflictsResolved { get; set; }
 
     [Parameter]
@@ -86,7 +101,8 @@ public partial class ConfigurationTransferReviewPanel
         $"configuration-transfer-rename-{Uri.EscapeDataString(conflict.ImportedId)}";
 
     private bool HasNestedContent(ConfigurationSectionPreview section) =>
-        section.Issues.Count > 0
+        section.AutomationReview is not null
+        || section.Issues.Count > 0
         || section.GuessingProfileMappings.Count > 0
         || section.Conflicts.Count > 0;
 

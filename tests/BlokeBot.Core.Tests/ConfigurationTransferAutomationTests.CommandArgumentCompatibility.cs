@@ -196,7 +196,7 @@ public sealed partial class ConfigurationTransferAutomationTests
         var applied = await fixture.Coordinator.ApplyAsync(
             Session(fixture.HostId),
             repaired,
-            selection,
+            await ReviewImportEffectsAsync(database, repaired, selection, fixture.Adapter),
             new("destination-id", "destination"),
             CancellationToken.None
         );
@@ -242,7 +242,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             var restored = await fixture.Coordinator.ApplyAsync(
                 Session(fixture.HostId),
                 exported,
-                selection,
+                await ReviewImportEffectsAsync(database, exported, selection, fixture.Adapter),
                 new("destination-id", "destination"),
                 CancellationToken.None
             );
@@ -591,7 +591,8 @@ public sealed partial class ConfigurationTransferAutomationTests
             {
                 Id = saved.FlowId,
             },
-            target
+            target,
+            adapter
         );
     }
 
@@ -615,6 +616,7 @@ public sealed partial class ConfigurationTransferAutomationTests
         PluginFeatureSnapshotRegistry Snapshots,
         PluginFeatureState State,
         AutomationFlowDraft Draft,
-        AutomationFlowDraftNode Target
+        AutomationFlowDraftNode Target,
+        IAutomationConfigurationTransferAdapter Adapter
     );
 }

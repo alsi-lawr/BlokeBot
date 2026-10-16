@@ -125,7 +125,7 @@ public sealed partial class ConfigurationTransferAutomationTests
         var initial = await coordinator.ApplyAsync(
             Session(first),
             document,
-            AutomationSelection(first),
+            await ReviewImportEffectsAsync(database, document, AutomationSelection(first)),
             new("destination-id", "destination"),
             CancellationToken.None
         );
@@ -209,7 +209,11 @@ public sealed partial class ConfigurationTransferAutomationTests
         var secondImport = await coordinator.ApplyAsync(
             Session(second),
             firstExport.Document,
-            AutomationSelection(second),
+            await ReviewImportEffectsAsync(
+                database,
+                firstExport.Document,
+                AutomationSelection(second)
+            ),
             new("destination-id", "destination"),
             CancellationToken.None
         );
@@ -225,7 +229,11 @@ public sealed partial class ConfigurationTransferAutomationTests
         var again = await coordinator.ApplyAsync(
             Session(second),
             firstExport.Document,
-            AutomationSelection(second),
+            await ReviewImportEffectsAsync(
+                database,
+                firstExport.Document,
+                AutomationSelection(second)
+            ),
             new("destination-id", "destination"),
             CancellationToken.None
         );
@@ -252,17 +260,21 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(second),
                 skippedDocument,
-                AutomationSelection(second) with
-                {
-                    Sections =
-                    [
-                        new(
-                            ConfigurationSectionId.Automations,
-                            ImportConflictStrategy.AddMissing,
-                            []
-                        ),
-                    ],
-                },
+                await ReviewImportEffectsAsync(
+                    database,
+                    skippedDocument,
+                    AutomationSelection(second) with
+                    {
+                        Sections =
+                        [
+                            new(
+                                ConfigurationSectionId.Automations,
+                                ImportConflictStrategy.AddMissing,
+                                []
+                            ),
+                        ],
+                    }
+                ),
                 new("destination-id", "destination"),
                 CancellationToken.None
             )
@@ -345,7 +357,14 @@ public sealed partial class ConfigurationTransferAutomationTests
             {
                 Sections = document.Sections with { Automations = invalid },
             },
-            AutomationSelection(host),
+            await ReviewImportEffectsAsync(
+                database,
+                document with
+                {
+                    Sections = document.Sections with { Automations = invalid },
+                },
+                AutomationSelection(host)
+            ),
             new("destination-id", "destination"),
             CancellationToken.None
         );
@@ -374,7 +393,17 @@ public sealed partial class ConfigurationTransferAutomationTests
                     Automations = section with { Subflows = [cycle, section.Subflows[1]] },
                 },
             },
-            AutomationSelection(host),
+            await ReviewImportEffectsAsync(
+                database,
+                document with
+                {
+                    Sections = document.Sections with
+                    {
+                        Automations = section with { Subflows = [cycle, section.Subflows[1]] },
+                    },
+                },
+                AutomationSelection(host)
+            ),
             new("destination-id", "destination"),
             CancellationToken.None
         );
@@ -430,7 +459,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 invalid,
-                AutomationSelection(host),
+                await ReviewImportEffectsAsync(database, invalid, AutomationSelection(host)),
                 new("destination-id", "destination"),
                 CancellationToken.None
             )
@@ -448,7 +477,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 identity,
-                AutomationSelection(host),
+                await ReviewImportEffectsAsync(database, identity, AutomationSelection(host)),
                 new("destination-id", "destination"),
                 CancellationToken.None
             )
@@ -510,7 +539,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             .ApplyAsync(
                 Session(host),
                 document,
-                selection,
+                await ReviewImportEffectsAsync(database, document, selection),
                 new("destination-id", "destination"),
                 CancellationToken.None
             );
@@ -547,7 +576,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 document,
-                AutomationSelection(host),
+                await ReviewImportEffectsAsync(database, document, AutomationSelection(host)),
                 new("destination-id", "destination"),
                 CancellationToken.None
             )
@@ -564,7 +593,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 document,
-                AutomationSelection(host),
+                await ReviewImportEffectsAsync(database, document, AutomationSelection(host)),
                 new("destination-id", "destination"),
                 CancellationToken.None
             )
@@ -582,7 +611,11 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 NestedDocument(),
-                AutomationSelection(host),
+                await ReviewImportEffectsAsync(
+                    database,
+                    NestedDocument(),
+                    AutomationSelection(host)
+                ),
                 new("destination-id", "destination"),
                 CancellationToken.None
             )

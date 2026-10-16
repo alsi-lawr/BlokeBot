@@ -6,6 +6,8 @@ public sealed partial class AutomationSubflowService
 {
     private static bool SameReview(AutomationSubflowReview left, AutomationSubflowReview right) =>
         left.Draft.Id == right.Draft.Id
+        && AutomationFlowService.SameEffects(left.Effects, right.Effects)
+        && AutomationFlowService.SameEffectParents(left.EffectParents, right.EffectParents)
         && left.PreviousRevision == right.PreviousRevision
         && SameInterface(left.PreviousInterface, right.PreviousInterface)
         && SameInterface(left.Draft.Interface, right.Draft.Interface)
@@ -54,7 +56,7 @@ public sealed partial class AutomationSubflowService
                         right.Outputs.OrderBy(port => port.Id.Value, StringComparer.Ordinal)
                     );
 
-    private static bool SameGraph(AutomationFlowDraft left, AutomationFlowDraft right) =>
+    internal static bool SameGraph(AutomationFlowDraft left, AutomationFlowDraft right) =>
         left.HostId == right.HostId
         && left.SchemaVersion == right.SchemaVersion
         && left.Nodes.Length == right.Nodes.Length

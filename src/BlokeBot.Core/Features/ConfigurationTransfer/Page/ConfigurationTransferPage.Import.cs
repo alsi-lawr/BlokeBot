@@ -8,11 +8,18 @@ public partial class ConfigurationTransferPage
     private async Task ReadFileAsync(InputFileChangeEventArgs args)
     {
         _busy = true;
+        _automationEffectsApproved = false;
+        var request = ++_previewRequest;
+        var host = HostId;
         try
         {
             await using var stream = args.File.OpenReadStream(long.MaxValue);
             using var memory = new MemoryStream();
             await stream.CopyToAsync(memory);
+            if (request != _previewRequest || HostId != host)
+            {
+                return;
+            }
             _pastedJson = Encoding.UTF8.GetString(memory.ToArray());
             await PreviewBytesAsync(memory.ToArray());
         }
@@ -49,6 +56,10 @@ public partial class ConfigurationTransferPage
     {
         _parseIssue = null;
         _applyIssue = null;
+        _automationEffectsApproved = false;
+        _previewRequest++;
+        _preview = null;
+        _document = null;
         if (parsed is ConfigurationDocumentParseOutcome.Invalid invalid)
         {
             _parseIssue = invalid.Issue;
@@ -79,23 +90,73 @@ public partial class ConfigurationTransferPage
             return;
         }
 
-        var outcome = await _previewService.PreviewAsync(
-            _document,
-            BuildPreviewSelection(),
-            CancellationToken.None
-        );
-        _preview = outcome is ConfigurationPreviewOutcome.Success success ? success.Preview : null;
+        _automationEffectsApproved = false;
+        var request = ++_previewRequest;
+        var document = _document;
+        var host = HostId;
+        var previous = _preview;
+        _previewPending = true;
+        try
+        {
+            _session = (await LoadPageContextAsync()).Session;
+            if (HostId != host)
+            {
+                ResetImport();
+                return;
+            }
+            if (request != _previewRequest || !ReferenceEquals(document, _document))
+            {
+                return;
+            }
+            var outcome = await _previewService.PreviewAsync(
+                document,
+                BuildSelection(),
+                CancellationToken.None
+            );
+            if (
+                request != _previewRequest
+                || !ReferenceEquals(document, _document)
+                || HostId != host
+            )
+            {
+                return;
+            }
+            _automationEffectsApproved = false;
+            _preview = outcome is ConfigurationPreviewOutcome.Success success
+                ? success.Preview with
+                {
+                    Sections = _strategies
+                        .Keys.Select(section =>
+                            success.Preview.Sections.FirstOrDefault(value =>
+                                value.Section == section
+                            ) ?? previous!.Sections.Single(value => value.Section == section)
+                        )
+                        .ToArray(),
+                }
+                : null;
+        }
+        finally
+        {
+            if (request == _previewRequest)
+            {
+                _previewPending = false;
+            }
+        }
     }
 
     private async Task ApplyAsync()
     {
-        if (_document is null || _preview is null)
+        if (_document is null || _preview is null || _previewPending)
         {
             return;
         }
 
         _busy = true;
         _applyIssue = null;
+        var request = _previewRequest;
+        var document = _document;
+        var host = HostId;
+        var selection = BuildSelection();
         try
         {
             ConfigurationImportApplyOutcome? outcome = null;
@@ -103,15 +164,29 @@ public partial class ConfigurationTransferPage
                 HostId,
                 async () =>
                     outcome = await _coordinator.ApplyAsync(
-                        _session,
-                        _document,
-                        BuildSelection(),
-                        new(_session.UserId, _session.Login),
+                        PageContext.Session,
+                        document,
+                        selection,
+                        new(PageContext.Session.UserId, PageContext.Session.Login),
                         CancellationToken.None
                     )
             );
+            if (HostId != host)
+            {
+                ResetImport();
+                return;
+            }
+            if (request != _previewRequest || !ReferenceEquals(document, _document))
+            {
+                return;
+            }
             switch (outcome)
             {
+                case ConfigurationImportApplyOutcome.StaleAutomationReview:
+                    await RefreshPreviewAsync();
+                    _applyIssue =
+                        "Automation effects changed. Review the current effects and approve them before applying again.";
+                    break;
                 case ConfigurationImportApplyOutcome.Applied applied:
                     _applied = applied.Result;
                     if (applied.Result.ActivationId is { } activationId)

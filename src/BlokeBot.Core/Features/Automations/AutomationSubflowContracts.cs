@@ -46,7 +46,10 @@ public abstract record AutomationSubflowPublishOutcome
         AutomationSubflowRevision Revision,
         ImmutableArray<AutomationSubflowCaller> IncompatibleCallers,
         AutomationSubflowInterface? PreviousInterface
-    ) : AutomationSubflowPublishOutcome;
+    ) : AutomationSubflowPublishOutcome
+    {
+        public ImmutableArray<AutomationEffectParent> DisabledParents { get; init; } = [];
+    }
 
     public sealed record Stale(AutomationSubflowPreviewOutcome.Ready Refreshed)
         : AutomationSubflowPublishOutcome;
@@ -146,7 +149,9 @@ public sealed class AutomationSubflowReview
         ImmutableArray<AutomationSubflowNodeContract> nodeContracts,
         HostFeatureFlags requiredFeatures,
         ImmutableArray<AutomationPluginProvenance> plugins,
-        ImmutableArray<AutomationSubflowCallerImpact> callers
+        ImmutableArray<AutomationSubflowCallerImpact> callers,
+        AutomationEffectDisclosure effects,
+        ImmutableArray<AutomationEffectParent> effectParents
     )
     {
         Draft = draft;
@@ -157,8 +162,12 @@ public sealed class AutomationSubflowReview
         RequiredFeatures = requiredFeatures;
         Plugins = plugins;
         Callers = callers;
+        Effects = effects;
+        EffectParents = effectParents;
     }
 
+    public AutomationEffectDisclosure Effects { get; }
+    public ImmutableArray<AutomationEffectParent> EffectParents { get; }
     internal AutomationSubflowDraft Draft { get; }
     internal AutomationSubflowRevisionId? PreviousRevision { get; }
     internal AutomationSubflowInterface? PreviousInterface { get; }

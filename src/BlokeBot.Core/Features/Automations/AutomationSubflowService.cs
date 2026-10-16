@@ -165,6 +165,18 @@ public sealed partial class AutomationSubflowService(
         {
             return new AutomationSubflowPublishOutcome.Stale(ready.Preview);
         }
+        var disabled = ready
+            .Reviewed.EffectParents.Where(parent => parent.WillDisable)
+            .ToImmutableArray();
+        var disabledIds = disabled.Select(parent => parent.FlowId.Value).ToArray();
+        _ = await db
+            .AutomationFlows.Where(flow =>
+                flow.HostId == draft.Graph.HostId.Value && disabledIds.Contains(flow.Id)
+            )
+            .ExecuteUpdateAsync(
+                set => set.SetProperty(flow => flow.IsEnabled, false),
+                cancellationToken
+            );
         var revision = ready.Revision;
         var hostId = draft.Graph.HostId.Value;
         var updated = await db
@@ -216,7 +228,10 @@ public sealed partial class AutomationSubflowService(
             revision,
             ready.Callers,
             ready.PreviousInterface
-        );
+        )
+        {
+            DisabledParents = disabled,
+        };
     }
 
     internal async Task<AutomationSubflowRemovalOutcome> RemoveRevisionAsync(

@@ -25,22 +25,7 @@ public sealed partial class ConfigurationTransferDashboardTests
         IModeratorAuthorityService? authority = null
     )
     {
-        var components = ConfigurationTransferAutomationTestServices.Create(database);
-        var scenarios = new AutomationScenarioService(
-            database,
-            components.Catalog,
-            components.Flows,
-            TimeProvider.System,
-            new AutomationExpressionService(),
-            BotSettings.FromOptions(new BotOptions()),
-            OAuthAuthorizationScopeSet.Create(["channel:bot"])
-        );
-        var automations = new AutomationConfigurationTransferAdapter(
-            components.Flows,
-            components.Catalog,
-            TimeProvider.System,
-            scenarios
-        );
+        var automations = AutomationAdapter(database);
         return new(
             database,
             new(new(database, null!, TimeProvider.System), new(), TimeProvider.System),
@@ -56,6 +41,56 @@ public sealed partial class ConfigurationTransferDashboardTests
             observers ?? UnavailableConfigurationImportObserverDispatcher.Instance,
             new(1, 1)
         );
+    }
+
+    private static AutomationConfigurationTransferAdapter AutomationAdapter(
+        IDbContextFactory<BlokeBotDbContext> database
+    )
+    {
+        var components = ConfigurationTransferAutomationTestServices.Create(database);
+        var scenarios = new AutomationScenarioService(
+            database,
+            components.Catalog,
+            components.Flows,
+            TimeProvider.System,
+            new AutomationExpressionService(),
+            BotSettings.FromOptions(new BotOptions()),
+            OAuthAuthorizationScopeSet.Create(["channel:bot"])
+        );
+        return new(components.Flows, components.Catalog, TimeProvider.System, scenarios);
+    }
+
+    private static async Task<ConfigurationImportSelection> ReviewedAutomationsAsync(
+        SqliteBlokeBotDbFactory database,
+        ConfigurationDocumentV2 document,
+        ConfigurationImportSelection selection
+    )
+    {
+        var preview = (
+            await new ConfigurationImportPreviewService(
+                database,
+                UnavailableOverlayConfigurationTransferAdapter.Instance,
+                AutomationAdapter(database)
+            ).PreviewAsync(document, selection, default)
+        )
+            .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
+            .Preview;
+        return selection with
+        {
+            Sections = selection
+                .Sections.Select(section =>
+                    section.Section == ConfigurationSectionId.Automations
+                        ? section with
+                        {
+                            AutomationReview = preview
+                                .Sections.Single(value => value.Section == section.Section)
+                                .AutomationReview,
+                            AutomationEffectsApproved = true,
+                        }
+                        : section
+                )
+                .ToArray(),
+        };
     }
 
     private static ConfigurationDocumentExporter Exporter(

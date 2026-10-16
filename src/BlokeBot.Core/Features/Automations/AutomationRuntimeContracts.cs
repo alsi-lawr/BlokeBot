@@ -244,6 +244,8 @@ public abstract record AutomationFlowEnableOutcome
 
     public sealed record Updated : AutomationFlowEnableOutcome;
 
+    public sealed record Review(AutomationFlowEnableReview Reviewed) : AutomationFlowEnableOutcome;
+
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
         : AutomationFlowEnableOutcome;
 

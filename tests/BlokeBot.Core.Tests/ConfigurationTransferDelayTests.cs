@@ -151,7 +151,17 @@ public sealed partial class ConfigurationTransferAutomationTests
                 .ApplyAsync(
                     Session(hostId),
                     parsed,
-                    selection,
+                    selection with
+                    {
+                        Sections =
+                        [
+                            selection.Sections[0] with
+                            {
+                                AutomationReview = preview.Preview.Sections[0].AutomationReview,
+                                AutomationEffectsApproved = true,
+                            },
+                        ],
+                    },
                     new("destination-id", "destination"),
                     CancellationToken.None
                 )

@@ -120,6 +120,24 @@ public sealed partial class ConfigurationTransferCoordinator
                     blockingPreviewIssues
                 );
             }
+            if (
+                Selected(selection, ConfigurationSectionId.Automations) is { } reviewedAutomations
+                && planned[ConfigurationSectionId.Automations].AutomationReview
+                    is { } currentEffects
+                && (
+                    !AutomationImportReview.Same(
+                        reviewedAutomations.AutomationReview,
+                        currentEffects
+                    )
+                    || (
+                        currentEffects.RequiresApproval
+                        && !reviewedAutomations.AutomationEffectsApproved
+                    )
+                )
+            )
+            {
+                return new ConfigurationImportApplyOutcome.StaleAutomationReview(operationId);
+            }
             var changingSelections = selection
                 .Sections.Where(selected =>
                     selected.Section != ConfigurationSectionId.ChannelToolEnablement
@@ -363,6 +381,8 @@ public abstract record ConfigurationImportApplyOutcome
         Guid OperationId,
         IReadOnlyList<ConfigurationValidationIssue> Issues
     ) : ConfigurationImportApplyOutcome;
+
+    public sealed record StaleAutomationReview(Guid OperationId) : ConfigurationImportApplyOutcome;
 
     public sealed record Rejected(Guid OperationId, string Message)
         : ConfigurationImportApplyOutcome;

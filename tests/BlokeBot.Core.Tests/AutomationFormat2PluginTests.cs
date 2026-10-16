@@ -86,11 +86,23 @@ public sealed partial class AutomationRuntimeTests
                 CancellationToken.None
             );
             var host = await db.Hosts.SingleAsync(host => host.Id == fixture.HostId);
-            var staged = await adapter.StageAsync(
+            var reviewed = await adapter.PreviewAsync(
                 db,
                 host,
                 document.Sections.Automations!,
                 selection.Sections[0],
+                references,
+                CancellationToken.None
+            );
+            var staged = await adapter.StageAsync(
+                db,
+                host,
+                document.Sections.Automations!,
+                selection.Sections[0] with
+                {
+                    AutomationReview = reviewed.AutomationReview,
+                    AutomationEffectsApproved = true,
+                },
                 references,
                 CancellationToken.None
             );

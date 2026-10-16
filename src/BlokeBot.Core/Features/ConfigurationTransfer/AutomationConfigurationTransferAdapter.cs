@@ -106,7 +106,12 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
             },
             issues,
             conflicts
-        );
+        )
+        {
+            AutomationReview = issues.Any(issue => issue.BlocksApply)
+                ? null
+                : await ReviewEffectsAsync(db, host.Id, drafts, selection, cancellationToken),
+        };
     }
 
     public async Task<AutomationConfigurationStageResult> StageAsync(
@@ -176,6 +181,20 @@ internal sealed partial class AutomationConfigurationTransferAdapter(
         if (issues.Count > 0)
         {
             return new(issues);
+        }
+
+        var current = await ReviewEffectsAsync(db, host.Id, drafts, selection, cancellationToken);
+        if (
+            !AutomationImportReview.Same(selection.AutomationReview, current)
+            || (current.RequiresApproval && !selection.AutomationEffectsApproved)
+        )
+        {
+            return new([
+                new(
+                    "sections.automations",
+                    "The automation effects changed. Review the current import and approve its effects before applying."
+                ),
+            ]);
         }
 
         var applied = await StageDraftsAsync(db, host.Id, drafts, selection, cancellationToken);

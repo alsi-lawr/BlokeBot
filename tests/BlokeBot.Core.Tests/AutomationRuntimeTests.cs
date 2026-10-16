@@ -1931,12 +1931,23 @@ public sealed partial class AutomationRuntimeTests
             .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
             .Flows.Single(flow => flow.Draft.Id == saved.FlowId)
             .Draft;
+        var enableReview = (
+            await fixture.Flows.SetEnabledAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                true,
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<AutomationFlowEnableOutcome.Review>()
+            .Reviewed;
         _ = (
             await fixture.Flows.SetEnabledAsync(
                 new(fixture.HostId),
                 saved.FlowId,
                 enabled: true,
-                CancellationToken.None
+                CancellationToken.None,
+                enableReview
             )
         ).ShouldBeOfType<AutomationFlowEnableOutcome.Updated>();
         var restoredTransform = restored.Nodes.Single(node => node.Id == transform.Id);

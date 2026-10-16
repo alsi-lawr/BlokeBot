@@ -7,16 +7,16 @@ public partial class ConfigurationTransferPage
             HostId,
             _strategies
                 .Where(x => _importSections.Contains(x.Key))
-                .Select(x => new SectionImportSelection(x.Key, x.Value, ResolutionsFor(x.Key)))
-                .ToArray(),
-            _enablementSelections
-        );
-
-    private ConfigurationImportSelection BuildPreviewSelection() =>
-        new(
-            HostId,
-            _strategies
-                .Select(x => new SectionImportSelection(x.Key, x.Value, ResolutionsFor(x.Key)))
+                .Select(x => new SectionImportSelection(x.Key, x.Value, ResolutionsFor(x.Key))
+                {
+                    AutomationReview =
+                        x.Key == ConfigurationSectionId.Automations
+                            ? _preview
+                                ?.Sections.FirstOrDefault(section => section.Section == x.Key)
+                                ?.AutomationReview
+                            : null,
+                    AutomationEffectsApproved = _automationEffectsApproved,
+                })
                 .ToArray(),
             _enablementSelections
         );
@@ -145,7 +145,9 @@ public partial class ConfigurationTransferPage
 
     private void ToggleUrlWarning(bool enabled) => _urlWarningAcknowledged = enabled;
 
-    private void ToggleEnablement(ConfigurationTransferReviewPanel.EnablementSelectionChange change)
+    private async Task ToggleEnablement(
+        ConfigurationTransferReviewPanel.EnablementSelectionChange change
+    )
     {
         if (change.Selected)
         {
@@ -155,9 +157,10 @@ public partial class ConfigurationTransferPage
         {
             _ = _enablementSelections.Remove(change.Feature);
         }
+        await RefreshPreviewAsync();
     }
 
-    private void ToggleImport(ConfigurationTransferReviewPanel.SectionSelectionChange change)
+    private async Task ToggleImport(ConfigurationTransferReviewPanel.SectionSelectionChange change)
     {
         if (change.Selected)
         {
@@ -167,11 +170,15 @@ public partial class ConfigurationTransferPage
         {
             _ = _importSections.Remove(change.Section);
         }
+        await RefreshPreviewAsync();
     }
 
     private void ResetImport()
     {
         _activationPoll?.Cancel();
+        _previewRequest++;
+        _previewPending = false;
+        _automationEffectsApproved = false;
         _preview = null;
         _document = null;
         _applied = null;

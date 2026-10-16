@@ -49,7 +49,8 @@ public sealed partial class AutomationFlowService
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         if (
-            draft.Nodes.Any(node =>
+            draft.Id is not null
+            || draft.Nodes.Any(node =>
                 node.Definition.TypeId == AutomationSubflowDefinitions.Invoke
                 || node.Definition.TypeId == AutomationDefinitionIds.CustomCommandSource.Value
             )
@@ -143,9 +144,9 @@ public sealed partial class AutomationFlowService
                         ]);
                     }
                 }
-                draft = draft with { IsEnabled = existing.IsEnabled };
             }
 
+            draft = draft with { IsEnabled = existing.IsEnabled };
             flow = await db.AutomationFlows.SingleAsync(
                 value => value.Id == existingId.Value && value.HostId == draft.HostId.Value,
                 cancellationToken
@@ -286,7 +287,8 @@ public sealed partial class AutomationFlowService
         AutomationHostId hostId,
         AutomationFlowId flowId,
         bool enabled,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        AutomationFlowEnableReview? reviewed = null
     )
     {
         var availability = await catalog.DiscoverAsync(hostId, cancellationToken);
@@ -294,16 +296,19 @@ public sealed partial class AutomationFlowService
         {
             return new AutomationFlowEnableOutcome.FeatureDisabled();
         }
-
         if (availability.Availability == AutomationCatalogAvailability.HostNotFound)
         {
             return new AutomationFlowEnableOutcome.HostNotFound();
         }
-
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        if (await MainDatabaseStatements.LockHostAsync(db, hostId.Value, cancellationToken) == 0)
+        {
+            return new AutomationFlowEnableOutcome.HostNotFound();
+        }
         var flow = await db
-            .AutomationFlows.Include(static value => value.Nodes)
-            .Include(static value => value.Edges)
+            .AutomationFlows.Include(value => value.Nodes)
+            .Include(value => value.Edges)
             .SingleOrDefaultAsync(
                 value => value.Id == flowId.Value && value.HostId == hostId.Value,
                 cancellationToken
@@ -312,21 +317,6 @@ public sealed partial class AutomationFlowService
         {
             return new AutomationFlowEnableOutcome.FlowNotFound();
         }
-
-        var enabledFeatures = await db
-            .Hosts.AsNoTracking()
-            .Where(value => value.Id == hostId.Value)
-            .Select(static value => value.EnabledFeatures)
-            .SingleAsync(cancellationToken);
-        var capabilityErrors = CapabilityUnavailableErrors(
-            flow.Nodes.Select(static node => (new AutomationNodeId(node.Id), node.DefinitionId)),
-            enabledFeatures
-        );
-        if (enabled && !capabilityErrors.IsEmpty)
-        {
-            return new AutomationFlowEnableOutcome.Invalid(capabilityErrors);
-        }
-
         if (enabled)
         {
             if (
@@ -336,17 +326,68 @@ public sealed partial class AutomationFlowService
             {
                 return new AutomationFlowEnableOutcome.Invalid([MalformedGraphError()]);
             }
-
-            var validation = await ValidateAsync(restored.Draft, cancellationToken);
+            var loaded = await AutomationSubflowStore.LoadClosureAsync(
+                db,
+                hostId,
+                AutomationSubflowStore.Calls(restored.Draft.Nodes).Select(call => call.SubflowId),
+                null,
+                cancellationToken
+            );
+            if (loaded is AutomationSubflowClosureOutcome.Invalid invalid)
+            {
+                return new AutomationFlowEnableOutcome.Invalid(invalid.Errors);
+            }
+            var closure = ((AutomationSubflowClosureOutcome.Available)loaded).Closure;
+            var validation = await ValidatePreparedAsync(
+                restored.Draft,
+                closure,
+                AutomationGraphAdmission.Saved,
+                cancellationToken,
+                db
+            );
+            if (validation.Gate is { } gate)
+            {
+                return gate == AutomationCatalogAvailability.HostNotFound
+                    ? new AutomationFlowEnableOutcome.HostNotFound()
+                    : new AutomationFlowEnableOutcome.FeatureDisabled();
+            }
             if (!validation.Errors.IsEmpty)
             {
                 return new AutomationFlowEnableOutcome.Invalid(validation.Errors);
             }
+            var disclosure = await EffectsAsync(
+                db,
+                restored.Draft,
+                cancellationToken,
+                closure.Revisions
+            );
+            if (disclosure.Summary is not { } effects)
+            {
+                return new AutomationFlowEnableOutcome.Invalid(disclosure.Errors);
+            }
+            var current = new AutomationFlowEnableReview(
+                restored.Draft,
+                effects,
+                closure.Revisions.ToImmutableDictionary(child => child.SubflowId, child => child.Id)
+            );
+            if (
+                reviewed is null
+                || reviewed.Draft.Id != current.Draft.Id
+                || !AutomationSubflowService.SameGraph(reviewed.Draft, current.Draft)
+                || reviewed.Effects != current.Effects
+                || reviewed.Dependencies.Count != current.Dependencies.Count
+                || reviewed.Dependencies.Any(pair =>
+                    !current.Dependencies.TryGetValue(pair.Key, out var id) || id != pair.Value
+                )
+            )
+            {
+                return new AutomationFlowEnableOutcome.Review(current);
+            }
         }
-
         flow.IsEnabled = enabled;
         flow.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
         _ = await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         await PublishSourceReadinessAsync(hostId);
         await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowEnableOutcome.Updated();

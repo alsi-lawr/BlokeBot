@@ -87,7 +87,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 document,
-                selection,
+                await ReviewImportEffectsAsync(database, document, selection),
                 new("destination-id", "destination"),
                 default
             )
@@ -218,7 +218,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             await coordinator.ApplyAsync(
                 Session(host),
                 repair,
-                selection,
+                await ReviewImportEffectsAsync(database, repair, selection),
                 new("destination-id", "destination"),
                 default
             )

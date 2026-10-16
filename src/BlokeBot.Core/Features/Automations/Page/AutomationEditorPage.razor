@@ -1,3 +1,4 @@
+@using System.Collections.Immutable
 @page "/automations"
 @using BlokeBot.Core.Features.Overlays
 @using BlokeBot.Eventing
@@ -267,7 +268,7 @@
                                 }
                                 else if (_authoringTask == AutomationAuthoringTask.Extraction)
                                 {
-                                    <div class="automation-authoring-body" data-automation-extraction><h2>Extract selection</h2><button class="btn-secondary" type="button" @onclick="PreviewExtractionAsync">Refresh preview</button><label class="field"><span class="field__label">Subflow name</span><input class="field__input" value="@_extractionName" @onchange="async args => { _extractionName = args.Value?.ToString() ?? string.Empty; await PreviewExtractionAsync(); }" /></label>
+                                    <div class="automation-authoring-body" data-automation-extraction><h2>Extract selection</h2>@if (_extraction?.Reviewed is { } extractionReview) { <section class="automation-authoring-section"><h3>Effects</h3><span>@(extractionReview.Effects.Summary?.Description ?? "Effects unavailable.")</span></section> }<button class="btn-secondary" type="button" @onclick="PreviewExtractionAsync">Refresh preview</button><label class="field"><span class="field__label">Subflow name</span><input class="field__input" value="@_extractionName" @onchange="async args => { _extractionName = args.Value?.ToString() ?? string.Empty; await PreviewExtractionAsync(); }" /></label>
                                         @if (_extraction is { } extraction)
                                         {
                                             @foreach (var error in extraction.Errors) { <p class="automation-authoring-error" role="alert">@error.Message</p> }
@@ -283,6 +284,23 @@
                                         <label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label>
                                         @if (_subflowPreview is { } review)
                                         {
+                                            <section class="automation-authoring-section">
+                                                <h3>@(_subflowPublished ? "Published effects" : "Proposed effects")</h3>
+                                                <span>@(review.Reviewed.Effects.Summary?.Description ?? "Effects unavailable. Repair the dependencies before enabling.")</span>
+                                            </section>
+                                            var effectParents = _subflowPublished ? _disabledEffectParents : review.Reviewed.EffectParents.Where(parent => parent.WillDisable).ToImmutableArray();
+                                            @if (!effectParents.IsEmpty)
+                                            {
+                                                <section class="automation-authoring-section">
+                                                    <h3>@effectParents.Length automations @(_subflowPublished ? "disabled" : "will be disabled")</h3>
+                                                    <small>Review their effects before enabling. Runs already started continue.</small>
+                                                    <ul class="subflow-callers">@foreach (var parent in effectParents)
+                                                    {
+                                                        <li><strong>@parent.Name</strong><small>@(parent.After.Summary?.Description ?? "Effects unavailable. Repair the dependencies before enabling.")</small>
+                                                        @if (_subflowPublished) { <button type="button" data-automation-effect-parent="@parent.FlowId.Value" @onclick="() => OpenEffectParentAsync(parent)">Open automation</button> }</li>
+                                                    }</ul>
+                                                </section>
+                                            }
                                             <section class="automation-authoring-section" data-automation-publication-preview>
                                                 <h3>@(_subflowPublished ? "Published interface changes" : "Proposed interface changes")</h3>
                                                 <small>Published baseline: @(review.Candidate.Revision == 1 ? "new subflow" : $"version {review.Candidate.Revision - 1}") · @(_subflowPublished ? "Published" : "Proposed") version @review.Candidate.Revision</small>

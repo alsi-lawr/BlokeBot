@@ -6,12 +6,6 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationEditorPage
 {
-    private AutomationActionCapabilities CurrentCapabilities() =>
-        _editor?.Nodes.Aggregate(
-            AutomationActionCapabilities.None,
-            static (capabilities, node) => capabilities | node.Definition.Capabilities
-        ) ?? AutomationActionCapabilities.None;
-
     private AutomationNodeId? SampleSourceId()
     {
         var sources = _editor?.Nodes.Where(static node =>
@@ -181,7 +175,11 @@ public partial class AutomationEditorPage
         }
     }
 
-    private void CancelEnable() => _enableConfirmation = false;
+    private void CancelEnable()
+    {
+        _enableConfirmation = false;
+        _enableReview = null;
+    }
 
     private void ShowRunDetails() =>
         _feedback = _recentRuns.FirstOrDefault() is { } run

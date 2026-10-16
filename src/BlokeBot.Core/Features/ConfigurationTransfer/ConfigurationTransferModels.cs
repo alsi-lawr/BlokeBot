@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.ConfigurationTransfer.Contracts;
 using BlokeBot.Persistence.Models;
 
@@ -58,7 +59,11 @@ public sealed record SectionImportSelection(
     ConfigurationSectionId Section,
     ImportConflictStrategy Strategy,
     IReadOnlyList<ImportItemResolution> ItemResolutions
-);
+)
+{
+    public AutomationImportReview? AutomationReview { get; init; }
+    public bool AutomationEffectsApproved { get; init; }
+}
 
 public sealed record ConfigurationImportSelection(
     int DestinationHostId,
@@ -90,6 +95,7 @@ public sealed record ConfigurationSectionPreview(
 )
 {
     public IReadOnlyList<GuessingProfileMappingPreview> GuessingProfileMappings { get; init; } = [];
+    public AutomationImportReview? AutomationReview { get; init; }
 }
 
 public sealed record GuessingProfileMappingPreview(
@@ -135,4 +141,51 @@ public sealed record ConfigurationImportApplied(
     public IReadOnlyList<ConfigurationPostCommitFailure> PostCommitFailures { get; init; } = [];
 
     public IReadOnlyList<ConfigurationImportManualFollowUp> ManualFollowUps { get; init; } = [];
+}
+
+public sealed record AutomationImportedEffects(
+    AutomationFlowId FlowId,
+    string Name,
+    bool IsEnabled,
+    bool? PreviouslyEnabled,
+    AutomationEffectDisclosure Effects
+);
+
+public sealed class AutomationImportReview
+{
+    internal AutomationImportReview(
+        int hostId,
+        IReadOnlyList<AutomationImportedEffects> flows,
+        System.Collections.Immutable.ImmutableArray<AutomationEffectParent> parents
+    )
+    {
+        HostId = hostId;
+        Flows = flows;
+        Parents = parents;
+    }
+
+    internal int HostId { get; }
+    public IReadOnlyList<AutomationImportedEffects> Flows { get; }
+    public System.Collections.Immutable.ImmutableArray<AutomationEffectParent> Parents { get; }
+    public IEnumerable<AutomationEffectParent> DisabledParents =>
+        Parents.Where(parent =>
+            parent.WillDisable && Flows.All(flow => flow.FlowId != parent.FlowId)
+        );
+    public bool RequiresApproval =>
+        Flows.Any(flow => flow.IsEnabled && flow.Effects.Summary?.IsEmpty is not true);
+
+    internal static bool Same(AutomationImportReview? left, AutomationImportReview? right) =>
+        left is not null
+        && right is not null
+        && left.HostId == right.HostId
+        && left.Flows.Count == right.Flows.Count
+        && left.Flows.All(flow =>
+            right.Flows.Any(current =>
+                current.FlowId == flow.FlowId
+                && current.IsEnabled == flow.IsEnabled
+                && current.PreviouslyEnabled == flow.PreviouslyEnabled
+                && AutomationFlowService.SameEffects(current.Effects, flow.Effects)
+            )
+        )
+        && AutomationFlowService.SameEffectParents(left.Parents, right.Parents);
 }

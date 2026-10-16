@@ -152,7 +152,9 @@ public sealed partial class AutomationSubflowService
             revision.NodeContracts,
             revision.RequiredFeatures,
             revision.PluginDependencies,
-            incompatible
+            incompatible,
+            await flows.EffectsAsync(db, draft.Graph, cancellationToken, closure.Revisions),
+            await flows.EffectParentsAsync(db, draft.Graph.HostId, [revision], cancellationToken)
         );
         return new Preparation.Ready(
             revision,

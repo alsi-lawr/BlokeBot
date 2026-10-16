@@ -126,6 +126,7 @@ public partial class AutomationEditorPage
         _feedback = null;
         _operationFailed = false;
         _enableConfirmation = false;
+        _enableReview = null;
         _deleteConfirmation = false;
         _hasChanges = _editor is not null && _history.IsDirty(_editor);
     }

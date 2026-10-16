@@ -27,6 +27,9 @@ public partial class ConfigurationTransferPage
     private ConfigurationValidationIssue? _parseIssue;
     private string? _applyIssue;
     private ConfigurationImportPreview? _preview;
+    private bool _automationEffectsApproved;
+    private bool _previewPending;
+    private long _previewRequest;
     private ConfigurationDocumentV2? _document;
     private ConfigurationImportApplied? _applied;
     private ConfigurationActivationView? _activation;

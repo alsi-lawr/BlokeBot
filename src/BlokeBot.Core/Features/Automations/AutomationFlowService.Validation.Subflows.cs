@@ -28,7 +28,7 @@ public sealed partial class AutomationFlowService
                     AutomationSubflowStore.Calls(draft.Nodes).Select(pin => pin.SubflowId),
                     publishing,
                     cancellationToken,
-                    preparedCandidate
+                    preparedCandidate is null ? null : [preparedCandidate]
                 );
             if (closure is AutomationSubflowClosureOutcome.Invalid invalid)
             {

@@ -31,23 +31,10 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                 || !existing.Any(flow => flow.Id == imported.Draft.Id!.Value.Value)
             )
             .ToArray();
-        var needed = appliedFlows
-            .SelectMany(imported => AutomationSubflowStore.Calls(imported.Draft.Nodes))
-            .Select(pin => pin.SubflowId)
-            .ToHashSet();
-        foreach (var revision in mapped.Revisions.Reverse())
-        {
-            if (needed.Contains(revision.SubflowId))
-            {
-                needed.UnionWith(
-                    AutomationSubflowStore.Calls(revision.Graph.Nodes).Select(pin => pin.SubflowId)
-                );
-            }
-        }
         await StageRevisionsAsync(
             db,
             hostId,
-            mapped.Revisions.Where(revision => needed.Contains(revision.SubflowId)).ToArray(),
+            NeededRevisions(mapped, appliedFlows),
             cancellationToken
         );
         foreach (var imported in appliedFlows)
@@ -126,6 +113,13 @@ internal sealed partial class AutomationConfigurationTransferAdapter
                     _ = db.AutomationFlows.Remove(flow);
                 }
             }
+        }
+        var disabledParents = selection
+            .AutomationReview!.DisabledParents.Select(parent => parent.FlowId.Value)
+            .ToHashSet();
+        foreach (var parent in existing.Where(flow => disabledParents.Contains(flow.Id)))
+        {
+            parent.IsEnabled = false;
         }
         _ = await db.SaveChangesAsync(cancellationToken);
         return appliedFlows.ToDictionary(

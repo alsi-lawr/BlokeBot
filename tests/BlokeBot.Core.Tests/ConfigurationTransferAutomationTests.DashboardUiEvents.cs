@@ -80,7 +80,7 @@ public sealed partial class ConfigurationTransferAutomationTests
             .ApplyAsync(
                 Session(hostId),
                 imported,
-                selection,
+                await ReviewImportEffectsAsync(database, imported, selection),
                 new("destination-id", "destination"),
                 CancellationToken.None
             );

@@ -7,6 +7,7 @@ public partial class AutomationEditorPage
 {
     private AutomationSubflowPreviewOutcome.Ready? _subflowPreview;
     private bool _subflowPublished;
+    private ImmutableArray<AutomationEffectParent> _disabledEffectParents = [];
     private bool _subflowReviewRequired;
     private long _previewRevision = -1;
     private int _callerOffset;
@@ -313,6 +314,7 @@ public partial class AutomationEditorPage
                     reviewed
                 );
                 _subflowPublished = true;
+                _disabledEffectParents = published.DisabledParents;
                 _callerOffset = 0;
                 var details = await _subflowsService.DescribeCallersAsync(
                     new(host),
@@ -366,6 +368,18 @@ public partial class AutomationEditorPage
         {
             _busy = false;
         }
+    }
+
+    private Task OpenEffectParentAsync(AutomationEffectParent parent)
+    {
+        var host = HostId;
+        return RequestTransitionAsync(async () =>
+        {
+            if (host == HostId)
+            {
+                await LoadCoreAsync(parent.FlowId);
+            }
+        });
     }
 
     private Task OpenAffectedCallerAsync(

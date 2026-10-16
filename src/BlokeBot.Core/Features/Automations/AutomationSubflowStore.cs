@@ -15,7 +15,7 @@ internal static class AutomationSubflowStore
         IEnumerable<AutomationSubflowId> roots,
         AutomationSubflowId? publishing,
         CancellationToken cancellationToken,
-        AutomationSubflowRevision? preparedCandidate = null
+        IReadOnlyCollection<AutomationSubflowRevision>? preparedRevisions = null
     )
     {
         var revisions = new Dictionary<AutomationSubflowId, AutomationSubflowRevision>();
@@ -60,9 +60,10 @@ internal static class AutomationSubflowStore
                     return;
                 }
                 if (
-                    preparedCandidate is { } candidate
-                    && candidate.SubflowId == id
-                    && candidate.Graph.HostId == hostId
+                    preparedRevisions?.FirstOrDefault(candidate =>
+                        candidate.SubflowId == id && candidate.Graph.HostId == hostId
+                    ) is
+                    { } candidate
                 )
                 {
                     revision = candidate;

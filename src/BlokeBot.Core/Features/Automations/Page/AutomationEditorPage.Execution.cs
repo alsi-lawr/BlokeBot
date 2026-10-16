@@ -198,24 +198,18 @@ public partial class AutomationEditorPage
         await RunScenarioAsync();
     }
 
+    private AutomationFlowEnableReview? _enableReview;
+
     private async Task ToggleEnabledAsync()
     {
-        if (_editor?.Id is not { } flowId || HostId == 0)
+        if (_busy || _hasChanges || _editor?.Id is not { } flowId || HostId == 0)
         {
             return;
         }
-
-        var enabling = !_editor.IsEnabled;
-        if (
-            enabling
-            && CurrentCapabilities() != AutomationActionCapabilities.None
-            && !_enableConfirmation
-        )
-        {
-            _enableConfirmation = true;
-            return;
-        }
-
+        var editor = _editor;
+        var version = _draftRevision;
+        var enabling = !editor.IsEnabled;
+        var reviewed = _enableConfirmation ? _enableReview : null;
         _busy = true;
         var requestedHostId = HostId;
         try
@@ -228,22 +222,67 @@ public partial class AutomationEditorPage
                         new(requestedHostId),
                         flowId,
                         enabling,
-                        CancellationToken.None
+                        CancellationToken.None,
+                        reviewed
                     );
+                    if (
+                        requestedHostId != HostId
+                        || !ReferenceEquals(editor, _editor)
+                        || version != _draftRevision
+                    )
+                    {
+                        return;
+                    }
+                    if (
+                        outcome is AutomationFlowEnableOutcome.Review initial
+                        && reviewed is null
+                        && initial.Reviewed.Effects.IsEmpty
+                    )
+                    {
+                        outcome = await _flowsService.SetEnabledAsync(
+                            new(requestedHostId),
+                            flowId,
+                            true,
+                            CancellationToken.None,
+                            initial.Reviewed
+                        );
+                    }
+                    if (
+                        requestedHostId != HostId
+                        || !ReferenceEquals(editor, _editor)
+                        || version != _draftRevision
+                    )
+                    {
+                        return;
+                    }
                     switch (outcome)
                     {
                         case AutomationFlowEnableOutcome.Updated:
+                            _enableConfirmation = false;
+                            _enableReview = null;
                             await LoadCoreAsync(flowId);
                             _feedback = enabling ? "Flow enabled." : "Flow disabled.";
                             _operationFailed = false;
                             break;
+                        case AutomationFlowEnableOutcome.Review review:
+                            _enableReview = review.Reviewed;
+                            _enableConfirmation = true;
+                            if (reviewed is not null)
+                            {
+                                _feedback = "Effects changed. Review them before enabling.";
+                            }
+                            break;
                         case AutomationFlowEnableOutcome.Invalid invalid:
+                            _enableConfirmation = false;
+                            _enableReview = null;
                             ShowValidation(
                                 invalid.Errors,
                                 "Correct the flow before you enable it."
                             );
                             break;
                         default:
+                            _enableConfirmation = false;
+                            _enableReview = null;
                             ShowUnavailable();
                             break;
                     }
@@ -252,7 +291,6 @@ public partial class AutomationEditorPage
         }
         finally
         {
-            _enableConfirmation = false;
             _busy = false;
         }
     }

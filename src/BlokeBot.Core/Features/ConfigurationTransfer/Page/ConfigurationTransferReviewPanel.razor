@@ -97,6 +97,23 @@
                                        Title="@issue.Location"
                                        Description="@issue.Message" />
                         }
+                        @if (section.AutomationReview is { } effects)
+                        {
+                            <div class="enablement-grid">
+                                @foreach (var flow in effects.Flows)
+                                {
+                                    <div class="enablement-row"><div class="enablement-row__copy"><strong>@flow.Name · @(flow.IsEnabled ? "Enabled" : "Disabled")</strong><span class="section-row__detail">@(flow.Effects.Summary?.Description ?? "Effects unavailable. Repair before enabling.")</span></div></div>
+                                }
+                                @foreach (var parent in effects.DisabledParents)
+                                {
+                                    <div class="enablement-row"><div class="enablement-row__copy"><strong>@parent.Name · will be disabled</strong><span class="section-row__detail">@(parent.After.Summary?.Description ?? "Effects unavailable. Repair before enabling.") Review its effects before enabling. Runs already started continue.</span></div></div>
+                                }
+                                @if (effects.RequiresApproval)
+                                {
+                                    <div class="conflict-row"><div class="section-row"><div class="section-row__copy"><span class="section-row__title">Review enabled automation effects</span><span class="section-row__detail">Enabled automations can perform these actions when their events arrive.</span></div><button type="button" class="studio-toggle" role="switch" aria-checked="@(AutomationEffectsApproved ? "true" : "false")" aria-label="Approve enabled automation effects" disabled="@Busy" @onclick="() => AutomationEffectsApprovedChanged.InvokeAsync(!AutomationEffectsApproved)"></button></div></div>
+                                }
+                            </div>
+                        }
                         @foreach (var mapping in section.GuessingProfileMappings)
                         {
                             <div class="mapping-row" @key="mapping.ImportedProfileId">
@@ -216,7 +233,7 @@
             <button id="configuration-transfer-apply"
                     class="btn-primary"
                     type="button"
-                    disabled="@(Busy || !AllConflictsResolved)"
+                    disabled="@(Busy || !AllConflictsResolved || (_requiresEffectApproval && !AutomationEffectsApproved))"
                     @onclick="Apply">
                 Apply selected sections
             </button>
