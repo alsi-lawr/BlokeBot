@@ -118,6 +118,18 @@ public sealed class AutomationFlowRoutingTests
     public Task FocusedConnection_ActivatesOrDeletesItsOwnIdentityAndDisposesKeyboardOwnership() =>
         RunModuleProbeAsync(_focusedConnectionKeyboard);
 
+    [Test]
+    public Task TouchIntent_PansTapsAndExplicitlyMovesSelectionWithoutBodyDrag() =>
+        RunModuleProbeAsync(_touchIntent);
+
+    [Test]
+    public Task TouchPinch_TakesOverNodeAndPortWithoutResidualEditsOrTap() =>
+        RunModuleProbeAsync(_touchTakeover);
+
+    [Test]
+    public Task CancelledDragAndViewportLifetime_RestoreDraftAndRejectStaleCompletion() =>
+        RunModuleProbeAsync(_gestureLifetime);
+
     private static async Task RunModuleProbeAsync(string scenario)
     {
         var source = string.Join(
@@ -573,6 +585,7 @@ function buildCanvas({ orientation = "horizontal", edgeStyle = "angular" } = {})
   const zoomReset = new FakeButton("button", { dataset: { canvasZoomReset: "" }, parent: shell });
   const zoomLabel = new FakeElement("span", { dataset: { canvasZoomLabel: "" }, parent: zoomReset });
   zoomLabel.textContent = "100%";
+  new FakeButton("button", { dataset: { canvasMultiSelect: "" }, parent: shell });
   return { shell, root, svg, stage, preview, marquee };
 }
 
@@ -1452,5 +1465,96 @@ assert.equal(dotnet.calls.length, beforeEditing, "native field keys stay native"
 moduleExports.dispose(root);
 dispatch(root, "keydown", { key: "Delete", target: e2 });
 assert.equal(dotnet.calls.length, beforeEditing, "disposal releases canvas keyboard ownership");
+""";
+    private const string _touchIntent = """
+const f = buildStandardFixture();
+const dotnet = makeDotnet();
+moduleExports.initialize(f.root, dotnet);
+flushAllScheduled();
+const touch = (name, target, id, x, y) => dispatch(f.root, name, {
+  pointerType: "touch", pointerId: id, target, clientX: x, clientY: y,
+});
+const tap = (node, id) => {
+  touch("pointerdown", node, id, 20, 20);
+  touch("pointerup", node, id, 20, 20);
+};
+touch("pointerdown", f.a, 1, 20, 20);
+touch("pointermove", f.a, 1, 70, 70);
+touch("pointerup", f.a, 1, 70, 70);
+assert.equal(dotnet.calls.length, 0, "body drift is not a move or selection");
+tap(f.a, 2);
+assert.deepEqual(dotnet.calls.find(c => c.method === "SetPointerSelectionFromCanvasAsync").values, [["node-a"]]);
+const mode = f.shell.querySelector("[data-canvas-multi-select]");
+dispatch(mode, "click");
+tap(f.b, 3);
+assert.deepEqual(dotnet.calls.filter(c => c.method === "SetPointerSelectionFromCanvasAsync").at(-1).values, [["node-a", "node-b"]]);
+touch("pointerdown", f.root, 4, 700, 500);
+touch("pointermove", f.root, 4, 760, 540);
+touch("pointerup", f.root, 4, 760, 540);
+assert.equal(f.stage.style.transform, "translate(60px, 40px) scale(1)");
+assert.equal(dotnet.calls.filter(c => c.method === "MoveNodesFromCanvasAsync").length, 0);
+const handle = new FakeButton("button", { dataset: { automationNodeDrag: "" }, parent: f.a });
+touch("pointerdown", handle, 5, 20, 20);
+touch("pointermove", handle, 5, 68, 44);
+touch("pointerup", handle, 5, 68, 44);
+assert.deepEqual(dotnet.calls.filter(c => c.method === "MoveNodesFromCanvasAsync").map(c => c.values), [[[
+  { nodeId: "node-a", x: 48, y: 120 }, { nodeId: "node-b", x: 528, y: 120 },
+]]]);
+moduleExports.dispose(f.root);
+""";
+
+    private const string _touchTakeover = """
+for (const start of ["handle", "port"]) {
+  const f = buildStandardFixture();
+  f.shell.dataset.viewportKey = start;
+  const dotnet = makeDotnet();
+  moduleExports.initialize(f.root, dotnet);
+  flushAllScheduled();
+  const target = start === "handle"
+    ? new FakeButton("button", { dataset: { automationNodeDrag: "" }, parent: f.a })
+    : f.a.querySelector("[data-automation-port]");
+  const touch = (name, target, id, x, y) => dispatch(f.root, name, {
+    pointerType: "touch", pointerId: id, target, clientX: x, clientY: y,
+  });
+  touch("pointerdown", target, 1, 20, 20);
+  touch("pointermove", target, 1, 68, 44);
+  flushAllScheduled();
+  touch("pointerdown", f.b, 2, 168, 44);
+  touch("pointermove", f.b, 2, 218, 44);
+  assert.equal(f.shell.querySelector("[data-canvas-zoom-label]").textContent, "150%");
+  touch("pointerup", f.b, 2, 218, 44);
+  touch("pointermove", target, 1, 200, 200);
+  touch("pointerup", target, 1, 200, 200);
+  dispatch(f.root, "click", { target: f.b.querySelector("[data-automation-port]") });
+  assert.equal(dotnet.calls.some(c => c.method === "ConnectFromCanvasAsync" || c.method === "MoveNodesFromCanvasAsync"), false);
+  assert.equal(f.preview.getAttribute("d"), "");
+  assert.deepEqual(nodeRectangle(f.a), { left: 0, top: 96, right: 120, bottom: 156 });
+  touch("pointerdown", f.b, 3, 20, 20);
+  touch("pointerup", f.b, 3, 20, 20);
+  assert.deepEqual(dotnet.calls.filter(c => c.method === "SetPointerSelectionFromCanvasAsync").at(-1).values, [["node-b"]]);
+  moduleExports.dispose(f.root);
+}
+""";
+
+    private const string _gestureLifetime = """
+for (const ending of ["pointercancel", "lostpointercapture", "viewport", "dispose"]) {
+  const f = buildStandardFixture();
+  f.shell.dataset.viewportKey = ending;
+  const dotnet = makeDotnet();
+  moduleExports.initialize(f.root, dotnet);
+  flushAllScheduled();
+  dispatch(f.root, "pointerdown", { target: f.a, pointerId: 7, clientX: 10, clientY: 10 });
+  dispatch(f.root, "pointermove", { pointerId: 7, clientX: 60, clientY: 60 });
+  flushAllScheduled();
+  if (ending === "viewport") {
+    f.shell.dataset.viewportKey = "different-flow";
+    moduleExports.refresh(f.root);
+  } else if (ending === "dispose") moduleExports.dispose(f.root);
+  else dispatch(f.root, ending, { pointerId: 7 });
+  dispatch(f.root, "pointerup", { pointerId: 7, clientX: 60, clientY: 60 });
+  assert.equal(dotnet.calls.filter(c => c.method === "MoveNodesFromCanvasAsync").length, 0, ending);
+  assert.deepEqual(nodeRectangle(f.a), { left: 0, top: 96, right: 120, bottom: 156 }, ending);
+  moduleExports.dispose(f.root);
+}
 """;
 }

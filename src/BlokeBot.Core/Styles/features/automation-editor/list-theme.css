@@ -72,9 +72,28 @@
         padding: 0.45rem;
     }
 
-    .automation-connection-legend,
-    .automation-workspace-toolbar label {
-        display: none;
+    .automation-workspace-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .automation-workspace-toolbar-scroll {
+        display: contents;
+    }
+
+    .automation-workspace-toolbar label select,
+    .automation-workspace-toolbar > .editor-menu-opener > button,
+    .automation-workspace-toolbar > .editor-toolbox-toggle {
+        min-height: 44px;
+    }
+
+    .automation-workspace-toolbar > .editor-menu-opener {
+        margin-left: auto;
+    }
+
+    .automation-connection-legend {
+        flex: 1 0 40%;
+        font-size: 0.6rem;
+        order: 1;
     }
 
     .automation-toolbox-backdrop {

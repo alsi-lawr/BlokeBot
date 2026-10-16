@@ -233,3 +233,42 @@
     top: auto;
     transform: translateX(-50%);
 }
+
+.automation-node-drag {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.4rem;
+    color: var(--app-text-muted);
+    cursor: grab;
+    display: inline-flex;
+    height: 28px;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    right: 5px;
+    top: 4px;
+    width: 28px;
+}
+
+.automation-node-drag:focus-visible {
+    outline: 2px solid var(--tone-blue-solid);
+    outline-offset: 2px;
+}
+
+.automation-node-kind,
+.automation-node-title {
+    margin-right: 32px;
+}
+
+@media (pointer: coarse) {
+    .automation-node-drag {
+        height: 44px;
+        width: 44px;
+    }
+
+    .automation-node-kind,
+    .automation-node-title {
+        margin-right: 48px;
+    }
+}

@@ -14,7 +14,8 @@
             <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" title="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)"><EditorIcon Name="arrow-down" /></button>
             <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" title="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)"><EditorIcon Name="arrow-right" /></button>
         </div>
-        <button type="button" data-canvas-zoom-reset><EditorIcon Name="zoom-reset" /><span data-canvas-zoom-label>100%</span></button>
+        <button type="button" data-canvas-zoom-reset aria-label="Reset canvas view" title="Reset canvas view"><EditorIcon Name="zoom-reset" /><span data-canvas-zoom-label>100%</span></button>
+        <button type="button" data-canvas-multi-select aria-label="Select multiple nodes" title="Select multiple nodes" aria-pressed="false"><EditorIcon Name="check" /></button>
     </div>
 
     <div class="automation-canvas-viewport"
@@ -102,6 +103,7 @@
                         </span>
                         <span class="@(needsRepair ? "automation-node-status automation-node-status--repair" : "automation-node-status")">@NodeStatus(needsRepair, outcome)</span>
                     </button>
+                    <button type="button" class="automation-node-drag" data-automation-node-drag aria-label="@($"Move {node.EffectiveName}")" title="@($"Move {node.EffectiveName}")"><EditorIcon Name="drag" /></button>
                     @foreach (var input in node.Definition.Inputs.Select((port, index) => new { Port = port, Index = index }))
                     {
                         <button type="button"

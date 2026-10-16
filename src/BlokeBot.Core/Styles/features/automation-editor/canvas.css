@@ -186,3 +186,16 @@
     position: absolute;
     z-index: 6;
 }
+
+.automation-canvas-tools button[aria-pressed="true"] {
+    background: var(--tone-blue-bg);
+    border-color: var(--tone-blue-solid);
+    color: var(--tone-blue-fg);
+}
+
+@media (pointer: coarse) {
+    .automation-canvas-tools button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}

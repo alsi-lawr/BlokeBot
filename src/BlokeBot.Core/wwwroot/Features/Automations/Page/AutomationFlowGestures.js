@@ -13,8 +13,9 @@ import {
   snap,
   viewportPoint,
   zoomScale,
+  zoomSteps,
 } from "./AutomationFlowCanvasState.js";
-import { cancelConnection } from "./AutomationFlowConnections.js";
+import { cancelConnection, cancelConnectionDrag } from "./AutomationFlowConnections.js";
 import { cancelDragRouteFrame, scheduleDragRoutes } from "./AutomationFlowDragRouting.js";
 import { cancelRoutePass, scheduleRoutePass } from "./AutomationFlowRoutePass.js";
 
@@ -59,7 +60,7 @@ export function beginNodeDrag(state, event, node) {
     startX: event.clientX,
     startY: event.clientY,
     moved: false,
-    discloseOnClick: !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey,
+    discloseOnClick: !event.target.closest("[data-automation-node-drag]") && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey,
     nodes,
   };
 }
@@ -96,8 +97,8 @@ export function finishNodeDrag(state, event, cancelled = false) {
   const vertical = state.shell.dataset.orientation === "vertical";
   const moves = drag.nodes.map((item) => {
     item.element.classList.remove("automation-node--moving");
-    const displayX = snap(item.x);
-    const displayY = snap(item.y);
+    const displayX = cancelled ? item.startX : snap(item.x);
+    const displayY = cancelled ? item.startY : snap(item.y);
     setNodeGraphPosition(item.element, displayX, displayY);
     return {
       nodeId: item.nodeId,
@@ -107,7 +108,7 @@ export function finishNodeDrag(state, event, cancelled = false) {
   });
   cancelDragRouteFrame(state);
   state.dragRouting = null;
-  if (drag.moved) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
+  if (drag.moved && !cancelled) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
   else if (!cancelled && drag.discloseOnClick) {
     const nodeId = drag.capture.dataset.automationNode;
     const wasDisclosed = drag.capture.classList.contains("automation-node--disclosed");
@@ -135,7 +136,7 @@ export function beginBackgroundAction(state, event) {
       id: node.dataset.automationNode,
       rectangle: nodeGraphRectangle(node),
     }));
-    state.marqueeState = { pointerId: event.pointerId, start, current: start, nodes };
+    state.marqueeState = { pointerId: event.pointerId, start, current: start, nodes, selected: selectionIds(state.root) };
     Object.assign(state.marquee.style, {
       left: `${start.x}px`,
       top: `${start.y}px`,
@@ -210,9 +211,9 @@ export function cancelMarqueeUpdate(state) {
   state.marqueeFrame = null;
 }
 
-export function finishBackgroundAction(state, event) {
+export function finishBackgroundAction(state, event, cancelled = false) {
   if (state.panState?.pointerId === event.pointerId) {
-    const deselect = !state.panState.moved;
+    const deselect = !cancelled && !state.panState.moved;
     if (deselect) {
       state.panX = state.panState.originX;
       state.panY = state.panState.originY;
@@ -233,7 +234,8 @@ export function finishBackgroundAction(state, event) {
   }
   if (state.marqueeState?.pointerId !== event.pointerId) return false;
   cancelMarqueeUpdate(state);
-  applyMarqueeSelection(state);
+  if (cancelled) setLocalSelection(state, state.marqueeState.selected, null);
+  else applyMarqueeSelection(state);
   state.marqueeState = null;
   if (state.root.hasPointerCapture(event.pointerId)) {
     state.root.releasePointerCapture(event.pointerId);
@@ -241,6 +243,105 @@ export function finishBackgroundAction(state, event) {
   state.marquee.hidden = true;
   state.root.classList.remove("automation-canvas--selecting");
   scheduleRoutePass(state);
-  void notifyCompactSelection(state);
+  if (!cancelled) void notifyCompactSelection(state);
+  return true;
+}
+
+export function cancelPointerActions(state) {
+  if (state.drag !== null) finishNodeDrag(state, { pointerId: state.drag.pointerId }, true);
+  if (state.panState !== null) finishBackgroundAction(state, { pointerId: state.panState.pointerId }, true);
+  if (state.marqueeState !== null) finishBackgroundAction(state, { pointerId: state.marqueeState.pointerId }, true);
+  cancelConnectionDrag(state);
+  state.touchTap = null;
+}
+
+export function resetTouchActions(state) {
+  cancelPointerActions(state);
+  for (const id of state.touchPoints.keys()) {
+    if (state.root.hasPointerCapture(id)) state.root.releasePointerCapture(id);
+  }
+  state.touchPoints.clear();
+  state.pinch = null;
+  state.suppressTouchClick = true;
+}
+
+export function beginTouchAction(state, event) {
+  if (event.pointerType !== "touch") return false;
+  if (state.touchPoints.size === 0) state.suppressTouchClick = false;
+  state.touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (state.touchPoints.size > 1) {
+    event.preventDefault();
+    cancelPointerActions(state);
+    state.suppressTouchClick = true;
+    const [first, second] = state.touchPoints.values();
+    const midpoint = viewportPoint(state, (first.x + second.x) / 2, (first.y + second.y) / 2);
+    state.pinch = {
+      distance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)),
+      scale: zoomScale(state),
+      graphX: (midpoint.x - state.panX) / zoomScale(state),
+      graphY: (midpoint.y - state.panY) / zoomScale(state),
+    };
+    for (const id of state.touchPoints.keys()) state.root.setPointerCapture(id);
+    return true;
+  }
+  const node = event.target.closest("[data-automation-node]");
+  if (node !== null && event.target.closest("[data-automation-port], [data-automation-node-drag]") === null) {
+    event.preventDefault();
+    state.touchTap = { pointerId: event.pointerId, node, x: event.clientX, y: event.clientY, moved: false };
+    state.root.setPointerCapture(event.pointerId);
+    return true;
+  }
+  return false;
+}
+
+export function moveTouchAction(state, event) {
+  if (!state.touchPoints.has(event.pointerId)) return false;
+  state.touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (state.pinch !== null) {
+    event.preventDefault();
+    if (state.touchPoints.size < 2) return true;
+    const [first, second] = state.touchPoints.values();
+    const scale = state.pinch.scale * Math.hypot(second.x - first.x, second.y - first.y) / state.pinch.distance;
+    state.zoomIndex = zoomSteps.reduce((nearest, step, index) =>
+      Math.abs(step.scale - scale) < Math.abs(zoomSteps[nearest].scale - scale) ? index : nearest, 0);
+    const midpoint = viewportPoint(state, (first.x + second.x) / 2, (first.y + second.y) / 2);
+    state.panX = midpoint.x - state.pinch.graphX * zoomScale(state);
+    state.panY = midpoint.y - state.pinch.graphY * zoomScale(state);
+    state.zoomTransition = null;
+    applyTransform(state);
+    return true;
+  }
+  if (state.touchTap?.pointerId !== event.pointerId) return false;
+  state.touchTap.moved ||= Math.hypot(event.clientX - state.touchTap.x, event.clientY - state.touchTap.y) > 6;
+  return true;
+}
+
+export function finishTouchAction(state, event, cancelled = false) {
+  if (!state.touchPoints.delete(event.pointerId)) return false;
+  if (cancelled) state.suppressTouchClick = true;
+  if (state.pinch !== null) {
+    if (state.root.hasPointerCapture(event.pointerId)) state.root.releasePointerCapture(event.pointerId);
+    if (state.touchPoints.size === 0) state.pinch = null;
+    return true;
+  }
+  const tap = state.touchTap;
+  if (tap?.pointerId !== event.pointerId) return false;
+  state.touchTap = null;
+  if (state.root.hasPointerCapture(event.pointerId)) state.root.releasePointerCapture(event.pointerId);
+  if (cancelled || tap.moved) return true;
+  const nodeId = tap.node.dataset.automationNode;
+  const selected = new Set(selectionIds(state.root));
+  if (state.multiSelect) {
+    if (!selected.delete(nodeId)) selected.add(nodeId);
+  } else {
+    selected.clear();
+    selected.add(nodeId);
+  }
+  const wasDisclosed = tap.node.classList.contains("automation-node--disclosed");
+  setLocalSelection(state, selected, null);
+  void notifyPointerSelection(state);
+  requestDisclosure(state, state.multiSelect || wasDisclosed ? null : nodeId);
+  tap.node.querySelector("[data-automation-node-select]")?.focus({ preventScroll: true });
+  scheduleRoutePass(state);
   return true;
 }

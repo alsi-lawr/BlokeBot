@@ -24,6 +24,10 @@ import {
 import {
   beginBackgroundAction,
   beginNodeDrag,
+  beginTouchAction,
+  finishTouchAction,
+  moveTouchAction,
+  resetTouchActions,
   cancelMarqueeUpdate,
   finishBackgroundAction,
   finishNodeDrag,
@@ -73,6 +77,11 @@ export function initialize(root, dotnet) {
     panY: 0,
     zoomTransition: null,
     drag: null,
+    touchPoints: new Map(),
+    touchTap: null,
+    pinch: null,
+    multiSelect: false,
+    suppressTouchClick: false,
     panState: null,
     marqueeState: null,
     connection: null,
@@ -105,6 +114,8 @@ export function initialize(root, dotnet) {
   });
 
   register(state, root, "pointerdown", (event) => {
+    if (state.touchPoints.size === 0) state.suppressTouchClick = false;
+    if (beginTouchAction(state, event)) return;
     const port = event.target instanceof Element ? event.target.closest("[data-automation-port]") : null;
     if (
       port instanceof HTMLButtonElement
@@ -123,20 +134,31 @@ export function initialize(root, dotnet) {
     beginBackgroundAction(state, event);
   });
   register(state, root, "pointermove", (event) => {
-    if (moveNodeDrag(state, event) || moveBackgroundAction(state, event)) return;
+    if (moveTouchAction(state, event) || moveNodeDrag(state, event) || moveBackgroundAction(state, event)) return;
     updateConnectionPreview(state, event.clientX, event.clientY);
   });
   register(state, root, "pointerup", (event) => {
+    if (finishTouchAction(state, event)) return;
     if (finishConnectionDrag(state, event)) return;
     if (finishNodeDrag(state, event)) return;
     finishBackgroundAction(state, event);
   });
-  register(state, root, "pointercancel", (event) => {
+  const cancelPointer = (event) => {
+    if (finishTouchAction(state, event, true)) return;
     if (finishConnectionDrag(state, event, true)) return;
     if (finishNodeDrag(state, event, true)) return;
-    finishBackgroundAction(state, event);
+    finishBackgroundAction(state, event, true);
+  };
+  register(state, root, "pointercancel", cancelPointer);
+  register(state, root, "lostpointercapture", (event) => {
+    if (!root.hasPointerCapture(event.pointerId)) cancelPointer(event);
   });
   register(state, root, "click", (event) => {
+    if (state.suppressTouchClick && event.detail !== 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const selector = event.target instanceof Element
       ? event.target.closest("[data-automation-node-select]")
       : null;
@@ -147,7 +169,7 @@ export function initialize(root, dotnet) {
       const nodeElement = selector.closest("[data-automation-node]");
       const nodeId = nodeElement?.dataset.automationNode;
       if (nodeId === undefined) return;
-      if (event.shiftKey) {
+      if (event.shiftKey || state.multiSelect) {
         requestDisclosure(state, null);
         scheduleRoutePass(state);
         void state.dotnet.invokeMethodAsync("ToggleNodeSelectionFromCanvasAsync", nodeId);
@@ -212,6 +234,13 @@ export function initialize(root, dotnet) {
     }
     void dotnet.invokeMethodAsync("DeleteSelectionFromCanvasAsync", nodeIds, edgeId);
   });
+  const multiSelect = shell.querySelector("[data-canvas-multi-select]");
+  if (multiSelect instanceof HTMLButtonElement) {
+    register(state, multiSelect, "click", () => {
+      state.multiSelect = !state.multiSelect;
+      multiSelect.setAttribute("aria-pressed", String(state.multiSelect));
+    });
+  }
   register(state, zoomReset, "click", () => {
     state.zoomIndex = defaultZoomIndex;
     state.panX = 0;
@@ -243,6 +272,9 @@ export function refresh(root) {
   state.preview = root.querySelector("[data-connection-preview]");
   state.marquee = root.querySelector("[data-automation-marquee]");
   if (state.viewportKey !== (state.shell.dataset.viewportKey ?? "")) {
+    resetTouchActions(state);
+    state.multiSelect = false;
+    state.shell.querySelector("[data-canvas-multi-select]")?.setAttribute("aria-pressed", "false");
     restoreViewport(state);
   } else {
     applyTransform(state);
@@ -309,6 +341,7 @@ export function contextSelection(root, target, point) {
 export function dispose(root) {
   const state = states.get(root);
   if (state === undefined) return;
+  resetTouchActions(state);
   cancelDragRouteFrame(state);
   cancelMarqueeUpdate(state);
   cancelRoutePass(state);
