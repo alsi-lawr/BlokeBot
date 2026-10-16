@@ -227,7 +227,7 @@ else
             var choices = ChoicesFor(field);
             var fieldErrors = FieldErrors(field.Id);
             <div class="@(fieldErrors.Count > 0 ? "automation-field automation-field--invalid" : "automation-field")" @key="field.Id">
-                <label for="@FieldId(Node.Id, field.Id)">@field.Name</label>
+                <label for="@FieldId(Node.Id, field.Id)">@ConfigurationLabel(field)</label>
                 @if (field.FieldType is AutomationConfigurationFieldType.Text { Multiline: true })
                 {
                     <textarea id="@FieldId(Node.Id, field.Id)" value="@Node.Value(field.Id)" maxlength="@MaximumLength(field)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @oninput="args => SetValueAsync(field.Id, args.Value)"></textarea>
@@ -238,9 +238,9 @@ else
                 }
                 else
                 {
-                    <input id="@FieldId(Node.Id, field.Id)" type="@GenericInputType(field)" value="@Node.Value(field.Id)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @oninput="args => SetValueAsync(field.Id, args.Value)" />
+                    <input id="@FieldId(Node.Id, field.Id)" type="@GenericInputType(field)" step="@(Node.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource && field.Id.Value == "local-time" ? "1" : null)" value="@ConfigurationValue(field)" required="@field.Required" aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)" @oninput="args => SetValueAsync(field.Id, args.Value)" />
                 }
-                <p>@field.Description</p>
+                <p>@ConfigurationDescription(field)</p>
                 @if (fieldErrors.Count > 0) { <div id="@(FieldId(Node.Id, field.Id) + "-errors")">@foreach (var error in fieldErrors){<span class="automation-field-error" role="alert">@(error.Diagnostic is { } diagnostic ? $"{diagnostic.Summary}. {diagnostic.Correction}" : error.Message)</span>}</div> }
             </div>
         }
@@ -248,6 +248,11 @@ else
         @if (_scheduleTimeWarning is { } timeWarning)
         {
             <p class="automation-field-error" role="status" data-automation-schedule-skipped-time>@timeWarning</p>
+        }
+
+        @if (Node.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource)
+        {
+            @ScheduleHistory
         }
 
         @if (Node.IsCelTransform)

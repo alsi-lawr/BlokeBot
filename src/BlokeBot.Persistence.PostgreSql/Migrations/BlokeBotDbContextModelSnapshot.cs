@@ -696,6 +696,42 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.ToTable("automation_scenarios", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationScheduleSkip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FlowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ScheduledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SourceNodeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("HostId", "FlowId", "SourceNodeId", "ObservedAtUtc");
+
+                    b.ToTable("automation_schedule_skips", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
                 {
                     b.Property<int>("HostId")
@@ -10106,6 +10142,15 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Flow");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationScheduleSkip", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>

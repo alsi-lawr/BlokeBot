@@ -340,7 +340,14 @@ public sealed partial class AutomationRuntimeService
             CancellationToken,
             Task<ImmutableArray<AutomationObservedTrigger>>
         > observe,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        Func<
+            BlokeBotDbContext,
+            AutomationObservedTrigger,
+            AutomationDispatchOutcome,
+            CancellationToken,
+            Task
+        >? afterAdmission = null
     )
     {
         await EnsureInitializedAsync(cancellationToken);
@@ -367,6 +374,10 @@ public sealed partial class AutomationRuntimeService
                     (current, token) =>
                         AcceptExpandedOccurrenceAsync(current, trigger.Context, token)
                 );
+                if (afterAdmission is not null)
+                {
+                    await afterAdmission(db, trigger, admission, cancellationToken);
+                }
                 accepted.AddRange(admission.RunIds);
                 rejected.AddRange(admission.Rejections);
             }

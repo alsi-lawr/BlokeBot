@@ -101,6 +101,7 @@ public partial class AutomationEditorPage
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await EnsureScheduleHistoryAsync();
         try
         {
             if (firstRender)
@@ -205,6 +206,7 @@ public partial class AutomationEditorPage
 
     public async ValueTask DisposeAsync()
     {
+        ResetScheduleHistory();
         if (_pageModule is not null)
         {
             try

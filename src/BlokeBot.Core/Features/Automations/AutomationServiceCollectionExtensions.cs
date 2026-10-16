@@ -111,6 +111,7 @@ public static class AutomationServiceCollectionExtensions
             p.GetRequiredService<ChannelBotOAuthService>().RequestedScopes()
         ));
         services.TryAddSingleton<AutomationTraceStore>();
+        services.TryAddSingleton<AutomationScheduleSkipStore>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, AutomationTraceCleanupWorker>()
         );

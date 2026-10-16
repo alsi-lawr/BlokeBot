@@ -15,6 +15,7 @@
 @inject AutomationManualRunService _manualRuns
 @inject AutomationScenarioService _scenariosService
 @inject AutomationTraceStore _tracesService
+@inject AutomationScheduleSkipStore _scheduleSkipsService
 @inject AutomationSubflowService _subflowsService
 @inject AutomationRunQueryService _runsService
 @inject AutomationRuntimeService _runtimeService
@@ -355,6 +356,42 @@
                                                  Repair="RepairConnection"
                                                  DeleteEdge="DeleteEdge"
                                                  DeleteNode="DeleteNode">
+                            <ScheduleHistory>
+                                <section class="automation-inspector-section">
+                                    <details>
+                                        <summary>Recent skips · 24h</summary>
+                                        @if (CurrentScheduleHistoryScope() is not { Saved: true })
+                                        {
+                                            <p>History is available after this source is saved.</p>
+                                        }
+                                        else if (_scheduleHistoryLoading || _scheduleHistoryScope != CurrentScheduleHistoryScope())
+                                        {
+                                            <p role="status">Loading recent skips…</p>
+                                        }
+                                        else if (_scheduleHistoryFailed)
+                                        {
+                                            <p role="alert">Recent skips could not be loaded. Try refreshing.</p>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var fact in _scheduleSkips)
+                                            {
+                                                <div class="automation-binding-card">
+                                                    <strong>@SkipLabel(fact.Reason)</strong>
+                                                    <div>Scheduled · @SkipTime(fact.ScheduledAtUtc)</div>
+                                                    <div>Observed · @SkipTime(fact.ObservedAtUtc)</div>
+                                                </div>
+                                            }
+                                            @if (_scheduleSkips.IsEmpty)
+                                            {
+                                                <p>No skips observed in the last 24 hours.</p>
+                                            }
+                                        }
+                                        <EditorAction Label="Refresh recent skips" Icon="history" Disabled="@(_scheduleHistoryLoading || CurrentScheduleHistoryScope() is not { Saved: true })" Click="RefreshScheduleHistoryAsync" />
+                                        <p>Observed skips only. Missed runs are not replayed.</p>
+                                    </details>
+                                </section>
+                            </ScheduleHistory>
                             <BoundaryDeclarations>
                                 @if (_editor.Subflow is not null && _selectedNode.Subflow is AutomationSubflowBoundaryConfiguration)
                                 {

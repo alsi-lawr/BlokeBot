@@ -287,13 +287,24 @@ public sealed partial class AutomationRuntimeService(
             .Select(static source => source.DefinitionId.Value)
             .ToHashSet(StringComparer.Ordinal);
 
-    internal async Task<ImmutableArray<AutomationConfiguredSource>> ConfiguredSourcesAsync(
+    internal Task<ImmutableArray<AutomationConfiguredSource>> ConfiguredSourcesAsync(
         AutomationHostId hostId,
+        CancellationToken cancellationToken
+    ) => ConfiguredSourcesAsync(hostId, false, cancellationToken);
+
+    internal Task<ImmutableArray<AutomationConfiguredSource>> ConfiguredSchedulesAsync(
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
+    ) => ConfiguredSourcesAsync(hostId, true, cancellationToken);
+
+    private async Task<ImmutableArray<AutomationConfiguredSource>> ConfiguredSourcesAsync(
+        AutomationHostId hostId,
+        bool schedulesOnly,
         CancellationToken cancellationToken
     )
     {
         var gate = await AdmissionGateAsync(hostId, cancellationToken);
-        if (gate is not AutomationRuntimeGate.Enabled)
+        if (!schedulesOnly && gate is not AutomationRuntimeGate.Enabled)
         {
             return [];
         }
@@ -322,7 +333,15 @@ public sealed partial class AutomationRuntimeService(
                 cancellationToken
             );
             var restoredFlow = AutomationFlowService.RestoreDraft(flow);
-            foreach (var node in flow.Nodes.Where(IsSourceDefinition))
+            foreach (
+                var node in flow.Nodes.Where(node =>
+                    IsSourceDefinition(node)
+                    && (
+                        !schedulesOnly
+                        || node.DefinitionId == AutomationDefinitionIds.ScheduledTimeSource.Value
+                    )
+                )
+            )
             {
                 var configuration =
                     restoredFlow is AutomationFlowDraftRestoreOutcome.Available restored

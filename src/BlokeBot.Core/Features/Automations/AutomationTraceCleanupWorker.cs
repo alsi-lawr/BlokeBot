@@ -1,7 +1,10 @@
 namespace BlokeBot.Core.Features.Automations;
 
-internal sealed class AutomationTraceCleanupWorker(AutomationTraceStore traces, TimeProvider clock)
-    : BackgroundService
+internal sealed class AutomationTraceCleanupWorker(
+    AutomationTraceStore traces,
+    AutomationScheduleSkipStore scheduleSkips,
+    TimeProvider clock
+) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -9,6 +12,7 @@ internal sealed class AutomationTraceCleanupWorker(AutomationTraceStore traces, 
         do
         {
             _ = await traces.DeleteExpiredAsync(stoppingToken);
+            _ = await scheduleSkips.DeleteExpiredAsync(stoppingToken);
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 }

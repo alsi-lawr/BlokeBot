@@ -48,6 +48,7 @@ public partial class AutomationEditorPage
         _diagnosticInspectorOpen = false;
         if (_selectedNodeId != nodeId)
         {
+            ResetScheduleHistory();
             ResetCallSelector();
         }
         _disclosedNodeId = null;
@@ -65,6 +66,7 @@ public partial class AutomationEditorPage
 
     private void ClearSelection()
     {
+        ResetScheduleHistory();
         _diagnosticInspectorOpen = false;
         ResetCallSelector();
         _disclosedNodeId = null;

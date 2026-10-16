@@ -214,7 +214,17 @@ public sealed partial class AutomationEditorNode
                 static field => field.Id,
                 field =>
                     transform is null
-                        ? DefaultValue(field)
+                        ? definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+                            ? field.Id.Value switch
+                            {
+                                "zone" => "UTC",
+                                "local-time" => DateTime.UtcNow.ToString(
+                                    "yyyy-MM-ddTHH:mm:ss",
+                                    System.Globalization.CultureInfo.InvariantCulture
+                                ),
+                                _ => DefaultValue(field),
+                            }
+                            : DefaultValue(field)
                         : DisplayFixedValue(
                             transform
                                 .Inputs.Single(input => input.BindingFieldId == field.Id)
@@ -318,6 +328,27 @@ public sealed partial class AutomationEditorNode
         {
             _ = TrySetSubflowFixedValue(new(fieldId.Value), value);
             return;
+        }
+        if (
+            Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+            && fieldId.Value == "local-time"
+            && Value(new("kind")) == "Weekly"
+            && TimeOnly.TryParse(
+                value,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var clock
+            )
+            && DateTime.TryParse(
+                Value(fieldId),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var local
+            )
+        )
+        {
+            value = local
+                .Date.Add(clock.ToTimeSpan())
+                .ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
         }
         _values[ValueField(fieldId)] = value;
         if (_transform is not null)

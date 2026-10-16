@@ -79,6 +79,13 @@ public partial class AutomationNodeInspector
 
     private bool ShowConfigurationField(AutomationConfigurationFieldMetadata field) =>
         !(
+            Node?.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+            && (
+                (field.Id.Value == "day" && Node.Value(new("kind")) != "Weekly")
+                || (field.Id.Value == "interval-seconds" && Node.Value(new("kind")) != "Interval")
+            )
+        )
+        && !(
             Node?.Definition.Id == AutomationDefinitionIds.CountdownSource
             && field.Id.Value == "name"
             && Node.Value(new("timers")) == "AnyViewer"
@@ -124,6 +131,13 @@ public partial class AutomationNodeInspector
     ) =>
         field.FieldType switch
         {
+            AutomationConfigurationFieldType.Choice
+                when Node?.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+                    && field.Id.Value == "live-only" =>
+            [
+                new("false", "Any time"),
+                new("true", "Only while streaming"),
+            ],
             AutomationConfigurationFieldType.Choice choice => choice
                 .Values.Select(value => new AutomationReferenceChoice(value, ChoiceLabel(value)))
                 .ToArray(),
@@ -138,12 +152,59 @@ public partial class AutomationNodeInspector
         : input.ValueType == AutomationPortValueType.Timestamp ? "datetime-local"
         : "text";
 
-    private static string GenericInputType(AutomationConfigurationFieldMetadata field) =>
-        field.FieldType
-            is AutomationConfigurationFieldType.Number
-                or AutomationConfigurationFieldType.Duration
-            ? "number"
-            : "text";
+    private string GenericInputType(AutomationConfigurationFieldMetadata field) =>
+        Node?.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+        && field.Id.Value == "local-time"
+            ? Node.Value(new("kind")) == "Weekly"
+                ? "time"
+                : "datetime-local"
+            : field.FieldType
+                is AutomationConfigurationFieldType.Number
+                    or AutomationConfigurationFieldType.Duration
+                ? "number"
+                : "text";
+
+    private string ConfigurationValue(AutomationConfigurationFieldMetadata field) =>
+        Node?.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+        && field.Id.Value == "local-time"
+        && Node.Value(new("kind")) == "Weekly"
+        && DateTime.TryParse(
+            Node.Value(field.Id),
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None,
+            out var local
+        )
+            ? local.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
+            : Node?.Value(field.Id) ?? string.Empty;
+
+    private string ConfigurationLabel(AutomationConfigurationFieldMetadata field) =>
+        Node?.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+            ? field.Id.Value switch
+            {
+                "kind" => "Schedule",
+                "local-time" => Node.Value(new("kind")) switch
+                {
+                    "Weekly" => "Local time",
+                    "Interval" => "Anchor date and time",
+                    _ => "Local date and time",
+                },
+                "interval-seconds" => "Interval (seconds)",
+                "live-only" => "Run",
+                _ => field.Name,
+            }
+            : field.Name;
+
+    private string ConfigurationDescription(AutomationConfigurationFieldMetadata field) =>
+        Node?.Definition.Id == AutomationDefinitionIds.ScheduledTimeSource
+        && field.Id.Value == "local-time"
+            ? Node.Value(new("kind")) switch
+            {
+                "Weekly" => "Missing DST times are skipped; the first repeated time is used.",
+                "Interval" =>
+                    "Local anchor in the selected zone; after the first valid slot, intervals use fixed UTC time.",
+                _ => "Local date and time in the selected zone. Missed runs are not replayed.",
+            }
+            : field.Description;
 
     private static string FieldId(
         AutomationNodeId nodeId,

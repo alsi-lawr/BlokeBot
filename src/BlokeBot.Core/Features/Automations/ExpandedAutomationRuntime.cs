@@ -6,7 +6,6 @@ using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using static BlokeBot.Core.Features.Automations.ExpandedAutomationContext;
 
 namespace BlokeBot.Core.Features.Automations;
 
@@ -392,64 +391,7 @@ internal sealed partial class ExpandedAutomationRuntime(
                 ct
             );
             var now = clock.GetUtcNow();
-            foreach (var schedule in sources.OfType<ScheduledTimeSourceConfiguration>())
-            {
-                var key = (host.Id, schedule.ToString());
-                if (!_nextSchedules.TryGetValue(key, out var next))
-                {
-                    if (AutomationScheduleTime.Next(schedule, now) is { } first)
-                    {
-                        _nextSchedules[key] = first;
-                    }
-                    continue;
-                }
-                if (next > now)
-                {
-                    continue;
-                }
-                if (AutomationScheduleTime.Next(schedule, now) is { } future)
-                {
-                    _nextSchedules[key] = future;
-                }
-                else
-                {
-                    _nextSchedules[key] = DateTimeOffset.MaxValue;
-                }
-                if (!connected || now - next > TimeSpan.FromSeconds(2))
-                {
-                    continue;
-                }
-                if (
-                    schedule.LiveOnly
-                    && await LiveAsync(host, ct) is not HostStreamLivenessOutcome.Live
-                )
-                {
-                    continue;
-                }
-                _ = await runtime.DispatchExpandedAsync(
-                    Create(
-                        host,
-                        AutomationDefinitionIds.ScheduledTimeSource,
-                        $"{schedule}:{next.UtcTicks}",
-                        next,
-                        now,
-                        [Time("scheduled-at", next), Text("schedule-zone", schedule.Zone)]
-                    ),
-                    c => c == schedule,
-                    ct
-                );
-            }
-            foreach (
-                var key in _nextSchedules.Keys.Where(k =>
-                    k.Host == host.Id
-                    && !sources
-                        .OfType<ScheduledTimeSourceConfiguration>()
-                        .Any(s => s.ToString() == k.Key)
-                )
-            )
-            {
-                _ = _nextSchedules.TryRemove(key, out _);
-            }
+            await TickSchedulesAsync(host, connected, now, ct);
             if (!connected || !host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
             {
                 await PublishObservationReadinessAsync(host);

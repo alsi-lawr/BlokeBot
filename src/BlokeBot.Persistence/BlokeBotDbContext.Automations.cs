@@ -5,6 +5,8 @@ namespace BlokeBot.Persistence;
 
 public sealed partial class BlokeBotDbContext
 {
+    public DbSet<AutomationScheduleSkip> AutomationScheduleSkips => Set<AutomationScheduleSkip>();
+
     private static void ConfigureAutomations(ModelBuilder modelBuilder)
     {
         _ = modelBuilder.Entity<AutomationFlow>(static b =>
@@ -25,6 +27,24 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasMany(static x => x.Edges)
                 .WithOne(static x => x.Flow)
                 .HasForeignKey(static x => x.FlowId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        _ = modelBuilder.Entity<AutomationScheduleSkip>(static b =>
+        {
+            _ = b.ToTable("automation_schedule_skips");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasIndex(static x => new
+            {
+                x.HostId,
+                x.FlowId,
+                x.SourceNodeId,
+                x.ObservedAtUtc,
+            });
+            _ = b.HasIndex(static x => x.ExpiresAtUtc);
+            _ = b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

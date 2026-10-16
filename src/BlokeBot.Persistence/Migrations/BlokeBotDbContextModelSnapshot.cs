@@ -679,6 +679,42 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("automation_scenarios", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationScheduleSkip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FlowId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ScheduledAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SourceNodeId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("HostId", "FlowId", "SourceNodeId", "ObservedAtUtc");
+
+                    b.ToTable("automation_schedule_skips", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>
                 {
                     b.Property<int>("HostId")
@@ -9799,6 +9835,15 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Flow");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationScheduleSkip", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationSeenViewer", b =>

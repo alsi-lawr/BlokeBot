@@ -34,6 +34,9 @@ public partial class AutomationNodeInspector
     [Parameter]
     public RenderFragment? BoundaryDeclarations { get; set; }
 
+    [Parameter]
+    public RenderFragment? ScheduleHistory { get; set; }
+
     private bool _isSubflowBoundary =>
         Node?.Definition.Id.Value
             is AutomationSubflowDefinitions.Entry
