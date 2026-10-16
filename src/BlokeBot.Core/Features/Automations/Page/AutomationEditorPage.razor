@@ -17,6 +17,7 @@
 @inject AutomationTraceStore _tracesService
 @inject AutomationSubflowService _subflowsService
 @inject AutomationRunQueryService _runsService
+@inject AutomationRuntimeService _runtimeService
 @inject IDbContextFactory<BlokeBotDbContext> _dbFactory
 @inject IOverlayCueAdmissionService _overlayCues
 @inject EventBus<AppEventKind> _events
@@ -55,22 +56,9 @@
                    Title="Automations are off">
             <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
         </PageState>
-        @if (!_recentRuns.IsEmpty)
+        @if (_feedback is not null)
         {
-            <AutomationRunDrawer Visible="true"
-                                 FocusMode="false"
-                                 HasRecentRuns="true"
-                                 CanRunSample="false"
-                                 Kind="history"
-                                 IconClass="@_runIconClass"
-                                 Icon="@_runIcon"
-                                 Title="@_runTitle"
-                                 Description="@_runDescription"
-                                 ShowDetails="ShowRunDetails" />
-            @if (_feedback is not null)
-            {
-                <div class="automation-feedback" role="status">@_feedback</div>
-            }
+            <div class="automation-feedback" role="@(_operationFailed ? "alert" : "status")">@_feedback</div>
         }
     }
     else
@@ -380,18 +368,7 @@
                     }
                 </div>
 
-                <AutomationRunDrawer Visible="@(!_traceOpen && _editor.Subflow is null && (!_focusMode || !_runDrawerCollapsed))"
-                                     FocusMode="_focusMode"
-                                     HasRecentRuns="@(_recentRuns.Length > 0)"
-                                     CanRunSample="@(!_busy && _editor.Nodes.Count > 0)"
-                                     Kind="@(_viewingCurrentScenario ? "sample" : "history")"
-                                     IconClass="@_runIconClass"
-                                     Icon="@_runIcon"
-                                     Title="@_runTitle"
-                                     Description="@_runDescription"
-                                     Toggle="ToggleRunDrawer"
-                                     ShowDetails="ShowRunDetails"
-                                     RunSample="RunSampleAsync" />
+                @RunManagementDrawer
 
                 @if (_focusMode)
                 {
@@ -412,6 +389,10 @@
         }
 
     }
+    @if (!_loading && !_loadFailed && Host is not null && (!_featureEnabled || _editor is null || _sourceFlowId is not null))
+    {
+        @RunManagementDrawer
+    }
 </DashboardPage>
 
 <AutomationDirtyDialog Open="_dirtyDialogOpen"
@@ -422,6 +403,51 @@
                        Save="SaveDirtyTransitionAsync" />
 
 @code {
+    private RenderFragment RunManagementDrawer => @<AutomationRunDrawer Visible="@(!_focusMode || !_runDrawerCollapsed)"
+        FocusMode="_focusMode" CanRunSample="@(_featureEnabled && !_busy && _editor?.Subflow is null && _editor?.Nodes.Count > 0)"
+        Kind="@(_viewingCurrentScenario ? "sample" : "history")" IconClass="@_runIconClass" Icon="@_runIcon"
+        Title="@(_runManagementOpen ? $"{_managedRuns.Length} unfinished runs" : _runTitle)" Description="@_runDescription"
+        Toggle="ToggleRunDrawer" ShowDetails="ShowRunDetailsAsync" RunSample="RunSampleAsync"
+        ManagementOpen="_runManagementOpen" Management="RunManagementControls" />;
+
+    private RenderFragment RunManagementControls => @<section class="automation-run-management" aria-label="Manage unfinished runs">
+        <div class="automation-run-fields">
+            <label class="field"><span class="field__label">Show runs</span>
+                <select class="field__input" value="@(_runScopeFlowId?.Value.ToString() ?? "")" @onchange="ChangeRunScope">
+                    <option value="">All automations</option>
+                    @foreach (var flow in _runScopeChoices)
+                    {
+                        <option value="@flow.Value">@RunFlowName(flow)</option>
+                    }
+                </select>
+            </label>
+            <label class="field"><span class="field__label">Unfinished run</span>
+                <select class="field__input" value="@_managedRunId?.Value" disabled="@(_runManagementBusy || _managedRuns.IsEmpty)" @onchange="ChangeManagedRun">
+                    @if (_managedRuns.IsEmpty) { <option value="">No unfinished runs</option> }
+                    @foreach (var run in _managedRuns)
+                    {
+                        <option value="@run.Id.Value">@run.State · @RunFlowName(run.FlowId) · @FormatTimestamp(run.StartedAtUtc) · @run.Id.Value.ToString("N")[^8..]</option>
+                    }
+                </select>
+            </label>
+        </div>
+        <div class="automation-run-actions">
+            <button class="btn-secondary" type="button" disabled="@_runManagementBusy" @onclick="RefreshManagedRunsAsync">Refresh</button>
+            <button class="btn-secondary" type="button" @onclick="OpenRecentTraceAsync">Run history</button>
+            <button class="btn-danger" type="button" disabled="@(_runManagementBusy || _managedRunId is null)" @onclick="CancelManagedRunAsync">Cancel run</button>
+            <button @ref="_bulkRunButton" class="btn-danger" type="button" disabled="@(_runManagementBusy || _managedRuns.IsEmpty)" @onclick="ConfirmRunCancellation">@(_runScopeFlowId is null ? "Cancel channel runs" : "Cancel flow runs")</button>
+        </div>
+        @if (_runCancellationConfirmation is { } confirmation)
+        {
+            <div class="automation-enable-warning" role="alert">
+                <div><strong>Cancel unfinished runs for @confirmation.Name?</strong><span>All branches and pending waits stop. An action already dispatched may finish; external effects cannot be undone. New starts are unchanged.</span></div>
+                <button @ref="_confirmRunButton" class="btn-danger" type="button" disabled="@_runManagementBusy" @onclick="CancelConfirmedRunsAsync">Confirm cancellation</button>
+                <button class="btn-secondary" type="button" disabled="@_runManagementBusy" @onclick="KeepRunsAsync">Keep runs</button>
+            </div>
+        }
+        <p class="text-sm">Cancellation stops later actions, not an action already dispatched, and retains run history. It does not stop new starts.</p>
+    </section>;
+
     private RenderFragment RepairItems => @<text>
         @foreach (var entry in _authoringEntries)
         {

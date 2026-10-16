@@ -261,7 +261,9 @@ public partial class AutomationEditorPage
                             _enableConfirmation = false;
                             _enableReview = null;
                             await LoadCoreAsync(flowId);
-                            _feedback = enabling ? "Flow enabled." : "Flow disabled.";
+                            _feedback = enabling
+                                ? "New starts allowed."
+                                : "New starts stopped. Admitted work continues.";
                             _operationFailed = false;
                             break;
                         case AutomationFlowEnableOutcome.Review review:

@@ -114,7 +114,10 @@ public sealed partial class AutomationRuntimeTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
-        using var ui = UiTestContextFactory.Create(fixture.Database, fixture.HostId);
+        using var ui = UiTestContextFactory.Create(
+            (SqliteBlokeBotDbFactory)fixture.Database,
+            fixture.HostId
+        );
         _ = ui.Services.AddSingleton<IPublicChatMessageSender>(fixture.Chat);
         _ = ui.Services.AddSingleton<IOverlayCueAdmissionService>(new NoOverlayCues());
         _ = ui.Services.AddSingleton<TimeProvider>(fixture.Clock);

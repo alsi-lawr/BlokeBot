@@ -262,6 +262,7 @@ internal static class AutomationNodePresentation
                 AutomationNodeRunState.Failed => "Failed",
                 AutomationNodeRunState.ContinuedAfterFailure => "Continued after failure",
                 AutomationNodeRunState.Invalidated => "Invalidated",
+                AutomationNodeRunState.Cancelled => "Cancelled",
                 _ => outcome.OutcomeCode,
             },
         };

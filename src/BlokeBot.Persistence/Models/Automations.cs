@@ -7,6 +7,7 @@ public enum AutomationFlowRunStatus
     Completed,
     Failed,
     Invalidated,
+    Cancelled,
 }
 
 public enum AutomationNodeRunStatus
@@ -18,6 +19,7 @@ public enum AutomationNodeRunStatus
     ContinuedAfterFailure,
     Invalidated,
     Waiting,
+    Cancelled,
 }
 
 public enum PersistedAutomationEdgeKind

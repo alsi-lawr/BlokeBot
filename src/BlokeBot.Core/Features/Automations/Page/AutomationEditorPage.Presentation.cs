@@ -76,6 +76,7 @@ public partial class AutomationEditorPage
                     _recentRuns[0].State
                         is AutomationFlowRunState.Failed
                             or AutomationFlowRunState.Invalidated
+                            or AutomationFlowRunState.Cancelled
                     || _recentRuns[0].FailedNode is not null
                 );
 

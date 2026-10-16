@@ -70,6 +70,7 @@ public partial class AutomationEditorPage
         _catalogRevision = catalog.Revision;
         var runQuery = await _runsService.ListAsync(hostId, CancellationToken.None);
         var hostRuns = runQuery is AutomationRunQueryOutcome.Available runs ? runs.Runs : [];
+        _channelRuns = hostRuns;
         _recentRuns = hostRuns;
         if (!_featureEnabled)
         {

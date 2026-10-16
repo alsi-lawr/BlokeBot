@@ -430,14 +430,14 @@ public sealed partial class AutomationRuntimeService(
                 return new(AutomationResumeStatus.NotFound);
             }
 
-            if (run.ExecutionLeaseId != leaseId)
-            {
-                return new(AutomationResumeStatus.Waiting);
-            }
-
             if (Terminal(run.Status) is { } terminal)
             {
                 return new(terminal);
+            }
+
+            if (run.ExecutionLeaseId != leaseId)
+            {
+                return new(AutomationResumeStatus.Waiting);
             }
 
             var executionGate = await EnforceExecutionGateAsync(
@@ -708,24 +708,13 @@ public sealed partial class AutomationRuntimeService(
             var resumed = await inputs.Match<Task<AutomationResumeOutcome?>>(
                 async resolvedInputs =>
                 {
-                    await TraceAsync(
-                        db,
-                        run,
-                        AutomationTraceEventKind.ResolvedInputs,
-                        cancellationToken,
-                        node,
-                        values: resolvedInputs.PortValues
-                    );
-                    await TraceAsync(
-                        db,
-                        run,
-                        AutomationTraceEventKind.Attempt,
-                        cancellationToken,
-                        node
-                    );
                     if (valid.Configuration is AutomationSubflowConfiguration)
                     {
                         _ = await CompleteBoundaryAsync(scope, resolvedInputs, cancellationToken);
+                        return null;
+                    }
+                    if (!await AdmitOwnedNodeAsync(scope, resolvedInputs, cancellationToken))
+                    {
                         return null;
                     }
                     var result = await ExecuteNodeAsync(
@@ -811,11 +800,13 @@ public sealed partial class AutomationRuntimeService(
             node.Status =
                 terminalStatus == AutomationFlowRunStatus.Invalidated
                     ? AutomationNodeRunStatus.Invalidated
-                    : AutomationNodeRunStatus.Failed;
+                : terminalStatus == AutomationFlowRunStatus.Cancelled
+                    ? AutomationNodeRunStatus.Cancelled
+                : AutomationNodeRunStatus.Failed;
             node.OutcomeCode =
-                terminalStatus == AutomationFlowRunStatus.Invalidated
-                    ? "run-invalidated"
-                    : "execution-interrupted";
+                terminalStatus == AutomationFlowRunStatus.Invalidated ? "run-invalidated"
+                : terminalStatus == AutomationFlowRunStatus.Cancelled ? "user-cancelled"
+                : "execution-interrupted";
             node.CompletedAtUtc = now;
         }
     }
@@ -1512,6 +1503,7 @@ public sealed partial class AutomationRuntimeService(
             AutomationFlowRunStatus.Completed => AutomationResumeStatus.Completed,
             AutomationFlowRunStatus.Failed => AutomationResumeStatus.Failed,
             AutomationFlowRunStatus.Invalidated => AutomationResumeStatus.Invalidated,
+            AutomationFlowRunStatus.Cancelled => AutomationResumeStatus.Cancelled,
             _ => null,
         };
 

@@ -114,7 +114,10 @@ public sealed partial class AutomationRuntimeTests
                     )
             ).ShouldBe(AutomationSubflowRemovalOutcome.Removed);
         }
-        using var ui = UiTestContextFactory.Create(fixture.Database, fixture.HostId);
+        using var ui = UiTestContextFactory.Create(
+            (SqliteBlokeBotDbFactory)fixture.Database,
+            fixture.HostId
+        );
         _ = ui.Services.AddSingleton<IPublicChatMessageSender>(fixture.Chat);
         _ = ui.Services.AddSingleton<IOverlayCueAdmissionService>(new NoOverlayCues());
         _ = ui.Services.AddSingleton<TimeProvider>(fixture.Clock);
@@ -262,7 +265,10 @@ public sealed partial class AutomationRuntimeTests
             JsonSerializer.Serialize(trace).ShouldNotContain("private-");
         }
         fixture.Chat.Calls.ShouldBe(0);
-        using var ui = UiTestContextFactory.Create(fixture.Database, fixture.HostId);
+        using var ui = UiTestContextFactory.Create(
+            (SqliteBlokeBotDbFactory)fixture.Database,
+            fixture.HostId
+        );
         _ = ui.Services.AddSingleton<IPublicChatMessageSender>(fixture.Chat);
         _ = ui.Services.AddSingleton<IOverlayCueAdmissionService>(new NoOverlayCues());
         _ = ui.Services.AddSingleton<TimeProvider>(fixture.Clock);

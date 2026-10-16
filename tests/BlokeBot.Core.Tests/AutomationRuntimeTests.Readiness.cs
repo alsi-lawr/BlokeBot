@@ -644,7 +644,10 @@ public sealed partial class AutomationRuntimeTests
         ReadinessChannels channels
     )
     {
-        var ui = UiTestContextFactory.CreateWithAuthorization(f.Database, f.HostId);
+        var ui = UiTestContextFactory.CreateWithAuthorization(
+            (SqliteBlokeBotDbFactory)f.Database,
+            f.HostId
+        );
         var context = ui.Context;
         _ = context.Services.AddSingleton(ui.Authorization);
         _ = context.Services.AddSingleton(f.UiChanges);

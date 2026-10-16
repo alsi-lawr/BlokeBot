@@ -84,12 +84,14 @@ public sealed class AutomationTracePresentation
                             or AutomationTraceOutcome.ContinuedAfterFailure
                             or AutomationTraceOutcome.Invalidated
                             or AutomationTraceOutcome.Interrupted
+                            or AutomationTraceOutcome.Cancelled
                 )
                 .Select(data => new AutomationScenarioNodeOutcome(
                     data.Node!.Id,
                     data.Outcome switch
                     {
                         AutomationTraceOutcome.Failed => AutomationNodeRunState.Failed,
+                        AutomationTraceOutcome.Cancelled => AutomationNodeRunState.Cancelled,
                         AutomationTraceOutcome.ContinuedAfterFailure =>
                             AutomationNodeRunState.ContinuedAfterFailure,
                         AutomationTraceOutcome.Invalidated or AutomationTraceOutcome.Interrupted =>

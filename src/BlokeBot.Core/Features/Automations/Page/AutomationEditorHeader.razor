@@ -31,8 +31,8 @@
             <button class="@(Enabled ? "btn-secondary" : "btn-primary")"
                     type="button"
                     disabled="@(Busy || !Saved || HasChanges)"
-                    title="@(HasChanges ? "Save the flow before you change its state." : null)"
-                    @onclick="ToggleEnabled"><EditorIcon Name="power" />@(Enabled ? "Disable" : EnableConfirmation ? "Enable anyway" : "Enable")</button>
+                    title="@(HasChanges ? "Save the flow before you change its state." : Enabled ? "Prevents new runs. Admitted work continues; use Runs to cancel it." : "Allows new runs. Does not restart cancelled work.")"
+                    @onclick="ToggleEnabled"><EditorIcon Name="power" />@(Enabled ? "Stop new starts" : EnableConfirmation ? "Allow anyway" : "Allow new starts")</button>
             }
         </div>
     </header>

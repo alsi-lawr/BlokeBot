@@ -44,9 +44,9 @@ internal static class AutomationSubflowExecutionTrace
             }
             caller.OutcomeCode = "subflow-terminated";
             caller.Status =
-                outcome == AutomationTraceOutcome.Invalidated
-                    ? AutomationNodeRunStatus.Invalidated
-                    : AutomationNodeRunStatus.Failed;
+                outcome == AutomationTraceOutcome.Invalidated ? AutomationNodeRunStatus.Invalidated
+                : outcome == AutomationTraceOutcome.Cancelled ? AutomationNodeRunStatus.Cancelled
+                : AutomationNodeRunStatus.Failed;
             caller.CompletedAtUtc = now;
             caller.OutputJson = null;
             await AutomationTraceStore.AppendAsync(

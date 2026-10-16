@@ -34,16 +34,43 @@ public sealed class PluginAutomationRunCoordinator(
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var runs = await db
-            .AutomationFlowRuns.Include(static run => run.NodeRuns)
+            .AutomationFlowRuns.AsNoTracking()
             .Where(run =>
                 run.Status == AutomationFlowRunStatus.Running
                 || run.Status == AutomationFlowRunStatus.Waiting
             )
             .ToArrayAsync(cancellationToken);
         var now = clock.GetUtcNow().UtcDateTime;
-        var changed = runs.Where(run => Contains(run.DefinitionJson, matches)).ToArray();
-        foreach (var run in changed)
+        var changed = new List<AutomationFlowRun>();
+        foreach (
+            var candidate in runs.Where(run => Contains(run.DefinitionJson, matches))
+                .OrderBy(run => run.Id)
+        )
         {
+            var locked = await db
+                .AutomationFlowRuns.Where(run =>
+                    run.Id == candidate.Id
+                    && (
+                        run.Status == AutomationFlowRunStatus.Running
+                        || run.Status == AutomationFlowRunStatus.Waiting
+                    )
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters.SetProperty(
+                            run => run.ExecutionLeaseId,
+                            run => run.ExecutionLeaseId
+                        ),
+                    cancellationToken
+                );
+            if (locked == 0)
+            {
+                continue;
+            }
+            var run = await db
+                .AutomationFlowRuns.Include(run => run.NodeRuns)
+                .SingleAsync(run => run.Id == candidate.Id, cancellationToken);
+            changed.Add(run);
             run.Status = AutomationFlowRunStatus.Invalidated;
             run.CompletedAtUtc = now;
             run.ExecutionLeaseId = null;

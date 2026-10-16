@@ -51,7 +51,10 @@ public sealed partial class AutomationRuntimeTests
         ).ShouldBeOfType<AutomationCountdownApplyOutcome.Started>();
         await using var initialRead = await f.Database.CreateDbContextAsync();
         var originalTimer = await initialRead.AutomationCountdowns.AsNoTracking().SingleAsync();
-        var uiFixture = UiTestContextFactory.CreateWithAuthorization(f.Database, f.HostId);
+        var uiFixture = UiTestContextFactory.CreateWithAuthorization(
+            (SqliteBlokeBotDbFactory)f.Database,
+            f.HostId
+        );
         await using var uiState = uiFixture.Context;
         var authorization = uiFixture.Authorization;
         var moderator = new DashboardControlModerator();

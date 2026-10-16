@@ -156,10 +156,6 @@
         white-space: normal;
     }
 
-    .automation-run-actions > :first-child {
-        display: none;
-    }
-
     .automation-editor--focus {
         display: grid;
         height: 100dvh;
@@ -208,7 +204,4 @@
         display: flex;
     }
 
-    .automation-editor--focus .automation-run-actions > :first-child {
-        display: inline-flex;
-    }
 }

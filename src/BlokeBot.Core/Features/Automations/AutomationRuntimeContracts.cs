@@ -306,6 +306,7 @@ public enum AutomationResumeStatus
     Invalidated,
     FeatureDisabled,
     NotFound,
+    Cancelled,
 }
 
 public sealed record AutomationResumeOutcome(AutomationResumeStatus Status);
@@ -351,6 +352,7 @@ public enum AutomationFlowRunState
     Completed,
     Failed,
     Invalidated,
+    Cancelled,
 }
 
 public sealed record AutomationNodeRunSummary(
@@ -372,6 +374,7 @@ public enum AutomationNodeRunState
     ContinuedAfterFailure,
     Invalidated,
     Waiting,
+    Cancelled,
 }
 
 public abstract record AutomationRunQueryOutcome

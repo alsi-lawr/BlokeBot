@@ -1329,7 +1329,10 @@ public sealed partial class AutomationEditorInteractionTests
     private static IElement FlowStateButton(IRenderedComponent<AutomationEditorPage> page) =>
         page.FindAll(".automation-editor-actions button")
             .Single(button =>
-                button.TextContent.Trim() is "Enable" or "Enable anyway" or "Disable"
+                button.TextContent.Trim()
+                    is "Allow new starts"
+                        or "Allow anyway"
+                        or "Stop new starts"
             );
 
     private static AutomationDefinitionDescriptor[] ProductionDefinitions() =>
@@ -1412,6 +1415,15 @@ public sealed partial class AutomationEditorInteractionTests
             );
             _ = context.Services.AddSingleton<IPublicChatMessageSender>(
                 new UnavailablePublicChatMessageSender()
+            );
+            _ = context.Services.AddSingleton(
+                new BlokeBot.Core.Auth.Moderation.ModeratorAuthorityService(
+                    null!,
+                    null!,
+                    null!,
+                    null!,
+                    TimeProvider.System
+                )
             );
             _ = context.Services.AddBlokeBotAutomations();
             _ = context.Services.AddSingleton(provider => new AutomationScenarioService(

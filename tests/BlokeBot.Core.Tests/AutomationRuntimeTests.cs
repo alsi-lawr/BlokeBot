@@ -5788,7 +5788,7 @@ public sealed partial class AutomationRuntimeTests
     private sealed class RuntimeFixture : IAsyncDisposable
     {
         private RuntimeFixture(
-            SqliteBlokeBotDbFactory database,
+            IDbContextFactory<BlokeBotDbContext> database,
             MutableTimeProvider clock,
             RecordingChatSender chat,
             HostFeatureService features,
@@ -5804,6 +5804,7 @@ public sealed partial class AutomationRuntimeTests
         )
         {
             Database = database;
+            _databaseLease = (IAsyncDisposable)database;
             Clock = clock;
             Chat = chat;
             Features = features;
@@ -5818,7 +5819,8 @@ public sealed partial class AutomationRuntimeTests
             HostId = hostId;
         }
 
-        internal SqliteBlokeBotDbFactory Database { get; }
+        private readonly IAsyncDisposable _databaseLease;
+        internal IDbContextFactory<BlokeBotDbContext> Database { get; }
         internal MutableTimeProvider Clock { get; }
         internal RecordingChatSender Chat { get; }
         internal HostFeatureService Features { get; }
@@ -5859,14 +5861,17 @@ public sealed partial class AutomationRuntimeTests
             IInterceptor[]? databaseInterceptors = null,
             bool migrateSchema = false,
             IPublicChatMessageSender? executionChat = null,
-            ILogger<AutomationRuntimeService>? logger = null
+            ILogger<AutomationRuntimeService>? logger = null,
+            PointProviderFixture? provider = null
         )
         {
-            var database = migrateSchema
-                ? await SqliteBlokeBotDbFactory.CreateEmptyAsync([
-                    .. databaseInterceptors ?? [],
-                    new WeeklyAnnouncementMigrationInterceptor(),
-                ])
+            IDbContextFactory<BlokeBotDbContext> database =
+                provider is not null ? provider
+                : migrateSchema
+                    ? await SqliteBlokeBotDbFactory.CreateEmptyAsync([
+                        .. databaseInterceptors ?? [],
+                        new WeeklyAnnouncementMigrationInterceptor(),
+                    ])
                 : await SqliteBlokeBotDbFactory.CreateAsync(databaseInterceptors ?? []);
             if (migrateSchema)
             {
@@ -6041,7 +6046,7 @@ public sealed partial class AutomationRuntimeTests
             _ = await db.SaveChangesAsync();
         }
 
-        public async ValueTask DisposeAsync() => await Database.DisposeAsync();
+        public async ValueTask DisposeAsync() => await _databaseLease.DisposeAsync();
     }
 
     private sealed class RecordingChatSender(

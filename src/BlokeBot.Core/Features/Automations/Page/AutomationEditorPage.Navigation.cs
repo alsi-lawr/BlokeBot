@@ -116,6 +116,7 @@ public partial class AutomationEditorPage
 
     private void ResetTransientState()
     {
+        ResetRunManagement();
         ResetSource();
         ResetAuthoring();
         CancelValidationFeedback();

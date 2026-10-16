@@ -174,6 +174,15 @@ public sealed partial class AutomationRuntimeService
         {
             return false;
         }
+        await TraceAsync(
+            db,
+            run,
+            AutomationTraceEventKind.ResolvedInputs,
+            cancellationToken,
+            node,
+            values: inputs.PortValues
+        );
+        await TraceAsync(db, run, AutomationTraceEventKind.Attempt, cancellationToken, node);
         var now = clock.GetUtcNow().UtcDateTime;
         var invocation =
             node.DefinitionId == AutomationSubflowDefinitions.Invoke

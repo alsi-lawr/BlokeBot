@@ -181,11 +181,6 @@ public partial class AutomationEditorPage
         _enableReview = null;
     }
 
-    private void ShowRunDetails() =>
-        _feedback = _recentRuns.FirstOrDefault() is { } run
-            ? $"Recent run: {RecentRunDescription(run)}"
-            : "No persisted runs are available for this channel.";
-
     private static string ModeToken(AutomationEditorMode mode) =>
         mode == AutomationEditorMode.Grid ? "grid" : "list";
 
@@ -197,6 +192,7 @@ public partial class AutomationEditorPage
             AutomationFlowRunState.Completed => "Last live run completed",
             AutomationFlowRunState.Failed => "Last live run failed",
             AutomationFlowRunState.Waiting => "Live run waits",
+            AutomationFlowRunState.Cancelled => "Last live run cancelled",
             AutomationFlowRunState.Running => "Live run is active",
             _ => "Last live run was stopped",
         };

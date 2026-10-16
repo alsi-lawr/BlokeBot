@@ -200,3 +200,11 @@
     gap: 0.55rem;
     justify-content: flex-end;
 }
+
+.automation-run-drawer { flex-wrap: wrap; }
+.automation-run-management { display: grid; flex-basis: 100%; gap: 0.75rem; min-width: 0; }
+.automation-run-fields { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.automation-run-fields > .field { flex: 1; min-width: min(14rem, 100%); }
+.automation-run-fields .field__input { width: 100%; }
+.automation-run-management .automation-run-actions { flex-wrap: wrap; }
+.automation-run-management p { margin: 0; }

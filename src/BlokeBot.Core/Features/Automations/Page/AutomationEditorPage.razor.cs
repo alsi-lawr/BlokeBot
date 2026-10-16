@@ -175,6 +175,7 @@ public partial class AutomationEditorPage
             _restoreDiagnosticOpener = false;
             await _pageModule.InvokeVoidAsync("focusDiagnosticOpener");
         }
+        await FocusRunManagementAsync();
         await EnsureCallSelectorAsync();
 
         if (_acceptedTransition is not { } transition)

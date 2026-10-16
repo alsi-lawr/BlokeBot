@@ -11,23 +11,48 @@ public sealed partial class AutomationRuntimeService
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var runs = await db
-            .AutomationFlowRuns.Include(static value => value.NodeRuns)
-            .Where(value =>
+        var ids = await db
+            .AutomationFlowRuns.Where(value =>
                 value.ExecutionLeaseId != null
                 || value.NodeRuns.Any(node =>
                     node.Status == AutomationNodeRunStatus.Running
                     || node.Status == AutomationNodeRunStatus.Waiting
                 )
             )
+            .OrderBy(value => value.Id)
+            .Select(value => value.Id)
             .ToArrayAsync(cancellationToken);
-        if (runs.Length == 0)
+        var runs = new List<AutomationFlowRun>();
+        foreach (var id in ids)
+        {
+            var locked = await db
+                .AutomationFlowRuns.Where(run =>
+                    run.Id == id && run.Status != AutomationFlowRunStatus.Cancelled
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters.SetProperty(
+                            run => run.ExecutionLeaseId,
+                            run => run.ExecutionLeaseId
+                        ),
+                    cancellationToken
+                );
+            if (locked != 0)
+            {
+                runs.Add(
+                    await db
+                        .AutomationFlowRuns.Include(run => run.NodeRuns)
+                        .SingleAsync(run => run.Id == id, cancellationToken)
+                );
+            }
+        }
+        if (runs.Count == 0)
         {
             await transaction.CommitAsync(cancellationToken);
             return;
         }
 
-        var changed = await RecoverRunsAsync(db, runs, cancellationToken);
+        var changed = await RecoverRunsAsync(db, [.. runs], cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         foreach (var recovered in changed)
         {
