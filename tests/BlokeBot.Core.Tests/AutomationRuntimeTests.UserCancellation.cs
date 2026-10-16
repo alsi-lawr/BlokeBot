@@ -168,6 +168,272 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UserCancellation_RevokedLeaseRejectsLatePureBeginAndInputEvents(
+        bool afterInnerCheckpoint
+    )
+    {
+        var barrier = new RecoveryCommitBarrier();
+        await using var f = await RuntimeFixture.CreateAsync(databaseInterceptors: [barrier]);
+        var source = Node("test-number-source", "{}");
+        var inner = Node(
+            "test-cel-transform",
+            TransformJson(
+                [],
+                [
+                    new(
+                        "result",
+                        "Result",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'prepared'"
+                    ),
+                ]
+            )
+        );
+        var outer = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "input",
+                        "value",
+                        "Value",
+                        "input",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        ""
+                    ),
+                ],
+                [
+                    new(
+                        "result",
+                        "Result",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "value"
+                    ),
+                ]
+            ),
+            bindings: Bindings("input", AutomationInputBindingMode.Connected)
+        );
+        var send = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await f.SaveAsync(
+            [source, inner, outer, send],
+            [
+                Edge(source, "flow", send),
+                Edge(inner, "result", outer, "input", AutomationEdgeKind.Data),
+                Edge(outer, "result", send, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        barrier.Arm(async () =>
+        {
+            await using var db = await f.Database.CreateDbContextAsync();
+            return afterInnerCheckpoint
+                ? await db.AutomationNodeRuns.AnyAsync(node =>
+                    node.NodeId == inner.Id.Value
+                    && node.Status == AutomationNodeRunStatus.Succeeded
+                )
+                : await db.AutomationNodeRuns.AnyAsync(node =>
+                    node.NodeId == send.Id.Value && node.Status == AutomationNodeRunStatus.Running
+                );
+        });
+        var dispatch = f.Runtime.DispatchAsync(
+            new(
+                Context(f.HostId, sourceDefinitionId: new("test-number-source")),
+                new DataContractConfiguration()
+            ),
+            default
+        );
+        try
+        {
+            await barrier.Committed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var id = new AutomationRunId(await SingleRunIdAsync(f));
+            (await f.Runtime.CancelRunAsync(new(f.HostId), id, default)).ShouldBe(1);
+            await using var cancelled = await f.Database.CreateDbContextAsync();
+            var nodes = await cancelled
+                .AutomationNodeRuns.Where(node => node.RunId == id.Value)
+                .OrderBy(node => node.NodeId)
+                .Select(node => new
+                {
+                    node.NodeId,
+                    node.Status,
+                    node.OutcomeCode,
+                    node.OutputJson,
+                })
+                .ToArrayAsync();
+            var events = await cancelled
+                .AutomationTraceEvents.Where(entry => entry.TraceId == id.Value)
+                .OrderBy(entry => entry.Sequence)
+                .Select(entry => entry.EventJson)
+                .ToArrayAsync();
+            nodes.ShouldAllBe(node =>
+                node.Status == AutomationNodeRunStatus.Succeeded
+                || node.Status == AutomationNodeRunStatus.Cancelled
+            );
+            if (afterInnerCheckpoint)
+            {
+                _ = nodes
+                    .Single(node => node.NodeId == inner.Id.Value)
+                    .OutputJson.ShouldNotBeNull();
+                nodes
+                    .Single(node => node.NodeId == outer.Id.Value)
+                    .Status.ShouldBe(AutomationNodeRunStatus.Cancelled);
+            }
+            else
+            {
+                nodes.ShouldNotContain(node =>
+                    node.NodeId == inner.Id.Value || node.NodeId == outer.Id.Value
+                );
+            }
+            _ = barrier.Release.TrySetResult();
+            _ = await dispatch;
+            await f.NewRuntime().InitializeAsync(default);
+            (await f.Runtime.ResumeAsync(id, default)).Status.ShouldBe(
+                AutomationResumeStatus.Cancelled
+            );
+            f.Chat.Calls.ShouldBe(0);
+            await using var verify = await f.Database.CreateDbContextAsync();
+            (await verify.AutomationFlowRuns.SingleAsync()).Status.ShouldBe(
+                AutomationFlowRunStatus.Cancelled
+            );
+            (
+                await verify
+                    .AutomationNodeRuns.Where(node => node.RunId == id.Value)
+                    .OrderBy(node => node.NodeId)
+                    .Select(node => new
+                    {
+                        node.NodeId,
+                        node.Status,
+                        node.OutcomeCode,
+                        node.OutputJson,
+                    })
+                    .ToArrayAsync()
+            ).ShouldBe(nodes);
+            (
+                await verify
+                    .AutomationTraceEvents.Where(entry => entry.TraceId == id.Value)
+                    .OrderBy(entry => entry.Sequence)
+                    .Select(entry => entry.EventJson)
+                    .ToArrayAsync()
+            ).ShouldBe(events);
+        }
+        finally
+        {
+            _ = barrier.Release.TrySetResult();
+            _ = await dispatch;
+        }
+    }
+
+    [Test]
+    public async Task UserCancellation_RevokedLeasePreservesInvalidCachedOutputAfterLaterClaim()
+    {
+        var barrier = new RecoveryCommitBarrier();
+        await using var f = await RuntimeFixture.CreateAsync(databaseInterceptors: [barrier]);
+        var source = Node("test-number-source", "{}");
+        var producer = Node(
+            "test-cel-transform",
+            TransformJson(
+                [],
+                [
+                    new(
+                        "result",
+                        "Result",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'committed'"
+                    ),
+                ]
+            )
+        );
+        var first = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var later = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await f.SaveAsync(
+            [source, producer, first, delay, later],
+            [
+                Edge(source, "flow", first),
+                Edge(first, "complete", delay),
+                Edge(delay, "complete", later),
+                Edge(producer, "result", first, "message", AutomationEdgeKind.Data),
+                Edge(producer, "result", later, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        var id = (
+            await f.Runtime.DispatchAsync(
+                new(
+                    Context(f.HostId, sourceDefinitionId: new("test-number-source")),
+                    new DataContractConfiguration()
+                ),
+                default
+            )
+        ).RunIds.ShouldHaveSingleItem();
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                node.RunId == id.Value && node.NodeId == producer.Id.Value
+            );
+            checkpoint.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+            checkpoint.OutputJson = "{}";
+            _ = await db.SaveChangesAsync();
+        }
+        barrier.Arm(async () =>
+        {
+            await using var db = await f.Database.CreateDbContextAsync();
+            return await db.AutomationNodeRuns.AnyAsync(node =>
+                node.NodeId == later.Id.Value && node.Status == AutomationNodeRunStatus.Running
+            );
+        });
+        f.Clock.Advance(TimeSpan.FromSeconds(2));
+        var resume = f.Runtime.ResumeAsync(id, default);
+        try
+        {
+            await barrier.Committed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            (await f.Runtime.CancelRunAsync(new(f.HostId), id, default)).ShouldBe(1);
+            var trace = await ReadTraceAsync(f, new(id.Value));
+            _ = barrier.Release.TrySetResult();
+            (await resume).Status.ShouldBe(AutomationResumeStatus.Cancelled);
+            await f.NewRuntime().InitializeAsync(default);
+            await using var verify = await f.Database.CreateDbContextAsync();
+            var producerCheckpoint = await verify.AutomationNodeRuns.SingleAsync(node =>
+                node.RunId == id.Value && node.NodeId == producer.Id.Value
+            );
+            producerCheckpoint.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+            producerCheckpoint.OutputJson.ShouldBe("{}");
+            producerCheckpoint.OutcomeCode.ShouldBe("output-checkpointed");
+            (await verify.AutomationFlowRuns.SingleAsync()).Status.ShouldBe(
+                AutomationFlowRunStatus.Cancelled
+            );
+            (
+                await verify.AutomationNodeRuns.Where(node => node.RunId == id.Value).ToArrayAsync()
+            ).ShouldAllBe(node =>
+                node.Status == AutomationNodeRunStatus.Succeeded
+                || node.Status == AutomationNodeRunStatus.Cancelled
+            );
+            (await ReadTraceAsync(f, new(id.Value))).Events.Length.ShouldBe(trace.Events.Length);
+            f.Chat.Messages.ShouldBe(["committed"]);
+        }
+        finally
+        {
+            _ = barrier.Release.TrySetResult();
+            _ = await resume;
+        }
+    }
+
+    [Test]
     public async Task UserCancellation_EnteredEffectMayFinishButNeitherSiblingNorContinuationInvokes()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

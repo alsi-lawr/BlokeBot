@@ -1564,6 +1564,14 @@ public sealed partial class AutomationRuntimeService(
             {
                 return new AutomationPureCheckpoint.Failed();
             }
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            if (await TouchOwnedRunAsync(db, run.Id, leaseId, cancellationToken) == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new AutomationPureCheckpoint.Failed();
+            }
             if (existing is not null)
             {
                 if (existing.Status == AutomationNodeRunStatus.Succeeded)
@@ -1573,6 +1581,7 @@ public sealed partial class AutomationRuntimeService(
                     existing.OutputJson = null;
                     existing.CompletedAtUtc = clock.GetUtcNow().UtcDateTime;
                     _ = await db.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
                 }
 
                 return new AutomationPureCheckpoint.Failed();
@@ -1590,6 +1599,7 @@ public sealed partial class AutomationRuntimeService(
             };
             run.NodeRuns.Add(checkpoint);
             _ = await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return new AutomationPureCheckpoint.Begin();
         }
 
@@ -1599,6 +1609,14 @@ public sealed partial class AutomationRuntimeService(
             CancellationToken cancellationToken
         )
         {
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            if (await TouchOwnedRunAsync(db, run.Id, leaseId, cancellationToken) == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
             var now = clock.GetUtcNow().UtcDateTime;
             await AutomationTraceStore.AppendAsync(
                 db,
@@ -1620,6 +1638,7 @@ public sealed partial class AutomationRuntimeService(
                 now,
                 cancellationToken
             );
+            await transaction.CommitAsync(cancellationToken);
         }
 
         public async ValueTask<bool> CompleteAsync(

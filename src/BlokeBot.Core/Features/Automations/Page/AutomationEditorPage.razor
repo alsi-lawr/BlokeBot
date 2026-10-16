@@ -434,14 +434,14 @@
         <div class="automation-run-actions">
             <button class="btn-secondary" type="button" disabled="@_runManagementBusy" @onclick="RefreshManagedRunsAsync">Refresh</button>
             <button class="btn-secondary" type="button" @onclick="OpenRecentTraceAsync">Run history</button>
-            <button class="btn-danger" type="button" disabled="@(_runManagementBusy || _managedRunId is null)" @onclick="CancelManagedRunAsync">Cancel run</button>
-            <button @ref="_bulkRunButton" class="btn-danger" type="button" disabled="@(_runManagementBusy || _managedRuns.IsEmpty)" @onclick="ConfirmRunCancellation">@(_runScopeFlowId is null ? "Cancel channel runs" : "Cancel flow runs")</button>
+            <button class="automation-danger-button" type="button" disabled="@(_runManagementBusy || _managedRunId is null)" @onclick="CancelManagedRunAsync">Cancel run</button>
+            <button @ref="_bulkRunButton" class="automation-danger-button" type="button" disabled="@(_runManagementBusy || _managedRuns.IsEmpty)" @onclick="ConfirmRunCancellation">@(_runScopeFlowId is null ? "Cancel channel runs" : "Cancel flow runs")</button>
         </div>
         @if (_runCancellationConfirmation is { } confirmation)
         {
             <div class="automation-enable-warning" role="alert">
                 <div><strong>Cancel unfinished runs for @confirmation.Name?</strong><span>All branches and pending waits stop. An action already dispatched may finish; external effects cannot be undone. New starts are unchanged.</span></div>
-                <button @ref="_confirmRunButton" class="btn-danger" type="button" disabled="@_runManagementBusy" @onclick="CancelConfirmedRunsAsync">Confirm cancellation</button>
+                <button @ref="_confirmRunButton" class="automation-danger-button" type="button" disabled="@_runManagementBusy" @onclick="CancelConfirmedRunsAsync">Confirm cancellation</button>
                 <button class="btn-secondary" type="button" disabled="@_runManagementBusy" @onclick="KeepRunsAsync">Keep runs</button>
             </div>
         }
