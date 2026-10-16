@@ -32,6 +32,65 @@ internal sealed record AutomationValidationPresentation(
         return new(visible, retainedIssues.Length + visible.Length - representedValidationErrors);
     }
 
+    internal static IReadOnlyList<string> NodeIssues(
+        AutomationEditorNode node,
+        IReadOnlyList<AutomationEditorNode> nodes,
+        IReadOnlyList<AutomationFlowDraftEdge> edges,
+        IReadOnlyList<AutomationGraphError> errors
+    ) =>
+        errors
+            .Where(error => error.NodeId == node.Id)
+            .Select(ErrorLabel)
+            .Concat(
+                node.Definition.Inputs.Select(input =>
+                    InputIssue(node, input, nodes, edges, errors)
+                )
+            )
+            .Concat(
+                edges
+                    .Where(edge => edge.SourceNodeId == node.Id || edge.TargetNodeId == node.Id)
+                    .Select(edge => AutomationConnections.Issue(edge, nodes))
+            )
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+    internal static string? InputIssue(
+        AutomationEditorNode node,
+        AutomationPortMetadata input,
+        IReadOnlyList<AutomationEditorNode> nodes,
+        IReadOnlyList<AutomationFlowDraftEdge> edges,
+        IReadOnlyList<AutomationGraphError> errors
+    )
+    {
+        var error = errors.FirstOrDefault(error =>
+            error.NodeId == node.Id
+            && (
+                error.PortId == input.Id
+                || (input.BindingFieldId is not null && error.FieldId == input.BindingFieldId)
+            )
+        );
+        if (error is not null)
+        {
+            return ErrorLabel(error);
+        }
+        var edge = edges.FirstOrDefault(edge =>
+            edge.Kind == AutomationEdgeKind.Data
+            && edge.TargetNodeId == node.Id
+            && edge.TargetPortId == input.Id
+        );
+        return edge is not null ? AutomationConnections.Issue(edge, nodes)
+            : input.BindingFieldId is { } fieldId
+            && node.Binding(fieldId).Mode == AutomationInputBindingMode.Connected
+                ? "Choose a source."
+            : null;
+    }
+
+    private static string ErrorLabel(AutomationGraphError error) =>
+        error.Diagnostic is { } diagnostic
+            ? $"{diagnostic.Summary}. {diagnostic.Correction}"
+            : error.Message;
+
     private static bool IsFalseDisconnectedCascade(
         AutomationGraphError error,
         IReadOnlySet<AutomationNodeId> reachable
@@ -173,4 +232,37 @@ internal sealed record AutomationValidationPresentation(
         _ = visiting.Remove(nodeId);
         return backings;
     }
+}
+
+internal static class AutomationNodePresentation
+{
+    internal static string Status(
+        bool needsRepair,
+        bool validated,
+        AutomationScenarioNodeOutcome? outcome
+    )
+    {
+        var configuration =
+            needsRepair ? "Needs repair"
+            : validated ? "Ready"
+            : "Draft";
+        return outcome is null ? configuration : $"{configuration} · {OutcomeLabel(outcome)}";
+    }
+
+    internal static string OutcomeLabel(AutomationScenarioNodeOutcome outcome) =>
+        outcome.OutcomeCode switch
+        {
+            "source-received" => "Received",
+            "condition-true" => "Yes branch",
+            "condition-false" => "No branch",
+            "delayed" => "Virtual delay",
+            "action-simulated" => "Hypothetical",
+            _ => outcome.State switch
+            {
+                AutomationNodeRunState.Failed => "Failed",
+                AutomationNodeRunState.ContinuedAfterFailure => "Continued after failure",
+                AutomationNodeRunState.Invalidated => "Invalidated",
+                _ => outcome.OutcomeCode,
+            },
+        };
 }

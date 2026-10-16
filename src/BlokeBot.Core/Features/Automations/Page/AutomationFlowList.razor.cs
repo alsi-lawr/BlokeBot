@@ -20,6 +20,9 @@ public partial class AutomationFlowList
     public IReadOnlyList<AutomationGraphError> Errors { get; set; } = [];
 
     [Parameter]
+    public bool Validated { get; set; }
+
+    [Parameter]
     public IReadOnlyList<AutomationScenarioNodeOutcome> SampleOutcomes { get; set; } = [];
 
     [Parameter]
@@ -47,45 +50,6 @@ public partial class AutomationFlowList
         await selector.FocusAsync();
     }
 
-    private IReadOnlyList<AutomationEditorNode> _orderedNodes =>
-        Nodes
-            .OrderBy(node => node.Id == SelectedNodeId ? 0 : 1)
-            .ThenBy(static node => node.Position.Y.Value)
-            .ThenBy(static node => node.Position.X.Value)
-            .ThenBy(static node => node.EffectiveName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private string Incoming(AutomationEditorNode node) =>
-        Names(
-            Edges
-                .Where(edge => edge.TargetNodeId == node.Id)
-                .Select(edge =>
-                    Nodes
-                        .FirstOrDefault(candidate => candidate.Id == edge.SourceNodeId)
-                        ?.EffectiveName
-                )
-        );
-
-    private string Outgoing(AutomationEditorNode node) =>
-        Names(
-            Edges
-                .Where(edge => edge.SourceNodeId == node.Id)
-                .Select(edge =>
-                    Nodes
-                        .FirstOrDefault(candidate => candidate.Id == edge.TargetNodeId)
-                        ?.EffectiveName
-                )
-        );
-
-    private static string Names(IEnumerable<string?> names)
-    {
-        var values = names
-            .Where(static name => name is not null)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        return values.Length == 0 ? "None" : string.Join(", ", values);
-    }
-
     private string InputSource(AutomationEditorNode node, AutomationPortMetadata input)
     {
         var binding = node.Binding(input.BindingFieldId!.Value);
@@ -103,10 +67,11 @@ public partial class AutomationFlowList
             return "No source";
         }
         var source = Nodes.FirstOrDefault(candidate => candidate.Id == edge.SourceNodeId);
-        var output = source?.Definition.Outputs.FirstOrDefault(port =>
-            port.Id == edge.SourcePortId
+        var output = AutomationConnections.PortLabel(
+            source?.Definition.Outputs ?? [],
+            edge.SourcePortId
         );
-        return $"{source?.EffectiveName ?? "Unavailable node"}.{output?.Name ?? "Unavailable port"}";
+        return $"{source?.EffectiveName ?? "Unavailable node"}.{output}";
     }
 
     private AutomationFlowDraftEdge? IncomingDataEdge(
@@ -120,16 +85,7 @@ public partial class AutomationFlowList
         );
 
     private string? InputIssue(AutomationEditorNode node, AutomationPortMetadata input) =>
-        IncomingDataEdge(node, input) is { } edge ? AutomationConnections.Issue(edge, Nodes)
-        : node.Binding(input.BindingFieldId!.Value).Mode == AutomationInputBindingMode.Connected
-            ? "Choose a source."
-        : null;
-
-    private string? NodeIssue(AutomationEditorNode node) =>
-        Edges
-            .Where(edge => edge.TargetNodeId == node.Id)
-            .Select(edge => AutomationConnections.Issue(edge, Nodes))
-            .FirstOrDefault(static issue => issue is not null);
+        AutomationValidationPresentation.InputIssue(node, input, Nodes, Edges, Errors);
 
     private static bool IsDataPort(AutomationPortMetadata port) =>
         port.ValueType != AutomationPortValueType.Flow && port.BindingFieldId is not null;

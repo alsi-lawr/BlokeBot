@@ -32,7 +32,17 @@ public partial class AutomationNodeInspector
             ? []
             : Errors
                 .Where(error =>
-                    error.NodeId == Node.Id && error.FieldId is null && error.PortId is null
+                    error.NodeId == Node.Id
+                    && !Node
+                        .Definition.Inputs.Where(IsDataPort)
+                        .Any(input => FieldErrors(input.BindingFieldId!.Value).Contains(error))
+                    && !Node
+                        .Definition.Configuration.Where(ShowConfigurationField)
+                        .Any(configuration => FieldErrors(configuration.Id).Contains(error))
+                    && !(
+                        Node.IsCelTransform
+                        && Node.TransformOutputs.Any(output => error.PortId == output.PortId)
+                    )
                 )
                 .ToArray();
 

@@ -10,15 +10,20 @@
     else
     {
         <div class="automation-connection-list">
-            @foreach (var node in _orderedNodes)
+            @foreach (var node in Nodes)
             {
-                var issue = NodeIssue(node);
+                var issues = AutomationValidationPresentation.NodeIssues(node, Nodes, Edges, Errors);
+                var outcome = SampleOutcomes.FirstOrDefault(outcome => outcome.NodeId == node.Id);
+                var connections = Edges.Where(edge => edge.SourceNodeId == node.Id || edge.TargetNodeId == node.Id).ToArray();
                 var unavailable = UnavailableDefinitionIds.Contains(node.Definition.Id);
-                <article @key="node.Id" class="@(issue is null && !unavailable ? "automation-connection-row" : "automation-connection-row automation-connection-row--invalid")">
+                <article @key="node.Id" class="@(issues.Count == 0 && !unavailable ? "automation-connection-row" : "automation-connection-row automation-connection-row--invalid")">
                     <button type="button" class="automation-connection-node" data-automation-list-node="@node.Id.Value" @ref="_nodeSelectors[node.Id]" aria-pressed="@(node.Id == SelectedNodeId ? "true" : "false")" @onclick="() => SelectNode.InvokeAsync(node.Id)">
                         <AutomationNodeIcon DefinitionId="node.Definition.Id" /><span><strong>@node.EffectiveName</strong><small>@KindLabel(node.Definition.Kind) · @node.Definition.Display.Name</small></span>
                     </button>
-                    <div class="automation-list-connections"><strong>Connections</strong><span>From: @Incoming(node)</span><span>To: @Outgoing(node)</span></div>
+                    <div class="automation-list-connections"><strong>Connections</strong>
+                        @if (connections.Length == 0) { <span>None</span> }
+                        @foreach (var edge in connections) { <span @key="edge.Id" data-automation-list-edge="@edge.Id">@AutomationConnections.Label(edge, Nodes)</span> }
+                    </div>
                     <div class="automation-list-inputs"><strong>Data inputs · choice, source, type</strong>
                         @if (!node.Definition.Inputs.Any(IsDataPort))
                         {
@@ -32,7 +37,11 @@
                             }
                         }
                     </div>
-                    <div class="automation-list-status"><strong>Status</strong><span>@(unavailable ? "Unavailable" : issue is null ? "✓ Available" : "! Needs repair")</span>@if (issue is not null){<small>@issue</small>}</div>
+                    <div class="automation-list-status"><strong>Status</strong>
+                        @if (unavailable) { <span>Unavailable definition</span> }
+                        <span class="@(outcome?.State is AutomationNodeRunState.Failed or AutomationNodeRunState.ContinuedAfterFailure or AutomationNodeRunState.Invalidated ? "automation-list-needs-repair" : null)">@AutomationNodePresentation.Status(issues.Count > 0 || unavailable, Validated, outcome)</span>
+                        @foreach (var issue in issues) { <small>@issue</small> }
+                    </div>
                     <div class="automation-list-actions"><strong>Actions</strong><button type="button" aria-label="Select @node.EffectiveName" @onclick="() => SelectNode.InvokeAsync(node.Id)"><EditorIcon Name="node" /></button><button type="button" aria-label="Delete @node.EffectiveName" @onclick="() => DeleteNode.InvokeAsync(node.Id)"><EditorIcon Name="delete" /></button></div>
                 </article>
             }

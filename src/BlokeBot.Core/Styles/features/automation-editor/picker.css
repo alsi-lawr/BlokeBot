@@ -72,7 +72,8 @@
     border: 1px solid var(--app-border);
     border-radius: 0.6rem;
     display: grid;
-    grid-template-columns: 10rem 13.5rem minmax(17rem, 1fr) 7rem 5rem;
+    grid-template-columns: minmax(0, 10fr) minmax(0, 13.5fr) minmax(0, 17fr) minmax(0, 7fr) minmax(0, 5fr);
+    overflow-wrap: anywhere;
     overflow: hidden;
 }
 

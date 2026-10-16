@@ -65,11 +65,11 @@
 
             @foreach (var node in Nodes)
             {
-                var errors = ErrorsFor(node.Id);
+                var errors = ErrorsFor(node);
                 var outcome = OutcomeFor(node.Id);
                 var selected = SelectedNodeIds.Contains(node.Id);
                 var disclosed = DisclosedNodeId == node.Id;
-                var needsRepair = errors.Count > 0 || Disconnected(node.Id);
+                var needsRepair = errors.Count > 0;
                 <article @key="node.Id"
                          class="@NodeClass(node, errors.Count > 0, outcome)"
                          style="@NodeStyle(node)"

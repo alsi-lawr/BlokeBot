@@ -1,3 +1,7 @@
+.automation-connection-node > span {
+    min-width: 0;
+}
+
 .automation-connection-node span,
 .automation-connection-node small,
 .automation-list-connections span,

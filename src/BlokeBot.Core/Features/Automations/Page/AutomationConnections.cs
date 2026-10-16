@@ -90,6 +90,34 @@ internal static class AutomationConnections
         return compatibility.IsCompatible ? null : compatibility.Reason;
     }
 
+    internal static string PortLabel(
+        IReadOnlyList<AutomationPortMetadata> ports,
+        AutomationPortId portId
+    )
+    {
+        var port = ports.FirstOrDefault(port => port.Id == portId);
+        return port is null ? $"Unavailable port ({portId.Value})"
+            : ports.Count(candidate => candidate.Name == port.Name) > 1
+                ? $"{port.Name} ({portId.Value})"
+            : port.Name;
+    }
+
+    internal static string Label(
+        AutomationFlowDraftEdge edge,
+        IReadOnlyList<AutomationEditorNode> nodes
+    )
+    {
+        var source = nodes.FirstOrDefault(node => node.Id == edge.SourceNodeId);
+        var target = nodes.FirstOrDefault(node => node.Id == edge.TargetNodeId);
+        var sourcePort = PortLabel(source?.Definition.Outputs ?? [], edge.SourcePortId);
+        var targetPort = PortLabel(target?.Definition.Inputs ?? [], edge.TargetPortId);
+        var kind = edge.Kind == AutomationEdgeKind.Flow ? "Flow" : "Data";
+        var label =
+            $"{kind} connection from {source?.EffectiveName ?? "Unavailable source"}, output {sourcePort}, to {target?.EffectiveName ?? "Unavailable target"}, input {targetPort}";
+        var issue = Issue(edge, nodes);
+        return issue is null ? label : $"{label}. Needs repair. {issue}";
+    }
+
     internal static string TypeLabel(AutomationPortMetadata port) =>
         $"{port.ValueType}{(port.Nullability == AutomationPortNullability.Nullable ? "?" : string.Empty)}";
 }

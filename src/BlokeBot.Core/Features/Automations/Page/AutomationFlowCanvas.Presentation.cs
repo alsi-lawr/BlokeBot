@@ -2,8 +2,8 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationFlowCanvas
 {
-    private IReadOnlyList<AutomationGraphError> ErrorsFor(AutomationNodeId nodeId) =>
-        Errors.Where(error => error.NodeId == nodeId).ToArray();
+    private IReadOnlyList<string> ErrorsFor(AutomationEditorNode node) =>
+        AutomationValidationPresentation.NodeIssues(node, Nodes, Edges, Errors);
 
     private AutomationScenarioNodeOutcome? OutcomeFor(AutomationNodeId nodeId) =>
         SampleOutcomes.FirstOrDefault(outcome => outcome.NodeId == nodeId);
@@ -20,7 +20,7 @@ public partial class AutomationFlowCanvas
                 "automation-node",
                 SelectedNodeIds.Contains(node.Id) ? "automation-node--selected" : string.Empty,
                 DisclosedNodeId == node.Id ? "automation-node--disclosed" : string.Empty,
-                invalid || Disconnected(node.Id) ? "automation-node--invalid" : string.Empty,
+                invalid ? "automation-node--invalid" : string.Empty,
                 outcome?.State
                     is AutomationNodeRunState.Failed
                         or AutomationNodeRunState.ContinuedAfterFailure
@@ -30,9 +30,6 @@ public partial class AutomationFlowCanvas
                 : string.Empty,
             }.Where(static value => value.Length > 0)
         );
-
-    private bool Disconnected(AutomationNodeId nodeId) =>
-        Edges.All(edge => edge.SourceNodeId != nodeId && edge.TargetNodeId != nodeId);
 
     private string EdgeGroupClass(AutomationFlowDraftEdge edge) =>
         string.Join(
@@ -121,37 +118,11 @@ public partial class AutomationFlowCanvas
         return $"Select {node.EffectiveName}. {KindLabel(node.Definition.Kind)}. {node.Definition.Display.Name} icon. {NodeStatus(needsRepair, outcome)}. Ports: {string.Join(". ", ports)}";
     }
 
-    private static string NodeStatus(bool needsRepair, AutomationScenarioNodeOutcome? outcome) =>
-        needsRepair ? "Needs repair"
-        : outcome is null ? "Ready"
-        : OutcomeLabel(outcome);
+    private string NodeStatus(bool needsRepair, AutomationScenarioNodeOutcome? outcome) =>
+        AutomationNodePresentation.Status(needsRepair, Validated, outcome);
 
-    private string EdgeAccessibleLabel(AutomationFlowDraftEdge edge)
-    {
-        var source = Nodes.FirstOrDefault(node => node.Id == edge.SourceNodeId);
-        var target = Nodes.FirstOrDefault(node => node.Id == edge.TargetNodeId);
-        var sourceName = source?.EffectiveName ?? "Unavailable source";
-        var targetName = target?.EffectiveName ?? "Unavailable target";
-        var sourcePort = EdgePortLabel(source?.Definition.Outputs ?? [], edge.SourcePortId);
-        var targetPort = EdgePortLabel(target?.Definition.Inputs ?? [], edge.TargetPortId);
-        var kind = edge.Kind == AutomationEdgeKind.Flow ? "Flow" : "Data";
-        var label =
-            $"{kind} connection from {sourceName}, output {sourcePort}, to {targetName}, input {targetPort}";
-        var issue = AutomationConnections.Issue(edge, Nodes);
-        return issue is null ? label : $"{label}. Needs repair. {issue}";
-    }
-
-    private static string EdgePortLabel(
-        IReadOnlyList<AutomationPortMetadata> ports,
-        AutomationPortId portId
-    )
-    {
-        var port = ports.FirstOrDefault(port => port.Id == portId);
-        return port is null ? $"Unavailable port ({portId.Value})"
-            : ports.Count(candidate => candidate.Name == port.Name) > 1
-                ? $"{port.Name} ({portId.Value})"
-            : port.Name;
-    }
+    private string EdgeAccessibleLabel(AutomationFlowDraftEdge edge) =>
+        AutomationConnections.Label(edge, Nodes);
 
     private static string EdgeMarker(AutomationFlowDraftEdge edge) =>
         edge.Kind == AutomationEdgeKind.Flow
@@ -202,23 +173,6 @@ public partial class AutomationFlowCanvas
                 )
             )
         );
-
-    private static string OutcomeLabel(AutomationScenarioNodeOutcome outcome) =>
-        outcome.OutcomeCode switch
-        {
-            "source-received" => "Received",
-            "condition-true" => "Yes branch",
-            "condition-false" => "No branch",
-            "delayed" => "Virtual delay",
-            "action-simulated" => "Hypothetical",
-            _ => outcome.State switch
-            {
-                AutomationNodeRunState.Failed => "Failed",
-                AutomationNodeRunState.ContinuedAfterFailure => "Continued after failure",
-                AutomationNodeRunState.Invalidated => "Invalidated",
-                _ => outcome.OutcomeCode,
-            },
-        };
 
     private static string OrientationToken(AutomationFlowOrientation orientation) =>
         orientation == AutomationFlowOrientation.Vertical ? "vertical" : "horizontal";
