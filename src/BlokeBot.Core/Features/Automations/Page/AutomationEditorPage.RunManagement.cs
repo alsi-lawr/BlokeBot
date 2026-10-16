@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Globalization;
+using BlokeBot.Eventing;
 using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Automations.Page;
@@ -6,6 +8,15 @@ namespace BlokeBot.Core.Features.Automations.Page;
 public partial class AutomationEditorPage
 {
     private ImmutableArray<AutomationRunSummary> _channelRuns = [];
+    private AutomationRunUsage? _runUsage;
+    private string? _unfinishedLimit;
+    private string? _waitingLimit;
+    private long _runLimitsLoad;
+    private readonly List<IDisposable> _runLimitSubscriptions = [];
+
+    [Inject]
+    private AutomationUiChanges _runUiChanges { get; set; } = default!;
+    private string? _runLimitFeedback;
     private bool _runManagementOpen;
     private bool _runManagementBusy;
     private long _runManagementLoad;
@@ -44,6 +55,12 @@ public partial class AutomationEditorPage
     private void ResetRunManagement()
     {
         _runManagementLoad++;
+        _runLimitsLoad++;
+        _runUsage = null;
+        _unfinishedLimit = null;
+        _waitingLimit = null;
+        _runLimitFeedback = null;
+        DisposeRunLimitSubscriptions();
         _runManagementOpen = false;
         _runCancellationConfirmation = null;
         _managedRunId = null;
@@ -77,13 +94,185 @@ public partial class AutomationEditorPage
             : [];
         _recentRuns = _channelRuns.Where(run => run.FlowId == _editor?.Id).ToImmutableArray();
         SelectAvailableManagedRun();
+        await RefreshRunLimitsAsync(resetInputs: true);
     }
 
-    private void ChangeRunScope(ChangeEventArgs args)
+    private async Task ChangeRunScope(ChangeEventArgs args)
     {
         _runScopeFlowId = Guid.TryParse(args.Value?.ToString(), out var id) ? new(id) : null;
         _runCancellationConfirmation = null;
+        _runLimitFeedback = null;
         SelectAvailableManagedRun();
+        await RefreshRunLimitsAsync(resetInputs: true);
+    }
+
+    private async Task RefreshRunLimitsAsync(bool resetInputs)
+    {
+        var host = HostId;
+        var flow = _runScopeFlowId;
+        var request = ++_runLimitsLoad;
+        var result = await _runsService.ReadLimitsAsync(new(host), flow, CancellationToken.None);
+        if (host != HostId || flow != _runScopeFlowId || request != _runLimitsLoad)
+        {
+            return;
+        }
+        _runUsage = (result as AutomationRunLimitsOutcome.Available)?.Usage;
+        if (resetInputs)
+        {
+            _unfinishedLimit = _runUsage?.Limits.Unfinished?.ToString(CultureInfo.InvariantCulture);
+            _waitingLimit = _runUsage?.Limits.Waiting?.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+
+    private async Task SaveRunLimitsAsync()
+    {
+        if (_runManagementBusy)
+        {
+            return;
+        }
+        if (
+            !TryRunLimit(_unfinishedLimit, out var unfinished)
+            || !TryRunLimit(_waitingLimit, out var waiting)
+        )
+        {
+            _runLimitFeedback = "Use a whole number of one or more, or leave blank for unlimited.";
+            return;
+        }
+        var host = HostId;
+        var flow = _runScopeFlowId;
+        var request = _runLimitsLoad;
+        _runManagementBusy = true;
+        try
+        {
+            await RunSelectedHostMutationAsync(
+                host,
+                async () =>
+                {
+                    if (HostId != host || _runScopeFlowId != flow || request != _runLimitsLoad)
+                    {
+                        return;
+                    }
+                    var result = await _runsService.SaveLimitsAsync(
+                        new(host),
+                        flow,
+                        new(unfinished, waiting),
+                        CancellationToken.None
+                    );
+                    if (HostId != host || _runScopeFlowId != flow || request != _runLimitsLoad)
+                    {
+                        return;
+                    }
+                    if (result is AutomationRunLimitsOutcome.Available saved)
+                    {
+                        _runUsage = saved.Usage;
+                        _runLimitFeedback = "Run limits saved. Admitted work continues.";
+                    }
+                    else
+                    {
+                        _runLimitFeedback = "Run limits could not be saved for this selection.";
+                    }
+                }
+            );
+        }
+        finally
+        {
+            _runManagementBusy = false;
+        }
+    }
+
+    private static bool TryRunLimit(string? text, out int? value)
+    {
+        value = null;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return true;
+        }
+        if (
+            !int.TryParse(
+                text.Trim(),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var parsed
+            )
+        )
+        {
+            return false;
+        }
+        value = parsed;
+        return parsed > 0;
+    }
+
+    private void DisposeRunLimitSubscriptions()
+    {
+        foreach (var subscription in _runLimitSubscriptions)
+        {
+            subscription.Dispose();
+        }
+        _runLimitSubscriptions.Clear();
+    }
+
+    private void SubscribeRunLimitRejections()
+    {
+        DisposeRunLimitSubscriptions();
+        var host = HostId;
+        var keys = _runScopeChoices
+            .SelectMany(flow =>
+                new[]
+                {
+                    new AutomationUiChange.RunLimitRejected(
+                        new(host),
+                        flow,
+                        AutomationAdmissionRejectionReason.FlowUnfinishedLimit
+                    ),
+                    new AutomationUiChange.RunLimitRejected(
+                        new(host),
+                        flow,
+                        AutomationAdmissionRejectionReason.FlowWaitingLimit
+                    ),
+                }
+            )
+            .Concat([
+                new(new(host), null, AutomationAdmissionRejectionReason.ChannelUnfinishedLimit),
+                new(new(host), null, AutomationAdmissionRejectionReason.ChannelWaitingLimit),
+            ]);
+        foreach (var key in keys)
+        {
+            _runLimitSubscriptions.Add(
+                _runUiChanges.Subscribe(
+                    key,
+                    ObserverIdentity.For(typeof(AutomationEditorPage)),
+                    async (_, token) =>
+                    {
+                        token.ThrowIfCancellationRequested();
+                        await InvokeAsync(async () =>
+                        {
+                            if (HostId != host)
+                            {
+                                return;
+                            }
+                            _runLimitFeedback = RunLimitRejectionMessage(key.Flow, key.Reason);
+                            _feedback = _runLimitFeedback;
+                            _operationFailed = true;
+                            await RefreshRunLimitsAsync(resetInputs: false);
+                            StateHasChanged();
+                        });
+                    }
+                )
+            );
+        }
+    }
+
+    private string RunLimitRejectionMessage(
+        AutomationFlowId? flow,
+        AutomationAdmissionRejectionReason reason
+    )
+    {
+        var target = flow is { } id ? RunFlowName(id) : "channel";
+        var waiting =
+            reason
+            is AutomationAdmissionRejectionReason.FlowWaitingLimit
+                or AutomationAdmissionRejectionReason.ChannelWaitingLimit;
+        return $"New start rejected: {target} {(waiting ? "waiting threshold" : "unfinished-run limit")} reached.";
     }
 
     private void ChangeManagedRun(ChangeEventArgs args)

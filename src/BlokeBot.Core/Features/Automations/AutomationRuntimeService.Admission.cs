@@ -25,7 +25,13 @@ public sealed partial class AutomationRuntimeService
         var host = await db
             .Hosts.AsNoTracking()
             .Where(value => value.Id == context.HostId.Value)
-            .Select(value => new { value.EnabledFeatures, value.AutomationGeneration })
+            .Select(value => new
+            {
+                value.EnabledFeatures,
+                value.AutomationGeneration,
+                value.MaximumUnfinishedAutomationRuns,
+                value.MaximumWaitingAutomationRuns,
+            })
             .SingleAsync(cancellationToken);
         if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
         {
@@ -121,6 +127,35 @@ public sealed partial class AutomationRuntimeService
                         var frozenFlow = candidate.Flow;
                         var requiredFeatures = candidate.RequiredFeatures;
                         var now = clock.GetUtcNow().UtcDateTime;
+                        if (
+                            await db.AutomationFlowRuns.AnyAsync(
+                                value =>
+                                    value.FlowId == flow.Id
+                                    && value.SourceDefinitionId
+                                        == context.Event.SourceDefinitionId.Value
+                                    && value.SourceNodeId == sourceId
+                                    && value.SourceOccurrenceId == context.Event.OccurrenceId,
+                                cancellationToken
+                            )
+                        )
+                        {
+                            duplicateCount++;
+                            continue;
+                        }
+                        var limit = await CheckRunLimitsAsync(
+                            db,
+                            flow,
+                            new(
+                                host.MaximumUnfinishedAutomationRuns,
+                                host.MaximumWaitingAutomationRuns
+                            ),
+                            cancellationToken
+                        );
+                        if (limit is { } reason)
+                        {
+                            Reject(flow, [sources.Single(source => source.Id == sourceId)], reason);
+                            continue;
+                        }
                         var inserted = await MainDatabaseStatements.TryInsertAutomationFlowRunAsync(
                             db,
                             new(
@@ -268,8 +303,11 @@ public sealed partial class AutomationRuntimeService
             accepted.Count > 0 ? AutomationDispatchStatus.Accepted
             : rejections.Any(rejection =>
                 rejection.Reason != AutomationAdmissionRejectionReason.FeatureDisabled
+                && !IsRunLimit(rejection.Reason)
             )
                 ? AutomationDispatchStatus.InvalidFlow
+            : rejections.Any(rejection => IsRunLimit(rejection.Reason))
+                ? AutomationDispatchStatus.RunLimitReached
             : matchingCount > 0 && duplicateCount == matchingCount
                 ? AutomationDispatchStatus.Duplicate
             : rejections.Count > 0 ? AutomationDispatchStatus.FeatureDisabled
@@ -307,6 +345,7 @@ public sealed partial class AutomationRuntimeService
     {
         await EnsureInitializedAsync(cancellationToken);
         var accepted = ImmutableArray.CreateBuilder<AutomationRunId>();
+        var rejected = ImmutableArray.CreateBuilder<AutomationAdmissionRejection>();
         await using (var db = await dbFactory.CreateDbContextAsync(cancellationToken))
         {
             await using var transaction = await db.Database.BeginTransactionAsync(
@@ -329,9 +368,11 @@ public sealed partial class AutomationRuntimeService
                         AcceptExpandedOccurrenceAsync(current, trigger.Context, token)
                 );
                 accepted.AddRange(admission.RunIds);
+                rejected.AddRange(admission.Rejections);
             }
             await transaction.CommitAsync(cancellationToken);
         }
+        await PublishRunLimitRejectionsAsync(hostId, rejected.ToImmutable());
         await RunAdmittedAsync(hostId, accepted.ToImmutable(), true, cancellationToken);
     }
 

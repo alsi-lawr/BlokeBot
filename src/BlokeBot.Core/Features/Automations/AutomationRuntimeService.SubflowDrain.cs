@@ -16,7 +16,7 @@ public sealed partial class AutomationRuntimeService
             .Select(node => node.NodeId)
             .ToHashSet();
 
-    private static async Task WaitForSubtreeAsync(
+    private async Task WaitForSubtreeAsync(
         AutomationNodeExecutionScope scope,
         CancellationToken cancellationToken
     )
@@ -29,8 +29,14 @@ public sealed partial class AutomationRuntimeService
         }
         nodeRun.Status = AutomationNodeRunStatus.Waiting;
         nodeRun.OutcomeCode = "subflow-draining";
+        var previousStatus = run.Status;
+        UpdateFrontierStatus(run, clock.GetUtcNow().UtcDateTime);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (previousStatus != run.Status)
+        {
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+        }
     }
 
     private static AutomationNodeRun[] DrainedExits(
@@ -83,8 +89,14 @@ public sealed partial class AutomationRuntimeService
             exit.Status = AutomationNodeRunStatus.Pending;
             exit.AvailableAtUtc = clock.GetUtcNow().UtcDateTime;
         }
+        var previousStatus = run.Status;
+        UpdateFrontierStatus(run, clock.GetUtcNow().UtcDateTime);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (previousStatus != run.Status)
+        {
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+        }
         return true;
     }
 }

@@ -35,6 +35,8 @@ public sealed class AutomationFlow
     public string Name { get; set; } = string.Empty;
     public int SchemaVersion { get; set; }
     public bool IsEnabled { get; set; }
+    public int? MaximumUnfinishedRuns { get; set; }
+    public int? MaximumWaitingRuns { get; set; }
     public bool UseVerticalLayout { get; set; }
     public bool UseSmoothEdges { get; set; }
     public string? UnavailableReason { get; set; }

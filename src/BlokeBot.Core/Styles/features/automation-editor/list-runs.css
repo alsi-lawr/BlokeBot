@@ -208,3 +208,6 @@
 .automation-run-fields .field__input { width: 100%; }
 .automation-run-management .automation-run-actions { flex-wrap: wrap; }
 .automation-run-management p { margin: 0; }
+
+.automation-run-limits > :not(summary) { margin-top: 0.75rem; }
+.automation-run-limits summary { cursor: pointer; }

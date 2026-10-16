@@ -58,6 +58,7 @@ public sealed partial class AutomationRuntimeTests
         changes.States.ShouldBe([
             AutomationFlowRunState.Running,
             AutomationFlowRunState.Waiting,
+            AutomationFlowRunState.Running,
             AutomationFlowRunState.Completed,
         ]);
         _ = await f.Features.DisableAsync(
@@ -68,7 +69,7 @@ public sealed partial class AutomationRuntimeTests
         _ = (
             await manual.RunAsync(new(f.HostId), flow, CancellationToken.None)
         ).ShouldBeOfType<AutomationManualRunOutcome.Unavailable>();
-        changes.States.Count.ShouldBe(3);
+        changes.States.Count.ShouldBe(4);
     }
 
     [Test]
@@ -183,6 +184,12 @@ public sealed partial class AutomationRuntimeTests
 
         public Task SourceReadinessChangedAsync(AutomationHostId host) =>
             fixture.UiChanges.SourceReadinessChangedAsync(host);
+
+        public Task RunLimitRejectedAsync(
+            AutomationHostId host,
+            AutomationFlowId flow,
+            AutomationAdmissionRejectionReason reason
+        ) => fixture.UiChanges.RunLimitRejectedAsync(host, flow, reason);
 
         public async Task RunChangedAsync(AutomationHostId host, AutomationRunId run)
         {

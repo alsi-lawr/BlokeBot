@@ -52,6 +52,10 @@ public sealed class BotHost
 
     public int AutomationGeneration { get; set; }
 
+    public int? MaximumUnfinishedAutomationRuns { get; set; }
+
+    public int? MaximumWaitingAutomationRuns { get; set; }
+
     public string TimeZoneId { get; set; } = "UTC";
 
     public bool? StartupMessageEnabled { get; set; }

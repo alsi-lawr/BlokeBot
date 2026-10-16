@@ -169,14 +169,34 @@ public partial class AutomationEditorPage
                         id,
                         CancellationToken.None
                     );
+                    if (HostId != requestedHostId)
+                    {
+                        return;
+                    }
                     await LoadCoreAsync(id, preserveViewport: true, preserveHistory: true);
+                    var limit = (
+                        outcome as AutomationManualRunOutcome.Dispatched
+                    )?.Dispatch.Rejections.FirstOrDefault(rejection =>
+                        AutomationRuntimeService.IsRunLimit(rejection.Reason)
+                    );
+                    var limitMessage = limit is not null
+                        ? RunLimitRejectionMessage(
+                            limit.Reason
+                                is AutomationAdmissionRejectionReason.ChannelUnfinishedLimit
+                                    or AutomationAdmissionRejectionReason.ChannelWaitingLimit
+                                ? null
+                                : limit.FlowId,
+                            limit.Reason
+                        )
+                        : null;
                     _feedback = outcome
                         is AutomationManualRunOutcome.Dispatched
                         {
                             Dispatch.Status: AutomationDispatchStatus.Accepted
                         }
-                        ? "Saved flow run admitted with real effects."
-                        : "The saved flow could not run. Check its enabled state, manual source and required features.";
+                        ? $"Saved flow run admitted with real effects. {limitMessage}".TrimEnd()
+                        : limitMessage
+                            ?? "The saved flow could not run. Check its enabled state, manual source and required features.";
                     _operationFailed =
                         outcome
                             is not AutomationManualRunOutcome.Dispatched

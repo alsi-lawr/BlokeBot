@@ -411,6 +411,10 @@
         ManagementOpen="_runManagementOpen" Management="RunManagementControls" />;
 
     private RenderFragment RunManagementControls => @<section class="automation-run-management" aria-label="Manage unfinished runs">
+        @if (_runUsage is { } usage)
+        {
+            <p class="text-sm">@usage.Unfinished@(usage.Limits.Unfinished is { } maximum ? $" of {maximum}" : "") unfinished · @usage.Waiting waiting</p>
+        }
         <div class="automation-run-fields">
             <label class="field"><span class="field__label">Show runs</span>
                 <select class="field__input" value="@(_runScopeFlowId?.Value.ToString() ?? "")" @onchange="ChangeRunScope">
@@ -444,6 +448,23 @@
                 <button @ref="_confirmRunButton" class="automation-danger-button" type="button" disabled="@_runManagementBusy" @onclick="CancelConfirmedRunsAsync">Confirm cancellation</button>
                 <button class="btn-secondary" type="button" disabled="@_runManagementBusy" @onclick="KeepRunsAsync">Keep runs</button>
             </div>
+        }
+        <details class="automation-run-limits">
+            <summary>Run limits</summary>
+            <div class="automation-run-fields">
+                <label class="field"><span class="field__label">Unfinished runs</span>
+                    <input class="field__input" type="text" inputmode="numeric" min="1" step="1" pattern="[0-9]*" placeholder="Unlimited" value="@_unfinishedLimit" @oninput="e => _unfinishedLimit = e.Value?.ToString()" />
+                </label>
+                <label class="field"><span class="field__label">Waiting threshold</span>
+                    <input class="field__input" type="text" inputmode="numeric" min="1" step="1" pattern="[0-9]*" placeholder="Unlimited" value="@_waitingLimit" @oninput="e => _waitingLimit = e.Value?.ToString()" />
+                </label>
+            </div>
+            <p class="text-sm">Blank means unlimited. Limits reject new starts; admitted runs continue.</p>
+            <button class="btn-secondary" type="button" disabled="@(_runManagementBusy || _runUsage is null)" @onclick="SaveRunLimitsAsync">Save limits</button>
+        </details>
+        @if (_runLimitFeedback is not null)
+        {
+            <p class="automation-feedback" role="status">@_runLimitFeedback</p>
         }
         <p class="text-sm">Cancellation stops later actions, not an action already dispatched, and retains run history. It does not stop new starts.</p>
     </section>;

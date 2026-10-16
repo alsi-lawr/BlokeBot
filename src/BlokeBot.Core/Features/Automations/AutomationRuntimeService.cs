@@ -190,19 +190,23 @@ public sealed partial class AutomationRuntimeService(
                 selectedFlow,
                 selectedSource
             );
-            if (dispatch.Status != AutomationDispatchStatus.Accepted)
+            if (dispatch.Status == AutomationDispatchStatus.Accepted)
             {
-                return new CustomCommandAutomationAdmissionOutcome.Dispatched(dispatch);
+                if (
+                    claim is not null
+                    && await claim(db, cancellationToken)
+                        is CustomCommandInvocationClaimOutcome.AlreadyUsed
+                )
+                {
+                    return new CustomCommandAutomationAdmissionOutcome.AlreadyUsed();
+                }
+                await transaction.CommitAsync(cancellationToken);
             }
-            if (
-                claim is not null
-                && await claim(db, cancellationToken)
-                    is CustomCommandInvocationClaimOutcome.AlreadyUsed
-            )
-            {
-                return new CustomCommandAutomationAdmissionOutcome.AlreadyUsed();
-            }
-            await transaction.CommitAsync(cancellationToken);
+        }
+        await PublishRunLimitRejectionsAsync(context.HostId, dispatch.Rejections);
+        if (dispatch.Status != AutomationDispatchStatus.Accepted)
+        {
+            return new CustomCommandAutomationAdmissionOutcome.Dispatched(dispatch);
         }
         onCommitted?.Invoke();
         await RunAdmittedAsync(
@@ -505,6 +509,10 @@ public sealed partial class AutomationRuntimeService(
                     )
                 )
                 {
+                    if (!run.NodeRuns.Any(node => node.Status == AutomationNodeRunStatus.Running))
+                    {
+                        _ = await SetOwnedWaitingAsync(db, run, leaseId, cancellationToken);
+                    }
                     return new(AutomationResumeStatus.Waiting);
                 }
                 await using var completionTransaction = await db.Database.BeginTransactionAsync(
@@ -540,23 +548,9 @@ public sealed partial class AutomationRuntimeService(
 
             if (pending.AvailableAtUtc > now)
             {
-                var waiting = await OwnedActiveRuns(db, run.Id, leaseId)
-                    .ExecuteUpdateAsync(
-                        setters =>
-                            setters.SetProperty(
-                                static value => value.Status,
-                                AutomationFlowRunStatus.Waiting
-                            ),
-                        cancellationToken
-                    );
-                if (waiting == 0)
+                if (!await SetOwnedWaitingAsync(db, run, leaseId, cancellationToken))
                 {
                     continue;
-                }
-
-                if (run.Status != AutomationFlowRunStatus.Waiting)
-                {
-                    await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
                 }
                 return new(AutomationResumeStatus.Waiting);
             }
@@ -965,7 +959,7 @@ public sealed partial class AutomationRuntimeService(
             );
     }
 
-    private static async Task<bool> ClaimNodeAsync(
+    private async Task<bool> ClaimNodeAsync(
         BlokeBotDbContext db,
         AutomationFlowRun run,
         AutomationNodeRun node,
@@ -998,7 +992,17 @@ public sealed partial class AutomationRuntimeService(
             return false;
         }
 
+        _ = await OwnedActiveRuns(db, run.Id, leaseId)
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters.SetProperty(value => value.Status, AutomationFlowRunStatus.Running),
+                cancellationToken
+            );
         await transaction.CommitAsync(cancellationToken);
+        if (run.Status != AutomationFlowRunStatus.Running)
+        {
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+        }
         return true;
     }
 
@@ -1074,8 +1078,14 @@ public sealed partial class AutomationRuntimeService(
             succeeded.NextAvailableAtUtc,
             cancellationToken
         );
+        var previousStatus = run.Status;
+        UpdateFrontierStatus(run, now);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (previousStatus != run.Status)
+        {
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+        }
         return true;
     }
 
@@ -1167,8 +1177,14 @@ public sealed partial class AutomationRuntimeService(
         );
         AddPending(db, run.Id, next, now, run.NodeRuns.Max(static value => value.Sequence) + 1);
         await TraceScheduledAsync(db, run, flow, next, now, cancellationToken);
+        var previousStatus = run.Status;
+        UpdateFrontierStatus(run, now);
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (previousStatus != run.Status)
+        {
+            await uiChanges.RunChangedAsync(new(run.HostId), new(run.Id));
+        }
         return AutomationFailureCompletion.Continued;
     }
 

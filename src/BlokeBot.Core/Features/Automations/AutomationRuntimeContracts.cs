@@ -271,6 +271,7 @@ public enum AutomationDispatchStatus
     InvalidFlow,
     FeatureDisabled,
     HostNotFound,
+    RunLimitReached,
 }
 
 public sealed record AutomationDispatchOutcome(
@@ -290,6 +291,10 @@ public enum AutomationAdmissionRejectionReason
     ExecutionUnavailable,
     SubflowReferences,
     FeatureDisabled,
+    FlowUnfinishedLimit,
+    FlowWaitingLimit,
+    ChannelUnfinishedLimit,
+    ChannelWaitingLimit,
 }
 
 public sealed record AutomationAdmissionRejection(
@@ -387,4 +392,19 @@ public abstract record AutomationRunQueryOutcome
     public sealed record FeatureDisabled : AutomationRunQueryOutcome;
 
     public sealed record HostNotFound : AutomationRunQueryOutcome;
+}
+
+public sealed record AutomationRunLimits(int? Unfinished, int? Waiting);
+
+public sealed record AutomationRunUsage(AutomationRunLimits Limits, int Unfinished, int Waiting);
+
+public abstract record AutomationRunLimitsOutcome
+{
+    private AutomationRunLimitsOutcome() { }
+
+    public sealed record Available(AutomationRunUsage Usage) : AutomationRunLimitsOutcome;
+
+    public sealed record NotFound : AutomationRunLimitsOutcome;
+
+    public sealed record Invalid : AutomationRunLimitsOutcome;
 }

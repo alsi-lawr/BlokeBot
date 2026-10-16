@@ -6,6 +6,12 @@ internal abstract record AutomationUiChange
 {
     private AutomationUiChange() { }
 
+    internal sealed record RunLimitRejected(
+        AutomationHostId Host,
+        AutomationFlowId? Flow,
+        AutomationAdmissionRejectionReason Reason
+    ) : AutomationUiChange;
+
     internal sealed record Run(AutomationHostId Host, AutomationRunId Id) : AutomationUiChange;
 
     internal sealed record Countdown(AutomationHostId Host, string Name) : AutomationUiChange;
@@ -28,6 +34,23 @@ internal sealed class AutomationUiChanges(
         ObserverIdentity observer,
         Func<EventNotification<AutomationUiChange>, CancellationToken, ValueTask> handler
     ) => events.Subscribe(identity, observer, handler);
+
+    public Task RunLimitRejectedAsync(
+        AutomationHostId host,
+        AutomationFlowId flow,
+        AutomationAdmissionRejectionReason reason
+    ) =>
+        PublishAsync(
+            new AutomationUiChange.RunLimitRejected(
+                host,
+                reason
+                    is AutomationAdmissionRejectionReason.ChannelUnfinishedLimit
+                        or AutomationAdmissionRejectionReason.ChannelWaitingLimit
+                    ? null
+                    : flow,
+                reason
+            )
+        );
 
     public Task RunChangedAsync(AutomationHostId host, AutomationRunId run) =>
         PublishAsync(new AutomationUiChange.Run(host, run));

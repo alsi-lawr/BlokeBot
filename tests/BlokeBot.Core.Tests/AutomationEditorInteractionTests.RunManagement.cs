@@ -113,12 +113,63 @@ public sealed partial class AutomationEditorInteractionTests
             new Claim(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(selected)),
             new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(selected))
         );
+        f.Page.Find(".automation-run-limits input").Input("1");
+        FindButton(f.Page, "Save limits").Click();
         FindButton(f.Page, "Confirm cancellation").Click();
         await using var verify = await f.Database.CreateDbContextAsync();
         (
             await verify.AutomationFlowRuns.Where(run => run.HostId == host).SingleAsync()
         ).Status.ShouldBe(AutomationFlowRunStatus.Waiting);
         (await verify.AutomationFlowRuns.CountAsync(run => run.HostId == otherHost)).ShouldBe(0);
+        (await verify.AutomationFlows.SingleAsync()).MaximumUnfinishedRuns.ShouldBeNull();
+        (
+            await verify.Hosts.SingleAsync(value => value.Id == otherHost)
+        ).MaximumUnfinishedAutomationRuns.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task RunLimitsUi_ExplicitScopeSaveRejectsInvalidEditsAndManualRunKeepsCapacityReason()
+    {
+        await using var f = await AutomationEditorPageFixture.CreateAsync(
+            authored: WaitingRunEditor()
+        );
+        var (host, flow) = await RunWaitingAsync(f);
+        FindButton(f.Page, "Run details").Click();
+        f.Page.Find(".automation-run-limits input").Input("-1");
+        FindButton(f.Page, "Save limits").Click();
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            (await db.AutomationFlows.SingleAsync()).MaximumUnfinishedRuns.ShouldBeNull();
+        }
+        f.Page.Find(".automation-run-limits input").Input("1");
+        f.Page.FindAll(".automation-run-limits input")[1].Input("2");
+        FindButton(f.Page, "Save limits").Click();
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            var saved = await db.AutomationFlows.SingleAsync();
+            saved.MaximumUnfinishedRuns.ShouldBe(1);
+            saved.MaximumWaitingRuns.ShouldBe(2);
+            (await db.Hosts.SingleAsync()).MaximumUnfinishedAutomationRuns.ShouldBeNull();
+        }
+        f.Page.Find(".automation-run-fields select").Change("");
+        f.Page.FindAll(".automation-run-limits input")
+            .ShouldAllBe(input => string.IsNullOrEmpty(input.GetAttribute("value")));
+        f.Page.Find(".automation-run-limits input").Input("4");
+        FindButton(f.Page, "Save limits").Click();
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            (await db.Hosts.SingleAsync()).MaximumUnfinishedAutomationRuns.ShouldBe(4);
+        }
+        FindButton(f.Page, "Run saved flow").Click();
+        f.Page.WaitForAssertion(() =>
+            f.Page.Find(".automation-feedback").TextContent.ShouldContain("unfinished-run limit")
+        );
+        await using var verify = await f.Database.CreateDbContextAsync();
+        (await verify.AutomationFlowRuns.CountAsync()).ShouldBe(1);
+        (await verify.AutomationTraces.CountAsync()).ShouldBe(1);
+        (await verify.AutomationFlowRuns.SingleAsync()).Status.ShouldBe(
+            AutomationFlowRunStatus.Waiting
+        );
     }
 
     private static AngleSharp.Dom.IElement FindButton(

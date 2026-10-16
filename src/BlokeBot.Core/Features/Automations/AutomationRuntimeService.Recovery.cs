@@ -309,6 +309,10 @@ public sealed partial class AutomationRuntimeService
                 );
             }
         }
+        foreach (var run in runs)
+        {
+            UpdateFrontierStatus(run, now);
+        }
         _ = await db.SaveChangesAsync(cancellationToken);
         return runs.Where(run => previousStates[run.Id] != (run.Status, run.CompletedAtUtc))
             .ToArray();

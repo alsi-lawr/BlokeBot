@@ -25,6 +25,73 @@ public sealed partial class ConfigurationTransferAutomationTests
     private const string _malformedCommandReference = "raw-host-reference-secret";
 
     [Test]
+    public async Task RunLimits_ImportAndGraphSavePreserveTargetLocalSettingsWhileNewTargetsAreUnlimited()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "limits-transfer");
+        var document = DynamicTransformDocument();
+        var coordinator = Coordinator(
+            database,
+            new RecordingLogger<ConfigurationTransferCoordinator>()
+        );
+        async Task Import() =>
+            (
+                await coordinator.ApplyAsync(
+                    Session(host),
+                    document,
+                    await ReviewImportEffectsAsync(database, document, AutomationSelection(host)),
+                    new("destination-id", "destination"),
+                    default
+                )
+            ).ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
+        await Import();
+        AutomationFlowDraft draft;
+        Guid id;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var flow = await db
+                .AutomationFlows.Include(value => value.Nodes)
+                .Include(value => value.Edges)
+                .SingleAsync();
+            flow.MaximumUnfinishedRuns.ShouldBeNull();
+            flow.MaximumWaitingRuns.ShouldBeNull();
+            id = flow.Id;
+            draft = AutomationFlowService
+                .RestoreDraft(flow)
+                .ShouldBeOfType<AutomationFlowDraftRestoreOutcome.Available>()
+                .Draft;
+            flow.MaximumUnfinishedRuns = 2;
+            flow.MaximumWaitingRuns = 1;
+            var record = await db.Hosts.SingleAsync();
+            record.MaximumUnfinishedAutomationRuns = 8;
+            record.EnabledFeatures |= HostFeatureFlags.Automations;
+            _ = await db.SaveChangesAsync();
+        }
+        var transfer = AutomationTransfer(database);
+        _ = (
+            await transfer.FlowService.SaveAsync(
+                draft with
+                {
+                    Canvas = new(AutomationFlowOrientation.Vertical, AutomationEdgeStyle.Smooth),
+                },
+                default
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        await Import();
+        _ = (
+            await transfer.FlowService.DuplicateAsync(new(host), new(id), default)
+        ).ShouldBeOfType<AutomationFlowDuplicateOutcome.Duplicated>();
+        await using var verify = await database.CreateDbContextAsync();
+        var retained = await verify.AutomationFlows.SingleAsync(flow => flow.Id == id);
+        retained.MaximumUnfinishedRuns.ShouldBe(2);
+        retained.MaximumWaitingRuns.ShouldBe(1);
+        var copy = await verify.AutomationFlows.SingleAsync(flow => flow.Id != id);
+        copy.MaximumUnfinishedRuns.ShouldBeNull();
+        copy.MaximumWaitingRuns.ShouldBeNull();
+        (await verify.Hosts.SingleAsync()).MaximumUnfinishedAutomationRuns.ShouldBe(8);
+    }
+
+    [Test]
     [Arguments("""{"minimum-bits":100}""", null)]
     [Arguments("""{"minimum-bits":100,"maximum-bits":200}""", 200)]
     public async Task Cheer_ExportImportPreservesBoundedAndUncappedConfiguration(

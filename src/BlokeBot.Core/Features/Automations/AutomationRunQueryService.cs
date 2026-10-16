@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public sealed class AutomationRunQueryService(
+public sealed partial class AutomationRunQueryService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostFeatureService features,
     AutomationCatalogService catalog

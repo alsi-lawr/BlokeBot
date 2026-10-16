@@ -192,6 +192,7 @@ public partial class AutomationEditorPage
     {
         if (disposing)
         {
+            DisposeRunLimitSubscriptions();
             InvalidateScenarioPreview();
             _scenarioCancellation?.Cancel();
             CancelValidationFeedback();

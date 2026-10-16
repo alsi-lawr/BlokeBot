@@ -365,6 +365,12 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("MaximumUnfinishedRuns")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaximumWaitingRuns")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2108,6 +2114,12 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("MaximumUnfinishedAutomationRuns")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaximumWaitingAutomationRuns")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(512)

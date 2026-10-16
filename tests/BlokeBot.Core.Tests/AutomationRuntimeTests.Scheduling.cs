@@ -41,6 +41,9 @@ public sealed partial class AutomationRuntimeTests
         f.Chat.Messages.ShouldBe(["ready descendant"]);
         var waiting = await SchedulingStoredRunAsync(f);
         waiting.Status.ShouldBe(AutomationFlowRunStatus.Waiting);
+        (await f.Queries.ReadLimitsAsync(new(f.HostId), null, default))
+            .ShouldBeOfType<AutomationRunLimitsOutcome.Available>()
+            .Usage.ShouldBe(new(new(null, null), 1, 1));
         waiting.CompletedAtUtc.ShouldBeNull();
         waiting.ExecutionLeaseId.ShouldBeNull();
         var future = waiting.NodeRuns.Single(n => n.NodeId == delayed.Id.Value);
@@ -281,6 +284,10 @@ public sealed partial class AutomationRuntimeTests
             wake.Advance(TimeSpan.FromSeconds(1));
             await sender.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var held = await SchedulingStoredRunAsync(f);
+            held.Status.ShouldBe(AutomationFlowRunStatus.Running);
+            (await f.Queries.ReadLimitsAsync(new(f.HostId), null, default))
+                .ShouldBeOfType<AutomationRunLimitsOutcome.Available>()
+                .Usage.ShouldBe(new(new(null, null), 1, 0));
             var lease = held.ExecutionLeaseId.ShouldNotBeNull();
             held.NodeRuns.Single(n => n.NodeId == shortSend.Id.Value)
                 .Status.ShouldBe(AutomationNodeRunStatus.Running);

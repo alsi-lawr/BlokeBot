@@ -76,6 +76,7 @@ public partial class AutomationEditorPage
         {
             _flowSnapshots = [];
             _editor = null;
+            SubscribeRunLimitRejections();
             return;
         }
 
@@ -87,6 +88,7 @@ public partial class AutomationEditorPage
         }
         _flowSnapshots = available.Flows;
         _authoringEntries = available.AuthoringEntries;
+        SubscribeRunLimitRejections();
         await LoadReferenceChoicesAsync();
         var selectedId =
             preferredFlowId
