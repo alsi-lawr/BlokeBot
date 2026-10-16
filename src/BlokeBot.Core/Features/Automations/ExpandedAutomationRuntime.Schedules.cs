@@ -112,6 +112,14 @@ internal sealed partial class ExpandedAutomationRuntime
                     {
                         foreach (var node in rejection.SourceNodeIds)
                         {
+                            if (
+                                !enabled.Any(source =>
+                                    source.FlowId == rejection.FlowId && source.NodeId == node
+                                )
+                            )
+                            {
+                                continue;
+                            }
                             await AutomationScheduleSkipStore.AppendAsync(
                                 db,
                                 new(host.Id),

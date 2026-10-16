@@ -223,6 +223,58 @@ public sealed partial class AutomationRuntimeTests
     }
 
     [Test]
+    public async Task ScheduleSkips_UnrelatedMalformedSourceCannotAcquireObservedGroupsOccurrence()
+    {
+        await using var f = await RuntimeFixture.CreateAsync();
+        var json = _skipSchedule.Replace("true", "false");
+        var source = Node("scheduled-time", json);
+        var wait = Node("delay", """{"duration-milliseconds":60000}""");
+        var later = Node("send-chat", """{"message":"later"}""");
+        var due = await f.SaveAsync(
+            [source, wait, later],
+            [Edge(source, "flow", wait), Edge(wait, "complete", later)]
+        );
+        _ = await f.Queries.SaveLimitsAsync(new(f.HostId), due, new(1, null), default);
+        var unrelated = await SaveExpandedChatAsync(
+            f,
+            "scheduled-time",
+            json.Replace("\"interval-seconds\":10", "\"interval-seconds\":60"),
+            "unrelated"
+        );
+        var x = ExpandedFixtureFor(f);
+        await x.Runtime.TickAsync(default);
+        f.Clock.Advance(TimeSpan.FromSeconds(10));
+        await x.Runtime.TickAsync(default);
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            var malformed = await db.AutomationFlowNodes.SingleAsync(node =>
+                node.FlowId == unrelated.Value && node.DefinitionId == "scheduled-time"
+            );
+            malformed.ConfigurationJson = json.Replace(
+                "\"interval-seconds\":10",
+                "\"interval-seconds\":0"
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        f.Clock.Advance(TimeSpan.FromSeconds(10));
+        var observed = f.Clock.GetUtcNow().UtcDateTime;
+        await x.Runtime.TickAsync(default);
+        await using var verify = await f.Database.CreateDbContextAsync();
+        var fact = await verify.AutomationScheduleSkips.SingleAsync(row => row.FlowId == due.Value);
+        fact.SourceNodeId.ShouldBe(source.Id.Value);
+        fact.Reason.ShouldBe((int)AutomationScheduleSkipReason.FlowUnfinishedLimit);
+        fact.ScheduledAtUtc.ShouldBe(observed);
+        fact.ObservedAtUtc.ShouldBe(observed);
+        (
+            await verify
+                .AutomationScheduleSkips.Where(row => row.FlowId == unrelated.Value)
+                .ToArrayAsync()
+        ).ShouldBeEmpty();
+        (await verify.AutomationFlowRuns.CountAsync()).ShouldBe(1);
+        f.Chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task ScheduleSkips_ScopedReadsExpireAt24HoursAndPhysicalCleanupIsBounded()
     {
         await using var f = await RuntimeFixture.CreateAsync();
