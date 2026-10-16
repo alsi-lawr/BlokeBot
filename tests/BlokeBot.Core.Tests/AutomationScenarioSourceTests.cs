@@ -1,5 +1,9 @@
 using System.Collections.Immutable;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Automations.Page;
+using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -224,7 +228,7 @@ public sealed partial class AutomationRuntimeTests
         var source = Node("stream-online", "{}");
         var draft = Draft(fixture.HostId, [source], []);
         var flowId = await fixture.SaveAsync(draft.Nodes, draft.Edges);
-        var input = fixture.Scenarios.CreateDefaultFixture(draft, source.Id);
+        var input = fixture.Scenarios.CreatePortableFixture(draft, source.Id);
         var saved = await fixture.Scenarios.SaveAsync(
             new(fixture.HostId),
             flowId,
@@ -240,6 +244,15 @@ public sealed partial class AutomationRuntimeTests
         reloaded.Fixture.Context.Stream.ShouldBe(input.Context.Stream);
         reloaded.Fixture.Context.Timestamps.ShouldBe(input.Context.Timestamps);
         reloaded.Fixture.Context.Variables.ForExecution().ShouldBeEmpty();
+        fixture.Scenarios.IsPortableFixture(draft, reloaded.Fixture).ShouldBeTrue();
+        var manual = new AutomationScenarioEditor(reloaded.Fixture);
+        manual.SetSourceValue(
+            fixture
+                .Scenarios.SourceFields(draft, source.Id)
+                .Single(field => field.Id.Value == "stream_type"),
+            new AutomationValue.Text("authored")
+        );
+        fixture.Scenarios.IsPortableFixture(draft, manual.Fixture).ShouldBeFalse();
         writes.Armed = true;
         _ = (
             await fixture.Scenarios.RunSavedAsync(
@@ -421,5 +434,188 @@ public sealed partial class AutomationRuntimeTests
             ).Status.ShouldBe(AutomationScenarioAuthoringStatus.Invalid);
         }
         writes.Writes.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Scenario_RedemptionInputsReachPreparationAndLegacyAbsenceStaysHonest()
+    {
+        var writes = new ScenarioWriteGuard();
+        await using var f = await RuntimeFixture.CreateAsync(
+            hostFeatures: HostFeatureFlags.Automations
+                | HostFeatureFlags.CustomCommands
+                | HostFeatureFlags.RewardsAndRedemptions,
+            databaseInterceptors: [writes]
+        );
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            _ = db.TwitchCustomRewards.Add(
+                new()
+                {
+                    HostId = f.HostId,
+                    ProviderRewardId = "authored-reward",
+                    Title = "Hydrate",
+                    Cost = 250,
+                    IsManageable = true,
+                    IsEnabled = true,
+                    UpdatedAtUtc = f.Clock.GetUtcNow().UtcDateTime,
+                }
+            );
+            _ = db.HostBroadcasterAuthorizations.Add(
+                new()
+                {
+                    HostId = f.HostId,
+                    TwitchUserId = "streamer-id",
+                    ProtectedTokenPayload = [1],
+                    AuthorizedScopes = ScopeSet.Format(
+                        HostBroadcasterAuthorizationService.MilestoneScopes
+                    ),
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var source = Node("reward-redemption", """{"completion-policy":"manual"}""");
+        var action = Node("fulfil-redemption", "{}");
+        var draft = Draft(f.HostId, [source, action], [Edge(source, "flow", action)]);
+        var flow = await f.SaveAsync(draft.Nodes, draft.Edges);
+        var defaults = f.Scenarios.CreateDefaultFixture(draft, source.Id);
+        var legacy = defaults with { Context = defaults.Context with { Variables = new([]) } };
+        var saved = await f.Scenarios.SaveAsync(
+            new(f.HostId),
+            flow,
+            null,
+            "Old redemption inputs",
+            legacy,
+            default
+        );
+        saved.Status.ShouldBe(AutomationScenarioAuthoringStatus.Saved);
+        var reloaded = (
+            await f.Scenarios.ListAsync(new(f.HostId), flow, default)
+        ).ShouldHaveSingleItem();
+        reloaded.Fixture.Context.Variables.ForExecution().ShouldBeEmpty();
+        writes.Armed = true;
+        (await f.Scenarios.RunSavedAsync(new(f.HostId), flow, saved.Id!.Value, default))
+            .ShouldBeOfType<AutomationScenarioRunOutcome.Failed>()
+            .Nodes[^1]
+            .OutcomeCode.ShouldBe("redemption-context-missing");
+        var editor = new AutomationScenarioEditor(reloaded.Fixture);
+        var fields = f.Scenarios.SourceFields(draft, source.Id);
+        editor.SetSourceValue(
+            fields.Single(field => field.Id.Value == "redemption_id"),
+            new AutomationValue.Text("authored-redemption")
+        );
+        editor.SetSourceValue(
+            fields.Single(field => field.Id.Value == "reward_id"),
+            new AutomationValue.Text("authored-reward")
+        );
+        editor.SetSourceValue(
+            fields.Single(field => field.Id.Value == "user_input"),
+            new AutomationValue.Text(new string('x', 500))
+        );
+        var prepared = AutomationNativeActionPreparation
+            .Redemption(editor.Fixture.Context)
+            .ShouldBeOfType<AutomationNativePreparation<AutomationPreparedRedemption>.Prepared>();
+        prepared.Payload.ShouldBe(new("authored-redemption", "authored-reward"));
+        (await f.Scenarios.RunAsync(draft, editor.Fixture, default))
+            .ShouldBeOfType<AutomationScenarioRunOutcome.Completed>()
+            .Nodes[^1]
+            .OutcomeCode.ShouldBe("action-simulated");
+        var baseline = AutomationScenarioSerialization.Serialize(editor.Fixture);
+        foreach (
+            var (name, variable, code) in new (string, AutomationVariable, string)[]
+            {
+                (
+                    "bits",
+                    new(new AutomationValue.Number(4), AutomationDataSensitivity.Safe),
+                    "scenario-source-variable-invalid"
+                ),
+                (
+                    "reward_cost",
+                    new(new AutomationValue.Text("not a number"), AutomationDataSensitivity.Safe),
+                    "scenario-source-value-invalid"
+                ),
+                (
+                    "user_input",
+                    new(
+                        new AutomationValue.Text("wrong sensitivity"),
+                        AutomationDataSensitivity.Safe
+                    ),
+                    "scenario-source-value-invalid"
+                ),
+                (
+                    "reward_title",
+                    new(
+                        new AutomationValue.Text(new string('x', 501)),
+                        AutomationDataSensitivity.Safe
+                    ),
+                    "scenario-source-value-too-long"
+                ),
+                (
+                    "reward_id",
+                    new(
+                        new AutomationValue.Null(AutomationPortValueType.Text),
+                        AutomationDataSensitivity.Safe
+                    ),
+                    "scenario-source-value-invalid"
+                ),
+            }
+        )
+        {
+            var invalid = editor.Fixture with
+            {
+                Context = editor.Fixture.Context with
+                {
+                    Variables = new(
+                        editor
+                            .Fixture.Context.Variables.ForExecution()
+                            .ToImmutableDictionary()
+                            .SetItem(new(name), variable)
+                    ),
+                },
+            };
+            (await f.Scenarios.RunAsync(draft, invalid, default))
+                .ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>()
+                .Errors.ShouldContain(error =>
+                    error.Code == code && error.PortId == new AutomationPortId(name)
+                );
+            (
+                await f.Scenarios.SaveAsync(
+                    new(f.HostId),
+                    flow,
+                    saved.Id,
+                    "Rejected inputs",
+                    invalid,
+                    default
+                )
+            ).Status.ShouldBe(AutomationScenarioAuthoringStatus.Invalid);
+        }
+        writes.Armed = false;
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            (await db.HostBroadcasterAuthorizations.SingleAsync()).AuthorizedScopes = string.Empty;
+            _ = await db.SaveChangesAsync();
+        }
+        writes.Armed = true;
+        (await f.Scenarios.RunAsync(draft, editor.Fixture, default))
+            .ShouldBeOfType<AutomationScenarioRunOutcome.Failed>()
+            .Nodes[^1]
+            .OutcomeCode.ShouldBe("broadcaster-authorization-missing");
+        writes.Armed = false;
+        await using (var db = await f.Database.CreateDbContextAsync())
+        {
+            (await db.Hosts.SingleAsync()).EnabledFeatures &=
+                ~HostFeatureFlags.RewardsAndRedemptions;
+            _ = await db.SaveChangesAsync();
+        }
+        writes.Armed = true;
+        (await f.Scenarios.RunAsync(draft, editor.Fixture, default))
+            .ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>()
+            .Errors.ShouldContain(error => error.Code == "capability-unavailable");
+        AutomationScenarioSerialization.Serialize(editor.Fixture).ShouldBe(baseline);
+        (await f.Scenarios.ListAsync(new(f.HostId), flow, default))
+            .ShouldHaveSingleItem()
+            .Fixture.Context.Variables.ForExecution()
+            .ShouldBeEmpty();
+        writes.Writes.ShouldBe(0);
+        f.Chat.Calls.ShouldBe(0);
     }
 }

@@ -125,11 +125,8 @@ public sealed partial class AutomationScenarioService
         draft.Nodes.FirstOrDefault(node => node.Id == sourceNodeId) is { } source
         && catalog.ValidatePersistedDefinition(source.Definition)
             is AutomationConfigurationCheck.Valid valid
-            ?
-            [
-                .. AutomationCommandSource
-                    .Project(valid.Definition, valid.Configuration, schemas)
-                    .Outputs.Where(port => port.ValueType != AutomationPortValueType.Flow),
-            ]
+            ? SourceFields(
+                AutomationCommandSource.Project(valid.Definition, valid.Configuration, schemas)
+            )
             : [];
 }

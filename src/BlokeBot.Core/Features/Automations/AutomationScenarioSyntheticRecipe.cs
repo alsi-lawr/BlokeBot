@@ -62,7 +62,11 @@ public sealed partial class AutomationScenarioService
                         : null,
                     Variables = new(
                         SourceFields(draft, sourceNodeId)
-                            .Where(field => !ReservedContextVariable(new(field.Id.Value)))
+                            .Where(field =>
+                                !ReservedContextVariable(new(field.Id.Value))
+                                && !ContextFields(fixture.SourceDefinitionId)
+                                    .Any(contextField => contextField.Id == field.Id)
+                            )
                             .Select(field => new KeyValuePair<
                                 AutomationVariableName,
                                 AutomationVariable

@@ -82,11 +82,6 @@ public sealed partial class AutomationScenarioService
             {
                 Definition.Kind: AutomationNodeKind.Source
             } valid
-            ?
-            [
-                .. valid.Definition.Outputs.Where(port =>
-                    port.ValueType != AutomationPortValueType.Flow
-                ),
-            ]
+            ? SourceFields(valid.Definition)
             : [];
 }

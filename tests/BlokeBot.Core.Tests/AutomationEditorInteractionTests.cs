@@ -1380,7 +1380,8 @@ public sealed partial class AutomationEditorInteractionTests
             bool includeUnavailableFlow = false,
             IEnumerable<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>? interceptors =
                 null,
-            bool typedCommand = false
+            bool typedCommand = false,
+            AutomationEditorState? authored = null
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync([.. interceptors ?? []]);
@@ -1422,7 +1423,7 @@ public sealed partial class AutomationEditorInteractionTests
                 BotSettings.FromOptions(new BotOptions()),
                 OAuthAuthorizationScopeSet.Create(["channel:bot"])
             ));
-            var editor = AvailableEditor(typedCommand);
+            var editor = authored ?? AvailableEditor(typedCommand);
             _ = (
                 await context
                     .Services.GetRequiredService<AutomationFlowService>()
@@ -1435,7 +1436,8 @@ public sealed partial class AutomationEditorInteractionTests
 
             var page = context.Render<AutomationEditorPage>();
             page.WaitForAssertion(() =>
-                page.FindComponent<AutomationFlowCanvas>().Instance.Nodes.Count.ShouldBe(2)
+                page.FindComponent<AutomationFlowCanvas>()
+                    .Instance.Nodes.Count.ShouldBe(editor.Nodes.Count)
             );
             return new(database, context, page, ui.Authorization);
         }

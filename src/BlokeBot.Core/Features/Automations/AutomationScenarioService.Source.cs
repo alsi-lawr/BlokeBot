@@ -94,6 +94,7 @@ public sealed partial class AutomationScenarioService
     {
         var fields = SourceFields(draft, fixture.SourceNodeId);
         var variables = fixture.Context.Variables.ForExecution();
+        var contextFields = ContextFields(fixture.SourceDefinitionId);
         foreach (var (name, _) in variables)
         {
             if (ReservedContextVariable(name) || !fields.Any(field => field.Id.Value == name.Value))
@@ -127,7 +128,10 @@ public sealed partial class AutomationScenarioService
                 : variables.GetValueOrDefault(new(field.Id.Value));
             if (variable is null)
             {
-                if (field.Nullability == AutomationPortNullability.NonNullable)
+                if (
+                    field.Nullability == AutomationPortNullability.NonNullable
+                    && !contextFields.Any(contextField => contextField.Id == field.Id)
+                )
                 {
                     errors.Add(
                         new(
@@ -153,6 +157,21 @@ public sealed partial class AutomationScenarioService
                         fixture.SourceNodeId,
                         "scenario-source-value-invalid",
                         "Use the trigger field's declared type, nullability and sensitivity.",
+                        PortId: field.Id
+                    )
+                );
+            }
+            else if (
+                variable.Value is AutomationValue.Text text
+                && contextFields.Any(contextField => contextField.Id == field.Id)
+                && text.Value.Length > TwitchEventAutomationContext.MaximumTextLength
+            )
+            {
+                errors.Add(
+                    new(
+                        fixture.SourceNodeId,
+                        "scenario-source-value-too-long",
+                        $"Use at most {TwitchEventAutomationContext.MaximumTextLength} characters for this trigger field.",
                         PortId: field.Id
                     )
                 );
