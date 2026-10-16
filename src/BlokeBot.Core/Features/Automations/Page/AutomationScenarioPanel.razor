@@ -6,30 +6,32 @@
 @if (Editor is not null)
 {
     <div class="automation-authoring-body" data-automation-scenario-editor>
-        <div class="automation-authoring-heading">
-        <h2>Test scenarios</h2>
-        <button class="btn-secondary" type="button" @onclick="New">New</button>
-        </div>
-        <label class="field">
-        <span class="field__label">Scenario</span>
-        <select class="field__input" value="@Editor.Id?.Value.ToString()" @onchange="args => Select.InvokeAsync(args.Value?.ToString() ?? string.Empty)">
-        <option value="">New scenario</option>@foreach (var item in Saved) { <option value="@item.Id.Value">@item.Name</option> }</select>
-        </label>
-        <label class="field">
-        <span class="field__label">Name</span>
-        <input class="field__input" maxlength="200" @bind="Editor.Name" />
-        </label>
         <label class="field">
         <span class="field__label">Trigger</span>
         <select class="field__input" value="@Editor.Fixture.SourceNodeId.Value" @onchange="args => SourceChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)">@foreach (var node in Nodes.Where(node => node.Definition.Kind == AutomationNodeKind.Source)) { <option value="@node.Id.Value">@node.EffectiveName</option> }</select>
         </label>
-        <section class="automation-authoring-section">
-        <h3>Source fields</h3>
-            @if (CommandSchema is { } schema)
+        @if (CommandId > 0)
+        {
+            <label class="field"><span class="field__label">Input format</span>
+                <select class="field__input" value="@Editor.CommandInputFormat" @onchange="args => { if (Enum.TryParse<AutomationScenarioCommandInputFormat>(args.Value?.ToString(), out var format)) Editor.CommandInputFormat = format; }">
+                    <option value="Raw">Raw chat message</option><option value="Structured">Structured inputs</option>
+                </select>
+            </label>
+            @if (Editor.CommandInputFormat == AutomationScenarioCommandInputFormat.Raw)
+            {
+                <label class="field"><span class="field__label">Chat message</span>
+                    <textarea class="field__input" maxlength="1000" value="@Editor.RawCommand" @oninput="args => Editor.SetRawCommand(args.Value?.ToString() ?? string.Empty)"></textarea>
+                </label>
+                <p class="text-sm">Uses the selected command's current alias and argument schema. Quotes are literal, just as in chat.</p>
+            }
+            else if (CommandSchema is not null)
             {
                 <label class="field"><span class="field__label">Arguments after the command</span>
                     <textarea class="field__input" value="@Editor.Fixture.CommandArgumentTail" @oninput="args => Editor.SetCommandArgumentTail(args.Value?.ToString() ?? string.Empty)"></textarea>
                 </label>
+            }
+            @if (CommandSchema is { } schema)
+            {
                 @(CustomCommandArguments.Parse(CommandId, "command", schema, Editor.Fixture.CommandArgumentTail ?? string.Empty).Match<RenderFragment>(
                     prepared => @<div>
                         @foreach (var field in schema.Fields)
@@ -39,11 +41,16 @@
                     </div>,
                     rejected => @<p role="status">@rejected.Message</p>))
             }
-            @foreach (var field in Fields.Where(field => CommandSchema is null || (field.Id.Value != "arguments" && !field.Id.Value.StartsWith("argument.", StringComparison.Ordinal))))
+        }
+        <details open="@(CommandId == 0)">
+        <summary>Other source fields</summary>
+        <div class="automation-authoring-section">
+            @foreach (var field in Fields.Where(field => (CommandSchema is null || (field.Id.Value != "arguments" && !field.Id.Value.StartsWith("argument.", StringComparison.Ordinal))) && !(CommandId > 0 && Editor.CommandInputFormat == AutomationScenarioCommandInputFormat.Raw && field.Id.Value == "arguments")))
             {
                 <AutomationFixtureValueInput @key="(Editor, field.Id)" Label="@field.Name" Value="@Editor.SourceValue(field)" ValueType="field.ValueType" Nullable="@(field.Nullability == AutomationPortNullability.Nullable)" Changed="value => Editor.SetSourceValue(field, value)" ValidityChanged="valid => InputValidity.InvokeAsync(new(field.Id.Value, valid))" />
             }
-        </section>
+        </div>
+        </details>
         <details>
         <summary>Clock and seed</summary>
         <div class="automation-authoring-section">
@@ -57,8 +64,9 @@
             </label>
         </div>
         </details>
-        <section class="automation-authoring-section">
-        <h3>Hypothetical action outcomes</h3>
+        <details>
+        <summary>Hypothetical action outcomes</summary>
+        <div class="automation-authoring-section">
         <p>Actions are not sent to Twitch. Known missing permissions fail; current Twitch approval, eligibility and live state are not checked.</p>
             @foreach (var node in Nodes.Where(node => node.Definition.Kind == AutomationNodeKind.Action))
             {
@@ -81,7 +89,8 @@
                 </select>
                 </label>
             }
-        </section>
+        </div>
+        </details>
         <details>
         <summary>Connected input overrides</summary>
         <div class="automation-authoring-section">
@@ -105,7 +114,21 @@
             }
         </div>
         </details>
-        <button class="btn-secondary" type="button" @onclick="Generate">Generate fixture</button>
+        <details><summary>Saved sample inputs</summary>
+        <div class="automation-authoring-heading">
+        <h3>Saved inputs</h3>
+        <button class="btn-secondary" type="button" @onclick="New">New</button>
+        </div>
+        <label class="field">
+        <span class="field__label">Scenario</span>
+        <select class="field__input" value="@Editor.Id?.Value.ToString()" @onchange="args => Select.InvokeAsync(args.Value?.ToString() ?? string.Empty)">
+        <option value="">New scenario</option>@foreach (var item in Saved) { <option value="@item.Id.Value">@item.Name</option> }</select>
+        </label>
+        <label class="field">
+        <span class="field__label">Name</span>
+        <input class="field__input" maxlength="200" @bind="Editor.Name" />
+        </label>
+        <button class="btn-secondary" type="button" @onclick="Generate">Generate sample inputs</button>
         @if (Editor.Id is not null)
         {
             <details>
@@ -116,10 +139,12 @@
             </div>
             </details>
         }
+        </details>
+        <p class="text-sm">Saving keeps inputs, not results. Current test values clear when you leave or edit. Only generated portable samples can be exported.</p>
     </div>
     <footer class="automation-authoring-footer">
-    <button class="btn-primary" type="button" disabled="@(Busy || InvalidInputs || CommandArgumentsInvalid)" data-automation-run-scenario @onclick="Run">Run scenario</button>
-    <button class="btn-secondary" type="button" disabled="@(Busy || !CanSave || InvalidInputs)" data-automation-save-scenario @onclick="Save">Save scenario</button>@if (Busy) { <button class="btn-secondary" type="button" @onclick="Cancel">Cancel</button> }</footer>
+    <button class="btn-primary" type="button" disabled="@(Busy || InvalidInputs || CommandArgumentsInvalid)" data-automation-run-scenario @onclick="Run">Run</button>
+    <button class="btn-secondary" type="button" disabled="@(Busy || !CanSave || InvalidInputs)" data-automation-save-scenario @onclick="Save">Save sample</button>@if (Busy) { <button class="btn-secondary" type="button" @onclick="Cancel">Cancel</button> }</footer>
 }
 else
 {
@@ -134,7 +159,7 @@ else
     private int CommandId => Nodes.FirstOrDefault(node => node.Id == Editor?.Fixture.SourceNodeId) is { } node
         && node.Definition.Id == AutomationDefinitionIds.CustomCommandSource
         && int.TryParse(node.Value(new("custom-command-id")), out var id) ? id : 0;
-    private bool CommandArgumentsInvalid => CommandSchema is { } schema && Editor is not null && CustomCommandArguments.Parse(CommandId, "command", schema, Editor.Fixture.CommandArgumentTail ?? string.Empty).Match(_ => false, _ => true);
+    private bool CommandArgumentsInvalid => Editor?.CommandInputFormat != AutomationScenarioCommandInputFormat.Raw && CommandSchema is { } schema && Editor is not null && CustomCommandArguments.Parse(CommandId, "command", schema, Editor.Fixture.CommandArgumentTail ?? string.Empty).Match(_ => false, _ => true);
     private CustomCommandArgumentSchema? CommandSchema => CommandSchemas.GetValueOrDefault(CommandId);
     private static string DisplayArgument(AutomationValue value) => value switch { AutomationValue.Number number => number.Value.ToString(CultureInfo.InvariantCulture), AutomationValue.Text text => text.Value, _ => string.Empty };
 

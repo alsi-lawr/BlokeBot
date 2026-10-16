@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,10 +25,40 @@ public sealed partial class AutomationScenarioService(
     public async Task<AutomationScenarioRunOutcome> RunAsync(
         AutomationFlowDraft draft,
         AutomationScenarioFixture fixture,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        string? rawCommand = null
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        string? commandRoute = null;
+        if (rawCommand is not null)
+        {
+            if (
+                !ChatCommandDispatcher.TryParseCommand(rawCommand, out var route, out var arguments)
+            )
+            {
+                return new AutomationScenarioRunOutcome.Invalid([
+                    new(
+                        fixture.SourceNodeId,
+                        "scenario-command-invalid",
+                        "Enter a full chat command beginning with !."
+                    ),
+                ]);
+            }
+            commandRoute = route;
+            fixture = fixture with
+            {
+                CommandArgumentTail = CustomCommandArguments.OriginalTail(rawCommand),
+                Context = fixture.Context with
+                {
+                    Arguments =
+                    [
+                        .. arguments.Select((text, index) => new AutomationArgument(index, text)),
+                    ],
+                    CommandArguments = null,
+                },
+            };
+        }
         var shape = await ValidateAsync(draft, fixture, cancellationToken, transfer: true);
         if (shape.Gate == AutomationCatalogAvailability.HostNotFound)
         {
@@ -87,7 +118,8 @@ public sealed partial class AutomationScenarioService(
             graphDb,
             configured,
             fixture,
-            cancellationToken
+            cancellationToken,
+            commandRoute
         );
         if (preparedCommand.Error is { } commandError)
         {
@@ -136,6 +168,7 @@ public sealed partial class AutomationScenarioService(
             ]);
         }
         var frozen = expansion.Flow;
+        var previewDefinitions = new Dictionary<Guid, AutomationDefinitionDescriptor>();
         foreach (var node in frozen.Nodes)
         {
             if (
@@ -155,6 +188,7 @@ public sealed partial class AutomationScenarioService(
                     ),
                 ]);
             }
+            previewDefinitions.Add(node.Id, valid.Definition);
         }
         await preparation.CommitAsync(cancellationToken);
         var context = SourceContext(configured, fixture);
@@ -169,7 +203,8 @@ public sealed partial class AutomationScenarioService(
             clock.GetUtcNow().UtcDateTime,
             cancellationToken
         );
-        Task Emit(
+        var preview = new PreviewCapture(now);
+        async Task Emit(
             AutomationTraceEventKind kind,
             AutomationRuntimeSerialization.PersistedNode? node = null,
             AutomationTraceOutcome outcome = AutomationTraceOutcome.None,
@@ -177,9 +212,11 @@ public sealed partial class AutomationScenarioService(
             DateTime? due = null,
             IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue>? values = null,
             CancellationToken? token = null,
-            AutomationDiagnostic? diagnostic = null
-        ) =>
-            AutomationTraceStore.AppendAsync(
+            AutomationDiagnostic? diagnostic = null,
+            string? wouldSend = null
+        )
+        {
+            await AutomationTraceStore.AppendAsync(
                 traceDb,
                 traceId,
                 AutomationTraceRedaction.Event(
@@ -196,6 +233,16 @@ public sealed partial class AutomationScenarioService(
                 clock.GetUtcNow().UtcDateTime,
                 token ?? cancellationToken
             );
+            var ports =
+                node is not null && previewDefinitions.TryGetValue(node.Id, out var definition)
+                    ? kind
+                        is AutomationTraceEventKind.Outputs
+                            or AutomationTraceEventKind.SubflowEntry
+                        ? definition.Outputs
+                        : definition.Inputs
+                    : [];
+            preview.Record(now, values, ports, wouldSend);
+        }
         await Emit(
             AutomationTraceEventKind.Admission,
             frozen.Nodes.Single(node => node.Id == fixture.SourceNodeId.Value),
@@ -368,6 +415,7 @@ public sealed partial class AutomationScenarioService(
                     }
                     continue;
                 }
+                string? wouldSend = null;
                 var execution = await inputs.Match<Task<AutomationNodeExecution>>(
                     async available =>
                         await MissingPrerequisiteAsync(
@@ -402,7 +450,20 @@ public sealed partial class AutomationScenarioService(
                                     )
                                     ?.Result
                                     ?? AutomationScenarioEffectResult.Succeeded,
-                                now
+                                now,
+                                message =>
+                                {
+                                    if (
+                                        valid.Definition.Inputs.Any(port =>
+                                            port.BindingFieldId
+                                                == new AutomationConfigurationFieldId("message")
+                                            && port.Sensitivity == AutomationDataSensitivity.Safe
+                                        )
+                                    )
+                                    {
+                                        wouldSend = message;
+                                    }
+                                }
                             )
                         : new AutomationNodeExecution.Failed("binding-invalid"),
                     failed =>
@@ -429,7 +490,8 @@ public sealed partial class AutomationScenarioService(
                         await Emit(
                             AutomationTraceEventKind.Result,
                             node,
-                            AutomationTraceOutcome.Succeeded
+                            AutomationTraceOutcome.Succeeded,
+                            wouldSend: wouldSend
                         );
                         foreach (var port in succeeded.OutputSelection.BranchPorts)
                         {
@@ -576,7 +638,8 @@ public sealed partial class AutomationScenarioService(
                 {
                     return new AutomationScenarioRunOutcome.Failed(
                         outcomes.ToImmutable(),
-                        new(traceId)
+                        new(traceId),
+                        preview.Events
                     );
                 }
             }
@@ -584,7 +647,11 @@ public sealed partial class AutomationScenarioService(
                 AutomationTraceEventKind.Terminal,
                 outcome: AutomationTraceOutcome.Succeeded
             );
-            return new AutomationScenarioRunOutcome.Completed(outcomes.ToImmutable(), new(traceId));
+            return new AutomationScenarioRunOutcome.Completed(
+                outcomes.ToImmutable(),
+                new(traceId),
+                preview.Events
+            );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

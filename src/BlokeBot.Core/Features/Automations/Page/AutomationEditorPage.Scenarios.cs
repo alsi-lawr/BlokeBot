@@ -9,6 +9,43 @@ public partial class AutomationEditorPage
     private ImmutableArray<AutomationPortMetadata> _scenarioFields = [];
     private readonly HashSet<string> _invalidFixtureInputs = [];
     private CancellationTokenSource? _scenarioCancellation;
+    private long _scenarioPreviewRevision;
+    private AutomationScenarioEventPreview? _selectedScenarioPreview =>
+        _viewingCurrentScenario
+        && _selectedTrace is { } selected
+        && _currentScenarioResult is { } current
+        && _viewedTraceId == current.TraceId
+        && !current.Preview.IsDefaultOrEmpty
+            ? current.Preview.FirstOrDefault(preview => preview.Sequence == selected.Entry.Sequence)
+            : null;
+
+    private void InvalidateScenarioPreview()
+    {
+        _scenarioPreviewRevision++;
+        _traceLoad++;
+        _currentScenarioResult = null;
+    }
+
+    private void ScenarioInputsChanged()
+    {
+        InvalidateScenarioPreview();
+        if (
+            _validationErrors.Any(error =>
+                error.Code.StartsWith("scenario-command-", StringComparison.Ordinal)
+            )
+        )
+        {
+            _validationErrors =
+            [
+                .. _validationErrors.Where(error =>
+                    !error.Code.StartsWith("scenario-command-", StringComparison.Ordinal)
+                ),
+            ];
+            _feedback = null;
+            _operationFailed = false;
+        }
+        StateHasChanged();
+    }
 
     private async Task OpenScenariosAsync()
     {
@@ -16,6 +53,7 @@ public partial class AutomationEditorPage
         {
             return;
         }
+        CloseTrace();
         await OpenAuthoringAsync(AutomationAuthoringTask.Scenarios);
         if (_scenario is null)
         {
@@ -39,29 +77,35 @@ public partial class AutomationEditorPage
 
     private void NewScenario()
     {
+        InvalidateScenarioPreview();
         _invalidFixtureInputs.Clear();
         _scenario =
             _editor is not null && SampleSourceId() is { } source
-                ? new(_scenariosService.CreateDefaultFixture(_editor.Draft(new(HostId)), source))
+                ? new(
+                    _scenariosService.CreateDefaultFixture(_editor.Draft(new(HostId)), source),
+                    ScenarioInputsChanged
+                )
                 : null;
         RefreshScenarioFields();
     }
 
     private void SelectScenario(string id)
     {
+        InvalidateScenarioPreview();
         var saved = _savedScenarios.FirstOrDefault(value => value.Id.Value.ToString() == id);
         if (saved is null)
         {
             NewScenario();
             return;
         }
-        _scenario = new(saved.Fixture) { Id = saved.Id, Name = saved.Name };
+        _scenario = new(saved.Fixture, ScenarioInputsChanged) { Id = saved.Id, Name = saved.Name };
         _invalidFixtureInputs.Clear();
         RefreshScenarioFields();
     }
 
     private void SelectScenarioSource(string id)
     {
+        InvalidateScenarioPreview();
         if (
             _editor is null
             || _scenario is null
@@ -102,12 +146,14 @@ public partial class AutomationEditorPage
         }
         else
         {
+            InvalidateScenarioPreview();
             _ = _invalidFixtureInputs.Add(validity.Key);
         }
     }
 
     private void GenerateScenarioFixture()
     {
+        InvalidateScenarioPreview();
         if (_editor is null || _scenario is null)
         {
             return;
@@ -162,7 +208,12 @@ public partial class AutomationEditorPage
         var fixture = scenario.Fixture;
         var draft = editor.Draft(new(HostId));
         var host = HostId;
-        _currentScenarioResult = null;
+        InvalidateScenarioPreview();
+        var previewRevision = _scenarioPreviewRevision;
+        var rawCommand =
+            scenario.CommandInputFormat == AutomationScenarioCommandInputFormat.Raw
+                ? scenario.RawCommand
+                : null;
         _traceLoad++;
         _viewedTraceId = null;
         _trace = null;
@@ -175,10 +226,18 @@ public partial class AutomationEditorPage
         {
             var outcome = await RunAuthoringMutationAsync(
                 host,
-                () => _scenariosService.RunAsync(draft, fixture, _scenarioCancellation.Token)
+                () =>
+                    _scenariosService.RunAsync(
+                        draft,
+                        fixture,
+                        _scenarioCancellation.Token,
+                        rawCommand
+                    )
             );
             if (
-                !ReferenceEquals(scenario, _scenario)
+                previewRevision != _scenarioPreviewRevision
+                || !ReferenceEquals(fixture, scenario.Fixture)
+                || !ReferenceEquals(scenario, _scenario)
                 || !ReferenceEquals(editor, _editor)
                 || version != _draftRevision
                 || host != HostId
@@ -194,7 +253,8 @@ public partial class AutomationEditorPage
                         completed.TraceId,
                         version,
                         AutomationTraceOutcome.Succeeded,
-                        completed.Nodes
+                        completed.Nodes,
+                        completed.Preview
                     );
                     trace = completed.TraceId;
                     _traceTitle = "Test trace";
@@ -204,13 +264,20 @@ public partial class AutomationEditorPage
                         failed.TraceId,
                         version,
                         AutomationTraceOutcome.Failed,
-                        failed.Nodes
+                        failed.Nodes,
+                        failed.Preview
                     );
                     trace = failed.TraceId;
                     _traceTitle = "Test trace";
                     break;
                 case AutomationScenarioRunOutcome.Invalid invalid:
-                    ShowValidation(invalid.Errors, "Correct the scenario or draft.");
+                    ShowValidation(
+                        invalid.Errors,
+                        invalid.Errors is [var error]
+                        && error.Code.StartsWith("scenario-command-", StringComparison.Ordinal)
+                            ? error.Message
+                            : "Correct the scenario or draft."
+                    );
                     break;
                 default:
                     ShowUnavailable();

@@ -693,6 +693,10 @@ public sealed partial class AutomationRuntimeTests
             )
         ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         JsonSerializer.Serialize(scenario).ShouldNotContain("sensitive-boundary-value");
+        scenario
+            .Preview.SelectMany(value => value.Values)
+            .Where(value => value.PortId == sensitive.Id)
+            .ShouldAllBe(value => value.DisplayValue == "available");
         JsonSerializer
             .Serialize(await ReadTraceAsync(fixture, scenario.TraceId))
             .ShouldNotContain("sensitive-boundary-value");
@@ -722,23 +726,28 @@ public sealed partial class AutomationRuntimeTests
             """{"message":"fallback"}""",
             bindings: Bindings("message", AutomationInputBindingMode.Connected)
         );
-        (
-            await fixture.Flows.SaveAsync(
-                caller with
-                {
-                    Nodes = [.. caller.Nodes, sink],
-                    Edges =
-                    [
-                        .. caller.Edges,
-                        Edge(caller.Nodes[1], "complete", sink),
-                        Edge(caller.Nodes[1], "secret", sink, "message", AutomationEdgeKind.Data),
-                    ],
-                },
-                CancellationToken.None
-            )
-        )
+        var unsafeCaller = caller with
+        {
+            Nodes = [.. caller.Nodes, sink],
+            Edges =
+            [
+                .. caller.Edges,
+                Edge(caller.Nodes[1], "complete", sink),
+                Edge(caller.Nodes[1], "secret", sink, "message", AutomationEdgeKind.Data),
+            ],
+        };
+        (await fixture.Flows.SaveAsync(unsafeCaller, CancellationToken.None))
             .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
             .Errors.ShouldContain(error => error.Code == "data-sensitivity-incompatible");
+        var denied = (
+            await fixture.Scenarios.RunAsync(
+                unsafeCaller,
+                fixture.Scenarios.CreateDefaultFixture(unsafeCaller, caller.Nodes[0].Id),
+                default
+            )
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>();
+        denied.Errors.ShouldContain(error => error.Code == "data-sensitivity-incompatible");
+        JsonSerializer.Serialize(denied).ShouldNotContain("sensitive-boundary-value");
         fixture.Chat.Calls.ShouldBe(0);
     }
 

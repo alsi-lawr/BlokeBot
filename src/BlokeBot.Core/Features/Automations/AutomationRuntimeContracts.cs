@@ -206,12 +206,14 @@ public abstract record AutomationScenarioRunOutcome
 
     public sealed record Completed(
         ImmutableArray<AutomationScenarioNodeOutcome> Nodes,
-        AutomationTraceId TraceId
+        AutomationTraceId TraceId,
+        ImmutableArray<AutomationScenarioEventPreview> Preview = default
     ) : AutomationScenarioRunOutcome;
 
     public sealed record Failed(
         ImmutableArray<AutomationScenarioNodeOutcome> Nodes,
-        AutomationTraceId TraceId
+        AutomationTraceId TraceId,
+        ImmutableArray<AutomationScenarioEventPreview> Preview = default
     ) : AutomationScenarioRunOutcome;
 
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)

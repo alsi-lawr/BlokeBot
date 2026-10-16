@@ -49,6 +49,10 @@ public partial class AutomationEditorPage
 
     private async Task OpenAuthoringAsync(AutomationAuthoringTask task)
     {
+        if (task != _authoringTask)
+        {
+            InvalidateScenarioPreview();
+        }
         var opening = _authoringTask == AutomationAuthoringTask.None;
         _authoringTask = task;
         _nodeLibraryOpen = false;
@@ -71,6 +75,7 @@ public partial class AutomationEditorPage
 
     private async Task CloseAuthoringAsync()
     {
+        InvalidateScenarioPreview();
         _authoringTask = AutomationAuthoringTask.None;
         await InvokeAsync(StateHasChanged);
         if (_pageModule is not null)
@@ -176,6 +181,7 @@ public partial class AutomationEditorPage
 
     private void CloseTrace()
     {
+        InvalidateScenarioPreview();
         _traceLoad++;
         _traceOpen = false;
     }
@@ -363,6 +369,7 @@ public partial class AutomationEditorPage
         {
             return;
         }
+        InvalidateScenarioPreview();
         _traceTitle = _traceHeaders
             .FirstOrDefault(header => header.Id.Value == value)
             ?.ProductionRunId

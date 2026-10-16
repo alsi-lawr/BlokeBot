@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Automations;
 
@@ -14,20 +15,58 @@ public sealed partial class AutomationScenarioService
         BlokeBotDbContext db,
         AutomationFlowDraft draft,
         AutomationScenarioFixture fixture,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        string? commandRoute = null
     )
     {
         var schemas = await AutomationCommandSource.LoadAsync(db, draft.HostId, cancellationToken);
         var source = draft.Nodes.FirstOrDefault(node => node.Id == fixture.SourceNodeId);
-        if (
-            source is null
-            || catalog.ValidatePersistedDefinition(source.Definition)
-                is not AutomationConfigurationCheck.Valid
+        var command =
+            source is not null
+            && catalog.ValidatePersistedDefinition(source.Definition)
+                is AutomationConfigurationCheck.Valid
                 {
-                    Configuration: CustomCommandSourceConfiguration command
+                    Configuration: CustomCommandSourceConfiguration configured
                 }
-            || !schemas.TryGetValue(command.CommandId.Value, out var schema)
-        )
+                ? configured
+                : null;
+        var alias = "command";
+        if (commandRoute is not null)
+        {
+            if (command is null)
+            {
+                return (
+                    fixture,
+                    new(
+                        fixture.SourceNodeId,
+                        "scenario-command-invalid",
+                        "Enter a full chat command beginning with !."
+                    )
+                );
+            }
+            alias = CommandAliasNormalizer.Normalize(commandRoute);
+            var matches = await db
+                .CustomCommandAliases.AsNoTracking()
+                .AnyAsync(
+                    candidate =>
+                        candidate.HostId == draft.HostId.Value
+                        && candidate.CustomCommandId == command.CommandId.Value
+                        && candidate.Alias == alias,
+                    cancellationToken
+                );
+            if (!matches)
+            {
+                return (
+                    fixture,
+                    new(
+                        fixture.SourceNodeId,
+                        "scenario-command-mismatch",
+                        "This message does not invoke the selected command. Choose its current alias."
+                    )
+                );
+            }
+        }
+        if (command is null || !schemas.TryGetValue(command.CommandId.Value, out var schema))
         {
             return (
                 fixture with
@@ -39,7 +78,7 @@ public sealed partial class AutomationScenarioService
         }
         var result = CustomCommandArguments.Parse(
             command.CommandId.Value,
-            "command",
+            alias,
             schema,
             fixture.CommandArgumentTail ?? string.Empty
         );
@@ -51,12 +90,16 @@ public sealed partial class AutomationScenarioService
                         Context = fixture.Context with
                         {
                             CommandArguments = prepared.Arguments,
-                            Arguments =
-                            [
-                                .. (fixture.CommandArgumentTail ?? string.Empty)
-                                    .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-                                    .Select((text, index) => new AutomationArgument(index, text)),
-                            ],
+                            Arguments = commandRoute is not null
+                                ? fixture.Context.Arguments
+                                :
+                                [
+                                    .. (fixture.CommandArgumentTail ?? string.Empty)
+                                        .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                                        .Select(
+                                            (text, index) => new AutomationArgument(index, text)
+                                        ),
+                                ],
                         },
                     },
                     (AutomationGraphError?)null

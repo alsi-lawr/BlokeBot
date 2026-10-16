@@ -122,7 +122,7 @@ public partial class AutomationEditorPage
         CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];
-        _currentScenarioResult = null;
+        InvalidateScenarioPreview();
         _feedback = null;
         _operationFailed = false;
         _enableConfirmation = false;

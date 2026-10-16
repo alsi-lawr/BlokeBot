@@ -591,8 +591,6 @@ public sealed partial class AutomationRuntimeTests
             TimeSpan.FromSeconds(20)
         );
         var current = page.FindComponent<AutomationTracePanel>().Instance.Snapshot!.Id;
-        var currentRich = page.FindComponent<AutomationFlowCanvas>()
-            .Instance.SampleOutcomes.Single(outcome => outcome.NodeId == action.Id);
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationTracePanel>()
                 .Instance.SelectRun.InvokeAsync(first.Value.ToString())
@@ -608,8 +606,8 @@ public sealed partial class AutomationRuntimeTests
         );
         page.FindComponent<AutomationFlowCanvas>()
             .Instance.SampleOutcomes.Single(outcome => outcome.NodeId == action.Id)
-            .ShouldBe(currentRich);
-        page.FindComponent<AutomationRunDrawer>().Instance.Kind.ShouldBe("sample");
+            .ResolvedInputs.IsDefaultOrEmpty.ShouldBeTrue();
+        page.FindComponent<AutomationRunDrawer>().Instance.Kind.ShouldBe("history");
         // Missing historical records also cannot borrow the current result.
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationTracePanel>()

@@ -68,6 +68,18 @@
         {
             <p class="automation-trace-message" role="status">Check this Transform's supplied inputs and every output expression. For <code>decimal(text)</code>, supply an existing input containing a finite number with a dot decimal separator.</p>
         }
+        @if (Preview is { } preview)
+        {
+            <p class="automation-trace-message">Current test only · values are not retained in history · displays limited to 200 characters</p>
+            <dl>
+                <dt>Virtual time</dt><dd>@preview.VirtualOffsetMilliseconds ms from start</dd>
+                @foreach (var value in preview.Values)
+                {
+                    <dt>@value.PortId.Value · @value.ValueType</dt><dd class="whitespace-pre-wrap">@value.DisplayValue</dd>
+                }
+                @if (preview.WouldSend is { } message) { <dt>Would send · hypothetical</dt><dd class="whitespace-pre-wrap">@message</dd> }
+            </dl>
+        }
         <span>@selected.Context</span>@if (selected.RootNodeId is null || !Nodes.Any(node => node.Id == selected.RootNodeId)) { <span>Graph node unavailable</span> }@foreach (var value in selected.Entry.Event.Values) { <span>@value.PortId.Value · @value.ValueType</span> }<details>
         <summary>Event details</summary>
         <dl>
@@ -99,6 +111,7 @@
     [Parameter] public string? Message { get; set; }
     [Parameter] public AutomationTraceSnapshot? Snapshot { get; set; }
     [Parameter] public AutomationTracePresentation? Presentation { get; set; }
+    [Parameter] public AutomationScenarioEventPreview? Preview { get; set; }
     [Parameter] public AutomationTraceRow? Selected { get; set; }
     [Parameter] public ImmutableArray<AutomationTraceSummary> Headers { get; set; } = [];
     [Parameter] public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];

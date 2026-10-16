@@ -1,16 +1,69 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.CustomCommands;
 
 namespace BlokeBot.Core.Features.Automations.Page;
 
 public sealed record AutomationFixtureInputValidity(string Key, bool Valid);
 
-public sealed class AutomationScenarioEditor(AutomationScenarioFixture fixture)
+public enum AutomationScenarioCommandInputFormat
+{
+    Structured,
+    Raw,
+}
+
+public sealed class AutomationScenarioEditor(
+    AutomationScenarioFixture fixture,
+    Action? changed = null
+)
 {
     public AutomationScenarioId? Id { get; set; }
     public string Name { get; set; } = "New scenario";
-    public AutomationScenarioFixture Fixture { get; private set; } = fixture;
+    public AutomationScenarioFixture Fixture
+    {
+        get;
+        private set
+        {
+            field = value;
+            changed?.Invoke();
+        }
+    } = fixture;
 
-    public void Replace(AutomationScenarioFixture replacement) => Fixture = replacement;
+    public AutomationScenarioCommandInputFormat CommandInputFormat
+    {
+        get;
+        set
+        {
+            field = value;
+            changed?.Invoke();
+        }
+    }
+    public string RawCommand { get; private set; } = string.Empty;
+
+    public void Replace(AutomationScenarioFixture replacement)
+    {
+        Fixture = replacement;
+        CommandInputFormat = AutomationScenarioCommandInputFormat.Structured;
+        RawCommand = string.Empty;
+    }
+
+    public void SetRawCommand(string message)
+    {
+        RawCommand = message;
+        SetCommandArgumentTail(CustomCommandArguments.OriginalTail(message));
+        if (ChatCommandDispatcher.TryParseCommand(message, out _, out var arguments))
+        {
+            Fixture = Fixture with
+            {
+                Context = Fixture.Context with
+                {
+                    Arguments =
+                    [
+                        .. arguments.Select((text, index) => new AutomationArgument(index, text)),
+                    ],
+                },
+            };
+        }
+    }
 
     public void SetCommandArgumentTail(string value) =>
         Fixture = Fixture with

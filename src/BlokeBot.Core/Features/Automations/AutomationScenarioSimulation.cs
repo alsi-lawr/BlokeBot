@@ -68,7 +68,8 @@ internal static class AutomationScenarioSimulation
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         AutomationContext context,
         AutomationScenarioEffectResult effectResult,
-        DateTime now
+        DateTime now,
+        Action<string>? preparedMessage = null
     ) =>
         configuration switch
         {
@@ -78,7 +79,8 @@ internal static class AutomationScenarioSimulation
             SendChatActionConfiguration => Prepared(
                 AutomationNativeActionPreparation.Chat(inputs, context),
                 effectResult,
-                now
+                now,
+                payload => preparedMessage?.Invoke(payload.Message)
             ),
             PlayOverlayCueActionConfiguration cue => Prepared(
                 preparation.Cue(cue, fields, context),
@@ -141,10 +143,15 @@ internal static class AutomationScenarioSimulation
     private static AutomationNodeExecution Prepared<T>(
         AutomationNativePreparation<T> prepared,
         AutomationScenarioEffectResult effectResult,
-        DateTime now
+        DateTime now,
+        Action<T>? capture = null
     ) =>
         prepared.Match(
-            _ => Effect(effectResult, now),
+            prepared =>
+            {
+                capture?.Invoke(prepared.Payload);
+                return Effect(effectResult, now);
+            },
             failed => new AutomationNodeExecution.Failed(failed.Code)
         );
 

@@ -57,7 +57,7 @@ public sealed class ChatCommandDispatcher
         }
     }
 
-    private static bool TryParseCommand(
+    public static bool TryParseCommand(
         string text,
         out string route,
         out IReadOnlyList<string> args

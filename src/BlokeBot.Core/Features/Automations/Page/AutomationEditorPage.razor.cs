@@ -18,7 +18,8 @@ public partial class AutomationEditorPage
         AutomationTraceId TraceId,
         long DraftRevision,
         AutomationTraceOutcome TerminalOutcome,
-        ImmutableArray<AutomationScenarioNodeOutcome> Nodes
+        ImmutableArray<AutomationScenarioNodeOutcome> Nodes,
+        ImmutableArray<AutomationScenarioEventPreview> Preview
     );
 
     private CurrentScenarioResult? _currentScenarioResult;
@@ -190,6 +191,7 @@ public partial class AutomationEditorPage
     {
         if (disposing)
         {
+            InvalidateScenarioPreview();
             _scenarioCancellation?.Cancel();
             CancelValidationFeedback();
             _catalogChangeCancellation.Cancel();
