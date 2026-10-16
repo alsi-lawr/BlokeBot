@@ -193,14 +193,12 @@ public sealed partial class AutomationEditorInteractionTests
         );
         for (var i = 0; i < AutomationSubflowService.LibraryPageSize + 1; i++)
         {
+            var next = draft with { Id = new(Guid.NewGuid()) };
+            var review = (
+                await service.PreviewAsync(next, CancellationToken.None)
+            ).ShouldBeOfType<AutomationSubflowPreviewOutcome.Ready>();
             _ = (
-                await service.PublishAsync(
-                    draft with
-                    {
-                        Id = new(Guid.NewGuid()),
-                    },
-                    CancellationToken.None
-                )
+                await service.PublishAsync(next, review.Reviewed, CancellationToken.None)
             ).ShouldBeOfType<AutomationSubflowPublishOutcome.Published>();
         }
         await fixture.Page.InvokeAsync(() =>

@@ -48,6 +48,9 @@ public abstract record AutomationSubflowPublishOutcome
         AutomationSubflowInterface? PreviousInterface
     ) : AutomationSubflowPublishOutcome;
 
+    public sealed record Stale(AutomationSubflowPreviewOutcome.Ready Refreshed)
+        : AutomationSubflowPublishOutcome;
+
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
         : AutomationSubflowPublishOutcome;
 }
@@ -102,7 +105,8 @@ public abstract record AutomationSubflowPreviewOutcome
     public sealed record Ready(
         ImmutableArray<AutomationSubflowCaller> IncompatibleCallers,
         AutomationSubflowRevision Candidate,
-        AutomationSubflowInterface? PreviousInterface
+        AutomationSubflowInterface? PreviousInterface,
+        AutomationSubflowReview Reviewed
     ) : AutomationSubflowPreviewOutcome;
 
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
@@ -131,3 +135,44 @@ public sealed record AutomationSubflowPortChange(
         && Current is not null
         && (Previous.Name != Current.Name || Previous.Description != Current.Description);
 }
+
+public sealed class AutomationSubflowReview
+{
+    internal AutomationSubflowReview(
+        AutomationSubflowDraft draft,
+        AutomationSubflowRevisionId? previousRevision,
+        AutomationSubflowInterface? previousInterface,
+        ImmutableDictionary<AutomationSubflowId, AutomationSubflowRevision> dependencies,
+        ImmutableArray<AutomationSubflowNodeContract> nodeContracts,
+        HostFeatureFlags requiredFeatures,
+        ImmutableArray<AutomationPluginProvenance> plugins,
+        ImmutableArray<AutomationSubflowCallerImpact> callers
+    )
+    {
+        Draft = draft;
+        PreviousRevision = previousRevision;
+        PreviousInterface = previousInterface;
+        Dependencies = dependencies;
+        NodeContracts = nodeContracts;
+        RequiredFeatures = requiredFeatures;
+        Plugins = plugins;
+        Callers = callers;
+    }
+
+    internal AutomationSubflowDraft Draft { get; }
+    internal AutomationSubflowRevisionId? PreviousRevision { get; }
+    internal AutomationSubflowInterface? PreviousInterface { get; }
+    internal ImmutableDictionary<
+        AutomationSubflowId,
+        AutomationSubflowRevision
+    > Dependencies { get; }
+    internal ImmutableArray<AutomationSubflowNodeContract> NodeContracts { get; }
+    internal HostFeatureFlags RequiredFeatures { get; }
+    internal ImmutableArray<AutomationPluginProvenance> Plugins { get; }
+    internal ImmutableArray<AutomationSubflowCallerImpact> Callers { get; }
+}
+
+internal sealed record AutomationSubflowCallerImpact(
+    AutomationSubflowCaller Caller,
+    AutomationSubflowInterface? Interface
+);

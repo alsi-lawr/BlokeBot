@@ -118,7 +118,9 @@ public sealed partial class AutomationSubflowService
             ? configuration as AutomationSubflowInvocationConfiguration
             : null;
 
-    private static async Task<ImmutableArray<AutomationSubflowCaller>> IncompatibleCallersAsync(
+    private static async Task<
+        ImmutableArray<AutomationSubflowCallerImpact>
+    > IncompatibleCallersAsync(
         BlokeBotDbContext db,
         int hostId,
         AutomationSubflowId subflowId,
@@ -160,14 +162,16 @@ public sealed partial class AutomationSubflowService
                 revision.SnapshotJson,
             }
         ).ToArrayAsync(cancellationToken);
-        bool Incompatible(PersistedAutomationNodeDefinition definition) =>
-            !AutomationSubflowDefinitions.TryRead(definition, out var call)
-            || !AutomationSubflowDefinitions.Compatible(call.Interface, contract);
+        AutomationSubflowCallerImpact Impact(
+            AutomationSubflowCaller caller,
+            PersistedAutomationNodeDefinition definition
+        ) => new(caller, Invocation(definition)?.Interface);
         return
         [
             .. ordinary
-                .Where(node =>
-                    Incompatible(
+                .Select(node =>
+                    Impact(
+                        new(new(node.FlowId), null, new(node.Id)),
                         new(
                             node.DefinitionId,
                             node.DefinitionSchemaVersion,
@@ -175,21 +179,21 @@ public sealed partial class AutomationSubflowService
                         )
                     )
                 )
-                .Select(node => new AutomationSubflowCaller(new(node.FlowId), null, new(node.Id))),
-            .. nested
-                .Where(item =>
-                    Incompatible(
-                        AutomationSubflowSerialization
-                            .Restore(item.SnapshotJson)
-                            .Graph.Nodes.Single(node => node.Id.Value == item.NodeId)
-                            .Definition
+                .Concat(
+                    nested.Select(item =>
+                        Impact(
+                            new(null, new(item.CallerSubflowId), new(item.NodeId)),
+                            AutomationSubflowSerialization
+                                .Restore(item.SnapshotJson)
+                                .Graph.Nodes.Single(node => node.Id.Value == item.NodeId)
+                                .Definition
+                        )
                     )
                 )
-                .Select(item => new AutomationSubflowCaller(
-                    null,
-                    new(item.CallerSubflowId),
-                    new(item.NodeId)
-                )),
+                .Where(impact =>
+                    impact.Interface is null
+                    || !AutomationSubflowDefinitions.Compatible(impact.Interface, contract)
+                ),
         ];
     }
 }

@@ -38,7 +38,8 @@ public sealed partial class AutomationRuntimeTests
             [SubflowPort("text", AutomationPortValueType.Text)]
         );
         var publication = (
-            await service.PublishAsync(
+            await PublishReviewedAsync(
+                service,
                 Subflow(fixture.HostId, changedInterface) with
                 {
                     Id = draft.Id,
@@ -169,6 +170,7 @@ public sealed partial class AutomationRuntimeTests
         _ = (
             await service.PublishAsync(
                 Nesting(Subflow(otherHost), revision),
+                await ReviewSubflowAsync(service, Subflow(otherHost)),
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
@@ -191,11 +193,21 @@ public sealed partial class AutomationRuntimeTests
         var a = Subflow(fixture.HostId);
         var first = await Publish(service, a);
         var direct = (
-            await service.PublishAsync(Nesting(a, first), CancellationToken.None)
+            await service.PublishAsync(
+                Nesting(a, first),
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
         direct.Errors.ShouldContain(error => error.Code == "subflow-recursion");
         var b = await Publish(service, Nesting(Subflow(fixture.HostId), first));
-        (await service.PublishAsync(Nesting(a, b), CancellationToken.None))
+        (
+            await service.PublishAsync(
+                Nesting(a, b),
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
+        )
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>()
             .Errors.ShouldContain(error => error.Code == "subflow-recursion");
         var current = b;
@@ -206,6 +218,7 @@ public sealed partial class AutomationRuntimeTests
         (
             await service.PublishAsync(
                 Nesting(Subflow(fixture.HostId), current),
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
                 CancellationToken.None
             )
         )
@@ -239,7 +252,13 @@ public sealed partial class AutomationRuntimeTests
         {
             Graph = draft.Graph with { Nodes = [.. draft.Graph.Nodes, source] },
         };
-        (await service.PublishAsync(invalid, CancellationToken.None))
+        (
+            await service.PublishAsync(
+                invalid,
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
+        )
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>()
             .Errors.ShouldContain(error => error.Code == "subflow-boundaries");
         invalid = draft with
@@ -250,14 +269,24 @@ public sealed partial class AutomationRuntimeTests
             },
         };
         _ = (
-            await service.PublishAsync(invalid, CancellationToken.None)
+            await service.PublishAsync(
+                invalid,
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
         var incompatible = new AutomationSubflowInterface(
             draft.Interface.Inputs,
             [SubflowPort("value", AutomationPortValueType.Map)]
         );
         invalid = Subflow(fixture.HostId, incompatible);
-        (await service.PublishAsync(invalid, CancellationToken.None))
+        (
+            await service.PublishAsync(
+                invalid,
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
+        )
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>()
             .Errors.ShouldContain(error => error.Code == "data-type-incompatible");
         invalid = Subflow(
@@ -265,7 +294,11 @@ public sealed partial class AutomationRuntimeTests
             new([draft.Interface.Inputs[0], draft.Interface.Inputs[0]], [])
         );
         _ = (
-            await service.PublishAsync(invalid, CancellationToken.None)
+            await service.PublishAsync(
+                invalid,
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
         (
             await service.ListAsync(new(fixture.HostId), new(""), CancellationToken.None)
@@ -474,6 +507,7 @@ public sealed partial class AutomationRuntimeTests
                         Nodes = [draft.Graph.Nodes[0], stalePlugin, draft.Graph.Nodes[2]],
                     },
                 },
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
@@ -617,7 +651,13 @@ public sealed partial class AutomationRuntimeTests
                 ],
             },
         };
-        (await service.PublishAsync(unfinished, CancellationToken.None))
+        (
+            await service.PublishAsync(
+                unfinished,
+                await ReviewSubflowAsync(service, Subflow(fixture.HostId)),
+                CancellationToken.None
+            )
+        )
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>()
             .Errors.ShouldContain(error => error.Code == "subflow-flow-output-disconnected");
         await using var db = await fixture.Database.CreateDbContextAsync();
@@ -848,9 +888,28 @@ public sealed partial class AutomationRuntimeTests
         AutomationSubflowService service,
         AutomationSubflowDraft draft
     ) =>
-        (await service.PublishAsync(draft, CancellationToken.None))
+        (await PublishReviewedAsync(service, draft, CancellationToken.None))
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Published>()
             .Revision;
+
+    private static async Task<AutomationSubflowReview> ReviewSubflowAsync(
+        AutomationSubflowService service,
+        AutomationSubflowDraft draft
+    ) =>
+        (await service.PreviewAsync(draft, CancellationToken.None))
+            .ShouldBeOfType<AutomationSubflowPreviewOutcome.Ready>()
+            .Reviewed;
+
+    private static async Task<AutomationSubflowPublishOutcome> PublishReviewedAsync(
+        AutomationSubflowService service,
+        AutomationSubflowDraft draft,
+        CancellationToken cancellationToken
+    ) =>
+        await service.PublishAsync(
+            draft,
+            await ReviewSubflowAsync(service, draft),
+            cancellationToken
+        );
 
     private static AutomationPortMetadata SubflowPort(string id, AutomationPortValueType type) =>
         new(new(id), id, "Subflow data.", type);

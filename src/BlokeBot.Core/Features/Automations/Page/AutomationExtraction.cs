@@ -18,6 +18,8 @@ internal sealed record AutomationExtractionPreview(
     ImmutableHashSet<AutomationNodeId> Selection
 )
 {
+    internal AutomationSubflowReview? Reviewed { get; init; }
+
     internal bool IsValid => Subflow is not null && Errors.IsEmpty;
 }
 

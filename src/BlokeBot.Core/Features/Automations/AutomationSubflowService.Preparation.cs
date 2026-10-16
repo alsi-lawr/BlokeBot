@@ -144,7 +144,23 @@ public sealed partial class AutomationSubflowService
             draft.Interface,
             cancellationToken
         );
-        return new Preparation.Ready(revision, json, incompatible, previous?.Interface);
+        var reviewed = new AutomationSubflowReview(
+            draft,
+            previous?.Id,
+            previous?.Interface,
+            closure.Revisions.ToImmutableDictionary(child => child.SubflowId, child => child),
+            revision.NodeContracts,
+            revision.RequiredFeatures,
+            revision.PluginDependencies,
+            incompatible
+        );
+        return new Preparation.Ready(
+            revision,
+            json,
+            [.. incompatible.Select(impact => impact.Caller)],
+            previous?.Interface,
+            reviewed
+        );
     }
 
     private static AutomationGraphValidation ValidationFailure(string code, string message) =>
@@ -159,8 +175,13 @@ public sealed partial class AutomationSubflowService
             AutomationSubflowRevision Revision,
             string Json,
             ImmutableArray<AutomationSubflowCaller> Callers,
-            AutomationSubflowInterface? PreviousInterface
-        ) : Preparation;
+            AutomationSubflowInterface? PreviousInterface,
+            AutomationSubflowReview Reviewed
+        ) : Preparation
+        {
+            internal AutomationSubflowPreviewOutcome.Ready Preview =>
+                new(Callers, Revision, PreviousInterface, Reviewed);
+        }
 
         internal sealed record Invalid(ImmutableArray<AutomationGraphError> Errors) : Preparation;
     }

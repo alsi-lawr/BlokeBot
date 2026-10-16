@@ -149,7 +149,7 @@ public sealed partial class AutomationRuntimeTests
                 ],
             },
         };
-        var published = await service.PublishAsync(subflow, default);
+        var published = await PublishReviewedAsync(service, subflow, default);
         var revision = published
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Published>()
             .Revision;

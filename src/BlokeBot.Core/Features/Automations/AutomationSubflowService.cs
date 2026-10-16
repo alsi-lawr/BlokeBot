@@ -124,11 +124,7 @@ public sealed partial class AutomationSubflowService(
             ])
             : await PrepareAsync(db, draft, validation, cancellationToken) switch
             {
-                Preparation.Ready ready => new AutomationSubflowPreviewOutcome.Ready(
-                    ready.Callers,
-                    ready.Revision,
-                    ready.PreviousInterface
-                ),
+                Preparation.Ready ready => ready.Preview,
                 Preparation.Invalid invalid => new AutomationSubflowPreviewOutcome.Invalid(
                     invalid.Errors
                 ),
@@ -138,6 +134,7 @@ public sealed partial class AutomationSubflowService(
 
     public async Task<AutomationSubflowPublishOutcome> PublishAsync(
         AutomationSubflowDraft draft,
+        AutomationSubflowReview reviewed,
         CancellationToken cancellationToken
     )
     {
@@ -164,6 +161,10 @@ public sealed partial class AutomationSubflowService(
             return new AutomationSubflowPublishOutcome.Invalid(invalid.Errors);
         }
         var ready = (Preparation.Ready)prepared;
+        if (!SameReview(reviewed, ready.Reviewed))
+        {
+            return new AutomationSubflowPublishOutcome.Stale(ready.Preview);
+        }
         var revision = ready.Revision;
         var hostId = draft.Graph.HostId.Value;
         var updated = await db

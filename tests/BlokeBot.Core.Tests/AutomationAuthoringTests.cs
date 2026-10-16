@@ -57,7 +57,7 @@ public sealed partial class AutomationRuntimeTests
             CancellationToken.None
         );
         _ = (
-            await service.PublishAsync(changed, CancellationToken.None)
+            await service.PublishAsync(changed, preview.Reviewed, CancellationToken.None)
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>();
         await using var unchanged = await fixture.Database.CreateDbContextAsync();
         (await unchanged.AutomationSubflowRevisions.CountAsync()).ShouldBe(1);

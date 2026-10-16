@@ -7,6 +7,7 @@ public partial class AutomationEditorPage
 {
     private AutomationSubflowPreviewOutcome.Ready? _subflowPreview;
     private bool _subflowPublished;
+    private bool _subflowReviewRequired;
     private long _previewRevision = -1;
     private int _callerOffset;
     private long _callerQuery;
@@ -228,6 +229,7 @@ public partial class AutomationEditorPage
             _callerDetails = details.ToImmutableDictionary(detail => detail.Caller);
             _subflowPreview = preview as AutomationSubflowPreviewOutcome.Ready;
             _subflowPublished = false;
+            _subflowReviewRequired = false;
             _previewRevision = version;
             _callerOffset = 0;
             await OpenAuthoringAsync(AutomationAuthoringTask.SubflowReview);
@@ -274,6 +276,7 @@ public partial class AutomationEditorPage
             || _editor?.Subflow is null
             || _subflowPreview is null
             || _subflowPublished
+            || _subflowReviewRequired
             || _previewRevision != _draftRevision
         )
         {
@@ -281,6 +284,7 @@ public partial class AutomationEditorPage
         }
         var editor = _editor;
         var draft = SubflowDraft(editor);
+        var reviewed = _subflowPreview.Reviewed;
         var version = _draftRevision;
         var host = HostId;
         _busy = true;
@@ -288,7 +292,7 @@ public partial class AutomationEditorPage
         {
             var result = await RunAuthoringMutationAsync(
                 host,
-                () => _subflowsService.PublishAsync(draft, CancellationToken.None)
+                () => _subflowsService.PublishAsync(draft, reviewed, CancellationToken.None)
             );
             if (result is null)
             {
@@ -305,7 +309,8 @@ public partial class AutomationEditorPage
                 _subflowPreview = new(
                     published.IncompatibleCallers,
                     published.Revision,
-                    published.PreviousInterface
+                    published.PreviousInterface,
+                    reviewed
                 );
                 _subflowPublished = true;
                 _callerOffset = 0;
@@ -325,9 +330,36 @@ public partial class AutomationEditorPage
                 _callerDetails = details.ToImmutableDictionary(detail => detail.Caller);
                 _feedback = "Subflow published.";
             }
+            else if (result is AutomationSubflowPublishOutcome.Stale stale)
+            {
+                var details = await _subflowsService.DescribeCallersAsync(
+                    new(host),
+                    stale.Refreshed.IncompatibleCallers,
+                    CancellationToken.None
+                );
+                if (
+                    host != HostId
+                    || !ReferenceEquals(editor, _editor)
+                    || version != _draftRevision
+                )
+                {
+                    return;
+                }
+                _subflowPreview = stale.Refreshed;
+                _subflowReviewRequired = true;
+                _callerOffset = 0;
+                _callerDetails = details.ToImmutableDictionary(detail => detail.Caller);
+                _feedback =
+                    "Publication impact changed. Review the refreshed preview before publishing.";
+            }
             else if (result is AutomationSubflowPublishOutcome.Invalid invalid)
             {
-                ShowValidation(invalid.Errors, "Subflow not published.");
+                _subflowPreview = null;
+                _subflowReviewRequired = true;
+                ShowValidation(
+                    invalid.Errors,
+                    "Subflow not published. Review again after correcting the current issues."
+                );
             }
         }
         finally

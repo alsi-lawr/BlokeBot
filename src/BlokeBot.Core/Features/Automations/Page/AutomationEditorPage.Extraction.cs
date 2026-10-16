@@ -77,7 +77,11 @@ public partial class AutomationEditorPage
                         ready.Candidate,
                         CancellationToken.None
                     );
-                    preview = preview with { Errors = ExtractionErrors(validation) };
+                    preview = preview with
+                    {
+                        Errors = ExtractionErrors(validation),
+                        Reviewed = ready.Reviewed,
+                    };
                 }
             }
         }
@@ -114,7 +118,8 @@ public partial class AutomationEditorPage
         if (
             _busy
             || _editor is null
-            || _extraction is not { IsValid: true, Subflow: { } draft } preview
+            || _extraction
+                is not { IsValid: true, Subflow: { } draft, Reviewed: { } reviewed } preview
             || !_selectedNodeIds.SetEquals(preview.Selection)
             || _extractionSource?.Matches(_editor) is not true
         )
@@ -129,7 +134,7 @@ public partial class AutomationEditorPage
         {
             var result = await RunAuthoringMutationAsync(
                 host,
-                () => _subflowsService.PublishAsync(draft, CancellationToken.None)
+                () => _subflowsService.PublishAsync(draft, reviewed, CancellationToken.None)
             );
             if (result is null)
             {
@@ -139,9 +144,16 @@ public partial class AutomationEditorPage
             {
                 return;
             }
+            if (result is AutomationSubflowPublishOutcome.Stale)
+            {
+                _extraction = preview with { Reviewed = null };
+                _feedback =
+                    "Publication impact changed. Refresh preview before creating the subflow.";
+                return;
+            }
             if (result is AutomationSubflowPublishOutcome.Invalid invalid)
             {
-                _extraction = preview with { Errors = invalid.Errors };
+                _extraction = preview with { Errors = invalid.Errors, Reviewed = null };
                 return;
             }
             var published = ((AutomationSubflowPublishOutcome.Published)result).Revision;

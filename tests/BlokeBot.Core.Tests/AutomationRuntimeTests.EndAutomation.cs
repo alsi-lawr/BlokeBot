@@ -463,7 +463,13 @@ public sealed partial class AutomationRuntimeTests
                 Edges = [Edge(child.Graph.Nodes[0], "complete", end)],
             },
         };
-        (await library.PublishAsync(invalid, default))
+        (
+            await library.PublishAsync(
+                invalid,
+                await ReviewSubflowAsync(library, Subflow(f.HostId)),
+                default
+            )
+        )
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Invalid>()
             .Errors.ShouldContain(error =>
                 error.NodeId == end.Id && error.Code == "subflow-exit-unreachable"

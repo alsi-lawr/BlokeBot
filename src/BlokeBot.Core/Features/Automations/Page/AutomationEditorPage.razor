@@ -275,7 +275,7 @@
                                             <section class="automation-authoring-section"><h3>Generated outputs</h3>@if (extraction.Outputs.IsEmpty) { <span>None</span> }@foreach (var output in extraction.Outputs) { <div class="automation-interface-summary"><strong>@output.Port.Id.Value</strong><span>@output.Port.ValueType · @(output.Port.Nullability == AutomationPortNullability.Nullable ? "Nullable" : "Required")</span></div> }</section>
                                             <section class="automation-authoring-section"><h3>Caller replacement</h3><strong>@_extractionName · Invoke</strong><p>@string.Join(", ", _editor.Nodes.Where(node => extraction.Selection.Contains(node.Id)).Select(node => node.EffectiveName))</p><p>@extraction.Incoming.Count(edge => edge.Kind == AutomationEdgeKind.Flow) incoming flow edges · @extraction.Outgoing.Count(edge => edge.Kind == AutomationEdgeKind.Flow) outgoing</p><p>@extraction.Incoming.Count(edge => edge.Kind == AutomationEdgeKind.Data) incoming data edges · @extraction.Outgoing.Count(edge => edge.Kind == AutomationEdgeKind.Data) outgoing</p></section>
                                         }
-                                    </div><footer class="automation-authoring-footer"><button class="btn-primary" type="button" disabled="@(_busy || _extraction?.IsValid is not true || !_selectedNodeIds.SetEquals(_extraction.Selection))" data-automation-apply-extraction @onclick="ApplyExtractionAsync">Create subflow and replace</button><button class="btn-secondary" type="button" @onclick="CloseAuthoringAsync">Cancel</button></footer>
+                                    </div><footer class="automation-authoring-footer"><button class="btn-primary" type="button" disabled="@(_busy || _extraction?.IsValid is not true || _extraction.Reviewed is null || !_selectedNodeIds.SetEquals(_extraction.Selection))" data-automation-apply-extraction @onclick="ApplyExtractionAsync">Create subflow and replace</button><button class="btn-secondary" type="button" @onclick="CloseAuthoringAsync">Cancel</button></footer>
                                 }
                                 else if (_editor.Subflow is { } subflow)
                                 {
@@ -285,6 +285,8 @@
                                         {
                                             <section class="automation-authoring-section" data-automation-publication-preview>
                                                 <h3>@(_subflowPublished ? "Published interface changes" : "Proposed interface changes")</h3>
+                                                <small>Published baseline: @(review.Candidate.Revision == 1 ? "new subflow" : $"version {review.Candidate.Revision - 1}") · @(_subflowPublished ? "Published" : "Proposed") version @review.Candidate.Revision</small>
+                                                @foreach (var dependency in review.Reviewed.Dependencies.Values.OrderBy(child => child.SubflowId.Value)) { <small>@dependency.Graph.Name · version @dependency.Revision</small> }
                                                 @foreach (var change in AutomationSubflowDefinitions.Changes(review.PreviousInterface, review.Candidate.Interface)) { <div class="subflow-delta" >
     <h4>@change.Direction · @((change.Current ?? change.Previous!).Name) <code>@change.Id.Value</code></h4>
     <div class="subflow-delta-values"><div><small>@(_subflowPublished ? "Previous" : "Published")</small>
@@ -300,14 +302,15 @@
                                                 @foreach (var caller in review.IncompatibleCallers.Skip(_callerOffset).Take(20))
                                                 {
                                                     var detail = _callerDetails.GetValueOrDefault(caller);
-                                                    var available = detail?.Invocation?.SubflowId == review.Candidate.SubflowId;
+                                                    var authored = review.Reviewed.Callers.FirstOrDefault(impact => impact.Caller == caller)?.Interface;
+                                                    var available = detail?.Invocation?.SubflowId == review.Candidate.SubflowId && authored is not null;
                                                     <li>
                                                         @if (_subflowPublished && available) { <button type="button" data-automation-caller-node="@caller.NodeId.Value" @onclick="() => OpenAffectedCallerAsync(caller)">@CallerDescription(caller)</button> }
                                                         else { <strong>@CallerDescription(caller)</strong> }
                                                         @if (available)
                                                         {
                                                             @if (caller.SubflowId is not null) { <small>Subflow caller</small> }
-                                                            @foreach (var change in AutomationSubflowDefinitions.Changes(detail!.Invocation!.Interface, review.Candidate.Interface).Where(change => !change.Compatible))
+                                                            @foreach (var change in AutomationSubflowDefinitions.Changes(authored!, review.Candidate.Interface).Where(change => !change.Compatible))
                                                             {
                                                                 @if (_subflowPublished) { <button type="button" data-automation-caller-port="@($"{change.Direction}:{change.Id.Value}")" data-automation-caller="@caller.NodeId.Value" @onclick="() => OpenAffectedCallerAsync(caller, change)">@change.Direction · @change.Id.Value</button> }
                                                                 else { <small>@change.Direction · @change.Id.Value: @(change.Previous is { } oldPort ? $"{oldPort.ValueType} · {oldPort.Nullability} · {oldPort.Sensitivity}" : "Not present") → @(change.Current is { } newPort ? $"{newPort.ValueType} · {newPort.Nullability} · {newPort.Sensitivity}" : "Removed")</small> }
@@ -322,7 +325,7 @@
                                         }
                                     </div>
                                     <footer class="automation-authoring-footer">
-                                        @if (_subflowPreview is not null && !_subflowPublished) { <button class="btn-primary" type="button" disabled="@_busy" data-automation-publish-subflow @onclick="PublishSubflowAsync">Publish subflow</button> }
+                                        @if (_subflowPreview is not null && !_subflowPublished && !_subflowReviewRequired) { <button class="btn-primary" type="button" disabled="@_busy" data-automation-publish-subflow @onclick="PublishSubflowAsync">Publish subflow</button> }
                                         else if (!_subflowPublished || _subflowPreview is null) { <button class="btn-primary" type="button" disabled="@_busy" data-automation-review-subflow @onclick="ReviewSubflowAsync">Review subflow</button> }
                                         <button class="btn-secondary" type="button" @onclick="CloseAuthoringAsync">@(_subflowPublished ? "Close" : "Cancel")</button>
                                     </footer>

@@ -53,7 +53,7 @@ internal static partial class SimulationAutomationAuthoringFixture
         }
         var original =
             (
-                await subflows.PublishAsync(Draft(contract), cancellationToken)
+                await PublishReviewedAsync(subflows, Draft(contract), cancellationToken)
                 as AutomationSubflowPublishOutcome.Published
             )?.Revision
             ?? throw new InvalidOperationException("The typed input fixture is invalid.");
@@ -88,7 +88,8 @@ internal static partial class SimulationAutomationAuthoringFixture
             throw new InvalidOperationException("The typed input caller is invalid.");
         }
         if (
-            await subflows.PublishAsync(
+            await PublishReviewedAsync(
+                subflows,
                 Draft(
                     contract with
                     {

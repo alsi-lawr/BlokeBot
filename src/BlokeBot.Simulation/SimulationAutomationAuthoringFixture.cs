@@ -93,13 +93,14 @@ internal static partial class SimulationAutomationAuthoringFixture
         );
         var revision =
             (
-                await subflows.PublishAsync(leaf, cancellationToken)
+                await PublishReviewedAsync(subflows, leaf, cancellationToken)
                 as AutomationSubflowPublishOutcome.Published
             )?.Revision
             ?? throw new InvalidOperationException("The authoring fixture subflow is invalid.");
         for (var i = 1; i <= AutomationSubflowService.LibraryPageSize; i++)
         {
-            _ = await subflows.PublishAsync(
+            _ = await PublishReviewedAsync(
+                subflows,
                 leaf with
                 {
                     Id = new(new Guid(i + 1, 0, 0, new byte[8])),
@@ -141,7 +142,8 @@ internal static partial class SimulationAutomationAuthoringFixture
         );
         var outer =
             (
-                await subflows.PublishAsync(
+                await PublishReviewedAsync(
+                    subflows,
                     new(
                         new(Guid.NewGuid()),
                         "Two welcome messages",
@@ -404,4 +406,23 @@ internal static partial class SimulationAutomationAuthoringFixture
         string targetPort = "flow",
         AutomationEdgeKind kind = AutomationEdgeKind.Flow
     ) => new(Guid.NewGuid(), kind, source.Id, new(sourcePort), target.Id, new(targetPort));
+
+    private static async Task<AutomationSubflowPublishOutcome> PublishReviewedAsync(
+        AutomationSubflowService service,
+        AutomationSubflowDraft draft,
+        CancellationToken cancellationToken
+    ) =>
+        await service.PreviewAsync(draft, cancellationToken) switch
+        {
+            AutomationSubflowPreviewOutcome.Ready ready => await service.PublishAsync(
+                draft,
+                ready.Reviewed,
+                cancellationToken
+            ),
+            AutomationSubflowPreviewOutcome.Invalid invalid =>
+                new AutomationSubflowPublishOutcome.Invalid(invalid.Errors),
+            _ => throw new InvalidOperationException(
+                "The authoring fixture preview is unavailable."
+            ),
+        };
 }

@@ -102,6 +102,7 @@ public partial class AutomationEditorPage
         _authoringTask = AutomationAuthoringTask.None;
         _subflowPreview = null;
         _subflowPublished = false;
+        _subflowReviewRequired = false;
         _callerDetails = ImmutableDictionary<
             AutomationSubflowCaller,
             AutomationSubflowCallerDetails

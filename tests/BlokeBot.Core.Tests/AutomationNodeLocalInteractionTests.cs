@@ -380,11 +380,11 @@ public sealed partial class AutomationEditorInteractionTests
                 ]
             )
         );
-        return (
-            await fixture
-                .Context.Services.GetRequiredService<AutomationSubflowService>()
-                .PublishAsync(draft, CancellationToken.None)
-        )
+        var service = fixture.Context.Services.GetRequiredService<AutomationSubflowService>();
+        var review = (
+            await service.PreviewAsync(draft, CancellationToken.None)
+        ).ShouldBeOfType<AutomationSubflowPreviewOutcome.Ready>();
+        return (await service.PublishAsync(draft, review.Reviewed, CancellationToken.None))
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Published>()
             .Revision;
     }

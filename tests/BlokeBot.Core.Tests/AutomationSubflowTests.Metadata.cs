@@ -124,7 +124,7 @@ public sealed partial class AutomationRuntimeTests
             delta.Single(d => d.Id == added.Id).Previous.ShouldBeNull();
         }
         var published = (
-            await service.PublishAsync(structural, CancellationToken.None)
+            await PublishReviewedAsync(service, structural, CancellationToken.None)
         ).ShouldBeOfType<AutomationSubflowPublishOutcome.Published>();
         published.PreviousInterface!.Inputs.ShouldBe([renamed]);
         published.IncompatibleCallers.ShouldBe(preview.IncompatibleCallers);

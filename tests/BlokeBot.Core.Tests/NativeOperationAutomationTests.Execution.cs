@@ -290,13 +290,11 @@ public sealed partial class NativeOperationAutomationTests
                 IsEnabled = false,
             }
         );
-        var revision = (
-            await new AutomationSubflowService(
-                fixture.Database,
-                fixture.Flows,
-                fixture.Clock
-            ).PublishAsync(child, CancellationToken.None)
-        )
+        var subflows = new AutomationSubflowService(fixture.Database, fixture.Flows, fixture.Clock);
+        var review = (
+            await subflows.PreviewAsync(child, CancellationToken.None)
+        ).ShouldBeOfType<AutomationSubflowPreviewOutcome.Ready>();
+        var revision = (await subflows.PublishAsync(child, review.Reviewed, CancellationToken.None))
             .ShouldBeOfType<AutomationSubflowPublishOutcome.Published>()
             .Revision;
         var invoke = Node(AutomationSubflowDefinitions.Invoke, "{}") with
