@@ -300,6 +300,294 @@ public sealed partial class AutomationRuntimeTests
         JsonSerializer.Serialize(trace).ShouldNotContain("frozen child");
     }
 
+    [Test]
+    [Arguments("tea break")]
+    [Arguments("one two three four five six seven eight nine ten")]
+    public async Task PublishedTimerRecipe_TypedMessagesAndMillisecondsAgreeOfflineAndAcrossRestart(
+        string name
+    )
+    {
+        var writes = new ScenarioWriteGuard();
+        await using var f = await RuntimeFixture.CreateAsync(databaseInterceptors: [writes]);
+        (await SaveArgumentSchema(f, _publishedTimerSchema, "timer")).ShouldBeNull();
+        var timer = PublishedTimer(f.HostId);
+        var saved = (
+            await f.Flows.SaveAsync(timer.Draft, default)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var draft = timer.Draft with { Id = saved.FlowId };
+        var input = f.Scenarios.CreateDefaultFixture(draft, timer.Source.Id);
+        input = input with
+        {
+            Context = input.Context with { Actor = new("viewer-id", "viewer", "Viewer") },
+        };
+        var expectedStart = $"Viewer has started a 1.001 seconds {name} timer";
+        var expectedFinish = $"Viewer's {name} timer has finished!";
+        writes.Armed = true;
+        var result = (
+            await f.Scenarios.RunAsync(draft, input, default, $"!timer 1.001 {name}")
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
+        var messages = result.Preview.Where(value => value.WouldSend is not null).ToArray();
+        messages.Select(value => value.WouldSend).ShouldBe([expectedStart, expectedFinish]);
+        messages.Select(value => value.VirtualOffsetMilliseconds).ShouldBe([0L, 1001L]);
+        result
+            .Preview.SelectMany(value => value.Values)
+            .ShouldContain(value =>
+                value.PortId.Value == "milliseconds"
+                && value.ValueType == AutomationPortValueType.Number
+                && decimal.Parse(
+                    value.DisplayValue,
+                    System.Globalization.CultureInfo.InvariantCulture
+                ) == 1001m
+            );
+        var trace = await ReadTraceAsync(f, result.TraceId);
+        trace
+            .Events.Single(item => item.Event.Kind == AutomationTraceEventKind.Delay)
+            .Event.DueAtUtc.ShouldBe(input.ClockUtc.AddMilliseconds(1001));
+        JsonSerializer.Serialize(trace).ShouldNotContain(name);
+        JsonSerializer.Serialize(trace).ShouldNotContain(expectedStart);
+        writes.Writes.ShouldBe(0);
+        f.Chat.Calls.ShouldBe(0);
+        writes.Armed = false;
+
+        var context = Context(f.HostId) with
+        {
+            CommandArguments = CustomCommandArguments
+                .Parse(7, "timer", _publishedTimerSchema, $"1.001 {name}")
+                .ShouldBeOfType<CustomCommandArgumentParse.Prepared>()
+                .Arguments,
+        };
+        var started = f.Clock.GetUtcNow();
+        var run = (
+            await f.Runtime.DispatchAsync(
+                new(context, new CustomCommandSourceConfiguration(new(7))),
+                default
+            )
+        ).RunIds.ShouldHaveSingleItem();
+        f.Chat.Messages.ShouldBe([expectedStart]);
+        f.Clock.Advance(TimeSpan.FromTicks((1001 * TimeSpan.TicksPerMillisecond) - 1));
+        var restarted = f.NewRuntime();
+        await restarted.ResumeDueAsync(default);
+        f.Chat.Messages.ShouldBe([expectedStart]);
+        f.Clock.Advance(TimeSpan.FromTicks(1));
+        await restarted.ResumeDueAsync(default);
+        (await restarted.ResumeAsync(run, default)).Status.ShouldBe(
+            AutomationResumeStatus.Completed
+        );
+        f.Chat.Messages.ShouldBe([expectedStart, expectedFinish]);
+        await using var db = await f.Database.CreateDbContextAsync();
+        (await db.AutomationScenarios.CountAsync()).ShouldBe(0);
+        (
+            await db.AutomationNodeRuns.SingleAsync(node => node.NodeId == timer.Finish.Id.Value)
+        ).AvailableAtUtc.ShouldBe(started.UtcDateTime.AddMilliseconds(1001));
+    }
+
+    [Test]
+    public async Task PublishedTimerRecipe_ParserRejectionsAndSubMillisecondBranchNeverSendStarted()
+    {
+        await using var f = await RuntimeFixture.CreateAsync();
+        (await SaveArgumentSchema(f, _publishedTimerSchema, "timer")).ShouldBeNull();
+        var timer = PublishedTimer(f.HostId);
+        _ = (
+            await f.Flows.SaveAsync(timer.Draft, default)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var input = f.Scenarios.CreateDefaultFixture(timer.Draft, timer.Source.Id);
+        foreach (
+            var tail in new[]
+            {
+                "",
+                "1",
+                "private-invalid tea",
+                "0 tea",
+                "-1 tea",
+                "922337203685.478 tea",
+                "1 one two three four five six seven eight nine ten eleven",
+            }
+        )
+        {
+            _ = CustomCommandArguments
+                .Parse(7, "timer", _publishedTimerSchema, tail)
+                .ShouldBeOfType<CustomCommandArgumentParse.Rejected>();
+            var invalid = (
+                await f.Scenarios.RunAsync(timer.Draft, input, default, "!timer " + tail)
+            ).ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>();
+            invalid.Errors.ShouldContain(error =>
+                error.Code == "scenario-command-arguments-invalid"
+            );
+        }
+        var result = (
+            await f.Scenarios.RunAsync(timer.Draft, input, default, "!timer 0.0001 tea break")
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
+        result
+            .Preview.Where(value => value.WouldSend is not null)
+            .Select(value => value.WouldSend)
+            .ShouldBe([
+                "Use a positive number of seconds that gives whole milliseconds, then a name of one to ten words.",
+            ]);
+        var trace = await ReadTraceAsync(f, result.TraceId);
+        trace.Events.ShouldContain(item =>
+            item.Event.Kind == AutomationTraceEventKind.Branch
+            && item.Event.Node!.Id == timer.Condition.Id
+            && item.Event.SelectedPort!.Value.Value == "no"
+        );
+        trace.Events.ShouldNotContain(item => item.Event.Kind == AutomationTraceEventKind.Delay);
+        result.Nodes.ShouldNotContain(node =>
+            node.NodeId == timer.Start.Id || node.NodeId == timer.Finish.Id
+        );
+        var context = Context(f.HostId) with
+        {
+            CommandArguments = CustomCommandArguments
+                .Parse(7, "timer", _publishedTimerSchema, "0.0001 tea break")
+                .ShouldBeOfType<CustomCommandArgumentParse.Prepared>()
+                .Arguments,
+        };
+        var run = (
+            await f.Runtime.DispatchAsync(
+                new(context, new CustomCommandSourceConfiguration(new(7))),
+                default
+            )
+        ).RunIds.ShouldHaveSingleItem();
+        f.Chat.Messages.ShouldBe([
+            "Use a positive number of seconds that gives whole milliseconds, then a name of one to ten words.",
+        ]);
+        (await f.Runtime.ResumeAsync(run, default)).Status.ShouldBe(
+            AutomationResumeStatus.Completed
+        );
+    }
+
+    private static CustomCommandArgumentSchema _publishedTimerSchema =>
+        new([
+            new("seconds", CustomCommandArgumentKind.Number, 0m, 922337203685.477m),
+            new("name", CustomCommandArgumentKind.RemainingText, MaximumWords: 10),
+        ]);
+
+    private static PublishedTimerGraph PublishedTimer(int hostId)
+    {
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var transform = Node(
+            "cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "seconds",
+                        "seconds",
+                        "Seconds",
+                        "seconds-input",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        null
+                    ),
+                    new(
+                        "name",
+                        "name",
+                        "Name",
+                        "name-input",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        null
+                    ),
+                    new(
+                        "viewer",
+                        "viewer",
+                        "Viewer",
+                        "viewer-input",
+                        AutomationPortValueType.Actor,
+                        AutomationPortNullability.NonNullable,
+                        null
+                    ),
+                ],
+                [
+                    new(
+                        "valid",
+                        "valid",
+                        AutomationPortValueType.Boolean,
+                        AutomationPortNullability.NonNullable,
+                        "seconds * 1000 == decimal(int(seconds * 1000))"
+                    ),
+                    new(
+                        "milliseconds",
+                        "milliseconds",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        "seconds * 1000"
+                    ),
+                    new(
+                        "started",
+                        "started",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "${viewer.display_name} has started a ${seconds} seconds ${name} timer"
+                    ),
+                    new(
+                        "finished",
+                        "finished",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "${viewer.display_name}'s ${name} timer has finished!"
+                    ),
+                ]
+            ),
+            bindings: Bindings("seconds-input", AutomationInputBindingMode.Connected)
+                .Add(new("name-input"), new(AutomationInputBindingMode.Connected, null))
+                .Add(new("viewer-input"), new(AutomationInputBindingMode.Connected, null))
+        );
+        var condition = Node(
+            "condition",
+            """{"predicate":true}""",
+            bindings: Bindings("predicate", AutomationInputBindingMode.Connected)
+        );
+        var start = Node(
+            "send-chat",
+            """{"message":""}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var finish = Node(
+            "send-chat",
+            """{"message":""}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var invalid = Node(
+            "send-chat",
+            """{"message":"Use a positive number of seconds that gives whole milliseconds, then a name of one to ten words."}"""
+        );
+        var delay = Node(
+            "delay",
+            """{"duration-milliseconds":1}""",
+            bindings: Bindings("duration-value-milliseconds", AutomationInputBindingMode.Connected)
+        );
+        return new(
+            Draft(
+                hostId,
+                [source, transform, condition, start, delay, finish, invalid],
+                [
+                    Edge(source, "flow", condition),
+                    Edge(condition, "yes", start),
+                    Edge(condition, "no", invalid),
+                    Edge(start, "complete", delay),
+                    Edge(delay, "complete", finish),
+                    Edge(source, "argument.seconds", transform, "seconds", AutomationEdgeKind.Data),
+                    Edge(source, "argument.name", transform, "name", AutomationEdgeKind.Data),
+                    Edge(source, "actor", transform, "viewer", AutomationEdgeKind.Data),
+                    Edge(transform, "valid", condition, "predicate", AutomationEdgeKind.Data),
+                    Edge(transform, "milliseconds", delay, "duration", AutomationEdgeKind.Data),
+                    Edge(transform, "started", start, "message", AutomationEdgeKind.Data),
+                    Edge(transform, "finished", finish, "message", AutomationEdgeKind.Data),
+                ]
+            ),
+            source,
+            condition,
+            start,
+            finish
+        );
+    }
+
+    private sealed record PublishedTimerGraph(
+        AutomationFlowDraft Draft,
+        AutomationFlowDraftNode Source,
+        AutomationFlowDraftNode Condition,
+        AutomationFlowDraftNode Start,
+        AutomationFlowDraftNode Finish
+    );
+
     private static AutomationContext TypedCommandContext(int hostId, string tail) =>
         Context(hostId) with
         {
@@ -385,7 +673,8 @@ public sealed partial class AutomationRuntimeTests
 
     private static async Task<CustomCommandConfigurationSaveFailure?> SaveArgumentSchema(
         RuntimeFixture f,
-        CustomCommandArgumentSchema? schema
+        CustomCommandArgumentSchema? schema,
+        string? commandName = null
     )
     {
         await using var db = await f.Database.CreateDbContextAsync();
@@ -400,7 +689,13 @@ public sealed partial class AutomationRuntimeTests
         {
             editor.Aliases = editor.Name;
         }
-        editors.Single(command => command.Id == 7).ArgumentSchema = schema;
+        var selected = editors.Single(command => command.Id == 7);
+        selected.ArgumentSchema = schema;
+        if (commandName is not null)
+        {
+            selected.Name = commandName;
+            selected.Aliases = commandName;
+        }
         var draft = new CustomCommandConfiguration { Commands = editors };
         var validated = CustomCommandConfigurationValidator
             .Validate(draft)

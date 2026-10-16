@@ -247,8 +247,10 @@ public partial class PageHelpButton
                 [
                     "Validate the flow before you save or enable it.",
                     "Correct each red node or field.",
-                    "Test the flow with a sample event.",
-                    "Read the run summary to find a failed node.",
+                    "Open Test draft, choose Trigger and edit its typed inputs. For a command choose Raw chat message and enter Chat message, then select Run.",
+                    "Read current node results, would-send text and virtual times. Unsupported actions and plugins never fall back to live execution; known missing permissions or disabled features fail, and unknown live outcomes remain hypothetical.",
+                    "Current values are privacy-gated and clear or invalidate on edits, rerun or leaving. Save sample explicitly keeps inputs, not results; only matching generated portable samples export.",
+                    "Flows own their command references; multiple enabled matching flows can start. Read the full guide for the typed !timer recipe and its exact Flow and Data connections.",
                     "Confirm the warning before you enable actions with public effects.",
                 ]
             ),
@@ -256,7 +258,7 @@ public partial class PageHelpButton
                 "Turn Automations on or off",
                 "Use the Automations switch in Channel setup.",
                 [
-                    "When Automations is off, BlokeBot blocks flow edits, tests, triggers, and actions.",
+                    "Turning Automations off blocks new starts; already admitted work is not cancelled. Use the separate Cancel run controls to cancel existing runs.",
                     "Saved flows and run history remain.",
                     "BlokeBot does not replay events that it blocked while Automations was off.",
                 ]

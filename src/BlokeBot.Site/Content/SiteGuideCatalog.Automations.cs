@@ -90,17 +90,19 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Open a flow and select Test draft. You do not need to save your current graph edits.",
-                        "Choose a saved scenario or select New. Choose the trigger and edit its typed Source fields.",
-                        "Set Clock and seed for repeatable values. Generate fixture creates source values from the current trigger schema.",
-                        "Choose Success or Failure under Action outcomes. Connected input overrides can supply a specific typed value to a connected input.",
-                        "Select Run scenario. The draft is validated before the isolated test starts.",
+                        "Choose Trigger and enter its typed source values. For Custom command, select Input format: Raw chat message and enter the full Chat message, or use Structured inputs.",
+                        "Open Clock and seed for repeatable values. Under Saved sample inputs, Generate sample inputs creates values from the current trigger schema.",
+                        "Hypothetical action outcomes offers Would succeed or Failure (and Would start or Would already be running for Start countdown). Connected input overrides can supply a typed value to a connected input.",
+                        "Select Run. The draft is validated before the isolated test starts.",
                         "Select a trace row to highlight its authored graph node. Nested calls include their call context, so repeated calls remain distinguishable.",
-                        "Select Save scenario to keep the fixture for a saved flow. This does not save or enable the production graph.",
+                        "Use Saved sample inputs to name or select inputs. Select Save sample to persist them for a saved flow; this does not save or enable the production graph or persist current result values.",
                     ],
                     Paragraphs =
                     [
                         "Scenarios simulate supported actions instead of sending chat, changing points, playing overlays or calling Twitch. Unsupported nodes and plugin execution are rejected, not run live. Outcome choices apply to action nodes in the authored flow, not individual actions inside nested calls.",
-                        "Configuration Transfer includes only selected generated fixtures that still match their portable recipe. Other authored fixtures and traces are excluded.",
+                        "Known missing permissions and disabled features fail the test. Current live eligibility and Twitch state are not checked: the selected outcomes are hypothetical, not permission to act live.",
+                        "Current typed values, would-send messages and virtual times belong only to the latest test. Editing inputs or the draft, rerunning, leaving or closing the test, and reloading clear or invalidate them. Sensitive values and values with unknown provenance stay masked; displays are bounded.",
+                        "Save sample explicitly stores sample inputs. Configuration Transfer includes only selected generated samples that still match their portable recipe. Other authored samples, current values and traces are excluded.",
                         "Traces opens recent test results. The ordered details show successes, failures and selected call context. Expired or truncated details are reported rather than reconstructed. Recent live runs remain available in the run drawer.",
                         "Validate and repair the flow before enabling it. The editor asks for confirmation when enabling public-message, points, overlay or Twitch effects. Duplicate creates a disabled graph copy without run history.",
                     ],
@@ -117,7 +119,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Run saved flow is unavailable while the draft is changed, unsaved, busy, disabled or has no Manual run source. Multiple Manual run nodes each start their own matching source-node run for the same invocation.",
-                        "Real runs may send public chat, change points, play cues or use Twitch actions. Test draft and Run scenario remain isolated simulations. A real flow's Cancel countdown action is ordinary cancellation, not quiet restart cancellation.",
+                        "Real runs may send public chat, change points, play cues or use Twitch actions. Test draft and its Run button remain an isolated simulation. A real flow's Cancel countdown action is ordinary cancellation, not quiet restart cancellation.",
                     ],
                 },
                 new SiteGuideSection
@@ -210,9 +212,10 @@ internal static partial class SiteGuideCatalog
                         "An output can return Timestamp or a null value with the Timestamp type.",
                         "Use format_number(number) to format a Number. Add a second value from 0 through 6 for exact decimal places.",
                         "If a port changes, BlokeBot keeps the connection and marks it for repair. Repair it or disconnect it.",
-                        "CEL cannot use raw event context and private data.",
-                        "CEL cannot use IDs and roles.",
-                        "CEL cannot use services and outputs from the same Transform.",
+                        "Ordinary supported input Expression uses the execution context: arguments, supported actor/channel fields and variables, subject to the existing privacy gates. Named command ports are not global expression variables.",
+                        "Transform input Expression has a restricted safe trigger view: arguments only, not ordinary actor/channel context. Connect an Actor input for public viewer fields.",
+                        "Transform output expressions see only declared inputs and their allowed fields, not raw event context, private IDs, roles, services or other outputs of the same Transform. format_number is Transform-only.",
+                        "For legacy raw tokens, decimal(arguments[0]) converts numeric Text. If joining a tail, first declare an Arguments input named args, then use join(args, 1, size(args), \" \"). The end index is exclusive and clamped. This joins tokens; it does not preserve the original whitespace like typed Remaining text.",
                     ],
                     Code =
                         "${actor.display_name} rolled ${format_number(number)}\nnumber >= 75\narguments_input.size() > 0",
@@ -223,6 +226,89 @@ internal static partial class SiteGuideCatalog
                             "https://github.com/cel-expr/cel-spec/blob/master/doc/intro.md"
                         ),
                     ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Timer recipe: command inputs",
+                    Paragraphs =
+                    [
+                        "Build !timer <seconds> <name> with seven nodes: Custom command, one CEL Transform, Condition, three Send chat message nodes (Started, Finished and Input error), and Delay. This uses a durable flow Delay, not a named countdown.",
+                    ],
+                    Steps =
+                    [
+                        "Create a custom command named timer with alias !timer. Under What happens choose Run automation flows. In Arguments, enable named arguments.",
+                        "Add seconds first: Number, Required, Minimum (exclusive) 0, Maximum 922337203685.477. The inclusive maximum is the native Delay limit in milliseconds divided by 1000.",
+                        "Add name last: Remaining text, Required, Maximum words 10. Remaining text preserves internal and trailing whitespace; quotes are literal, not grouping characters. The command tail also has the existing 500-character and 50-word limits.",
+                        "Save the command. In the flow's Custom command source, select timer (configuration field custom-command-id). Its typed outputs are argument.seconds (Number), argument.name (Text), and actor (Viewer).",
+                    ],
+                    Links = [new SiteLink("Create and configure the command", "commands")],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Timer recipe: format the values",
+                    Steps =
+                    [
+                        "In CEL Transform, create three Inputs from Connected sources. Keep each Required: CEL name seconds / Number from argument.seconds; name / Text from argument.name; viewer / Actor from actor. Connect these Data outputs; do not enter the names as ordinary expression variables.",
+                        "Add four Outputs. Set Output name, Type, Required? to Required, and CEL expression as shown below. Transform.valid and the other Transform names in this recipe mean these output labels; the editor assigns their port IDs. Each expression reads declared inputs, not another output.",
+                    ],
+                    Code = """
+                        valid (Boolean)
+                        seconds * 1000 == decimal(int(seconds * 1000))
+
+                        milliseconds (Number)
+                        seconds * 1000
+
+                        started (Text)
+                        ${viewer.display_name} has started a ${seconds} seconds ${name} timer
+
+                        finished (Text)
+                        ${viewer.display_name}'s ${name} timer has finished!
+                        """,
+                    Note =
+                        "The Number schema bounds make the integer conversion safe. valid rejects fractional milliseconds without truncating them. int here receives a Number, not Text. Send chat Fixed text does not interpolate: build both messages in this Transform instead.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Timer recipe: connect Flow and Data",
+                    Steps =
+                    [
+                        "Set Condition Predicate to Connected. Connect Transform.valid to its predicate Data input.",
+                        "Set Started and Finished Message to Connected. Connect Transform.started to Started.message and Transform.finished to Finished.message.",
+                        "Set Delay Duration to Connected. Connect Transform.milliseconds to its duration Data input (binding field duration-value-milliseconds). The value is numeric milliseconds, not seconds or formatted text.",
+                        "Leave Input error Message Fixed: Use a positive number of seconds that gives whole milliseconds, then a name of one to ten words.",
+                        "Connect the Flow ports below. Every destination Flow input is flow. Keep failure policy Stop. The Transform is pure and has no incoming Flow connection.",
+                        "Validate and repair the draft before saving and enabling it. Both Custom commands and Automations must be on for real command starts.",
+                    ],
+                    Code = """
+                        Custom command.flow → Condition.flow
+                        Condition.yes → Started.flow
+                        Condition.no → Input error.flow
+                        Started.complete → Delay.flow
+                        Delay.complete → Finished.flow
+                        """,
+                    Paragraphs =
+                    [
+                        "Flow schedules actions; Data only supplies values. The parser rejects missing, malformed, nonpositive or above-maximum seconds and missing or over-ten-word names before a real run is admitted. Real chat receives the parser's error/usage; an offline run reports Invalid. A positive fractional millisecond takes Condition.no and sends only Input error, never Started.",
+                        "Missing or incompatible Data and failed expression evaluation stop before Started; they are not promised the friendly Input error message. These are parsing and flow checks, not a guarantee against later send or Delay failure. The native Delay also checks actual DateTime headroom when reached; an extreme duration or later failure can occur after Started. There is no rollback or guaranteed external delivery.",
+                        "An admitted Delay keeps frozen inputs and can resume its continuation after restart. Named countdowns instead cancel quietly on restart and do not replay their old warning, finish or cancellation events.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Timer recipe: test without sending chat",
+                    Steps =
+                    [
+                        "Open Test draft, choose the Custom command Trigger, and select Input format: Raw chat message. Enter !timer 1.001 tea break in Chat message.",
+                        "Open Other source fields and set Viewer display name to Viewer. Leave Connected input overrides off and the chat actions at Would succeed under Hypothetical action outcomes. Select Run.",
+                        "Inspect the Yes branch and typed milliseconds value 1001. The virtual timeline shows Started at 0 ms and Finished at 1001 ms, with the two messages below. No live chat is sent and the test does not wait 1.001 wall-clock seconds.",
+                        "Try a ten-word name, then eleven words, a missing value or bad number. Parser errors are Invalid. Try !timer 0.0001 tea break: only the No branch and Input error message run.",
+                    ],
+                    Code = """
+                        Viewer has started a 1.001 seconds tea break timer
+                        Viewer's tea break timer has finished!
+                        """,
+                    Note =
+                        "These current values are ephemeral and privacy-gated. Save sample stores inputs only, explicitly; it is not an assertion suite or a saved result. See Test and enable safely for unsupported actions, hypothetical outcomes and export limits.",
                 },
                 new SiteGuideSection
                 {

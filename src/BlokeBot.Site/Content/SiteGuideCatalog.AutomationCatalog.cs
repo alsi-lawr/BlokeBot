@@ -99,9 +99,16 @@ internal static partial class SiteGuideCatalog
                     Heading = "Start flows from a custom command",
                     Paragraphs =
                     [
-                        "The Custom command source starts a flow after chat uses a selected custom command. It provides the viewer and command text. Create the command. Select Run automation flow under What happens. Custom commands and Automations must both be on.",
+                        "Create the command and select Run automation flows under What happens. Each flow selects its own Custom command reference; the command is not a single-flow router. All matching enabled flows can start from the same command and receive its viewer, raw arguments and typed argument ports. Custom commands and Automations must both be on.",
                     ],
-                    Links = [new SiteLink("Create Custom Commands", "commands")],
+                    Links =
+                    [
+                        new SiteLink("Create Custom Commands", "commands"),
+                        new SiteLink(
+                            "Build the typed timer recipe",
+                            "automations#timer-recipe-command-inputs"
+                        ),
+                    ],
                 },
                 new SiteGuideSection
                 {
@@ -158,9 +165,9 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Start countdown starts a stopped timer. Starting an already running timer changes nothing and sends no new Started event.",
-                        "Reset countdown starts a fresh full-duration occurrence, whether the timer was running or stopped. It sends Reset, not Started. The previous occurrence cannot produce another warning or finish.",
-                        "Cancel countdown stops a running occurrence and sends Cancelled. These are normal flow actions; there is no countdown manager or manual timer-control dashboard.",
-                        "Timer names belong to the selected channel. The bot's process restart cancels active countdowns quietly: no resumed timers, old warnings, finishes or cancellation flows run on startup.",
+                        "Reset countdown sends Reset, not Started. A legacy fixed-name Reset can start a fresh full-duration occurrence even when stopped. A runtime-bound Reset requires the existing viewer-owned timer and its full identity; it cannot create a missing timer and preserves the owner. The previous occurrence cannot produce another warning or finish.",
+                        "Cancel countdown stops a running occurrence and sends Cancelled. The channel owner or a moderator with timer-management permission can also use the existing countdown dashboard controls; ordinary viewer controls remain owner-scoped.",
+                        "Legacy fixed names remain channel-wide. Runtime-bound names belong to the channel, initiating stable viewer ID and name; equal display names do not merge timers. Lifecycle sources match their exact fixed name unless Any viewer timer is explicitly selected. Restart quietly cancels active named countdowns and clears runtime-owned identity/context: no old warnings, finishes or cancellation flows run on startup. This differs from a durable flow Delay, which can resume with frozen inputs.",
                     ],
                 },
                 new SiteGuideSection

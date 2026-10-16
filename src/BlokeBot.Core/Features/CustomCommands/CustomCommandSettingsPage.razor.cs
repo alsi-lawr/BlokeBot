@@ -1841,7 +1841,7 @@ public partial class CustomCommandSettingsPage
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
             CustomCommandActionKind.OverlayCue => "Play an overlay cue",
-            CustomCommandActionKind.Automation => "Run automation flow",
+            CustomCommandActionKind.Automation => "Run automation flows",
             _ => "Choose what happens",
         };
 
