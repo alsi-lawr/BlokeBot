@@ -436,13 +436,15 @@ public sealed partial class AutomationRuntimeTests
     [Test]
     public async Task UserCancellation_EnteredEffectMayFinishButNeitherSiblingNorContinuationInvokes()
     {
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sender = new RecordingChatSender(
             null,
-            async (_, _, token) =>
+            async (call, message, token) =>
             {
-                _ = entered.TrySetResult();
+                _ = entered.TrySetResult(message);
                 await release.Task.WaitAsync(token);
             }
         );
@@ -457,6 +459,7 @@ public sealed partial class AutomationRuntimeTests
                 Edge(source, "flow", first),
                 Edge(source, "flow", sibling),
                 Edge(first, "complete", later),
+                Edge(sibling, "complete", later),
             ]
         );
         var dispatch = f.Runtime.DispatchAsync(
@@ -465,12 +468,12 @@ public sealed partial class AutomationRuntimeTests
         );
         try
         {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var firstMessage = await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var id = new AutomationRunId(await SingleRunIdAsync(f));
             (await f.Runtime.CancelChannelRunsAsync(new(f.HostId), default)).ShouldBe(1);
             release.SetResult();
             _ = await dispatch;
-            sender.Messages.ShouldBe(["entered"]);
+            sender.Messages.ShouldBe([firstMessage]);
             (await f.Runtime.ResumeAsync(id, default)).Status.ShouldBe(
                 AutomationResumeStatus.Cancelled
             );
