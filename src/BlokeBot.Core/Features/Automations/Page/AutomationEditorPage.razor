@@ -279,19 +279,52 @@
                                 }
                                 else if (_editor.Subflow is { } subflow)
                                 {
-                                    <div class="automation-authoring-body" data-automation-subflow-review><label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label></div>
-                                    <footer class="automation-authoring-footer">
+                                    <div class="automation-authoring-body" data-automation-subflow-review>
+                                        <label class="field"><span class="field__label">Description</span><input class="field__input" maxlength="2000" value="@subflow.Description" @onchange="ChangeSubflowDescription" /></label>
                                         @if (_subflowPreview is { } review)
                                         {
-                                            <div class="@(review.IncompatibleCallers.IsEmpty ? "automation-subflow-review automation-subflow-review--compatible" : "automation-subflow-review")" role="status" data-automation-publication-preview><strong>@review.IncompatibleCallers.Length incompatible callers</strong>@foreach (var caller in review.IncompatibleCallers.Skip(_callerOffset).Take(20)) { <span>@CallerDescription(caller)</span> }@if (review.IncompatibleCallers.Length > 20)
-                                            {
-                                                <div class="automation-authoring-actions">
-                                                    <button class="btn-secondary" type="button" disabled="@(_callerOffset == 0)" @onclick="() => LoadCallerPageAsync(Math.Max(0, _callerOffset - 20))">Previous callers</button>
-                                                    <button class="btn-secondary" type="button" disabled="@(_callerOffset + 20 >= review.IncompatibleCallers.Length)" @onclick="() => LoadCallerPageAsync(_callerOffset + 20)">Next callers</button>
-                                                </div>
-                                            }</div><button class="btn-primary" type="button" disabled="@_busy" data-automation-publish-subflow @onclick="PublishSubflowAsync">Publish subflow</button>
+                                            <section class="automation-authoring-section" data-automation-publication-preview>
+                                                <h3>@(_subflowPublished ? "Published interface changes" : "Proposed interface changes")</h3>
+                                                @foreach (var change in AutomationSubflowDefinitions.Changes(review.PreviousInterface, review.Candidate.Interface)) { <div class="subflow-delta" >
+    <h4>@change.Direction · @((change.Current ?? change.Previous!).Name) <code>@change.Id.Value</code></h4>
+    <div class="subflow-delta-values"><div><small>@(_subflowPublished ? "Previous" : "Published")</small>
+        @if (change.Previous is { } previous) { <span>@previous.ValueType · @(previous.Nullability == AutomationPortNullability.Nullable ? "nullable" : "required") · @previous.Sensitivity</span>@if (change.MetadataChanged) { <span>@previous.Name</span><small>@previous.Description</small> } } else { <span>Not present</span> }
+    </div><span aria-hidden="true">→</span><div><small>@(_subflowPublished ? "Published" : "Proposed")</small>
+        @if (change.Current is { } current) { @if (change.Previous is null) { <span class="subflow-added">Added</span> }<span>@current.ValueType · @(current.Nullability == AutomationPortNullability.Nullable ? "nullable" : "required") · @current.Sensitivity</span>@if (change.MetadataChanged) { <span>@current.Name</span><small>@current.Description</small> } } else { <span class="subflow-removed">Removed</span> }
+    </div></div><small>@(change.Compatible ? "Compatible metadata change" : "Interface change · callers may need repair")</small>
+</div> }
+                                                @if (AutomationSubflowDefinitions.Changes(review.PreviousInterface, review.Candidate.Interface).IsEmpty) { <span>No interface changes.</span> }
+                                            </section>
+                                            <section class="automation-authoring-section"><h3>@review.IncompatibleCallers.Length callers @(_subflowPublished ? "need repair" : "would need repair")</h3>
+                                                <ul class="subflow-callers">
+                                                @foreach (var caller in review.IncompatibleCallers.Skip(_callerOffset).Take(20))
+                                                {
+                                                    var detail = _callerDetails.GetValueOrDefault(caller);
+                                                    var available = detail?.Invocation?.SubflowId == review.Candidate.SubflowId;
+                                                    <li>
+                                                        @if (_subflowPublished && available) { <button type="button" data-automation-caller-node="@caller.NodeId.Value" @onclick="() => OpenAffectedCallerAsync(caller)">@CallerDescription(caller)</button> }
+                                                        else { <strong>@CallerDescription(caller)</strong> }
+                                                        @if (available)
+                                                        {
+                                                            @if (caller.SubflowId is not null) { <small>Subflow caller</small> }
+                                                            @foreach (var change in AutomationSubflowDefinitions.Changes(detail!.Invocation!.Interface, review.Candidate.Interface).Where(change => !change.Compatible))
+                                                            {
+                                                                @if (_subflowPublished) { <button type="button" data-automation-caller-port="@($"{change.Direction}:{change.Id.Value}")" data-automation-caller="@caller.NodeId.Value" @onclick="() => OpenAffectedCallerAsync(caller, change)">@change.Direction · @change.Id.Value</button> }
+                                                                else { <small>@change.Direction · @change.Id.Value: @(change.Previous is { } oldPort ? $"{oldPort.ValueType} · {oldPort.Nullability} · {oldPort.Sensitivity}" : "Not present") → @(change.Current is { } newPort ? $"{newPort.ValueType} · {newPort.Nullability} · {newPort.Sensitivity}" : "Removed")</small> }
+                                                            }
+                                                        }
+                                                        else { <small>This call changed or is unavailable.</small> }
+                                                    </li>
+                                                }
+                                                </ul>
+                                                @if (review.IncompatibleCallers.Length > 20) { <div class="automation-authoring-actions"><button class="btn-secondary" type="button" disabled="@(_callerOffset == 0)" @onclick="() => LoadCallerPageAsync(Math.Max(0, _callerOffset - 20))">Previous callers</button><button class="btn-secondary" type="button" disabled="@(_callerOffset + 20 >= review.IncompatibleCallers.Length)" @onclick="() => LoadCallerPageAsync(_callerOffset + 20)">Next callers</button></div> }
+                                            </section>
                                         }
-                                        else { <button class="btn-primary" type="button" disabled="@_busy" data-automation-review-subflow @onclick="ReviewSubflowAsync">Review subflow</button> }
+                                    </div>
+                                    <footer class="automation-authoring-footer">
+                                        @if (_subflowPreview is not null && !_subflowPublished) { <button class="btn-primary" type="button" disabled="@_busy" data-automation-publish-subflow @onclick="PublishSubflowAsync">Publish subflow</button> }
+                                        else if (!_subflowPublished || _subflowPreview is null) { <button class="btn-primary" type="button" disabled="@_busy" data-automation-review-subflow @onclick="ReviewSubflowAsync">Review subflow</button> }
+                                        <button class="btn-secondary" type="button" @onclick="CloseAuthoringAsync">@(_subflowPublished ? "Close" : "Cancel")</button>
                                     </footer>
                                 }
                             </div>
@@ -320,7 +353,7 @@
                                 }
                             </BoundaryDeclarations>
                             <CallSubflowSelector>
-                                <AutomationCallTarget Name="@(_callTarget?.Graph.Name)" HasTarget="@(_selectedNode.Subflow is AutomationSubflowInvocationConfiguration)" Loading="_callLoading" Choosing="_callChoosing" InterfaceChanged="_callInterfaceChanged" Message="@_callMessage" Page="_callPage" Search="@_callSearch" Offset="_callOffset" PageLoading="_callPageLoading" Change="ChooseCallTargetAsync" UpdateInterface="UpdateCallInterfaceAsync" SearchChanged="SearchCallTargetsAsync" PageChanged="LoadCallPageAsync" Selected="SelectCallTargetAsync" />
+                                <AutomationCallTarget Changes="_callChanges" Name="@(_callTarget?.Graph.Name)" HasTarget="@(_selectedNode.Subflow is AutomationSubflowInvocationConfiguration)" Loading="_callLoading" Choosing="_callChoosing" InterfaceChanged="_callInterfaceChanged" Message="@_callMessage" Page="_callPage" Search="@_callSearch" Offset="_callOffset" PageLoading="_callPageLoading" Change="ChooseCallTargetAsync" UpdateInterface="UpdateCallInterfaceAsync" SearchChanged="SearchCallTargetsAsync" PageChanged="LoadCallPageAsync" Selected="SelectCallTargetAsync" />
                             </CallSubflowSelector>
                         </AutomationNodeInspector>
                     }

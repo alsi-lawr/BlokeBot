@@ -126,7 +126,8 @@ public sealed partial class AutomationSubflowService(
             {
                 Preparation.Ready ready => new AutomationSubflowPreviewOutcome.Ready(
                     ready.Callers,
-                    ready.Revision
+                    ready.Revision,
+                    ready.PreviousInterface
                 ),
                 Preparation.Invalid invalid => new AutomationSubflowPreviewOutcome.Invalid(
                     invalid.Errors
@@ -210,7 +211,11 @@ public sealed partial class AutomationSubflowService(
         );
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return new AutomationSubflowPublishOutcome.Published(revision, ready.Callers);
+        return new AutomationSubflowPublishOutcome.Published(
+            revision,
+            ready.Callers,
+            ready.PreviousInterface
+        );
     }
 
     internal async Task<AutomationSubflowRemovalOutcome> RemoveRevisionAsync(

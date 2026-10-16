@@ -141,7 +141,7 @@ public sealed partial class AutomationEditorInteractionTests
         }
         page.Find("[data-automation-publish-subflow]").Click();
         page.WaitForAssertion(() =>
-            page.FindAll("[data-automation-publication-preview]").ShouldBeEmpty()
+            page.FindAll("[data-automation-publish-subflow]").ShouldBeEmpty()
         );
         await using var published = await fixture.Database.CreateDbContextAsync();
         (await published.AutomationSubflowRevisions.CountAsync()).ShouldBe(1);

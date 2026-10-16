@@ -7,7 +7,8 @@ namespace BlokeBot.Core.Features.Automations;
 internal sealed record AutomationSubflowCallerDetails(
     AutomationSubflowCaller Caller,
     string Name,
-    string NodeName
+    string NodeName,
+    AutomationSubflowInvocationConfiguration? Invocation
 );
 
 public sealed partial class AutomationSubflowService
@@ -36,6 +37,9 @@ public sealed partial class AutomationSubflowService
                 node.FlowId,
                 node.Flow.Name,
                 node.DisplayAlias,
+                node.DefinitionId,
+                node.DefinitionSchemaVersion,
+                node.ConfigurationJson,
             })
             .ToArrayAsync(cancellationToken);
         var snapshots = await (
@@ -70,7 +74,20 @@ public sealed partial class AutomationSubflowService
             )
             {
                 result.Add(
-                    new(caller, node.Name, node.DisplayAlias ?? caller.NodeId.Value.ToString())
+                    new(
+                        caller,
+                        node.Name,
+                        node.DisplayAlias ?? caller.NodeId.Value.ToString(),
+                        Invocation(
+                            new(
+                                node.DefinitionId,
+                                node.DefinitionSchemaVersion,
+                                System
+                                    .Text.Json.JsonDocument.Parse(node.ConfigurationJson)
+                                    .RootElement
+                            )
+                        )
+                    )
                 );
             }
             else if (caller.SubflowId is { } id && revisions.TryGetValue(id, out var revision))
@@ -84,7 +101,8 @@ public sealed partial class AutomationSubflowService
                         new(
                             caller,
                             revision.Graph.Name,
-                            authored.DisplayAlias ?? caller.NodeId.Value.ToString()
+                            authored.DisplayAlias ?? caller.NodeId.Value.ToString(),
+                            Invocation(authored.Definition)
                         )
                     );
                 }
@@ -92,6 +110,13 @@ public sealed partial class AutomationSubflowService
         }
         return result.ToImmutable();
     }
+
+    private static AutomationSubflowInvocationConfiguration? Invocation(
+        PersistedAutomationNodeDefinition definition
+    ) =>
+        AutomationSubflowDefinitions.TryRead(definition, out var configuration)
+            ? configuration as AutomationSubflowInvocationConfiguration
+            : null;
 
     private static async Task<ImmutableArray<AutomationSubflowCaller>> IncompatibleCallersAsync(
         BlokeBotDbContext db,

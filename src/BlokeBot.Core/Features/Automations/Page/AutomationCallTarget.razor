@@ -15,8 +15,17 @@
     @if (InterfaceChanged)
     {
         <p class="automation-field-error" role="alert">Update this call's interface and inputs.</p>
-        <button class="btn-secondary" type="button" data-automation-update-call-interface @onclick="UpdateInterface">Update inputs and outputs</button>
+
     }
+    @foreach (var change in Changes) { <div class="subflow-delta" tabindex="-1" data-automation-call-port="@($"{change.Direction}:{change.Id.Value}")">
+    <h4>@change.Direction · @((change.Current ?? change.Previous!).Name) <code>@change.Id.Value</code></h4>
+    <div class="subflow-delta-values"><div><small>This call</small>
+        @if (change.Previous is { } previous) { <span>@previous.ValueType · @(previous.Nullability == AutomationPortNullability.Nullable ? "nullable" : "required") · @previous.Sensitivity</span>@if (change.MetadataChanged) { <span>@previous.Name</span><small>@previous.Description</small> } } else { <span>Not present</span> }
+    </div><span aria-hidden="true">→</span><div><small>Published</small>
+        @if (change.Current is { } current) { @if (change.Previous is null) { <span class="subflow-added">Added</span> }<span>@current.ValueType · @(current.Nullability == AutomationPortNullability.Nullable ? "nullable" : "required") · @current.Sensitivity</span>@if (change.MetadataChanged) { <span>@current.Name</span><small>@current.Description</small> } } else { <span class="subflow-removed">Removed</span> }
+    </div></div><small>@(change.Compatible ? "Compatible metadata change" : "Interface change · callers may need repair")</small>
+</div> }
+    @if (InterfaceChanged) { <button class="btn-secondary" type="button" data-automation-update-call-interface @onclick="UpdateInterface">Update inputs and outputs</button> }
     @if (Message is not null)
     {
         <p class="automation-field-error" role="alert">@Message</p>
@@ -28,6 +37,7 @@
 </section>
 
 @code {
+    [Parameter] public System.Collections.Immutable.ImmutableArray<AutomationSubflowPortChange> Changes { get; set; } = [];
     [Parameter] public string? Name { get; set; }
     [Parameter] public bool HasTarget { get; set; }
     [Parameter] public bool Loading { get; set; }

@@ -6,6 +6,7 @@ namespace BlokeBot.Core.Features.Automations.Page;
 public partial class AutomationEditorPage
 {
     private AutomationSubflowPreviewOutcome.Ready? _subflowPreview;
+    private bool _subflowPublished;
     private long _previewRevision = -1;
     private int _callerOffset;
     private long _callerQuery;
@@ -226,6 +227,7 @@ public partial class AutomationEditorPage
             }
             _callerDetails = details.ToImmutableDictionary(detail => detail.Caller);
             _subflowPreview = preview as AutomationSubflowPreviewOutcome.Ready;
+            _subflowPublished = false;
             _previewRevision = version;
             _callerOffset = 0;
             await OpenAuthoringAsync(AutomationAuthoringTask.SubflowReview);
@@ -271,6 +273,7 @@ public partial class AutomationEditorPage
             _busy
             || _editor?.Subflow is null
             || _subflowPreview is null
+            || _subflowPublished
             || _previewRevision != _draftRevision
         )
         {
@@ -299,7 +302,27 @@ public partial class AutomationEditorPage
             {
                 _history.ContinueAfterSave(editor);
                 _hasChanges = false;
-                _subflowPreview = null;
+                _subflowPreview = new(
+                    published.IncompatibleCallers,
+                    published.Revision,
+                    published.PreviousInterface
+                );
+                _subflowPublished = true;
+                _callerOffset = 0;
+                var details = await _subflowsService.DescribeCallersAsync(
+                    new(host),
+                    published.IncompatibleCallers,
+                    CancellationToken.None
+                );
+                if (
+                    host != HostId
+                    || !ReferenceEquals(editor, _editor)
+                    || version != _draftRevision
+                )
+                {
+                    return;
+                }
+                _callerDetails = details.ToImmutableDictionary(detail => detail.Caller);
                 _feedback = "Subflow published.";
             }
             else if (result is AutomationSubflowPublishOutcome.Invalid invalid)
@@ -311,5 +334,88 @@ public partial class AutomationEditorPage
         {
             _busy = false;
         }
+    }
+
+    private Task OpenAffectedCallerAsync(
+        AutomationSubflowCaller caller,
+        AutomationSubflowPortChange? port = null
+    )
+    {
+        if (!_subflowPublished || _subflowPreview is not { } publication)
+        {
+            return Task.CompletedTask;
+        }
+        var host = HostId;
+        return RequestTransitionAsync(async () =>
+        {
+            if (host != HostId)
+            {
+                return;
+            }
+            if (caller.FlowId is { } flow)
+            {
+                await LoadAuthoringFlowAsync(flow);
+                if (HostId != host || _editor?.Id != flow)
+                {
+                    return;
+                }
+            }
+            else if (caller.SubflowId is { } subflow)
+            {
+                var editor = _editor;
+                var version = _draftRevision;
+                var request = ++_librarySelection;
+                var current = await _subflowsService.LoadCurrentAsync(
+                    new(host),
+                    subflow,
+                    CancellationToken.None
+                );
+                if (
+                    host != HostId
+                    || request != _librarySelection
+                    || version != _draftRevision
+                    || !ReferenceEquals(editor, _editor)
+                )
+                {
+                    return;
+                }
+                if (current is null || !LoadSubflowEditor(current))
+                {
+                    _feedback = "This caller is unavailable.";
+                    return;
+                }
+            }
+            var node = _editor?.Nodes.FirstOrDefault(node => node.Id == caller.NodeId);
+            if (
+                node?.Subflow is not AutomationSubflowInvocationConfiguration call
+                || call.SubflowId != publication.Candidate.SubflowId
+            )
+            {
+                _feedback = "This call changed or is unavailable.";
+                return;
+            }
+            SetSingleNodeSelection(node.Id);
+            _disclosedNodeId = node.Id;
+            _mobileInspectorOpen = true;
+            await EnsureCallSelectorAsync();
+            if (host != HostId || !ReferenceEquals(node, _selectedNode))
+            {
+                return;
+            }
+            _validationFocusField = null;
+            _validationFocusPort =
+                port is not null
+                && _callChanges.Any(change =>
+                    change.Direction == port.Direction && change.Id == port.Id
+                )
+                    ? $"{port.Direction}:{port.Id.Value}"
+                    : null;
+            if (port is not null && _validationFocusPort is null)
+            {
+                _feedback = "This port changed; review the current call interface.";
+            }
+            _focusInspectorAfterRender = true;
+            await InvokeAsync(StateHasChanged);
+        });
     }
 }

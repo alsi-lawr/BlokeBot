@@ -44,7 +44,8 @@ public abstract record AutomationSubflowPublishOutcome
 
     public sealed record Published(
         AutomationSubflowRevision Revision,
-        ImmutableArray<AutomationSubflowCaller> IncompatibleCallers
+        ImmutableArray<AutomationSubflowCaller> IncompatibleCallers,
+        AutomationSubflowInterface? PreviousInterface
     ) : AutomationSubflowPublishOutcome;
 
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
@@ -100,9 +101,33 @@ public abstract record AutomationSubflowPreviewOutcome
 
     public sealed record Ready(
         ImmutableArray<AutomationSubflowCaller> IncompatibleCallers,
-        AutomationSubflowRevision Candidate
+        AutomationSubflowRevision Candidate,
+        AutomationSubflowInterface? PreviousInterface
     ) : AutomationSubflowPreviewOutcome;
 
     public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
         : AutomationSubflowPreviewOutcome;
+}
+
+public enum AutomationSubflowPortDirection
+{
+    Input,
+    Output,
+}
+
+public sealed record AutomationSubflowPortChange(
+    AutomationSubflowPortDirection Direction,
+    AutomationPortMetadata? Previous,
+    AutomationPortMetadata? Current
+)
+{
+    public AutomationPortId Id => (Current ?? Previous!).Id;
+    public bool Compatible =>
+        Previous is not null
+        && Current is not null
+        && AutomationSubflowDefinitions.Compatible(new([Previous], []), new([Current], []));
+    public bool MetadataChanged =>
+        Previous is not null
+        && Current is not null
+        && (Previous.Name != Current.Name || Previous.Description != Current.Description);
 }

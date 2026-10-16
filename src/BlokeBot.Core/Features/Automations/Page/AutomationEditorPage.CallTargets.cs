@@ -26,6 +26,13 @@ public partial class AutomationEditorPage
         && current.SubflowId == authored.SubflowId
         && !AutomationSubflowDefinitions.Compatible(authored.Interface, current.Interface);
 
+    private System.Collections.Immutable.ImmutableArray<AutomationSubflowPortChange> _callChanges =>
+        _selectedNode?.Subflow is AutomationSubflowInvocationConfiguration authored
+        && _callTarget is { } current
+        && current.SubflowId == authored.SubflowId
+            ? AutomationSubflowDefinitions.Changes(authored.Interface, current.Interface)
+            : [];
+
     private CallContext? CurrentCallContext() =>
         _editor is { } editor
         && _selectedNode is { } node

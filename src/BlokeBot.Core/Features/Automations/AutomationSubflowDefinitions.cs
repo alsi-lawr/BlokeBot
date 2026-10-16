@@ -179,6 +179,43 @@ public static partial class AutomationSubflowDefinitions
         AutomationSubflowInterface right
     ) => SamePorts(left.Inputs, right.Inputs) && SamePorts(left.Outputs, right.Outputs);
 
+    internal static ImmutableArray<AutomationSubflowPortChange> Changes(
+        AutomationSubflowInterface? previous,
+        AutomationSubflowInterface current
+    ) =>
+        [
+            .. PortChanges(
+                AutomationSubflowPortDirection.Input,
+                previous?.Inputs ?? [],
+                current.Inputs
+            ),
+            .. PortChanges(
+                AutomationSubflowPortDirection.Output,
+                previous?.Outputs ?? [],
+                current.Outputs
+            ),
+        ];
+
+    private static IEnumerable<AutomationSubflowPortChange> PortChanges(
+        AutomationSubflowPortDirection direction,
+        ImmutableArray<AutomationPortMetadata> previous,
+        ImmutableArray<AutomationPortMetadata> current
+    )
+    {
+        foreach (var port in previous)
+        {
+            var next = current.FirstOrDefault(candidate => candidate.Id == port.Id);
+            if (port != next)
+            {
+                yield return new(direction, port, next);
+            }
+        }
+        foreach (var port in current.Where(port => previous.All(old => old.Id != port.Id)))
+        {
+            yield return new(direction, null, port);
+        }
+    }
+
     private static bool SamePorts(
         ImmutableArray<AutomationPortMetadata> left,
         ImmutableArray<AutomationPortMetadata> right

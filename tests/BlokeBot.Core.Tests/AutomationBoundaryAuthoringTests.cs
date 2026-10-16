@@ -105,9 +105,11 @@ public sealed partial class AutomationEditorInteractionTests
         exit.SubflowFixedValue(new("fixed")).ShouldBe(new AutomationValue.Text("1"));
         page.FindComponent<AutomationFlowCanvas>().Instance.Edges.ShouldBe(edges);
         var after = CanvasDraft(page.FindComponent<AutomationFlowCanvas>().Instance);
-        page.FindComponent<AutomationBoundaryPorts>().Find("input").Change("extra");
         page.FindComponent<AutomationBoundaryPorts>()
-            .Find("input")
+            .Find("[data-automation-port-id=message]")
+            .Change("extra");
+        page.FindComponent<AutomationBoundaryPorts>()
+            .Find("[data-automation-port-id=message]")
             .GetAttribute("value")
             .ShouldBe("message");
         _ = page.FindComponent<AutomationBoundaryPorts>().Find("[role=alert]").ShouldNotBeNull();
@@ -154,7 +156,7 @@ public sealed partial class AutomationEditorInteractionTests
         );
         page.Find("[data-automation-publish-subflow]").Click();
         page.WaitForAssertion(() =>
-            page.FindAll("[data-automation-publication-preview]").ShouldBeEmpty()
+            page.FindAll("[data-automation-publish-subflow]").ShouldBeEmpty()
         );
         var service = fixture.Context.Services.GetRequiredService<AutomationSubflowService>();
         var saved = (
@@ -219,10 +221,12 @@ public sealed partial class AutomationEditorInteractionTests
         );
         await DiscloseAsync(page, entry.Id);
         var missing = CanvasDraft(page.FindComponent<AutomationFlowCanvas>().Instance);
-        page.FindComponent<AutomationBoundaryPorts>().Find("input").Change("renamed");
+        page.FindComponent<AutomationBoundaryPorts>()
+            .Find("[data-automation-port-id=message]")
+            .Change("renamed");
         CanvasDraft(page.FindComponent<AutomationFlowCanvas>().Instance).ShouldBe(missing);
         page.FindComponent<AutomationBoundaryPorts>()
-            .Find("input")
+            .Find("[data-automation-port-id=message]")
             .GetAttribute("value")
             .ShouldBe("message");
         _ = page.FindComponent<AutomationBoundaryPorts>().Find("[role=alert]").ShouldNotBeNull();

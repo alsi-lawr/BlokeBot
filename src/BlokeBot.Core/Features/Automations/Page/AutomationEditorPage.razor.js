@@ -159,8 +159,9 @@ export function focusInspector(field = null, port = null) {
     const inspector = document.querySelector("[data-automation-inspector]");
     const owner = field !== null
         ? inspector?.querySelector(`[data-automation-field="${CSS.escape(field)}"]`)
-        : port !== null ? inspector?.querySelector(`[data-automation-output="${CSS.escape(port)}"]`) : null;
-    const target = owner?.querySelector('[aria-invalid="true"]')
+        : port !== null ? inspector?.querySelector(`[data-automation-output="${CSS.escape(port)}"]`)
+            ?? inspector?.querySelector(`[data-automation-call-port="${CSS.escape(port)}"]`) : null;
+    const target = owner?.hasAttribute("data-automation-call-port") ? owner : owner?.querySelector('[aria-invalid="true"]')
         ?? owner?.querySelector('textarea') ?? owner?.querySelector('input,select,button') ?? inspector;
     target?.focus({ preventScroll: false });
 }

@@ -28,6 +28,78 @@ public sealed partial class ConfigurationTransferAutomationTests
             new RecordingLogger<ConfigurationTransferCoordinator>()
         );
         var document = NestedDocument();
+        var portablePort = new AutomationPortMetadata(
+            new("stable-input"),
+            "Readable portable label",
+            "Description distinct from both identity and label.",
+            AutomationPortValueType.Text,
+            Nullability: AutomationPortNullability.Nullable
+        );
+        var portableInterface = new AutomationSubflowInterface([portablePort], []);
+        var portableSubflows = document.Sections.Automations!.Subflows;
+        var leaf = portableSubflows[0];
+        leaf = leaf with
+        {
+            Interface = portableInterface,
+            Graph = leaf.Graph with
+            {
+                Nodes = leaf
+                    .Graph.Nodes.Select(node =>
+                        node with
+                        {
+                            Subflow = node.Subflow! with { Interface = portableInterface },
+                        }
+                    )
+                    .ToArray(),
+            },
+        };
+        var outer = portableSubflows[1];
+        outer = outer with
+        {
+            Graph = outer.Graph with
+            {
+                Nodes = outer
+                    .Graph.Nodes.Select(node =>
+                        node.Subflow?.SubflowId == "leaf"
+                            ? node with
+                            {
+                                Subflow = node.Subflow with
+                                {
+                                    Interface = portableInterface,
+                                    FixedInputsJson =
+                                        AutomationDataValueSerialization.SerializeOutputs(
+                                            new Dictionary<
+                                                AutomationPortId,
+                                                AutomationResolvedValue
+                                            >
+                                            {
+                                                [portablePort.Id] = new(
+                                                    new AutomationValue.Null(
+                                                        AutomationPortValueType.Text
+                                                    ),
+                                                    [AutomationValueProvenance.Generated]
+                                                ),
+                                            }
+                                        ),
+                                },
+                                InputBindings =
+                                [
+                                    new("stable-input", AutomationInputBindingMode.Fixed),
+                                ],
+                            }
+                            : node
+                    )
+                    .ToArray(),
+            },
+        };
+        document = document with
+        {
+            Sections = document.Sections with
+            {
+                Automations = document.Sections.Automations with { Subflows = [leaf, outer] },
+            },
+        };
+
         var revisions = document.Sections.Automations!.Subflows;
         document = document with
         {
@@ -57,7 +129,9 @@ public sealed partial class ConfigurationTransferAutomationTests
             new("destination-id", "destination"),
             CancellationToken.None
         );
-        _ = initial.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
+        _ = initial.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>(
+            JsonSerializer.Serialize(initial, initial.GetType())
+        );
         var transfer = AutomationTransfer(database);
         var library = new AutomationSubflowService(
             database,
@@ -141,6 +215,10 @@ public sealed partial class ConfigurationTransferAutomationTests
         );
         _ = secondImport.ShouldBeOfType<ConfigurationImportApplyOutcome.Applied>();
         var secondExport = await ExportAllAsync(second);
+        secondExport
+            .Document.Sections.Automations!.Subflows.Single(s => s.Graph.Name == "Leaf")
+            .Interface.Inputs.ShouldBe([portablePort]);
+
         JsonSerializer
             .Serialize(secondExport.Document.Sections)
             .ShouldBe(JsonSerializer.Serialize(firstExport.Document.Sections));

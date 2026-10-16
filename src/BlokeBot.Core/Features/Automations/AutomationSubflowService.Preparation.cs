@@ -75,15 +75,27 @@ public sealed partial class AutomationSubflowService
             return new Preparation.Invalid(validation.Errors);
         }
         var hostId = draft.Graph.HostId.Value;
-        var number =
-            (
-                await db
-                    .AutomationSubflows.AsNoTracking()
-                    .Where(row => row.HostId == hostId && row.Id == draft.Id.Value)
-                    .Select(row => (int?)row.LastRevision)
-                    .SingleOrDefaultAsync(cancellationToken)
-                ?? 0
-            ) + 1;
+        var previousJson = await (
+            from current in db.AutomationSubflows.AsNoTracking()
+            join saved in db.AutomationSubflowRevisions.AsNoTracking()
+                on new
+                {
+                    current.HostId,
+                    SubflowId = current.Id,
+                    Revision = current.LastRevision,
+                } equals new
+                {
+                    saved.HostId,
+                    saved.SubflowId,
+                    saved.Revision,
+                }
+            where current.HostId == hostId && current.Id == draft.Id.Value
+            select saved.SnapshotJson
+        ).SingleOrDefaultAsync(cancellationToken);
+        var previous = previousJson is null
+            ? null
+            : AutomationSubflowSerialization.Restore(previousJson);
+        var number = (previous?.Revision ?? 0) + 1;
         var allNodes = draft
             .Graph.Nodes.Concat(closure.Revisions.SelectMany(revision => revision.Graph.Nodes))
             .ToArray();
@@ -132,7 +144,7 @@ public sealed partial class AutomationSubflowService
             draft.Interface,
             cancellationToken
         );
-        return new Preparation.Ready(revision, json, incompatible);
+        return new Preparation.Ready(revision, json, incompatible, previous?.Interface);
     }
 
     private static AutomationGraphValidation ValidationFailure(string code, string message) =>
@@ -146,7 +158,8 @@ public sealed partial class AutomationSubflowService
         internal sealed record Ready(
             AutomationSubflowRevision Revision,
             string Json,
-            ImmutableArray<AutomationSubflowCaller> Callers
+            ImmutableArray<AutomationSubflowCaller> Callers,
+            AutomationSubflowInterface? PreviousInterface
         ) : Preparation;
 
         internal sealed record Invalid(ImmutableArray<AutomationGraphError> Errors) : Preparation;

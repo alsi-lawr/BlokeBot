@@ -13,14 +13,16 @@
             <div class="automation-interface-port" @key="index">
                 <div class="automation-interface-fields">
                 <label class="field">
-                <span class="field__label">Port name</span>
-                <input class="field__input" @bind:get="port.Id.Value" @bind:set="value => Update(port.Id, current => current with { Id = new(value), Name = value, Description = value })" />
+                <span class="field__label">Label</span>
+                <input class="field__input" required maxlength="200" data-automation-port-label="@port.Id.Value" @bind:get="port.Name" @bind:set="value => Update(port.Id, current => current with { Name = value })" />
                 </label>
                 <label class="field">
                 <span class="field__label">Type</span>
                 <select class="field__input" value="@port.ValueType" @onchange="args => ChangeType(port.Id, args)">@foreach (var type in _types) { <option value="@type">@type</option> }</select>
                 </label>
                 </div>
+                <label class="field"><span class="field__label">Description</span><textarea class="field__input" required maxlength="1000" data-automation-port-description="@port.Id.Value" @bind:get="port.Description" @bind:set="value => Update(port.Id, current => current with { Description = value })"></textarea></label>
+                <details class="subflow-port-identity"><summary>Port ID · <code>@port.Id.Value</code></summary><label class="field"><span class="field__label">Port ID</span><input class="field__input" required maxlength="96" data-automation-port-id="@port.Id.Value" @bind:get="port.Id.Value" @bind:set="value => Update(port.Id, current => current with { Id = new(value) })" /></label><small>Changing this ID affects callers.</small></details>
                 <div class="automation-port-options">
                 <label>
                 <input type="checkbox" checked="@(port.Nullability == AutomationPortNullability.Nullable)" @onchange="args => Update(port.Id, current => current with { Nullability = args.Value is true ? AutomationPortNullability.Nullable : AutomationPortNullability.NonNullable })" /> Nullable</label>
@@ -33,7 +35,7 @@
         <button class="btn-secondary" type="button" disabled="@(ports.Length >= 32)" @onclick="() => Add(inputs)">Add @(inputs ? "input" : "output")</button>
     @if (_failure is { } failure)
     {
-        <p class="automation-field-error" role="alert">@(failure == EditFailure.UnavailablePort ? "This port changed or was removed." : "Use unique valid port names and types.")</p>
+        <p class="automation-field-error" role="alert">@(failure == EditFailure.UnavailablePort ? "This port changed or was removed." : "Use valid unique IDs, labels, descriptions and types.")</p>
     }
     </section>
 

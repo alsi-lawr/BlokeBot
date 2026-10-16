@@ -36,7 +36,7 @@ public partial class AutomationEditorPage
         {
             AutomationAuthoringTask.Scenarios => "Scenarios",
             AutomationAuthoringTask.Extraction => "Extract selection",
-            _ => "Subflow review",
+            _ => _subflowPublished && _subflowPreview is not null ? "Published" : "Subflow review",
         };
 
     private Task Handle_authoringKeyAsync(KeyboardEventArgs args) =>
@@ -101,6 +101,7 @@ public partial class AutomationEditorPage
         _traceOpen = false;
         _authoringTask = AutomationAuthoringTask.None;
         _subflowPreview = null;
+        _subflowPublished = false;
         _callerDetails = ImmutableDictionary<
             AutomationSubflowCaller,
             AutomationSubflowCallerDetails

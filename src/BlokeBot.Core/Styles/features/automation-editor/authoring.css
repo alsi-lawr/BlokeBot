@@ -141,31 +141,11 @@
     padding: 0.8rem 1rem;
 }
 
-.automation-subflow-review {
-    background: var(--tone-amber-bg);
-    border-left: 3px solid var(--tone-amber-solid);
-    color: var(--tone-amber-fg);
-    display: grid;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-    max-height: 10rem;
-    overflow: auto;
-    overflow-wrap: anywhere;
-    padding: 0.7rem;
-    width: 100%;
-}
-
 .automation-authoring-error {
     background: var(--tone-red-bg);
     border-radius: 0.45rem;
     color: var(--tone-red-fg);
     padding: 0.65rem;
-}
-
-.automation-subflow-review--compatible {
-    background: var(--app-surface-solid);
-    border-color: var(--app-border);
-    color: var(--app-text-muted);
 }
 
 .automation-subflow-library {
@@ -355,3 +335,18 @@
     align-items: flex-start;
     gap: 0.4rem;
 }
+
+.subflow-delta { border-bottom: 1px solid var(--app-border); display: grid; gap: .5rem; padding: .8rem 0; overflow-wrap: anywhere; }
+.subflow-delta h4 { font-size: .8rem; font-weight: 700; margin: 0; }
+.subflow-delta-values { display: grid; gap: .4rem; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); font-size: .78rem; }
+.subflow-delta-values > div { display: grid; align-content: start; gap: .3rem; }
+.subflow-delta small, .subflow-callers small, .subflow-port-identity { color: var(--app-text-muted); font-size: .7rem; }
+.subflow-added { color: var(--tone-green-fg); }
+.subflow-removed { color: var(--tone-red-fg); }
+.subflow-callers { display: grid; gap: .8rem; list-style: none; padding: 0; margin: 0; overflow-wrap: anywhere; }
+.subflow-callers li { display: grid; gap: .3rem; font-size: .8rem; }
+.subflow-callers button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0; text-align: left; text-decoration: underline; overflow-wrap: anywhere; }
+.subflow-delta:focus { outline: 2px solid var(--tone-blue-solid); outline-offset: 2px; }
+.subflow-port-identity summary { cursor: pointer; overflow-wrap: anywhere; }
+.subflow-port-identity .field { margin-top: .5rem; }
+.automation-interface-port > .field textarea { min-height: 5rem; resize: vertical; }
