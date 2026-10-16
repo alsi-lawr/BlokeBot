@@ -58,6 +58,13 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
             "Named countdown",
             "Started, reset, cancelled, finished or a future remaining-time crossing. Restart quietly cancels countdowns.",
             [
+                new(
+                    new("timers"),
+                    "Timers",
+                    "Choose fixed channel timers or explicitly subscribe to any viewer timer.",
+                    new AutomationConfigurationFieldType.Choice(["Fixed", "AnyViewer"]),
+                    true
+                ),
                 NameField(),
                 Choice<CountdownLifecycle>("event"),
                 Seconds("remaining-seconds", "Remaining threshold", 0),
@@ -70,14 +77,36 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
                 NumberPort("remaining-seconds"),
             ],
             j =>
-                NameValue(j, out var n)
+                OptionalChoice(j, "timers", CountdownTimerSelection.Fixed, out var timers)
+                && (timers == CountdownTimerSelection.AnyViewer || NameValue(j, out _))
                 && ChoiceValue<CountdownLifecycle>(j, "event", out var e)
                 && SecondsValue(j, "remaining-seconds", 0, out var d)
-                    ? Parsed(new CountdownSourceConfiguration(n, e, d))
+                    ? Parsed(
+                        new CountdownSourceConfiguration(Optional(j, "name") ?? "", e, d, timers)
+                    )
                     : Invalid(
                         "name",
                         "Enter a timer name, lifecycle event and remaining-time threshold."
-                    )
+                    ),
+            c =>
+                c.Timers == CountdownTimerSelection.AnyViewer
+                    ?
+                    [
+                        new(
+                            new("initiating-display-name"),
+                            "Initiating display name",
+                            "Public initiating display name, for viewer timers.",
+                            AutomationPortValueType.Text
+                        ),
+                        new(
+                            new("initiating-viewer-id"),
+                            "Initiating viewer ID",
+                            "Stable initiating viewer identity, for viewer timers.",
+                            AutomationPortValueType.Text,
+                            AutomationDataSensitivity.Sensitive
+                        ),
+                    ]
+                    : []
         ),
         CountdownAction(
             AutomationDefinitionIds.StartCountdownAction,
@@ -385,41 +414,47 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
         string description,
         ImmutableArray<AutomationConfigurationFieldMetadata> fields,
         ImmutableArray<AutomationPortMetadata> outputs,
-        Func<JsonElement, AutomationConfigurationParseResult> parse
+        Func<JsonElement, AutomationConfigurationParseResult> parse,
+        Func<T, ImmutableArray<AutomationPortMetadata>>? additionalOutputs = null
     )
-        where T : AutomationConfiguration =>
-        new AutomationDefinition<T>(
-            new(
-                id,
-                AutomationNodeKind.Source,
-                AutomationDefinitionScope.Host,
-                new(new(1), new(1)),
-                new(name, description, "Timing & activity"),
-                [],
-                [
-                    new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
-                    new(
-                        new("channel"),
-                        "Channel",
-                        "Owning channel.",
-                        AutomationPortValueType.Channel
-                    ),
-                    new(
-                        new("event-time"),
-                        "Event time",
-                        "Observed or scheduled UTC instant.",
-                        AutomationPortValueType.Timestamp,
-                        AutomationDataSensitivity.Sensitive
-                    ),
-                    .. outputs,
-                ],
-                fields,
-                AutomationActionCapabilities.None,
-                AutomationActionRetrySafety.NotApplicable
-            ),
-            parse,
-            ValidateTyped
+        where T : AutomationConfiguration
+    {
+        var descriptor = new AutomationDefinitionDescriptor(
+            id,
+            AutomationNodeKind.Source,
+            AutomationDefinitionScope.Host,
+            new(new(1), new(1)),
+            new(name, description, "Timing & activity"),
+            [],
+            [
+                new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
+                new(new("channel"), "Channel", "Owning channel.", AutomationPortValueType.Channel),
+                new(
+                    new("event-time"),
+                    "Event time",
+                    "Observed or scheduled UTC instant.",
+                    AutomationPortValueType.Timestamp,
+                    AutomationDataSensitivity.Sensitive
+                ),
+                .. outputs,
+            ],
+            fields,
+            AutomationActionCapabilities.None,
+            AutomationActionRetrySafety.NotApplicable
         );
+        return new AutomationDefinition<T>(
+            descriptor,
+            parse,
+            ValidateTyped,
+            additionalOutputs is null
+                ? null
+                : c =>
+                    descriptor with
+                    {
+                        Outputs = [.. descriptor.Outputs, .. additionalOutputs(c)],
+                    }
+        );
+    }
 
     private static IAutomationDefinition CountdownAction(
         AutomationDefinitionId id,
@@ -441,7 +476,28 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
                         : "Cancels an active countdown and emits Cancelled.",
                     "Timing"
                 ),
-                [new(new("flow"), "Flow", "Runs the action.", AutomationPortValueType.Flow)],
+                [
+                    new(new("flow"), "Flow", "Runs the action.", AutomationPortValueType.Flow),
+                    new(
+                        new("name"),
+                        "Timer name",
+                        "Trimmed timer name, at most 96 characters.",
+                        AutomationPortValueType.Text,
+                        BindingFieldId: new("name")
+                    ),
+                    .. operation == CountdownOperation.Cancel
+                        ? Array.Empty<AutomationPortMetadata>()
+                        :
+                        [
+                            new(
+                                new("duration-seconds"),
+                                "Duration (seconds)",
+                                "Positive whole seconds, at most 365 days.",
+                                AutomationPortValueType.Number,
+                                BindingFieldId: new("duration-seconds")
+                            ),
+                        ],
+                ],
                 [
                     new(
                         new("complete"),
@@ -468,40 +524,101 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
                         : [],
                 ],
                 [
-                    NameField(),
+                    new(
+                        new("owner"),
+                        "Timer owner",
+                        "Viewer uses the person who triggered the automation.",
+                        new AutomationConfigurationFieldType.Choice(["Channel", "Viewer"]),
+                        true
+                    ),
+                    new(
+                        new("name"),
+                        "Timer name",
+                        "Trimmed timer name, at most 96 characters.",
+                        new AutomationConfigurationFieldType.Data(AutomationPortValueType.Text),
+                        true
+                    ),
                     .. operation == CountdownOperation.Cancel
                         ? Array.Empty<AutomationConfigurationFieldMetadata>()
-                        : [Seconds("duration-seconds", "Duration", 1)],
+                        :
+                        [
+                            new(
+                                new("duration-seconds"),
+                                "Duration (seconds)",
+                                "Positive whole seconds, at most 365 days.",
+                                new AutomationConfigurationFieldType.Data(
+                                    AutomationPortValueType.Number
+                                ),
+                                true
+                            ),
+                        ],
                 ],
                 AutomationActionCapabilities.None,
                 AutomationActionRetrySafety.Unsafe
             ),
-            j =>
-                NameValue(j, out var n)
-                && (
-                    operation == CountdownOperation.Cancel
-                    || SecondsValue(j, "duration-seconds", 1, out _)
-                )
-                    ? Parsed(
-                        new CountdownActionConfiguration(
-                            n,
-                            operation == CountdownOperation.Cancel
-                                ? TimeSpan.Zero
-                                : TimeSpan.FromSeconds(
-                                    j.GetProperty("duration-seconds").GetInt64()
-                                ),
-                            operation
-                        )
-                    )
-                    : Invalid("name", "Enter a timer name and positive duration."),
+            j => ParseCountdown(j, operation),
             c =>
                 c.Operation == operation
                     ? ValidateTyped(c)
                     : AutomationValidationResult.Invalid(
                         new AutomationValidationTarget.Definition(),
                         "Countdown operation does not match the action."
-                    )
+                    ),
+            parseForInputBindings: j => ParseCountdown(j, operation, bound: true),
+            validateForInputBindings: (c, bindings) =>
+                ValidateTyped(
+                    c with
+                    {
+                        Name =
+                            bindings.TryGetValue(new("name"), out var nameBinding)
+                            && nameBinding.Mode != AutomationInputBindingMode.Fixed
+                                ? "bound"
+                                : c.Name,
+                        Duration =
+                            bindings.TryGetValue(new("duration-seconds"), out var durationBinding)
+                            && durationBinding.Mode != AutomationInputBindingMode.Fixed
+                                ? TimeSpan.FromSeconds(1)
+                                : c.Duration,
+                    }
+                )
         );
+
+    private static AutomationConfigurationParseResult ParseCountdown(
+        JsonElement json,
+        CountdownOperation operation,
+        bool bound = false
+    )
+    {
+        if (!OptionalChoice(json, "owner", CountdownTimerOwner.Channel, out var owner))
+        {
+            return Invalid("owner", "Choose Channel or Viewer.");
+        }
+        var name = Optional(json, "name") ?? "";
+        var duration =
+            json.TryGetProperty("duration-seconds", out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetDecimal(out var seconds)
+            && seconds >= 1
+            && seconds <= 365 * 86400
+            && seconds == decimal.Truncate(seconds)
+                ? TimeSpan.FromSeconds((long)seconds)
+                : TimeSpan.Zero;
+        return
+            bound
+            || (
+                ValidName(name)
+                && (operation == CountdownOperation.Cancel || duration > TimeSpan.Zero)
+            )
+            ? Parsed(new CountdownActionConfiguration(name, duration, operation, owner))
+            : Invalid("name", "Enter a timer name and positive whole duration in seconds.");
+    }
+
+    private static bool OptionalChoice<T>(JsonElement json, string id, T fallback, out T value)
+        where T : struct, Enum
+    {
+        value = fallback;
+        return !json.TryGetProperty(id, out _) || ChoiceValue(json, id, out value);
+    }
 
     private static AutomationValidationResult ValidateTyped(AutomationConfiguration configuration)
     {
@@ -509,10 +626,12 @@ internal sealed class ExpandedAutomationCatalogModule : IAutomationCatalogModule
         {
             AdTimingSourceConfiguration s => Enum.IsDefined(s.Event)
                 && BoundedDuration(s.Offset, 0),
-            CountdownSourceConfiguration s => ValidName(s.Name)
+            CountdownSourceConfiguration s => Enum.IsDefined(s.Timers)
+                && (s.Timers == CountdownTimerSelection.AnyViewer || ValidName(s.Name))
                 && Enum.IsDefined(s.Event)
                 && BoundedDuration(s.Remaining, 0),
             CountdownActionConfiguration a => ValidName(a.Name)
+                && Enum.IsDefined(a.Owner)
                 && Enum.IsDefined(a.Operation)
                 && (
                     a.Operation == CountdownOperation.Cancel

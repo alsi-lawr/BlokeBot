@@ -4,6 +4,8 @@ public sealed class AutomationCountdown
 {
     public int HostId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string OwnerViewerId { get; set; } = string.Empty;
+    public string? OwnerDisplayName { get; set; }
     public Guid OccurrenceId { get; set; }
     public Guid ProcessId { get; set; }
     public int AutomationGeneration { get; set; }

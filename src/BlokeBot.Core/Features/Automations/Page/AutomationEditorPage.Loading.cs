@@ -170,7 +170,7 @@ public partial class AutomationEditorPage
             new(HostId),
             CancellationToken.None
         );
-        RefreshCommandSourceDefinitions();
+        RefreshSourceDefinitions();
         _referenceChoices[AutomationReferenceKind.CustomCommand] = await db
             .CustomCommands.AsNoTracking()
             .Where(command => command.HostId == HostId)

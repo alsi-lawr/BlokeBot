@@ -291,6 +291,12 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("OwnerViewerId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("");
+
                     b.Property<string>("Name")
                         .HasMaxLength(96)
                         .HasColumnType("TEXT");
@@ -310,6 +316,10 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<Guid>("OccurrenceId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("OwnerDisplayName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ProcessId")
                         .HasColumnType("TEXT");
 
@@ -319,7 +329,7 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<bool>("WasCancelled")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("HostId", "Name");
+                    b.HasKey("HostId", "OwnerViewerId", "Name");
 
                     b.ToTable("automation_countdowns", (string)null);
                 });

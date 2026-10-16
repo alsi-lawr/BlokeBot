@@ -68,7 +68,8 @@ internal sealed class DashboardAutomationControls(
         DashboardWidgetConfiguration.Countdown configuration,
         CountdownOperation operation,
         TimeSpan? durationOverride,
-        CancellationToken ct
+        CancellationToken ct,
+        AutomationCountdownSnapshot? selected = null
     )
     {
         if (
@@ -87,6 +88,18 @@ internal sealed class DashboardAutomationControls(
                 new AutomationCountdownControlOutcome.Unavailable()
             );
         }
+        if (selected is { OwnerViewerId.Length: > 0 })
+        {
+            return new DashboardResult<AutomationCountdownControlOutcome>.Succeeded(
+                await countdowns.ApplyOwnedAsync(
+                    new(host.Value),
+                    selected,
+                    operation,
+                    durationOverride ?? configuration.DefaultDuration,
+                    ct
+                )
+            );
+        }
         var action = new CountdownActionConfiguration(
             target.Name,
             operation == CountdownOperation.Cancel
@@ -103,7 +116,8 @@ internal sealed class DashboardAutomationControls(
         AuthenticatedSession session,
         DashboardHostId host,
         DashboardWidgetConfiguration.Countdown configuration,
-        CancellationToken ct
+        CancellationToken ct,
+        AutomationCountdownSnapshot? selected = null
     ) =>
         await authority.AuthorizeAsync(session, host, ct)
             is DashboardResult<DashboardHostId>.Rejected rejected
@@ -111,7 +125,28 @@ internal sealed class DashboardAutomationControls(
             : new DashboardResult<AutomationCountdownControlOutcome>.Succeeded(
                 configuration.Binding
                     is DashboardBinding.Configured { Target: DashboardTarget.Countdown target }
-                    ? await countdowns.ReadAsync(new(host.Value), target.Name, ct)
+                    ? await countdowns.ReadAsync(
+                        new(host.Value),
+                        selected?.Name ?? target.Name,
+                        ct,
+                        selected?.OwnerViewerId ?? ""
+                    )
                     : new AutomationCountdownControlOutcome.Unavailable()
+            );
+
+    internal async Task<
+        DashboardResult<ImmutableArray<AutomationCountdownSnapshot>>
+    > ReadLiveCountdownsAsync(
+        AuthenticatedSession session,
+        DashboardHostId host,
+        CancellationToken ct
+    ) =>
+        await authority.AuthorizeAsync(session, host, ct)
+            is DashboardResult<DashboardHostId>.Rejected rejected
+            ? new DashboardResult<ImmutableArray<AutomationCountdownSnapshot>>.Rejected(
+                rejected.Reason
+            )
+            : new DashboardResult<ImmutableArray<AutomationCountdownSnapshot>>.Succeeded(
+                await countdowns.ListOwnedAsync(new(host.Value), ct)
             );
 }

@@ -94,14 +94,29 @@ public sealed class AutomationActionExecutor(
         {
             return configuration switch
             {
-                CountdownActionConfiguration countdown => (
-                    await countdowns.ApplyAsync(hostId, countdown, cancellationToken)
-                ).Match<AutomationActionOutcome>(
-                    static _ => new AutomationActionOutcome.CountdownStarted(),
-                    static _ => new AutomationActionOutcome.CountdownAlreadyRunning(),
-                    static _ => new AutomationActionOutcome.Succeeded(),
-                    static _ => new AutomationActionOutcome.Failed("countdown-unavailable")
-                ),
+                CountdownActionConfiguration countdown => await AutomationNativeActionPreparation
+                    .Countdown(countdown, inputs, context.Actor, countdowns.UtcNow)
+                    .Match(
+                        async prepared =>
+                            (
+                                await countdowns.ApplyPreparedAsync(
+                                    hostId,
+                                    prepared.Payload,
+                                    cancellationToken
+                                )
+                            ).Match<AutomationActionOutcome>(
+                                static _ => new AutomationActionOutcome.CountdownStarted(),
+                                static _ => new AutomationActionOutcome.CountdownAlreadyRunning(),
+                                static _ => new AutomationActionOutcome.Succeeded(),
+                                static _ => new AutomationActionOutcome.Failed(
+                                    "countdown-unavailable"
+                                )
+                            ),
+                        failed =>
+                            Task.FromResult<AutomationActionOutcome>(
+                                new AutomationActionOutcome.Failed(failed.Code)
+                            )
+                    ),
                 SendChatActionConfiguration => await SendChatAsync(
                     hostId,
                     inputs,

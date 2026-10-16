@@ -144,6 +144,15 @@ public partial class DashboardWidgetControl
             }
         );
 
+    private void SelectCountdown(ChangeEventArgs args)
+    {
+        _selectedCountdown = Guid.TryParse(args.Value?.ToString(), out var occurrence)
+            ? _liveCountdowns.FirstOrDefault(value => value.OccurrenceId == occurrence)
+            : null;
+        _feedback = null;
+        _refresh?.Request();
+    }
+
     private Task CountdownAsync(CountdownOperation operation) =>
         OperateAsync(
             async (session, host, widget, generation) =>
@@ -152,17 +161,33 @@ public partial class DashboardWidgetControl
                 {
                     return;
                 }
+                var selectedTimer = _selectedCountdown;
                 var result = await _automation.ApplyCountdownAsync(
                     session,
                     host,
                     config,
                     operation,
                     TimeSpan.FromSeconds(_duration),
-                    CancellationToken.None
+                    CancellationToken.None,
+                    selectedTimer
                 );
                 if (!Current(generation, widget, host))
                 {
                     return;
+                }
+                if (
+                    selectedTimer is not null
+                    && result
+                        is DashboardResult<AutomationCountdownControlOutcome>.Succeeded
+                        {
+                            Value: AutomationCountdownControlOutcome.Available selected
+                        }
+                )
+                {
+                    _selectedCountdown =
+                        selected.Countdown.State == AutomationCountdownState.Running
+                            ? selected.Countdown
+                            : null;
                 }
                 _feedback = result
                     is DashboardResult<AutomationCountdownControlOutcome>.Succeeded

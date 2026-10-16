@@ -98,6 +98,8 @@ public partial class DashboardWidgetControl
     private int _duration;
     private ImmutableArray<AutomationRunId> _runIds = [];
     private AutomationCountdownSnapshot? _countdown;
+    private AutomationCountdownSnapshot? _selectedCountdown;
+    private ImmutableArray<AutomationCountdownSnapshot> _liveCountdowns = [];
     private PollControlState? _poll;
     private PredictionControlState? _prediction;
     private PointsGiveawayCurrent? _giveaway;
@@ -151,6 +153,8 @@ public partial class DashboardWidgetControl
             _busy = false;
             _duration = 0;
             _countdown = null;
+            _selectedCountdown = null;
+            _liveCountdowns = [];
             _poll = null;
             _prediction = null;
             _giveaway = null;
@@ -342,13 +346,46 @@ public partial class DashboardWidgetControl
                 }
                 break;
             case DashboardWidgetConfiguration.Countdown timer:
+                var requestedTimer = _selectedCountdown;
+                var live = await _automation.ReadLiveCountdownsAsync(
+                    session,
+                    host,
+                    CancellationToken.None
+                );
+                if (
+                    !Current(generation, widget, host)
+                    || !Visible
+                    || _selectedCountdown != requestedTimer
+                )
+                {
+                    return;
+                }
+                _liveCountdowns = live
+                    is DashboardResult<ImmutableArray<AutomationCountdownSnapshot>>.Succeeded timers
+                    ? timers.Value
+                    : [];
+                if (
+                    requestedTimer is not null
+                    && !_liveCountdowns.Any(value =>
+                        value.OccurrenceId == requestedTimer.OccurrenceId
+                    )
+                )
+                {
+                    _selectedCountdown = null;
+                    requestedTimer = null;
+                }
                 var timerResult = await _automation.ReadCountdownAsync(
                     session,
                     host,
                     timer,
-                    CancellationToken.None
+                    CancellationToken.None,
+                    requestedTimer
                 );
-                if (!Current(generation, widget, host) || !Visible)
+                if (
+                    !Current(generation, widget, host)
+                    || !Visible
+                    || _selectedCountdown != requestedTimer
+                )
                 {
                     return;
                 }

@@ -85,17 +85,45 @@ public enum RedemptionUpdateKind
     Cancelled,
 }
 
+public enum CountdownTimerOwner
+{
+    Channel,
+    Viewer,
+}
+
+public enum CountdownTimerSelection
+{
+    Fixed,
+    AnyViewer,
+}
+
 public sealed record CountdownSourceConfiguration(
     string Name,
     CountdownLifecycle Event,
-    TimeSpan Remaining
-) : AutomationConfiguration;
+    TimeSpan Remaining,
+    CountdownTimerSelection Timers = CountdownTimerSelection.Fixed
+) : AutomationConfiguration
+{
+    internal bool Matches(string name, string ownerViewerId) =>
+        Timers == CountdownTimerSelection.AnyViewer
+            ? ownerViewerId.Length > 0
+            : ownerViewerId.Length == 0 && Name == name;
+}
 
 public sealed record CountdownActionConfiguration(
     string Name,
     TimeSpan Duration,
-    CountdownOperation Operation
-) : AutomationConfiguration;
+    CountdownOperation Operation,
+    CountdownTimerOwner Owner = CountdownTimerOwner.Channel
+) : AutomationConfiguration
+{
+    internal static bool IsInput(
+        AutomationDefinitionDescriptor definition,
+        AutomationPortMetadata input
+    ) =>
+        definition.Id.Value is "start-countdown" or "reset-countdown" or "cancel-countdown"
+        && input.BindingFieldId is { Value: "name" or "duration-seconds" };
+}
 
 public sealed record AdTimingSourceConfiguration(AdTimingKind Event, TimeSpan Offset)
     : AutomationConfiguration;

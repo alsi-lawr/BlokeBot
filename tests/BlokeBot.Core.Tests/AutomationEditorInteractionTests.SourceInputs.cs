@@ -181,7 +181,7 @@ public sealed partial class AutomationEditorInteractionTests
             "Seconds",
             "seconds"
         );
-        source.RefreshCommandDefinition(
+        source.RefreshSourceDefinition(
             source.Definition with
             {
                 Outputs = source

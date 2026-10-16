@@ -306,6 +306,12 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("OwnerViewerId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasDefaultValue("");
+
                     b.Property<string>("Name")
                         .HasMaxLength(96)
                         .HasColumnType("character varying(96)");
@@ -325,6 +331,10 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<Guid>("OccurrenceId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("OwnerDisplayName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<Guid>("ProcessId")
                         .HasColumnType("uuid");
 
@@ -334,7 +344,7 @@ namespace BlokeBot.Persistence.PostgreSql.Migrations
                     b.Property<bool>("WasCancelled")
                         .HasColumnType("boolean");
 
-                    b.HasKey("HostId", "Name");
+                    b.HasKey("HostId", "OwnerViewerId", "Name");
 
                     b.ToTable("automation_countdowns", (string)null);
                 });

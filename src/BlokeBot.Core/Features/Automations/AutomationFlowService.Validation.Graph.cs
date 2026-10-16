@@ -26,6 +26,15 @@ public sealed partial class AutomationFlowService
             {
                 var incoming = dataIncoming.GetValueOrDefault((node.Id, input.Id));
                 if (
+                    CountdownActionConfiguration.IsInput(definition, input)
+                    && input.BindingFieldId is { } countdownField
+                    && !node.InputBindings.ContainsKey(countdownField)
+                    && incoming == 0
+                )
+                {
+                    continue;
+                }
+                if (
                     AutomationDelayDurationBinding.IsInput(definition, input)
                     && AutomationDelayDurationBinding.Admit(node.InputBindings, incoming)
                         is AutomationDelayDurationBinding.Admission.LegacyLiteral

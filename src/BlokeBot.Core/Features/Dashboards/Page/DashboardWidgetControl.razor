@@ -38,14 +38,20 @@ else {
         }
         <p class="dashboard-status">@_valueStatus</p>
         break;
-        case DashboardWidgetConfiguration.Countdown:
+        case DashboardWidgetConfiguration.Countdown timer:
+        <label class="field"><span class="field__label">Timer</span>
+            <select class="field__input" value="@(_selectedCountdown?.OccurrenceId?.ToString() ?? string.Empty)" @onchange="SelectCountdown" disabled="@_busy">
+                <option value="">@(timer.Binding is DashboardBinding.Configured { Target: DashboardTarget.Countdown target } ? target.Name : "Fixed timer") · Channel</option>
+                @foreach (var live in _liveCountdowns) { <option value="@live.OccurrenceId">@live.Name · @live.OwnerDisplayName (#@live.OwnerViewerId)</option> }
+            </select>
+        </label>
         <div class="dashboard-value" data-countdown-deadline="@(_countdown?.State == AutomationCountdownState.Running ? _countdown.DeadlineUtc?.ToString("O") : null)">@(_remainingText)</div>
         <label class="field">
             <span class="field__label">Duration (seconds)</span>
             <input class="field__input" type="number" min="1" step="1" @bind="_duration" />
         </label>
         <div class="dashboard-operations">
-            <button class="btn-secondary" disabled="@_busy" @onclick="() => CountdownAsync(CountdownOperation.Start)">
+            <button class="btn-secondary" disabled="@(_busy || _selectedCountdown is not null)" @onclick="() => CountdownAsync(CountdownOperation.Start)">
                 <EditorIcon Name="play" />Start</button>
             <EditorAction Label="Reset countdown" Icon="history" Disabled="_busy" Click="() => CountdownAsync(CountdownOperation.Reset)" />
             <EditorAction Label="Cancel countdown" Icon="close" Disabled="_busy" Click="() => CountdownAsync(CountdownOperation.Cancel)" />

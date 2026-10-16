@@ -78,7 +78,19 @@ public partial class AutomationNodeInspector
             : Enum.GetValues<AutomationInputBindingMode>();
 
     private bool ShowConfigurationField(AutomationConfigurationFieldMetadata field) =>
-        field.FieldType is not AutomationConfigurationFieldType.Data
+        !(
+            Node?.Definition.Id == AutomationDefinitionIds.CountdownSource
+            && field.Id.Value == "name"
+            && Node.Value(new("timers")) == "AnyViewer"
+        )
+        && !(
+            Node?.Definition.Id.Value
+                is "start-countdown"
+                    or "reset-countdown"
+                    or "cancel-countdown"
+            && field.Id.Value == "owner"
+        )
+        && field.FieldType is not AutomationConfigurationFieldType.Data
         && !(
             Node?.Definition.Id == AutomationDefinitionIds.SendChatAction
             && field.Id == new AutomationConfigurationFieldId("message")
@@ -169,7 +181,9 @@ public partial class AutomationNodeInspector
         };
 
     private static string ChoiceLabel(string value) =>
-        string.Join(
+        value == "AnyViewer" ? "Any viewer timer"
+        : value == "Fixed" ? "Fixed timer name"
+        : string.Join(
             ' ',
             value
                 .Split('-', StringSplitOptions.RemoveEmptyEntries)

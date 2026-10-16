@@ -30,8 +30,15 @@ public sealed partial class BlokeBotDbContext
         _ = modelBuilder.Entity<AutomationCountdown>(b =>
         {
             _ = b.ToTable("automation_countdowns");
-            _ = b.HasKey(x => new { x.HostId, x.Name });
+            _ = b.HasKey(x => new
+            {
+                x.HostId,
+                x.OwnerViewerId,
+                x.Name,
+            });
             _ = b.Property(x => x.Name).HasMaxLength(96);
+            _ = b.Property(x => x.OwnerViewerId).HasMaxLength(128).HasDefaultValue(string.Empty);
+            _ = b.Property(x => x.OwnerDisplayName).HasMaxLength(128);
             _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)

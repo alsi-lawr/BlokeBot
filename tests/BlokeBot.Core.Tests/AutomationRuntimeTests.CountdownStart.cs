@@ -518,7 +518,9 @@ public sealed partial class AutomationRuntimeTests
     [Test]
     [Arguments("reset-countdown")]
     [Arguments("cancel-countdown")]
-    public async Task CountdownStart_ScenarioSupportDoesNotExecuteResetOrCancel(string action)
+    public async Task CountdownStart_ScenarioResetCancelRemainHypotheticalWithoutLiveWrites(
+        string action
+    )
     {
         await using var f = await RuntimeFixture.CreateAsync();
         var source = Node("manual-run", """{"data":"go"}""");
@@ -530,11 +532,9 @@ public sealed partial class AutomationRuntimeTests
         );
         var graph = Draft(f.HostId, [source, unsupported], [Edge(source, "flow", unsupported)]);
         var fixture = f.Scenarios.CreateDefaultFixture(graph, source.Id, 1);
-        (await f.Scenarios.RunAsync(graph, fixture, default))
-            .ShouldBeOfType<AutomationScenarioRunOutcome.Invalid>()
-            .Errors.ShouldContain(error =>
-                error.Code == "scenario-simulation-unsupported" && error.NodeId == unsupported.Id
-            );
+        _ = (
+            await f.Scenarios.RunAsync(graph, fixture, default)
+        ).ShouldBeOfType<AutomationScenarioRunOutcome.Completed>();
         await using var db = await f.Database.CreateDbContextAsync();
         (await db.AutomationCountdowns.CountAsync()).ShouldBe(0);
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
@@ -666,16 +666,30 @@ public sealed partial class AutomationRuntimeTests
                 default
             );
             var host = await db.Hosts.SingleAsync(host => host.Id == f.HostId);
-            var staged = await new AutomationConfigurationTransferAdapter(
+            var adapter = new AutomationConfigurationTransferAdapter(
                 f.Flows,
                 f.Catalog,
                 f.Clock,
                 f.Scenarios
-            ).StageAsync(
+            );
+            var preview = await adapter.PreviewAsync(
                 db,
                 host,
                 exported.Sections.Automations!,
                 selection.Sections[0],
+                references,
+                default
+            );
+            var reviewed = selection.Sections[0] with
+            {
+                AutomationReview = preview.AutomationReview,
+                AutomationEffectsApproved = true,
+            };
+            var staged = await adapter.StageAsync(
+                db,
+                host,
+                exported.Sections.Automations!,
+                reviewed,
                 references,
                 default
             );

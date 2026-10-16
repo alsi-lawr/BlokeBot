@@ -79,6 +79,12 @@ else
             </section>
         }
 
+        @if (Node.Definition.Id.Value is "start-countdown" or "reset-countdown" or "cancel-countdown")
+        {
+            var ownerField = new AutomationConfigurationFieldId("owner");
+            <label class="automation-field"><span>Timer owner</span><select value="@Node.Value(ownerField)" @onchange="args => SetValueAsync(ownerField, args.Value)"><option value="Channel">Channel</option><option value="Viewer">Viewer</option></select><span>Viewer uses the person who triggered the automation.</span></label>
+        }
+
         @if (_isSubflowExit && Node.Definition.Inputs.Any(IsDataPort))
         {
             <h3 class="automation-return-values-heading">Return values</h3>

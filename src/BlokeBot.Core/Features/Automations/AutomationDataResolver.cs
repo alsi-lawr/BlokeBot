@@ -196,6 +196,18 @@ internal sealed class AutomationDataResolver(
                     return new AutomationInputResolution.Failed("binding-invalid");
                 }
             }
+            if (
+                CountdownActionConfiguration.IsInput(valid.Definition, input)
+                && !bindings.Bindings.ContainsKey(input.BindingFieldId!.Value)
+                && !flow.Edges.Any(edge =>
+                    edge.Kind == AutomationEdgeKind.Data
+                    && edge.TargetNodeId == consumer.Id
+                    && edge.TargetPortId == input.Id.Value
+                )
+            )
+            {
+                continue;
+            }
             if (!bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding))
             {
                 return new AutomationInputResolution.Failed("binding-invalid");
@@ -605,6 +617,16 @@ internal sealed class AutomationDataResolver(
                 new AutomationValue.Number(delay.Duration.Ticks / TimeSpan.TicksPerMillisecond),
                 [AutomationValueProvenance.Generated]
             ),
+            (CountdownActionConfiguration countdown, "name") => new(
+                new AutomationValue.Text(countdown.Name),
+                [AutomationValueProvenance.Generated]
+            ),
+            (CountdownActionConfiguration countdown, "duration-seconds") => new(
+                new AutomationValue.Number(
+                    countdown.Duration.Ticks / (decimal)TimeSpan.TicksPerSecond
+                ),
+                [AutomationValueProvenance.Generated]
+            ),
             (ConditionControlConfiguration condition, "predicate") => new(
                 new AutomationValue.Boolean(condition.Predicate),
                 [AutomationValueProvenance.Generated]
@@ -637,6 +659,23 @@ internal sealed class AutomationDataResolver(
         : port.Sensitivity != AutomationDataSensitivity.Safe ? null
         : port.Id.Value switch
         {
+            "initiating-display-name" when configuration is CountdownSourceConfiguration => context
+                .Variables.ForExecution()
+                .TryGetValue(new("initiating-display-name"), out var display)
+                ? new(display.Value, [AutomationValueProvenance.PublicDisplayName])
+                : new(
+                    new AutomationValue.Null(AutomationPortValueType.Text),
+                    [AutomationValueProvenance.PublicDisplayName]
+                ),
+            "initiating-viewer-id" when configuration is CountdownSourceConfiguration => context
+                .Variables.ForExecution()
+                .TryGetValue(new("initiating-viewer-id"), out var viewer)
+                ? new(viewer.Value, [], ValueFreeDiagnostic: true)
+                : new(
+                    new AutomationValue.Null(AutomationPortValueType.Text),
+                    [],
+                    ValueFreeDiagnostic: true
+                ),
             "actor" when context.Actor is { } actor => new(
                 new AutomationValue.Actor(new(actor.Login, actor.DisplayName)),
                 [AutomationValueProvenance.PublicDisplayName, AutomationValueProvenance.PublicLogin]

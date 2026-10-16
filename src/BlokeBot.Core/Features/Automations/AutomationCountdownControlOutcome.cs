@@ -15,7 +15,9 @@ public sealed record AutomationCountdownSnapshot(
     AutomationCountdownState State,
     Guid? OccurrenceId,
     DateTimeOffset? StartedAtUtc,
-    DateTimeOffset? DeadlineUtc
+    DateTimeOffset? DeadlineUtc,
+    string OwnerViewerId = "",
+    string? OwnerDisplayName = null
 );
 
 public abstract record AutomationCountdownControlOutcome

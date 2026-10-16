@@ -164,10 +164,13 @@ public sealed partial class AutomationEditorNode
         return Definition.PluginProvenance is null && current.PluginProvenance is null;
     }
 
-    internal void RefreshCommandDefinition(AutomationDefinitionDescriptor definition)
+    internal void RefreshSourceDefinition(AutomationDefinitionDescriptor definition)
     {
         if (
-            Definition.Id == AutomationDefinitionIds.CustomCommandSource
+            (
+                Definition.Id == AutomationDefinitionIds.CustomCommandSource
+                || Definition.Id == AutomationDefinitionIds.CountdownSource
+            )
             && definition.Id == Definition.Id
         )
         {
@@ -249,14 +252,26 @@ public sealed partial class AutomationEditorNode
                             ? DisplayFixedValue(fixedInput.Value)
                             : DefaultValue(field)
                         : transform is null
-                            ? ReadValue(node.Definition.Configuration, field.Id)
+                            ? definition.Id.Value
+                                is "start-countdown"
+                                    or "reset-countdown"
+                                    or "cancel-countdown"
+                                    or "countdown-lifecycle"
+                            && field.Id.Value is "owner" or "timers"
+                            && !node.Definition.Configuration.TryGetProperty(field.Id.Value, out _)
+                                ? DefaultValue(field)
+                                : ReadValue(node.Definition.Configuration, field.Id)
                             : DisplayFixedValue(
                                 transform
                                     .Inputs.Single(input => input.BindingFieldId == field.Id)
                                     .FixedValue
                             )
             ),
-            definition.Id == AutomationDefinitionIds.DelayControl
+            definition.Id.Value
+                is "delay"
+                    or "start-countdown"
+                    or "reset-countdown"
+                    or "cancel-countdown"
                 ? node.InputBindings.ToDictionary()
                 : definition
                     .Configuration.Where(field =>
@@ -284,8 +299,8 @@ public sealed partial class AutomationEditorNode
                 _ = restored._values.TryAdd(field, string.Empty);
             }
         }
-        restored._originalProjection = restored.ConfigurationJson();
         restored._original = node;
+        restored._originalProjection = restored.ConfigurationJson();
         return restored;
     }
 
@@ -370,9 +385,17 @@ public sealed partial class AutomationEditorNode
     }
 
     internal AutomationInputBinding Binding(AutomationConfigurationFieldId fieldId) =>
-        Definition.Id == AutomationDefinitionIds.DelayControl
-        && fieldId == AutomationDelayDurationBinding.ValueField
-        && !_bindings.ContainsKey(fieldId)
+        !_bindings.ContainsKey(fieldId)
+        && (
+            (
+                Definition.Id == AutomationDefinitionIds.DelayControl
+                && fieldId == AutomationDelayDurationBinding.ValueField
+            )
+            || (
+                Definition.Id.Value is "start-countdown" or "reset-countdown" or "cancel-countdown"
+                && fieldId.Value is "name" or "duration-seconds"
+            )
+        )
             ? new(AutomationInputBindingMode.Fixed, null)
             : _bindings[fieldId];
 

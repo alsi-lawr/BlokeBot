@@ -8,6 +8,8 @@ internal static class AutomationScenarioSimulation
     >(StringComparer.Ordinal)
     {
         ["start-countdown"] = typeof(CountdownActionConfiguration),
+        ["reset-countdown"] = typeof(CountdownActionConfiguration),
+        ["cancel-countdown"] = typeof(CountdownActionConfiguration),
         ["send-chat"] = typeof(SendChatActionConfiguration),
         ["play-overlay-cue"] = typeof(PlayOverlayCueActionConfiguration),
         ["fulfil-redemption"] = typeof(FulfilRedemptionActionConfiguration),
@@ -117,21 +119,29 @@ internal static class AutomationScenarioSimulation
                 effectResult,
                 now
             ),
-            CountdownActionConfiguration { Operation: CountdownOperation.Start } =>
-                AutomationNodeEvaluation.Action(
-                    effectResult switch
-                    {
-                        AutomationScenarioEffectResult.Succeeded
-                        or AutomationScenarioEffectResult.Started =>
-                            new AutomationActionOutcome.CountdownStarted(),
-                        AutomationScenarioEffectResult.AlreadyRunning =>
-                            new AutomationActionOutcome.CountdownAlreadyRunning(),
-                        AutomationScenarioEffectResult.Failed => new AutomationActionOutcome.Failed(
-                            "simulated-action-failed"
-                        ),
-                    },
-                    now,
-                    "action-simulated"
+            CountdownActionConfiguration countdown => AutomationNativeActionPreparation
+                .Countdown(countdown, inputs, context.Actor, new(now, TimeSpan.Zero))
+                .Match(
+                    _ =>
+                        countdown.Operation == CountdownOperation.Start
+                            ? AutomationNodeEvaluation.Action(
+                                effectResult switch
+                                {
+                                    AutomationScenarioEffectResult.Succeeded
+                                    or AutomationScenarioEffectResult.Started =>
+                                        new AutomationActionOutcome.CountdownStarted(),
+                                    AutomationScenarioEffectResult.AlreadyRunning =>
+                                        new AutomationActionOutcome.CountdownAlreadyRunning(),
+                                    AutomationScenarioEffectResult.Failed =>
+                                        new AutomationActionOutcome.Failed(
+                                            "simulated-action-failed"
+                                        ),
+                                },
+                                now,
+                                "action-simulated"
+                            )
+                            : Effect(effectResult, now),
+                    failed => new AutomationNodeExecution.Failed(failed.Code)
                 ),
             EndPollActionConfiguration
             or CreateClipActionConfiguration

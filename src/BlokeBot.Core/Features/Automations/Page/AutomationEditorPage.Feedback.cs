@@ -74,7 +74,7 @@ public partial class AutomationEditorPage
         _operationFailed = true;
     }
 
-    private void RefreshCommandSourceDefinitions()
+    private void RefreshSourceDefinitions()
     {
         if (_editor is null)
         {
@@ -83,6 +83,7 @@ public partial class AutomationEditorPage
         foreach (
             var node in _editor.Nodes.Where(node =>
                 node.Definition.Id == AutomationDefinitionIds.CustomCommandSource
+                || node.Definition.Id == AutomationDefinitionIds.CountdownSource
             )
         )
         {
@@ -91,12 +92,14 @@ public partial class AutomationEditorPage
                 is AutomationConfigurationCheck.Valid valid
             )
             {
-                node.RefreshCommandDefinition(
-                    AutomationCommandSource.Project(
-                        valid.Definition,
-                        valid.Configuration,
-                        _commandSchemas
-                    )
+                node.RefreshSourceDefinition(
+                    node.Definition.Id == AutomationDefinitionIds.CustomCommandSource
+                        ? AutomationCommandSource.Project(
+                            valid.Definition,
+                            valid.Configuration,
+                            _commandSchemas
+                        )
+                        : valid.Definition
                 );
             }
         }
@@ -104,7 +107,7 @@ public partial class AutomationEditorPage
 
     private void EditorChanged()
     {
-        RefreshCommandSourceDefinitions();
+        RefreshSourceDefinitions();
         if (_editor is null || !_history.Record(_editor))
         {
             return;

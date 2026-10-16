@@ -20,13 +20,18 @@ internal static class HostFeatureTransitionStager
         if (Disabled(previous, updated, HostFeatureFlags.Automations))
         {
             var cancelled = await db
-                .AutomationCountdowns.Where(t => t.HostId == host.Id && t.IsRunning)
+                .AutomationCountdowns.Where(t =>
+                    t.HostId == host.Id && t.IsRunning && t.OwnerViewerId == ""
+                )
                 .ExecuteUpdateAsync(
                     s =>
                         s.SetProperty(t => t.IsRunning, false)
                             .SetProperty(t => t.WasCancelled, true),
                     cancellationToken
                 );
+            cancelled += await db
+                .AutomationCountdowns.Where(t => t.HostId == host.Id && t.OwnerViewerId != "")
+                .ExecuteDeleteAsync(cancellationToken);
             if (cancelled > 0 && db.Database.CurrentTransaction is null)
             {
                 await uiChanges.CountdownsChangedAsync(new(host.Id));

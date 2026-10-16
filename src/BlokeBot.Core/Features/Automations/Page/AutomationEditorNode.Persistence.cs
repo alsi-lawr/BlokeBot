@@ -78,6 +78,20 @@ public sealed partial class AutomationEditorNode
                 {
                     continue;
                 }
+                if (
+                    _original is not null
+                    && Definition.Id.Value
+                        is "start-countdown"
+                            or "reset-countdown"
+                            or "cancel-countdown"
+                            or "countdown-lifecycle"
+                    && field.Id.Value is "owner" or "timers"
+                    && !_original.Definition.Configuration.TryGetProperty(field.Id.Value, out _)
+                    && _values[field.Id] == (field.Id.Value == "owner" ? "Channel" : "Fixed")
+                )
+                {
+                    continue;
+                }
                 WriteField(writer, field, _values[field.Id]);
             }
 

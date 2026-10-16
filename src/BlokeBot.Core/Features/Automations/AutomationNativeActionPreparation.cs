@@ -33,10 +33,99 @@ internal sealed record AutomationPreparedChat(string Channel, string Message);
 
 internal sealed record AutomationPreparedCue(Guid TargetId, Guid CueId);
 
+internal sealed record AutomationPreparedCountdown(
+    CountdownActionConfiguration Action,
+    string OwnerViewerId,
+    string? OwnerDisplayName,
+    Guid? ExpectedOccurrence = null
+);
+
 internal sealed record AutomationPreparedRedemption(string RedemptionId, string RewardId);
 
 internal sealed class AutomationNativeActionPreparation(AutomationExpressionService expressions)
 {
+    internal static AutomationNativePreparation<AutomationPreparedCountdown> Countdown(
+        CountdownActionConfiguration configuration,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
+        AutomationActor? actor,
+        DateTimeOffset now
+    )
+    {
+        var name = configuration.Name;
+        if (inputs.TryGetValue(new("name"), out var boundName))
+        {
+            if (boundName.Value is not AutomationValue.Text text)
+            {
+                return new AutomationNativePreparation<AutomationPreparedCountdown>.Failed(
+                    "countdown-name-invalid"
+                );
+            }
+            name = text.Value.Trim();
+        }
+        var seconds = configuration.Duration.Ticks / (decimal)TimeSpan.TicksPerSecond;
+        if (
+            configuration.Operation != CountdownOperation.Cancel
+            && inputs.TryGetValue(new("duration-seconds"), out var boundDuration)
+        )
+        {
+            if (boundDuration.Value is not AutomationValue.Number number)
+            {
+                return new AutomationNativePreparation<AutomationPreparedCountdown>.Failed(
+                    "countdown-duration-invalid"
+                );
+            }
+            seconds = number.Value;
+        }
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 96 || name != name.Trim())
+        {
+            return new AutomationNativePreparation<AutomationPreparedCountdown>.Failed(
+                "countdown-name-invalid"
+            );
+        }
+        if (
+            configuration.Operation != CountdownOperation.Cancel
+            && (
+                seconds < 1
+                || seconds > 365 * 86400
+                || seconds != decimal.Truncate(seconds)
+                || seconds * TimeSpan.TicksPerSecond > DateTime.MaxValue.Ticks - now.UtcTicks
+            )
+        )
+        {
+            return new AutomationNativePreparation<AutomationPreparedCountdown>.Failed(
+                "countdown-duration-invalid"
+            );
+        }
+        var ownerId =
+            configuration.Owner == CountdownTimerOwner.Viewer ? actor?.TwitchUserId : string.Empty;
+        var displayName =
+            configuration.Owner == CountdownTimerOwner.Viewer ? actor?.DisplayName : null;
+        return
+            !Enum.IsDefined(configuration.Owner)
+            || !Enum.IsDefined(configuration.Operation)
+            || (
+                configuration.Owner == CountdownTimerOwner.Viewer
+                && (string.IsNullOrWhiteSpace(ownerId) || ownerId.Length > 128)
+            )
+            ? new AutomationNativePreparation<AutomationPreparedCountdown>.Failed(
+                "countdown-owner-unavailable"
+            )
+            : new AutomationNativePreparation<AutomationPreparedCountdown>.Prepared(
+                new(
+                    configuration with
+                    {
+                        Name = name,
+                        Duration =
+                            configuration.Operation == CountdownOperation.Cancel
+                                ? TimeSpan.Zero
+                                : TimeSpan.FromSeconds((long)seconds),
+                    },
+                    ownerId ?? string.Empty,
+                    displayName?[..Math.Min(128, displayName.Length)]
+                )
+            );
+    }
+
     internal static AutomationNativePreparation<AutomationPreparedChat> Chat(
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         AutomationContext context
