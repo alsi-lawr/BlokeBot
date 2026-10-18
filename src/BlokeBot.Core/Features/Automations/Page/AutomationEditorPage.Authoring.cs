@@ -369,7 +369,7 @@ public partial class AutomationEditorPage
         {
             return;
         }
-        InvalidateScenarioPreview();
+        _scenarioPreviewRevision++;
         _traceTitle = _traceHeaders
             .FirstOrDefault(header => header.Id.Value == value)
             ?.ProductionRunId

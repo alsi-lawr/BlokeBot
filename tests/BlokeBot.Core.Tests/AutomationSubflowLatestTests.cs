@@ -150,7 +150,16 @@ public sealed partial class AutomationRuntimeTests
             new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
             CancellationToken.None
         );
-        rejected.Status.ShouldBe(AutomationDispatchStatus.InvalidFlow);
+        rejected.Status.ShouldBe(AutomationDispatchStatus.NoMatchingFlow);
+        var enable = (
+            await fixture.Flows.SetEnabledAsync(
+                new(fixture.HostId),
+                directSaved.FlowId,
+                true,
+                default
+            )
+        ).ShouldBeOfType<AutomationFlowEnableOutcome.Invalid>();
+        enable.Errors.ShouldContain(error => error.Code == "subflow-interface-incompatible");
         (
             await fixture.Scenarios.RunAsync(
                 indirect,
@@ -281,7 +290,7 @@ public sealed partial class AutomationRuntimeTests
         var library = Subflows(fixture);
         var leaf = await Publish(library, draft);
         var parent = await Publish(library, Nesting(Subflow(fixture.HostId), leaf));
-        _ = (
+        var caller = (
             await fixture.Flows.SaveAsync(Caller(fixture.HostId, parent), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
         var send = Node("send-chat", """{"message":"current-without-overlay"}""") with
@@ -298,6 +307,18 @@ public sealed partial class AutomationRuntimeTests
                 },
             }
         );
+        var review = (
+            await fixture.Flows.SetEnabledAsync(new(fixture.HostId), caller.FlowId, true, default)
+        ).ShouldBeOfType<AutomationFlowEnableOutcome.Review>();
+        _ = (
+            await fixture.Flows.SetEnabledAsync(
+                new(fixture.HostId),
+                caller.FlowId,
+                true,
+                default,
+                review.Reviewed
+            )
+        ).ShouldBeOfType<AutomationFlowEnableOutcome.Updated>();
         _ = await fixture.Features.DisableAsync(
             fixture.HostId,
             HostFeatureFlags.Overlays,

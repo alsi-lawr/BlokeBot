@@ -17,10 +17,14 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
     )
     {
         _keeperConnection = keeperConnection;
-        _options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+        var builder = new DbContextOptionsBuilder<BlokeBotDbContext>()
             .UseSqlite(connectionString)
-            .AddInterceptors(interceptors)
-            .Options;
+            .AddInterceptors(interceptors);
+        if (interceptors.OfType<ISingletonInterceptor>().Any())
+        {
+            _ = builder.EnableServiceProviderCaching(false);
+        }
+        _options = builder.Options;
     }
 
     public static async Task<SqliteBlokeBotDbFactory> CreateAsync(

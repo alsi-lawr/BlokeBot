@@ -14,25 +14,23 @@ namespace BlokeBot.Persistence.Migrations
                 name: "ObservedFailures",
                 table: "automation_traces",
                 type: "INTEGER",
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.AddColumn<int>(
                 name: "TerminalOutcome",
                 table: "automation_traces",
                 type: "INTEGER",
-                nullable: true);
+                nullable: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "ObservedFailures",
-                table: "automation_traces");
+            migrationBuilder.DropColumn(name: "ObservedFailures", table: "automation_traces");
 
-            migrationBuilder.DropColumn(
-                name: "TerminalOutcome",
-                table: "automation_traces");
+            migrationBuilder.DropColumn(name: "TerminalOutcome", table: "automation_traces");
         }
     }
 }

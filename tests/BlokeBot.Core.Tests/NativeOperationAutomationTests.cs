@@ -840,7 +840,7 @@ public sealed partial class NativeOperationAutomationTests
                 ? ImmutableDictionary<
                     AutomationConfigurationFieldId,
                     AutomationInputBinding
-                >.Empty.Add(new("message"), new(AutomationInputBindingMode.Fixed, Expression: null))
+                >.Empty.Add(new("message"), new(messageMode, Expression: null))
                 : ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }

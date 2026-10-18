@@ -76,8 +76,17 @@ public sealed class OverlayMediaMigrationTests
             DisplayName = "Migration",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO hosts ("TwitchUserId", "Login", "DisplayName", "BotRuntimeState", "CommandsAliasesConfigured", "AutomationGeneration", "ViewerPassportContinuityGeneration", "EnabledFeatures", "TimeZoneId", "CreatedAtUtc")
+            VALUES ({host.TwitchUserId}, {host.Login}, {host.DisplayName}, {0}, {host.CommandsAliasesConfigured}, {host.AutomationGeneration}, {host.ViewerPassportContinuityGeneration}, {(long)
+                host.EnabledFeatures}, {host.TimeZoneId}, {host.CreatedAtUtc})
+            """
+        );
+        host.Id = await db
+            .Hosts.Where(value => value.Login == host.Login)
+            .Select(value => value.Id)
+            .SingleAsync();
         var presentId = Guid.NewGuid();
         var missingId = Guid.NewGuid();
         var presentKey = new string('a', 32);

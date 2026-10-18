@@ -23,8 +23,17 @@ public sealed class WatchTimeMigrationTests
                 DisplayName = "Legacy",
                 CreatedAtUtc = DateTime.UtcNow,
             };
-            _ = before.Hosts.Add(host);
-            _ = await before.SaveChangesAsync();
+            _ = await before.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO hosts ("TwitchUserId", "Login", "DisplayName", "BotRuntimeState", "CommandsAliasesConfigured", "AutomationGeneration", "ViewerPassportContinuityGeneration", "EnabledFeatures", "TimeZoneId", "CreatedAtUtc")
+                VALUES ({host.TwitchUserId}, {host.Login}, {host.DisplayName}, {0}, {host.CommandsAliasesConfigured}, {host.AutomationGeneration}, {host.ViewerPassportContinuityGeneration}, {(long)
+                    host.EnabledFeatures}, {host.TimeZoneId}, {host.CreatedAtUtc})
+                """
+            );
+            host.Id = await before
+                .Hosts.Where(value => value.Login == host.Login)
+                .Select(value => value.Id)
+                .SingleAsync();
             var legacyEntry = before.Entry(
                 new PointsSettings { HostId = host.Id, PointLabel = "legacy coins" }
             );

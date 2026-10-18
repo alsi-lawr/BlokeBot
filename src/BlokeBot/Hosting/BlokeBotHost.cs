@@ -282,7 +282,10 @@ internal sealed record BlokeBotHostComposition(
     {
         try
         {
-            if (!App.Lifetime.ApplicationStopped.IsCancellationRequested)
+            if (
+                App.Lifetime.ApplicationStarted.IsCancellationRequested
+                && !App.Lifetime.ApplicationStopped.IsCancellationRequested
+            )
             {
                 await App.StopAsync();
             }

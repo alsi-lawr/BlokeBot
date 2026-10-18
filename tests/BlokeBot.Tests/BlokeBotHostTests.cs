@@ -154,6 +154,26 @@ public sealed class BlokeBotHostTests
     }
 
     [Test]
+    public async Task FailedStartup_DisposalPreservesTheOriginalDependencyFailure()
+    {
+        var builder = WebApplication.CreateBuilder();
+        _ = builder.Services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(_ =>
+            throw new InvalidOperationException("startup-dependency-sentinel")
+        );
+        var composition = new BlokeBotHostComposition(
+            builder.Build(),
+            new(BlokeBotRuntimeMode.Offline, []),
+            new("unused-state", "unused.db", "unused.tokens")
+        );
+        var failure = await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            await using var owned = composition;
+            await owned.App.StartAsync();
+        });
+        failure.Message.ShouldBe("startup-dependency-sentinel");
+    }
+
+    [Test]
     public void Configuration_PrecedenceAndRelativeConfigPath_AreExplicit()
     {
         var root = TemporaryDirectory();

@@ -89,8 +89,17 @@ public sealed class WeeklyAnnouncementMigrationTests
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO hosts ("TwitchUserId", "Login", "DisplayName", "BotRuntimeState", "CommandsAliasesConfigured", "AutomationGeneration", "ViewerPassportContinuityGeneration", "EnabledFeatures", "TimeZoneId", "CreatedAtUtc")
+            VALUES ({host.TwitchUserId}, {host.Login}, {host.DisplayName}, {0}, {host.CommandsAliasesConfigured}, {host.AutomationGeneration}, {host.ViewerPassportContinuityGeneration}, {(long)
+                host.EnabledFeatures}, {host.TimeZoneId}, {host.CreatedAtUtc})
+            """
+        );
+        host.Id = await db
+            .Hosts.Where(value => value.Login == host.Login)
+            .Select(value => value.Id)
+            .SingleAsync();
         reply.HostId = host.Id;
         _ = db.CustomMessageLibraryEntries.Add(reply);
         _ = await db.SaveChangesAsync();

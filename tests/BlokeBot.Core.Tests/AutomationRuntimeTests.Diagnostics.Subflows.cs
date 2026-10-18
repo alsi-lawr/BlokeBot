@@ -122,6 +122,7 @@ public sealed partial class AutomationRuntimeTests
         _ = ui.Services.AddSingleton<IOverlayCueAdmissionService>(new NoOverlayCues());
         _ = ui.Services.AddSingleton<TimeProvider>(fixture.Clock);
         _ = ui.Services.AddBlokeBotAutomations();
+        _ = ui.Services.AddSingleton(fixture.Scenarios);
         var page = ui.Render<AutomationEditorPage>();
         page.WaitForAssertion(() =>
             page.FindComponent<AutomationFlowCanvas>()
@@ -273,6 +274,7 @@ public sealed partial class AutomationRuntimeTests
         _ = ui.Services.AddSingleton<IOverlayCueAdmissionService>(new NoOverlayCues());
         _ = ui.Services.AddSingleton<TimeProvider>(fixture.Clock);
         _ = ui.Services.AddBlokeBotAutomations();
+        _ = ui.Services.AddSingleton(fixture.Scenarios);
         var page = ui.Render<AutomationEditorPage>();
         page.WaitForAssertion(() =>
             page.FindComponent<AutomationFlowCanvas>()

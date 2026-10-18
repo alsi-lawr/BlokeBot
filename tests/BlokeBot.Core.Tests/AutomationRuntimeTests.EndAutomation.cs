@@ -298,6 +298,32 @@ public sealed partial class AutomationRuntimeTests
             [new(ConfigurationSectionId.Automations, ImportConflictStrategy.Merge, [])],
             new HashSet<HostFeatureFlags>()
         );
+        var adapter = new AutomationConfigurationTransferAdapter(
+            f.Flows,
+            f.Catalog,
+            f.Clock,
+            f.Scenarios
+        );
+        var preview = (
+            await new ConfigurationImportPreviewService(
+                f.Database,
+                UnavailableOverlayConfigurationTransferAdapter.Instance,
+                adapter
+            ).PreviewAsync(document, selection, default)
+        )
+            .ShouldBeOfType<ConfigurationPreviewOutcome.Success>()
+            .Preview;
+        selection = selection with
+        {
+            Sections =
+            [
+                selection.Sections[0] with
+                {
+                    AutomationReview = preview.Sections.Single().AutomationReview,
+                    AutomationEffectsApproved = true,
+                },
+            ],
+        };
         await using (var db = await f.Database.CreateDbContextAsync())
         {
             await using var transaction = await db.Database.BeginTransactionAsync();

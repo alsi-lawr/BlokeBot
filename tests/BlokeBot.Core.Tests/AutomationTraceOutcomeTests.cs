@@ -316,8 +316,17 @@ public sealed partial class AutomationRuntimeTests
         {
             await old.Database.MigrateAsync("20261015205956_CustomCommandArguments");
             var host = new BotHost { Login = "trace-upgrade", CreatedAtUtc = now };
-            _ = old.Hosts.Add(host);
-            _ = await old.SaveChangesAsync();
+            _ = await old.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO hosts ("TwitchUserId", "Login", "DisplayName", "BotRuntimeState", "CommandsAliasesConfigured", "AutomationGeneration", "ViewerPassportContinuityGeneration", "EnabledFeatures", "TimeZoneId", "CreatedAtUtc")
+                VALUES ({host.TwitchUserId}, {host.Login}, {host.DisplayName}, {0}, {host.CommandsAliasesConfigured}, {host.AutomationGeneration}, {host.ViewerPassportContinuityGeneration}, {(long)
+                    host.EnabledFeatures}, {host.TimeZoneId}, {host.CreatedAtUtc})
+                """
+            );
+            host.Id = await old
+                .Hosts.Where(value => value.Login == host.Login)
+                .Select(value => value.Id)
+                .SingleAsync();
             hostId = host.Id;
             _ = await old.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO automation_traces (\"Id\",\"HostId\",\"SchemaVersion\",\"CreatedAtUtc\",\"ExpiresAtUtc\",\"EventCount\",\"ByteCount\",\"Truncation\") VALUES ({id},{hostId},{1},{now},{now.AddDays(7)},{1},{Encoding.UTF8.GetByteCount(json)},{0})"
@@ -594,6 +603,8 @@ public sealed partial class AutomationRuntimeTests
             TimeSpan.FromSeconds(20)
         );
         var current = page.FindComponent<AutomationTracePanel>().Instance.Snapshot!.Id;
+        var currentRich = page.FindComponent<AutomationFlowCanvas>()
+            .Instance.SampleOutcomes.Single(outcome => outcome.NodeId == action.Id);
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationTracePanel>()
                 .Instance.SelectRun.InvokeAsync(first.Value.ToString())
@@ -609,8 +620,8 @@ public sealed partial class AutomationRuntimeTests
         );
         page.FindComponent<AutomationFlowCanvas>()
             .Instance.SampleOutcomes.Single(outcome => outcome.NodeId == action.Id)
-            .ResolvedInputs.IsDefaultOrEmpty.ShouldBeTrue();
-        page.FindComponent<AutomationRunDrawer>().Instance.Kind.ShouldBe("history");
+            .ShouldBe(currentRich);
+        page.FindComponent<AutomationRunDrawer>().Instance.Kind.ShouldBe("sample");
         // Missing historical records also cannot borrow the current result.
         await page.InvokeAsync(() =>
             page.FindComponent<AutomationTracePanel>()

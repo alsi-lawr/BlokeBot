@@ -18,9 +18,8 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
 {
     internal const string PriorReleaseSqliteMigration =
         "20260822192152_v0.12.0_GuessingSharedAliases";
-    internal const string CurrentSqliteMigration = "20261008185949_SeparateStoredValueNamespaces";
-    internal const string CurrentPostgreSqlMigration =
-        "20261008190031_SeparateStoredValueNamespaces";
+    internal const string CurrentSqliteMigration = "20261016044753_AutomationScheduleSkips";
+    internal const string CurrentPostgreSqlMigration = "20261016044820_AutomationScheduleSkips";
     internal static readonly string[] CurrentPostgreSqlMigrations =
     [
         "20260901145930_20260901_v0_14_0_Baseline",
@@ -35,6 +34,13 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         "20261003213012_AutomationSourceLifecycle",
         "20261006192903_WatchTimePoints",
         "20261008174636_ScopedCustomCommandValues",
+        "20261008190031_SeparateStoredValueNamespaces",
+        "20261010152958_ChannelDashboards",
+        "20261013164543_RecentChannelChatters",
+        "20261015210035_CustomCommandArguments",
+        "20261015232213_AutomationTraceOutcomeSummary",
+        "20261016034651_AutomationRunLimits",
+        "20261016041929_ViewerOwnedCountdowns",
         CurrentPostgreSqlMigration,
     ];
     internal const int SeedHostId = 900;
@@ -55,6 +61,10 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         "5648f98e-b4c5-45d1-b14f-748a3b5cbba5"
     );
 
+    private static readonly Guid _scheduleSkipId = Guid.Parse(
+        "12a835d7-e9cd-48c9-8cee-d9bbb8064217"
+    );
+
     private const string _tracePrivateValue = "synthetic-cutover-private-value";
     private static readonly Guid _traceId = Guid.Parse("8a28148b-9cc9-4554-9576-9d4a7d4ad99c");
     private static readonly Guid _scenarioId = Guid.Parse("25c3fa68-dd1d-4f99-98c1-87b4c0f46ade");
@@ -72,6 +82,7 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         41,
         DateTimeKind.Utc
     ).AddTicks(1234567);
+    private static readonly DateTime _observationTime = SeedTime.AddTicks(-7);
 
     private static readonly AutomationScenarioFixture _scenarioFixture = new(
         new(_scenarioSourceId),
@@ -236,7 +247,14 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         mergedCandidate.MergedIntoCandidateId = TargetCandidateId;
         mergedCandidate.MergedIntoCandidate = targetCandidate;
 
-        _ = db.Add(host);
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO hosts ("Id", "TwitchUserId", "Login", "DisplayName", "BotRuntimeState", "EnabledFeatures", "AutomationGeneration", "ViewerPassportContinuityGeneration", "TimeZoneId", "StartupMessageEnabled", "CommandsAliasesConfigured", "CreatedAtUtc")
+            VALUES ({host.Id}, {host.TwitchUserId}, {host.Login}, {host.DisplayName}, {(int)
+                host.BotRuntimeState}, {(long)
+                host.EnabledFeatures}, {host.AutomationGeneration}, {host.ViewerPassportContinuityGeneration}, {host.TimeZoneId}, {host.StartupMessageEnabled}, {host.CommandsAliasesConfigured}, {host.CreatedAtUtc})
+            """
+        );
         _ = db.Add(
             new RequestBoardField
             {
@@ -417,6 +435,29 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
                 NodeId = _subflowCallerId,
                 HostId = SeedHostId,
                 SubflowId = _subflowId,
+            }
+        );
+        _ = db.RecentChannelChatters.Add(
+            new()
+            {
+                HostId = SeedHostId,
+                TwitchUserId = "cutover-viewer",
+                Login = "cutover_viewer",
+                DisplayName = "Cutover Viewer",
+                ObservedAtUtc = _observationTime,
+            }
+        );
+        _ = db.AutomationScheduleSkips.Add(
+            new()
+            {
+                Id = _scheduleSkipId,
+                HostId = SeedHostId,
+                FlowId = FlowId,
+                SourceNodeId = _scenarioSourceId,
+                Reason = (int)AutomationScheduleSkipReason.FlowWaitingLimit,
+                ScheduledAtUtc = _observationTime.AddSeconds(-1),
+                ObservedAtUtc = _observationTime,
+                ExpiresAtUtc = _observationTime.AddHours(24),
             }
         );
         SeedCurrentOverlayAndStoredValueRows(db);

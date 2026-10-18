@@ -11,6 +11,7 @@ using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -278,6 +279,19 @@ public sealed class AutomationSourceAuthorizationTests
                     {
                         Identity = new BotIdentityOptions { ClientId = "fixture-client" },
                     }
+                )
+            );
+            _ = services.AddSingleton(
+                new BlokeBot.Core.Features.HostedChannels.Authorization.ChannelBotOAuthService(
+                    new ConfigurationBuilder()
+                        .AddInMemoryCollection(
+                            new Dictionary<string, string?>
+                            {
+                                ["TwitchBot:ChannelAuthorization:Scopes:0"] = "channel:bot",
+                            }
+                        )
+                        .Build(),
+                    new OAuthTransport(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
                 )
             );
             _ = services.AddSingleton<HostModAccessService>();

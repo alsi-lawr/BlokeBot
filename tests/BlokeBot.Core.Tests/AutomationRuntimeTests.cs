@@ -1734,7 +1734,7 @@ public sealed partial class AutomationRuntimeTests
         var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
 
         resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
-        changes.ShouldBe([AutomationFlowRunState.Failed]);
+        changes.ShouldBe([AutomationFlowRunState.Running, AutomationFlowRunState.Failed]);
         fixture.Chat.Messages.ShouldBeEmpty();
         await using var verified = await fixture.Database.CreateDbContextAsync();
         var failed = await verified

@@ -20,6 +20,7 @@ automation_countdowns
 automation_event_receipts
 automation_flows
 automation_goal_observations
+automation_schedule_skips
 automation_source_admissions
 automation_stream_observations
 automation_subflows
@@ -72,6 +73,7 @@ points_settings
 public_chat_pin_operations
 raid_collaboration_history
 raid_collaboration_settings
+recent_channel_chatters
 reply_delivery_settings
 reply_pin_policies
 request_boards

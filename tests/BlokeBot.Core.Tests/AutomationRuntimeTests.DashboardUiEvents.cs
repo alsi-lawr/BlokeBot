@@ -91,7 +91,7 @@ public sealed partial class AutomationRuntimeTests
             .State.ShouldBe(AutomationFlowRunState.Waiting);
         f.Clock.Advance(TimeSpan.FromSeconds(1));
         await f.Runtime.ResumeDueAsync(CancellationToken.None);
-        states.ShouldBe([AutomationFlowRunState.Completed]);
+        states.ShouldBe([AutomationFlowRunState.Running, AutomationFlowRunState.Completed]);
         f.Chat.Messages.ShouldBe(["done"]);
     }
 

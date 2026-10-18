@@ -262,6 +262,25 @@ internal sealed partial class DatabaseCutoverIntegrationFixture
         foreach (var db in new[] { source, target })
         {
             await AssertCurrentOverlayAndStoredValueRowsAsync(db);
+            var chatter = (
+                await db.RecentChannelChatters.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            chatter.HostId.ShouldBe(SeedHostId);
+            chatter.TwitchUserId.ShouldBe("cutover-viewer");
+            chatter.Login.ShouldBe("cutover_viewer");
+            chatter.DisplayName.ShouldBe("Cutover Viewer");
+            chatter.ObservedAtUtc.ShouldBe(_observationTime);
+            var skip = (
+                await db.AutomationScheduleSkips.AsNoTracking().ToArrayAsync()
+            ).ShouldHaveSingleItem();
+            skip.Id.ShouldBe(_scheduleSkipId);
+            skip.HostId.ShouldBe(SeedHostId);
+            skip.FlowId.ShouldBe(FlowId);
+            skip.SourceNodeId.ShouldBe(_scenarioSourceId);
+            skip.Reason.ShouldBe((int)AutomationScheduleSkipReason.FlowWaitingLimit);
+            skip.ScheduledAtUtc.ShouldBe(_observationTime.AddSeconds(-1));
+            skip.ObservedAtUtc.ShouldBe(_observationTime);
+            skip.ExpiresAtUtc.ShouldBe(_observationTime.AddHours(24));
             var scenario = (
                 await db.AutomationScenarios.AsNoTracking().ToArrayAsync()
             ).ShouldHaveSingleItem();

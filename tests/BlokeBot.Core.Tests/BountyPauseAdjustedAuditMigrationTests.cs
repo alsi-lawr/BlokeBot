@@ -20,7 +20,14 @@ public sealed class BountyPauseAdjustedAuditMigrationTests
         await using (var before = await database.CreateDbContextAsync())
         {
             await before.Database.MigrateAsync(_releasedMigration);
-            _ = before.Hosts.Add(Host());
+            var host = Host();
+            _ = await before.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO hosts ("Id", "TwitchUserId", "Login", "DisplayName", "BotRuntimeState", "CommandsAliasesConfigured", "AutomationGeneration", "ViewerPassportContinuityGeneration", "EnabledFeatures", "CreatedAtUtc")
+                VALUES ({host.Id}, {host.TwitchUserId}, {host.Login}, {host.DisplayName}, {0}, {host.CommandsAliasesConfigured}, {host.AutomationGeneration}, {host.ViewerPassportContinuityGeneration}, {(long)
+                    host.EnabledFeatures}, {host.CreatedAtUtc})
+                """
+            );
             _ = before.Bounties.Add(Bounty());
             _ = await before.SaveChangesAsync();
             var bounty = await before.Bounties.SingleAsync();
