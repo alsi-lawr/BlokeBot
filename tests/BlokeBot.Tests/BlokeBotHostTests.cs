@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using BlokeBot.Cli;
 using BlokeBot.Core.Features.Plugins;
@@ -7,8 +8,11 @@ using BlokeBot.Plugins.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Shouldly;
 
@@ -174,6 +178,135 @@ public sealed class BlokeBotHostTests
     }
 
     [Test]
+    [Arguments("")]
+    [Arguments("&start=false")]
+    public Task PublicSiteDashboardNavigation_ReachesReadOnlyLoginWithoutCookies(
+        string startQuery
+    ) =>
+        WithOfflineWebAuthHostAsync(async client =>
+        {
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "same-site");
+            using var dashboard = await client.GetAsync("/");
+
+            dashboard.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+            dashboard.Headers.Contains("Set-Cookie").ShouldBeFalse();
+            var login = dashboard.Headers.Location.ShouldNotBeNull();
+            login.AbsolutePath.ShouldBe("/auth/login");
+            QueryHelpers.ParseQuery(login.Query)["ReturnUrl"].ToString().ShouldBe("/");
+
+            using var response = await client.GetAsync(login + startQuery);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            response.Content.Headers.ContentType?.MediaType.ShouldBe("text/html");
+            (await response.Content.ReadAsStringAsync()).ShouldContain(
+                "href=\"/auth/login?start=true\""
+            );
+            response.Headers.Contains("Set-Cookie").ShouldBeFalse();
+        });
+
+    [Test]
+    [Arguments("same-site")]
+    [Arguments("cross-site")]
+    public Task AuthCookieWrites_RejectUntrustedStartsAndSessionsButRetainNonceCallbacks(
+        string site
+    ) =>
+        WithOfflineWebAuthHostAsync(async client =>
+        {
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Site", site);
+            var dashboardOrigin = client.BaseAddress.ShouldNotBeNull();
+            foreach (
+                var path in new[]
+                {
+                    "/auth/login?start=true&returnUrl=%2F",
+                    "/AUTH/LOGIN/?START=TrUe",
+                    "/auth/logout",
+                    "/auth/twitch/callback?error=access_denied&state=missing-nonce",
+                }
+            )
+            {
+                using var rejected = await client.GetAsync(path);
+
+                rejected.StatusCode.ShouldBe(HttpStatusCode.Forbidden, path);
+                rejected.Headers.CacheControl?.NoStore.ShouldBe(true);
+                rejected.Headers.Contains("Set-Cookie").ShouldBeFalse(path);
+            }
+
+            foreach (
+                var query in new[]
+                {
+                    "start=false&start=true",
+                    "start=true&start=false",
+                    "start=true&start=true",
+                }
+            )
+            {
+                using var ambiguous = await client.GetAsync($"/auth/login?{query}");
+
+                ambiguous.Headers.Contains("Set-Cookie").ShouldBeFalse(query);
+                if (ambiguous.Headers.Location is { } location)
+                {
+                    new Uri(dashboardOrigin, location)
+                        .GetLeftPart(UriPartial.Authority)
+                        .ShouldBe(dashboardOrigin.GetLeftPart(UriPartial.Authority), query);
+                }
+            }
+
+            using var startRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                "/auth/login?start=TrUe&returnUrl=%2F"
+            );
+            startRequest.Headers.Add("Sec-Fetch-Site", "same-origin");
+            startRequest.Headers.Referrer = client.BaseAddress;
+            using var started = await client.SendAsync(startRequest);
+
+            started.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+            var authorization = started.Headers.Location.ShouldNotBeNull();
+            var state = QueryHelpers.ParseQuery(authorization.Query)["state"].ToString();
+            state.ShouldNotBeNullOrWhiteSpace();
+            started
+                .Headers.GetValues("Set-Cookie")
+                .ShouldContain(cookie => cookie.StartsWith($"BlokeBot.AuthState={state};"));
+            started
+                .Headers.GetValues("Set-Cookie")
+                .ShouldContain(cookie => cookie.StartsWith("BlokeBot.AuthReturnUrl="));
+
+            using var mismatchedRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                "/auth/twitch/callback?error=access_denied&state=mismatched-nonce"
+            );
+            mismatchedRequest.Headers.Add("Cookie", $"BlokeBot.AuthState={state}");
+            using var mismatched = await client.SendAsync(mismatchedRequest);
+
+            mismatched.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            mismatched.Headers.Contains("Set-Cookie").ShouldBeFalse();
+
+            using var callbackRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/auth/twitch/callback?error=access_denied&state={state}"
+            );
+            callbackRequest.Headers.Add("Cookie", $"BlokeBot.AuthState={state}");
+            using var callback = await client.SendAsync(callbackRequest);
+
+            callback.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+            callback
+                .Headers.GetValues("Set-Cookie")
+                .ShouldContain(cookie => cookie.StartsWith("BlokeBot.AuthState=;"));
+            callback
+                .Headers.GetValues("Set-Cookie")
+                .ShouldContain(cookie => cookie.StartsWith("BlokeBot.AuthReturnUrl=;"));
+
+            using var logoutRequest = new HttpRequestMessage(HttpMethod.Get, "/auth/logout");
+            logoutRequest.Headers.Add("Sec-Fetch-Site", "same-origin");
+            logoutRequest.Headers.Referrer = client.BaseAddress;
+            using var logout = await client.SendAsync(logoutRequest);
+
+            logout.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+            logout
+                .Headers.GetValues("Set-Cookie")
+                .ShouldContain(cookie => cookie.StartsWith("BlokeBot.Auth=;"));
+        });
+
+    [Test]
     public void Configuration_PrecedenceAndRelativeConfigPath_AreExplicit()
     {
         var root = TemporaryDirectory();
@@ -253,5 +386,74 @@ public sealed class BlokeBotHostTests
         var path = Path.Combine(Path.GetTempPath(), $"blokebot-host-tests-{Guid.NewGuid():N}");
         _ = Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static async Task WithOfflineWebAuthHostAsync(Func<HttpClient, Task> journey)
+    {
+        var dataDirectory = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            ".agent-workspace",
+            "dashboard-login-375",
+            Guid.NewGuid().ToString("N")
+        );
+        _ = Directory.CreateDirectory(dataDirectory);
+        var configurationPath = Path.Combine(dataDirectory, "web-auth.json");
+        await File.WriteAllTextAsync(
+            configurationPath,
+            """
+            {
+              "TwitchBot": {
+                "Identity": {
+                  "BotUsername": "",
+                  "ClientId": "offline-web-client",
+                  "ClientSecret": "offline-web-secret"
+                }
+              }
+            }
+            """
+        );
+        try
+        {
+            await using var composition = BlokeBotHost.Create(
+                new BlokeBotServeOptions("127.0.0.1", 0, dataDirectory, configurationPath)
+            );
+            composition.Twitch.Mode.ShouldBe(BlokeBotRuntimeMode.Offline);
+            composition
+                .App.Services.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>()
+                .Get(GitHubPluginMarketplaceRepositoryTransport.ClientName)
+                .HttpMessageHandlerBuilderActions.Add(builder =>
+                    builder.PrimaryHandler = new OfflineMarketplaceHandler()
+                );
+            await BlokeBotDatabaseStartup.InitializeAsync(composition.App, CancellationToken.None);
+            await composition.App.StartAsync();
+            var address = composition
+                .App.Services.GetRequiredService<IServer>()
+                .Features.Get<IServerAddressesFeature>()!
+                .Addresses.Single();
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+            };
+            using var client = new HttpClient(handler) { BaseAddress = new Uri(address) };
+            client.DefaultRequestHeaders.Referrer = new Uri("https://www.blokebot.com/");
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Mode", "navigate");
+            client.DefaultRequestHeaders.Add("Sec-Fetch-Dest", "document");
+            client.DefaultRequestHeaders.Add("Sec-Fetch-User", "?1");
+            await journey(client);
+        }
+        finally
+        {
+            await Log.CloseAndFlushAsync();
+            Directory.Delete(dataDirectory, recursive: true);
+        }
+    }
+
+    private sealed class OfflineMarketplaceHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
     }
 }

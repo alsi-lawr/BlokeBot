@@ -8,7 +8,7 @@ internal static class AuthCookieRequestBoundary
         app.Use(
             async (context, next) =>
             {
-                if (WritesAuthenticationCookies(context.Request.Path) && !MayWrite(context.Request))
+                if (WritesAuthenticationCookies(context.Request) && !MayWrite(context.Request))
                 {
                     if (context.Features.Get<IStatusCodePagesFeature>() is { } pages)
                     {
@@ -56,17 +56,20 @@ internal static class AuthCookieRequestBoundary
             && string.Equals(state, expected, StringComparison.Ordinal);
     }
 
-    private static bool WritesAuthenticationCookies(PathString path) =>
-        path.Value?.TrimEnd('/').ToLowerInvariant()
-            is "/auth/login"
-                or "/auth/twitch/callback"
-                or "/auth/logout"
-                or "/auth/select-host"
-                or "/auth/select-own-host"
-                or "/auth/recover-moderator-access"
-                or "/auth/exit-admin"
-                or "/admin/select-host"
-                or "/host/create"
-                or "/oauth/channel-bot/start"
-                or "/oauth/channel-bot/callback";
+    private static bool WritesAuthenticationCookies(HttpRequest request) =>
+        request.Path.Value?.TrimEnd('/').ToLowerInvariant() switch
+        {
+            "/auth/login" => bool.TryParse(request.Query["start"], out var start) && start,
+            "/auth/twitch/callback"
+            or "/auth/logout"
+            or "/auth/select-host"
+            or "/auth/select-own-host"
+            or "/auth/recover-moderator-access"
+            or "/auth/exit-admin"
+            or "/admin/select-host"
+            or "/host/create"
+            or "/oauth/channel-bot/start"
+            or "/oauth/channel-bot/callback" => true,
+            _ => false,
+        };
 }
