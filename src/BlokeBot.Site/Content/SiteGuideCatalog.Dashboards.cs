@@ -38,6 +38,11 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Arrange and save",
+                    Videos = DashboardVideos(
+                        "editor",
+                        "Arrange, configure and save",
+                        "Narrow and move the announcement widget, override its Manual Run text, then save the shared arrangement."
+                    ),
                     Paragraphs =
                     [
                         "Drag the header handle to move a widget and the corner handle to resize it. Arrow keys on these handles or Position & size fields provide the same editing controls. Narrow screens show an ordered list with the same settings and actions.",
@@ -48,6 +53,11 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Operate native controls",
+                    Videos = DashboardVideos(
+                        "control",
+                        "Use native controls",
+                        "Start a 90-second countdown, watch it tick and cancel it. Start a poll, view its choices, then end it."
+                    ),
                     Paragraphs =
                     [
                         "Automation admission is not completion. Only that invocation's returned run IDs are tracked. Countdown text ticks locally, but reaching zero is not proof that native completion has run.",
@@ -58,4 +68,29 @@ internal static partial class SiteGuideCatalog
             ],
         };
     }
+
+    private static IReadOnlyList<SiteGuideVideo> DashboardVideos(
+        string operation,
+        string title,
+        string description
+    ) =>
+        [
+            new(
+                $"{title} · laptop",
+                description,
+                $"media/dashboards/laptop-light-{operation}.webm",
+                $"media/dashboards/laptop-dark-{operation}.webm",
+                $"media/dashboards/laptop-light-{operation}.png",
+                $"media/dashboards/laptop-dark-{operation}.png"
+            ),
+            new(
+                $"{title} · phone",
+                description,
+                $"media/dashboards/phone-light-{operation}.webm",
+                $"media/dashboards/phone-dark-{operation}.webm",
+                $"media/dashboards/phone-light-{operation}.png",
+                $"media/dashboards/phone-dark-{operation}.png",
+                Phone: true
+            ),
+        ];
 }

@@ -1,0 +1,15 @@
+<figure class="guide-video @(Phone ? "guide-video--phone" : null)">
+    <video src="@LightSource" data-theme-media
+           data-theme-light-source="@LightSource" data-theme-dark-source="@DarkSource"
+           controls playsinline preload="metadata" aria-label="@Title">
+        Your browser cannot play this video. Use the still image and written instructions.
+    </video>
+    <figcaption><strong>@Title.</strong> @Description Silent recording of the experimental builder in Simulation. Use the video controls to play, pause or seek, and full screen for small details.</figcaption>
+    <details class="guide-video__still">
+        <summary>View still image</summary>
+        <img src="@LightStill" data-theme-media
+             data-theme-light-source="@LightStill" data-theme-dark-source="@DarkStill"
+             alt="@($"{Title}: experimental dashboard workspace before the demonstrated steps.")"
+             loading="lazy" />
+    </details>
+</figure>

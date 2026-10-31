@@ -16,6 +16,16 @@ internal sealed record SiteMedia(
     string Caption
 );
 
+internal sealed record SiteGuideVideo(
+    string Title,
+    string Description,
+    string LightSource,
+    string DarkSource,
+    string LightStill,
+    string DarkStill,
+    bool Phone = false
+);
+
 internal sealed record SiteGuideSection
 {
     internal required string Heading { get; init; }
@@ -38,6 +48,8 @@ internal sealed record SiteGuideSection
     internal SiteMedia? MediaAfterHeading { get; init; }
 
     internal SiteMedia? MediaAfterContent { get; init; }
+
+    internal IReadOnlyList<SiteGuideVideo> Videos { get; init; } = [];
 
     internal IReadOnlyList<string> Paragraphs { get; init; } = [];
 
