@@ -10,7 +10,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Channel controls",
             Title = "Build your own control dashboard",
             Summary =
-                "Arrange named dashboards of native channel controls and live values. Owners and current moderators share the saved layout; each operator keeps their own viewer selection.",
+                "The dashboard builder is experimental. Arrange named dashboards of native channel controls and live values. Owners and current moderators share the saved layout; each operator keeps their own viewer selection.",
             Sections =
             [
                 new SiteGuideSection

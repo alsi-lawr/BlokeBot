@@ -47,7 +47,7 @@ internal static partial class SiteGuideCatalog
             [
                 GuideLink("Getting started", "guide/getting-started"),
                 GuideLink("Dashboard", "dashboard"),
-                GuideLink("Custom dashboards", "dashboards"),
+                GuideLink("Custom dashboards (experimental)", "dashboards"),
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
