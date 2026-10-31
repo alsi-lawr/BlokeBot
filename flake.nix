@@ -18,7 +18,7 @@
         in
         if imageVersion != "" then imageVersion
         else if packageVersion != "" then packageVersion
-        else "0.17.0";
+        else "0.18.0-rc.1";
       imageSource = "https://github.com/alsi-lawr/BlokeBot";
       imageRevision = self.rev or self.dirtyRev or "unknown";
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;

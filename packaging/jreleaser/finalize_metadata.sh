@@ -28,8 +28,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  echo "Version must be strict X.Y.Z: $version" >&2
+if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$ ]]; then
+  echo "Version must be X.Y.Z or X.Y.Z-rc.N without leading zeroes: $version" >&2
   exit 2
 fi
 test -d "$release_directory" || { echo "Release directory does not exist: $release_directory" >&2; exit 2; }

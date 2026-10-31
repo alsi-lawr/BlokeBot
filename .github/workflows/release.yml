@@ -14,7 +14,7 @@ permissions:
 jobs:
   release:
     name: Run reusable release workflow
-    uses: alsi-lawr/package-release-workflows/.github/workflows/package-dotnet.yml@de9f20faceb0644e1a2b1997da9a8723abbe90ce
+    uses: alsi-lawr/package-release-workflows/.github/workflows/package-dotnet.yml@97b50c9f1ef0588a6bfa214848d0aa44d54b299f
     secrets:
       CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -24,12 +24,12 @@ jobs:
       dotnet_version: '10.0.301'
       dotnet_project_path: src/BlokeBot/BlokeBot.csproj
       package_publish_matrix: '[{"rid":"linux-x64","runner":"ubuntu-26.04","machine":"x86_64","executable":"artifacts/publish/linux-x64/blokebot"},{"rid":"linux-arm64","runner":"ubuntu-26.04-arm","machine":"aarch64","executable":"artifacts/publish/linux-arm64/blokebot"},{"rid":"osx-arm64","runner":"macos-latest","machine":"arm64","executable":"artifacts/publish/osx-arm64/blokebot"},{"rid":"win-x64","runner":"windows-latest","machine":"amd64","executable":"artifacts/publish/win-x64/blokebot.exe"},{"rid":"win-arm64","runner":"windows-11-arm","machine":"arm64","executable":"artifacts/publish/win-arm64/blokebot.exe"}]'
-      package_smoke_script: packaging/smoke/native_smoke.py
+      package_smoke_script: packaging/smoke/native_smoke
       package_name: blokebot
       command_name: blokebot
       release_name: BlokeBot
-      smoke_script: packaging/smoke/native_smoke.py
-      container_smoke_script: packaging/smoke/container_smoke.py
+      smoke_script: packaging/smoke/native_smoke
+      container_smoke_script: packaging/smoke/container_smoke.sh
       release_title_prefix: BlokeBot
       brew_formula_path: artifacts/package-metadata/blokebot/brew/Formula/blokebot.rb
       scoop_manifest_path: artifacts/package-metadata/blokebot/scoop/bucket/blokebot.json
