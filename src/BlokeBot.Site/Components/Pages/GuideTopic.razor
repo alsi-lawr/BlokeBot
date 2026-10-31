@@ -182,6 +182,14 @@
                     <aside class="doc-note"><p>@section.Note</p></aside>
                 }
 
+                @foreach (var video in section.Videos)
+                {
+                    <GuideVideo Title="@video.Title" Description="@video.Description"
+                                LightSource="@video.LightSource" DarkSource="@video.DarkSource"
+                                LightStill="@video.LightStill" DarkStill="@video.DarkStill"
+                                Phone="@video.Phone" />
+                }
+
                 @if (section.MediaAfterContent is not null)
                 {
                     <div style="display: contents">

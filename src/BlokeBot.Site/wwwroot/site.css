@@ -552,6 +552,44 @@ main {
   text-align: center;
 }
 
+/* Keep native playback controls unobscured; phone recordings retain readable width. */
+.guide-video {
+  margin: 2rem 0 2.5rem;
+}
+
+.guide-video--phone {
+  max-width: 28rem;
+  margin-inline: auto;
+}
+
+.guide-video video,
+.guide-video img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.guide-video figcaption {
+  margin-top: 0.8rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.guide-video__still {
+  margin-top: 0.75rem;
+}
+
+.guide-video__still summary {
+  cursor: pointer;
+  color: var(--link);
+}
+
+.guide-video__still img {
+  margin-top: 0.75rem;
+}
+
 .role-strip {
   padding-block: clamp(4rem, 8vw, 7rem);
   border-top: 0.0625rem solid var(--line);

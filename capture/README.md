@@ -61,6 +61,47 @@ return bindings. All twelve theme/device/mode outputs are regenerated together.
 `BLOKEBOT_AUTOMATION_AUTHORING_FIXTURE=1` seed. A manually supplied Simulation must use that
 flag too; do not point the recipe at a human preview.
 
+## Dashboard builder WebM demonstrations
+
+`dashboards.lua` records the real experimental Editor and Control in the existing isolated
+Simulation: change Position & size and Manual Run text, Save, then start/cancel a ticking
+countdown and start/end a poll. Its eight cases cover laptop (1280×900) and phone (390×900),
+both themes and both flows. The narrower laptop viewport keeps the embedded guide readable.
+These are silent demonstrations, not product correctness tests.
+
+After the Simulation build above, run from the repository root:
+
+```sh
+VISET_CHECKOUT=../Viset ./capture/capture-dashboards.sh
+```
+
+The runner requires `dotnet`, `nix`, `python3`, `google-chrome`, `ffmpeg` (animated WebP decoder
+and libvpx-vp9) and `ffprobe`. Set `BLOKEBOT_CAPTURE_BROWSER` to another existing compatible
+headless browser executable, or `VISET_CHECKOUT` to an existing Viset checkout. It does not
+install or modify those tools. Use the Viset revision recorded in the release evidence to
+reproduce that release's encoder input.
+
+Unlike the older screenshot runner, this dedicated runner **never reuses a listening service**.
+It selects and checks an ephemeral loopback port, excludes reserved human ports 5084–5088,
+and starts/stops only its own Simulation PID with a disposable StateDirectory. Every case
+resets the relevant widgets through the real UI. It needs no live Twitch account or product
+reset endpoint. Do not run another capture against that owned port.
+
+Viset records genuine animated WebP at 12 fps, with its built-in device frame. Only after
+Viset finishes does the runner convert those recordings to silent VP9 WebM (CRF 30,
+yuv420p, padding an odd edge to an even dimension if necessary); it does not repeat a still
+or invent a duration. First-frame PNG alternatives and WebM files go to
+`src/BlokeBot.Site/wwwroot/media/dashboards/`. Other guide assets are not regenerated.
+
+The runner leaves raw recordings, Simulation/Viset/encoder logs, stream probes and source,
+recipe, browser and encoder provenance under its printed `.agent-workspace` directory.
+`BLOKEBOT_CAPTURE_WORK_ROOT` can place that owned scratch under a session directory.
+Before accepting generated media, fully decode every WebM, inspect distinct operation frames
+(including countdown ticks), then play and seek the **served guide assets** at laptop/phone
+widths in both themes. Check the experimental label, readable embedded controls, static
+alternatives and unchanged image-only guides. Preserve the useful evidence, then remove only
+that owned scratch directory after the runner has stopped.
+
 ## Design evidence
 
 `viewer-portal-mockup.lua` and `viewer-portal-mockup-phone-lower.lua` photograph the
