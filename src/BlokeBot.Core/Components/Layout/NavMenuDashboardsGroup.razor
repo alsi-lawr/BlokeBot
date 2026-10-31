@@ -1,15 +1,15 @@
 <div class="nav-menu__panel nav-menu__group rounded-xl p-1" data-nav-section="dashboards" data-open="@Group.IsOpen.ToString().ToLowerInvariant()">
-    <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition" type="button" aria-label="Dashboards" aria-describedby='@Routes.RouteHelpReference("dashboards-group")' aria-controls="@Group.BodyId" aria-expanded="@Group.IsOpen.ToString().ToLowerInvariant()" aria-current='@(_current ? "page" : null)' data-current="@_current.ToString().ToLowerInvariant()" @onclick="Group.ToggleAsync" @onkeydown="Group.CloseOnEscape">
+    <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition" type="button" aria-label="Dashboards (experimental)" aria-describedby='@Routes.RouteHelpReference("dashboards-group")' aria-controls="@Group.BodyId" aria-expanded="@Group.IsOpen.ToString().ToLowerInvariant()" aria-current='@(_current ? "page" : null)' data-current="@_current.ToString().ToLowerInvariant()" @onclick="Group.ToggleAsync" @onkeydown="Group.CloseOnEscape">
         <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true"><EditorIcon Name="grid" /></span>
-        <span class="nav-menu__label min-w-0 flex-1">Dashboards</span>
+        <span class="nav-menu__label min-w-0 flex-1">Dashboards (experimental)</span>
         <span class="nav-menu__badge" aria-label="2 destinations">2</span>
         <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
-    @Routes.RouteHelp("dashboards-group", "Dashboards")
+    @Routes.RouteHelp("dashboards-group", "Dashboards (experimental)")
     <div id="@Group.BodyId" class="nav-menu__section-body grid gap-1 border-t border-slate-100" hidden="@(!Group.IsOpen)">
-        <p class="nav-menu__flyout-title">Dashboards</p>
-        <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition" ActiveClass="nav-menu__item-active" href="dashboards/control" aria-label="Dashboard controls" aria-current='@Routes.CurrentRoute("dashboards/control")' @onclick="Routes.NotifyNavigatedAsync">Control</NavLink>
-        <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition" ActiveClass="nav-menu__item-active" href="dashboards/editor" aria-label="Dashboard editor" aria-current='@Routes.CurrentRoute("dashboards/editor")' @onclick="Routes.NotifyNavigatedAsync">Editor</NavLink>
+        <p class="nav-menu__flyout-title">Dashboards (experimental)</p>
+        <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition" ActiveClass="nav-menu__item-active" href="dashboards/control" aria-label="Experimental dashboard controls" aria-current='@Routes.CurrentRoute("dashboards/control")' @onclick="Routes.NotifyNavigatedAsync">Control</NavLink>
+        <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition" ActiveClass="nav-menu__item-active" href="dashboards/editor" aria-label="Experimental dashboard editor" aria-current='@Routes.CurrentRoute("dashboards/editor")' @onclick="Routes.NotifyNavigatedAsync">Editor</NavLink>
     </div>
 </div>
 

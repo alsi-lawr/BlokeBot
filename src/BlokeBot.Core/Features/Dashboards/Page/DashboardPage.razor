@@ -10,9 +10,9 @@
 @inject NavigationManager _navigation
 @inject IJSRuntime _js
 
-<PageTitle>BlokeBot | Dashboards</PageTitle>
+<PageTitle>BlokeBot | Dashboards (experimental)</PageTitle>
 <NavigationLock ConfirmExternalNavigation="@_dirty" OnBeforeInternalNavigation="BeforeNavigationAsync" />
-<BlokeBot.Core.Components.Layout.DashboardPage Kicker="Channel tools" Title="@(_editing ? "Dashboard editor" : "Dashboard controls")" Width="DashboardPageWidth.Wide">
+<BlokeBot.Core.Components.Layout.DashboardPage Kicker="Experimental dashboards" Title="@(_editing ? "Dashboard editor" : "Dashboard controls")" Width="DashboardPageWidth.Wide">
     @if (_loading) {
         <PageState Kind="PageStateKind.Loading" Title="Loading dashboards" />
     }
